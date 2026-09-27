@@ -36,6 +36,13 @@ services:
       MDARIX_OUTBOX_PUBLISHER: ${MDARIX_OUTBOX_PUBLISHER:-noop}
       MDARIX_OUTBOX_ALERT_WEBHOOK: ${MDARIX_OUTBOX_ALERT_WEBHOOK:-}
       MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS: ${MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS:-5}
+      MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,time; p='/tmp/mdarix-outbox-heartbeat.json'; d=json.load(open(p)); assert time.time()-__import__('datetime').datetime.fromisoformat(d['updated_at']).timestamp() < 30"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       postgres: {condition: service_healthy}
 

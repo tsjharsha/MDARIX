@@ -5,7 +5,13 @@ export const AUTH_ENDPOINTS = { session: "/api/v1/auth/session", signin: "/api/v
 export const PLATFORM_ADMIN_VIEWS: readonly AppView[] = [
   "admin", "admin-stage2", "admin-product-configuration", "admin-subscriptions", "admin-mapping",
   "admin-customers", "admin-create-customer", "admin-customer-360",
-  "admin-manage", "admin-audit",
+  "admin-manage", "admin-audit", "platform-customers", "platform-tenants", "platform-onboarding",
+  "platform-licenses", "platform-tenant-health", "platform-tenant-audit",
+  "admin-config-360", "admin-master-data", "admin-canonical-model", "admin-data-mapping", "admin-transformations",
+  "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies",
+  "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides",
+  "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry",
+  "admin-schema-registry", "admin-transformation-library",
 ];
 
 export const CUSTOMER_ADMIN_VIEWS: readonly AppView[] = ["customer-admin"];

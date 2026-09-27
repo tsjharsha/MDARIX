@@ -12,8 +12,14 @@ def change_diff(before: dict[str, Any] | None, after: dict[str, Any] | None) -> 
     changed = {key for key in keys if old.get(key) != new.get(key)}
     return safe_details({key: old.get(key) for key in changed}), safe_details({key: new.get(key) for key in changed})
 def safe_details(details: dict[str, Any] | None) -> dict[str, Any]:
+    """Redact sensitive keys recursively before persisting audit evidence."""
     if not details: return {}
-    return {key: value for key, value in details.items() if not any(term in key.lower() for term in SECRET_TERMS)}
+    def clean(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {str(key): clean(item) for key, item in value.items() if not any(term in str(key).lower() for term in SECRET_TERMS)}
+        if isinstance(value, list): return [clean(item) for item in value]
+        return value
+    return clean(details)
 
 def make_audit_event(*, tenant_id, actor_ref, action: str, entity_type: str, entity_id=None, correlation_id: str | None = None, details: dict[str, Any] | None = None, created_at=None, request=None, reason: str | None = None, old_values: dict[str, Any] | None = None, new_values: dict[str, Any] | None = None) -> AuditEvent:
     now = created_at or datetime.now(timezone.utc)

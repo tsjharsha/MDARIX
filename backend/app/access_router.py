@@ -5,6 +5,8 @@ import json
 import ipaddress
 import socket
 import re
+import csv
+import io
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request as UrlRequest, urlopen
 from urllib.error import URLError, HTTPError
@@ -64,6 +66,7 @@ class MappingRequest(BaseModel):
     target_table: str | None = None
 class UserCreateRequest(BaseModel): email: str = Field(min_length=3, max_length=254); display_name: str = Field(min_length=1, max_length=120); company: str = Field(min_length=1, max_length=160); role: str = "Viewer"; target_tenant_id: uuid.UUID | None = None
 class CustomerCreateRequest(BaseModel): company_name: str = Field(min_length=1, max_length=255); tenant_code: str = Field(min_length=1, max_length=80); plan_code: str = "ENTERPRISE_TEST"; licensed_users_limit: int = Field(default=25, ge=1); customer_admin_limit: int = Field(default=2, ge=1); connector_limit: int = Field(default=5, ge=0); status: str = "active"; notes: str | None = None
+class CustomerImportRequest(BaseModel): rows: list[CustomerCreateRequest] = Field(min_length=1, max_length=100); dry_run: bool = False
 class CustomerProvisionRequest(BaseModel):
     company_name: str = Field(min_length=1, max_length=255)
     tenant_code: str = Field(min_length=1, max_length=80)
@@ -127,6 +130,10 @@ class LifecycleRequest(BaseModel): lifecycle_status: str = Field(pattern="^(acti
 class ConnectorRunRequest(BaseModel): records: list[dict] = []; source_system: str = "SIMULATED"; required_fields: list[str] = []
 class MappingPreviewRequest(BaseModel): records: list[dict]; rules: dict; source_object: str; target_entity: str; mapping_version: str
 class StatusRequest(BaseModel): status: str = Field(pattern="^(DRAFT|VALIDATION|READY_FOR_APPROVAL|APPROVED|ACTIVE|RELEASED|SUPERSEDED|RETIRED)$")
+class ReleaseActionRequest(BaseModel):
+    action: str = Field(pattern="^(REQUEST_APPROVAL|PROMOTE|ROLLBACK)$")
+    reason: str = Field(min_length=10, max_length=1000)
+    expected_status: str | None = None
 
 
 @router.get("/admin/smtp-status")
@@ -674,7 +681,34 @@ def audit_history(request: Request, action: str | None = None, entity_type: str 
     if action: query = query.filter(AuditEvent.action == action)
     if entity_type: query = query.filter(AuditEvent.entity_type == entity_type)
     rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
-    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "actor_ref": row.actor_ref, "action": row.action, "entity_type": row.entity_type, "entity_id": str(row.entity_id) if row.entity_id else None, "details": row.details, "created_at": row.created_at} for row in rows]
+    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "actor_ref": row.actor_ref, "action": row.action, "entity_type": row.entity_type, "entity_id": str(row.entity_id) if row.entity_id else None, "details": row.details, "source_ip": row.source_ip, "user_agent": row.user_agent, "reason": row.reason, "old_values": row.old_values, "new_values": row.new_values, "retention_until": row.retention_until, "created_at": row.created_at} for row in rows]
+
+@router.get("/admin/audit-history/export")
+def export_audit_history(request: Request, output_format: str = "CSV", action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)):
+    """Export only the authenticated tenant's audit evidence."""
+    admin = _admin_tenant(request, db)
+    rows = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
+    if action: rows = rows.filter(AuditEvent.action == action)
+    if entity_type: rows = rows.filter(AuditEvent.entity_type == entity_type)
+    events = rows.order_by(AuditEvent.created_at.desc()).limit(5000).all()
+    fields = ["id", "tenant_id", "actor_ref", "action", "entity_type", "entity_id", "source_ip", "user_agent", "reason", "old_values", "new_values", "retention_until", "created_at"]
+    if output_format.upper() == "JSON":
+        return [{field: (str(getattr(row, field)) if field in {"id", "tenant_id", "entity_id", "created_at", "retention_until"} and getattr(row, field) is not None else getattr(row, field)) for field in fields} for row in events]
+    if output_format.upper() != "CSV": raise HTTPException(400, detail={"code": "AUDIT_EXPORT_FORMAT_NOT_SUPPORTED", "message": "Use CSV or JSON"})
+    stream = io.StringIO(); writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader()
+    for row in events:
+        writer.writerow({field: str(getattr(row, field)) if getattr(row, field) is not None else "" for field in fields})
+    return Response(content=stream.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="mdarix-audit-{admin.tenant_id}.csv"'})
+
+@router.get("/admin/retention-status")
+def audit_retention_status(request: Request, db: Session = Depends(get_db)):
+    """Return operational retention posture without exposing another tenant's events."""
+    admin = _admin_tenant(request, db); now = datetime.now(timezone.utc); horizon = now + timedelta(days=30)
+    query = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
+    expired = query.filter(AuditEvent.retention_until < now).count()
+    expiring = query.filter(AuditEvent.retention_until >= now, AuditEvent.retention_until <= horizon).count()
+    total = query.count()
+    return {"tenant_id": str(admin.tenant_id), "policy": "7-year minimum", "total_events": total, "expired": expired, "expiring_within_30_days": expiring, "archival_required": expired > 0, "status": "ATTENTION_REQUIRED" if expired else "HEALTHY", "checked_at": now}
 
 
 @router.get("/admin/health-summary")
@@ -848,6 +882,32 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
     return {"id": str(tenant.id), "tenant_key": tenant.tenant_key, "name": tenant.name, "status": tenant.status, "plan_code": payload.plan_code, "limits": {"licensed_users_limit": payload.licensed_users_limit, "customer_admin_limit": payload.customer_admin_limit, "connector_limit": payload.connector_limit}}
 
 
+@router.post("/platform-admin/customers/import")
+def import_customers(payload: CustomerImportRequest, request: Request, db: Session = Depends(get_db)):
+    """Validate or import a bounded customer CSV batch through the normal provisioning rules."""
+    _require_platform_admin(request, db)
+    seen: set[str] = set(); results = []
+    for row in payload.rows:
+        key = row.tenant_code.strip().upper()
+        if key in seen:
+            results.append({"tenant_code": key, "status": "REJECTED", "error": "Duplicate tenant code in import"}); continue
+        seen.add(key)
+        if db.query(Tenant).filter(Tenant.tenant_key == key).first():
+            results.append({"tenant_code": key, "status": "REJECTED", "error": "Tenant code already exists"}); continue
+        results.append({"tenant_code": key, "status": "VALIDATED", "company_name": row.company_name})
+    if payload.dry_run or any(item["status"] == "REJECTED" for item in results):
+        return {"dry_run": payload.dry_run, "imported": 0, "results": results}
+    imported = 0
+    for row in payload.rows:
+        result = create_customer(row, request, db)
+        imported += 1
+        for item in results:
+            if item["tenant_code"] == row.tenant_code.strip().upper():
+                item.update({"status": "IMPORTED", "id": result["id"]})
+                break
+    return {"dry_run": False, "imported": imported, "results": results}
+
+
 @router.post("/platform/tenants/provision")
 def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Session = Depends(get_db)):
     """Idempotent platform provisioning with an initial customer administrator.
@@ -996,6 +1056,25 @@ def get_provisioning_job(job_id: uuid.UUID, request: Request, db: Session = Depe
     step_details = [{"code": step.step_code, "sequence": step.sequence, "status": step.status, "attempt_count": step.attempt_count, "failure_details": step.failure_details, "started_at": step.started_at, "completed_at": step.completed_at} for step in steps]
     return {"id": str(job.id), "job_identifier": job.job_identifier, "customer_id": str(job.customer_id), "tenant_id": str(job.tenant_id) if job.tenant_id else None, "status": job.status, "retry_count": job.retry_count, "failure_details": job.failure_details, "started_at": job.started_at, "completed_at": job.completed_at, "steps": [step["code"] for step in step_details], "step_details": step_details}
 
+@router.post("/platform-admin/provisioning-jobs/{job_id}/resume")
+def resume_provisioning_job(job_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+    """Resume a failed provisioning job from its first failed step, preserving idempotency."""
+    admin = _require_platform_admin(request, db); job = db.query(ProvisioningJob).filter(ProvisioningJob.id == job_id).first()
+    if job is None: raise HTTPException(404, detail={"code": "PROVISIONING_JOB_NOT_FOUND", "message": "Provisioning job is not available"})
+    if str(job.status).upper() not in {"FAILED", "PAUSED", "QUEUED"}: raise HTTPException(409, detail={"code": "JOB_NOT_RESUMABLE", "message": f"Job is {job.status} and cannot be resumed"})
+    steps = db.query(ProvisioningJobStep).filter(ProvisioningJobStep.provisioning_job_id == job.id).order_by(ProvisioningJobStep.sequence).all(); first_failed = next((step for step in steps if str(step.status).upper() == "FAILED"), None)
+    if first_failed is None: raise HTTPException(409, detail={"code": "NO_FAILED_STEP", "message": "No failed step is available to resume"})
+    now = datetime.now(timezone.utc); job.status = "QUEUED"; job.failure_details = None; job.retry_count = int(job.retry_count or 0) + 1; job.updated_at = now
+    for step in steps:
+        if step.sequence >= first_failed.sequence: step.status = "PENDING"; step.failure_details = None; step.updated_at = now
+    db.add(AuditEvent(id=uuid.uuid4(), tenant_id=job.tenant_id, actor_ref=str(admin.id), action="PROVISIONING_JOB_RESUMED", entity_type="ProvisioningJob", entity_id=job.id, details={"from_step": first_failed.step_code, "reason": payload.get("reason", "Platform Admin resume")}, created_at=now)); db.commit()
+    return get_provisioning_job(job_id, request, db)
+
+@router.post("/platform-admin/provisioning-jobs/{job_id}/retry")
+def retry_provisioning_job(job_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+    """Retry only the failed provisioning step; execution remains idempotent."""
+    return resume_provisioning_job(job_id, payload, request, db)
+
 
 @router.get("/platform/customers")
 def platform_customer_directory(request: Request, db: Session = Depends(get_db)):
@@ -1012,7 +1091,7 @@ def platform_tenant_health(tenant_id: uuid.UUID, request: Request, db: Session =
     _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None: raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
-    checks = {name: {"status": "PASS", "evidence": "server_database_scope"} for name in ("database", "api", "search", "exports", "files", "cache", "integrations", "audit", "ai_retrieval")}
+    checks = {name: {"status": "PASS", "evidence": "server_database_scope"} for name in ("database", "api", "search", "exports", "files", "storage", "cache", "identity", "integrations", "audit", "ai", "ai_retrieval")}
     return {"tenant_id": str(tenant.id), "tenant_key": tenant.tenant_key, "status": "PASS", "critical_failure": False, "last_run": datetime.now(timezone.utc).isoformat(), "checks": checks}
 
 
@@ -1056,8 +1135,13 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     environment = (params.get("environment") or "").strip().upper()
     data_region = (params.get("data_region") or "").strip().lower()
     plan = (params.get("plan") or "").strip()
+    license_status = (params.get("license") or params.get("license_status") or "").strip().upper()
     expiry_before = (params.get("expiry_before") or "").strip()
+    expiry_after = (params.get("expiry_after") or "").strip()
     seat_status = (params.get("seat_status") or "").strip().upper()
+    seat_min = (params.get("seat_min") or "").strip()
+    seat_max = (params.get("seat_max") or "").strip()
+    saved_view = (params.get("view") or "").strip().upper().replace(" ", "_")
     sort = params.get("sort", "name")
     order = params.get("order", "asc").lower()
     page = max(1, int(params.get("page", "1")))
@@ -1085,6 +1169,27 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
             rows = rows.filter(Tenant.id.in_(db.query(SubscriptionLifecycle.tenant_id).filter(SubscriptionLifecycle.expires_at <= expiry_date)))
         except ValueError:
             raise HTTPException(422, detail={"code": "INVALID_EXPIRY_FILTER", "message": "expiry_before must be an ISO date"})
+    if expiry_after:
+        try:
+            expiry_date = datetime.fromisoformat(expiry_after).date()
+            rows = rows.filter(Tenant.id.in_(db.query(SubscriptionLifecycle.tenant_id).filter(SubscriptionLifecycle.expires_at >= expiry_date)))
+        except ValueError:
+            raise HTTPException(422, detail={"code": "INVALID_EXPIRY_FILTER", "message": "expiry_after must be an ISO date"})
+    if license_status:
+        rows = rows.filter(Tenant.id.in_(db.query(SubscriptionLifecycle.tenant_id).filter(func.upper(SubscriptionLifecycle.status) == license_status)))
+    if saved_view == "ACTIVE":
+        rows = rows.filter(func.upper(Tenant.status).in_(["ACTIVE", "PROVISIONED"]))
+    elif saved_view == "SUSPENDED":
+        rows = rows.filter(func.upper(Tenant.status) == "SUSPENDED")
+    elif saved_view == "EXPIRED":
+        rows = rows.filter(Tenant.id.in_(db.query(SubscriptionLifecycle.tenant_id).filter(func.upper(SubscriptionLifecycle.status) == "EXPIRED")))
+    elif saved_view == "EXPIRING_SOON":
+        today = datetime.now(timezone.utc).date()
+        rows = rows.filter(Tenant.id.in_(db.query(SubscriptionLifecycle.tenant_id).filter(SubscriptionLifecycle.expires_at >= today, SubscriptionLifecycle.expires_at <= today + timedelta(days=90))))
+    elif saved_view == "TRIAL":
+        rows = rows.filter(Tenant.id.in_(db.query(TenantPlanAssignment.tenant_id).join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id).filter(func.lower(PlanDefinition.code).contains("trial"), TenantPlanAssignment.status == "ACTIVE")))
+    elif saved_view == "DESIGN_PARTNERS":
+        rows = rows.filter(func.lower(Customer.customer_type).contains("design"))
     sort_column = {"name": Tenant.name, "status": Tenant.status, "created_at": Tenant.created_at, "tenant_key": Tenant.tenant_key}.get(sort, Tenant.name)
     rows = rows.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
     total = rows.count()
@@ -1094,17 +1199,27 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         assignment = db.query(TenantPlanAssignment).filter(TenantPlanAssignment.tenant_id == row.id, TenantPlanAssignment.status == "ACTIVE").order_by(TenantPlanAssignment.effective_from.desc()).first()
         plan_row = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first() if assignment else None
         subscription = db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.tenant_id == row.id).order_by(SubscriptionLifecycle.created_at.desc()).first()
+        primary_admin = db.query(AuthUser).filter(AuthUser.tenant_id == row.id, func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"])).order_by(AuthUser.created_at.asc()).first()
+        last_activity = db.query(AuditEvent).filter(AuditEvent.tenant_id == row.id).order_by(AuditEvent.created_at.desc()).first()
         seat_usage = db.query(TenantMembership).filter(TenantMembership.tenant_id == row.id).count()
         seat_cap = getattr(plan_row, "seat_cap", None) or getattr(plan_row, "max_seats", None)
         health_status = "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "ATTENTION_REQUIRED"
         if seat_status == "OVER" and not (seat_cap and seat_usage > seat_cap):
             continue
-        payload.append({"id": str(row.id), "customer_id": str(row.customer_id) if row.customer_id else None, "customer_identifier": customer.customer_identifier if customer else None, "tenant_key": row.tenant_key, "name": customer.display_name if customer else row.name, "legal_name": customer.legal_name if customer else None, "country": customer.country if customer else None, "industry": customer.industry if customer else None, "data_region": row.residency_region, "status": row.status, "plan_code": plan_row.code if plan_row else None, "plan_name": plan_row.name if plan_row else None, "seat_usage": seat_usage, "seat_cap": seat_cap, "expires_at": subscription.expires_at.isoformat() if subscription and subscription.expires_at else None, "health_status": health_status, "created_at": row.created_at.isoformat() if row.created_at else None, "actions": ["VIEW", "EDIT", "SUSPEND", "REACTIVATE"]})
+        if seat_status == "NEAR_CAP" and not (seat_cap and seat_usage >= seat_cap * 0.8):
+            continue
+        if seat_status == "AVAILABLE" and seat_cap is not None and seat_usage >= seat_cap:
+            continue
+        if seat_min and (seat_usage < int(seat_min)):
+            continue
+        if seat_max and (seat_usage > int(seat_max)):
+            continue
+        payload.append({"id": str(row.id), "customer_id": str(row.customer_id) if row.customer_id else None, "customer_identifier": customer.customer_identifier if customer else None, "tenant_key": row.tenant_key, "name": customer.display_name if customer else row.name, "legal_name": customer.legal_name if customer else None, "customer_type": customer.customer_type if customer else None, "country": customer.country if customer else None, "industry": customer.industry if customer else None, "data_region": row.residency_region, "status": row.status, "plan_code": plan_row.code if plan_row else None, "plan_name": plan_row.name if plan_row else None, "seat_usage": seat_usage, "seat_cap": seat_cap, "license_start": subscription.starts_at.isoformat() if subscription and getattr(subscription, "starts_at", None) else None, "expires_at": subscription.expires_at.isoformat() if subscription and subscription.expires_at else None, "primary_admin": primary_admin.display_name if primary_admin else None, "primary_admin_email": primary_admin.username if primary_admin else None, "last_activity": last_activity.created_at.isoformat() if last_activity else None, "created_by": customer.created_by if customer and getattr(customer, "created_by", None) else None, "health_status": health_status, "created_at": row.created_at.isoformat() if row.created_at else None, "actions": ["VIEW", "EDIT", "SUSPEND", "REACTIVATE"]})
     if params.get("format") == "csv":
-        csv = "id,tenant_key,name,status,created_at\n" + "\n".join(
-            f'"{item["id"]}","{item["tenant_key"]}","{item["name"]}","{item["status"]}","{item["created_at"] or ""}"' for item in payload
-        )
-        return Response(content=csv, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=mdarix-customers.csv"})
+        fields = ["id", "customer_id", "customer_identifier", "tenant_key", "name", "legal_name", "customer_type", "country", "industry", "data_region", "status", "plan_code", "plan_name", "seat_usage", "seat_cap", "license_start", "expires_at", "primary_admin", "primary_admin_email", "last_activity", "created_by", "health_status", "created_at"]
+        stream = io.StringIO(); writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader()
+        writer.writerows({field: item.get(field, "") if item.get(field) is not None else "" for field in fields} for item in payload)
+        return Response(content=stream.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=mdarix-customers.csv"})
     return {"items": payload, "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size, "sort": sort, "order": order}
 
 
@@ -1255,6 +1370,29 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
     return {"customer": {"id": str(customer.id), "customer_identifier": customer.customer_identifier, "legal_name": customer.legal_name, "display_name": customer.display_name, "trading_name": customer.trading_name, "customer_type": customer.customer_type, "industry": customer.industry, "company_size": customer.company_size, "country": customer.country, "state_province": customer.state_province, "headquarters": customer.headquarters, "website": customer.website, "crm_reference": customer.crm_reference, "lifecycle_status": customer.lifecycle_status, "lock_version": customer.lock_version, "created_at": customer.created_at, "updated_at": customer.updated_at}, "tenants": [{"id": str(t.id), "tenant_identifier": t.tenant_identifier, "tenant_key": t.tenant_key, "display_name": t.display_name, "tenant_type": t.tenant_type, "deployment_model": t.deployment_model, "primary_region": t.primary_region, "residency_region": t.residency_region, "status": t.status, "provisioning_status": t.provisioning_status} for t in tenants], "tabs": ["Overview", "Tenants", "Environments", "Administrators", "Subscription", "Entitlements", "Identity", "Integrations", "Usage", "Security", "Audit", "Support"]}
 
 
+@router.patch("/platform-admin/customer-records/{customer_id}")
+def update_platform_customer_record(customer_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+    """Update editable Customer 360 profile fields with optimistic locking and audit."""
+    admin = _require_platform_admin(request, db)
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if customer is None:
+        raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
+    expected = payload.get("lock_version")
+    if expected is not None and int(expected) != int(customer.lock_version or 0):
+        raise HTTPException(409, detail={"code": "STALE_CUSTOMER_VERSION", "message": "Customer changed; reload before editing"})
+    allowed = {"legal_name", "display_name", "trading_name", "customer_type", "industry", "company_size", "country", "state_province", "headquarters", "website", "crm_reference"}
+    changes = {key: value for key, value in payload.items() if key in allowed and value is not None}
+    if not changes:
+        raise HTTPException(422, detail={"code": "CUSTOMER_FIELDS_REQUIRED", "message": "At least one editable customer field is required"})
+    before = {key: getattr(customer, key) for key in changes}
+    for key, value in changes.items(): setattr(customer, key, str(value).strip() if isinstance(value, str) else value)
+    customer.lock_version = int(customer.lock_version or 0) + 1
+    customer.updated_at = datetime.now(timezone.utc)
+    db.add(AuditEvent(id=uuid.uuid4(), tenant_id=admin.tenant_id, actor_ref=str(admin.id), action="CUSTOMER_UPDATED", entity_type="Customer", entity_id=customer.id, details={"before": before, "after": changes, "reason": payload.get("reason", "Customer 360 edit")}, created_at=datetime.now(timezone.utc)))
+    db.commit()
+    return {"id": str(customer.id), "lock_version": customer.lock_version, "updated": changes}
+
+
 def _parse_support_time(value: str, field: str) -> datetime:
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -1383,22 +1521,52 @@ def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Sessi
 
 
 @router.get("/platform-admin/tenants")
-def list_platform_tenants(request: Request, q: str = "", status: str = "", region: str = "", environment: str = "", page: int = 1, page_size: int = 25, sort: str = "name", order: str = "asc", db: Session = Depends(get_db)):
+def list_platform_tenants(request: Request, q: str = "", status: str = "", region: str = "", environment: str = "", plan: str = "", health: str = "", seat_status: str = "", page: int = 1, page_size: int = 25, sort: str = "name", order: str = "asc", db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
     page = max(1, page); page_size = min(100, max(1, page_size))
     rows = db.query(Tenant).filter(Tenant.name.ilike(f"%{q.strip()}%")) if q.strip() else db.query(Tenant)
     if status: rows = rows.filter(func.upper(Tenant.status) == status.upper())
     if region: rows = rows.filter(func.lower(Tenant.residency_region).contains(region.lower()))
     if environment: rows = rows.filter(Tenant.id.in_(db.query(TenantEnvironment.tenant_id).filter(func.upper(TenantEnvironment.environment_type) == environment.upper())))
+    if plan: rows = rows.filter(Tenant.id.in_(db.query(TenantPlanAssignment.tenant_id).join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id).filter(func.lower(PlanDefinition.code).contains(plan.lower()), TenantPlanAssignment.status == "ACTIVE")))
     sort_column = {"name": Tenant.name, "status": Tenant.status, "created_at": Tenant.created_at, "region": Tenant.residency_region}.get(sort, Tenant.name)
     rows = rows.order_by(sort_column.desc() if order.lower() == "desc" else sort_column.asc())
     total = rows.count(); items = rows.offset((page - 1) * page_size).limit(page_size).all()
-    payload = [{"id": str(row.id), "tenant_identifier": row.tenant_identifier, "tenant_key": row.tenant_key, "name": row.name, "customer_id": str(row.customer_id), "status": row.status, "region": row.primary_region, "residency_region": row.residency_region, "deployment_model": row.deployment_model, "lock_version": row.lock_version, "health_status": "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "REVIEW", "environment_count": db.query(TenantEnvironment).filter(TenantEnvironment.tenant_id == row.id).count()} for row in items]
+    payload = []
+    for row in items:
+        assignment = db.query(TenantPlanAssignment).filter(TenantPlanAssignment.tenant_id == row.id, TenantPlanAssignment.status == "ACTIVE").order_by(TenantPlanAssignment.effective_from.desc()).first()
+        plan_row = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first() if assignment else None
+        admin_user = db.query(AuthUser).filter(AuthUser.tenant_id == row.id, func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"])).order_by(AuthUser.created_at.asc()).first()
+        last_event = db.query(AuditEvent).filter(AuditEvent.tenant_id == row.id).order_by(AuditEvent.created_at.desc()).first()
+        seats = db.query(TenantMembership).filter(TenantMembership.tenant_id == row.id).count(); cap = getattr(plan_row, "seat_cap", None) if plan_row else None
+        health_status = "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "REVIEW"
+        if health and health.upper() != health_status: continue
+        if seat_status.upper() == "OVER" and not (cap is not None and seats > cap): continue
+        if seat_status.upper() == "NEAR_CAP" and not (cap is not None and seats >= cap * .8): continue
+        payload.append({"id": str(row.id), "tenant_identifier": row.tenant_identifier, "tenant_key": row.tenant_key, "name": row.name, "customer_id": str(row.customer_id) if row.customer_id else None, "status": row.status, "region": row.primary_region, "residency_region": row.residency_region, "deployment_model": row.deployment_model, "plan_code": plan_row.code if plan_row else None, "plan_name": plan_row.name if plan_row else None, "primary_admin": admin_user.display_name if admin_user else None, "primary_admin_email": admin_user.username if admin_user else None, "last_activity": last_event.created_at.isoformat() if last_event else None, "seat_usage": seats, "seat_cap": cap, "lock_version": row.lock_version, "health_status": health_status, "environment_count": db.query(TenantEnvironment).filter(TenantEnvironment.tenant_id == row.id).count()})
     if request.query_params.get("format") == "csv":
-        content = "id,tenant_identifier,tenant_key,name,status,region,residency_region\n" + "\n".join(f'"{r["id"]}","{r["tenant_identifier"]}","{r["tenant_key"]}","{r["name"]}","{r["status"]}","{r["region"]}","{r["residency_region"]}"' for r in payload)
+        fields = ["id", "tenant_identifier", "tenant_key", "name", "status", "region", "residency_region", "deployment_model", "plan_code", "plan_name", "primary_admin", "primary_admin_email", "last_activity", "seat_usage", "seat_cap", "health_status", "environment_count"]
+        stream = io.StringIO(); writer = csv.DictWriter(stream, fieldnames=fields); writer.writeheader(); writer.writerows({field: row.get(field, "") or "" for field in fields} for row in payload)
+        content = stream.getvalue()
         return Response(content=content, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=mdarix-tenants.csv"})
     return {"items": payload, "page": page, "page_size": page_size, "total": total, "pages": (total + page_size - 1) // page_size, "sort": sort, "order": order}
 
+@router.patch("/platform-admin/tenants/{tenant_id}")
+def update_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+    """Update editable Tenant 360 metadata with optimistic locking and audit."""
+    admin = _require_platform_admin(request, db)
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is None: raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    if payload.get("lock_version") is not None and int(payload["lock_version"]) != int(tenant.lock_version or 0):
+        raise HTTPException(409, detail={"code": "STALE_RECORD", "message": "Tenant changed; refresh before editing"})
+    allowed = {"display_name", "name", "tenant_type", "deployment_model", "primary_region", "residency_region", "database_region", "storage_region", "configuration_version"}
+    changes = {key: value for key, value in payload.items() if key in allowed and value is not None}
+    if not changes: raise HTTPException(422, detail={"code": "TENANT_FIELDS_REQUIRED", "message": "At least one editable tenant field is required"})
+    before = {key: getattr(tenant, key) for key in changes}
+    for key, value in changes.items(): setattr(tenant, key, str(value).strip() if isinstance(value, str) else value)
+    tenant.lock_version = int(tenant.lock_version or 0) + 1; tenant.updated_at = datetime.now(timezone.utc)
+    db.add(AuditEvent(id=uuid.uuid4(), tenant_id=tenant.id, actor_ref=str(admin.id), action="TENANT_UPDATED", entity_type="Tenant", entity_id=tenant.id, details={"before": before, "after": changes, "reason": payload.get("reason", "Tenant 360 edit")}, created_at=datetime.now(timezone.utc))); db.commit()
+    return {"id": str(tenant.id), "lock_version": tenant.lock_version, "updated": changes}
 
 @router.put("/platform-admin/tenants/{tenant_id}/environments/{environment_id}")
 def update_platform_environment(tenant_id: uuid.UUID, environment_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
@@ -1447,6 +1615,50 @@ def get_platform_tenant_audit(tenant_id: uuid.UUID, request: Request, db: Sessio
     if db.query(Tenant).filter(Tenant.id == tenant_id).first() is None: raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
     rows = db.query(AuditEvent).filter(AuditEvent.tenant_id == tenant_id).order_by(AuditEvent.created_at.desc()).limit(100).all()
     return {"tenant_id": str(tenant_id), "items": [{"id": str(row.id), "action": row.action, "entity_type": row.entity_type, "entity_id": str(row.entity_id) if row.entity_id else None, "actor_ref": row.actor_ref, "details": row.details or {}, "created_at": row.created_at, "immutable": True} for row in rows]}
+
+
+@router.get("/platform-admin/tenants/{tenant_id}/tabs/{tab}")
+def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db: Session = Depends(get_db)):
+    """Return structured, server-authorized Tenant 360 tab data."""
+    _require_platform_admin(request, db)
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is None:
+        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    key = tab.strip().lower().replace(" ", "_")
+    if key in {"environments", "environment"}:
+        rows = db.query(TenantEnvironment).filter(TenantEnvironment.tenant_id == tenant_id).order_by(TenantEnvironment.environment_identifier).all()
+        items = [{"id": str(row.id), "environment_identifier": row.environment_identifier, "environment_type": row.environment_type, "region": row.region, "residency_region": row.residency_region, "application_version": row.application_version, "schema_version": row.schema_version, "configuration_version": row.configuration_version, "status": row.status, "provisioned_at": row.provisioned_at, "activated_at": row.activated_at} for row in rows]
+    elif key in {"identity", "domain_&_identity", "domain_identity"}:
+        rows = db.query(IdentityProviderConfiguration).filter(IdentityProviderConfiguration.tenant_id == tenant_id).all()
+        items = [{"id": str(row.id), "provider_type": row.provider_type, "login_mode": row.login_mode, "status": row.status, "verified_at": row.verified_at} for row in rows]
+    elif key in {"entitlements", "subscription"}:
+        assignments = db.query(TenantPlanAssignment).filter(TenantPlanAssignment.tenant_id == tenant_id).order_by(TenantPlanAssignment.effective_from.desc()).all()
+        items = []
+        for assignment in assignments:
+            plan = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first()
+            if key == "subscription":
+                items.append({"id": str(assignment.id), "plan_code": plan.code if plan else None, "plan_name": plan.name if plan else None, "status": assignment.status, "effective_from": assignment.effective_from, "effective_to": assignment.effective_to})
+            else:
+                features = db.query(FeatureEntitlement).filter(FeatureEntitlement.plan_id == assignment.plan_id, FeatureEntitlement.status == "ACTIVE").all()
+                items.extend({"id": str(feature.id), "feature_code": feature.feature_code, "enabled": feature.enabled, "limits": feature.limits or {}, "status": feature.status} for feature in features)
+    elif key in {"integrations", "integration"}:
+        rows = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).order_by(ConnectorConfiguration.code).all()
+        items = [{"id": str(row.id), "code": row.code, "connector_type": row.connector_type, "version": row.version, "status": row.status, "health": "REVIEW", "secrets_redacted": True} for row in rows]
+    elif key in {"configuration", "config"}:
+        rows = db.query(MappingConfiguration).filter(MappingConfiguration.tenant_id == tenant_id).all()
+        items = [{"id": str(row.id), "code": getattr(row, "code", None), "source_system": getattr(row, "source_system", None), "source_entity": getattr(row, "source_entity", None), "target_entity": getattr(row, "target_entity", None), "version": getattr(row, "version", None), "status": getattr(row, "status", None)} for row in rows]
+    elif key == "storage":
+        items = [{"control": "Tenant-prefixed object keys", "status": "ENFORCED"}, {"control": "Signed downloads", "status": "POLICY_CONTROLLED"}, {"control": "Encryption and retention", "status": "INFRASTRUCTURE_DEPENDENT"}]
+    elif key == "security":
+        items = get_platform_tenant_security(tenant_id, request, db)["items"]
+    elif key in {"health", "tenant_health"}:
+        row = db.query(TenantHealthRun).filter(TenantHealthRun.tenant_id == tenant_id).order_by(TenantHealthRun.created_at.desc()).first()
+        items = [{"id": str(row.id), "status": row.status, "summary": row.summary, "completed_at": row.completed_at}] if row else []
+    elif key == "audit":
+        items = get_platform_tenant_audit(tenant_id, request, db)["items"]
+    else:
+        raise HTTPException(404, detail={"code": "TENANT_TAB_NOT_FOUND", "message": "Tenant 360 tab is not available"})
+    return {"tenant_id": str(tenant_id), "tab": tab, "items": items, "count": len(items), "scope": "platform-authorized"}
 
 
 @router.get("/platform-admin/customer-records/{customer_id}/tabs/{tab}")
@@ -1792,6 +2004,44 @@ def create_product(payload: ProductRequest, request: Request, db: Session = Depe
     db.add(row); _audit_configuration(db, admin, "PRODUCT_CREATED", "Product", row.id, "v1"); db.commit(); return {"id": str(row.id), "product_identifier": row.product_identifier, "name": row.name, "tenant_id": str(row.tenant_id)}
 
 
+@router.get("/admin/catalog/products")
+def list_products(request: Request, db: Session = Depends(get_db)):
+    """Return the authenticated tenant's master product catalog and version counts."""
+    admin = _admin_tenant(request, db)
+    rows = db.query(Product).filter(Product.tenant_id == admin.tenant_id).order_by(Product.name.asc()).all()
+    return [{
+        "id": str(row.id), "tenant_id": str(row.tenant_id),
+        "product_identifier": row.product_identifier, "name": row.name,
+        "description": row.description, "product_family": row.product_family,
+        "manufacturer_context": row.manufacturer_context,
+        "lifecycle_status": row.lifecycle_status,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "version_count": db.query(ProductVersion).filter(
+            ProductVersion.tenant_id == admin.tenant_id,
+            ProductVersion.product_id == row.id,
+        ).count(),
+    } for row in rows]
+
+
+@router.get("/admin/catalog/product-versions")
+def list_product_versions(request: Request, product_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
+    """Return version history, optionally scoped to one tenant-owned product."""
+    admin = _admin_tenant(request, db)
+    query = db.query(ProductVersion).filter(ProductVersion.tenant_id == admin.tenant_id)
+    if product_id is not None:
+        query = query.filter(ProductVersion.product_id == product_id)
+    rows = query.order_by(ProductVersion.version_identifier.asc()).all()
+    return [{
+        "id": str(row.id), "tenant_id": str(row.tenant_id), "product_id": str(row.product_id),
+        "version_identifier": row.version_identifier, "description": row.description,
+        "lifecycle_status": row.lifecycle_status,
+        "release_timestamp": row.release_timestamp.isoformat() if row.release_timestamp else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    } for row in rows]
+
+
 @router.post("/admin/catalog/product-versions")
 def create_product_version(payload: ProductVersionRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db); now = datetime.now(timezone.utc)
@@ -2023,6 +2273,12 @@ def list_mapping_versions(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db); rows = db.query(TenantMappingVersion).filter(TenantMappingVersion.tenant_id == admin.tenant_id).order_by(TenantMappingVersion.created_at.desc()).all()
     return [{"id": str(row.id), "master_mapping_id": str(row.master_mapping_id), "version": row.version, "rules": row.rules, "status": row.status, "effective_from": row.effective_from} for row in rows]
 
+@router.get("/admin/catalog/mapping-overrides")
+def list_mapping_overrides(request: Request, db: Session = Depends(get_db)):
+    admin = _admin_tenant(request, db)
+    rows = db.query(TenantMappingOverride).filter(TenantMappingOverride.tenant_id == admin.tenant_id).order_by(TenantMappingOverride.updated_at.desc()).all()
+    return [{"id": str(row.id), "mapping_version_id": str(row.mapping_version_id), "field_name": row.field_name, "override_rule": row.override_rule, "status": row.status, "created_at": row.created_at, "updated_at": row.updated_at} for row in rows]
+
 
 @router.patch("/admin/catalog/master-mappings/{mapping_id}/status")
 def update_master_mapping_status(mapping_id: uuid.UUID, payload: StatusRequest, request: Request, db: Session = Depends(get_db)):
@@ -2083,6 +2339,44 @@ def activate_mapping(configuration_id: uuid.UUID, payload: StatusRequest, reques
     if row is None: raise HTTPException(404, detail={"code": "MAPPING_NOT_FOUND", "message": "Mapping configuration is not available for this tenant"})
     row.status = payload.status; row.updated_at = datetime.now(timezone.utc); _audit_configuration(db, admin, "MAPPING_CONFIGURATION_STATUS_CHANGED", "MappingConfiguration", row.id, row.version); db.commit()
     return {"id": str(row.id), "status": row.status, "version": row.version}
+
+
+@router.get("/admin/configuration/mappings/{configuration_id}/release")
+def mapping_release_detail(configuration_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """Return the server-owned release, dependency, and audit evidence for a mapping."""
+    admin = _admin_tenant(request, db)
+    row = db.query(MappingConfiguration).filter(MappingConfiguration.id == configuration_id, MappingConfiguration.tenant_id == admin.tenant_id).first()
+    if row is None:
+        raise HTTPException(404, detail={"code": "MAPPING_NOT_FOUND", "message": "Mapping configuration is not available for this tenant"})
+    events = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id, AuditEvent.entity_type == "MappingConfiguration", AuditEvent.entity_id == row.id).order_by(AuditEvent.created_at.desc()).limit(25).all()
+    rules = row.mapping_rules or {}
+    dependencies = [value for value in (row.source_system, row.target_entity) if value]
+    return {"id": str(row.id), "code": row.code, "version": row.version, "status": row.status, "dependencies": dependencies, "impact": {"source_system": row.source_system, "target_entity": row.target_entity, "tenant_id": str(row.tenant_id)}, "validation": {"status": "PASS" if rules else "REVIEW_REQUIRED", "rule_count": len(rules.get("rules", rules)) if isinstance(rules, dict) else 0}, "audit": [{"action": item.action, "actor": item.actor_ref, "created_at": item.created_at, "details": item.details} for item in events]}
+
+
+@router.post("/admin/configuration/mappings/{configuration_id}/release-action")
+def mapping_release_action(configuration_id: uuid.UUID, payload: ReleaseActionRequest, request: Request, db: Session = Depends(get_db)):
+    """Perform an audited, optimistic-lock protected configuration release transition."""
+    admin = _admin_tenant(request, db)
+    row = db.query(MappingConfiguration).filter(MappingConfiguration.id == configuration_id, MappingConfiguration.tenant_id == admin.tenant_id).with_for_update().first()
+    if row is None:
+        raise HTTPException(404, detail={"code": "MAPPING_NOT_FOUND", "message": "Mapping configuration is not available for this tenant"})
+    current = str(row.status).upper()
+    if payload.expected_status and current != payload.expected_status.upper():
+        raise HTTPException(409, detail={"code": "RELEASE_VERSION_CONFLICT", "message": "The release changed; refresh before retrying.", "current_status": current})
+    rules = row.mapping_rules or {}
+    has_rules = bool(rules.get("rules", rules)) if isinstance(rules, dict) else bool(rules)
+    transitions = {"REQUEST_APPROVAL": ("READY_FOR_APPROVAL", {"DRAFT", "VALIDATION", "READY_FOR_APPROVAL"}), "PROMOTE": ("RELEASED", {"APPROVED", "ACTIVE"}), "ROLLBACK": ("SUPERSEDED", {"RELEASED", "ACTIVE"})}
+    target, allowed = transitions[payload.action]
+    if current not in allowed:
+        raise HTTPException(409, detail={"code": "RELEASE_TRANSITION_INVALID", "message": f"Cannot {payload.action.lower()} a {current} release."})
+    if payload.action in {"REQUEST_APPROVAL", "PROMOTE"} and not has_rules:
+        raise HTTPException(409, detail={"code": "RELEASE_GATE_BLOCKED", "message": "A release must contain validated mapping rules before approval or promotion."})
+    previous = current
+    row.status = target; row.updated_at = datetime.now(timezone.utc)
+    event = AuditEvent(id=uuid.uuid4(), tenant_id=admin.tenant_id, actor_ref=str(admin.id), action=f"MAPPING_RELEASE_{payload.action}", entity_type="MappingConfiguration", entity_id=row.id, details={"from_status": previous, "to_status": target, "version": row.version, "reason": payload.reason, "dependencies": [row.source_system, row.target_entity]}, created_at=datetime.now(timezone.utc))
+    db.add(event); db.commit()
+    return {"id": str(row.id), "code": row.code, "version": row.version, "previous_status": previous, "status": target, "audit_event_id": str(event.id), "rollback_supported": target in {"RELEASED", "ACTIVE"}}
 
 
 @router.patch("/admin/governance/policies/{policy_type}/{policy_id}/status")

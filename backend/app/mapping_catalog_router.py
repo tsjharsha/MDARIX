@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.db.models.foundation import AuthUser, MappingImpactHistory
+from backend.app.db.models.foundation import AuthUser, MappingImpactHistory, AuditEvent
 from datetime import datetime, timezone
 import uuid
 
@@ -26,6 +26,12 @@ class DryRunRequest(BaseModel):
 class ValidationRequest(BaseModel):
     entity_id: str = Field(min_length=1)
     rules: list[dict] = []
+
+class ValidationDecisionRequest(BaseModel):
+    entity_id: str = Field(min_length=1, max_length=120)
+    decision: str = Field(pattern="^(REVIEW|ACCEPT_WITH_REMEDIATION|REJECT|APPROVE_FOR_RELEASE)$")
+    remediation_plan: str = Field(default="", max_length=2000)
+    validation_result: dict = {}
 
 class DiscoveryRequest(BaseModel):
     source_object_id: str = Field(min_length=3)
@@ -231,6 +237,26 @@ def validate_mapping(payload: ValidationRequest, db: Session = Depends(get_db), 
         if rule.get("override_policy") not in {None, "TENANT_ALLOWED", "PLATFORM_ONLY", "APPROVAL_REQUIRED"}: errors.append({"code": "INVALID_OVERRIDE_POLICY", "target": target})
     missing = [name for name, meta in fields.items() if meta.get("required") and name not in targets]
     return {"status": "PASS" if not errors and not missing else "BLOCKED", "errors": errors, "missing_required": missing, "checked_rules": len(payload.rules), "schema_compatible": not any(e["code"] in {"TYPE_INCOMPATIBLE", "UNKNOWN_TARGET"} for e in errors), "release_blocked": bool(errors or missing)}
+
+@router.post("/validation-decisions")
+def save_validation_decision(payload: ValidationDecisionRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    _guard(db, ctx)
+    if payload.decision == "APPROVE_FOR_RELEASE" and (payload.validation_result.get("release_blocked") or payload.validation_result.get("errors") or payload.validation_result.get("missing_required")):
+        raise HTTPException(409, detail={"code": "VALIDATION_BLOCKED", "message": "A blocked validation cannot be approved for release"})
+    now = datetime.now(timezone.utc)
+    event = AuditEvent(id=uuid.uuid4(), tenant_id=ctx.tenant_id, actor_ref=ctx.user_id, action="MAPPING_VALIDATION_DECISION_RECORDED", entity_type="CanonicalValidation", entity_id=uuid.uuid4(), details={"entity_id": payload.entity_id, "decision": payload.decision, "remediation_plan": payload.remediation_plan, "validation_result": payload.validation_result}, created_at=now)
+    db.add(event); db.commit()
+    return {"id": str(event.id), "tenant_id": str(ctx.tenant_id), "entity_id": payload.entity_id, "decision": payload.decision, "remediation_plan": payload.remediation_plan, "created_at": now.isoformat()}
+
+@router.get("/validation-decisions")
+def list_validation_decisions(entity_id: str | None = None, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    _guard(db, ctx); query = db.query(AuditEvent).filter(AuditEvent.tenant_id == ctx.tenant_id, AuditEvent.action == "MAPPING_VALIDATION_DECISION_RECORDED").order_by(AuditEvent.created_at.desc()).limit(50)
+    rows = query.all(); result = []
+    for row in rows:
+        details = row.details or {}
+        if entity_id and details.get("entity_id") != entity_id: continue
+        result.append({"id": str(row.id), "entity_id": details.get("entity_id"), "decision": details.get("decision"), "remediation_plan": details.get("remediation_plan", ""), "validation_result": details.get("validation_result", {}), "created_at": row.created_at})
+    return result
 
 @router.post("/schema-discovery")
 def schema_discovery(payload: DiscoveryRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):

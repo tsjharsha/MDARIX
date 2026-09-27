@@ -263,7 +263,7 @@ function PrivateApplication() {
   </div>;
 
   return (
-    <div className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""}`}>
+    <div className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""} ${isCustomerAdmin ? "customer-admin-shell" : "quality-shell"}`}>
       {!isPlatformAdmin && <aside className="side-nav">
         <div className="brand-block"><div className="brand">{securityContext?.current_tenant?.tenant_name ?? "MDARIX"}</div><span>Product Lifecycle Intelligence · {securityContext?.environment ?? "environment"}</span></div>
         <nav>
@@ -295,7 +295,7 @@ function PrivateApplication() {
       <main>
         {!isPlatformAdmin && <button className="logout-control" onClick={async () => { await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined); window.location.replace("/signin"); }} aria-label="Sign out of MDARIX">Logout</button>}
         {isPlatformAdmin && activeView !== "admin" && ["admin-stage2", "admin-product-configuration", "admin-subscriptions", "admin-mapping", "admin-customers", "admin-create-customer", "admin-customer-360", "admin-manage", "admin-audit"].includes(activeView) && <div className="platform-admin-return-bar"><button onClick={() => changeView("admin")}>← Platform administration</button><span>Controlled workspace</span></div>}
-        {!['customer-admin', 'admin', 'admin-stage2', 'admin-product-configuration', 'admin-subscriptions', 'admin-mapping', 'admin-customers', 'admin-create-customer', 'admin-customer-360', 'admin-manage', 'admin-audit'].includes(activeView) && <header className={`topbar ${activeView === "home" ? "home-topbar" : ""}`}>
+        {!['customer-admin', 'admin', 'admin-stage2', 'admin-product-configuration', 'admin-subscriptions', 'admin-mapping', 'admin-customers', 'admin-create-customer', 'admin-customer-360', 'admin-manage', 'admin-audit', 'admin-config-360', 'admin-master-data', 'admin-canonical-model', 'admin-data-mapping', 'admin-transformations', 'admin-validation', 'admin-baselines', 'admin-mapping-versions', 'admin-config-releases', 'admin-config-health', 'admin-config-dependencies', 'admin-reference-data', 'admin-validation-rules', 'admin-configuration-sets', 'admin-customer-baselines', 'admin-customer-overrides', 'admin-change-requests', 'admin-deployments', 'admin-import-export', 'admin-upgrade-center', 'admin-integration-registry', 'admin-api-registry', 'admin-schema-registry', 'admin-transformation-library'].includes(activeView) && <header className={`topbar ${activeView === "home" ? "home-topbar" : ""}`}>
           {activeView === "home" && contextToolbar}
           <div>
             <p className="eyebrow">{activeView === "home" ? "Intelligence workspace" : "Persistent workflow context"}</p>
@@ -303,6 +303,7 @@ function PrivateApplication() {
           </div>
           {activeView !== "home" && contextToolbar}
         </header>}
+        {activeView === "customer-admin" && <header className="role-context-header"><div><span className="eyebrow">Customer administration</span><strong>{securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"}</strong></div><div className="role-context-meta"><span>{securityContext?.display_name ?? "Authenticated user"}</span><b>{securityContext?.active_role ?? "Customer Admin"}</b></div></header>}
         {error && <div className="error">{error}</div>}
         {view && activeView === "home" && <><ApplicationHome view={view} investigations={investigations} onNavigate={changeView} /><Stage3CommandCenter /></>}
         {view && activeView === "products" && <Product360View view={view} />}
@@ -317,7 +318,7 @@ function PrivateApplication() {
         {view && activeView === "assurance" && <AssuranceView view={view} />}
         {view && activeView === "audit" && <AuditTrailView view={view} />}
         {activeView === "customer-admin" && <CustomerAdminHome securityContext={securityContext} products={products} investigations={investigations} onNavigate={changeView} />}
-        {isPlatformAdmin && activeView === "admin" && <PlatformAdminScreen securityContext={securityContext} onNavigate={changeView} />}
+        {isPlatformAdmin && ["admin", "platform-tenants", "platform-tenant-health", "admin-config-360", "admin-master-data", "admin-canonical-model", "admin-data-mapping", "admin-transformations", "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies", "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides", "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry", "admin-schema-registry", "admin-transformation-library"].includes(activeView) && <PlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialItem={({ "admin-config-360": "Configuration 360", "admin-master-data": "Master data", "admin-canonical-model": "Canonical data model", "admin-data-mapping": "Data mapping", "admin-transformations": "Transformation library", "admin-validation": "Validation & data quality", "admin-baselines": "Customer baselines & overrides", "admin-mapping-versions": "Mapping versions", "admin-config-releases": "Configuration releases", "admin-config-health": "Configuration health", "admin-config-dependencies": "Dependencies & impact", "admin-reference-data": "Reference data", "admin-validation-rules": "Validation rules", "admin-configuration-sets": "Configuration sets", "admin-customer-baselines": "Customer baselines", "admin-customer-overrides": "Customer overrides", "admin-change-requests": "Change requests", "admin-deployments": "Deployments", "admin-import-export": "Import / Export", "admin-upgrade-center": "Upgrade center", "admin-integration-registry": "Integration registry", "admin-api-registry": "API & contract registry", "admin-schema-registry": "Schema registry", "admin-transformation-library": "Transformation library" } as Record<string, string>)[activeView]} />}
         {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
         {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
         {activeView === "admin-subscriptions" && <SubscriptionAdministration />}
@@ -327,6 +328,10 @@ function PrivateApplication() {
         {activeView === "admin-customer-360" && <Customer360 />}
         {activeView === "admin-manage" && <CustomerAdminManagement />}
         {activeView === "admin-audit" && <PlatformAdministrationAudit />}
+        {isPlatformAdmin && activeView === "platform-customers" && <PlatformCustomers onNavigate={changeView} />}
+        {isPlatformAdmin && activeView === "platform-onboarding" && <CreateCustomer onCreated={() => changeView("platform-customers")} />}
+        {isPlatformAdmin && activeView === "platform-licenses" && <SubscriptionAdministration />}
+        {isPlatformAdmin && activeView === "platform-tenant-audit" && <PlatformAdministrationAudit />}
       </main>
       <ConsentBanner />
     </div>
@@ -486,9 +491,9 @@ function CustomerAdminManagement() {
 }
 
 function PlatformAdministrationAudit() {
-  const [rows, setRows] = useState<any[]>([]); const [message, setMessage] = useState("");
-  useEffect(() => { api<any[]>("/api/v1/admin/audit-history").then(setRows).catch((error) => setMessage(error.message)); }, []);
-  return <div className="content governance-view"><section className="panel"><div className="section-title"><ShieldCheck size={18}/> Recent platform administration activity</div><p>Server-recorded changes to customer administrator accounts and platform configuration.</p>{message && <p className="field-error">{message}</p>}{rows.map((row) => <div className="audit-row" key={String(row.id)}><strong>{row.action}</strong><span>{row.entity_type ?? "Configuration"}</span><small>{row.created_at ? String(row.created_at).slice(0, 19).replace("T", " ") : "Server recorded"}</small></div>)}{!rows.length && !message && <p>No platform administration activity recorded.</p>}</section></div>;
+  const [rows, setRows] = useState<any[]>([]); const [retention, setRetention] = useState<any>(null); const [message, setMessage] = useState("");
+  useEffect(() => { Promise.all([api<any[]>("/api/v1/admin/audit-history"), api<any>("/api/v1/admin/retention-status")]).then(([events, status]) => { setRows(events); setRetention(status); }).catch((error) => setMessage(error.message)); }, []);
+  return <div className="content governance-view"><section className="panel"><div className="section-title"><ShieldCheck size={18}/> Recent platform administration activity</div><p>Server-recorded changes with actor, request metadata, reason, and before/after values.</p><div className="audit-actions"><a className="secondary-link" href="/api/v1/admin/audit-history/export?output_format=CSV">Export CSV</a><a className="secondary-link" href="/api/v1/admin/audit-history/export?output_format=JSON">Export JSON</a><a className="primary-action" href="/api/v1/stage3/compliance-report?output_format=PDF">Download evidence package</a></div>{retention && <div className={`retention-banner ${retention.status === "HEALTHY" ? "healthy" : "attention"}`}><strong>{retention.policy}</strong><span>{retention.total_events} events · {retention.expired} expired · {retention.expiring_within_30_days} expiring within 30 days</span></div>}{message && <p className="field-error">{message}</p>}{rows.map((row) => <div className="audit-row" key={String(row.id)}><strong>{row.action}</strong><span>{row.entity_type ?? "Configuration"} · {row.actor_ref ?? "System"}</span><small>{row.created_at ? String(row.created_at).slice(0, 19).replace("T", " ") : "Server recorded"}{row.source_ip ? ` · ${row.source_ip}` : ""}</small></div>)}{!rows.length && !message && <p>No platform administration activity recorded.</p>}</section></div>;
 }
 
 function CustomerAdminInviteForm({ onSaved }: { onSaved: () => void }) {
