@@ -5,6 +5,7 @@ import pytest
 
 from ask_mdarix.authorized_retrieval import AuthorizedRetrievalRequest, AuthorizedRetrievalService
 from backend.app.db.models.foundation import Evidence, Investigation, Product, ProductVersion, Tenant
+from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.session import SessionLocal
 
 
@@ -13,10 +14,41 @@ def day27_db():
     db = SessionLocal()
     stamp = dt.datetime.now(dt.timezone.utc)
     tenants = []
+    customers = []
     records = {}
     try:
         for suffix in ("A", "B"):
-            tenant = Tenant(id=uuid.uuid4(), tenant_key=f"DAY27_AUTOMATED_{suffix}_{uuid.uuid4().hex[:8]}", name=f"Day 27 automated {suffix}", status="active", created_at=stamp, updated_at=stamp)
+            customer = Customer(
+                id=uuid.uuid4(),
+                customer_identifier=f"DAY27-CUSTOMER-{suffix}-{uuid.uuid4().hex[:8]}",
+                legal_name=f"Day 27 automated customer {suffix}",
+                display_name=f"Day 27 automated customer {suffix}",
+                customer_type="DESIGN_PARTNER",
+                country="US",
+                lifecycle_status="ACTIVE",
+                created_at=stamp,
+                updated_at=stamp,
+            )
+            db.add(customer); db.flush(); customers.append(customer)
+            tenant = Tenant(
+                id=uuid.uuid4(),
+                customer_id=customer.id,
+                tenant_key=f"DAY27_AUTOMATED_{suffix}_{uuid.uuid4().hex[:8]}",
+                tenant_identifier=f"DAY27-TENANT-{suffix}-{uuid.uuid4().hex[:8]}",
+                name=f"Day 27 automated {suffix}",
+                display_name=f"Day 27 automated {suffix}",
+                tenant_slug=f"day27-automated-{suffix.lower()}-{uuid.uuid4().hex[:8]}",
+                tenant_type="STANDARD",
+                deployment_model="SHARED",
+                primary_region="US",
+                residency_region="US",
+                cross_border_processing_allowed=False,
+                lock_version=1,
+                status="ACTIVE",
+                provisioning_status="PROVISIONED",
+                created_at=stamp,
+                updated_at=stamp,
+            )
             db.add(tenant); db.flush(); tenants.append(tenant)
             product = Product(id=uuid.uuid4(), tenant_id=tenant.id, product_identifier=f"TENANT_{suffix}_PRODUCT_CANARY", name=f"Synthetic product {suffix}", description=f"TENANT_{suffix}_PRODUCT_CANARY", lifecycle_status="active", product_family="DAY27", created_at=stamp, updated_at=stamp)
             db.add(product); db.flush()
@@ -36,6 +68,8 @@ def day27_db():
             db.query(ProductVersion).filter(ProductVersion.id == item["version"].id).delete(synchronize_session=False)
             db.query(Product).filter(Product.id == item["product"].id).delete(synchronize_session=False)
             db.query(Tenant).filter(Tenant.id == item["tenant"].id).delete(synchronize_session=False)
+        for customer in customers:
+            db.query(Customer).filter(Customer.id == customer.id).delete(synchronize_session=False)
         db.commit(); db.close()
 
 

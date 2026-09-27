@@ -64,6 +64,18 @@ services:
       timeout: 5s
       retries: 10
 
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8025/api/v1/info"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   trackwise-simulator-db:
     image: postgres:16
     environment: {POSTGRES_DB: trackwise, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
@@ -104,6 +116,46 @@ services:
     environment: {SIMULATOR_PROVIDER: SUPPLIER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@supplier-simulator-db:5432/supplier}
     depends_on: {supplier-simulator-db: {condition: service_healthy}}
     ports: ["8104:8099"]
+  veeva-qms-simulator-db:
+    image: postgres:16
+    environment: {POSTGRES_DB: veeva_qms, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
+    volumes: [veeva_qms_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d veeva_qms"], interval: 5s, timeout: 5s, retries: 10}
+  teamcenter-simulator-db:
+    image: postgres:16
+    environment: {POSTGRES_DB: teamcenter, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
+    volumes: [teamcenter_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d teamcenter"], interval: 5s, timeout: 5s, retries: 10}
+  oracle-erp-simulator-db:
+    image: postgres:16
+    environment: {POSTGRES_DB: oracle_erp, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
+    volumes: [oracle_erp_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d oracle_erp"], interval: 5s, timeout: 5s, retries: 10}
+  coupa-simulator-db:
+    image: postgres:16
+    environment: {POSTGRES_DB: coupa, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
+    volumes: [coupa_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d coupa"], interval: 5s, timeout: 5s, retries: 10}
+  veeva-qms-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: VEEVA_QMS, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@veeva-qms-simulator-db:5432/veeva_qms}
+    depends_on: {veeva-qms-simulator-db: {condition: service_healthy}}
+    ports: ["8105:8099"]
+  teamcenter-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: TEAMCENTER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@teamcenter-simulator-db:5432/teamcenter}
+    depends_on: {teamcenter-simulator-db: {condition: service_healthy}}
+    ports: ["8106:8099"]
+  oracle-erp-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: ORACLE_ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@oracle-erp-simulator-db:5432/oracle_erp}
+    depends_on: {oracle-erp-simulator-db: {condition: service_healthy}}
+    ports: ["8107:8099"]
+  coupa-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: COUPA, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@coupa-simulator-db:5432/coupa}
+    depends_on: {coupa-simulator-db: {condition: service_healthy}}
+    ports: ["8108:8099"]
 
 volumes:
   mdarix_postgres_data:
@@ -112,4 +164,8 @@ volumes:
   plm_data:
   erp_data:
   supplier_data:
+  veeva_qms_data:
+  teamcenter_data:
+  oracle_erp_data:
+  coupa_data:
   mdarix_object_storage:

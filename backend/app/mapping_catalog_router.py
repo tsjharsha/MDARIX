@@ -56,7 +56,7 @@ class SuggestionDecision(BaseModel):
 
 APPLICATIONS = [
     ("TRACKWISE", "TrackWise Digital", "QMS", "REST"), ("VEEVA_QMS", "Veeva Vault QMS", "QMS", "REST"),
-    ("SALESFORCE_SERVICE", "Salesforce Service", "CRM", "REST"), ("TEAMCENTER", "Teamcenter PLM", "PLM", "REST"),
+    ("SALESFORCE_SERVICE", "Salesforce Service", "CRM", "REST"), ("TEAMCENTER", "Teamcenter PLM", "PLM", "REST"), ("COUPA", "Coupa Supplier Network", "PROCUREMENT", "REST"),
     ("WINDCHILL", "Windchill PLM", "PLM", "REST"), ("SAP_ERP", "SAP ERP", "ERP", "REST"),
     ("ORACLE_ERP", "Oracle ERP", "ERP", "REST"), ("RISK", "Risk Management System", "RISK", "REST"),
     ("RIM", "RIM / Vigilance System", "REGULATORY", "REST"), ("SAFETY", "Safety / Field Action System", "SAFETY", "REST"),
@@ -64,12 +64,13 @@ APPLICATIONS = [
 ]
 OBJECTS = {
     "TRACKWISE": ["Complaint", "Investigation", "CAPA", "Evidence", "Quality Event"],
-    "VEEVA_QMS": ["Quality Event", "Investigation", "Evidence", "Document"],
-    "TEAMCENTER": ["Product", "Product Version", "Component", "BOM", "Change"],
+    "VEEVA_QMS": ["QualityEvent", "Investigation", "CAPA", "Evidence", "Document"],
+    "TEAMCENTER": ["Item", "ItemRevision", "ChangeNotice", "Product", "Product Version", "Component", "BOM", "Change"],
     "WINDCHILL": ["Product", "Product Version", "Component", "BOM", "Change"],
     "SAP_ERP": ["Supplier", "Manufacturing Site", "Lot", "Batch", "Material"],
     "SALESFORCE_SERVICE": ["Case", "Service Event", "Complaint Intake"],
-    "ORACLE_ERP": ["Supplier", "Manufacturing Site", "Lot", "Batch", "Material"],
+    "ORACLE_ERP": ["Supplier", "PurchaseOrder", "Manufacturing Site", "Lot", "Batch", "Material"],
+    "COUPA": ["Supplier", "PurchaseOrder", "SupplierRisk"],
     "RISK": ["Risk", "Failure Mode", "Control", "Hazard"], "RIM": ["Vigilance", "Regulatory Assessment"],
     "SAFETY": ["Field Action", "Recall"], "LIMS": ["Result", "Sample"], "MES": ["Production Record", "Genealogy", "Process Event"],
 }
@@ -92,6 +93,9 @@ CONNECTOR_VERSIONS = [
     {"application_id": "TEAMCENTER", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
     {"application_id": "SAP_ERP", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
     {"application_id": "SALESFORCE_SERVICE", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
+    {"application_id": "VEEVA_QMS", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
+    {"application_id": "ORACLE_ERP", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
+    {"application_id": "COUPA", "connector_type": "REST", "version": "v1", "status": "ACTIVE", "supports_schema_discovery": True},
 ]
 CANONICAL = {
     "Complaint": ["external_id", "complaint_number", "product_id", "product_version_id", "event_at", "received_at", "awareness_at", "country", "reporter_type", "complaint_type", "problem_code", "problem_description", "severity", "lot_id", "serial_number", "udi", "device_returned", "patient_involved", "serious_injury", "death", "malfunction", "status", "source_created_at", "source_updated_at"],

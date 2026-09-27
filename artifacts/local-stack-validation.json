@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-09-27T20:50:05.180020+00:00",
+  "ports": {
+    "5177": true,
+    "8007": true,
+    "5433": true,
+    "9000": false,
+    "8025": false,
+    "8101": true,
+    "8102": true,
+    "8103": true,
+    "8104": true,
+    "8105": true,
+    "8106": true,
+    "8107": true,
+    "8108": true
+  },
+  "http": {
+    "frontend": {
+      "reachable": true,
+      "status": 200
+    },
+    "backend_live": {
+      "reachable": true,
+      "status": 200
+    },
+    "mailpit": {
+      "reachable": false,
+      "error": "URLError"
+    }
+  },
+  "database": "configured externally; validate with migrations and RLS tests",
+  "production_gates": [
+    "TLS",
+    "runtime role",
+    "backup/restore/PITR",
+    "monitoring",
+    "multi-instance"
+  ]
+}
