@@ -13,6 +13,32 @@ CONFIDENCE_SEMANTICS = {
 }
 
 
+def validate_confidence_semantics() -> dict[str, str]:
+    required = {"HIGH", "MEDIUM", "LOW", "UNKNOWN"}
+    if set(CONFIDENCE_SEMANTICS) != required or any(not value.strip() for value in CONFIDENCE_SEMANTICS.values()):
+        raise ValueError("Invalid regulatory confidence semantics")
+    return dict(CONFIDENCE_SEMANTICS)
+
+
+def detect_unsupported_claims(claims: list[dict], verified_citations: list[dict]) -> list[dict]:
+    """Return a deterministic traceability result for every generated claim."""
+    by_claim: dict[str, list[dict]] = {}
+    for citation in verified_citations:
+        by_claim.setdefault(str(citation.get("claim_id", "")), []).append(citation)
+    result = []
+    for claim in claims:
+        claim_id = str(claim.get("claim_id", ""))
+        linked = by_claim.get(claim_id, [])
+        result.append({
+            "claim_id": claim_id,
+            "traceability_status": "TRACEABLE" if linked else "UNTRACEABLE",
+            "citation_ids": [item.get("citation_id") for item in linked],
+            "authoritative_clauses": [item.get("traceability_key") for item in linked],
+            "unsupported": not bool(linked),
+        })
+    return result
+
+
 TEMPLATES = {
     "ESTAR_510K": "FDA 510(k) submission draft",
     "GSPR": "EU MDR Annex I GSPR evidence draft",
@@ -43,7 +69,10 @@ class RegulatoryDraftService:
         kind = document_type.upper()
         if kind not in TEMPLATES:
             raise ValueError(f"Unsupported regulatory document type: {document_type}")
+        validate_confidence_semantics()
         citations = verify_citations(context.get("citations", []))
+        traceability = detect_unsupported_claims(context.get("claims", []), citations["verified"])
+        traceability_by_claim = {item["claim_id"]: item for item in traceability}
         required_sections = AUTHORING_SECTIONS[kind]
         authored = context.get("authoring_sections", {})
         missing_sections = [name for name in required_sections if not authored.get(name)]
@@ -51,6 +80,11 @@ class RegulatoryDraftService:
         for item in context.get("claims", []):
             claim_citations = [c for c in citations["verified"] if c.get("claim_id") == item.get("claim_id")]
             confidence = "HIGH" if claim_citations else "UNKNOWN"
+            if item.get("contradicted"):
+                confidence = "LOW"
+            elif item.get("evidence_only") and claim_citations:
+                confidence = "MEDIUM"
+            trace = traceability_by_claim.get(str(item.get("claim_id", "")), {})
             sections.append({
                 "claim_id": item.get("claim_id"),
                 "text": item.get("text", ""),
@@ -58,6 +92,8 @@ class RegulatoryDraftService:
                 "confidence_definition": CONFIDENCE_SEMANTICS[confidence],
                 "citation_ids": [c.get("citation_id") for c in claim_citations],
                 "unsupported": not bool(claim_citations),
+                "traceability_status": trace.get("traceability_status", "UNTRACEABLE"),
+                "authoritative_clauses": trace.get("authoritative_clauses", []),
             })
         sections.extend({
             "section_id": name,
@@ -73,6 +109,14 @@ class RegulatoryDraftService:
             ]
         if missing_sections:
             limitations.append("Required authoring sections are incomplete: " + ", ".join(missing_sections))
+        if traceability and not all(item["traceability_status"] == "TRACEABLE" for item in traceability):
+            limitations.append("One or more generated statements lack an authoritative clause citation and require human verification.")
+        citations["traceability"] = {
+            "claims_total": len(traceability),
+            "claims_traceable": sum(item["traceability_status"] == "TRACEABLE" for item in traceability),
+            "claims_untraceable": sum(item["traceability_status"] != "TRACEABLE" for item in traceability),
+            "all_statements_traceable": all(item["traceability_status"] == "TRACEABLE" for item in traceability),
+        }
         return RegulatoryDraft(
             document_type=kind,
             title=TEMPLATES[kind],

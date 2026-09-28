@@ -15,6 +15,7 @@ class RegulatorySource:
     url: str
     jurisdiction: str
     access_note: str
+    text_available: bool = False
 
 
 OFFICIAL_SOURCES = {
@@ -63,7 +64,35 @@ def verify_citations(citations: list[dict]) -> dict:
                 raise ValueError("citation URL is not on the registered official domain")
             if not citation.get("clause"):
                 raise ValueError("citation clause is required")
-            verified.append({**citation, "source_id": source.source_id, "verified": True})
+            verified.append({
+                **citation,
+                "source_id": source.source_id,
+                "authority": source.authority,
+                "source_title": source.title,
+                "official_url": source.url,
+                "jurisdiction": source.jurisdiction,
+                "traceability_key": f"{source.source_id}:{citation['clause']}",
+                "verified": True,
+            })
         except (ValueError, TypeError) as exc:
             rejected.append({"citation": citation, "reason": str(exc)})
     return {"verified": verified, "rejected": rejected, "all_verified": not rejected}
+
+
+def official_source_manifest() -> list[dict]:
+    """Return the source/ licensing manifest used by regulatory workflows.
+
+    ISO standards are deliberately metadata-only: customers must provide the
+    licensed clause text or an approved licensed index before ingestion.
+    """
+    return [
+        {
+            "source_id": source.source_id,
+            "authority": source.authority,
+            "title": source.title,
+            "official_url": source.url,
+            "jurisdiction": source.jurisdiction,
+            "ingestion_mode": "PUBLIC_METADATA" if source.text_available else "LICENSED_CUSTOMER_TEXT_REQUIRED",
+        }
+        for source in OFFICIAL_SOURCES.values()
+    ]
