@@ -1,9 +1,16 @@
 """Database-backed authentication sessions and one-time links."""
-from datetime import datetime, timedelta, timezone
 import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
-from backend.app.db.models.stage2 import AuthSession, UserInvitation, PasswordResetRequest
+
+from backend.app.db.models.stage2 import (
+    AuthSession,
+    PasswordResetRequest,
+    UserInvitation,
+)
+
 
 def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()

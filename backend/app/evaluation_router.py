@@ -1,13 +1,15 @@
 import uuid
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from backend.app.db.session import get_db
-from backend.app.evidence.router import get_default_tenant_id
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+
 from backend.app.db.models.foundation import EvaluationRun, ReleaseAssuranceResult
+from backend.app.db.session import get_db
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from evaluation.harness import configuration_snapshot, run_golden_suite
+
 router=APIRouter(prefix="/api/v1/evaluations",tags=["Golden Evaluation"])
 class EvaluationRequest(BaseModel): release_version: str="MDARIX-R1"; model_version: str="1.0"; prompt_version: str="R1-controlled-v1"
 @router.post("/runs")

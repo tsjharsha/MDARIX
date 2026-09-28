@@ -1,8 +1,12 @@
 """Tenant-, field-, and size-bounded export preparation."""
 from __future__ import annotations
+
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
+
 from backend.app.ai_boundary import AI_PROHIBITED_FIELDS
+
 
 @dataclass(frozen=True)
 class ExportDecision:

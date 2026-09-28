@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import os
 import sys
-import httpx
 
+import httpx
 
 BASE = os.environ.get("DAY27_API_BASE", "http://127.0.0.1:8007")
 PASSWORD = os.environ.get("DAY27_FIXTURE_PASSWORD", "")

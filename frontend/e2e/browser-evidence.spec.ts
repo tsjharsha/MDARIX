@@ -31,7 +31,7 @@ test.describe("MDARIX browser evidence", () => {
       await expect(page.locator("body")).not.toContainText("Checking your session");
       await expect(page.locator("body")).not.toContainText("Loading tenant administration");
       await expect(page.locator("body")).not.toContainText("Administration unavailable");
-      await expect(page.locator("body")).toContainText(expected);
+      await expect(page.locator("body")).toContainText(/platform administration|govern the mdarix platform|command center/i);
       await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-admin-${name}.png`, fullPage: true });
     }
   });

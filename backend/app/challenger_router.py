@@ -1,13 +1,15 @@
 import os
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+
+from backend.app.db.models.foundation import Investigation
 from backend.app.db.session import get_db
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from challenger.schemas import ChallengeRequest, ChallengeResponse
 from challenger.service import ChallengerError, ChallengerService
-from backend.app.db.models.foundation import Investigation
 
 router=APIRouter(prefix="/api/v1/investigations",tags=["AI Challenger"]); service=ChallengerService()
 def err(e): return HTTPException(status_code=404 if e.code.endswith("NOT_FOUND") else 400,detail={"code":e.code,"message":e.message})

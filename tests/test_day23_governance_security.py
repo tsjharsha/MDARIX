@@ -12,6 +12,7 @@ from auth.durable import persist_session
 from backend.app.main import app
 from backend.app.db.session import SessionLocal
 from backend.app.db.models.foundation import ApprovalAuthority, AuthUser, Decision, FeatureEntitlement, Investigation, SignedApprovalRecord, Tenant, TenantMembership
+from backend.app.db.models.customer_lifecycle import Customer
 
 
 def account():
@@ -105,7 +106,8 @@ def test_api_signing_security_matrix():
         db.expire_all(); assert db.query(SignedApprovalRecord).filter_by(object_id=stale.id).count()==0
         entitlement=db.query(FeatureEntitlement).filter_by(feature_code="DECISION_CENTER_SIGNATURES").first(); entitlement.enabled=False; db.commit(); denied=_decision(db,tenant.id,investigation,creator); ids.append(denied.id); assert approver_client.post(f"/api/v1/governance/decisions/{denied.id}/sign",json={"decision":"APPROVE","remarks":"Denied","password":"Correct current password 123","object_version":denied.updated_at.isoformat()}).status_code==403; entitlement.enabled=True; db.commit()
         authority=db.query(ApprovalAuthority).filter_by(tenant_id=tenant.id,role_name="Viewer").first(); authority.status="REVOKED"; db.commit(); no_authority=_decision(db,tenant.id,investigation,creator); ids.append(no_authority.id); assert approver_client.post(f"/api/v1/governance/decisions/{no_authority.id}/sign",json={"decision":"APPROVE","remarks":"Denied","password":"Correct current password 123","object_version":no_authority.updated_at.isoformat()}).status_code==403; authority.status="ACTIVE"; db.commit()
-        other=Tenant(id=uuid.uuid4(),tenant_key=f"D23-{uuid.uuid4().hex[:8]}",name="Other synthetic tenant",status="active",created_at=datetime.now(timezone.utc),updated_at=datetime.now(timezone.utc)); db.add(other); db.commit(); foreign_client=_client(f"foreign-{uuid.uuid4().hex[:8]}@example.com",other.id); assert foreign_client.post(f"/api/v1/governance/decisions/{first.id}/sign",json={"decision":"REJECT","remarks":"Cross tenant","password":"Correct current password 123","object_version":version}).status_code in {403,404}; assert foreign_client.get(f"/api/v1/governance/decisions/{first.id}/signature-history").json()==[]
+        other_customer = Customer(id=uuid.uuid4(), customer_identifier=f"D23-CUSTOMER-{uuid.uuid4().hex[:8]}", legal_name="Other synthetic customer", display_name="Other synthetic customer", customer_type="DESIGN_PARTNER", lifecycle_status="ACTIVE", created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc)); db.add(other_customer); db.flush()
+        other=Tenant(id=uuid.uuid4(),customer_id=other_customer.id,tenant_key=f"D23-{uuid.uuid4().hex[:8]}",name="Other synthetic tenant",status="active",created_at=datetime.now(timezone.utc),updated_at=datetime.now(timezone.utc)); db.add(other); db.commit(); foreign_client=_client(f"foreign-{uuid.uuid4().hex[:8]}@example.com",other.id); assert foreign_client.post(f"/api/v1/governance/decisions/{first.id}/sign",json={"decision":"REJECT","remarks":"Cross tenant","password":"Correct current password 123","object_version":version}).status_code in {403,404}; assert foreign_client.get(f"/api/v1/governance/decisions/{first.id}/signature-history").json()==[]
     finally:
         # Audit evidence is append-only and must remain available after the test.
         db.query(SignedApprovalRecord).filter(SignedApprovalRecord.object_id.in_(ids)).delete(synchronize_session=False); db.query(Decision).filter(Decision.id.in_(ids)).delete(synchronize_session=False); db.commit(); db.close()

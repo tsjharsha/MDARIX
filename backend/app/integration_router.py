@@ -1,8 +1,11 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from integration.gateway import ConnectionConfig, MappingDefinition, preview
-import os
+
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from integration.gateway import ConnectionConfig, MappingDefinition, preview
+
 router=APIRouter(prefix="/api/v1/integrations",tags=["Integration Gateway"])
 class PreviewRequest(BaseModel): connection_id:str; connector_type:str="FILE"; source_system_type:str="SIMULATED"; records:list[dict]; target_entity:str; mapping_version:str; rules:dict
 @router.post("/preview")

@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta, timezone
 import logging
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta, timezone
+
 from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
 

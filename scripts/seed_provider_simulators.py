@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, ROOT)
-from source_simulator.provider_catalog import PROVIDER_CATALOG, PROVIDER_PORTS
+from source_simulator.provider_catalog import PROVIDER_PORTS
 
 TENANTS = {"TENANT_A": "sim-a", "TENANT_B": "sim-b", "TENANT_C": "sim-c", "TENANT_D": "sim-d"}
 SEEDS = {

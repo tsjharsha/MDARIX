@@ -1,8 +1,10 @@
 import json
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_webhook
 from communication.email.resend_provider import ResendProvider
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/communication", tags=["Communication"])
 

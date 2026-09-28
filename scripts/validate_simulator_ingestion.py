@@ -1,8 +1,10 @@
 """Validate provider read -> tenant-scoped outbox enqueue and idempotency."""
 import os
 from uuid import UUID
-from integration.simulator_ingestion import read_provider, enqueue_provider_records
+
 from backend.app.db.session import SessionLocal
+from integration.simulator_ingestion import enqueue_provider_records, read_provider
+
 
 def main():
     provider = os.getenv("SIMULATOR_PROVIDER", "TRACKWISE").upper()

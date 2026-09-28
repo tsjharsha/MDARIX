@@ -1,17 +1,31 @@
-import hashlib, json, uuid, os
+import hashlib
+import json
+import os
+import uuid
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+
 from auth.service import _verify
-from backend.app.db.session import get_db
-from backend.app.db.models.foundation import (ApprovalAuthority, AuditEvent, Decision, FeatureEntitlement, PlanDefinition, SegregationOfDutiesPolicy, SignedApprovalRecord, Tenant, TenantPlanAssignment)
-from backend.app.db.models.stage3 import ContextSnapshot
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.db.models.foundation import AuthUser
-from backend.app.enterprise_audit import change_diff
+from backend.app.db.models.foundation import (
+ ApprovalAuthority,
+ AuditEvent,
+ AuthUser,
+ Decision,
+ FeatureEntitlement,
+ PlanDefinition,
+ SegregationOfDutiesPolicy,
+ SignedApprovalRecord,
+ Tenant,
+ TenantPlanAssignment,
+)
 from backend.app.db.models.stage2 import MfaChallenge
-from backend.app.auth_router import _mfa_hash
+from backend.app.db.models.stage3 import ContextSnapshot
+from backend.app.db.session import get_db
+from backend.app.enterprise_audit import change_diff
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router=APIRouter(prefix="/api/v1/governance",tags=["Enterprise Governance"])
 FEATURE="DECISION_CENTER_SIGNATURES"; ASK_FEATURE="ASK_MDARIX"; NOW=lambda: datetime.now(timezone.utc)

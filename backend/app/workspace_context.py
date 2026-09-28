@@ -1,12 +1,15 @@
 from datetime import datetime, timezone
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
+
+from backend.app.db.models.foundation import Investigation, Product, ProductVersion
 from backend.app.db.models.stage2 import MDARIXCaseContext
-from backend.app.db.models.foundation import Product, ProductVersion, Investigation
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+
 router = APIRouter(prefix='/api/v1/workspace/context', tags=['Workspace Context'])
 class ContextUpdate(BaseModel):
     model_config = ConfigDict(extra='forbid')

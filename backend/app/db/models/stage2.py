@@ -1,9 +1,20 @@
 """Stage 2 durable platform primitives."""
 import uuid
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Boolean
+
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from backend.app.db.base import Base
+
 
 def _id(): return mapped_column(UUID(as_uuid=True), primary_key=True, server_default=__import__('sqlalchemy').text('gen_random_uuid()'))
 def _tenant(): return mapped_column(UUID(as_uuid=True), ForeignKey('tenants.id'), nullable=False)

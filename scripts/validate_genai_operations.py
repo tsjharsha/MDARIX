@@ -1,8 +1,9 @@
 """Run provider-contract, cost-reconciliation, and concurrent safety checks."""
 import argparse
 import sys
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from genai.provider import GenAIProvider
 from genai.validation import reconcile_cost, validate_contract, validate_multi_instance

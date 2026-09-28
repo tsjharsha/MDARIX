@@ -1,9 +1,13 @@
 import uuid
+
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from backend.app.db.base import Base
-from .foundation import tenant_fk, uuid_pk, tz
+
+from .foundation import tenant_fk, tz, uuid_pk
+
 
 class ConnectorRun(Base):
     __tablename__ = "connector_runs"

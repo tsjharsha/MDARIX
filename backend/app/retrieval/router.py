@@ -4,11 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
-from backend.app.evidence.router import get_default_tenant_id
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from retrieval.schemas import RetrievalRequest, RetrievalResponse
 from retrieval.service import RetrievalError, TrustedRetrievalService
-
 
 router = APIRouter(prefix="/api/v1/retrieval", tags=["Trusted Evidence Retrieval"])
 service = TrustedRetrievalService()

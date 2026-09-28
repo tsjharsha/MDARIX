@@ -1,18 +1,36 @@
 import uuid
-from pathlib import Path
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, UploadFile, File, Response
+from pathlib import Path
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+)
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from backend.app.db.models.foundation import AuditEvent, SignedApprovalRecord
+from backend.app.db.models.stage3 import (
+    AIInteraction,
+    AIInteractionFeedback,
+    AIInteractionSession,
+    EvidenceAttachment,
+    InboundEmailEvent,
+    InboundProviderMapping,
+    SupplierEvidenceRequest,
+)
 from backend.app.db.session import get_db
-from backend.app.db.models.stage3 import AIInteraction, AIInteractionFeedback, AIInteractionSession, ContextSnapshot, InboundEmailEvent, InboundProviderMapping, SupplierEvidenceRequest, EvidenceAttachment
-from backend.app.db.models.foundation import AuditEvent, SignedApprovalRecord, Decision
-from object_storage.service import ObjectStorageService
-from communication.email.service import EmailService
-from communication.email.provider import EmailMessage
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_webhook
+from communication.email.service import EmailService
+from object_storage.service import ObjectStorageService
 
 router = APIRouter(prefix="/api/v1/stage3", tags=["Stage 3 Workflow"])
 NOW = lambda: datetime.now(timezone.utc)

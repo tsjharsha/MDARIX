@@ -1,7 +1,12 @@
 from __future__ import annotations
-import hashlib, hmac, secrets, time
+
+import hashlib
+import hmac
+import secrets
+import time
 from dataclasses import dataclass
 from email.utils import parseaddr
+
 
 def _hash(password, salt=None):
     salt=salt or secrets.token_bytes(16); return salt.hex()+":"+hashlib.scrypt(password.encode(),salt=salt,n=2**14,r=8,p=1).hex()

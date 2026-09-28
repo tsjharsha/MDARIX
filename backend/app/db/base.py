@@ -14,11 +14,11 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-from backend.app.db.models.foundation import *  # noqa: F401,F403,E402
-from backend.app.db.models.ingestion import *  # noqa: F401,F403,E402
-from backend.app.db.models.normalization import *  # noqa: F401,F403,E402
-from backend.app.db.models.enterprise import *  # noqa: F401,F403,E402
-from backend.app.db.models.ask import *  # noqa: F401,F403,E402
-from backend.app.db.models.stage2 import *  # noqa: F401,F403,E402
-from backend.app.db.models.stage3 import *  # noqa: F401,F403,E402
-from backend.app.db.models.customer_lifecycle import *  # noqa: F401,F403,E402
+from backend.app.db.models.ask import *
+from backend.app.db.models.customer_lifecycle import *
+from backend.app.db.models.enterprise import *
+from backend.app.db.models.foundation import *
+from backend.app.db.models.ingestion import *
+from backend.app.db.models.normalization import *
+from backend.app.db.models.stage2 import *
+from backend.app.db.models.stage3 import *

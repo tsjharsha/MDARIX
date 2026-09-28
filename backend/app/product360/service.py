@@ -4,7 +4,12 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
-from backend.app.product360.schemas import Product360Response, ProductSummary, TemporalRealityResponse, TimelineEvent
+from backend.app.product360.schemas import (
+    Product360Response,
+    ProductSummary,
+    TemporalRealityResponse,
+    TimelineEvent,
+)
 from graph.service import RealityGraphService
 
 TENANT_KEY = "ACME_CARE_SYNTHETIC"

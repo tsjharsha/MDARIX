@@ -1,17 +1,31 @@
-import os, hashlib, secrets
-from fastapi import APIRouter, HTTPException, Response, Request, Depends
+import hashlib
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from auth.service import auth_service, _hash
-from auth.emailer import send_password_reset_email, send_verification_email
-from backend.app.db.session import get_db
-from backend.app.db.models.foundation import AuthUser, TenantMembership
-from backend.app.db.models.stage2 import OnboardingRequest
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
-from auth.durable import persist_session, revoke_session, issue_reset, consume
-from auth.durable import hash_token
-from backend.app.db.models.stage2 import AuthSession, LoginThrottle, PasswordHistory, MfaChallenge
-from datetime import timedelta
+
+from auth.durable import (
+    consume,
+    hash_token,
+    issue_reset,
+    persist_session,
+    revoke_session,
+)
+from auth.emailer import send_password_reset_email
+from auth.service import _hash, auth_service
+from backend.app.db.models.foundation import AuthUser, TenantMembership
+from backend.app.db.models.stage2 import (
+    AuthSession,
+    LoginThrottle,
+    MfaChallenge,
+    OnboardingRequest,
+    PasswordHistory,
+)
+from backend.app.db.session import get_db
+
 router=APIRouter(prefix="/api/v1/auth",tags=["Authentication"])
 class Signup(BaseModel): email:str=Field(min_length=3,max_length=254); password: str=Field(min_length=12,max_length=128); display_name:str=Field(min_length=1,max_length=120); organization:str=Field(min_length=1,max_length=160)
 class Signin(BaseModel): email:str; password:str

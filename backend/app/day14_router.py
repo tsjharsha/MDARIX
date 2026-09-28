@@ -1,16 +1,24 @@
 import os
 import uuid
-from fastapi import APIRouter,Depends,HTTPException,Request
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from backend.app.db.session import get_db
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.enterprise_audit import make_audit_event
-from day14_service import Day14Error,Day14Service
-from unknowns.schemas import UnknownRequest,UnknownResponse,UnknownSet
-from failure_chain.schemas import FailureChainRequest,FailureChainResponse,FailureChainSet
-from unknowns.engine import PROVIDER as U_PROVIDER,ORCHESTRATION_VERSION as U_VERSION
-from failure_chain.engine import PROVIDER as F_PROVIDER,ORCHESTRATION_VERSION as F_VERSION
+
 from backend.app.db.models.foundation import Investigation
+from backend.app.db.session import get_db
+from backend.app.enterprise_audit import make_audit_event
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from day14_service import Day14Error, Day14Service
+from failure_chain.engine import ORCHESTRATION_VERSION as F_VERSION
+from failure_chain.engine import PROVIDER as F_PROVIDER
+from failure_chain.schemas import (
+    FailureChainRequest,
+    FailureChainResponse,
+    FailureChainSet,
+)
+from unknowns.engine import ORCHESTRATION_VERSION as U_VERSION
+from unknowns.engine import PROVIDER as U_PROVIDER
+from unknowns.schemas import UnknownRequest, UnknownResponse, UnknownSet
 
 router=APIRouter(prefix="/api/v1/investigations",tags=["Day 14 Intelligence"]); service=Day14Service()
 def err(e): return HTTPException(status_code=400,detail={"code":e.code,"message":e.message})

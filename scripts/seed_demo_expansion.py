@@ -5,20 +5,30 @@ never alters the canonical Golden dataset or its evaluation scenarios.
 """
 from __future__ import annotations
 
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.app.db.models.foundation import (
-    Complaint, Component, ComponentSupplier, Evidence, Investigation, InvestigationComplaint,
-    InvestigationEvidence, LotBatch, ManufacturingSite, Product, ProductComponent,
-    ProductVersion, Supplier, Tenant,
+    Complaint,
+    Component,
+    ComponentSupplier,
+    Evidence,
+    Investigation,
+    InvestigationComplaint,
+    InvestigationEvidence,
+    LotBatch,
+    ManufacturingSite,
+    Product,
+    ProductComponent,
+    ProductVersion,
+    Supplier,
+    Tenant,
 )
 from backend.app.db.session import SessionLocal
-
 
 NOW = datetime.now(timezone.utc)
 PRODUCTS = [

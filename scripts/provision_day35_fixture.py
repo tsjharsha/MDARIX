@@ -10,7 +10,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from access_control.fixtures import FIXTURE_TENANTS, FIXTURE_USERS, validate_fixture
 from auth.service import _hash
 from backend.app.db.models.customer_lifecycle import Customer
-from backend.app.db.models.foundation import AuthUser, PersonaAssignment, Tenant, TenantMembership
+from backend.app.db.models.foundation import (
+    AuthUser,
+    PersonaAssignment,
+    Tenant,
+    TenantMembership,
+)
 from backend.app.db.session import SessionLocal
 
 

@@ -1,9 +1,11 @@
 import uuid
-from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
+
+from sqlalchemy import String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+
 from backend.app.db.base import Base
-from backend.app.db.models.foundation import tz, tenant_fk, uuid_pk
+from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 
 class AIInteractionSession(Base):

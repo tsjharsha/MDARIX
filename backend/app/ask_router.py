@@ -1,25 +1,39 @@
 """Authenticated, non-chat Ask MDARIX control-plane endpoint."""
-from uuid import UUID, uuid4
 import os
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ask_mdarix import QueryInterpreter
+from ask_mdarix.authorized_retrieval import (
+    AuthorizedRetrievalRequest,
+    AuthorizedRetrievalService,
+)
+from ask_mdarix.lifecycle_retrieval import (
+    LifecycleRetrievalRequest,
+    LifecycleRetrievalService,
+)
 from ask_mdarix.retrieval import build_retrieval_plan
 from auth.service import auth_service
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.db.models.foundation import (
-    Evidence, FeatureEntitlement, Hypothesis, HypothesisEvidence, PlanDefinition,
-    Investigation, Product, ProductVersion, Tenant, TenantPlanAssignment, Unknown,
-)
 from backend.app.db.models.ask import InvestigationSessionRecord
+from backend.app.db.models.foundation import (
+    Evidence,
+    FeatureEntitlement,
+    Hypothesis,
+    HypothesisEvidence,
+    Investigation,
+    PlanDefinition,
+    ProductVersion,
+    Tenant,
+    TenantPlanAssignment,
+    Unknown,
+)
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
-from ask_mdarix.authorized_retrieval import AuthorizedRetrievalRequest, AuthorizedRetrievalService
-from ask_mdarix.lifecycle_retrieval import LifecycleRetrievalRequest, LifecycleRetrievalService
+from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"

@@ -1,6 +1,8 @@
 import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from briefs.schemas import BriefCreateRequest, BriefListResponse, BriefResponse

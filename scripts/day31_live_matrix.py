@@ -5,8 +5,8 @@ from the request body. Intended for host PowerShell execution.
 """
 import os
 import sys
-import httpx
 
+import httpx
 
 BASE = os.environ.get("DAY31_API_BASE", "http://127.0.0.1:8007").rstrip("/")
 PASSWORD = os.environ.get("DAY27_FIXTURE_PASSWORD")

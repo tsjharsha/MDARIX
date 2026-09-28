@@ -1,10 +1,10 @@
 """Run the continuously operating transactional-outbox worker."""
-import os
-import logging
-import signal
 import json
-import urllib.request
+import logging
+import os
+import signal
 import sys
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,6 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from outbox.worker import OutboxWorker
+
 
 def publish(event_name, payload):
     # Production deployments replace this adapter with the configured broker.

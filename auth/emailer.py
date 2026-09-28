@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import smtplib
-from email.utils import parseaddr
 from email.message import EmailMessage
+from email.utils import parseaddr
+
 from dotenv import load_dotenv
 
 load_dotenv()

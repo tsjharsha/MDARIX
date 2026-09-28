@@ -3,14 +3,16 @@
 The catalog is deliberately server-owned: the frontend consumes these
 responses and does not carry a second hard-coded field model.
 """
+import uuid
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+
+from backend.app.db.models.foundation import AuditEvent, AuthUser, MappingImpactHistory
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.db.models.foundation import AuthUser, MappingImpactHistory, AuditEvent
-from datetime import datetime, timezone
-import uuid
 
 router = APIRouter(prefix="/api/v1/admin/mapping", tags=["Mapping Studio Catalog"])
 

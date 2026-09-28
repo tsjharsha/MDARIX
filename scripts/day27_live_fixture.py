@@ -20,14 +20,25 @@ from sqlalchemy.orm import Session
 
 from auth.service import _hash
 from backend.app.db.models.foundation import (
-    AuthUser, Complaint, Component, ComponentSupplier, Evidence,
-    Investigation, InvestigationComplaint, InvestigationEvidence,
-    Product, ProductComponent, ProductVersion, Supplier, Tenant, Hypothesis,
-    Unknown, HypothesisEvidence,
+    AuthUser,
+    Complaint,
+    Component,
+    ComponentSupplier,
+    Evidence,
+    Hypothesis,
+    HypothesisEvidence,
+    Investigation,
+    InvestigationComplaint,
+    InvestigationEvidence,
+    Product,
+    ProductComponent,
+    ProductVersion,
+    Supplier,
+    Tenant,
+    Unknown,
 )
 from backend.app.db.session import SessionLocal
 from backend.app.governance_router import bootstrap
-
 
 PASSWORD = os.environ.get("DAY27_FIXTURE_PASSWORD", "")
 if len(PASSWORD) < 12:

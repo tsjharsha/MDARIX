@@ -1,7 +1,9 @@
 """Safe audit event construction using the existing AuditEvent model."""
 from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
 from typing import Any
-from datetime import datetime, timezone, timedelta
+
 from backend.app.db.models.foundation import AuditEvent
 
 SECRET_TERMS = ("password", "token", "secret", "credential", "api_key", "authorization")

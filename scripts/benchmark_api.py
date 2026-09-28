@@ -1,8 +1,13 @@
 """Small dependency-free API benchmark for release evidence."""
 from __future__ import annotations
-import argparse, json, statistics, time
-from urllib.request import urlopen
+
+import argparse
+import json
+import statistics
+import time
 from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()

@@ -1,10 +1,11 @@
 """Read-only verification of Day 35 schema and fixture invariants."""
-from sqlalchemy import inspect, text
 import sys
 from pathlib import Path
 
+from sqlalchemy import inspect, text
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backend.app.db.session import engine, SessionLocal
+from backend.app.db.session import SessionLocal, engine
 
 REQUIRED_TABLES = {
     "tenant_memberships", "persona_assignments", "role_definitions",

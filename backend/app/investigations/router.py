@@ -5,15 +5,22 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
-from backend.app.evidence.router import get_default_tenant_id
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from investigation_workspace.schemas import InvestigationWorkspaceRequest, InvestigationWorkspaceResponse
-from investigation_workspace.service import InvestigationWorkspaceError, InvestigationWorkspaceService
-from investigator.schemas import InvestigationAnalysisRequest, InvestigationAnalysisResponse
-from investigator.service import EvidenceGroundedInvestigatorService, InvestigatorError
 from hypothesis_engine.schemas import HypothesisSetRequest, HypothesisSetResponse
 from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
-
+from investigation_workspace.schemas import (
+    InvestigationWorkspaceRequest,
+    InvestigationWorkspaceResponse,
+)
+from investigation_workspace.service import (
+    InvestigationWorkspaceError,
+    InvestigationWorkspaceService,
+)
+from investigator.schemas import (
+    InvestigationAnalysisRequest,
+    InvestigationAnalysisResponse,
+)
+from investigator.service import EvidenceGroundedInvestigatorService, InvestigatorError
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Workspace"])
 service = InvestigationWorkspaceService()

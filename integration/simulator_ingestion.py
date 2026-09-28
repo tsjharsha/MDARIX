@@ -4,15 +4,17 @@ The module deliberately separates provider transport from MDARIX persistence:
 provider records are never inserted directly into business tables. Each read is
 represented by an idempotent outbox event for the normal ingestion pipeline.
 """
-import hashlib
 import json
 from urllib.request import Request, urlopen
 from uuid import UUID
+
 from sqlalchemy.orm import Session
-from backend.app.db.models.stage2 import OutboxEvent
+
 from backend.app.db.models.enterprise import ConnectorRun, ConnectorSourceRecord
+from backend.app.db.models.stage2 import OutboxEvent
 from integration.api_contract import idempotency_key
 from source_simulator.provider_catalog import PROVIDER_PORTS
+
 
 def read_provider(provider: str, tenant_key: str, token: str, entity: str, host: str = "127.0.0.1") -> list[dict]:
     provider = provider.upper()

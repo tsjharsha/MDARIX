@@ -1,13 +1,13 @@
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from backend.app.db.models.foundation import Evidence, Tenant
+from backend.app.db.models.foundation import Evidence
 from backend.app.db.session import get_db
-from evidence.services.evidence_service import EvidenceIntelligenceService
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from evidence.services.evidence_service import EvidenceIntelligenceService
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence Intelligence"])
 service = EvidenceIntelligenceService()
@@ -22,14 +22,14 @@ def tenant_context(ctx: AuthenticatedRequestContext) -> uuid.UUID:
 
 
 
-@router.get("", response_model=List[Dict[str, Any]])
+@router.get("", response_model=list[dict[str, Any]])
 def list_evidence(
     request: Request,
-    evidence_type: Optional[str] = None,
+    evidence_type: str | None = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Lists evidence items for default tenant with optional filtering."""
     tenant_id = tenant_context(ctx)
     query = db.query(Evidence).filter(Evidence.tenant_id == tenant_id)
@@ -55,7 +55,7 @@ def list_evidence(
 
 
 @router.get("/{evidence_id}")
-def get_evidence_detail(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_detail(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns evidence detail summary including chunks, observations, links, and provenance."""
     tenant_id = tenant_context(ctx)
     try:
@@ -70,7 +70,7 @@ def get_evidence_detail(evidence_id: str, request: Request, db: Session = Depend
 
 
 @router.get("/{evidence_id}/content")
-def get_evidence_content(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_content(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns secure tenant-isolated raw content of an evidence record."""
     tenant_id = tenant_context(ctx)
     try:
@@ -88,14 +88,14 @@ def get_evidence_content(evidence_id: str, request: Request, db: Session = Depen
 
 
 @router.get("/{evidence_id}/chunks")
-def get_evidence_chunks(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_chunks(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns chunk list and locators for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {"evidence_id": evidence_id, "chunks_count": summary["chunks_count"], "chunks": summary["chunks"]}
 
 
 @router.get("/{evidence_id}/observations")
-def get_evidence_observations(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_observations(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns extracted observations and source anchors for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -106,7 +106,7 @@ def get_evidence_observations(evidence_id: str, request: Request, db: Session = 
 
 
 @router.get("/{evidence_id}/provenance")
-def get_evidence_provenance(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_provenance(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns AI execution provenance records for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -117,7 +117,7 @@ def get_evidence_provenance(evidence_id: str, request: Request, db: Session = De
 
 
 @router.get("/{evidence_id}/related-entities")
-def get_evidence_related_entities(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Dict[str, Any]:
+def get_evidence_related_entities(evidence_id: str, request: Request, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
     """Returns canonical entity links and unresolved entity references for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -134,7 +134,7 @@ def process_evidence_intelligence(
     reprocess: bool = Query(False),
     db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Triggers Evidence Intelligence processing pipeline on evidence item."""
     tenant_id = tenant_context(ctx)
     try:

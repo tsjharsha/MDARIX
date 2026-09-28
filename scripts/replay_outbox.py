@@ -1,5 +1,6 @@
 """Controlled dead-letter replay: python scripts/replay_outbox.py EVENT_UUID."""
 import sys
+
 from backend.app.db.session import SessionLocal
 from outbox.worker import OutboxWorker
 

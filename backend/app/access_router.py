@@ -1,42 +1,92 @@
-import uuid
-import secrets
-import os
-import json
-import ipaddress
-import socket
-import re
 import csv
 import io
+import ipaddress
+import json
+import os
+import re
+import secrets
+import socket
+import uuid
+from datetime import datetime, timedelta, timezone
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
-from urllib.request import Request as UrlRequest, urlopen
-from urllib.error import URLError, HTTPError
-from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, HTTPException, Request, Depends, Response
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from auth.service import _verify
 from pydantic import BaseModel, Field
-from access_control.policy import PermissionSet, Role, User, effective_permissions
-from auth.service import auth_service
-from backend.app.request_context import get_request_context
-from auth.service import _hash
-from auth.emailer import EmailDeliveryError, send_activation_email, send_password_reset_email, smtp_configuration_status
-from auth.durable import issue_invitation, issue_reset, hash_token
-from backend.app.db.session import get_db
-from backend.app.db.models.foundation import (
-    AuthUser, PersonaAssignment, RoleAssignment, RoleDefinition,
-    RolePermissionSet, PermissionSetDefinition, TenantMembership,
-    FeatureEntitlement, PlanDefinition, Tenant, TenantPlanAssignment, Product, ProductVersion,
-    ApprovalAuthority, SegregationOfDutiesPolicy, ConnectorConfiguration, MappingConfiguration, AuditEvent, Decision,
-    MasterMapping, TenantMappingVersion, TenantMappingOverride, Investigation,
-)
-from backend.app.db.models.customer_lifecycle import Customer, TenantEnvironment, CustomerContact, CustomerDomain, DomainVerification, IdentityProviderConfiguration, SupportAccessGrant, TenantHealthRun, ProvisioningJob, ProvisioningJobStep, CustomerOnboardingDraft, TenantAccessTransition
-from access_control.personas import R1_PERSONAS as PERSONAS, get_persona
-from access_control.configuration_safety import safe_configuration
-from integration.gateway import ConnectionConfig, Connector, MappingDefinition, preview
-from sqlalchemy.orm import Session
 from sqlalchemy import func
-from datetime import datetime, timezone
-from backend.app.db.models.stage2 import AuthSession, UserInvitation, OutboxEvent, SubscriptionLifecycle, ReminderPolicy, EmailTemplate
-from backend.app.customer_lifecycle import build_customer_tenant, allowed_lifecycle_transition
-from backend.app.customer_admin_continuity import replacement_action, validate_support_window
+from sqlalchemy.orm import Session
+
+from access_control.configuration_safety import safe_configuration
+from access_control.personas import R1_PERSONAS as PERSONAS
+from access_control.personas import get_persona
+from access_control.policy import PermissionSet, Role, User, effective_permissions
+from auth.durable import hash_token, issue_invitation, issue_reset
+from auth.emailer import (
+    EmailDeliveryError,
+    send_activation_email,
+    send_password_reset_email,
+    smtp_configuration_status,
+)
+from auth.service import _hash, auth_service
+from backend.app.customer_admin_continuity import (
+    replacement_action,
+    validate_support_window,
+)
+from backend.app.customer_lifecycle import (
+    allowed_lifecycle_transition,
+    build_customer_tenant,
+)
+from backend.app.db.models.customer_lifecycle import (
+    Customer,
+    CustomerDomain,
+    CustomerOnboardingDraft,
+    DomainVerification,
+    IdentityProviderConfiguration,
+    ProvisioningJob,
+    ProvisioningJobStep,
+    SupportAccessGrant,
+    TenantAccessTransition,
+    TenantEnvironment,
+    TenantHealthRun,
+)
+from backend.app.db.models.foundation import (
+    ApprovalAuthority,
+    AuditEvent,
+    AuthUser,
+    ConnectorConfiguration,
+    Decision,
+    FeatureEntitlement,
+    Investigation,
+    MappingConfiguration,
+    MasterMapping,
+    PermissionSetDefinition,
+    PersonaAssignment,
+    PlanDefinition,
+    Product,
+    ProductVersion,
+    RoleAssignment,
+    RoleDefinition,
+    RolePermissionSet,
+    SegregationOfDutiesPolicy,
+    Tenant,
+    TenantMappingOverride,
+    TenantMappingVersion,
+    TenantMembership,
+    TenantPlanAssignment,
+)
+from backend.app.db.models.stage2 import (
+    EmailTemplate,
+    OutboxEvent,
+    ReminderPolicy,
+    SubscriptionLifecycle,
+    UserInvitation,
+)
+from backend.app.db.session import get_db
+from backend.app.request_context import get_request_context
+from integration.gateway import ConnectionConfig, Connector, MappingDefinition, preview
 
 router=APIRouter(prefix="/api/v1",tags=["Access Control"])
 def _development_token(token: str | None) -> str | None:
@@ -2070,7 +2120,7 @@ def update_product_version(version_id: uuid.UUID, payload: AdminUpdateRequest, r
     if set(payload.values) - allowed: raise HTTPException(422, detail={"code": "FIELD_NOT_ALLOWED", "message": "ProductVersion field cannot be edited"})
     row = db.query(ProductVersion).filter(ProductVersion.id == version_id, ProductVersion.tenant_id == admin.tenant_id).first()
     if row is None: raise HTTPException(404, detail={"code": "PRODUCT_VERSION_NOT_FOUND", "message": "ProductVersion is not available for this tenant"})
-    if "release_timestamp" in payload.values and payload.values["release_timestamp"]: payload.values["release_timestamp"] = datetime.fromisoformat(str(payload.values["release_timestamp"]).replace("Z", "+00:00"))
+    if payload.values.get("release_timestamp"): payload.values["release_timestamp"] = datetime.fromisoformat(str(payload.values["release_timestamp"]).replace("Z", "+00:00"))
     for field, value in payload.values.items(): setattr(row, field, value)
     row.updated_at = datetime.now(timezone.utc); _audit_configuration(db, admin, "PRODUCT_VERSION_UPDATED", "ProductVersion", row.id, "v1"); db.commit(); return {"id": str(row.id), "status": row.lifecycle_status}
 

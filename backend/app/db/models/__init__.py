@@ -1,6 +1,6 @@
-from backend.app.db.models.evidence_intelligence import *  # noqa: F401,F403
-from backend.app.db.models.foundation import *  # noqa: F401,F403
-from backend.app.db.models.ingestion import *  # noqa: F401,F403
-from backend.app.db.models.normalization import *  # noqa: F401,F403
-from backend.app.db.models.retrieval_intelligence import *  # noqa: F401,F403
-from backend.app.db.models.customer_lifecycle import *  # noqa: F401,F403
+from backend.app.db.models.customer_lifecycle import *
+from backend.app.db.models.evidence_intelligence import *
+from backend.app.db.models.foundation import *
+from backend.app.db.models.ingestion import *
+from backend.app.db.models.normalization import *
+from backend.app.db.models.retrieval_intelligence import *

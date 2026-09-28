@@ -1,6 +1,10 @@
 from __future__ import annotations
-import csv, hashlib, io, json
-from dataclasses import dataclass, field, asdict
+
+import csv
+import hashlib
+import io
+import json
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
 FAILURE_CATEGORIES = {"AUTHENTICATION", "CONNECTIVITY", "TIMEOUT", "SOURCE_SCHEMA", "MAPPING", "TRANSFORMATION", "IDENTITY", "TEMPORAL", "CANONICAL_VALIDATION", "DATABASE", "RATE_LIMIT", "UNKNOWN"}

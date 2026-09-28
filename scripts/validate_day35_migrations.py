@@ -1,7 +1,6 @@
 """Non-mutating validation of the Day 35 Alembic migration chain."""
-from pathlib import Path
 import re
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = ROOT / "infrastructure" / "database" / "migrations" / "versions"

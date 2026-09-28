@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
-from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
+from backend.app.db.models.foundation import tenant_fk, uuid_pk
 
 
 def now_tz():

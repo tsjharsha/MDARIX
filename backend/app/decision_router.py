@@ -3,10 +3,14 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.evidence.router import get_default_tenant_id
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.db.session import get_db
-from decision_center.schemas import AdvisoryRequest, DecisionContextRequest, DecisionCreateRequest, ReviewCreateRequest
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from decision_center.schemas import (
+    AdvisoryRequest,
+    DecisionContextRequest,
+    DecisionCreateRequest,
+    ReviewCreateRequest,
+)
 from decision_center.service import OPTIONS, DecisionCenterError, DecisionCenterService
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Decision Center"])

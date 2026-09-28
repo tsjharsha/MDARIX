@@ -1,12 +1,20 @@
 import uuid
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKeyConstraint, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKeyConstraint,
+    Index,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
 from backend.app.db.models.foundation import Vector, tenant_fk, uuid_pk
-
 
 EMBEDDING_DIMENSION = 32
 EMBEDDING_PROVIDER = "mdarix-deterministic"

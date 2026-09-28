@@ -1,46 +1,46 @@
-from datetime import datetime, timezone
 import os
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
-
-from backend.app.db.session import engine
-from backend.app.db.session import SessionLocal
-from backend.app.db.session import get_db
-from backend.app.enterprise_audit import make_audit_event
 from sqlalchemy.orm import Session
-from uuid import uuid4
-from backend.app.evidence.router import router as evidence_router
-from backend.app.investigations.router import router as investigations_router
-from backend.app.product360.schemas import Product360Response, ProductSummary, TemporalRealityResponse
-from backend.app.product360.service import Product360Error, Product360Service
-from backend.app.retrieval.router import router as retrieval_router
-from backend.app.challenger_router import router as challenger_router
-from backend.app.day14_router import router as day14_router
-from backend.app.decision_router import router as decision_router
-from counterfactual.router import router as counterfactual_router
-from backend.app.investigations.brief_router import router as brief_router
-from backend.app.trust_router import router as trust_router
-from backend.app.evaluation_router import router as evaluation_router
-from backend.app.integration_router import router as integration_router
-from backend.app.access_router import router as access_router
-from backend.app.auth_router import router as auth_router
-from backend.app.governance_router import router as governance_router
-from backend.app.ask_router import router as ask_router
-from scenario_intelligence.router import router as scenario_router
-from backend.app.workspace_context import router as workspace_context_router
-from backend.app.stage3_router import router as stage3_router
-from backend.app.communication_router import router as communication_router
-from backend.app.stage3_workflow_router import router as stage3_workflow_router
-from backend.app.mapping_catalog_router import router as mapping_catalog_router
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+
 from auth.durable import hash_token
+from backend.app.access_router import router as access_router
+from backend.app.ask_router import router as ask_router
+from backend.app.auth_router import router as auth_router
+from backend.app.challenger_router import router as challenger_router
+from backend.app.communication_router import router as communication_router
+from backend.app.day14_router import router as day14_router
 from backend.app.db.models.stage2 import AuthSession
-from backend.app.db.models.foundation import AuthUser
+from backend.app.db.session import SessionLocal, engine, get_db
+from backend.app.decision_router import router as decision_router
+from backend.app.enterprise_audit import make_audit_event
+from backend.app.evaluation_router import router as evaluation_router
+from backend.app.evidence.router import router as evidence_router
+from backend.app.governance_router import router as governance_router
+from backend.app.integration_router import router as integration_router
+from backend.app.investigations.brief_router import router as brief_router
+from backend.app.investigations.router import router as investigations_router
+from backend.app.mapping_catalog_router import router as mapping_catalog_router
+from backend.app.product360.schemas import (
+    Product360Response,
+    ProductSummary,
+    TemporalRealityResponse,
+)
+from backend.app.product360.service import Product360Error, Product360Service
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.retrieval.router import router as retrieval_router
+from backend.app.stage3_router import router as stage3_router
+from backend.app.stage3_workflow_router import router as stage3_workflow_router
+from backend.app.trust_router import router as trust_router
+from backend.app.workspace_context import router as workspace_context_router
+from counterfactual.router import router as counterfactual_router
 from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
+from scenario_intelligence.router import router as scenario_router
 
 _production_like = os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}
 _docs_enabled = os.getenv("MDARIX_ENABLE_API_DOCS", "true" if not _production_like else "false").lower() == "true"
@@ -98,7 +98,6 @@ async def audit_mutating_requests(request: Request, call_next):
     try:
         session = db.query(AuthSession).filter(AuthSession.session_hash == hash_token(request.cookies["mdarix_session"]), AuthSession.revoked_at.is_(None)).first()
         if session:
-            user = db.query(AuthUser).filter(AuthUser.id == session.user_id, AuthUser.tenant_id == session.tenant_id).first()
             now = datetime.now(timezone.utc)
             db.add(make_audit_event(tenant_id=session.tenant_id, actor_ref=str(session.user_id), action="REQUEST_MUTATION_COMPLETED", entity_type="HTTP_REQUEST", correlation_id=request.headers.get("X-Correlation-ID"), details={"method": request.method, "path": request.url.path, "status_code": response.status_code}, request=request, reason=request.headers.get("X-Change-Reason"), created_at=now))
             db.commit()

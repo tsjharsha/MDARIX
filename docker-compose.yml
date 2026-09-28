@@ -47,7 +47,7 @@ services:
       postgres: {condition: service_healthy}
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: minio/minio:latest
     command: server /data --console-address ":9001"
     restart: unless-stopped
     environment:

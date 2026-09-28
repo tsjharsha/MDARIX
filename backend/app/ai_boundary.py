@@ -1,7 +1,9 @@
 """Fail-closed, server-side allowlist for AI context construction."""
 from __future__ import annotations
+
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 AI_ALLOWED_FIELDS = frozenset({"id", "identifier", "title", "description", "status", "type", "category", "product_id", "product_version_id", "investigation_id", "event_time", "effective_time", "recorded_time", "source_reference", "provenance", "limitations", "observations", "hypotheses", "evidence_references"})
 AI_RESTRICTED_FIELDS = frozenset({"email", "phone", "address", "display_name", "organization"})

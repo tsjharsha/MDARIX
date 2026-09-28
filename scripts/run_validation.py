@@ -1,5 +1,6 @@
 """Single local command for the deterministic validation stack."""
 from __future__ import annotations
+
 import os
 import subprocess
 import sys

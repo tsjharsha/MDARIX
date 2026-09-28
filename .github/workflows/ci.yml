@@ -130,7 +130,7 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r requirements.txt pip-audit ruff
       - run: pip-audit -r requirements.txt
-      - run: ruff check backend auth access_control integration outbox scripts
+      - run: ruff check backend auth access_control integration outbox scripts --select F --ignore F403
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

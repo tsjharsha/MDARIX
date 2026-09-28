@@ -1,5 +1,4 @@
 """Read-only database hardening gate; reports local facts and external gates."""
-import os
 import sys
 from pathlib import Path
 

@@ -1,15 +1,22 @@
 """Reusable authenticated, tenant-scoped request context."""
 from dataclasses import dataclass
-from uuid import UUID, uuid4
-from fastapi import Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-from auth.service import auth_service
-from backend.app.db.session import get_db
-from backend.app.db.models.foundation import AuthUser, TenantMembership, RoleAssignment, RoleDefinition
-from backend.app.db.models.stage2 import AuthSession
-from auth.durable import hash_token
 from datetime import datetime, timezone
+from uuid import UUID, uuid4
+
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from auth.durable import hash_token
+from auth.service import auth_service
+from backend.app.db.models.foundation import (
+    AuthUser,
+    RoleAssignment,
+    RoleDefinition,
+    TenantMembership,
+)
+from backend.app.db.models.stage2 import AuthSession
+from backend.app.db.session import get_db
 
 
 def set_database_tenant_context(db: Session, tenant_id: str) -> None:
