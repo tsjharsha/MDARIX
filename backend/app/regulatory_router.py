@@ -22,6 +22,7 @@ class RegulatoryDraftRequest(BaseModel):
     document_type: str = Field(pattern="^(ESTAR_510K|GSPR|CER|IFU)$")
     claims: list[dict] = Field(default_factory=list, max_length=500)
     citations: list[dict] = Field(default_factory=list, max_length=1000)
+    authoring_sections: dict[str, str] = Field(default_factory=dict, max_length=40)
     document_identifier: str | None = Field(default=None, min_length=1, max_length=120)
     title: str | None = Field(default=None, max_length=255)
     change_reason: str = Field(default="Initial regulatory draft", min_length=1, max_length=1000)

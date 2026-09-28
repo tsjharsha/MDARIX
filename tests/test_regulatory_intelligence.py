@@ -22,3 +22,14 @@ def test_draft_marks_uncited_claims_unknown_and_requires_human_review():
     assert draft.sections[1]["unsupported"] is True
     assert draft.human_review_required is True
     assert set(CONFIDENCE_SEMANTICS) == {"HIGH", "MEDIUM", "LOW", "UNKNOWN"}
+
+
+def test_document_specific_authoring_sections_are_validated():
+    draft = RegulatoryDraftService().generate("IFU", {
+        "authoring_sections": {"intended_purpose": "Use for evaluation."},
+        "claims": [], "citations": [],
+    })
+    statuses = {item["section_id"]: item["status"] for item in draft.sections}
+    assert statuses["intended_purpose"] == "COMPLETE"
+    assert statuses["instructions"] == "MISSING"
+    assert any("Required authoring sections" in item for item in draft.limitations)

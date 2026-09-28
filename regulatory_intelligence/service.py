@@ -20,6 +20,13 @@ TEMPLATES = {
     "IFU": "Instructions for Use controlled draft",
 }
 
+AUTHORING_SECTIONS = {
+    "GSPR": ("device_scope", "general_requirements", "risk_controls", "verification_evidence", "residual_risks"),
+    "CER": ("device_description", "state_of_the_art", "clinical_evaluation_plan", "clinical_evidence", "benefit_risk_conclusion", "post_market_follow_up"),
+    "IFU": ("intended_purpose", "indications_and_contraindications", "warnings_and_precautions", "instructions", "residual_risks", "storage_and_disposal"),
+    "ESTAR_510K": ("device_description", "indications_for_use", "substantial_equivalence", "performance_testing", "labeling"),
+}
+
 
 @dataclass(frozen=True)
 class RegulatoryDraft:
@@ -37,6 +44,9 @@ class RegulatoryDraftService:
         if kind not in TEMPLATES:
             raise ValueError(f"Unsupported regulatory document type: {document_type}")
         citations = verify_citations(context.get("citations", []))
+        required_sections = AUTHORING_SECTIONS[kind]
+        authored = context.get("authoring_sections", {})
+        missing_sections = [name for name in required_sections if not authored.get(name)]
         sections = []
         for item in context.get("claims", []):
             claim_citations = [c for c in citations["verified"] if c.get("claim_id") == item.get("claim_id")]
@@ -49,14 +59,24 @@ class RegulatoryDraftService:
                 "citation_ids": [c.get("citation_id") for c in claim_citations],
                 "unsupported": not bool(claim_citations),
             })
+        sections.extend({
+            "section_id": name,
+            "title": name.replace("_", " ").title(),
+            "content": authored.get(name, ""),
+            "status": "COMPLETE" if authored.get(name) else "MISSING",
+            "human_review_required": True,
+        } for name in required_sections)
+        limitations = [
+                "Draft is evidence-organizing assistance, not regulatory advice or a submission decision.",
+                "Human review and approval are mandatory.",
+                "Licensed ISO text is not bundled; only registered official metadata and links are used.",
+            ]
+        if missing_sections:
+            limitations.append("Required authoring sections are incomplete: " + ", ".join(missing_sections))
         return RegulatoryDraft(
             document_type=kind,
             title=TEMPLATES[kind],
             sections=sections,
             citations=citations,
-            limitations=[
-                "Draft is evidence-organizing assistance, not regulatory advice or a submission decision.",
-                "Human review and approval are mandatory.",
-                "Licensed ISO text is not bundled; only registered official metadata and links are used.",
-            ],
+            limitations=limitations,
         )
