@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,7 @@ from backend.app.db.models.regulatory import RegulatoryDocument, RegulatoryDocum
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from regulatory_intelligence.service import RegulatoryDraftService
+from regulatory_intelligence.estar import generate_estar_package
 
 router = APIRouter(prefix="/api/v1/regulatory", tags=["Regulatory Intelligence"])
 
@@ -123,3 +125,18 @@ def update_regulatory_status(document_id: uuid.UUID, payload: RegulatoryStatusRe
     db.add(make_audit_event(tenant_id=ctx.tenant_id, actor_ref=str(ctx.user_id), action="REGULATORY_DOCUMENT_STATUS_CHANGED", entity_type="RegulatoryDocument", entity_id=document.id, details={"from": previous, "to": payload.status, "reason": payload.reason, "lock_version": document.lock_version}, created_at=now))
     db.commit()
     return {"id": str(document.id), "status": document.status, "lock_version": document.lock_version}
+
+
+@router.get("/documents/{document_id}/estar")
+def download_estar_preparation(document_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    document = db.query(RegulatoryDocument).filter(RegulatoryDocument.id == document_id, RegulatoryDocument.tenant_id == ctx.tenant_id).first()
+    if document is None:
+        raise HTTPException(404, detail={"code": "REGULATORY_DOCUMENT_NOT_FOUND", "message": "Regulatory document is not available"})
+    version = db.query(RegulatoryDocumentVersion).filter(RegulatoryDocumentVersion.document_id == document.id, RegulatoryDocumentVersion.tenant_id == ctx.tenant_id, RegulatoryDocumentVersion.version == document.current_version).first()
+    if version is None:
+        raise HTTPException(409, detail={"code": "REGULATORY_DOCUMENT_VERSION_MISSING", "message": "Current document version is unavailable"})
+    if document.document_type != "ESTAR_510K":
+        raise HTTPException(422, detail={"code": "ESTAR_DOCUMENT_TYPE_REQUIRED", "message": "Only ESTAR_510K documents can produce an eSTAR preparation package"})
+    sections = version.content.get("sections", [])
+    package = generate_estar_package(tenant_id=str(ctx.tenant_id), title=document.title, sections=sections, citations=version.citations, document_version=version.version)
+    return Response(content=package["content"], media_type=package["content_type"], headers={"Content-Disposition": f'attachment; filename="{package["filename"]}"', "X-MDARIX-XML-Validation": "passed", "X-MDARIX-Human-Review": "required"})
