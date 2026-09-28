@@ -1,0 +1,163 @@
+{
+  "package_id": "MDARIX-CSA-MVP-1.0",
+  "release": "MVP-1.0",
+  "generated_at": "2026-09-28T15:24:54.584476+00:00",
+  "intended_use": "Internal design-partner MVP validation; not a regulatory certification.",
+  "requirements": [
+    {
+      "id": "MDX-SEC-001",
+      "statement": "Authenticated users can access only authorized tenant data."
+    },
+    {
+      "id": "MDX-SEC-002",
+      "statement": "Protected fields are excluded from API, search, export, and AI context."
+    },
+    {
+      "id": "MDX-AI-001",
+      "statement": "AI output is advisory, provenance-aware, and requires human review."
+    },
+    {
+      "id": "MDX-AUD-001",
+      "statement": "Governed mutations create tenant-scoped audit evidence."
+    },
+    {
+      "id": "MDX-DOC-001",
+      "statement": "Regulatory drafts preserve version, citations, limitations, and approval state."
+    },
+    {
+      "id": "MDX-OPS-001",
+      "statement": "Migrations, health checks, worker processing, and recovery are observable."
+    }
+  ],
+  "tests": [
+    {
+      "test_id": "IQ-001",
+      "phase": "IQ",
+      "requirement_id": "MDX-OPS-001",
+      "objective": "Verify installation identity and source integrity.",
+      "procedure": [
+        "Record release commit and package versions.",
+        "Record Python, Node, PostgreSQL, and pgvector versions.",
+        "Verify migration head."
+      ],
+      "acceptance": "All versions and the approved migration head are recorded.",
+      "evidence": "IQ-001 environment record"
+    },
+    {
+      "test_id": "IQ-002",
+      "phase": "IQ",
+      "requirement_id": "MDX-SEC-001",
+      "objective": "Verify required services and configuration are installed.",
+      "procedure": [
+        "Start the controlled test stack.",
+        "Verify API, database, worker, simulator, and frontend health endpoints."
+      ],
+      "acceptance": "All required services report healthy without secrets in logs.",
+      "evidence": "IQ-002 health traces"
+    },
+    {
+      "test_id": "OQ-001",
+      "phase": "OQ",
+      "requirement_id": "MDX-SEC-001",
+      "objective": "Verify two tenants cannot read each other's records.",
+      "procedure": [
+        "Sign in as Tenant A.",
+        "Request Tenant B record, search, export, attachment, and AI context by ID.",
+        "Repeat in reverse."
+      ],
+      "acceptance": "Every unauthorized request returns denial or no foreign data.",
+      "evidence": "OQ-001 API traces and audit IDs"
+    },
+    {
+      "test_id": "OQ-002",
+      "phase": "OQ",
+      "requirement_id": "MDX-SEC-002",
+      "objective": "Verify field policy enforcement across all retrieval surfaces.",
+      "procedure": [
+        "Mark a field hidden.",
+        "Read API, search, export, attachment metadata, and AI context."
+      ],
+      "acceptance": "The hidden value is absent from every response and artifact.",
+      "evidence": "OQ-002 redacted response set"
+    },
+    {
+      "test_id": "OQ-003",
+      "phase": "OQ",
+      "requirement_id": "MDX-AI-001",
+      "objective": "Verify grounded AI safeguards.",
+      "procedure": [
+        "Submit a scoped investigation question.",
+        "Inspect citations, provenance, uncertainty, limitations, and human-review flag.",
+        "Submit an unsupported causal claim."
+      ],
+      "acceptance": "Unsupported causality is rejected or abstained from and human review remains required.",
+      "evidence": "OQ-003 AI response evidence"
+    },
+    {
+      "test_id": "OQ-004",
+      "phase": "OQ",
+      "requirement_id": "MDX-AUD-001",
+      "objective": "Verify governed mutation auditability.",
+      "procedure": [
+        "Perform a governed update and approval.",
+        "Inspect actor, tenant, timestamp, reason, old/new values, and signature binding."
+      ],
+      "acceptance": "The mutation and approval are immutable and version-bound.",
+      "evidence": "OQ-004 audit/signature evidence"
+    },
+    {
+      "test_id": "PQ-001",
+      "phase": "PQ",
+      "requirement_id": "MDX-DOC-001",
+      "objective": "Verify a complete regulatory authoring journey.",
+      "procedure": [
+        "Create CER, IFU, GSPR, and eSTAR preparation documents.",
+        "Create a second version.",
+        "Review, approve, archive, export, and verify the content hash."
+      ],
+      "acceptance": "The complete history is reproducible and no version is silently overwritten.",
+      "evidence": "PQ-001 document package"
+    },
+    {
+      "test_id": "PQ-002",
+      "phase": "PQ",
+      "requirement_id": "MDX-OPS-001",
+      "objective": "Verify normal and failure recovery workflows.",
+      "procedure": [
+        "Run connector ingestion, retry, dead-letter, replay, report generation, and stale-job recovery.",
+        "Capture worker and audit evidence."
+      ],
+      "acceptance": "Retries are bounded, replay is idempotent, and failures are visible and recoverable.",
+      "evidence": "PQ-002 operational report"
+    },
+    {
+      "test_id": "PQ-003",
+      "phase": "PQ",
+      "requirement_id": "MDX-SEC-001",
+      "objective": "Verify browser persona workflows.",
+      "procedure": [
+        "Exercise Platform Admin, Customer Admin, investigator, and approver journeys on desktop and mobile.",
+        "Review keyboard focus and screen-reader semantics."
+      ],
+      "acceptance": "Authorized journeys work without overflow, leakage, or inaccessible critical controls.",
+      "evidence": "PQ-003 browser/accessibility evidence"
+    }
+  ],
+  "deviation_process": [
+    "Record deviation ID and impact.",
+    "Assess patient/product/data integrity impact.",
+    "Approve corrective action.",
+    "Retest affected requirement.",
+    "Obtain QA and system-owner approval."
+  ],
+  "approval": {
+    "system_owner": "PENDING",
+    "quality_reviewer": "PENDING",
+    "approval_date": null
+  },
+  "status": "READY_FOR_EXECUTION",
+  "limitations": [
+    "Execution evidence must be generated against the approved test environment.",
+    "This package does not certify FDA, ISO, HIPAA, or 21 CFR Part 11 compliance."
+  ]
+}
