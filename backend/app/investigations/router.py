@@ -4,7 +4,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from hypothesis_engine.schemas import HypothesisSetRequest, HypothesisSetResponse
@@ -51,7 +50,6 @@ def get_investigation_workspace(
     as_of: datetime | None = None,
     include_retrieval: bool = True,
     retrieval_top_k: int = Query(8, ge=1, le=25),
-    db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationWorkspaceResponse:
@@ -74,13 +72,13 @@ def get_investigation_workspace(
 def create_investigation_analysis(
     investigation_id: uuid.UUID,
     request: InvestigationAnalysisRequest,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        return investigator_service.analyze(db, scoped_request)
+        return investigator_service.analyze(data_db, scoped_request)
     except InvestigatorError as exc:
         raise investigator_error(exc) from exc
 
@@ -88,11 +86,11 @@ def create_investigation_analysis(
 @router.get("/{investigation_id}/analysis/latest", response_model=InvestigationAnalysisResponse)
 def get_latest_investigation_analysis(
     investigation_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
-    result = investigator_service.latest(db, tenant_id, investigation_id)
+    result = investigator_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
         raise HTTPException(status_code=404, detail={"code": "ANALYSIS_NOT_FOUND", "message": "No investigation analysis exists"})
     return result
@@ -102,12 +100,12 @@ def get_latest_investigation_analysis(
 def get_investigation_analysis(
     investigation_id: uuid.UUID,
     analysis_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
     try:
-        return investigator_service.get(db, tenant_id, investigation_id, analysis_id)
+        return investigator_service.get(data_db, tenant_id, investigation_id, analysis_id)
     except InvestigatorError as exc:
         raise investigator_error(exc) from exc
 
@@ -116,13 +114,13 @@ def get_investigation_analysis(
 def create_hypotheses(
     investigation_id: uuid.UUID,
     request: HypothesisSetRequest,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        return hypothesis_service.generate(db, scoped_request)
+        return hypothesis_service.generate(data_db, scoped_request)
     except HypothesisEngineError as exc:
         raise hypothesis_error(exc) from exc
 
@@ -130,11 +128,11 @@ def create_hypotheses(
 @router.get("/{investigation_id}/hypotheses", response_model=HypothesisSetResponse)
 def list_latest_hypotheses(
     investigation_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
-    result = hypothesis_service.latest(db, tenant_id, investigation_id)
+    result = hypothesis_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
         raise HTTPException(status_code=404, detail={"code": "HYPOTHESIS_SET_NOT_FOUND", "message": "No hypothesis set exists"})
     return result
@@ -144,11 +142,11 @@ def list_latest_hypotheses(
 def get_hypothesis(
     investigation_id: uuid.UUID,
     hypothesis_id: uuid.UUID,
-    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     try:
-        return hypothesis_service.get(db, tenant_id, investigation_id, hypothesis_id)
+        return hypothesis_service.get(data_db, tenant_id, investigation_id, hypothesis_id)
     except HypothesisEngineError as exc:
         raise hypothesis_error(exc) from exc

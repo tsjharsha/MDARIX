@@ -11,7 +11,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AIExecution
-from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1", tags=["Stage 3 Experience"])
@@ -48,7 +48,7 @@ def _rows(db: Session, query: str, params: dict) -> list[dict]:
 
 
 @router.get("/analytics/command-center")
-def command_center(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def command_center(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     counts = {name: _tenant_count(db, table, ctx.tenant_id) for name, table in _COUNT_TABLES.items()}
     return {
         "tenant_id": ctx.tenant_id,
@@ -63,7 +63,7 @@ def command_center(db: Session = Depends(get_db), ctx: AuthenticatedRequestConte
 
 
 @router.get("/analytics/signals")
-def signals_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def signals_summary(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     rows = _rows(db, """
         SELECT complaint_identifier AS signal_id, description, severity, status, event_timestamp
         FROM complaints WHERE tenant_id = :tenant_id
@@ -75,7 +75,7 @@ def signals_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequestCont
 
 
 @router.get("/analytics/investigations")
-def investigations_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def investigations_summary(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     rows = _rows(db, """
         SELECT id, investigation_identifier, status, investigation_question
         FROM investigations WHERE tenant_id = :tenant_id
@@ -86,7 +86,7 @@ def investigations_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequ
 
 
 @router.get("/analytics/evidence")
-def evidence_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def evidence_summary(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     rows = _rows(db, """
         SELECT id, evidence_identifier, evidence_type, title, reliability_status, source_system
         FROM evidence WHERE tenant_id = :tenant_id ORDER BY created_at DESC NULLS LAST LIMIT 100
@@ -97,7 +97,7 @@ def evidence_summary(db: Session = Depends(get_db), ctx: AuthenticatedRequestCon
 
 
 @router.get("/analytics/persona/{persona}")
-def persona_dashboard(persona: str, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def persona_dashboard(persona: str, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     allowed = {"investigator", "quality-manager", "regulatory", "risk-manager", "approver", "executive"}
     normalized = persona.lower()
     if normalized not in allowed:
@@ -114,7 +114,7 @@ def persona_dashboard(persona: str, db: Session = Depends(get_db), ctx: Authenti
 
 
 @router.get("/story/{investigation_id}")
-def story_view(investigation_id: str, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def story_view(investigation_id: str, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     exists = db.execute(text("SELECT 1 FROM investigations WHERE id = :id AND tenant_id = :tenant_id"), {"id": investigation_id, "tenant_id": ctx.tenant_id}).first()
     if not exists:
         return {"status": "NOT_FOUND", "investigation_id": investigation_id, "tenant_id": ctx.tenant_id, "message": "Investigation is not available for this tenant."}
@@ -168,7 +168,7 @@ def _execution_cost(row: AIExecution) -> Decimal:
     except (InvalidOperation, TypeError): return Decimal(0)
 
 @router.get("/analytics/ai/provider-monitoring")
-def ai_provider_monitoring(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def ai_provider_monitoring(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """Tenant-scoped operational view for provider health and persisted executions."""
     rows = db.query(AIExecution).filter(AIExecution.tenant_id == ctx.tenant_id).order_by(AIExecution.execution_timestamp.desc()).limit(1000).all()
     failures = [row for row in rows if row.error_state or str(row.validation_status or "").upper() in {"FAILED", "BLOCKED"}]
@@ -180,7 +180,7 @@ def ai_provider_monitoring(db: Session = Depends(get_db), ctx: AuthenticatedRequ
     return {"tenant_id": ctx.tenant_id, "status": "DEGRADED" if failures else "HEALTHY", "metrics": {"executions": len(rows), "failures": len(failures), "failure_rate": round(len(failures) / len(rows), 4) if rows else 0, "p95_latency_ms": sorted(latencies)[max(0, int(len(latencies) * .95) - 1)] if latencies else None}, "providers": [{**item, "estimated_cost": str(item["estimated_cost"])} for item in ({"provider": key, **value} for key, value in by_provider.items())], "alert": bool(failures), "limitations": ["Metrics are tenant-scoped persisted execution telemetry; external provider monitoring remains deployment-specific."]}
 
 @router.get("/analytics/ai/cost-reconciliation")
-def ai_cost_reconciliation(provider_invoice_total: str | None = Query(default=None), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def ai_cost_reconciliation(provider_invoice_total: str | None = Query(default=None), db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """Reconcile persisted estimated provider cost with an supplied invoice total."""
     rows = db.query(AIExecution).filter(AIExecution.tenant_id == ctx.tenant_id).limit(10000).all()
     estimated = sum((_execution_cost(row) for row in rows), Decimal(0))

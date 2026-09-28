@@ -189,49 +189,49 @@ def readiness() -> dict[str, str]:
 
 
 @app.get("/api/v1/graph/nodes/{entity_type}/{entity_id}")
-def get_node(entity_type: str, entity_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def get_node(entity_type: str, entity_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)):
     try:
-        return graph_service.get_node(entity_type, entity_id, ctx.tenant_id)
+        return RealityGraphService(data_db).get_node(entity_type, entity_id, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 
 
 @app.get("/api/v1/graph/nodes/{entity_type}/{entity_id}/neighbors", response_model=GraphResponse)
-def get_neighbors(entity_type: str, entity_id: str, depth: int = Query(1, ge=0, le=3), direction: str = "both", relationship_type: str | None = None, target_entity_type: str | None = None, ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> GraphResponse:
+def get_neighbors(entity_type: str, entity_id: str, depth: int = Query(1, ge=0, le=3), direction: str = "both", relationship_type: str | None = None, target_entity_type: str | None = None, ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> GraphResponse:
     try:
-        return graph_service.get_neighbors(entity_type, entity_id, depth, direction, relationship_type, target_entity_type, ctx.tenant_id)
+        return RealityGraphService(data_db).get_neighbors(entity_type, entity_id, depth, direction, relationship_type, target_entity_type, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 
 
 @app.get("/api/v1/graph/products/{product_id}", response_model=GraphResponse)
-def get_product_graph(product_id: str, depth: int = Query(2, ge=0, le=3), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> GraphResponse:
+def get_product_graph(product_id: str, depth: int = Query(2, ge=0, le=3), ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> GraphResponse:
     try:
-        return graph_service.get_product_graph(product_id, depth, ctx.tenant_id)
+        return RealityGraphService(data_db).get_product_graph(product_id, depth, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 
 
 @app.get("/api/v1/graph/investigations/{investigation_id}", response_model=GraphResponse)
-def get_investigation_graph(investigation_id: str, depth: int = Query(2, ge=0, le=3), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> GraphResponse:
+def get_investigation_graph(investigation_id: str, depth: int = Query(2, ge=0, le=3), ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> GraphResponse:
     try:
-        return graph_service.get_investigation_graph(investigation_id, depth, ctx.tenant_id)
+        return RealityGraphService(data_db).get_investigation_graph(investigation_id, depth, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 
 
 @app.get("/api/v1/graph/relationships/{relationship_id}", response_model=RelationshipDetail)
-def get_relationship(relationship_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> RelationshipDetail:
+def get_relationship(relationship_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> RelationshipDetail:
     try:
-        return graph_service.get_relationship_detail(relationship_id, ctx.tenant_id)
+        return RealityGraphService(data_db).get_relationship_detail(relationship_id, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 
 
 @app.get("/api/v1/graph/paths", response_model=GraphResponse)
-def get_path(source_type: str, source_id: str, target_type: str, target_id: str, max_depth: int = Query(4, ge=0, le=5), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> GraphResponse:
+def get_path(source_type: str, source_id: str, target_type: str, target_id: str, max_depth: int = Query(4, ge=0, le=5), ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> GraphResponse:
     try:
-        return graph_service.get_path(source_type, source_id, target_type, target_id, max_depth, ctx.tenant_id)
+        return RealityGraphService(data_db).get_path(source_type, source_id, target_type, target_id, max_depth, ctx.tenant_id)
     except GraphError as exc:
         raise graph_error(exc) from exc
 

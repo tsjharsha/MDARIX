@@ -68,8 +68,16 @@ class GraphError(ValueError):
 
 
 class RealityGraphService:
+    def __init__(self, db=None):
+        # A request-scoped tenant data-plane session can be supplied by API
+        # routes.  The fallback preserves standalone graph tooling only.
+        self.db = db
+
+    def connection(self):
+        return self.db.connection() if self.db is not None else engine.connect()
+
     def tenant_id(self) -> str:
-        with engine.connect() as conn:
+        with self.connection() as conn:
             value = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}).scalar_one()
             return str(value)
 
@@ -77,7 +85,7 @@ class RealityGraphService:
         entity_type = self.clean_entity_type(entity_type)
         tenant_id = tenant_id or self.tenant_id()
         table, business_col, label_col = NODE_TYPES[entity_type]
-        with engine.connect() as conn:
+        with self.connection() as conn:
             row = conn.execute(
                 text(f"SELECT *, {business_col} AS business_identifier, {label_col} AS display_value FROM {table} WHERE tenant_id=:tenant_id AND id=:id"),
                 {"tenant_id": tenant_id, "id": entity_id},
@@ -192,7 +200,7 @@ class RealityGraphService:
 
     def all_relationships(self, tenant_id: str) -> list[GraphRelationship]:
         rels: dict[str, GraphRelationship] = {}
-        with engine.connect() as conn:
+        with self.connection() as conn:
             self.add_product_versions(conn, tenant_id, rels)
             self.add_lots(conn, tenant_id, rels)
             self.add_complaints(conn, tenant_id, rels)
@@ -305,7 +313,7 @@ class RealityGraphService:
     def evidence_for_relationship(self, rel: GraphRelationship, tenant_id: str) -> list[dict[str, Any]]:
         if rel.evidence_count == 0 and "EVIDENCE" not in rel.type:
             return []
-        with engine.connect() as conn:
+        with self.connection() as conn:
             rows = conn.execute(text("SELECT evidence_identifier, title, reliability_status FROM evidence WHERE tenant_id=:t LIMIT 5"), {"t": tenant_id}).mappings().all()
             return [dict(row) for row in rows]
 
