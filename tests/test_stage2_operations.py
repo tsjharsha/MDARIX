@@ -76,3 +76,12 @@ def test_outbox_worker_stops_gracefully_after_requested_stop():
     worker.process_once = process_once
     worker.run_forever(limit=7, interval_seconds=0, stop=lambda: len(calls) >= 1)
     assert calls == [7]
+
+
+def test_worker_exposes_heartbeat_and_metrics():
+    worker = OutboxWorker(lambda *_: None)
+    worker.metrics.heartbeat_at = "now"
+    worker.metrics.stale_recovered = 2
+    snapshot = worker.metrics.snapshot()
+    assert snapshot["heartbeat_at"] == "now"
+    assert snapshot["stale_recovered"] == 2

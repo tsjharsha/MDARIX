@@ -89,7 +89,7 @@ class MDARIXCaseContext(Base):
 
 class OutboxEvent(Base):
     __tablename__ = 'event_outbox'
-    id = _id(); tenant_id = _tenant(); event_name: Mapped[str] = mapped_column(String(120), nullable=False); aggregate_type: Mapped[str] = mapped_column(String(120), nullable=False); aggregate_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True)); payload: Mapped[dict] = mapped_column(JSONB, nullable=False); occurred_at = _ts(False); published_at = _ts(); attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default='0'); next_attempt_at = _ts(); dead_lettered_at = _ts(); last_error: Mapped[str | None] = mapped_column(Text)
+    id = _id(); tenant_id = _tenant(); event_name: Mapped[str] = mapped_column(String(120), nullable=False); aggregate_type: Mapped[str] = mapped_column(String(120), nullable=False); aggregate_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True)); payload: Mapped[dict] = mapped_column(JSONB, nullable=False); occurred_at = _ts(False); published_at = _ts(); attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default='0'); next_attempt_at = _ts(); dead_lettered_at = _ts(); last_error: Mapped[str | None] = mapped_column(Text); claimed_by: Mapped[str | None] = mapped_column(String(120)); claimed_at = _ts()
     __table_args__ = (Index('ix_event_outbox_pending','published_at','occurred_at'),)
 
 class SubscriptionLifecycle(Base):
