@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from auth.service import auth_service
-from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from .schemas import ScenarioRequest, ScenarioResponse
 from .service import ScenarioError, ScenarioService
@@ -22,7 +22,7 @@ def _context(request: Request) -> dict:
 
 
 @router.post("/{investigation_id}/scenarios", response_model=ScenarioResponse)
-def execute_scenario(investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_db)):
+def execute_scenario(investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_data_plane_db)):
     context = _context(request)
     tenant_id = uuid.UUID(context["tenant_id"])
     correlation = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())

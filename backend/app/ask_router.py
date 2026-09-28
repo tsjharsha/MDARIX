@@ -32,6 +32,7 @@ from backend.app.db.models.foundation import (
     Unknown,
 )
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import get_request_context
 
@@ -174,7 +175,12 @@ def _structured_intelligence(*, retrieval, lifecycle, intelligence, spec) -> dic
 
 
 @router.post("/")
-def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> dict:
+def ask(
+    request: Request,
+    data: AskRequest,
+    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
+) -> dict:
     context = _authenticated_context(request, db) if os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"} else _authenticated_context(request)
     correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
     tenant = db.query(Tenant).filter(Tenant.id == context["tenant_id"]).first()
@@ -195,7 +201,7 @@ def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> di
 
     _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_QUERY_RECEIVED", correlation_id=correlation_id)
     _validate_product_version_scope(
-        db,
+        data_db,
         tenant_id=UUID(context["tenant_id"]),
         product_version_id=_uuid_or_none(data.product_version_id),
         product_id=_uuid_or_none(data.product_id),
@@ -203,7 +209,7 @@ def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> di
     )
     if data.session_id:
         try:
-            session = db.query(InvestigationSessionRecord).filter(
+            session = data_db.query(InvestigationSessionRecord).filter(
                 InvestigationSessionRecord.id == UUID(data.session_id),
                 InvestigationSessionRecord.tenant_id == UUID(context["tenant_id"]),
                 InvestigationSessionRecord.owner_user_id == context["user_id"],
@@ -220,12 +226,12 @@ def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> di
             tenant_id=UUID(context["tenant_id"]), owner_user_id=context["user_id"],
             correlation_id=correlation_id, created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
         )
-        db.add(session)
-        db.flush()
+        data_db.add(session)
+        data_db.flush()
 
     if data.investigation_id:
         investigation_id = _uuid_or_none(data.investigation_id)
-        investigation = db.query(Investigation).filter(
+        investigation = data_db.query(Investigation).filter(
             Investigation.id == investigation_id,
             Investigation.tenant_id == UUID(context["tenant_id"]),
         ).first() if investigation_id else None
@@ -251,14 +257,14 @@ def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> di
             and (retrieval_requested or lifecycle_requested)
         ):
             raise RuntimeError("controlled Day 27 retrieval dependency failure")
-        retrieval = AuthorizedRetrievalService().retrieve(db, AuthorizedRetrievalRequest(
+        retrieval = AuthorizedRetrievalService().retrieve(data_db, AuthorizedRetrievalRequest(
             tenant_id=UUID(context["tenant_id"]),
             product_id=_uuid_or_none(data.product_id), product_identifier=data.product_identifier,
             product_version_id=_uuid_or_none(data.product_version_id), product_version_identifier=data.product_version_identifier,
             evidence_id=_uuid_or_none(data.evidence_id), evidence_identifier=data.evidence_identifier,
             limit=plan.limit or 25,
         ))
-        lifecycle = LifecycleRetrievalService().retrieve(db, LifecycleRetrievalRequest(
+        lifecycle = LifecycleRetrievalService().retrieve(data_db, LifecycleRetrievalRequest(
             tenant_id=UUID(context["tenant_id"]),
             product_id=_uuid_or_none(data.product_id),
             product_version_id=_uuid_or_none(data.product_version_id),
@@ -275,26 +281,27 @@ def ask(request: Request, data: AskRequest, db: Session = Depends(get_db)) -> di
         _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_RETRIEVAL_EXECUTED", correlation_id=correlation_id, details={"result_count": len(retrieval.ai_context)})
     _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_QUERY_PROCESSED", correlation_id=correlation_id, details={"status": "INTERPRETED", **_temporal_audit_details(spec)})
     session.updated_at = datetime.now(timezone.utc)
+    data_db.commit()
     db.commit()
     intelligence = None
     if data.investigation_id:
         investigation_id = _uuid_or_none(data.investigation_id)
         if investigation_id is not None:
-            hypotheses = db.query(Hypothesis).filter(
+            hypotheses = data_db.query(Hypothesis).filter(
                 Hypothesis.tenant_id == UUID(context["tenant_id"]),
                 Hypothesis.investigation_id == investigation_id,
             ).all()
             hypothesis_ids = [item.id for item in hypotheses]
-            unknowns = db.query(Unknown).filter(
+            unknowns = data_db.query(Unknown).filter(
                 Unknown.tenant_id == UUID(context["tenant_id"]),
                 Unknown.investigation_id == investigation_id,
             ).all()
-            links = db.query(HypothesisEvidence).filter(
+            links = data_db.query(HypothesisEvidence).filter(
                 HypothesisEvidence.tenant_id == UUID(context["tenant_id"]),
                 HypothesisEvidence.hypothesis_id.in_(hypothesis_ids) if hypothesis_ids else False,
             ).all()
             evidence_ids = [link.evidence_id for link in links]
-            evidence_rows = db.query(Evidence).filter(
+            evidence_rows = data_db.query(Evidence).filter(
                 Evidence.tenant_id == UUID(context["tenant_id"]),
                 Evidence.id.in_(evidence_ids) if evidence_ids else False,
             ).all()

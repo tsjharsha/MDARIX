@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.evidence.router import get_default_tenant_id
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from .schemas import CounterfactualRequest, CounterfactualResponse
@@ -18,7 +18,7 @@ def payload(item) -> CounterfactualResponse:
 
 
 @router.post("/{investigation_id}/counterfactuals", response_model=CounterfactualResponse)
-def create_counterfactual(investigation_id: uuid.UUID, request: CounterfactualRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def create_counterfactual(investigation_id: uuid.UUID, request: CounterfactualRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     try:
         return payload(service.execute(db, ctx.tenant_id, investigation_id, request))
     except CounterfactualError as exc:
@@ -26,12 +26,12 @@ def create_counterfactual(investigation_id: uuid.UUID, request: CounterfactualRe
 
 
 @router.get("/{investigation_id}/counterfactuals", response_model=list[CounterfactualResponse])
-def list_counterfactuals(investigation_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_counterfactuals(investigation_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     return [payload(item) for item in service.list(db, ctx.tenant_id, investigation_id)]
 
 
 @router.get("/counterfactuals/{counterfactual_id}", response_model=CounterfactualResponse)
-def get_counterfactual(counterfactual_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def get_counterfactual(counterfactual_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from backend.app.db.models.foundation import Scenario
     item = db.query(Scenario).filter(Scenario.tenant_id == ctx.tenant_id, Scenario.id == counterfactual_id, Scenario.assumptions["kind"].astext == "COUNTERFACTUAL").first()
     if not item:

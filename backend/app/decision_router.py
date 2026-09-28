@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from decision_center.schemas import (
     AdvisoryRequest,
@@ -23,7 +23,7 @@ def error(exc: DecisionCenterError) -> HTTPException:
 
 
 @router.get("/decisions/{decision_id}")
-def get_decision(decision_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def get_decision(decision_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from backend.app.db.models.foundation import Decision
     item = db.query(Decision).filter(Decision.tenant_id == ctx.tenant_id, Decision.id == decision_id).first()
     if not item:
@@ -32,7 +32,7 @@ def get_decision(decision_id: uuid.UUID, db: Session = Depends(get_db), ctx: Aut
 
 
 @router.post("/decisions/{decision_id}/reviews")
-def review_decision(decision_id: uuid.UUID, request: ReviewCreateRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def review_decision(decision_id: uuid.UUID, request: ReviewCreateRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     try:
         review = service.review(db, ctx.tenant_id, decision_id, request)
         return {"id": review.id, "decision_id": review.decision_id, "disposition": review.disposition, "reviewer_ref": review.reviewer_ref, "comments": review.comments, "review_timestamp": review.review_timestamp}
@@ -41,7 +41,7 @@ def review_decision(decision_id: uuid.UUID, request: ReviewCreateRequest, db: Se
 
 
 @router.get("/{investigation_id}/decision-context")
-def decision_context(investigation_id: uuid.UUID, request: DecisionContextRequest = Depends(), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def decision_context(investigation_id: uuid.UUID, request: DecisionContextRequest = Depends(), db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     try:
         return service.context(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
@@ -49,7 +49,7 @@ def decision_context(investigation_id: uuid.UUID, request: DecisionContextReques
 
 
 @router.post("/{investigation_id}/decision-advisory")
-def decision_advisory(investigation_id: uuid.UUID, request: AdvisoryRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def decision_advisory(investigation_id: uuid.UUID, request: AdvisoryRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     try:
         return service.advisory(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
@@ -57,7 +57,7 @@ def decision_advisory(investigation_id: uuid.UUID, request: AdvisoryRequest, db:
 
 
 @router.post("/{investigation_id}/decisions")
-def create_decision(investigation_id: uuid.UUID, request: DecisionCreateRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def create_decision(investigation_id: uuid.UUID, request: DecisionCreateRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     if request.selected_action not in OPTIONS:
         raise HTTPException(400, detail={"code": "INVALID_DECISION_OPTION", "message": "Decision option is not controlled"})
     try:
@@ -67,7 +67,7 @@ def create_decision(investigation_id: uuid.UUID, request: DecisionCreateRequest,
 
 
 @router.get("/{investigation_id}/decisions")
-def list_decisions(investigation_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_decisions(investigation_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from backend.app.db.models.foundation import Decision
     tenant_id = ctx.tenant_id
     service._investigation(db, tenant_id, investigation_id)

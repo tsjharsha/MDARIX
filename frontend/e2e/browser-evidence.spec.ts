@@ -122,4 +122,28 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.locator("body")).toContainText(/investigat|evidence|review/i);
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-ai-investigation.png`, fullPage: true });
   });
+
+  test("authenticated AI workflow surfaces remain usable across review stages", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    const workflows = [
+      ["/app/ask", /ask mdarix|authorized|human review/i, "ask"],
+      ["/app/investigations", /investigat|hypothes|evidence|review/i, "investigation"],
+      ["/app/evidence", /evidence|provenance|source/i, "evidence"],
+      ["/app/decision", /decision|review|human/i, "decision"],
+      ["/app/assurance", /assurance|ai|human review|trust/i, "assurance"],
+      ["/app/audit", /audit|activity|recorded/i, "audit"],
+    ] as const;
+    for (const [route, expected, name] of workflows) {
+      await page.goto(route);
+      await expect(page.locator("body")).not.toBeEmpty();
+      await expect(page.locator("body")).not.toContainText(/Administration unavailable|blank page/i);
+      await expect(page.locator("body")).toContainText(expected, { timeout: 20_000 });
+      const firstControl = page.locator("a,button,input,select,textarea").first();
+      await expect(firstControl).toBeVisible();
+      await firstControl.focus();
+      await expect(firstControl).toBeFocused();
+      await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-ai-${name}.png`, fullPage: true });
+    }
+  });
 });
