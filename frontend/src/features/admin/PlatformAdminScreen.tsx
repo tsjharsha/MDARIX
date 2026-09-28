@@ -548,6 +548,9 @@ export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }
   const [recordTab, setRecordTab] = useState("Overview");
   const [recordTabDetail, setRecordTabDetail] = useState<any>(null);
 
+  // Normalize legacy command-center labels to the canonical subsection names.
+  useEffect(() => { if (activeDomain === "Customers & Tenants" && activeItem === "Customers") setActiveItem("Customer Directory"); }, [activeDomain, activeItem]);
+
   useEffect(() => {
     let current = true;
     Promise.allSettled(SOURCES.map(([, path]) => api<any>(path))).then((results) => {
@@ -586,7 +589,7 @@ export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }
     api<any>(endpoint).then(setRecordTabDetail).catch((error) => setRecordTabDetail({ error: error instanceof Error ? error.message : "Tab data is unavailable" }));
   }, [recordView, recordDetail, recordTab]);
 
-  const selectDomain = (domain: typeof DOMAINS[number]) => {
+const selectDomain = (domain: typeof DOMAINS[number]) => {
     setActiveDomain(domain[0]);
     setActiveItem(domain[3][0]);
     setCollapsedDomain(null);
