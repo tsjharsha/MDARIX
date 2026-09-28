@@ -2,7 +2,9 @@
 
 MDARIX R1 development foundation for Release 1.
 
-This repository currently contains Day 0 engineering foundation only. It does not contain product functionality, application tables, API endpoints, frontend pages, AI agents, investigation workflows, evidence engines, or decision engines.
+This repository contains the MDARIX MVP 1.0 controlled synthetic-demo implementation. The frozen scope and demo script are in [`docs/MVP_SCOPE_AND_DEMO_READINESS.md`](docs/MVP_SCOPE_AND_DEMO_READINESS.md).
+
+The MVP uses synthetic tenants, seeded records, provider simulators, and local infrastructure for validation. Real customer integrations, hosted production operations, and production compliance evidence are explicitly outside the current demo scope.
 
 ## Local Development Prerequisites
 
