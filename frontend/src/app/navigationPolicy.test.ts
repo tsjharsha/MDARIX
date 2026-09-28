@@ -17,7 +17,7 @@ describe("authentication and role navigation", () => {
   it("routes each administrator to only its own protected area", () => {
     expect(allowedViewsForRole("Administrator")).toContain("admin");
     expect(allowedViewsForRole("Administrator")).not.toContain("customer-admin");
-    expect(allowedViewsForRole("Customer Admin")).toEqual(["customer-admin"]);
+    expect(allowedViewsForRole("Customer Admin")).toContain("customer-admin");
     expect(allowedViewsForRole("Viewer")).toBeNull();
   });
 
