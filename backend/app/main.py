@@ -37,6 +37,8 @@ from backend.app.stage3_router import router as stage3_router
 from backend.app.stage3_workflow_router import router as stage3_workflow_router
 from backend.app.trust_router import router as trust_router
 from backend.app.workspace_context import router as workspace_context_router
+from backend.app.data_plane_router import router as data_plane_router
+from backend.app.db.data_plane import get_data_plane_db
 from counterfactual.router import router as counterfactual_router
 from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
@@ -233,14 +235,14 @@ def get_path(source_type: str, source_id: str, target_type: str, target_id: str,
 
 
 @app.get("/api/v1/products", response_model=list[ProductSummary])
-def list_products(ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> list[ProductSummary]:
-    return product360_service.list_products(ctx.tenant_id)
+def list_products(ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> list[ProductSummary]:
+    return product360_service.list_products(ctx.tenant_id, db_engine=data_db.get_bind())
 
 
 @app.get("/api/v1/products/{product_id}/investigations")
-def list_product_investigations(product_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> list[dict]:
+def list_product_investigations(product_id: str, ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> list[dict]:
     try:
-        return product360_service.list_product_investigations(product_id, ctx.tenant_id)
+        return product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=data_db.get_bind())
     except Product360Error as exc:
         raise product_error(exc) from exc
 
@@ -256,9 +258,9 @@ def _product360_audit(db: Session, product: Product360Response, mode: str, as_of
 
 
 @app.get("/api/v1/products/{product_id}/product-360", response_model=Product360Response)
-def get_product360(request: Request, product_id: str, version_id: str | None = None, as_of: datetime | None = None, mode: str = Query("current", pattern="^(current|event|known)$"), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> Product360Response:
+def get_product360(request: Request, product_id: str, version_id: str | None = None, as_of: datetime | None = None, mode: str = Query("current", pattern="^(current|event|known)$"), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> Product360Response:
     try:
-        result = product360_service.product360(product_id, version_id, as_of, mode, ctx.tenant_id)
+        result = product360_service.product360(product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind())
         _product360_audit(db, result, mode, as_of, ctx)
         return result
     except Product360Error as exc:
@@ -266,10 +268,17 @@ def get_product360(request: Request, product_id: str, version_id: str | None = N
 
 
 @app.get("/api/v1/products/{product_id}/timeline", response_model=TemporalRealityResponse)
-def get_timeline(request: Request, product_id: str, version_id: str | None = None, as_of: datetime | None = None, mode: str = Query("event", pattern="^(event|known)$"), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> TemporalRealityResponse:
+def get_timeline(request: Request, product_id: str, version_id: str | None = None, as_of: datetime | None = None, mode: str = Query("event", pattern="^(event|known)$"), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)) -> TemporalRealityResponse:
     try:
-        result = product360_service.temporal_reality(product_id, version_id, as_of, mode, ctx.tenant_id)
-        _product360_audit(db, product360_service.product360(product_id, version_id, as_of, mode), mode, as_of, ctx)
+        result = product360_service.temporal_reality(product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind())
+        _product360_audit(db, product360_service.product360(product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind()), mode, as_of, ctx)
         return result
     except Product360Error as exc:
         raise product_error(exc) from exc
+
+
+# Keep this registration after the app-declared product routes.  The project
+# historically registers several routers before the remaining app decorators;
+# registering the data-plane surface here guarantees it is present in the
+# final application route map.
+app.include_router(data_plane_router)

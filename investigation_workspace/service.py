@@ -39,7 +39,7 @@ class InvestigationWorkspaceService:
         self.graph_service = graph_service or RealityGraphService()
         self.retrieval_service = retrieval_service or TrustedRetrievalService()
 
-    def workspace(self, db: Session, request: InvestigationWorkspaceRequest) -> InvestigationWorkspaceResponse:
+    def workspace(self, db: Session, request: InvestigationWorkspaceRequest, data_plane_engine=None) -> InvestigationWorkspaceResponse:
         if request.tenant_id is None:
             raise InvestigationWorkspaceError("TENANT_REQUIRED", "tenant_id is required")
 
@@ -56,7 +56,7 @@ class InvestigationWorkspaceService:
             version = db.query(ProductVersion).filter(ProductVersion.tenant_id == request.tenant_id, ProductVersion.id == product_version_id, ProductVersion.product_id == investigation.product_id).first()
             if version is None:
                 raise InvestigationWorkspaceError("PRODUCT_VERSION_NOT_FOUND", "ProductVersion is not available for this investigation product")
-        product_context = self._product_context(investigation, product_version_id, request)
+        product_context = self._product_context(investigation, product_version_id, request, data_plane_engine)
         relationship_context = self._relationship_context(investigation.id)
         evidence_context = self._evidence_context(db, request.tenant_id, investigation, request.temporal_mode, request.as_of)
         retrieval_context = self._retrieval_context(db, request, investigation, product_version_id) if request.include_retrieval else None
@@ -85,13 +85,14 @@ class InvestigationWorkspaceService:
             },
         )
 
-    def _product_context(self, investigation: Investigation, product_version_id: str | None, request: InvestigationWorkspaceRequest) -> dict[str, Any]:
+    def _product_context(self, investigation: Investigation, product_version_id: str | None, request: InvestigationWorkspaceRequest, data_plane_engine=None) -> dict[str, Any]:
         view = self.product_service.product360(
             str(investigation.product_id),
             version_id=product_version_id,
             as_of=request.as_of,
             mode=request.temporal_mode,
             tenant_id=str(request.tenant_id),
+            db_engine=data_plane_engine,
         )
         return {
             "product": view.product,

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from hypothesis_engine.schemas import HypothesisSetRequest, HypothesisSetResponse
 from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
@@ -51,6 +52,7 @@ def get_investigation_workspace(
     include_retrieval: bool = True,
     retrieval_top_k: int = Query(8, ge=1, le=25),
     db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationWorkspaceResponse:
     tenant_id = ctx.tenant_id
@@ -63,7 +65,7 @@ def get_investigation_workspace(
         retrieval_top_k=retrieval_top_k,
     )
     try:
-        return service.workspace(db, request)
+        return service.workspace(data_db, request, data_plane_engine=data_db.get_bind())
     except InvestigationWorkspaceError as exc:
         raise workspace_error(exc) from exc
 

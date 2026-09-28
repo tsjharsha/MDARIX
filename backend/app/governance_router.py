@@ -55,7 +55,7 @@ def bootstrap(db,tenant):
 def tenant(db,actor):
  try: tenant_id=uuid.UUID(actor["tenant_id"])
  except (ValueError,TypeError): raise HTTPException(403,detail={"code":"TENANT_CONTEXT_INVALID","message":"Authenticated tenant context is invalid"})
- item=db.query(Tenant).filter(Tenant.id==tenant_id,Tenant.status=="active").first()
+ item=db.query(Tenant).filter(Tenant.id==tenant_id,Tenant.status.in_(("active", "ACTIVE"))).first()
  if not item: raise HTTPException(403,detail={"code":"TENANT_INACTIVE","message":"Active tenant required"})
  bootstrap(db,item); return item
 def entitled(db,t):

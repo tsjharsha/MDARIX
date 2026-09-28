@@ -43,6 +43,31 @@ class TenantEnvironment(Base):
     __table_args__ = (ForeignKeyConstraint(["tenant_id", "clone_source_environment_id"], ["tenant_environments.tenant_id", "tenant_environments.id"]), UniqueConstraint("tenant_id", "environment_identifier", name="uq_tenant_environment_identifier"), UniqueConstraint("tenant_id", "environment_type", name="uq_tenant_environment_type"), UniqueConstraint("tenant_id", "id", name="uq_tenant_environment_tenant_id"), CheckConstraint("environment_type in ('PRODUCTION','SANDBOX','VALIDATION','UAT','DEMO')", name="tenant_environment_type_allowed"), CheckConstraint("status in ('DRAFT','PROVISIONING','ACTIVE','SUSPENDED','ARCHIVED','FAILED')", name="tenant_environment_status_allowed"))
 
 
+class TenantDataPlane(Base):
+    """Server-side routing metadata for the isolated customer data plane.
+
+    Secrets are deliberately not stored here. ``credential_ref`` points to a
+    deployment secret, while ``database_ref`` identifies the approved data
+    plane. The browser can never select or override these values.
+    """
+    __tablename__ = "tenant_data_planes"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    database_ref: Mapped[str] = mapped_column(String(160), nullable=False)
+    connection_secret_ref: Mapped[str] = mapped_column(String(160), nullable=False)
+    region: Mapped[str] = mapped_column(String(80), nullable=False)
+    residency_region: Mapped[str] = mapped_column(String(80), nullable=False)
+    schema_version: Mapped[str | None] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PROVISIONING")
+    created_at = tz(False)
+    updated_at = tz(False)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_tenant_data_plane_tenant"),
+        UniqueConstraint("database_ref", name="uq_tenant_data_plane_database_ref"),
+        CheckConstraint("status in ('PROVISIONING','ACTIVE','SUSPENDED','FAILED','RETIRED')", name="tenant_data_plane_status_allowed"),
+    )
+
+
 class CustomerContact(Base):
     __tablename__ = "customer_contacts"
     id = uuid_pk(); customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False); contact_type: Mapped[str] = mapped_column(String(40), nullable=False); name: Mapped[str] = mapped_column(String(160), nullable=False); email: Mapped[str] = mapped_column(String(254), nullable=False); phone: Mapped[str | None] = mapped_column(String(60)); status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="ACTIVE"); created_at = tz(False); updated_at = tz(False)

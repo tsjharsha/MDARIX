@@ -130,7 +130,7 @@ def signin(data:Signin,response:Response,db:Session=Depends(get_db)):
    raise HTTPException(429,detail={"code":"ACCOUNT_TEMPORARILY_LOCKED","message":"Too many failed sign-in attempts. Try again later."})
   row=db.query(AuthUser).filter(AuthUser.username==identifier).first()
   if not row: raise ValueError("INVALID_CREDENTIALS")
-  if row.password_expires_at and row.password_expires_at <= now:
+  if getattr(row, "password_expires_at", None) and row.password_expires_at <= now:
    raise HTTPException(403,detail={"code":"PASSWORD_EXPIRED","message":"Password change is required before sign-in."})
   token=auth_service.signin_persisted(data.email,data.password,user_id=row.id,display_name=row.display_name,tenant_id=row.tenant_id,password_hash=row.password_hash,role=row.role,status=row.status,email_verified=row.email_verified)
   if throttle:

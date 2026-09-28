@@ -145,7 +145,10 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r requirements.txt
       - run: docker compose config --quiet
-      - run: docker compose up -d postgres mailpit minio trackwise-simulator plm-simulator erp-simulator supplier-simulator veeva-qms-simulator teamcenter-simulator oracle-erp-simulator coupa-simulator
+      # MinIO is an optional local object-storage service. The hosted runner
+      # does not require it for the contract/integration tests below, and the
+      # upstream image is not reliably pullable from the runner registry.
+      - run: docker compose up -d postgres mailpit trackwise-simulator plm-simulator erp-simulator supplier-simulator veeva-qms-simulator teamcenter-simulator oracle-erp-simulator coupa-simulator
       - run: python scripts/validate_local_stack.py
       - run: python -m pytest -q tests/test_source_simulator.py tests/test_persistent_source_simulator.py tests/test_api_connector_contract.py tests/test_connector_security.py
       - name: Upload integration evidence

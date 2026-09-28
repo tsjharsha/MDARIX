@@ -22,3 +22,4 @@ from backend.app.db.models.ingestion import *
 from backend.app.db.models.normalization import *
 from backend.app.db.models.stage2 import *
 from backend.app.db.models.stage3 import *
+from backend.app.db.models.reporting import *

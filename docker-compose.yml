@@ -21,6 +21,34 @@ services:
       timeout: 5s
       retries: 10
 
+  # Customer data-plane databases. These contain customer business data in the
+  # MVP validation topology; control-plane identity and tenancy remain in
+  # `postgres`. Each database has an independent volume and credentials.
+  tenant-a-data:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_DB: mdarix_tenant_a, POSTGRES_USER: mdarix_data, POSTGRES_PASSWORD: '${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}'}
+    volumes: [tenant_a_data:/var/lib/postgresql/data]
+    ports: ["5541:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U mdarix_data -d mdarix_tenant_a"], interval: 5s, timeout: 5s, retries: 10}
+  tenant-b-data:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_DB: mdarix_tenant_b, POSTGRES_USER: mdarix_data, POSTGRES_PASSWORD: '${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}'}
+    volumes: [tenant_b_data:/var/lib/postgresql/data]
+    ports: ["5542:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U mdarix_data -d mdarix_tenant_b"], interval: 5s, timeout: 5s, retries: 10}
+  tenant-c-data:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_DB: mdarix_tenant_c, POSTGRES_USER: mdarix_data, POSTGRES_PASSWORD: '${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}'}
+    volumes: [tenant_c_data:/var/lib/postgresql/data]
+    ports: ["5543:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U mdarix_data -d mdarix_tenant_c"], interval: 5s, timeout: 5s, retries: 10}
+  tenant-d-data:
+    image: pgvector/pgvector:pg16
+    environment: {POSTGRES_DB: mdarix_tenant_d, POSTGRES_USER: mdarix_data, POSTGRES_PASSWORD: '${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}'}
+    volumes: [tenant_d_data:/var/lib/postgresql/data]
+    ports: ["5544:5432"]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U mdarix_data -d mdarix_tenant_d"], interval: 5s, timeout: 5s, retries: 10}
+
   mdarix-outbox-worker:
     build: {context: ., dockerfile: Dockerfile.worker}
     restart: unless-stopped
@@ -37,6 +65,10 @@ services:
       MDARIX_OUTBOX_ALERT_WEBHOOK: ${MDARIX_OUTBOX_ALERT_WEBHOOK:-}
       MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS: ${MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS:-5}
       MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
+      MDARIX_DATA_PLANE_R1_TENANT_1_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-a-data:5432/mdarix_tenant_a
+      MDARIX_DATA_PLANE_R1_TENANT_2_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-b-data:5432/mdarix_tenant_b
+      MDARIX_DATA_PLANE_R1_TENANT_3_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-c-data:5432/mdarix_tenant_c
+      MDARIX_DATA_PLANE_R1_TENANT_4_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-d-data:5432/mdarix_tenant_d
     healthcheck:
       test: ["CMD", "python", "-c", "import json,time; p='/tmp/mdarix-outbox-heartbeat.json'; d=json.load(open(p)); assert time.time()-__import__('datetime').datetime.fromisoformat(d['updated_at']).timestamp() < 30"]
       interval: 10s
@@ -45,6 +77,10 @@ services:
       start_period: 15s
     depends_on:
       postgres: {condition: service_healthy}
+      tenant-a-data: {condition: service_healthy}
+      tenant-b-data: {condition: service_healthy}
+      tenant-c-data: {condition: service_healthy}
+      tenant-d-data: {condition: service_healthy}
 
   minio:
     image: minio/minio:latest
@@ -169,3 +205,7 @@ volumes:
   oracle_erp_data:
   coupa_data:
   mdarix_object_storage:
+  tenant_a_data:
+  tenant_b_data:
+  tenant_c_data:
+  tenant_d_data:

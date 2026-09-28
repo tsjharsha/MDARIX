@@ -12,6 +12,7 @@ import hmac
 import os
 import subprocess
 import time
+import base64
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlencode
@@ -27,6 +28,8 @@ class ObjectStorageService:
         self.max_object_bytes = int(os.getenv("MDARIX_OBJECT_STORAGE_MAX_BYTES", str(10 * 1024 * 1024)))
         self.tenant_quota_bytes = int(os.getenv("MDARIX_OBJECT_STORAGE_TENANT_QUOTA_BYTES", str(100 * 1024 * 1024)))
         self.signing_secret = os.getenv("MDARIX_OBJECT_STORAGE_SIGNING_SECRET")
+        self.encryption_key = os.getenv("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY")
+        self.retention_days = int(os.getenv("MDARIX_OBJECT_STORAGE_RETENTION_DAYS", "2555"))
         if self.provider == "s3":
             try:
                 import boto3
@@ -78,6 +81,8 @@ class ObjectStorageService:
     def put(self, tenant_id: str, key: str, content: bytes, *, content_type: str = "application/octet-stream", retention_until: datetime | None = None) -> dict:
         if len(content) > self.max_object_bytes:
             raise StorageError("OBJECT_SIZE_QUOTA_EXCEEDED")
+        if not self.scan(content, content_type):
+            raise StorageError("MALWARE_SCAN_REJECTED")
         object_key = self._tenant_key(tenant_id, key)
         if self.provider == "local" and self._tenant_usage(tenant_id) + len(content) > self.tenant_quota_bytes:
             raise StorageError("TENANT_STORAGE_QUOTA_EXCEEDED")
@@ -90,7 +95,22 @@ class ObjectStorageService:
         else:
             path = self.root / object_key
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
+            stored = content
+            if self.encryption_key:
+                try:
+                    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                    key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
+                    if len(key_bytes) not in {16, 24, 32}:
+                        raise ValueError("encryption key must decode to 16, 24, or 32 bytes")
+                    nonce = os.urandom(12)
+                    stored = b"MDARIXENC1" + nonce + AESGCM(key_bytes).encrypt(nonce, content, object_key.encode())
+                except ImportError as exc:
+                    raise StorageError("OBJECT_ENCRYPTION_REQUIRES_CRYPTOGRAPHY") from exc
+                except Exception as exc:
+                    raise StorageError("OBJECT_ENCRYPTION_FAILED") from exc
+            path.write_bytes(stored)
+            if retention_until:
+                path.with_suffix(path.suffix + ".retention").write_text(retention_until.isoformat(), encoding="utf-8")
         self._audit("OBJECT_STORED", str(tenant_id), object_key, size=len(content), checksum=checksum)
         return {"tenant_id": str(tenant_id), "object_key": object_key, "size": len(content), "checksum": checksum,
                 "content_type": content_type, "retention_until": retention_until}
@@ -118,6 +138,16 @@ class ObjectStorageService:
             if not path.is_file():
                 raise FileNotFoundError(object_key)
             body = path.read_bytes()
+            if body.startswith(b"MDARIXENC1"):
+                if not self.encryption_key:
+                    raise StorageError("OBJECT_ENCRYPTION_KEY_NOT_CONFIGURED")
+                try:
+                    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+                    key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
+                    nonce, ciphertext = body[10:22], body[22:]
+                    body = AESGCM(key_bytes).decrypt(nonce, ciphertext, expected.encode())
+                except Exception as exc:
+                    raise StorageError("OBJECT_DECRYPTION_FAILED") from exc
         self._audit("OBJECT_READ", str(tenant_id), expected, size=len(body))
         return body
 
@@ -155,9 +185,18 @@ class ObjectStorageService:
         """Delete locally retained objects; S3 lifecycle rules handle production retention."""
         if self.provider != "local":
             return 0
-        # Retention is carried in metadata by S3; local callers should delete via
-        # the durable attachment policy rather than guessing from filenames.
-        return 0
+        now = (now or datetime.now()).timestamp()
+        deleted = 0
+        for marker in self.root.glob("**/*.retention"):
+            try:
+                expires = datetime.fromisoformat(marker.read_text(encoding="utf-8")).timestamp()
+                if expires <= now:
+                    object_path = Path(str(marker)[:-len(".retention")])
+                    if object_path.is_file(): object_path.unlink()
+                    marker.unlink(); deleted += 1
+            except (OSError, ValueError):
+                continue
+        return deleted
 
     def delete(self, tenant_id: str, object_key: str) -> None:
         expected = self._assert_tenant_key(tenant_id, object_key)

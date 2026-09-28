@@ -37,6 +37,7 @@ from backend.app.db.models.foundation import (
     Tenant,
     Unknown,
 )
+from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.session import SessionLocal
 from backend.app.governance_router import bootstrap
 
@@ -54,7 +55,29 @@ def ensure_fixture(db: Session, suffix: str) -> dict[str, str]:
     tenant_key = f"DAY27_{suffix}"
     tenant = db.query(Tenant).filter(Tenant.tenant_key == tenant_key).first()
     if tenant is None:
-        tenant = Tenant(id=uuid.uuid4(), tenant_key=tenant_key, name=f"Day 27 Synthetic Tenant {suffix}", status="active", created_at=timestamp, updated_at=timestamp)
+        customer = Customer(
+            id=uuid.uuid4(),
+            customer_identifier=f"DAY27-CUSTOMER-{suffix}-{uuid.uuid4().hex[:8]}",
+            legal_name=f"Day 27 Synthetic Customer {suffix}",
+            display_name=f"Day 27 Synthetic Customer {suffix}",
+            customer_type="DESIGN_PARTNER",
+            lifecycle_status="ACTIVE",
+            created_at=timestamp,
+            updated_at=timestamp,
+        )
+        db.add(customer); db.flush()
+        tenant = Tenant(
+            id=uuid.uuid4(), customer_id=customer.id, tenant_key=tenant_key,
+            tenant_identifier=f"DAY27-{suffix}-{uuid.uuid4().hex[:8]}",
+            name=f"Day 27 Synthetic Tenant {suffix}",
+            display_name=f"Day 27 Synthetic Tenant {suffix}",
+            tenant_slug=f"day27-{suffix.lower()}-{uuid.uuid4().hex[:8]}",
+            tenant_type="STANDARD", deployment_model="SHARED",
+            primary_region="US", residency_region="US",
+            cross_border_processing_allowed=False,
+            provisioning_status="PROVISIONED", status="ACTIVE", lock_version=1,
+            created_at=timestamp, updated_at=timestamp,
+        )
         db.add(tenant); db.flush()
     email = f"day27-{suffix.lower()}@synthetic.invalid"
     user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == email).first()

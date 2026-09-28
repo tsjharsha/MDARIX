@@ -1,0 +1,49 @@
+{
+  "manifest_version": "1.0",
+  "purpose": "Secret-free deterministic demo and tenant-isolation validation definition",
+  "tenants": [
+    {
+      "tenant_identifier": "TENANT_A",
+      "slug": "demo-tenant-a",
+      "display_name": "MDARIX Demo Tenant A",
+      "plan": "R1_GOVERNANCE_DEMO",
+      "users": [
+        {"user_key": "tenant-a-quality", "email": "quality.a@demo.mdarix.local", "role": "Quality Investigator"},
+        {"user_key": "tenant-a-admin", "email": "admin.a@demo.mdarix.local", "role": "Customer Administrator"}
+      ],
+      "permissions": ["read_product_context", "read_evidence", "create_investigation", "ask_mdarix", "submit_review"],
+      "records": {
+        "product": "DEMO-A-PROD-001",
+        "product_version": "DEMO-A-PROD-001-V1",
+        "complaint": "DEMO-A-CMP-001",
+        "investigation": "DEMO-A-INV-001",
+        "evidence": ["DEMO-A-EVD-001", "DEMO-A-EVD-002"]
+      }
+    },
+    {
+      "tenant_identifier": "TENANT_B",
+      "slug": "demo-tenant-b",
+      "display_name": "MDARIX Demo Tenant B",
+      "plan": "R1_GOVERNANCE_DEMO",
+      "users": [
+        {"user_key": "tenant-b-quality", "email": "quality.b@demo.mdarix.local", "role": "Quality Investigator"},
+        {"user_key": "tenant-b-admin", "email": "admin.b@demo.mdarix.local", "role": "Customer Administrator"}
+      ],
+      "permissions": ["read_product_context", "read_evidence", "create_investigation"],
+      "records": {
+        "product": "DEMO-B-PROD-001",
+        "product_version": "DEMO-B-PROD-001-V1",
+        "complaint": "DEMO-B-CMP-001",
+        "investigation": "DEMO-B-INV-001",
+        "evidence": ["DEMO-B-EVD-001"]
+      }
+    }
+  ],
+  "isolation_assertions": [
+    "Tenant A cannot read Tenant B records by route, ID, search, export, attachment path, cache key, or AI prompt.",
+    "Tenant B cannot read Tenant A records by route, ID, search, export, attachment path, cache key, or AI prompt.",
+    "Customer administrators cannot grant platform privileges.",
+    "Hidden fields are absent from API payloads, exports, search results, and AI context."
+  ],
+  "secrets_policy": "Credentials and tokens are supplied only by the test environment or CI secret store; none belong in this manifest."
+}

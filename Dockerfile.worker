@@ -5,6 +5,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY auth /app/auth
 COPY backend /app/backend
 COPY outbox /app/outbox
+COPY integration /app/integration
+COPY reports /app/reports
 COPY scripts /app/scripts
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "scripts/run_outbox_worker.py"]

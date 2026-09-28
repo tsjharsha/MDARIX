@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from uuid import uuid4
 
 import pytest
 from alembic.config import Config
@@ -29,7 +30,8 @@ def scalar(conn, sql, **params):
 
 
 def seed_core(conn):
-    tenant = scalar(conn, "INSERT INTO tenants (tenant_key, name, created_at, updated_at) VALUES ('t-a', 'Tenant A', :n, :n) RETURNING id", n=NOW)
+    customer = scalar(conn, "INSERT INTO customers (customer_identifier, legal_name, display_name, customer_type, country, lifecycle_status, created_at, updated_at) VALUES ('CUST-T-A', 'Tenant A Customer', 'Tenant A Customer', 'DESIGN_PARTNER', 'US', 'ACTIVE', :n, :n) RETURNING id", n=NOW)
+    tenant = scalar(conn, "INSERT INTO tenants (customer_id, tenant_key, tenant_identifier, name, display_name, tenant_slug, tenant_type, deployment_model, primary_region, residency_region, cross_border_processing_allowed, provisioning_status, status, lock_version, created_at, updated_at) VALUES (:c, 't-a', 'TENANT-A', 'Tenant A', 'Tenant A', 'tenant-a', 'STANDARD', 'SHARED', 'US', 'US', false, 'PROVISIONED', 'ACTIVE', 1, :n, :n) RETURNING id", c=customer, n=NOW)
     product = scalar(conn, "INSERT INTO products (tenant_id, product_identifier, name, lifecycle_status, created_at, updated_at) VALUES (:t, 'P-100', 'Infusion Pump', 'active', :n, :n) RETURNING id", t=tenant, n=NOW)
     version = scalar(conn, "INSERT INTO product_versions (tenant_id, product_id, version_identifier, lifecycle_status, release_timestamp, created_at, updated_at) VALUES (:t, :p, 'Rev D', 'active', :e, :n, :n) RETURNING id", t=tenant, p=product, e=EFFECTIVE, n=NOW)
     component = scalar(conn, "INSERT INTO components (tenant_id, component_identifier, name, revision, created_at, updated_at) VALUES (:t, 'C-200', 'Power Module', 'Rev B', :n, :n) RETURNING id", t=tenant, n=NOW)
@@ -156,7 +158,9 @@ def test_source_fact_and_hypothesis_are_separate(conn):
 
 def test_cross_tenant_relationship_is_prevented(conn):
     ids = seed_core(conn)
-    tenant_b = scalar(conn, "INSERT INTO tenants (tenant_key, name, created_at, updated_at) VALUES ('t-b', 'Tenant B', :n, :n) RETURNING id", n=NOW)
+    suffix = uuid4().hex[:8]
+    customer_b = scalar(conn, "INSERT INTO customers (customer_identifier, legal_name, display_name, customer_type, country, lifecycle_status, created_at, updated_at) VALUES (:identifier, 'Tenant B Customer', 'Tenant B Customer', 'DESIGN_PARTNER', 'US', 'ACTIVE', :n, :n) RETURNING id", identifier=f"CUST-T-B-{suffix}", n=NOW)
+    tenant_b = scalar(conn, "INSERT INTO tenants (customer_id, tenant_key, tenant_identifier, name, display_name, tenant_slug, tenant_type, deployment_model, primary_region, residency_region, cross_border_processing_allowed, provisioning_status, status, lock_version, created_at, updated_at) VALUES (:c, :key, :identifier, 'Tenant B', 'Tenant B', :slug, 'STANDARD', 'SHARED', 'US', 'US', false, 'PROVISIONED', 'ACTIVE', 1, :n, :n) RETURNING id", c=customer_b, key=f"t-b-{suffix}", identifier=f"TENANT-B-{suffix}", slug=f"tenant-b-{suffix}", n=NOW)
     with pytest.raises(DBAPIError):
         conn.execute(text("INSERT INTO product_versions (tenant_id, product_id, version_identifier, created_at, updated_at) VALUES (:tb, :pa, 'Bad', :n, :n)"), {"tb": tenant_b, "pa": ids["product"], "n": NOW})
 

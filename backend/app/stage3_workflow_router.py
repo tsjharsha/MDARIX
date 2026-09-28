@@ -27,6 +27,7 @@ from backend.app.db.models.stage3 import (
     SupplierEvidenceRequest,
 )
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_webhook
 from communication.email.service import EmailService
@@ -47,7 +48,7 @@ TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
 
 @router.post("/interactions")
-def create_interaction(payload: InteractionRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def create_interaction(payload: InteractionRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     now = NOW(); session = AIInteractionSession(id=uuid.uuid4(), tenant_id=ctx.tenant_id, user_id=ctx.user_id, page_context=payload.page_context, correlation_id=ctx.correlation_id, created_at=now, updated_at=now); db.add(session); db.flush()
     response = {"what_is_known": [], "relevant_evidence": [], "what_may_be_related": [], "contradictions": [], "unknowns": [], "missing_evidence": [], "limitations": ["No live model execution was requested by this endpoint."], "suggested_next_questions": [], "suggested_next_actions": [], "sources_provenance": [], "human_review_required": True}
     from genai.provider import GenAIProvider, GenAIUnavailable
@@ -77,18 +78,18 @@ def create_interaction(payload: InteractionRequest, db: Session = Depends(get_db
     return {"interaction_id": str(row.id), "session_id": str(session.id), "status": "READY_FOR_REVIEW", "response": response}
 
 @router.post("/interactions/{interaction_id}/feedback")
-def interaction_feedback(interaction_id: uuid.UUID, payload: FeedbackRequest, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def interaction_feedback(interaction_id: uuid.UUID, payload: FeedbackRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     row = db.query(AIInteraction).filter(AIInteraction.id == interaction_id, AIInteraction.tenant_id == ctx.tenant_id).first()
     if not row: raise HTTPException(404, detail={"code":"INTERACTION_NOT_FOUND","message":"Interaction is not available for this tenant"})
     feedback = AIInteractionFeedback(id=uuid.uuid4(), tenant_id=ctx.tenant_id, interaction_id=row.id, user_id=ctx.user_id, feedback=payload.model_dump(), created_at=NOW()); db.add(feedback); db.commit(); return {"status":"RECORDED","feedback_id":str(feedback.id)}
 
 @router.get("/interactions")
-def list_interactions(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_interactions(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     rows = db.query(AIInteraction).filter(AIInteraction.tenant_id == ctx.tenant_id, AIInteraction.user_id == ctx.user_id).order_by(AIInteraction.created_at.desc()).limit(100).all()
     return [{"id":str(r.id),"prompt":r.user_prompt,"response":r.response,"created_at":r.created_at,"investigation_id":r.investigation_id} for r in rows]
 
 @router.post("/supplier-evidence-requests")
-def request_supplier_evidence(payload: SupplierEvidenceRequestPayload, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def request_supplier_evidence(payload: SupplierEvidenceRequestPayload, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     now = NOW(); row = SupplierEvidenceRequest(id=uuid.uuid4(), tenant_id=ctx.tenant_id, investigation_id=payload.investigation_id, supplier_id=payload.supplier_id, requested_by=ctx.user_id, recipient=payload.recipient, title=payload.title, requested_items={"items": payload.requested_items}, status="PENDING_DELIVERY", created_at=now, updated_at=now); db.add(row); db.flush()
     delivery = "NOT_CONFIGURED"
     try:
@@ -100,12 +101,12 @@ def request_supplier_evidence(payload: SupplierEvidenceRequestPayload, db: Sessi
     return {"id":str(row.id),"tenant_id":ctx.tenant_id,"status":row.status,"email_delivery":delivery}
 
 @router.get("/supplier-evidence-requests")
-def list_supplier_evidence_requests(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_supplier_evidence_requests(db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     rows = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id).order_by(SupplierEvidenceRequest.created_at.desc()).limit(100).all()
     return [{"id":str(r.id),"recipient":r.recipient,"title":r.title,"status":r.status,"requested_items":r.requested_items} for r in rows]
 
 @router.post("/supplier-evidence-requests/{request_id}/attachments")
-async def upload_supplier_attachment(request_id: uuid.UUID, file: UploadFile = File(...), db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+async def upload_supplier_attachment(request_id: uuid.UUID, file: UploadFile = File(...), db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     row = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id).first()
     if not row: raise HTTPException(404, detail={"code":"EVIDENCE_REQUEST_NOT_FOUND","message":"Evidence request is not available"})
     content_type = (file.content_type or "").lower()
@@ -122,13 +123,13 @@ async def upload_supplier_attachment(request_id: uuid.UUID, file: UploadFile = F
     metadata = ObjectStorageService().put(ctx.tenant_id, f"{request_id}-{file.filename or 'attachment'}", content); now = NOW(); attachment = EvidenceAttachment(id=uuid.uuid4(), tenant_id=ctx.tenant_id, request_id=row.id, uploaded_by=ctx.user_id, filename=file.filename or "attachment", content_type=content_type, object_key=metadata["object_key"], size=metadata["size"], checksum=metadata["checksum"], created_at=now); db.add(attachment); db.add(AuditEvent(id=uuid.uuid4(), tenant_id=ctx.tenant_id, actor_ref=ctx.user_id, action="SUPPLIER_EVIDENCE_ATTACHMENT_UPLOADED", entity_type="EvidenceAttachment", entity_id=attachment.id, details={"filename":attachment.filename,"size":attachment.size,"checksum":attachment.checksum}, created_at=now)); db.commit(); return {"id":str(attachment.id),**metadata,"filename":attachment.filename}
 
 @router.get("/supplier-evidence-requests/{request_id}/attachments")
-def list_supplier_attachments(request_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_supplier_attachments(request_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     row = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id).first()
     if not row: raise HTTPException(404, detail={"code":"EVIDENCE_REQUEST_NOT_FOUND","message":"Evidence request is not available"})
     return [{"id":str(item.id),"filename":item.filename,"content_type":item.content_type,"size":item.size,"checksum":item.checksum,"created_at":item.created_at} for item in db.query(EvidenceAttachment).filter(EvidenceAttachment.request_id == request_id, EvidenceAttachment.tenant_id == ctx.tenant_id).order_by(EvidenceAttachment.created_at.desc()).all()]
 
 @router.get("/supplier-evidence-requests/{request_id}/attachments/{attachment_id}")
-def download_supplier_attachment(request_id: uuid.UUID, attachment_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def download_supplier_attachment(request_id: uuid.UUID, attachment_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     attachment = db.query(EvidenceAttachment).filter(EvidenceAttachment.id == attachment_id, EvidenceAttachment.request_id == request_id, EvidenceAttachment.tenant_id == ctx.tenant_id).first()
     if not attachment: raise HTTPException(404, detail={"code":"ATTACHMENT_NOT_FOUND","message":"Attachment is not available"})
     try: content = ObjectStorageService().get(ctx.tenant_id, attachment.object_key)
@@ -167,7 +168,7 @@ def stage3_genai_health(ctx: AuthenticatedRequestContext = Depends(get_request_c
     return {"tenant_id": ctx.tenant_id, **GenAIProvider().health()}
 
 @router.post("/reports/{report_code}")
-def generate_report(report_code: str, output_format: str = "JSON", db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def generate_report(report_code: str, output_format: str = "JSON", db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from reports.service import generate_report as build_report
     try:
         result = build_report(report_code.upper(), ctx.tenant_id, output_format=output_format, context={"correlation_id":ctx.correlation_id})
@@ -177,7 +178,7 @@ def generate_report(report_code: str, output_format: str = "JSON", db: Session =
     except ValueError as exc: raise HTTPException(400, detail={"code":str(exc),"message":"Report type is not supported"})
 
 @router.get("/compliance-report")
-def compliance_report(output_format: str = "PDF", db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def compliance_report(output_format: str = "PDF", db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """Generate a tenant-scoped audit and signature verification report."""
     fmt = output_format.upper()
     if fmt not in {"JSON", "CSV", "PDF"}:
@@ -204,26 +205,26 @@ def compliance_report(output_format: str = "PDF", db: Session = Depends(get_db),
     return Response(content=result["content"], media_type=result["content_type"], headers={"Content-Disposition": f'attachment; filename="mdarix-compliance-report-{ctx.tenant_id}.{extension}"'})
 
 @router.post("/reports/{report_code}/jobs")
-def queue_report(report_code: str, output_format: str = "PDF", db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def queue_report(report_code: str, output_format: str = "PDF", db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from reports.service import submit_report_job
     try:
-        job = submit_report_job(report_code.upper(), ctx.tenant_id, actor_id=ctx.user_id, output_format=output_format)
+        job = submit_report_job(report_code.upper(), ctx.tenant_id, actor_id=ctx.user_id, output_format=output_format, db=data_db)
     except ValueError as exc:
         raise HTTPException(400, detail={"code": str(exc), "message": "Report type or format is not supported"}) from exc
     db.add(AuditEvent(id=uuid.uuid4(), tenant_id=ctx.tenant_id, actor_ref=ctx.user_id, action="REPORT_GENERATION_QUEUED", entity_type="ReportJob", entity_id=uuid.UUID(job["id"]), details={"report_code": report_code.upper(), "format": job["format"], "report_version": job["report_version"]}, created_at=NOW())); db.commit()
     return {key: value for key, value in job.items() if key not in {"context", "hidden_fields"}}
 
 @router.get("/reports/jobs/{job_id}")
-def report_job(job_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def report_job(job_id: uuid.UUID, db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from reports.service import get_report_job
-    try: job = get_report_job(str(job_id), ctx.tenant_id)
+    try: job = get_report_job(str(job_id), ctx.tenant_id, db=data_db)
     except ValueError as exc: raise HTTPException(404, detail={"code": "REPORT_JOB_NOT_FOUND", "message": "Report job is not available"}) from exc
     return {key: value for key, value in job.items() if key not in {"context", "hidden_fields"}}
 
 @router.get("/reports/jobs/{job_id}/download")
-def download_report(job_id: uuid.UUID, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def download_report(job_id: uuid.UUID, db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     from reports.service import get_report_job
-    try: job = get_report_job(str(job_id), ctx.tenant_id)
+    try: job = get_report_job(str(job_id), ctx.tenant_id, db=data_db)
     except ValueError as exc: raise HTTPException(404, detail={"code": "REPORT_JOB_NOT_FOUND", "message": "Report job is not available"}) from exc
     if job.get("status") != "READY": raise HTTPException(409, detail={"code": "REPORT_NOT_READY", "message": "Report is not ready for download"})
     try: content = Path(job["path"]).read_bytes()

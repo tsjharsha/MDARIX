@@ -379,6 +379,8 @@ function SchemaRegistryWorkspace() {
 }
 
 function MappingWizardWorkspace() {
+  // Mapping contract vocabulary used by the UI and API: External database, External table,
+  // External field, MDARIX table, MDARIX field, Transform, and Required.
   const [step, setStep] = useState(1); const [apps, setApps] = useState<any[]>([]); const [objects, setObjects] = useState<any[]>([]); const [sourceFields, setSourceFields] = useState<any[]>([]); const [canonical, setCanonical] = useState<any[]>([]); const [targetFields, setTargetFields] = useState<any[]>([]); const [message, setMessage] = useState(""); const [error, setError] = useState("");
   const [form, setForm] = useState<any>({ code: "", source_system: "TRACKWISE", source_object: "", target_entity: "Complaint", version: "v1", source_database: "", source_schema: "customer", source_table: "", target_schema: "public", target_table: "Complaint", rules: [] });
   useEffect(() => { Promise.all([api<any>("/api/v1/admin/mapping/applications"), api<any>("/api/v1/admin/mapping/canonical/entities")]).then(([a, c]) => { setApps(list(a)); setCanonical(list(c)); }).catch((cause: any) => setError(cause?.message ?? "Mapping catalog could not be loaded.")); }, []);

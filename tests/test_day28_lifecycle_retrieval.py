@@ -21,8 +21,8 @@ def lifecycle_fixture():
     customer_a = Customer(id=uuid4(), customer_identifier=f"DAY28-CUSTOMER-A-{suffix}", legal_name="Day 28 Customer A", display_name="Day 28 Customer A", customer_type="DESIGN_PARTNER", country="US", lifecycle_status="ACTIVE", created_at=now, updated_at=now)
     customer_b = Customer(id=uuid4(), customer_identifier=f"DAY28-CUSTOMER-B-{suffix}", legal_name="Day 28 Customer B", display_name="Day 28 Customer B", customer_type="DESIGN_PARTNER", country="US", lifecycle_status="ACTIVE", created_at=now, updated_at=now)
     db.add_all([customer_a, customer_b]); db.flush()
-    a = Tenant(id=uuid4(), customer_id=customer_a.id, tenant_key=f"DAY28_TEST_A_{suffix}", tenant_identifier=f"DAY28-TENANT-A-{suffix}", name="Day 28 Test A", display_name="Day 28 Test A", tenant_slug=f"day28-test-a-{suffix}", status="active", created_at=now, updated_at=now)
-    b = Tenant(id=uuid4(), customer_id=customer_b.id, tenant_key=f"DAY28_TEST_B_{suffix}", tenant_identifier=f"DAY28-TENANT-B-{suffix}", name="Day 28 Test B", display_name="Day 28 Test B", tenant_slug=f"day28-test-b-{suffix}", status="active", created_at=now, updated_at=now)
+    a = Tenant(id=uuid4(), customer_id=customer_a.id, tenant_key=f"DAY28_TEST_A_{suffix}", tenant_identifier=f"DAY28-TENANT-A-{suffix}", name="Day 28 Test A", display_name="Day 28 Test A", tenant_slug=f"day28-test-a-{suffix}", tenant_type="STANDARD", deployment_model="SHARED", primary_region="US", residency_region="US", cross_border_processing_allowed=False, provisioning_status="PROVISIONED", status="ACTIVE", lock_version=1, created_at=now, updated_at=now)
+    b = Tenant(id=uuid4(), customer_id=customer_b.id, tenant_key=f"DAY28_TEST_B_{suffix}", tenant_identifier=f"DAY28-TENANT-B-{suffix}", name="Day 28 Test B", display_name="Day 28 Test B", tenant_slug=f"day28-test-b-{suffix}", tenant_type="STANDARD", deployment_model="SHARED", primary_region="US", residency_region="US", cross_border_processing_allowed=False, provisioning_status="PROVISIONED", status="ACTIVE", lock_version=1, created_at=now, updated_at=now)
     db.add_all([a, b]); db.flush()
     rows = []
     for tenant, label in ((a, "A"), (b, "B")):
