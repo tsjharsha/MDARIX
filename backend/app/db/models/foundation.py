@@ -469,6 +469,8 @@ class AuditEvent(Base):
     reason: Mapped[str | None] = mapped_column(Text)
     old_values: Mapped[dict | None] = mapped_column(JSONB)
     new_values: Mapped[dict | None] = mapped_column(JSONB)
+    previous_hash: Mapped[str | None] = mapped_column(String(64))
+    event_hash: Mapped[str | None] = mapped_column(String(64))
     retention_until = tz(True)
     created_at = tz(False)
 

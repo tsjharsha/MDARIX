@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend.app.db.models.foundation import AuditEvent
+from backend.app.audit_chain import audit_event_hash
 
 SECRET_TERMS = ("password", "token", "secret", "credential", "api_key", "authorization")
 def change_diff(before: dict[str, Any] | None, after: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -23,7 +24,7 @@ def safe_details(details: dict[str, Any] | None) -> dict[str, Any]:
         return value
     return clean(details)
 
-def make_audit_event(*, tenant_id, actor_ref, action: str, entity_type: str, entity_id=None, correlation_id: str | None = None, details: dict[str, Any] | None = None, created_at=None, request=None, reason: str | None = None, old_values: dict[str, Any] | None = None, new_values: dict[str, Any] | None = None) -> AuditEvent:
+def make_audit_event(*, tenant_id, actor_ref, action: str, entity_type: str, entity_id=None, correlation_id: str | None = None, details: dict[str, Any] | None = None, created_at=None, request=None, reason: str | None = None, old_values: dict[str, Any] | None = None, new_values: dict[str, Any] | None = None, previous_hash: str | None = None) -> AuditEvent:
     now = created_at or datetime.now(timezone.utc)
     source_ip = user_agent = None
     if request is not None:
@@ -36,4 +37,5 @@ def make_audit_event(*, tenant_id, actor_ref, action: str, entity_type: str, ent
             if forwarded:
                 source_ip = forwarded
         user_agent = request.headers.get("user-agent")
-    return AuditEvent(id=None, tenant_id=tenant_id, actor_ref=actor_ref, action=action, entity_type=entity_type, entity_id=entity_id, correlation_id=correlation_id, details=safe_details(details), source_ip=source_ip, user_agent=user_agent, reason=reason, old_values=safe_details(old_values), new_values=safe_details(new_values), retention_until=now + timedelta(days=365 * 7), created_at=now)
+    payload = {"tenant_id": tenant_id, "actor_ref": actor_ref, "action": action, "entity_type": entity_type, "entity_id": entity_id, "correlation_id": correlation_id, "details": safe_details(details), "source_ip": source_ip, "user_agent": user_agent, "reason": reason, "old_values": safe_details(old_values), "new_values": safe_details(new_values), "created_at": now}
+    return AuditEvent(id=None, **payload, previous_hash=previous_hash, event_hash=audit_event_hash(payload, previous_hash), retention_until=now + timedelta(days=365 * 7))
