@@ -195,10 +195,12 @@ test.describe("MDARIX browser evidence", () => {
   test("authenticated compliance evidence workflow exposes audit, package, signature, and MFA controls", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
-    await page.goto("/app/audit");
-    await expect(page.locator("body")).toContainText(/audit|activity|recorded/i, { timeout: 20_000 });
-    await expect(page.locator('a[href*="audit-history/export"]').first()).toBeVisible();
-    await expect(page.locator('a[href*="evidence-package"]').first()).toBeVisible();
+    await page.goto("/app/admin");
+    await expect(page.locator("body")).toContainText(/platform administration|control plane/i, { timeout: 20_000 });
+    await page.getByRole("button", { name: /^Customers & tenants$/i }).last().click();
+    await page.getByText("Tenant Audit", { exact: true }).click();
+    await expect(page.getByRole("button", { name: /export csv/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /create evidence package/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
 
     await page.goto("/app/decision");

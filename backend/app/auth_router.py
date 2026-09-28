@@ -72,6 +72,7 @@ def mfa_enroll(request: Request, db: Session = Depends(get_db)):
     db.commit()
     return {"status":"MFA_ENROLLMENT_PENDING", "expires_at": now + timedelta(minutes=10), "development_code": code if os.getenv("MDARIX_ENV", "development").lower() == "development" else None}
 
+@router.post('/mfa/verify')
 @router.post('/mfa/verify-enrollment')
 def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get('mdarix_session', '')
