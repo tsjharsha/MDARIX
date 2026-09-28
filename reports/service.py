@@ -13,6 +13,7 @@ import os
 import tempfile
 import threading
 import uuid
+import html
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,10 +42,46 @@ def _render_pdf(data: dict, watermark: str) -> bytes:
     return (f"%PDF-1.4\n1 0 obj<< /Type /Catalog /Pages 2 0 R>>endobj\n2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1>>endobj\n3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources<< /Font<< /F1 4 0 R>>>> /Contents 5 0 R>>endobj\n4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica>>endobj\n5 0 obj<< /Length {len(stream.encode())}>>stream\n{stream}\nendstream endobj\ntrailer<< /Root 1 0 R>>\n%%EOF").encode("latin-1")
 
 
+def _render_word(data: dict) -> bytes:
+    """Render a portable Word-compatible document without a server dependency.
+
+    Word opens this standards-based HTML document directly.  Keeping the
+    renderer dependency-free makes local and CI export tests deterministic;
+    customers can replace the template with a signed DOCX renderer later.
+    """
+    rows = []
+    for key, value in data.items():
+        if key == "content":
+            continue
+        rendered = json.dumps(value, default=str, indent=2) if isinstance(value, (dict, list)) else str(value)
+        rows.append(f"<tr><th>{html.escape(str(key))}</th><td><pre>{html.escape(rendered)}</pre></td></tr>")
+    document = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>MDARIX report</title>
+    <style>body{font-family:Arial;color:#102f45}h1{border-bottom:2px solid #087f7b}table{border-collapse:collapse;width:100%}th,td{border:1px solid #b8cbd4;padding:8px;text-align:left;vertical-align:top}th{width:22%;background:#eef7f7}pre{white-space:pre-wrap;font-family:Arial}.watermark{color:#087f7b;font-weight:bold}</style>
+    </head><body><h1>MDARIX governed report</h1><p class="watermark">WATERMARK: """ + html.escape(str(data["watermark"])) + "</p><table>" + "".join(rows) + "</table></body></html>"
+    return document.encode("utf-8")
+
+
+def _render_estar_xml(data: dict) -> bytes:
+    """Render MDARIX's auditable eSTAR handoff envelope.
+
+    This is intentionally an interchange envelope, not a claim of FDA
+    eSTAR submission-schema certification.  Official FDA templates must be
+    supplied and version-pinned before production submission use.
+    """
+    from xml.etree.ElementTree import Element, SubElement, tostring
+    root = Element("mdarix-estar-handoff", {"schema-version": "internal-1.0"})
+    for name in ("report_type", "report_version", "tenant_id", "generated_at", "watermark"):
+        SubElement(root, name).text = str(data.get(name, ""))
+    SubElement(root, "official-fda-schema-validation").text = "NOT_PERFORMED"
+    context = SubElement(root, "context-json")
+    context.text = json.dumps(data.get("context", {}), default=str, sort_keys=True)
+    return b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + tostring(root, encoding="utf-8")
+
+
 def generate_report(code: str, tenant_id: str, *, context: dict | None = None, output_format: str = "JSON", hidden_fields: set[str] | None = None, watermark: str | None = None) -> dict:
     if code not in REPORTS: raise ValueError("REPORT_TYPE_NOT_SUPPORTED")
     fmt = output_format.upper()
-    if fmt not in {"JSON", "CSV", "PDF"}: raise ValueError("REPORT_FORMAT_NOT_SUPPORTED")
+    if fmt not in {"JSON", "CSV", "PDF", "WORD", "DOC", "ESTAR_XML"}: raise ValueError("REPORT_FORMAT_NOT_SUPPORTED")
     generated = datetime.now(timezone.utc).isoformat()
     data = {"report_type": code, "title": REPORTS[code], "tenant_id": str(tenant_id), "report_version": REPORT_VERSION, "status": "READY_FOR_REVIEW", "generated_at": generated, "context": _safe_data(context or {}, hidden_fields or set()), "limitations": ["Report is a governed summary; it does not establish causality or replace human approval."], "human_review_required": True}
     data["watermark"] = watermark or f"MDARIX CONTROLLED COPY · {tenant_id} · v{REPORT_VERSION}"
@@ -54,6 +91,10 @@ def generate_report(code: str, tenant_id: str, *, context: dict | None = None, o
         data["content_type"], data["content"] = "text/csv", out.getvalue()
     elif fmt == "PDF":
         data["content_type"], data["content"] = "application/pdf", _render_pdf(data, data["watermark"])
+    elif fmt in {"WORD", "DOC"}:
+        data["content_type"], data["content"] = "application/msword", _render_word(data)
+    elif fmt == "ESTAR_XML":
+        data["content_type"], data["content"] = "application/xml", _render_estar_xml(data)
     data["format"] = fmt
     return data
 
@@ -97,7 +138,7 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
                 result = generate_report(job.report_code, str(job.tenant_id), context=job.context or {}, output_format=job.output_format, hidden_fields=set(job.hidden_fields or []))
                 directory = Path(os.getenv("MDARIX_REPORT_TEMP_ROOT", tempfile.gettempdir())) / "mdarix-reports" / str(job.tenant_id)
                 directory.mkdir(parents=True, exist_ok=True)
-                suffix = {"PDF": ".pdf", "CSV": ".csv", "JSON": ".json"}[job.output_format]
+                suffix = {"PDF": ".pdf", "CSV": ".csv", "JSON": ".json", "WORD": ".doc", "DOC": ".doc", "ESTAR_XML": ".xml"}[job.output_format]
                 path = directory / f"{job.id}{suffix}"
                 payload = result["content"] if isinstance(result.get("content"), (bytes, str)) else json.dumps(result, default=str)
                 path.write_bytes(payload if isinstance(payload, bytes) else payload.encode())
@@ -119,7 +160,7 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
             # Keep generated bytes tenant-isolated and outside the source tree.
             directory = Path(os.getenv("MDARIX_REPORT_TEMP_ROOT", tempfile.gettempdir())) / "mdarix-reports" / job["tenant_id"]
             directory.mkdir(parents=True, exist_ok=True)
-            suffix = {"PDF": ".pdf", "CSV": ".csv", "JSON": ".json"}[job["format"]]
+            suffix = {"PDF": ".pdf", "CSV": ".csv", "JSON": ".json", "WORD": ".doc", "DOC": ".doc", "ESTAR_XML": ".xml"}[job["format"]]
             path = directory / f"{job_id}{suffix}"
             payload = result["content"] if isinstance(result.get("content"), (bytes, str)) else json.dumps(result, default=str)
             path.write_bytes(payload if isinstance(payload, bytes) else payload.encode())

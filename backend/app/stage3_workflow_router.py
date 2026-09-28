@@ -181,8 +181,8 @@ def generate_report(report_code: str, output_format: str = "JSON", db: Session =
 def compliance_report(output_format: str = "PDF", db: Session = Depends(get_db), data_db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     """Generate a tenant-scoped audit and signature verification report."""
     fmt = output_format.upper()
-    if fmt not in {"JSON", "CSV", "PDF"}:
-        raise HTTPException(400, detail={"code": "REPORT_FORMAT_NOT_SUPPORTED", "message": "Use JSON, CSV, or PDF"})
+    if fmt not in {"JSON", "CSV", "PDF", "WORD", "DOC", "ESTAR_XML"}:
+        raise HTTPException(400, detail={"code": "REPORT_FORMAT_NOT_SUPPORTED", "message": "Use JSON, CSV, PDF, Word, or the controlled eSTAR XML handoff"})
     rows = db.query(AuditEvent).filter(AuditEvent.tenant_id == ctx.tenant_id).order_by(AuditEvent.created_at.desc()).limit(1000).all()
     signatures = db.query(SignedApprovalRecord).filter(SignedApprovalRecord.tenant_id == ctx.tenant_id).order_by(SignedApprovalRecord.signed_at.desc()).limit(500).all()
     signature_rows = []
@@ -201,7 +201,7 @@ def compliance_report(output_format: str = "PDF", db: Session = Depends(get_db),
     db.add(AuditEvent(id=uuid.uuid4(), tenant_id=ctx.tenant_id, actor_ref=ctx.user_id, action="COMPLIANCE_REPORT_GENERATED", entity_type="ComplianceReport", details={"format": fmt, "report_version": result["report_version"], "audit_count": len(rows), "signature_count": len(signature_rows)}, created_at=now)); db.commit()
     if fmt == "JSON":
         return result
-    extension = fmt.lower()
+    extension = {"WORD": "doc", "DOC": "doc", "ESTAR_XML": "xml"}.get(fmt, fmt.lower())
     return Response(content=result["content"], media_type=result["content_type"], headers={"Content-Disposition": f'attachment; filename="mdarix-compliance-report-{ctx.tenant_id}.{extension}"'})
 
 @router.post("/reports/{report_code}/jobs")
