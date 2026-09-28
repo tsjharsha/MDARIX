@@ -27,6 +27,13 @@ def make_audit_event(*, tenant_id, actor_ref, action: str, entity_type: str, ent
     now = created_at or datetime.now(timezone.utc)
     source_ip = user_agent = None
     if request is not None:
-        source_ip = request.client.host if request.client else None
+        # Only trust forwarding headers when the deployment explicitly opts in.
+        # This keeps local clients and untrusted proxies from spoofing audit origin.
+        if request.client:
+            source_ip = request.client.host
+        if str(__import__('os').environ.get('MDARIX_TRUST_PROXY_HEADERS', '')).lower() in {'1', 'true', 'yes'}:
+            forwarded = request.headers.get('x-forwarded-for', '').split(',')[0].strip()
+            if forwarded:
+                source_ip = forwarded
         user_agent = request.headers.get("user-agent")
     return AuditEvent(id=None, tenant_id=tenant_id, actor_ref=actor_ref, action=action, entity_type=entity_type, entity_id=entity_id, correlation_id=correlation_id, details=safe_details(details), source_ip=source_ip, user_agent=user_agent, reason=reason, old_values=safe_details(old_values), new_values=safe_details(new_values), retention_until=now + timedelta(days=365 * 7), created_at=now)

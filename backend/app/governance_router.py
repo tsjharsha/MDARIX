@@ -34,8 +34,9 @@ class SignatureRequest(BaseModel):
 class MaterialChangeRequest(BaseModel):
  change_summary:str=Field(min_length=1,max_length=2000); expected_updated_at:str
 
-def audit(db,tenant,actor,action,entity_id,details=None,request=None,reason=None):
- now=NOW(); db.add(AuditEvent(id=uuid.uuid4(),tenant_id=tenant.id,actor_ref=actor,action=action,entity_type="Decision",entity_id=entity_id,details=details or {},source_ip=request.client.host if request and request.client else None,user_agent=request.headers.get("user-agent") if request else None,reason=reason,retention_until=now+__import__('datetime').timedelta(days=365*7),created_at=now))
+def audit(db,tenant,actor,action,entity_id,details=None,request=None,reason=None,old_values=None,new_values=None):
+ from backend.app.enterprise_audit import make_audit_event
+ db.add(make_audit_event(tenant_id=tenant.id, actor_ref=actor, action=action, entity_type="Decision", entity_id=entity_id, details=details or {}, request=request, reason=reason, old_values=old_values, new_values=new_values))
 def bootstrap(db,tenant):
  plan=db.query(PlanDefinition).filter_by(code="R1_GOVERNANCE_DEMO").first()
  now=NOW(); changed=False

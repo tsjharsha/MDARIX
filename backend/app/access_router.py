@@ -7,6 +7,7 @@ import re
 import secrets
 import socket
 import uuid
+import zipfile
 from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
@@ -749,6 +750,35 @@ def export_audit_history(request: Request, output_format: str = "CSV", action: s
     for row in events:
         writer.writerow({field: str(getattr(row, field)) if getattr(row, field) is not None else "" for field in fields})
     return Response(content=stream.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="mdarix-audit-{admin.tenant_id}.csv"'})
+
+@router.get("/admin/audit-history/evidence-package")
+def download_audit_evidence_package(request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)):
+    """Download a tenant-scoped, redacted compliance evidence package.
+
+    The package is generated in memory, contains no credentials, and includes a
+    manifest, audit CSV, and machine-readable audit JSON for traceability.
+    """
+    admin = _admin_tenant(request, db)
+    query = db.query(AuditEvent).filter(AuditEvent.tenant_id == admin.tenant_id)
+    if action: query = query.filter(AuditEvent.action == action)
+    if entity_type: query = query.filter(AuditEvent.entity_type == entity_type)
+    events = query.order_by(AuditEvent.created_at.desc()).limit(10000).all()
+    fields = ["id", "tenant_id", "actor_ref", "action", "entity_type", "entity_id", "source_ip", "user_agent", "reason", "old_values", "new_values", "retention_until", "created_at"]
+    rows = []
+    for row in events:
+        item = {field: getattr(row, field) for field in fields}
+        for field in ("id", "tenant_id", "entity_id", "retention_until", "created_at"):
+            if item[field] is not None: item[field] = str(item[field])
+        rows.append(item)
+    manifest = {"package": "MDARIX_COMPLIANCE_EVIDENCE", "version": "1", "tenant_id": str(admin.tenant_id), "event_count": len(rows), "generated_at": datetime.now(timezone.utc).isoformat(), "filters": {"action": action, "entity_type": entity_type}, "retention_policy": "7-year minimum", "redaction": "secret-bearing fields excluded by audit writer"}
+    csv_stream = io.StringIO(); writer = csv.DictWriter(csv_stream, fieldnames=fields); writer.writeheader()
+    for row in rows: writer.writerow({key: json.dumps(value, default=str) if isinstance(value, (dict, list)) else ("" if value is None else value) for key, value in row.items()})
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("manifest.json", json.dumps(manifest, indent=2))
+        archive.writestr("audit-events.json", json.dumps(rows, indent=2, default=str))
+        archive.writestr("audit-events.csv", csv_stream.getvalue())
+    return Response(content=output.getvalue(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="mdarix-compliance-{admin.tenant_id}.zip"'})
 
 @router.get("/admin/retention-status")
 def audit_retention_status(request: Request, db: Session = Depends(get_db)):
