@@ -11,10 +11,10 @@ export const PLATFORM_ADMIN_VIEWS: readonly AppView[] = [
   "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies",
   "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides",
   "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry",
-  "admin-schema-registry", "admin-transformation-library", "regulatory-copilot",
+  "admin-schema-registry", "admin-transformation-library", "regulatory-copilot", "risk-traceability",
 ];
 
-export const CUSTOMER_ADMIN_VIEWS: readonly AppView[] = ["customer-admin", "regulatory-copilot"];
+export const CUSTOMER_ADMIN_VIEWS: readonly AppView[] = ["customer-admin", "regulatory-copilot", "risk-traceability"];
 
 export function isPlatformAdminRole(role?: string | null) {
   return ["ADMIN", "ADMINISTRATOR", "MDARIX ADMINISTRATOR", "PLATFORM ADMIN", "PLATFORM_ADMIN"].includes((role ?? "").trim().toUpperCase());
