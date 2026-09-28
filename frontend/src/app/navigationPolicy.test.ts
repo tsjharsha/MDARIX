@@ -24,6 +24,12 @@ describe("authentication and role navigation", () => {
   it("keeps every declared admin route addressable", () => {
     for (const [view, path] of Object.entries(APP_ROUTES)) expect(viewFromPath(path)).toBe(view);
   });
+
+  it("exposes the regulatory co-pilot only to governed admin roles", () => {
+    expect(allowedViewsForRole("Administrator")).toContain("regulatory-copilot");
+    expect(allowedViewsForRole("CUSTOMER_ADMIN")).toContain("regulatory-copilot");
+    expect(allowedViewsForRole("Viewer")).toBeNull();
+  });
 });
 
 describe("tenant cache and API failure boundaries", () => {

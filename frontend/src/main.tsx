@@ -18,6 +18,7 @@ import { fmt, humanize } from "./app/format";
 import { AnalysisPanel, DenseTable, Metric, Panel } from "./app/ui";
 import { ConsentBanner } from "./features/shared/ConsentBanner";
 import { PlatformAdminScreen } from "./features/admin/PlatformAdminScreen";
+import { RegulatoryCopilot } from "./features/regulatory/RegulatoryCopilot";
 
 type Product = {
   id: string;
@@ -318,6 +319,7 @@ function PrivateApplication() {
         {view && activeView === "assurance" && <AssuranceView view={view} />}
         {view && activeView === "audit" && <AuditTrailView view={view} />}
         {activeView === "customer-admin" && <CustomerAdminHome securityContext={securityContext} products={products} investigations={investigations} onNavigate={changeView} />}
+        {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
         {isPlatformAdmin && ["admin", "platform-tenants", "platform-tenant-health", "admin-config-360", "admin-master-data", "admin-canonical-model", "admin-data-mapping", "admin-transformations", "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies", "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides", "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry", "admin-schema-registry", "admin-transformation-library"].includes(activeView) && <PlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialItem={({ "admin-config-360": "Configuration 360", "admin-master-data": "Master data", "admin-canonical-model": "Canonical data model", "admin-data-mapping": "Data mapping", "admin-transformations": "Transformation library", "admin-validation": "Validation & data quality", "admin-baselines": "Customer baselines & overrides", "admin-mapping-versions": "Mapping versions", "admin-config-releases": "Configuration releases", "admin-config-health": "Configuration health", "admin-config-dependencies": "Dependencies & impact", "admin-reference-data": "Reference data", "admin-validation-rules": "Validation rules", "admin-configuration-sets": "Configuration sets", "admin-customer-baselines": "Customer baselines", "admin-customer-overrides": "Customer overrides", "admin-change-requests": "Change requests", "admin-deployments": "Deployments", "admin-import-export": "Import / Export", "admin-upgrade-center": "Upgrade center", "admin-integration-registry": "Integration registry", "admin-api-registry": "API & contract registry", "admin-schema-registry": "Schema registry", "admin-transformation-library": "Transformation library" } as Record<string, string>)[activeView]} />}
         {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
         {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
