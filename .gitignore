@@ -15,3 +15,6 @@ source-simulator.db
 mdarix-r1-day0-backup.sql
 infrastructure/database/backups/*.sql
 infrastructure/database/backups/*.dump
+# Playwright report bundles are generated locally and are not source evidence.
+/artifacts/playwright-report/data/
+/artifacts/playwright-report/trace/
