@@ -386,8 +386,15 @@ def _admin_tenant(request: Request, db: Session) -> AuthUser:
     return _require_administrator(request, db)
 
 
-def _audit_configuration(db, admin, action, entity_type, entity_id, version):
-    db.add(AuditEvent(id=uuid.uuid4(), tenant_id=admin.tenant_id, actor_ref=str(admin.id), action=action, entity_type=entity_type, entity_id=entity_id, details={"version": version, "source": "ADMIN_CONTROL_PLANE"}, created_at=datetime.now(timezone.utc)))
+def _audit_configuration(db, admin, action, entity_type, entity_id, version, *, request=None, before=None, after=None, reason=None):
+    """Use the shared redaction/origin/diff contract for legacy mutations."""
+    from backend.app.enterprise_audit import change_diff, make_audit_event
+    old_values, new_values = change_diff(before, after)
+    db.add(make_audit_event(tenant_id=admin.tenant_id, actor_ref=str(admin.id), action=action,
+                            entity_type=entity_type, entity_id=entity_id,
+                            details={"version": version, "source": "ADMIN_CONTROL_PLANE"},
+                            request=request, reason=reason, old_values=old_values,
+                            new_values=new_values))
 
 
 def _safe_provider_url(endpoint: str, path: str, *, timeout: float = 10.0) -> str:

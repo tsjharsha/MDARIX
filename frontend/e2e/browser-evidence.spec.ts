@@ -191,4 +191,23 @@ test.describe("MDARIX browser evidence", () => {
       await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-ai-${name}.png`, fullPage: true });
     }
   });
+
+  test("authenticated compliance evidence workflow exposes audit, package, signature, and MFA controls", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await page.goto("/app/audit");
+    await expect(page.locator("body")).toContainText(/audit|activity|recorded/i, { timeout: 20_000 });
+    await expect(page.locator('a[href*="audit-history/export"]').first()).toBeVisible();
+    await expect(page.locator('a[href*="evidence-package"]').first()).toBeVisible();
+    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
+
+    await page.goto("/app/decision");
+    await expect(page.locator("body")).toContainText(/decision|signature|review|human/i, { timeout: 20_000 });
+    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-signature.png`, fullPage: true });
+
+    await page.goto("/mfa?setup=1");
+    await expect(page.locator("body")).toContainText(/MFA|authenticator|identity/i, { timeout: 20_000 });
+    await expect(page.locator('input[aria-label="Six digit authentication code"]')).toBeVisible();
+    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-mfa.png`, fullPage: true });
+  });
 });
