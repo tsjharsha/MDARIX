@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -50,8 +51,56 @@ def build_package(release: str = "MVP-1.0") -> dict:
         "deviation_process": ["Record deviation ID and impact.", "Assess patient/product/data integrity impact.", "Approve corrective action.", "Retest affected requirement.", "Obtain QA and system-owner approval."],
         "approval": {"system_owner": "PENDING", "quality_reviewer": "PENDING", "approval_date": None},
         "status": "READY_FOR_EXECUTION",
+        "document_control": {"document_id": "MDARIX-CSA-MVP-1.0", "version": "1.0", "effective_date": None, "supersedes": None, "owner": "MDARIX Quality/System Owner"},
         "limitations": ["Execution evidence must be generated against the approved test environment.", "This package does not certify FDA, ISO, HIPAA, or 21 CFR Part 11 compliance."],
     }
+
+
+def build_evidence_manifest(package: dict | None = None, *, evidence_root: str = "evidence/csa-mvp") -> dict:
+    """Create a controlled, hashable index for executed IQ/OQ/PQ evidence."""
+    package = package or build_package()
+    return {
+        "package_id": package["package_id"],
+        "release": package["release"],
+        "manifest_version": "1.0",
+        "evidence_root": evidence_root,
+        "artifacts": [{"test_id": test["test_id"], "requirement_id": test["requirement_id"], "path": f"{evidence_root}/{test['test_id']}/", "status": "PENDING_EXECUTION", "sha256": None} for test in package["tests"]],
+        "integrity_rule": "Record SHA-256 after review; never overwrite an approved artifact. Create a new package version for corrections.",
+    }
+
+
+def render_validation_summary(package: dict | None = None) -> str:
+    package = package or build_package()
+    return "\n".join([
+        f"# {package['package_id']} — Validation Summary Report", "",
+        "## Scope", "Internal synthetic MVP validation under a controlled test environment.",
+        "This document is a template until the named IQ/OQ/PQ tests are executed, reviewed, and approved.", "",
+        "## Qualification status", "| Phase | Tests | Status |", "|---|---:|---|",
+        f"| IQ | {sum(t['phase']=='IQ' for t in package['tests'])} | PENDING EXECUTION |",
+        f"| OQ | {sum(t['phase']=='OQ' for t in package['tests'])} | PENDING EXECUTION |",
+        f"| PQ | {sum(t['phase']=='PQ' for t in package['tests'])} | PENDING EXECUTION |", "",
+        "## Deviations", "No deviations may be closed without impact assessment, corrective action, retest, and QA/system-owner approval.", "",
+        "## Release decision", "NO RELEASE DECISION RECORDED — execute and approve the package first.", "",
+        "## Regulatory boundary", "This package supports risk-based internal software validation. It is not a regulatory certification or a substitute for customer-specific validation.", "",
+    ])
+
+
+def render_customer_instructions() -> str:
+    return """# MDARIX customer implementation and validation instructions
+
+1. Identify the customer validation owner, quality reviewer, system owner, and approver.
+2. Record the approved MDARIX release commit, environment identifier, database migration head, and configuration versions.
+3. Create isolated synthetic or customer-approved validation tenants; do not use production data in a validation run unless separately approved.
+4. Execute IQ-001/IQ-002 and attach version, health, migration, and configuration evidence.
+5. Execute OQ tests for authentication, tenant isolation, field policy, AI safeguards, auditability, and signatures.
+6. Execute PQ tests using representative approved workflows, including document export and worker recovery.
+7. Record each result as PASS, FAIL, or DEVIATION. Attach redacted screenshots, API traces, audit IDs, and artifact SHA-256 values.
+8. Investigate every failure, assess data/product impact, approve corrective action, and repeat the affected test.
+9. Obtain quality and system-owner approval before declaring the validated release effective.
+10. Retain the signed protocol, results, deviations, evidence manifest, and summary report according to the customer's document-retention policy.
+
+Customer-specific requirements, infrastructure qualification, access controls, backup/restore tests, and regulated intended-use decisions remain the customer's responsibility.
+"""
 
 
 def render_markdown(package: dict) -> str:

@@ -1,0 +1,16 @@
+{
+  "package_id": "MDARIX-CSA-MVP-1.0",
+  "manifest_version": "1.0",
+  "status": "PENDING_EXECUTION",
+  "evidence_root": "evidence/csa-mvp",
+  "artifact_rule": "Record SHA-256 after review; never overwrite an approved artifact.",
+  "tests": [
+    "IQ-001", "IQ-002", "OQ-001", "OQ-002", "OQ-003", "OQ-004",
+    "PQ-001", "PQ-002", "PQ-003"
+  ],
+  "approval": {
+    "system_owner": "PENDING",
+    "quality_reviewer": "PENDING",
+    "approval_date": null
+  }
+}
