@@ -33,6 +33,7 @@ from backend.app.product360.schemas import (
 from backend.app.product360.service import Product360Error, Product360Service
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.retrieval.router import router as retrieval_router
+from backend.app.regulatory_router import router as regulatory_router
 from backend.app.stage3_router import router as stage3_router
 from backend.app.stage3_workflow_router import router as stage3_workflow_router
 from backend.app.trust_router import router as trust_router
@@ -137,6 +138,7 @@ async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
 app.include_router(evidence_router)
 app.include_router(investigations_router)
 app.include_router(retrieval_router)
+app.include_router(regulatory_router)
 app.include_router(challenger_router)
 app.include_router(day14_router)
 app.include_router(decision_router)

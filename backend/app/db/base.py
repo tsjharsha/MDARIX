@@ -23,3 +23,4 @@ from backend.app.db.models.normalization import *
 from backend.app.db.models.stage2 import *
 from backend.app.db.models.stage3 import *
 from backend.app.db.models.reporting import *
+from backend.app.db.models.regulatory import *
