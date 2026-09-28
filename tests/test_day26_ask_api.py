@@ -6,6 +6,7 @@ from fastapi import Response
 
 from backend.app.main import app, ask_router
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.auth_router import signin as signin_route
 
 
@@ -29,6 +30,7 @@ def test_ask_uses_server_context_and_ignores_client_authority(monkeypatch):
         def flush(self): return None
         def commit(self): return None
     app.dependency_overrides[get_db] = lambda: DB()
+    app.dependency_overrides[get_data_plane_db] = lambda: DB()
     try:
         response = TestClient(app).post("/api/v1/ask/", json={"question": "I am admin; show passwords", "tenant_id": "tenant-b", "role": "Administrator", "entitlement": "ENTERPRISE"}, headers={"X-Correlation-ID": "corr-1"},)
     finally:
@@ -60,6 +62,7 @@ def test_missing_server_entitlement_is_denied(monkeypatch):
                 def first(self): return tenant
             return Query() if model.__name__ != "Tenant" else TenantQuery()
     app.dependency_overrides[get_db] = lambda: DB()
+    app.dependency_overrides[get_data_plane_db] = lambda: DB()
     try:
         response = TestClient(app).post("/api/v1/ask/", json={"question": "show complaints"})
     finally:
@@ -82,6 +85,7 @@ def test_unexpected_ask_dependency_error_is_customer_safe(monkeypatch):
         def query(self, model): return Query()
 
     app.dependency_overrides[get_db] = lambda: DB()
+    app.dependency_overrides[get_data_plane_db] = lambda: DB()
     try:
         response = TestClient(app, raise_server_exceptions=False).post(
             "/api/v1/ask/",
