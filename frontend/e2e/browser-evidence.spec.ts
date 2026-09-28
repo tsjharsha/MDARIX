@@ -8,6 +8,8 @@ async function signIn(page: any, email: string, password: string) {
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/app/);
+  const consent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
+  await consent.waitFor({ state: "visible", timeout: 2000 }).then(() => consent.getByRole("button", { name: /acknowledge/i }).click()).catch(() => undefined);
 }
 
 test.describe("MDARIX browser evidence", () => {
@@ -31,6 +33,8 @@ test.describe("MDARIX browser evidence", () => {
   test("authenticated Platform Admin workflow and screenshots", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    const consent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
+    if (await consent.isVisible().catch(() => false)) await consent.getByRole("button", { name: /acknowledge/i }).click();
     for (const [route, name, expected] of [["/app/admin", "admin", /administrator control plane|platform administration|govern the mdarix platform/i], ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i], ["/app/decision", "decision", /decision center|decision readiness/i]] as const) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
@@ -45,6 +49,8 @@ test.describe("MDARIX browser evidence", () => {
     test.setTimeout(60_000);
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
     await page.goto("/app/admin");
+    const onboardingConsent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
+    await onboardingConsent.waitFor({ state: "visible", timeout: 2000 }).then(() => onboardingConsent.getByRole("button", { name: /acknowledge/i }).click()).catch(() => undefined);
     await expect(page.locator("main.platform-admin-workspace")).toBeVisible();
     await injectAxe(page);
     const axeResults = await page.evaluate(async () => await (window as any).axe.run(document));
@@ -79,6 +85,45 @@ test.describe("MDARIX browser evidence", () => {
         await expect(page.locator("main.platform-admin-workspace")).toHaveAttribute("data-admin-view", `${domain}:${item}`);
       }
     }
+  });
+
+  test("admin workflows expose actionable Customer/Tenant 360 and onboarding states", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await page.goto("/app/admin");
+    const navigation = page.getByRole("complementary", { name: "Platform administration domains" });
+    await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
+    await navigation.getByRole("button", { name: "Customer Directory", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Customers & tenants", exact: true })).toBeVisible();
+    const customerLink = page.locator(".platform-admin-table .table-link").first();
+    if (await customerLink.count()) {
+      await customerLink.click();
+      await expect(page.getByRole("navigation", { name: /customer detail tabs/i })).toBeVisible();
+      for (const tab of ["Overview", "Administrators", "Environments", "Subscription", "Integrations", "Security", "Audit"]) {
+        const tabButton = page.getByRole("button", { name: tab, exact: true });
+        if (await tabButton.count()) {
+          await tabButton.click();
+          await expect(page.locator(".platform-admin-record-page")).toBeVisible();
+          await expect(page.locator(".platform-admin-error")).toHaveCount(0);
+        }
+      }
+    }
+    await page.goto("/app/admin");
+    await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
+    await navigation.getByRole("button", { name: "Customer Onboarding", exact: true }).click();
+    await page.getByRole("button", { name: /start provisioning/i }).click();
+    await expect(page).toHaveURL(/admin-create-customer|platform-admin\/onboarding|\/app\/admin\/customers\/new/);
+    await expect(page.getByText(/Create Customer|Provision a customer tenant/i).first()).toBeVisible();
+  });
+
+  test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
+    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await page.goto("/app/admin/mapping-studio");
+    await expect(page.getByText(/Mapping Studio/i).first()).toBeVisible();
+    expect(await page.locator("button, input, select").count()).toBeGreaterThan(0);
+    await page.goto("/app/investigations");
+    await expect(page.getByText(/investigat|evidence|review/i).first()).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(/undefined|null\b/i);
   });
 
   test("authenticated Customer Admin workflow and screenshot", async ({ page }, testInfo) => {
@@ -139,7 +184,7 @@ test.describe("MDARIX browser evidence", () => {
       await expect(page.locator("body")).not.toBeEmpty();
       await expect(page.locator("body")).not.toContainText(/Administration unavailable|blank page/i);
       await expect(page.locator("body")).toContainText(expected, { timeout: 20_000 });
-      const firstControl = page.locator("a,button,input,select,textarea").first();
+      const firstControl = page.locator("a:visible,button:visible,input:visible,select:visible,textarea:visible").first();
       await expect(firstControl).toBeVisible();
       await firstControl.focus();
       await expect(firstControl).toBeFocused();
