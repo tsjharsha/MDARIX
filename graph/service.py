@@ -1,4 +1,5 @@
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
@@ -73,8 +74,22 @@ class RealityGraphService:
         # routes.  The fallback preserves standalone graph tooling only.
         self.db = db
 
+    @contextmanager
     def connection(self):
-        return self.db.connection() if self.db is not None else engine.connect()
+        """Yield a connection without closing an injected request session.
+
+        Data-plane API routes inject a SQLAlchemy ``Session``.  Calling
+        ``Session.connection()`` inside a normal ``with`` block causes the
+        connection to be closed while the request still needs the session,
+        which surfaced as ``ResourceClosedError`` in graph API tests.  The
+        session owns that connection; only standalone fallback connections
+        created by this service should be closed here.
+        """
+        if self.db is not None:
+            yield self.db.connection()
+            return
+        with engine.connect() as conn:
+            yield conn
 
     def tenant_id(self) -> str:
         with self.connection() as conn:
