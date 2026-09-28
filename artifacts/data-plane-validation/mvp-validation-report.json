@@ -1,0 +1,46 @@
+{
+  "scope": "Internal synthetic MVP validation only",
+  "executed_at": "2026-09-28",
+  "status": "PASS",
+  "planes": ["R1_TENANT_1", "R1_TENANT_2", "R1_TENANT_3", "R1_TENANT_4"],
+  "simulator_matrix": {
+    "providers": ["TRACKWISE", "PLM", "ERP", "SUPPLIER", "VEEVA_QMS", "TEAMCENTER", "ORACLE_ERP", "COUPA"],
+    "tenants": 4,
+    "provider_matrix_rows": 32,
+    "result": "PASS",
+    "checks": ["authenticated reads", "token isolation", "replay/idempotency"]
+  },
+  "data_plane_operations": {
+    "business_tables_per_plane": 130,
+    "cross_plane_query": "IMPOSSIBLE_BY_DATABASE_BOUNDARY",
+    "result": "PASS"
+  },
+  "route_and_isolation_regression": {
+    "tests": 82,
+    "passed": 82,
+    "failed": 0,
+    "covered": [
+      "data-plane business routing",
+      "Product/Investigation/Evidence",
+      "retrieval and AI context",
+      "evidence processing",
+      "simulator contracts",
+      "schema drift",
+      "replay/idempotency",
+      "retry/dead-letter",
+      "reports and exports"
+    ],
+    "result": "PASS"
+  },
+  "backup_restore": {
+    "planes": 4,
+    "dump_validation": "PASS",
+    "disposable_database_restore": "PASS",
+    "restored_tables_per_plane": 130,
+    "result": "PASS"
+  },
+  "explicit_non_scope": [
+    "production TLS, PITR, hosted monitoring, and multi-instance deployment",
+    "real customer endpoints and credentials"
+  ]
+}
