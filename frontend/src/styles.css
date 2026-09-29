@@ -31,16 +31,14 @@ button, input, select, textarea {
 }
 .app-shell.platform-admin-shell { grid-template-columns: 1fr; }
 .app-shell.customer-admin-shell { grid-template-columns: 1fr; }
-.ca-hero.ca-hero-compact { min-height: 0; align-items: center; padding: 16px 24px; }
-.ca-product-brand { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; }
-.ca-product-brand h1 { margin: 0; color: #123f57; font-size: 28px; font-weight: 900; letter-spacing: .035em; }
-.ca-product-brand > span { padding-left: 18px; border-left: 1px solid #bdd2dc; color: #527285; font-size: 14px; font-weight: 700; }
-.ca-product-brand .ca-badges { flex-basis: 100%; margin-top: 0; }
-.ca-hero-compact .ca-context { min-width: 310px; padding: 12px 16px; }
-.ca-hero-compact .ca-context .eyebrow { margin: 0; color: #527285; }
-.ca-hero-compact .ca-context strong { color: #123f57; }
-.customer-admin-control-plane .ca-shell { margin-top: 10px; }
-@media (max-width: 700px) { .ca-hero.ca-hero-compact { display: grid; } .ca-product-brand > span { padding-left: 0; border-left: 0; } .ca-hero-compact .ca-context { min-width: 0; } }
+.customer-admin-topbar { padding: 0 4px; }
+.customer-admin-tenant-context { display: grid; grid-template-columns: auto auto; gap: 2px 10px; align-items: center; margin-left: auto; color: #557087; font-size: 11px; }
+.customer-admin-tenant-context > span { text-transform: uppercase; letter-spacing: .06em; }
+.customer-admin-tenant-context > strong { color: #12324a; font-size: 13px; }
+.customer-admin-tenant-context > small { grid-column: 1 / -1; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+.customer-admin-tenant-context .ca-status { grid-column: 2; grid-row: 1 / 3; }
+.customer-admin-control-plane .ca-shell { margin-top: 12px; }
+@media (max-width: 800px) { .customer-admin-topbar { flex-wrap: wrap; padding: 10px 4px; } .customer-admin-tenant-context { order: 3; flex-basis: 100%; margin-left: 0; } }
 .app-shell main { min-width: 0; background: var(--canvas); }
 .role-context-header { display:flex; justify-content:space-between; align-items:center; gap:20px; min-height:64px; padding:0 28px; border-bottom:1px solid var(--border-default); background:var(--surface); }
 .role-context-header strong { display:block; margin-top:4px; color:var(--text-primary); font-size:18px; }

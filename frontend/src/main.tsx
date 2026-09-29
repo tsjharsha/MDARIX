@@ -302,7 +302,7 @@ function PrivateApplication() {
         <div className="side-nav-footer"><p>Evidence before inference.<br/>Authorized humans decide.</p></div>
       </aside>}
       <main>
-        {!isPlatformAdmin && <button className="logout-control" onClick={async () => { await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined); window.location.replace("/signin"); }} aria-label="Sign out of MDARIX">Logout</button>}
+        {!isPlatformAdmin && !isCustomerAdmin && <button className="logout-control" onClick={async () => { await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined); window.location.replace("/signin"); }} aria-label="Sign out of MDARIX">Logout</button>}
         {isPlatformAdmin && activeView !== "admin" && ["admin-stage2", "admin-product-configuration", "admin-subscriptions", "admin-mapping", "admin-customers", "admin-create-customer", "admin-customer-360", "admin-manage", "admin-audit"].includes(activeView) && <div className="platform-admin-return-bar"><button onClick={() => changeView("admin")}>← Platform administration</button><span>Controlled workspace</span></div>}
         {!['customer-admin', 'admin', 'admin-stage2', 'admin-product-configuration', 'admin-subscriptions', 'admin-mapping', 'admin-customers', 'admin-create-customer', 'admin-customer-360', 'admin-manage', 'admin-audit', 'admin-config-360', 'admin-master-data', 'admin-canonical-model', 'admin-data-mapping', 'admin-transformations', 'admin-validation', 'admin-baselines', 'admin-mapping-versions', 'admin-config-releases', 'admin-config-health', 'admin-config-dependencies', 'admin-reference-data', 'admin-validation-rules', 'admin-configuration-sets', 'admin-customer-baselines', 'admin-customer-overrides', 'admin-change-requests', 'admin-deployments', 'admin-import-export', 'admin-upgrade-center', 'admin-integration-registry', 'admin-api-registry', 'admin-schema-registry', 'admin-transformation-library'].includes(activeView) && <header className={`topbar ${activeView === "home" ? "home-topbar" : ""}`}>
           {activeView === "home" && contextToolbar}
@@ -312,7 +312,6 @@ function PrivateApplication() {
           </div>
           {activeView !== "home" && contextToolbar}
         </header>}
-        {activeView === "customer-admin" && <header className="role-context-header"><div><span className="eyebrow">Customer administration</span><strong>{securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"}</strong></div><div className="role-context-meta"><span>{securityContext?.display_name ?? "Authenticated user"}</span><b>{securityContext?.active_role ?? "Customer Admin"}</b></div></header>}
         {error && <div className="error">{error}</div>}
         {view && activeView === "home" && <><InvestigatorHome tenantName={securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"} userName={securityContext?.display_name ?? "Investigator"} productName={view.product.name ?? "Product not selected"} version={view.selected_version?.version_identifier ?? version} investigationCount={investigations.length} evidenceCount={view.evidence.length} limitationsCount={view.limitations.length} onNavigate={changeView} /><Stage3CommandCenter /></>}
         {view && activeView === "my-work" && <MyWork productId={selectedProduct} onOpen={changeView} />}
