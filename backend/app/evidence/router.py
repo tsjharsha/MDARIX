@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import Evidence
-from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from evidence.services.evidence_service import EvidenceIntelligenceService

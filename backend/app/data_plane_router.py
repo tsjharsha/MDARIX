@@ -3,14 +3,14 @@ from __future__ import annotations
 
 import csv
 import io
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
-from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1/data-plane", tags=["Tenant Data Plane"])
 

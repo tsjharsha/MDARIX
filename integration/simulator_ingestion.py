@@ -5,6 +5,7 @@ provider records are never inserted directly into business tables. Each read is
 represented by an idempotent outbox event for the normal ingestion pipeline.
 """
 import json
+import uuid
 from urllib.request import Request, urlopen
 from uuid import UUID
 

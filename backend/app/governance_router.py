@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from auth.service import _verify
 from backend.app.db.models.foundation import (
  ApprovalAuthority,
- AuditEvent,
  AuthUser,
  Decision,
  FeatureEntitlement,

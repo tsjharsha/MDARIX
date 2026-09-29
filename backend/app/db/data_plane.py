@@ -12,7 +12,6 @@ from functools import lru_cache
 from fastapi import Depends
 
 from sqlalchemy import create_engine
-from sqlalchemy.engine import URL
 from sqlalchemy.orm import Session, sessionmaker
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
