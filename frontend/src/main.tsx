@@ -17,6 +17,7 @@ import { PlatformProductConfiguration } from "./features/stage2/PlatformProductC
 import { fmt, humanize } from "./app/format";
 import { AnalysisPanel, DenseTable, Metric, Panel } from "./app/ui";
 import { ConsentBanner } from "./features/shared/ConsentBanner";
+import { CustomerAdminControlPlane } from "./features/customer-admin/CustomerAdminControlPlane";
 import { PlatformAdminScreen } from "./features/admin/PlatformAdminScreen";
 import { RegulatoryCopilot } from "./features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "./features/risk/RiskTraceabilityWorkspace";
@@ -320,7 +321,7 @@ function PrivateApplication() {
         {view && activeView === "decision" && !selectedInvestigationId && <div className="content"><section className="panel empty-state"><h2>Select an investigation first</h2><p>Open Investigations and select a live investigation before entering Decision Center.</p></section></div>}
         {view && activeView === "assurance" && <AssuranceView view={view} />}
         {view && activeView === "audit" && <AuditTrailView view={view} />}
-        {activeView === "customer-admin" && <CustomerAdminHome securityContext={securityContext} products={products} investigations={investigations} onNavigate={changeView} />}
+        {activeView === "customer-admin" && <CustomerAdminControlPlane securityContext={securityContext} products={products} investigations={investigations} onNavigate={changeView} />}
         {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
         {activeView === "risk-traceability" && <RiskTraceabilityWorkspace />}
         {activeView === "signature-verification" && <SignatureVerificationWorkspace />}
@@ -352,6 +353,8 @@ function LegacyConsentBanner() {
   return <section className="consent-banner" role="dialog" aria-label="Privacy and compliance consent"><div><strong>Privacy and compliance notice</strong><p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. Review your organization’s GDPR/HIPAA obligations before entering regulated data.</p></div><div className="consent-actions"><button className="secondary-action" onClick={() => setVisible(false)}>Dismiss</button><button className="primary-action" onClick={accept}>Acknowledge</button></div></section>;
 }
 
+/* Legacy CustomerAdminHome removed from the active application. CustomerAdminControlPlane owns this route. */
+/*
 function CustomerAdminHome({ securityContext, products, investigations, onNavigate }: { securityContext: { display_name: string; active_role: string | null; tenant_id?: string } | null; products: Product[]; investigations: InvestigationSummary[]; onNavigate: (view: AppView) => void }) {
   const [section, setSection] = useState("Overview");
   const [records, setRecords] = useState<any[]>([]);
@@ -404,6 +407,8 @@ function CustomerAdminHome({ securityContext, products, investigations, onNaviga
   </div>;
 }
 
+}
+*/
 type AdminHealth = { status: string; metrics: Record<string, number>; alerts: any[]; recent_audit: any[] };
 type AdminData = { users: any[]; roles: any[]; permissions: any[]; memberships: any[]; personas: any[]; entitlements: any[]; connectors: any[]; mappings: any[]; authorities: any[]; sod: any[]; audit: any[]; health: AdminHealth };
 

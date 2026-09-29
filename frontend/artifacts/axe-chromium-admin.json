@@ -13,7 +13,7 @@
     "orientationAngle": 0,
     "orientationType": "landscape-primary"
   },
-  "timestamp": "2026-09-28T17:23:32.165Z",
+  "timestamp": "2026-09-29T07:18:04.765Z",
   "url": "http://127.0.0.1:5177/app/admin",
   "toolOptions": {
     "reporter": "v1"
@@ -1488,7 +1488,7 @@
             }
           ],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -1519,7 +1519,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -1753,7 +1753,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -1789,7 +1789,7 @@
             }
           ],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -1820,7 +1820,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -4384,7 +4384,7 @@
             }
           ],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -4420,7 +4420,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -4470,7 +4470,7 @@
             }
           ],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -4872,7 +4872,7 @@
           ],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -5106,7 +5106,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -8111,7 +8111,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<strong>Privacy and compliance notice</strong>",
+          "html": "<strong>Privacy and data-use notice</strong>",
           "target": [
             ".consent-banner > div:nth-child(1) > strong"
           ]
@@ -15684,7 +15684,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and compliance consent\">",
+          "html": "<section class=\"consent-banner\" role=\"dialog\" aria-label=\"Privacy and data-use notice\">",
           "target": [
             ".consent-banner"
           ]
@@ -15704,7 +15704,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<div><strong>Privacy and compliance notice</strong><p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. Review your organization's GDPR/HIPAA obligations before entering regulated data.</p></div>",
+          "html": "<div>",
           "target": [
             ".consent-banner > div:nth-child(1)"
           ]
@@ -15724,7 +15724,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<strong>Privacy and compliance notice</strong>",
+          "html": "<strong>Privacy and data-use notice</strong>",
           "target": [
             ".consent-banner > div:nth-child(1) > strong"
           ]
@@ -15744,7 +15744,7 @@
           "all": [],
           "none": [],
           "impact": null,
-          "html": "<p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. Review your organization's GDPR/HIPAA obligations before entering regulated data.</p>",
+          "html": "<p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. This notice does not represent a GDPR, HIPAA, or other compliance certification; review your organization's obligations before entering regulated data.</p>",
           "target": [
             ".consent-banner > div:nth-child(1) > p"
           ]
@@ -16537,7 +16537,7 @@
           "all": [],
           "none": [],
           "impact": "serious",
-          "html": "<p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. Review your organization's GDPR/HIPAA obligations before entering regulated data.</p>",
+          "html": "<p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. This notice does not represent a GDPR, HIPAA, or other compliance certification; review your organization's obligations before entering regulated data.</p>",
           "target": [
             ".consent-banner > div:nth-child(1) > p"
           ],
