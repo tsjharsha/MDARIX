@@ -272,7 +272,7 @@ function PrivateApplication() {
 
   return (
     <div className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""} ${isCustomerAdmin ? "customer-admin-shell" : "quality-shell"}`}>
-      {!isPlatformAdmin && <aside className="side-nav">
+      {!isPlatformAdmin && !isCustomerAdmin && <aside className="side-nav">
         <div className="brand-block"><div className="brand">{securityContext?.current_tenant?.tenant_name ?? "MDARIX"}</div><span>Product Lifecycle Intelligence · {securityContext?.environment ?? "environment"}</span></div>
         <nav>
           {isPlatformAdmin ? <>

@@ -30,6 +30,7 @@ button, input, select, textarea {
   background: var(--canvas);
 }
 .app-shell.platform-admin-shell { grid-template-columns: 1fr; }
+.app-shell.customer-admin-shell { grid-template-columns: 1fr; }
 .app-shell main { min-width: 0; background: var(--canvas); }
 .role-context-header { display:flex; justify-content:space-between; align-items:center; gap:20px; min-height:64px; padding:0 28px; border-bottom:1px solid var(--border-default); background:var(--surface); }
 .role-context-header strong { display:block; margin-top:4px; color:var(--text-primary); font-size:18px; }
@@ -1589,7 +1590,3 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual .
 .investigation-tab-summary h3 { margin:5px 0; color:#12324a; }.investigation-tab-summary p { margin:0; color:#527284; max-width:680px; }
 .investigation-tab-status { display:flex; align-items:flex-end; flex-direction:column; gap:5px; white-space:nowrap; color:#087b73; }.investigation-tab-status strong { font-size:18px; }.investigation-tab-status span { color:#527284; font-size:12px; }
 @media (max-width: 650px) { .investigation-tab-summary { align-items:flex-start; flex-direction:column; }.investigation-tab-status { align-items:flex-start; white-space:normal; } }
-/* Remove the legacy dark-blue Customer Admin menu while preserving its workspace. */
-.customer-admin-page > .customer-admin-layout { display: block; }
-.customer-admin-page .customer-admin-menu { display: none !important; }
-.customer-admin-page .customer-admin-workspace { width: 100%; }
