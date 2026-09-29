@@ -22,6 +22,7 @@ import { PlatformAdminScreen } from "./features/admin/PlatformAdminScreen";
 import { RegulatoryCopilot } from "./features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "./features/risk/RiskTraceabilityWorkspace";
 import { SignatureVerificationWorkspace } from "./features/signature/SignatureVerificationWorkspace";
+import { InvestigatorHome } from "./features/investigator/InvestigatorHome";
 
 type Product = {
   id: string;
@@ -309,7 +310,7 @@ function PrivateApplication() {
         </header>}
         {activeView === "customer-admin" && <header className="role-context-header"><div><span className="eyebrow">Customer administration</span><strong>{securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"}</strong></div><div className="role-context-meta"><span>{securityContext?.display_name ?? "Authenticated user"}</span><b>{securityContext?.active_role ?? "Customer Admin"}</b></div></header>}
         {error && <div className="error">{error}</div>}
-        {view && activeView === "home" && <><ApplicationHome view={view} investigations={investigations} onNavigate={changeView} /><Stage3CommandCenter /></>}
+        {view && activeView === "home" && <><InvestigatorHome tenantName={securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"} userName={securityContext?.display_name ?? "Investigator"} productName={view.product.name ?? "Product not selected"} version={view.selected_version?.version_identifier ?? version} investigationCount={investigations.length} evidenceCount={view.evidence.length} limitationsCount={view.limitations.length} onNavigate={changeView} /><Stage3CommandCenter /></>}
         {view && activeView === "products" && <Product360View view={view} />}
         {view && activeView === "signals" && <Stage2Experience mode="signals" />}
         {view && activeView === "persona" && <Stage2Experience mode="persona" />}
