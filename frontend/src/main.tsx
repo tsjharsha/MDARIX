@@ -205,7 +205,7 @@ function PrivateApplication() {
   const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
   const [investigationsLoading, setInvestigationsLoading] = useState(false);
 
-  useEffect(() => { api<any>("/api/v1/session/context").then((value) => { setSecurityContext(value); setContextState("READY"); const tenant = value.current_tenant?.tenant_name ?? "MDARIX"; document.title = `${tenant} · MDARIX`; document.documentElement.style.setProperty("--tenant-accent", "#087b73"); }).catch(() => { setSecurityContext(null); setContextState("ERROR"); }); }, []);
+  useEffect(() => { api<any>("/api/v1/session/context").then((value) => { const role = String(value.active_role ?? "").trim().toUpperCase(); const current = viewFromPath(window.location.pathname); const allowed = allowedViewsForRole(role); const target: AppView = isPlatformAdminRole(role) && !allowed?.includes(current) ? "admin" : isCustomerAdminRole(role) && current !== "customer-admin" ? "customer-admin" : current; setSecurityContext(value); setActiveView(target); if (target !== current) navigateTo(target); const tenant = value.current_tenant?.tenant_name ?? "MDARIX"; document.title = `${tenant} · MDARIX`; document.documentElement.style.setProperty("--tenant-accent", "#087b73"); setContextState("READY"); }).catch(() => { setSecurityContext(null); setContextState("ERROR"); }); }, []);
   useEffect(() => { const onPopState = () => setActiveView(viewFromPath(window.location.pathname)); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
   const changeView = (view: AppView) => { setActiveView(view); navigateTo(view); };
 

@@ -1422,6 +1422,55 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual {
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::before,
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual .visual-node { display:none; }
+/* Investigation uses a dedicated MedTech review image instead of the generic journey diagram. */
+html[data-public-path="/platform/investigation"] .public-shell .public-hero { display:none; }
+html[data-public-path="/platform/investigation"] .public-shell .capability-visual { min-height:340px; background:#eef8f6 url('/medtech-product-360-device.png') center/cover no-repeat; }
+html[data-public-path="/platform/investigation"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/investigation"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/investigation"] .public-shell .capability-visual .visual-node { display:none; }
+/* Evidence Intelligence uses a dedicated MedTech collaboration visual instead of the generic journey diagram. */
+html[data-public-path="/platform/evidence"] .public-shell .public-hero { display:none; }
+html[data-public-path="/platform/evidence"] .public-shell .capability-visual { min-height:340px; background:#eef8f6 url('/medtech-evidence-intelligence-hero.png') center/cover no-repeat; }
+html[data-public-path="/platform/evidence"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/evidence"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/evidence"] .public-shell .capability-visual .visual-node { display:none; }
+/* Each investigation intelligence route has its own MedTech hero visual. */
+html[data-public-path="/platform/hypotheses"] .public-shell .public-hero,
+html[data-public-path="/platform/unknowns"] .public-shell .public-hero,
+html[data-public-path="/platform/failure-chain"] .public-shell .public-hero,
+html[data-public-path="/platform/counterfactual"] .public-shell .public-hero,
+html[data-public-path="/platform/decision-center"] .public-shell .public-hero,
+html[data-public-path="/platform/investigation-brief"] .public-shell .public-hero { display:none; }
+html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual { background-image:url('/medtech-hypotheses-hero.png'); }
+html[data-public-path="/platform/unknowns"] .public-shell .capability-visual { background-image:url('/medtech-unknowns-hero.png'); }
+html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual { background-image:url('/medtech-failure-chain-hero.png'); }
+html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual { background-image:url('/medtech-counterfactual-hero.png'); }
+html[data-public-path="/platform/decision-center"] .public-shell .capability-visual { background-image:url('/medtech-decision-center-hero.png'); }
+html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual { background-image:url('/medtech-investigation-brief-hero.png'); }
+html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual,
+html[data-public-path="/platform/unknowns"] .public-shell .capability-visual,
+html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual,
+html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual,
+html[data-public-path="/platform/decision-center"] .public-shell .capability-visual,
+html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual { min-height:340px; background-color:#eef8f6; background-position:center; background-size:cover; }
+html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/unknowns"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/unknowns"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/unknowns"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/decision-center"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/decision-center"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/decision-center"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual .visual-node { display:none; }
 
 @media (max-width: 620px) {
   .public-shell .public-header > .brand,

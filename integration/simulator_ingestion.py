@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.models.enterprise import ConnectorRun, ConnectorSourceRecord
 from backend.app.db.models.stage2 import OutboxEvent
 from integration.api_contract import idempotency_key
+from integration.api_contract import fetch_page
 from source_simulator.provider_catalog import PROVIDER_PORTS
 
 
@@ -26,6 +27,54 @@ def read_provider(provider: str, tenant_key: str, token: str, entity: str, host:
     if body.get("tenant_key") != tenant_key:
         raise ValueError("provider returned an unexpected tenant scope")
     return body.get("records", [])
+
+
+def provider_endpoint(provider: str, host: str = "127.0.0.1") -> str:
+    """Return the local simulator endpoint for any registered provider family."""
+    key = provider.upper()
+    if key not in PROVIDER_PORTS:
+        raise ValueError(f"UNKNOWN_PROVIDER:{key}")
+    return f"http://{host}:{PROVIDER_PORTS[key]}"
+
+
+def read_provider_page(
+    provider: str,
+    tenant_key: str,
+    token: str,
+    entity: str,
+    *,
+    cursor: str | None = None,
+    since: str | None = None,
+    limit: int = 100,
+    host: str = "127.0.0.1",
+) -> dict:
+    """Read one bounded, retryable provider page using the shared contract."""
+    endpoint = provider_endpoint(provider, host)
+    page = fetch_page(
+        endpoint,
+        f"records/{entity}",
+        headers={"X-Provider-Token": token},
+        limit=limit,
+        cursor=cursor,
+        since=since,
+    )
+    if page.get("tenant_key") != tenant_key:
+        raise ValueError("PROVIDER_TENANT_SCOPE_MISMATCH")
+    return page
+
+
+def read_provider_schema(provider: str, tenant_key: str, token: str, entity: str, *, host: str = "127.0.0.1") -> dict:
+    """Read and tenant-validate a provider schema before ingestion."""
+    endpoint = provider_endpoint(provider, host)
+    page = fetch_page(
+        endpoint,
+        f"schema/{entity}",
+        headers={"X-Provider-Token": token},
+        limit=1,
+    )
+    if page.get("tenant_key") != tenant_key:
+        raise ValueError("PROVIDER_TENANT_SCOPE_MISMATCH")
+    return page
 
 def enqueue_provider_records(db: Session, tenant_id: UUID, provider: str, tenant_key: str, entity: str, records: list[dict]) -> int:
     created = 0
