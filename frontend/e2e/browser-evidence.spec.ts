@@ -98,9 +98,10 @@ test.describe("MDARIX browser evidence", () => {
     const customerLink = page.locator(".platform-admin-table .table-link").first();
     if (await customerLink.count()) {
       await customerLink.click();
-      await expect(page.getByRole("navigation", { name: /customer detail tabs/i })).toBeVisible();
+      const detailTabs = page.getByRole("navigation", { name: /customer detail tabs/i });
+      await expect(detailTabs).toBeVisible();
       for (const tab of ["Overview", "Administrators", "Environments", "Subscription", "Integrations", "Security", "Audit"]) {
-        const tabButton = page.getByRole("button", { name: tab, exact: true });
+        const tabButton = detailTabs.getByRole("button", { name: tab, exact: true });
         if (await tabButton.count()) {
           await tabButton.click();
           await expect(page.locator(".platform-admin-record-page")).toBeVisible();
