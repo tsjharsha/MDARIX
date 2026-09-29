@@ -6,6 +6,7 @@ import { PublicMegaSite } from "./PublicMegaSite";
 import { AppView, navigateTo, viewFromPath } from "./app/router";
 import { Stage3CommandCenter } from "./features/command-center/Stage3CommandCenter";
 import { Stage2Experience } from "./features/stage2/Stage2Experience";
+import { ProductVersionStory } from "./features/investigator/ProductVersionStory";
 import { Stage2AdminControlPlane } from "./features/stage2/Stage2AdminControlPlane";
 import { AskMdarixPage } from "./features/ask/AskMdarixPage";
 import { MappingStudio } from "./features/stage2/MappingStudio";
@@ -640,6 +641,8 @@ function Product360View({ view }: { view: Product360 }) {
         <Metric icon={<AlertTriangle />} label="Complaints" value={view.overview.complaint_count} />
         <Metric icon={<FileText />} label="Evidence" value={view.overview.evidence_count} />
       </section>
+
+      <ProductVersionStory productId={view.product.id ?? undefined} versionId={view.selected_version?.id ?? undefined} />
 
       <section className="two-col">
         <Panel title="Configuration" icon={<GitBranch />}>

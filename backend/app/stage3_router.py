@@ -37,6 +37,14 @@ def _tenant_count(db: Session, table: str, tenant_id: str) -> int:
         return 0
 
 
+def _tenant_count_where(db: Session, table: str, clause: str, params: dict) -> int:
+    try:
+        return int(db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE tenant_id = :tenant_id AND {clause}"), params).scalar() or 0)
+    except Exception:
+        db.rollback()
+        return 0
+
+
 def _rows(db: Session, query: str, params: dict) -> list[dict]:
     """Return bounded analytics rows; missing optional tables become limitations."""
     try:
@@ -72,6 +80,55 @@ def signals_summary(db: Session = Depends(get_data_plane_db), ctx: Authenticated
     return {"tenant_id": ctx.tenant_id, "scope": "TENANT", "signals": rows,
             "limitations": ["Signal clusters are not inferred from complaint rows in this read-only foundation.",
                             "Severity and status are returned only when recorded by the source system."]}
+
+
+@router.get("/signals/{signal_id}")
+def signal_detail(signal_id: str, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """Return one tenant-scoped complaint signal with product/version story context."""
+    complaint = _rows(db, """
+        SELECT c.id, c.complaint_identifier AS signal_id, c.description, c.status,
+               c.event_timestamp, c.complaint_timestamp, c.product_id, c.product_version_id,
+               p.product_identifier, p.name AS product_name,
+               pv.version_identifier
+        FROM complaints c
+        LEFT JOIN products p ON p.tenant_id = c.tenant_id AND p.id = c.product_id
+        LEFT JOIN product_versions pv ON pv.tenant_id = c.tenant_id AND pv.id = c.product_version_id
+        WHERE c.tenant_id = :tenant_id AND (c.id::text = :signal_id OR c.complaint_identifier = :signal_id)
+        LIMIT 1
+    """, {"tenant_id": ctx.tenant_id, "signal_id": signal_id})
+    if not complaint:
+        return {"status": "NOT_FOUND", "signal_id": signal_id, "tenant_id": ctx.tenant_id, "message": "Signal is not available for this tenant."}
+    row = complaint[0]
+    related = _rows(db, """
+        SELECT investigation_identifier, status, investigation_question
+        FROM investigations WHERE tenant_id = :tenant_id
+          AND (product_id = :product_id OR (:product_id IS NULL AND false))
+        ORDER BY created_at DESC NULLS LAST LIMIT 20
+    """, {"tenant_id": ctx.tenant_id, "product_id": row.get("product_id")})
+    return {"status": "READY_FOR_REVIEW", "tenant_id": ctx.tenant_id, "signal": row,
+            "related_investigations": related,
+            "interpretation": {"observed": "Signal data is source-recorded.", "correlation": "Not inferred by this endpoint.", "unknown": "Causality is not established.", "missing_evidence": "Review source evidence and temporal context before opening an investigation."},
+            "human_review_required": True}
+
+
+@router.get("/products/{product_id}/versions/{version_id}/story")
+def product_version_story(product_id: str, version_id: str, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """Return a dedicated ProductVersion story, bounded to the authenticated tenant."""
+    version = _rows(db, """
+        SELECT pv.id, pv.product_id, pv.version_identifier, pv.description, pv.lifecycle_status, pv.release_timestamp,
+               p.product_identifier, p.name AS product_name
+        FROM product_versions pv JOIN products p ON p.tenant_id = pv.tenant_id AND p.id = pv.product_id
+        WHERE pv.tenant_id = :tenant_id AND pv.id = :version_id AND pv.product_id = :product_id LIMIT 1
+    """, {"tenant_id": ctx.tenant_id, "version_id": version_id, "product_id": product_id})
+    if not version:
+        return {"status": "NOT_FOUND", "product_id": product_id, "version_id": version_id, "tenant_id": ctx.tenant_id}
+    params = {"tenant_id": ctx.tenant_id, "version_id": version_id}
+    return {"status": "READY_FOR_REVIEW", "tenant_id": ctx.tenant_id, "version": version[0],
+            "counts": {"complaints": _tenant_count_where(db, "complaints", "product_version_id = :version_id", params), "investigations": _tenant_count_where(db, "investigations", "product_version_id = :version_id", params), "evidence": _tenant_count_where(db, "evidence", "product_version_id = :version_id", params)},
+            "complaints": _rows(db, "SELECT complaint_identifier, description, status, event_timestamp FROM complaints WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY event_timestamp DESC NULLS LAST LIMIT 50", params),
+            "investigations": _rows(db, "SELECT investigation_identifier, status, investigation_question FROM investigations WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50", params),
+            "evidence": _rows(db, "SELECT evidence_identifier, title, evidence_type, reliability_status FROM evidence WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50", params),
+            "limitations": ["Changes and causality are not inferred from this read-only story endpoint.", "All records are limited to the authenticated tenant and selected ProductVersion."]}
 
 
 @router.get("/analytics/investigations")
