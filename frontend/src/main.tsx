@@ -192,6 +192,7 @@ function PrivateApplicationGate() {
 
 function PrivateApplication() {
   const [securityContext, setSecurityContext] = useState<{display_name:string; active_role:string|null; tenant_id?:string; personas?:Array<{code:string;label:string}>; allowed_menu?:string[]; environment?:string; memberships?:Array<{tenant_id:string;tenant_key:string;tenant_name:string;is_default:boolean}>; current_tenant?:{tenant_id:string;tenant_name?:string}; entitlements?:Array<{feature_code:string;enabled:boolean;limits?:Record<string,unknown>}>} | null>(null);
+  const [contextState, setContextState] = useState<"LOADING" | "READY" | "ERROR">("LOADING");
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [version, setVersion] = useState<string>("D");
@@ -204,7 +205,7 @@ function PrivateApplication() {
   const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
   const [investigationsLoading, setInvestigationsLoading] = useState(false);
 
-  useEffect(() => { api<any>("/api/v1/session/context").then((value) => { setSecurityContext(value); const tenant = value.current_tenant?.tenant_name ?? "MDARIX"; document.title = `${tenant} · MDARIX`; document.documentElement.style.setProperty("--tenant-accent", "#087b73"); }).catch(() => setSecurityContext(null)); }, []);
+  useEffect(() => { api<any>("/api/v1/session/context").then((value) => { setSecurityContext(value); setContextState("READY"); const tenant = value.current_tenant?.tenant_name ?? "MDARIX"; document.title = `${tenant} · MDARIX`; document.documentElement.style.setProperty("--tenant-accent", "#087b73"); }).catch(() => { setSecurityContext(null); setContextState("ERROR"); }); }, []);
   useEffect(() => { const onPopState = () => setActiveView(viewFromPath(window.location.pathname)); window.addEventListener("popstate", onPopState); return () => window.removeEventListener("popstate", onPopState); }, []);
   const changeView = (view: AppView) => { setActiveView(view); navigateTo(view); };
 
@@ -269,6 +270,8 @@ function PrivateApplication() {
       <button className={mode === "known" ? "selected" : ""} onClick={() => setMode("known")}>Known</button>
     </div>
   </div>;
+
+  if (contextState !== "READY") return <div className="auth-shell"><div className="auth-card"><span className="eyebrow">MDARIX secure application</span><h1>{contextState === "LOADING" ? "Loading your workspace…" : "Workspace unavailable"}</h1><p>{contextState === "LOADING" ? "Applying your tenant, role, and permission context." : "Your authorized tenant context could not be loaded. Please sign in again."}</p>{contextState === "ERROR" && <a className="primary-action" href="/signin">Return to sign in</a>}</div></div>;
 
   return (
     <div className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""} ${isCustomerAdmin ? "customer-admin-shell" : "quality-shell"}`}>
