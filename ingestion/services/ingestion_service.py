@@ -134,9 +134,34 @@ class IngestionService:
             tenant_id = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:tenant_key"), {"tenant_key": tenant_key}).scalar_one_or_none()
             if tenant_id:
                 return str(tenant_id)
+            # ``tenants.customer_id`` is intentionally NOT NULL.  The day-4
+            # ingestion fixture predates the customer/tenant lifecycle model,
+            # so create or reuse the synthetic customer before creating its
+            # tenant rather than weakening the production constraint.
+            customer_id = conn.execute(
+                text("SELECT id FROM customers WHERE customer_identifier=:identifier"),
+                {"identifier": "CUST-ACME-SYNTHETIC"},
+            ).scalar_one_or_none()
+            if customer_id is None:
+                customer_id = conn.execute(
+                    text(
+                        "INSERT INTO customers "
+                        "(customer_identifier, legal_name, display_name, customer_type, country, lifecycle_status, lock_version, created_at, updated_at) "
+                        "VALUES (:identifier, :name, :name, 'SYNTHETIC', 'US', 'ACTIVE', 1, :now, :now) RETURNING id"
+                    ),
+                    {
+                        "identifier": "CUST-ACME-SYNTHETIC",
+                        "name": manifest["fictional_company"],
+                        "now": now,
+                    },
+                ).scalar_one()
             return str(conn.execute(
-                text("INSERT INTO tenants (tenant_key, name, status, created_at, updated_at) VALUES (:tenant_key, :name, 'active', :now, :now) RETURNING id"),
-                {"tenant_key": tenant_key, "name": manifest["fictional_company"], "now": now},
+                text(
+                    "INSERT INTO tenants "
+                    "(customer_id, tenant_key, tenant_identifier, name, display_name, tenant_slug, tenant_type, deployment_model, primary_region, residency_region, cross_border_processing_allowed, provisioning_status, status, lock_version, created_at, updated_at) "
+                    "VALUES (:customer_id, :tenant_key, 'TENANT-ACME-SYNTHETIC', :name, :name, 'acme-care-synthetic', 'STANDARD', 'SHARED', 'US', 'US', false, 'PROVISIONED', 'ACTIVE', 1, :now, :now) RETURNING id"
+                ),
+                {"customer_id": customer_id, "tenant_key": tenant_key, "name": manifest["fictional_company"], "now": now},
             ).scalar_one())
 
     def ingest_source(self, tenant_id: str, source: SourceFile, initiated_by: str) -> dict[str, Any]:
