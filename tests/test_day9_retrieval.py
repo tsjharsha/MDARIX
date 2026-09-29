@@ -51,7 +51,7 @@ def retrieval_fixture(db_session):
 
     other_tenant = db_session.query(Tenant).filter(Tenant.tenant_key == "DAY9_OTHER_TENANT").first()
     if other_tenant is None:
-        other_customer = Customer(id=uuid.uuid4(), customer_identifier=f"DAY9-CUSTOMER-{uuid.uuid4().hex[:8]}", legal_name="Day 9 Other Customer", display_name="Day 9 Other Customer", customer_type="DESIGN_PARTNER", lifecycle_status="ACTIVE", created_at=dt.datetime.now(dt.timezone.utc), updated_at=dt.datetime.now(dt.timezone.utc))
+        other_customer = Customer(id=uuid.uuid4(), customer_identifier=f"DAY9-CUSTOMER-{uuid.uuid4().hex[:8]}", legal_name="Day 9 Other Customer", display_name="Day 9 Other Customer", customer_type="DESIGN_PARTNER", country="US", lifecycle_status="ACTIVE", created_at=dt.datetime.now(dt.timezone.utc), updated_at=dt.datetime.now(dt.timezone.utc))
         db_session.add(other_customer)
         db_session.flush()
         other_tenant = Tenant(
