@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 node_modules/
+website-next/.next/
 dist/
 build/
 .pytest_cache/

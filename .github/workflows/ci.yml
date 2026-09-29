@@ -82,7 +82,7 @@ jobs:
       POSTGRES_DB: mdarix_r1
       MDARIX_DB_HARDENING_APPLY: '1'
       DAY35_FIXTURE_APPLY: '1'
-      DAY35_FIXTURE_PASSWORD: 'LegacyTestPassword123!'
+      DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -182,7 +182,7 @@ jobs:
       POSTGRES_DB: mdarix_r1
       MDARIX_DB_HARDENING_APPLY: '1'
       DAY35_FIXTURE_APPLY: '1'
-      DAY35_FIXTURE_PASSWORD: 'LegacyTestPassword123!'
+      DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:
       postgres:
         image: pgvector/pgvector:pg16
