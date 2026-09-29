@@ -1589,3 +1589,10 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual .
 .investigation-tab-summary h3 { margin:5px 0; color:#12324a; }.investigation-tab-summary p { margin:0; color:#527284; max-width:680px; }
 .investigation-tab-status { display:flex; align-items:flex-end; flex-direction:column; gap:5px; white-space:nowrap; color:#087b73; }.investigation-tab-status strong { font-size:18px; }.investigation-tab-status span { color:#527284; font-size:12px; }
 @media (max-width: 650px) { .investigation-tab-summary { align-items:flex-start; flex-direction:column; }.investigation-tab-status { align-items:flex-start; white-space:normal; } }
+/* Customer Admin uses a full-width workspace; section navigation is in the heading selector. */
+.ca-shell { display: block !important; margin-top: 18px; }
+.ca-shell > .ca-sidebar { display: none !important; }
+.ca-heading-actions { display: flex; align-items: end; gap: 10px; }
+.ca-area-selector { display: grid; gap: 5px; color: #527285; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.ca-area-selector select { min-width: 210px; border: 1px solid #bdd2dc; border-radius: 8px; padding: 10px 12px; background: #fff; color: #234c62; font: inherit; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: normal; }
+@media (max-width: 600px) { .ca-heading-actions { display: grid; align-items: stretch; } .ca-area-selector select { width: 100%; min-width: 0; } }
