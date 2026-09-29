@@ -23,6 +23,7 @@ import { RegulatoryCopilot } from "./features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "./features/risk/RiskTraceabilityWorkspace";
 import { SignatureVerificationWorkspace } from "./features/signature/SignatureVerificationWorkspace";
 import { InvestigatorHome } from "./features/investigator/InvestigatorHome";
+import { MyWork } from "./features/investigator/MyWork";
 
 type Product = {
   id: string;
@@ -239,6 +240,7 @@ function PrivateApplication() {
   const activeRole = securityContext?.active_role?.trim().toUpperCase();
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
+  const canSee = (item: string) => !securityContext?.allowed_menu?.length || securityContext.allowed_menu.includes(item);
 
   useEffect(() => {
     if (isPlatformAdmin && !allowedViewsForRole(activeRole)?.includes(activeView)) changeView("admin");
@@ -280,19 +282,20 @@ function PrivateApplication() {
             {[["Overview", "Overview"], ["Organization", "Organization"], ["Users", "Users"], ["Roles & Access", "Roles & Access"], ["Configuration", "Configuration"], ["Integrations", "Integrations"], ["Plans & Entitlements", "Plans & Entitlements"], ["Security", "Security"], ["Audit", "Audit"]].map(([label, section]) => <button key={label} className={`nav-link ${activeView === "customer-admin" && section === "Overview" ? "active" : ""}`} onClick={() => { window.dispatchEvent(new CustomEvent("customer-admin-section", { detail: section })); changeView("customer-admin"); }}>{label}</button>)}
           </> : <>
             <p className="nav-section-label">Workspace</p>
-            <button className={`nav-link ${activeView === "home" ? "active" : ""}`} onClick={() => changeView("home")}>Home</button>
-            <button className={`nav-link ${activeView === "products" ? "active" : ""}`} onClick={() => changeView("products")}>Products</button>
-            <button className={`nav-link ${activeView === "signals" ? "active" : ""}`} onClick={() => changeView("signals")}>Signals &amp; Complaints</button>
-            <button className={`nav-link ${activeView === "story" ? "active" : ""}`} onClick={() => changeView("story")}>Story View</button>
-            <button className={`nav-link ${activeView === "persona" ? "active" : ""}`} onClick={() => changeView("persona")}>Persona Dashboard</button>
-            <button className={`nav-link ${activeView === "ask" ? "active" : ""}`} onClick={() => changeView("ask")}>Ask MDARIX</button>
+            {canSee("home") && <button className={`nav-link ${activeView === "home" ? "active" : ""}`} onClick={() => changeView("home")}>Home</button>}
+            {canSee("home") && <button className={`nav-link ${activeView === "my-work" ? "active" : ""}`} onClick={() => changeView("my-work")}>My Work <small>Assignments, gaps, and reviews</small></button>}
+            {canSee("products") && <button className={`nav-link ${activeView === "products" ? "active" : ""}`} onClick={() => changeView("products")}>Products</button>}
+            {canSee("products") && <button className={`nav-link ${activeView === "signals" ? "active" : ""}`} onClick={() => changeView("signals")}>Signals &amp; Complaints</button>}
+            {canSee("products") && <button className={`nav-link ${activeView === "story" ? "active" : ""}`} onClick={() => changeView("story")}>Story View</button>}
+            {canSee("home") && <button className={`nav-link ${activeView === "persona" ? "active" : ""}`} onClick={() => changeView("persona")}>Persona Dashboard</button>}
+            {canSee("home") && <button className={`nav-link ${activeView === "ask" ? "active" : ""}`} onClick={() => changeView("ask")}>Ask MDARIX</button>}
             <p className="nav-section-label">Investigation</p>
-            <button className={`nav-link ${activeView === "investigations" ? "active" : ""}`} onClick={() => changeView("investigations")}>Investigations</button>
-            <button className={`nav-link ${activeView === "evidence" ? "active" : ""}`} onClick={() => changeView("evidence")}>Evidence</button>
+            {canSee("investigations") && <button className={`nav-link ${activeView === "investigations" ? "active" : ""}`} onClick={() => changeView("investigations")}>Investigations</button>}
+            {canSee("evidence") && <button className={`nav-link ${activeView === "evidence" ? "active" : ""}`} onClick={() => changeView("evidence")}>Evidence</button>}
             <p className="nav-section-label">Decision & Trust</p>
-            <button className={`nav-link ${activeView === "decision" ? "active" : ""}`} onClick={() => changeView("decision")}>Decision Center</button>
-            <button className={`nav-link ${activeView === "assurance" ? "active" : ""}`} onClick={() => changeView("assurance")}>AI Assurance <small>Inspect AI trust controls</small></button>
-            <button className={`nav-link ${activeView === "audit" ? "active" : ""}`} onClick={() => changeView("audit")}>Audit Trail <small>Review recorded activity</small></button>
+            {canSee("decision-center") && <button className={`nav-link ${activeView === "decision" ? "active" : ""}`} onClick={() => changeView("decision")}>Decision Center</button>}
+            {canSee("assurance") && <button className={`nav-link ${activeView === "assurance" ? "active" : ""}`} onClick={() => changeView("assurance")}>AI Assurance <small>Inspect AI trust controls</small></button>}
+            {canSee("audit") && <button className={`nav-link ${activeView === "audit" ? "active" : ""}`} onClick={() => changeView("audit")}>Audit Trail <small>Review recorded activity</small></button>}
           </>}
         </nav>
         <div className="side-nav-footer"><p>Evidence before inference.<br/>Authorized humans decide.</p></div>
@@ -311,6 +314,7 @@ function PrivateApplication() {
         {activeView === "customer-admin" && <header className="role-context-header"><div><span className="eyebrow">Customer administration</span><strong>{securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"}</strong></div><div className="role-context-meta"><span>{securityContext?.display_name ?? "Authenticated user"}</span><b>{securityContext?.active_role ?? "Customer Admin"}</b></div></header>}
         {error && <div className="error">{error}</div>}
         {view && activeView === "home" && <><InvestigatorHome tenantName={securityContext?.current_tenant?.tenant_name ?? "Authenticated tenant"} userName={securityContext?.display_name ?? "Investigator"} productName={view.product.name ?? "Product not selected"} version={view.selected_version?.version_identifier ?? version} investigationCount={investigations.length} evidenceCount={view.evidence.length} limitationsCount={view.limitations.length} onNavigate={changeView} /><Stage3CommandCenter /></>}
+        {view && activeView === "my-work" && <MyWork productId={selectedProduct} onOpen={changeView} />}
         {view && activeView === "products" && <Product360View view={view} />}
         {view && activeView === "signals" && <Stage2Experience mode="signals" />}
         {view && activeView === "persona" && <Stage2Experience mode="persona" />}
