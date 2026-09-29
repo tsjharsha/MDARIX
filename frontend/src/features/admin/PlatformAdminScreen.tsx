@@ -13,7 +13,7 @@ type PlatformAdminScreenProps = {
 };
 
 type DataKey = "users" | "roles" | "permissions" | "memberships" | "personas" |
-  "entitlements" | "connectors" | "mappings" | "dataMappings" | "audit" | "customers" | "plans";
+  "entitlements" | "connectors" | "mappings" | "dataMappings" | "audit" | "customers" | "plans" | "integrationRuns" | "reconciliation" | "credentials" | "aiExecutions";
 
 type AdminData = Record<DataKey, any[]> & {
   health: { status?: string; metrics?: Record<string, number>; alerts?: any[]; recent_audit?: any[] };
@@ -24,7 +24,7 @@ type AdminData = Record<DataKey, any[]> & {
 
 const EMPTY_DATA: AdminData = {
   users: [], roles: [], permissions: [], memberships: [], personas: [], entitlements: [],
-  connectors: [], mappings: [], dataMappings: [], audit: [], customers: [], plans: [], health: {},
+  connectors: [], mappings: [], dataMappings: [], audit: [], customers: [], plans: [], integrationRuns: [], reconciliation: [], credentials: [], aiExecutions: [], health: {},
   ai: null, security: null, operations: null,
 };
 
@@ -74,6 +74,10 @@ const SOURCES: Array<[string, string, string]> = [
   ["ai", "/api/v1/admin/ai-summary", "AI control summary"],
   ["security", "/api/v1/admin/security-summary", "Security summary"],
   ["operations", "/api/v1/admin/operations-summary", "Operations summary"],
+  ["integrationRuns", "/api/v1/admin/integrations/runs", "Integration runs"],
+  ["reconciliation", "/api/v1/admin/integrations/reconciliation", "Reconciliation"],
+  ["credentials", "/api/v1/admin/integrations/credentials", "Credential references"],
+  ["aiExecutions", "/api/v1/admin/ai-executions", "AI executions"],
 ];
 
 function RecordTable({ rows, columns, empty, onRowClick }: { rows: any[]; columns: Array<[string, (row: any) => unknown]>; empty: string; onRowClick?: (row: any) => void }) {
@@ -517,6 +521,16 @@ function ApiContractRegistryWorkspace() {
   return <section className="platform-admin-card api-contract-registry"><div className="platform-admin-card-title"><div><span className="eyebrow">Server-published contract</span><h3>API &amp; contract registry</h3><p>Inspect endpoint paths, request/response schemas, authorization requirements, errors, consumers, rate-limit policy, and audit ownership from the published API contract.</p></div><span className="platform-admin-badge success">OpenAPI {spec?.info?.version ?? "loading"}</span></div>{error && <div className="platform-admin-error" role="alert">{error}</div>}<div className="api-contract-tabs">{[["endpoints", "Endpoints"], ["schemas", "Schemas"], ["scopes", "Scopes"], ["errors", "Errors"], ["consumers", "Consumers"], ["audit", "Audit"]].map(([key, label]) => <button key={key} className={tab === key ? "selected" : ""} onClick={() => setTab(key)}>{label}</button>)}</div>{tab === "consumers" || tab === "audit" ? <div className="api-contract-info"><h4>{tab === "consumers" ? "API consumers" : "Contract audit"}</h4><p>{tab === "consumers" ? "Consumer registrations are tenant-scoped and must be provisioned through the governed integration workflow." : "Contract publication and endpoint changes are reviewed through the platform audit layer. Audit event detail is available from Audit & Evidence."}</p><span className="platform-admin-badge">No unverified consumer or audit data shown</span></div> : <div className="api-contract-layout"><div><RecordTable rows={rows as any[]} empty={spec ? "No matching contract entries." : "Loading OpenAPI contract…"} onRowClick={setSelected} columns={[["Method", (r) => r.method], ["Endpoint", (r) => r.path], ["Operation", (r) => r.operation?.summary ?? r.operation?.operationId ?? "—"], ["Authorization", (r) => r.operation?.security?.length ? "Required" : "Public / review"]]} /></div>{selected ? <aside className="api-contract-detail"><span className="eyebrow">{selected.method} contract</span><h4>{selected.path}</h4><p>{selected.operation?.description ?? selected.operation?.summary ?? "No description published."}</p><dl><div><dt>Operation ID</dt><dd>{selected.operation?.operationId ?? "Not assigned"}</dd></div><div><dt>Scopes</dt><dd>{selected.operation?.security?.map((item: any) => Object.keys(item).join(", ")).join(" · ") || "Not declared"}</dd></div><div><dt>Rate limits</dt><dd>Enforced by deployment policy; provider-specific values are not exposed in OpenAPI.</dd></div><div><dt>Errors</dt><dd>{Object.keys(selected.operation?.responses ?? {}).join(", ") || "Not declared"}</dd></div><div><dt>Audit</dt><dd>Mutation audit depends on the governed route implementation.</dd></div></dl><button className="platform-admin-secondary" onClick={() => setSelected(null)}>Close detail</button></aside> : <div className="platform-admin-empty">Select an endpoint to inspect its contract metadata.</div>}</div>}</section>;
 }
 
+function AdminOperationalRecords({ item, rows }: { item: string; rows: any[] }) {
+  const definitions: Record<string, Array<[string, (row: any) => unknown]>> = {
+    "Integration runs": [["Source", r => r.source_system], ["Status", r => r.status], ["Received", r => r.records_received], ["Accepted", r => r.records_accepted], ["Rejected", r => r.records_rejected], ["Retry", r => r.retry_attempt], ["Correlation", r => r.correlation_id]],
+    "Reconciliation": [["Run", r => r.connector_run_id], ["Status", r => r.status], ["Expected", r => r.expected_count], ["Accepted", r => r.accepted_count], ["Rejected", r => r.rejected_count], ["Duplicates", r => r.duplicate_count], ["Unresolved", r => r.unresolved_count]],
+    "Credentials": [["Connector", r => r.code], ["Type", r => r.connector_type], ["Reference", r => r.credential_ref], ["Configured", r => r.credential_configured ? "Yes" : "No"], ["Secrets", r => "Redacted"]],
+    "AI executions": [["Provider", r => r.provider], ["Model", r => r.model_name], ["Validation", r => r.validation_status], ["Confidence", r => r.confidence_label], ["Latency", r => r.latency_ms ? `${r.latency_ms} ms` : "—"], ["Error", r => r.error_state ?? "None"]],
+  };
+  return <section className="platform-admin-card"><div className="platform-admin-card-title"><div><span className="eyebrow">Durable operational records</span><h3>{item}</h3><p>Tenant-scoped records loaded from persisted backend data. Secrets and prompt content remain redacted.</p></div><span className="platform-admin-badge success">Server authorized</span></div><RecordTable rows={rows} empty={`No ${item.toLowerCase()} records are available`} columns={definitions[item] ?? [["Record", r => r.id], ["Status", r => r.status], ["Updated", r => r.updated_at ?? r.created_at]]} /></section>;
+}
+
 function ControlCenterWorkspace({ domain, item, data, metrics }: { domain: string; item: string; data: AdminData; metrics: Record<string, any> }) {
   const summary = domain === "AI Control Center" ? data.ai : domain === "Security" ? data.security : data.operations;
   const cards = domain === "AI Control Center"
@@ -658,6 +672,10 @@ const selectDomain = (domain: typeof DOMAINS[number]) => {
 
   const renderWorkspace = () => {
     if (recordView) return <>{renderRecordDetail()}{recordView.kind === "customer" && recordDetail?.customer ? <Customer360QuickActions customer={recordDetail.customer} tenants={recordDetail.tenants ?? []} onTab={setRecordTab} onRefresh={() => setRefreshVersion((value) => value + 1)} /> : recordView.kind === "tenant" && recordDetail?.tenant ? <Tenant360QuickActions tenant={recordDetail.tenant} environments={recordDetail.environments ?? []} onTab={setRecordTab} onRefresh={() => setRefreshVersion((value) => value + 1)} /> : null}</>;
+    if (activeDomain === "Integrations" && activeItem === "Integration runs") return <AdminOperationalRecords item="Integration runs" rows={data.integrationRuns} />;
+    if (activeDomain === "Integrations" && activeItem === "Reconciliation") return <AdminOperationalRecords item="Reconciliation" rows={data.reconciliation} />;
+    if (activeDomain === "Integrations" && activeItem === "Credentials") return <AdminOperationalRecords item="Credentials" rows={data.credentials} />;
+    if (activeDomain === "AI Control Center" && activeItem === "AI executions") return <AdminOperationalRecords item="AI executions" rows={data.aiExecutions} />;
     if (activeDomain === "Platform Overview") return renderOverview();
     if (activeDomain === "Customers & Tenants") {
       if (activeItem === "Customer Directory") return <CustomerDirectory onOpen={(row) => { const id = row.customer_id ?? row.id; if (id) { setRecordView({ kind: "customer", id: String(id) }); setRecordTab("Overview"); } }} />;

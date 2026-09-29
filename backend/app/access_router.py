@@ -77,7 +77,9 @@ from backend.app.db.models.foundation import (
     TenantMappingVersion,
     TenantMembership,
     TenantPlanAssignment,
+    AIExecution,
 )
+from backend.app.db.models.enterprise import ConnectorRun, ReconciliationRecord
 from backend.app.db.models.stage2 import (
     EmailTemplate,
     OutboxEvent,
@@ -873,6 +875,38 @@ def admin_operations_summary(request: Request, db: Session = Depends(get_db)):
     retried = db.query(OutboxEvent).filter(OutboxEvent.tenant_id == tenant_id, OutboxEvent.attempts > 0).count()
     connectors = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).count()
     return {"tenant_id": str(tenant_id), "status": "ATTENTION_REQUIRED" if dead_lettered else "HEALTHY", "metrics": {"outbox_pending": pending, "outbox_retried": retried, "outbox_dead_lettered": dead_lettered, "configured_connectors": connectors}, "worker": {"heartbeat": "NOT_REPORTED", "deployment": "ENVIRONMENT_DEPENDENT"}, "scope": {"tenant_scoped": True}}
+
+
+def _admin_detail_tenant(request: Request, db: Session):
+    return _admin_tenant(request, db).tenant_id
+
+
+@router.get("/admin/integrations/runs")
+def admin_integration_runs(request: Request, db: Session = Depends(get_db)):
+    tenant_id = _admin_detail_tenant(request, db)
+    rows = db.query(ConnectorRun).filter(ConnectorRun.tenant_id == tenant_id).order_by(ConnectorRun.created_at.desc()).limit(200).all()
+    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "connection_id": row.connection_id, "source_system": row.source_system, "run_type": row.run_type, "status": row.status, "records_received": row.records_received, "records_accepted": row.records_accepted, "records_rejected": row.records_rejected, "records_duplicate": row.records_duplicate, "retry_attempt": row.retry_attempt, "reconciliation_status": row.reconciliation_status, "schema_drift_status": row.schema_drift_status, "failure_category": row.failure_category, "correlation_id": row.correlation_id, "started_at": row.started_at, "completed_at": row.completed_at} for row in rows]
+
+
+@router.get("/admin/integrations/reconciliation")
+def admin_integration_reconciliation(request: Request, db: Session = Depends(get_db)):
+    tenant_id = _admin_detail_tenant(request, db)
+    rows = db.query(ReconciliationRecord).filter(ReconciliationRecord.tenant_id == tenant_id).order_by(ReconciliationRecord.reconciled_at.desc()).limit(200).all()
+    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "connector_run_id": str(row.connector_run_id), "expected_count": row.expected_count, "received_count": row.received_count, "accepted_count": row.accepted_count, "rejected_count": row.rejected_count, "quarantined_count": row.quarantined_count, "duplicate_count": row.duplicate_count, "unresolved_count": row.unresolved_count, "status": row.status, "details": row.details, "reconciled_at": row.reconciled_at} for row in rows]
+
+
+@router.get("/admin/integrations/credentials")
+def admin_integration_credentials(request: Request, db: Session = Depends(get_db)):
+    tenant_id = _admin_detail_tenant(request, db)
+    rows = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).all()
+    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "code": row.code, "connector_type": row.connector_type, "version": row.version, "status": row.status, "credential_ref": (row.configuration or {}).get("credential_ref"), "credential_configured": bool((row.configuration or {}).get("credential_ref")), "secret_value": None, "scope": {"tenant_scoped": True, "secrets_redacted": True}} for row in rows]
+
+
+@router.get("/admin/ai-executions")
+def admin_ai_executions(request: Request, db: Session = Depends(get_db)):
+    tenant_id = _admin_detail_tenant(request, db)
+    rows = db.query(AIExecution).filter(AIExecution.tenant_id == tenant_id).order_by(AIExecution.execution_timestamp.desc()).limit(200).all()
+    return [{"id": str(row.id), "tenant_id": str(row.tenant_id), "investigation_id": str(row.investigation_id) if row.investigation_id else None, "provider": row.provider, "model_name": row.model_name, "model_version": row.model_version, "prompt_template_version": row.prompt_template_version, "validation_status": row.validation_status, "confidence_label": row.confidence_label, "execution_timestamp": row.execution_timestamp, "latency_ms": row.latency_ms, "error_state": row.error_state, "structured_output": row.structured_output, "secrets_redacted": True} for row in rows]
 
 
 @router.get("/admin/identity/users")
