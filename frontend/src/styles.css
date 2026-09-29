@@ -1581,3 +1581,7 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual .
 .work-row:hover,.work-row:focus-visible { background:#f1faf9; }
 .work-row span { display:flex; flex-direction:column; gap:5px; }.work-row small { color:#527284; }.work-row b { color:#087b73; font-size:12px; letter-spacing:.05em; }
 @media (max-width: 650px) { .work-row { grid-template-columns:1fr auto; }.work-row span:nth-child(2) { grid-column:1; }.work-row svg { grid-column:2; grid-row:1 / span 2; } }
+.investigation-tab-summary { display:flex; justify-content:space-between; gap:18px; align-items:center; margin:14px 0; padding:18px 20px; border:1px solid #cfe2e4; border-radius:14px; background:linear-gradient(110deg,#f4fbfb,#fff); }
+.investigation-tab-summary h3 { margin:5px 0; color:#12324a; }.investigation-tab-summary p { margin:0; color:#527284; max-width:680px; }
+.investigation-tab-status { display:flex; align-items:flex-end; flex-direction:column; gap:5px; white-space:nowrap; color:#087b73; }.investigation-tab-status strong { font-size:18px; }.investigation-tab-status span { color:#527284; font-size:12px; }
+@media (max-width: 650px) { .investigation-tab-summary { align-items:flex-start; flex-direction:column; }.investigation-tab-status { align-items:flex-start; white-space:normal; } }

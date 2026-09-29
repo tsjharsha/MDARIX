@@ -868,6 +868,24 @@ function ControlledSignature({ decision, onSigned }: { decision: any; onSigned: 
   return <div className="human-review-box"><button className="primary-action" onClick={begin}>Approve or Reject — Sign</button>{message&&<p role="alert">{message}</p>}{signed&&<div className="advisory-box"><strong>{signed.status} — SIGNED</strong><p>Signature ID: {String(signed.signature_id)}</p><p>Signed By: {signed.signer} · Role: {signed.role}</p><p>Fingerprint: {signed.fingerprint}</p></div>}{open&&<div className="advisory-box"><strong>Controlled Decision Signature</strong><p>User: {session?.display_name} (read only)</p><p>Active role: {session?.active_role} (read only)</p><p>Record: {decision.decision_identifier} · Version: {decision.updated_at} (read only)</p><select value={choice} onChange={e=>setChoice(e.target.value)} aria-label="Signature decision"><option>APPROVE</option><option>REJECT</option></select><textarea value={remarks} onChange={e=>setRemarks(e.target.value)} placeholder="Mandatory decision remarks" rows={3}/><p>{meaning}</p><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Current password" autoComplete="current-password"/><div className="toolbar"><button className="secondary-link" onClick={close}>Cancel</button><button className="primary-action" onClick={sign}>Confirm &amp; Sign</button></div></div>}</div>;
 }
 
+function InvestigationTabSummary({ activeTab, workspace, analysis, hypothesisSet, unknownSet, failureChains, brief, onOpenDecision }: { activeTab: string; workspace: InvestigationWorkspace | null; analysis: InvestigationAnalysis | null; hypothesisSet: HypothesisSet | null; unknownSet: UnknownSet | null; failureChains: FailureChainSet | null; brief: InvestigationBrief | null; onOpenDecision: () => void }) {
+  const summaries: Record<string, { title: string; description: string; count: string; state: string }> = {
+    overview: { title: "Investigation overview", description: "Server-authorized product, temporal, evidence, and guardrail context for this case.", count: `${workspace?.evidence_context.length ?? 0} evidence records`, state: workspace ? "Context loaded" : "Loading context" },
+    evidence: { title: "Evidence review", description: "Inspect source anchors, reliability, and gaps before interpreting the case.", count: `${workspace?.evidence_context.length ?? 0} linked records`, state: workspace?.retrieval_context?.status ?? "Not requested" },
+    analysis: { title: "Observations and analysis", description: "Review grounded observations, contradictions, possible explanations, and missing information.", count: `${analysis?.observations.length ?? 0} observations`, state: analysis?.status ?? "Not run" },
+    hypotheses: { title: "Competing hypotheses", description: "Compare support and contradiction without selecting an unverified winner.", count: `${hypothesisSet?.hypotheses.length ?? 0} hypotheses`, state: hypothesisSet?.status ?? "Not run" },
+    challenger: { title: "Challenger review", description: "Test the current interpretation for unsupported assumptions and material challenges.", count: "Advisory only", state: "Human review required" },
+    unknowns: { title: "Unknowns and gaps", description: "Make missing tests, unresolved questions, and materiality visible.", count: `${unknownSet?.unknowns.length ?? 0} unknowns`, state: "Evidence gap posture" },
+    "failure-chain": { title: "Failure chain", description: "Show supportable relationships while preserving unresolved links and epistemic status.", count: `${failureChains?.chains.length ?? 0} chains`, state: "Causality not established" },
+    counterfactual: { title: "Constrained scenario", description: "Explore bounded alternatives; scenario output is hypothetical, not observed evidence.", count: "Bounded comparison", state: "Human interpretation required" },
+    brief: { title: "Investigation brief", description: "Assemble a versioned, provenance-aware package for human review.", count: brief ? `Version ${brief.brief_version}` : "Not generated", state: brief?.human_review_state ?? "Human review required" },
+    assurance: { title: "AI assurance", description: "Inspect grounding, provenance, temporal scope, and safety limitations.", count: "No hidden reasoning stored", state: "Advisory only" },
+    decision: { title: "Decision readiness", description: "Prepare the case for an authorized reviewer; MDARIX never makes the regulated decision.", count: "Human authority", state: "Open Decision Center" },
+  };
+  const summary = summaries[activeTab] ?? summaries.overview;
+  return <section className="investigation-tab-summary" aria-live="polite"><div><span className="eyebrow">Active workspace tab</span><h3>{summary.title}</h3><p>{summary.description}</p></div><div className="investigation-tab-status"><strong>{summary.count}</strong><span>{summary.state}</span>{activeTab === "decision" && <button className="primary-action" onClick={onOpenDecision}>Open Decision Center</button>}</div></section>;
+}
+
 function InvestigationWorkspacePanel({ investigationId, temporalMode: mode, asOf, onOpenDecision }: { investigationId: string; temporalMode: TemporalMode; asOf: string; onOpenDecision: () => void }) {
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
   const [analysis, setAnalysis] = useState<InvestigationAnalysis | null>(null);
@@ -1017,6 +1035,7 @@ function InvestigationWorkspacePanel({ investigationId, temporalMode: mode, asOf
       <div className="workflow-tabs" role="tablist" aria-label="Investigation workflow">
         {(["overview", "evidence", "analysis", "hypotheses", "challenger", "unknowns", "failure-chain", "counterfactual", "brief", "assurance", "decision"] as const).map((tab) => <button key={tab} role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? "active" : ""} onClick={() => { setActiveTab(tab); document.getElementById(`workflow-${tab}`)?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>{humanize(tab)}</button>)}
       </div>
+      <InvestigationTabSummary activeTab={activeTab} workspace={workspace} analysis={analysis} hypothesisSet={hypothesisSet} unknownSet={unknownSet} failureChains={failureChains} brief={brief} onOpenDecision={onOpenDecision} />
       {(actionStatus || pendingAction) && <div className={`action-feedback ${actionStatus.startsWith("BACKEND") ? "error-feedback" : ""}`} role="status">{pendingAction ? actionStatus : actionStatus}</div>}
       {error && <div className="error inline">{error}</div>}
       {workspace && (
