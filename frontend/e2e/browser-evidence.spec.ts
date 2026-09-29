@@ -134,6 +134,35 @@ test.describe("MDARIX browser evidence", () => {
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-customer-admin.png`, fullPage: true });
   });
 
+  test("Tenant A and Tenant B browser sessions cannot cross-read customer admin data", async ({ browser }) => {
+    test.setTimeout(60_000);
+    const tenantA = await browser.newPage();
+    const tenantB = await browser.newPage();
+    await signIn(tenantA, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(tenantB, "stelikicherla3008@gmail.com", "Temp@1234password");
+    const contextA = await tenantA.request.get("/api/v1/session/context");
+    const contextB = await tenantB.request.get("/api/v1/session/context");
+    expect(contextA.ok()).toBeTruthy();
+    expect(contextB.ok()).toBeTruthy();
+    const a = await contextA.json();
+    const b = await contextB.json();
+    expect(a.tenant_id).toBeTruthy();
+    expect(b.tenant_id).toBeTruthy();
+    expect(a.tenant_id).not.toBe(b.tenant_id);
+    const foreignUsers = await tenantB.evaluate(async (tenantId) => {
+      const response = await fetch("/api/v1/admin/identity/users", { headers: { "X-Tenant-ID": tenantId } });
+      return { status: response.status, body: await response.json() };
+    }, a.tenant_id);
+    expect(foreignUsers.status).toBe(200);
+    expect(foreignUsers.body.every((row: any) => row.tenant_id === b.tenant_id)).toBeTruthy();
+    await tenantA.goto("/app/customer-admin");
+    await tenantB.goto("/app/customer-admin");
+    await expect(tenantA.locator("body")).not.toContainText(b.tenant_id);
+    await expect(tenantB.locator("body")).not.toContainText(a.tenant_id);
+    await tenantA.close();
+    await tenantB.close();
+  });
+
   test("protected routes expose a nonblank state", async ({ page }) => {
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
     for (const route of ["/app/admin", "/app/customer-admin", "/app/admin/mapping-studio", "/app/decision"]) {
