@@ -74,8 +74,44 @@ jobs:
     name: Browser and accessibility evidence
     runs-on: ubuntu-latest
     needs: frontend
+    env:
+      POSTGRES_USER: mdarix_app
+      POSTGRES_PASSWORD: mdarix_app
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mdarix_r1
+      MDARIX_DB_HARDENING_APPLY: '1'
+      DAY35_FIXTURE_APPLY: '1'
+      DAY35_FIXTURE_PASSWORD: 'LegacyTestPassword123!'
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mdarix_app
+          POSTGRES_PASSWORD: mdarix_app
+          POSTGRES_DB: mdarix_r1
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
+          --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r requirements.txt
+      - run: alembic upgrade head
+      - run: python scripts/provision_day35_fixture.py
+      - name: Start backend
+        shell: bash
+        run: |
+          nohup python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8007 > backend.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8007/health/live >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat backend.log
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -138,6 +174,26 @@ jobs:
   integration:
     name: Simulator and integration gates
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: mdarix_app
+      POSTGRES_PASSWORD: mdarix_app
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mdarix_r1
+      MDARIX_DB_HARDENING_APPLY: '1'
+      DAY35_FIXTURE_APPLY: '1'
+      DAY35_FIXTURE_PASSWORD: 'LegacyTestPassword123!'
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mdarix_app
+          POSTGRES_PASSWORD: mdarix_app
+          POSTGRES_DB: mdarix_r1
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
+          --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -145,6 +201,8 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r requirements.txt
       - run: docker compose config --quiet
+      - run: alembic upgrade head
+      - run: python scripts/provision_day35_fixture.py
       # MinIO is an optional local object-storage service. The hosted runner
       # does not require it for the contract/integration tests below, and the
       # upstream image is not reliably pullable from the runner registry.
