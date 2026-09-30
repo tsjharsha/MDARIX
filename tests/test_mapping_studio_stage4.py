@@ -1,7 +1,25 @@
 from pathlib import Path
 
+import pytest
+
+from backend.app.db.session import SessionLocal
 from backend.app.main import app
-from backend.app.mapping_catalog_router import APPLICATIONS, OBJECTS, CANONICAL, source_fields, canonical_fields
+from backend.app.master_data import catalog
+from backend.app.mapping_catalog_router import source_fields, canonical_fields
+
+
+@pytest.fixture
+def catalog_db(monkeypatch):
+    """Real test-database session (Master Data seed) with the platform-admin guard bypassed."""
+    from backend.app import mapping_catalog_router
+
+    monkeypatch.setattr(mapping_catalog_router, "_platform_admin", lambda db, ctx: None)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
 
 
 def _admin_db():
@@ -27,21 +45,22 @@ def _ctx():
     )()
 
 
-def test_stage4_application_objects_are_scoped_to_application():
-    for application, objects in OBJECTS.items():
+def test_stage4_application_objects_are_scoped_to_application(catalog_db):
+    for application in catalog.applications(catalog_db):
+        objects = catalog.application_objects(catalog_db, application["application_id"])
         assert objects
-        assert all(isinstance(item, str) and item for item in objects)
+        assert all(item["source_object_id"].startswith(application["application_id"] + ":") for item in objects)
 
 
-def test_stage4_catalogs_and_protected_fields_are_available():
+def test_stage4_catalogs_and_protected_fields_are_available(catalog_db):
     # The catalog is extensible: new provider simulators may be added without
     # invalidating the Stage 4 contract. Keep the original minimum coverage.
-    assert len(APPLICATIONS) >= 12
-    for entity in CANONICAL:
-        fields = canonical_fields(entity, _admin_db(), _ctx())
+    assert len(catalog.applications(catalog_db)) >= 12
+    for entity in catalog.canonical_entities(catalog_db):
+        fields = canonical_fields(entity["entity_id"], catalog_db, _ctx())
         assert fields
         assert all("mapping_allowed" in field and "required" in field for field in fields)
-    fields = source_fields("TRACKWISE:COMPLAINT", _admin_db(), _ctx())
+    fields = source_fields("TRACKWISE:COMPLAINT", catalog_db, _ctx())
     assert any(field["field_group"] == "IDENTIFIERS" for field in fields)
     assert any(field["field_group"] == "DATES" for field in fields)
 

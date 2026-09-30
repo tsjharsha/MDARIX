@@ -14,7 +14,7 @@ production: several security issues below must be fixed first.
 
 | Check | Command | Result |
 |---|---|---|
-| Backend tests (unit + db) | `python -m pytest` on a freshly recreated `mdarix_r1_test` | 458 passed, 0 failed, 4 data-plane tests deselected |
+| Backend tests (unit + db) | `python -m pytest` on a freshly recreated `mdarix_r1_test` | 466 passed, 0 failed, 4 data-plane tests deselected (includes Master Data v1) |
 | Backend unit tests only | `python -m pytest -m unit` (no database) | 253 passed |
 | Frontend unit tests | `npm --prefix frontend test` | 14 passed (3 files) |
 | Frontend production build | `npm --prefix frontend run build` | Succeeds (single 668 kB JS chunk, size warning) |

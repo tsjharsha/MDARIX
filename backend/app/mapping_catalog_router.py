@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuditEvent, AuthUser, MappingImpactHistory
 from backend.app.db.session import get_db
+from backend.app.master_data import catalog
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/admin/mapping", tags=["Mapping Studio Catalog"])
@@ -66,305 +67,6 @@ class SuggestionDecision(BaseModel):
     reason: str | None = None
 
 
-APPLICATIONS = [
-    ("TRACKWISE", "TrackWise Digital", "QMS", "REST"),
-    ("VEEVA_QMS", "Veeva Vault QMS", "QMS", "REST"),
-    ("SALESFORCE_SERVICE", "Salesforce Service", "CRM", "REST"),
-    ("TEAMCENTER", "Teamcenter PLM", "PLM", "REST"),
-    ("COUPA", "Coupa Supplier Network", "PROCUREMENT", "REST"),
-    ("WINDCHILL", "Windchill PLM", "PLM", "REST"),
-    ("SAP_ERP", "SAP ERP", "ERP", "REST"),
-    ("ORACLE_ERP", "Oracle ERP", "ERP", "REST"),
-    ("RISK", "Risk Management System", "RISK", "REST"),
-    ("RIM", "RIM / Vigilance System", "REGULATORY", "REST"),
-    ("SAFETY", "Safety / Field Action System", "SAFETY", "REST"),
-    ("LIMS", "LIMS", "LABORATORY", "REST"),
-    ("MES", "MES", "MANUFACTURING", "REST"),
-]
-OBJECTS = {
-    "TRACKWISE": ["Complaint", "Investigation", "CAPA", "Evidence", "Quality Event"],
-    "VEEVA_QMS": ["QualityEvent", "Investigation", "CAPA", "Evidence", "Document"],
-    "TEAMCENTER": ["Item", "ItemRevision", "ChangeNotice", "Product", "Product Version", "Component", "BOM", "Change"],
-    "WINDCHILL": ["Product", "Product Version", "Component", "BOM", "Change"],
-    "SAP_ERP": ["Supplier", "Manufacturing Site", "Lot", "Batch", "Material"],
-    "SALESFORCE_SERVICE": ["Case", "Service Event", "Complaint Intake"],
-    "ORACLE_ERP": ["Supplier", "PurchaseOrder", "Manufacturing Site", "Lot", "Batch", "Material"],
-    "COUPA": ["Supplier", "PurchaseOrder", "SupplierRisk"],
-    "RISK": ["Risk", "Failure Mode", "Control", "Hazard"],
-    "RIM": ["Vigilance", "Regulatory Assessment"],
-    "SAFETY": ["Field Action", "Recall"],
-    "LIMS": ["Result", "Sample"],
-    "MES": ["Production Record", "Genealogy", "Process Event"],
-}
-TRACKWISE_FIELDS = [
-    "complaint_id",
-    "complaint_number",
-    "product_code",
-    "product_revision",
-    "event_date",
-    "received_date",
-    "awareness_date",
-    "country",
-    "reporter_type",
-    "complaint_type",
-    "problem_code",
-    "problem_description",
-    "severity",
-    "lot_number",
-    "serial_number",
-    "udi",
-    "device_returned",
-    "patient_involved",
-    "serious_injury",
-    "death",
-    "malfunction",
-    "status",
-    "investigation_number",
-    "created_at",
-    "updated_at",
-]
-FIELD_GROUPS = {
-    "complaint_id": "IDENTIFIERS",
-    "complaint_number": "IDENTIFIERS",
-    "product_code": "PRODUCT",
-    "product_revision": "PRODUCT",
-    "event_date": "DATES",
-    "received_date": "DATES",
-    "awareness_date": "DATES",
-    "country": "REPORTER",
-    "reporter_type": "REPORTER",
-    "complaint_type": "CLASSIFICATION",
-    "problem_code": "CLASSIFICATION",
-    "problem_description": "CLASSIFICATION",
-    "severity": "CLASSIFICATION",
-    "lot_number": "PRODUCT",
-    "serial_number": "PRODUCT",
-    "udi": "PRODUCT",
-    "device_returned": "CLINICAL",
-    "patient_involved": "CLINICAL",
-    "serious_injury": "CLINICAL",
-    "death": "CLINICAL",
-    "malfunction": "CLINICAL",
-    "status": "LIFECYCLE",
-    "investigation_number": "RELATIONSHIPS",
-    "created_at": "AUDIT",
-    "updated_at": "AUDIT",
-}
-CONNECTOR_VERSIONS = [
-    {
-        "application_id": "TRACKWISE",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "TEAMCENTER",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "SAP_ERP",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "SALESFORCE_SERVICE",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "VEEVA_QMS",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "ORACLE_ERP",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-    {
-        "application_id": "COUPA",
-        "connector_type": "REST",
-        "version": "v1",
-        "status": "ACTIVE",
-        "supports_schema_discovery": True,
-    },
-]
-CANONICAL = {
-    "Complaint": [
-        "external_id",
-        "complaint_number",
-        "product_id",
-        "product_version_id",
-        "event_at",
-        "received_at",
-        "awareness_at",
-        "country",
-        "reporter_type",
-        "complaint_type",
-        "problem_code",
-        "problem_description",
-        "severity",
-        "lot_id",
-        "serial_number",
-        "udi",
-        "device_returned",
-        "patient_involved",
-        "serious_injury",
-        "death",
-        "malfunction",
-        "status",
-        "source_created_at",
-        "source_updated_at",
-    ],
-    "Product": ["external_id", "product_identifier", "name", "status"],
-    "ProductVersion": [
-        "external_id",
-        "product_id",
-        "version_code",
-        "version_name",
-        "effective_at",
-        "released_at",
-        "status",
-        "software_version",
-        "configuration_reference",
-        "change_reference",
-        "source_recorded_at",
-        "source_known_at",
-    ],
-    "Investigation": ["external_id", "investigation_number", "status"],
-    "Evidence": ["external_id", "identifier", "title", "status"],
-    "Supplier": ["external_id", "supplier_identifier", "name", "status"],
-    "Site": ["external_id", "site_identifier", "name", "status"],
-    "Lot": ["external_id", "lot_identifier", "status"],
-    "Risk": ["external_id", "risk_identifier", "description", "status"],
-    "FailureMode": ["external_id", "failure_mode_identifier", "name", "status"],
-    "Control": ["external_id", "control_identifier", "control_type", "status"],
-    "CAPA": ["external_id", "capa_identifier", "status"],
-    "VigilanceAssessment": ["external_id", "assessment_identifier", "status"],
-    "FieldAction": ["external_id", "action_identifier", "status"],
-}
-PROTECTED = {
-    "tenant_id",
-    "id",
-    "created_by",
-    "audit_id",
-    "provenance_id",
-    "mapping_version_id",
-    "authorization_metadata",
-    "source_identity",
-}
-FAMILIES = [
-    "TRACKWISE_COMPLAINT",
-    "TRACKWISE_INVESTIGATION",
-    "TRACKWISE_CAPA",
-    "TRACKWISE_EVIDENCE",
-    "VEEVA_QUALITY_EVENT",
-    "VEEVA_INVESTIGATION",
-    "VEEVA_EVIDENCE",
-    "VEEVA_DOCUMENT",
-    "PLM_PRODUCT",
-    "PLM_PRODUCT_VERSION",
-    "PLM_COMPONENT",
-    "PLM_BOM",
-    "PLM_PRODUCT_CHANGE",
-    "SAP_SUPPLIER",
-    "SAP_SITE",
-    "SAP_LOT",
-    "SAP_BATCH",
-    "SAP_MATERIAL",
-    "SALESFORCE_CASE",
-    "SALESFORCE_SERVICE_EVENT",
-    "RISK_RISK",
-    "RISK_FAILURE_MODE",
-    "RISK_CONTROL",
-    "RIM_VIGILANCE",
-    "RIM_REGULATORY_ASSESSMENT",
-    "SAFETY_FIELD_ACTION",
-    "SAFETY_RECALL",
-    "LIMS_RESULT",
-    "LIMS_SAMPLE",
-    "MES_PRODUCTION_RECORD",
-    "MES_GENEALOGY",
-    "MES_PROCESS_EVENT",
-]
-INITIAL_MAPPINGS = [
-    {
-        "mapping_id": "TRACKWISE_COMPLAINT_V1",
-        "family": "TRACKWISE_COMPLAINT",
-        "source_object_id": "TRACKWISE:COMPLAINT",
-        "canonical_entity": "Complaint",
-        "version": "v1",
-        "status": "ACTIVE",
-        "rules": [
-            {"source": s, "target": t, "transform": x}
-            for s, t, x in [
-                ("complaint_id", "external_id", "DIRECT"),
-                ("complaint_number", "complaint_number", "DIRECT"),
-                ("product_code", "product_id", "REFERENCE_LOOKUP"),
-                ("product_revision", "product_version_id", "REFERENCE_LOOKUP"),
-                ("event_date", "event_at", "DATE_ISO8601"),
-                ("received_date", "received_at", "DATE_ISO8601"),
-                ("awareness_date", "awareness_at", "DATE_ISO8601"),
-                ("country", "country", "DIRECT"),
-                ("reporter_type", "reporter_type", "DIRECT"),
-                ("complaint_type", "complaint_type", "DIRECT"),
-                ("problem_code", "problem_code", "DIRECT"),
-                ("problem_description", "problem_description", "DIRECT"),
-                ("severity", "severity", "DIRECT"),
-                ("lot_number", "lot_id", "REFERENCE_LOOKUP"),
-                ("serial_number", "serial_number", "DIRECT"),
-                ("udi", "udi", "DIRECT"),
-                ("device_returned", "device_returned", "DIRECT"),
-                ("patient_involved", "patient_involved", "DIRECT"),
-                ("serious_injury", "serious_injury", "DIRECT"),
-                ("death", "death", "DIRECT"),
-                ("malfunction", "malfunction", "DIRECT"),
-                ("status", "status", "DIRECT"),
-                ("created_at", "source_created_at", "DIRECT"),
-                ("updated_at", "source_updated_at", "DIRECT"),
-            ]
-        ],
-    },
-    {
-        "mapping_id": "PLM_PRODUCT_VERSION_V1",
-        "family": "PLM_PRODUCT_VERSION",
-        "source_object_id": "TEAMCENTER:PRODUCT_VERSION",
-        "canonical_entity": "ProductVersion",
-        "version": "v1",
-        "status": "ACTIVE",
-        "rules": [
-            {"source": s, "target": t, "transform": x}
-            for s, t, x in [
-                ("version_id", "external_id", "DIRECT"),
-                ("product_id", "product_id", "REFERENCE_LOOKUP"),
-                ("revision", "version_code", "DIRECT"),
-                ("version_name", "version_name", "DIRECT"),
-                ("effective_date", "effective_at", "DATE_ISO8601"),
-                ("release_date", "released_at", "DATE_ISO8601"),
-                ("status", "status", "DIRECT"),
-                ("software_version", "software_version", "DIRECT"),
-                ("configuration_id", "configuration_reference", "DIRECT"),
-                ("change_order_id", "change_reference", "DIRECT"),
-                ("recorded_at", "source_recorded_at", "DIRECT"),
-                ("known_at", "source_known_at", "DIRECT"),
-            ]
-        ],
-    },
-]
-
-
 def _platform_admin(db: Session, ctx: AuthenticatedRequestContext):
     user = (
         db.query(AuthUser)
@@ -377,30 +79,18 @@ def _platform_admin(db: Session, ctx: AuthenticatedRequestContext):
         )
 
 
-def _app(code, name, category, connector):
-    return {
-        "application_id": code,
-        "application_code": code,
-        "display_name": name,
-        "category": category,
-        "status": "ACTIVE",
-        "description": f"Controlled {name} metadata catalog",
-        "default_connector_type": connector,
-        "supports_schema_discovery": True,
-        "supports_sample_payload": True,
-        "created_at": None,
-        "updated_at": None,
-    }
-
-
 def _guard(db, ctx):
     _platform_admin(db, ctx)
+
+
+def _not_found(code: str, message: str) -> HTTPException:
+    return HTTPException(404, detail={"code": code, "message": message})
 
 
 @router.get("/applications")
 def applications(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [_app(*item) for item in APPLICATIONS]
+    return catalog.applications(db)
 
 
 @router.get("/applications/{application_id}/objects")
@@ -408,20 +98,10 @@ def application_objects(
     application_id: str, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
 ):
     _guard(db, ctx)
-    objects = OBJECTS.get(application_id.upper())
+    objects = catalog.application_objects(db, application_id)
     if objects is None:
-        raise HTTPException(
-            404, detail={"code": "APPLICATION_NOT_FOUND", "message": "External application is not available"}
-        )
-    return [
-        {
-            "source_object_id": f"{application_id.upper()}:{item.upper().replace(' ', '_')}",
-            "application_id": application_id.upper(),
-            "object_name": item,
-            "status": "ACTIVE",
-        }
-        for item in objects
-    ]
+        raise _not_found("APPLICATION_NOT_FOUND", "External application is not available")
+    return objects
 
 
 @router.get("/objects/{source_object_id}/fields")
@@ -431,47 +111,16 @@ def source_fields(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
-    app, _, obj = source_object_id.partition(":")
-    if app not in OBJECTS or obj.replace("_", " ").title() not in OBJECTS[app]:
-        raise HTTPException(
-            404,
-            detail={
-                "code": "SOURCE_OBJECT_NOT_FOUND",
-                "message": "Source object is not available for this application",
-            },
-        )
-    names = (
-        TRACKWISE_FIELDS
-        if app == "TRACKWISE" and obj == "COMPLAINT"
-        else ["id", "name", "status", "created_at", "updated_at"]
-    )
-    return [
-        {
-            "source_field_id": f"{source_object_id}:{name}",
-            "application_id": app,
-            "source_object_id": source_object_id,
-            "field_name": name,
-            "field_label": name.replace("_", " ").title(),
-            "field_group": FIELD_GROUPS.get(name, "GENERAL"),
-            "data_type": "string",
-            "required": name in {"complaint_id", "complaint_number"},
-            "nullable": name not in {"complaint_id", "complaint_number"},
-            "sample_value": None,
-            "enum_values": [],
-            "schema_version": "v1",
-            "status": "ACTIVE",
-            "is_standard_field": True,
-            "is_customer_field": False,
-            "sensitivity_classification": "CONTROLLED",
-        }
-        for name in names
-    ]
+    fields = catalog.source_fields(db, source_object_id)
+    if fields is None:
+        raise _not_found("SOURCE_OBJECT_NOT_FOUND", "Source object is not available for this application")
+    return fields
 
 
 @router.get("/canonical/entities")
 def canonical_entities(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [{"entity_id": key, "entity_name": key, "status": "ACTIVE"} for key in CANONICAL]
+    return catalog.canonical_entities(db)
 
 
 @router.get("/canonical/entities/{entity_id}/fields")
@@ -479,96 +128,40 @@ def canonical_fields(
     entity_id: str, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
 ):
     _guard(db, ctx)
-    fields = CANONICAL.get(entity_id)
+    fields = catalog.canonical_fields(db, entity_id)
     if fields is None:
-        raise HTTPException(
-            404, detail={"code": "CANONICAL_ENTITY_NOT_FOUND", "message": "Canonical entity is not available"}
-        )
-    return [
-        {
-            "canonical_field_id": f"{entity_id}:{field}",
-            "entity_id": entity_id,
-            "field_name": field,
-            "field_label": field.replace("_", " ").title(),
-            "data_type": "string",
-            "required": field in {"external_id", "complaint_number", "product_identifier"},
-            "nullable": field not in {"external_id", "complaint_number", "product_identifier"},
-            "system_managed": field in PROTECTED,
-            "mapping_allowed": field not in PROTECTED,
-            "override_policy": "PLATFORM_ONLY" if field in PROTECTED else "TENANT_ALLOWED",
-            "validation_rule": None,
-            "reference_entity": "Product"
-            if field == "product_id"
-            else "ProductVersion"
-            if field == "product_version_id"
-            else "Lot"
-            if field == "lot_id"
-            else None,
-            "status": "ACTIVE",
-        }
-        for field in fields
-    ]
+        raise _not_found("CANONICAL_ENTITY_NOT_FOUND", "Canonical entity is not available")
+    return fields
 
 
 @router.get("/transforms")
 def transforms(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [
-        {"code": code, "label": label}
-        for code, label in [
-            ("DIRECT", "Direct copy"),
-            ("TRIM", "Trim whitespace"),
-            ("UPPER", "Uppercase"),
-            ("LOWER", "Lowercase"),
-            ("DATE_ISO8601", "Normalize ISO date"),
-            ("ENUM_MAP", "Controlled enum mapping"),
-            ("REFERENCE_LOOKUP", "Reference lookup"),
-        ]
-    ]
+    return catalog.transformations(db)
 
 
 @router.get("/validation-rules")
 def validation_rules(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [
-        {"code": code, "label": label}
-        for code, label in [
-            ("REQUIRED", "Required"),
-            ("MAX_LENGTH", "Maximum length"),
-            ("ENUM", "Controlled enum"),
-            ("REFERENCE_EXISTS", "Reference must resolve"),
-            ("DATE_VALID", "Valid date"),
-        ]
-    ]
+    return catalog.validation_rules(db)
 
 
 @router.get("/override-policies")
 def override_policies(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [
-        {"code": "PLATFORM_ONLY", "label": "Platform only"},
-        {"code": "TENANT_ALLOWED", "label": "Tenant override allowed"},
-        {"code": "APPROVAL_REQUIRED", "label": "Tenant override requires approval"},
-    ]
+    return catalog.override_policies(db)
 
 
 @router.get("/source-priorities")
 def source_priorities(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [
-        {"code": code, "label": label}
-        for code, label in [
-            ("PRIMARY", "Primary source"),
-            ("SECONDARY", "Secondary source"),
-            ("FALLBACK", "Fallback source"),
-        ]
-    ]
+    return catalog.source_authorities(db)
 
 
 @router.get("/families")
 def mapping_families(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     _guard(db, ctx)
-    return [{"code": code, "status": "ACTIVE"} for code in FAMILIES]
+    return catalog.mapping_families(db)
 
 
 @router.get("/connector-versions")
@@ -578,11 +171,7 @@ def connector_versions(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
-    return [
-        item
-        for item in CONNECTOR_VERSIONS
-        if application_id is None or item["application_id"] == application_id.upper()
-    ]
+    return catalog.connector_versions(db, application_id)
 
 
 @router.get("/initial-mappings")
@@ -592,7 +181,7 @@ def initial_mappings(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
-    return [item for item in INITIAL_MAPPINGS if family is None or item["family"] == family.upper()]
+    return catalog.released_mappings(db, family)
 
 
 @router.post("/schema-drift")
@@ -602,12 +191,10 @@ def schema_drift(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
-    app, _, obj = payload.source_object_id.partition(":")
-    expected = (
-        TRACKWISE_FIELDS
-        if app == "TRACKWISE" and obj == "COMPLAINT"
-        else ["id", "name", "status", "created_at", "updated_at"]
-    )
+    fields = catalog.source_fields(db, payload.source_object_id)
+    if fields is None:
+        raise _not_found("SOURCE_OBJECT_NOT_FOUND", "Source object is not available for this application")
+    expected = [field["field_name"] for field in fields]
     unknown = sorted(set(payload.source_fields) - set(expected))
     return {
         "source_object_id": payload.source_object_id,
@@ -617,6 +204,48 @@ def schema_drift(
     }
 
 
+TRUE_TOKENS = {"true", "t", "yes", "y", "1"}
+FALSE_TOKENS = {"false", "f", "no", "n", "0"}
+
+
+def _apply_transform(transform: str, value, enum_map: dict[str, str]):
+    """Apply one controlled Master Data transformation. Returns (value, issue_code or None, blocking)."""
+    if value is None:
+        return None, None, False
+    if transform in {"DIRECT_COPY", ""}:
+        return value, None, False
+    if transform == "TRIM":
+        return str(value).strip(), None, False
+    if transform == "UPPERCASE":
+        return str(value).upper(), None, False
+    if transform == "LOWERCASE":
+        return str(value).lower(), None, False
+    if transform == "DATE_PARSE":
+        try:
+            return datetime.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat(), None, False
+        except ValueError:
+            return value, "INVALID_DATE", True
+    if transform == "BOOLEAN_MAP":
+        token = str(value).strip().lower()
+        if token in TRUE_TOKENS:
+            return True, None, False
+        if token in FALSE_TOKENS:
+            return False, None, False
+        return value, "UNMAPPED_BOOLEAN_VALUE", False
+    if transform == "ENUM_MAP":
+        # Unknown source values are never silently coerced (Master Data 12.7).
+        if str(value) in enum_map:
+            return enum_map[str(value)], None, False
+        return value, "UNMAPPED_ENUM_VALUE", False
+    if transform in {"LOOKUP", "UNIT_CONVERSION"}:
+        return (
+            value,
+            "REFERENCE_UNRESOLVED_IN_DRY_RUN" if transform == "LOOKUP" else "UNIT_NOT_CONVERTED_IN_DRY_RUN",
+            False,
+        )
+    return value, "UNKNOWN_TRANSFORM", True
+
+
 @router.post("/dry-run")
 def dry_run(
     payload: DryRunRequest,
@@ -624,6 +253,16 @@ def dry_run(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
+    families = [
+        family
+        for family in catalog.mapping_families(db)
+        if family["source_object_id"] == payload.source_object_id.upper()
+    ]
+    target_fields = {}
+    for family in families:
+        for field in catalog.canonical_fields(db, family["canonical_entity"]) or []:
+            target_fields[field["field_name"]] = field
+    enum_maps: dict[str, dict[str, str]] = {}
     output = []
     for record in payload.records:
         target = {}
@@ -633,23 +272,19 @@ def dry_run(
             source, dest = str(rule.get("source", "")), str(rule.get("target", ""))
             if not source or not dest:
                 continue
-            if dest in PROTECTED:
+            field = target_fields.get(dest)
+            if field is not None and not field["mapping_allowed"]:
                 blocked.append({"target": dest, "code": "PROTECTED_FIELD"})
                 continue
-            value = record.get(source)
-            transform = str(rule.get("transform", "DIRECT"))
-            if value is not None and transform == "TRIM":
-                value = str(value).strip()
-            elif value is not None and transform == "UPPER":
-                value = str(value).upper()
-            elif value is not None and transform == "LOWER":
-                value = str(value).lower()
-            elif value is not None and transform == "DATE_ISO8601":
-                try:
-                    value = datetime.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat()
-                except ValueError:
-                    blocked.append({"target": dest, "code": "INVALID_DATE"})
-                    continue
+            transform = str(rule.get("transform") or "DIRECT_COPY")
+            if transform == "ENUM_MAP" and source not in enum_maps:
+                enum_maps[source] = catalog.enum_value_map(db, payload.source_object_id, source)
+            value, issue, blocking = _apply_transform(transform, record.get(source), enum_maps.get(source, {}))
+            if issue and blocking:
+                blocked.append({"target": dest, "code": issue})
+                continue
+            if issue:
+                warnings.append({"target": dest, "code": issue})
             if value is None and rule.get("required"):
                 warnings.append({"target": dest, "code": "REQUIRED_VALUE_MISSING"})
             target[dest] = value
@@ -672,6 +307,9 @@ def dry_run(
     }
 
 
+REFERENCE_TYPES = {"UUID_REF", "UUID"}
+
+
 @router.post("/validate")
 def validate_mapping(
     payload: ValidationRequest,
@@ -679,44 +317,48 @@ def validate_mapping(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _guard(db, ctx)
-    allowed_transforms = {"DIRECT", "TRIM", "UPPER", "LOWER", "DATE_ISO8601", "ENUM_MAP", "REFERENCE_LOOKUP"}
-    fields = {
-        name: {"required": name in {"external_id", "complaint_number", "product_identifier"}}
-        for name in CANONICAL.get(payload.entity_id, [])
-    }
+    canonical = catalog.canonical_fields(db, payload.entity_id)
+    if canonical is None:
+        raise _not_found("CANONICAL_ENTITY_NOT_FOUND", "Canonical entity is not available")
+    fields = {field["field_name"]: field for field in canonical}
+    allowed_transforms = {item["code"] for item in catalog.transformations(db)}
+    allowed_policies = {item["code"] for item in catalog.override_policies(db)}
+    entity_code = payload.entity_id.upper()
     targets = [str(rule.get("target", "")) for rule in payload.rules]
     errors = []
     for target in sorted({t for t in targets if targets.count(t) > 1}):
         errors.append({"code": "DUPLICATE_TARGET", "target": target})
-    seen_refs: dict[str, str] = {}
     for rule in payload.rules:
         target = str(rule.get("target", ""))
-        transform = str(rule.get("transform", "DIRECT"))
-        if target in PROTECTED:
-            errors.append({"code": "PROTECTED_FIELD", "target": target})
-        if target not in fields:
+        transform = str(rule.get("transform") or "DIRECT_COPY")
+        field = fields.get(target)
+        if field is None:
             errors.append({"code": "UNKNOWN_TARGET", "target": target})
+        elif not field["mapping_allowed"]:
+            errors.append({"code": "PROTECTED_FIELD", "target": target})
         if transform not in allowed_transforms:
             errors.append({"code": "INVALID_TRANSFORM", "transform": transform})
-        if transform == "REFERENCE_LOOKUP" and target not in {"product_id", "product_version_id", "lot_id"}:
+        if field is not None and field["data_type"] == "UUID_REF" and transform != "LOOKUP":
+            errors.append({"code": "REFERENCE_REQUIRES_LOOKUP", "target": target})
+        if transform == "LOOKUP" and field is not None and field["data_type"] not in REFERENCE_TYPES:
             errors.append({"code": "INVALID_REFERENCE", "target": target})
         reference = rule.get("reference_entity")
-        if reference and reference == payload.entity_id:
+        if reference and str(reference).upper() == entity_code:
             errors.append({"code": "CIRCULAR_REFERENCE", "target": target})
-        if reference:
-            seen_refs[target] = str(reference)
         if rule.get("enum_values") is not None and not isinstance(rule.get("enum_values"), list):
             errors.append({"code": "INVALID_ENUM_CONFIG", "target": target})
         if (
             rule.get("source_type")
             and rule.get("target_type")
-            and rule["source_type"] != rule["target_type"]
-            and transform == "DIRECT"
+            and str(rule["source_type"]).upper() != str(rule["target_type"]).upper()
+            and transform == "DIRECT_COPY"
         ):
             errors.append({"code": "TYPE_INCOMPATIBLE", "target": target})
-        if rule.get("override_policy") not in {None, "TENANT_ALLOWED", "PLATFORM_ONLY", "APPROVAL_REQUIRED"}:
+        if rule.get("override_policy") is not None and rule.get("override_policy") not in allowed_policies:
             errors.append({"code": "INVALID_OVERRIDE_POLICY", "target": target})
-    missing = [name for name, meta in fields.items() if meta.get("required") and name not in targets]
+    missing = [
+        name for name, field in fields.items() if field["required"] and field["mapping_allowed"] and name not in targets
+    ]
     return {
         "status": "PASS" if not errors and not missing else "BLOCKED",
         "errors": errors,

@@ -94,6 +94,16 @@ const requestLifecycleConfirmation = (action: string, subject: string) =>
     window.dispatchEvent(new Event("mdarix-lifecycle-dialog"));
   });
 
+// Transformation codes used before Master Data v1 -> md_master.transformation_definition codes.
+const MASTER_TRANSFORM_CODE: Record<string, string> = {
+  DIRECT: "DIRECT_COPY",
+  DIRECT_COPY: "DIRECT_COPY",
+  UPPER: "UPPERCASE",
+  LOWER: "LOWERCASE",
+  DATE_ISO8601: "DATE_PARSE",
+  REFERENCE_LOOKUP: "LOOKUP",
+};
+
 function LifecycleConfirmationDialog() {
   const [request, setRequest] = useState<LifecycleDialogRequest | null>(null);
   const [reason, setReason] = useState("");
@@ -3250,7 +3260,7 @@ function MappingWizardWorkspace() {
           kind,
           source_field: sourceFields[0]?.field_name ?? "",
           target_field: targetFields[0]?.field_name ?? "",
-          transform: kind === "value" ? "ENUM_MAP" : "DIRECT",
+          transform: kind === "value" ? "ENUM_MAP" : "DIRECT_COPY",
           condition: "",
           lookup: "",
           expression: "",
@@ -3506,7 +3516,7 @@ function TransformationLibraryWorkspace() {
           version: "v1",
           status: "ACTIVE",
           execution:
-            row.code === "REFERENCE_LOOKUP"
+            row.code === "LOOKUP"
               ? "Resolve governed reference"
               : row.code === "ENUM_MAP"
                 ? "Map controlled values"
@@ -3637,7 +3647,7 @@ function ValidationQualityWorkspace({ data }: { data: AdminData }) {
         .map((row: any) => ({
           target: row.target_field,
           source: row.source_field,
-          transform: row.transform ?? "DIRECT",
+          transform: MASTER_TRANSFORM_CODE[row.transform ?? "DIRECT_COPY"] ?? row.transform,
           required: row.required,
           source_type: row.source_type,
           target_type: row.target_type,
@@ -3842,7 +3852,7 @@ function Mapping360Workspace({ data }: { data: AdminData }) {
     ),
     Transformations: (
       <RecordTable
-        rows={rules.filter((r: any) => r.transform && r.transform !== "DIRECT")}
+        rows={rules.filter((r: any) => r.transform && !["DIRECT", "DIRECT_COPY"].includes(r.transform))}
         empty="This version contains no non-direct transformations."
         columns={[
           ["Source", (r) => r.source ?? r.source_field],

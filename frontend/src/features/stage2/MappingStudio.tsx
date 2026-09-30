@@ -18,7 +18,8 @@ export function MappingStudio() {
     [connectorVersions, setConnectorVersions] = useState<Item[]>([]);
   const [app, setApp] = useState("TRACKWISE"),
     [object, setObject] = useState("TRACKWISE:COMPLAINT"),
-    [entity, setEntity] = useState("Complaint");
+    [entity, setEntity] = useState("COMPLAINT");
+  const [transforms, setTransforms] = useState<Item[]>([]);
   const [masterId, setMasterId] = useState(""),
     [versionId, setVersionId] = useState(""),
     [version, setVersion] = useState("M1");
@@ -36,14 +37,16 @@ export function MappingStudio() {
 
   const load = async () => {
     try {
-      const [a, e, master, persisted] = await Promise.all([
+      const [a, e, master, persisted, t] = await Promise.all([
         request<Item[]>("/api/v1/admin/mapping/applications"),
         request<Item[]>("/api/v1/admin/mapping/canonical/entities"),
         request<Item[]>("/api/v1/admin/catalog/master-mappings"),
         request<Item[]>("/api/v1/admin/catalog/mapping-versions"),
+        request<Item[]>("/api/v1/admin/mapping/transforms"),
       ]);
       setApps(a);
       setEntities(e);
+      setTransforms(t);
       setMasters(master);
       setVersions(persisted);
       if (!masterId && master[0]) setMasterId(master[0].id);
@@ -99,7 +102,7 @@ export function MappingStudio() {
       protected: rows.filter((r) => canonical.some((f) => f.field_name === r.target && f.mapping_allowed === false))
         .length,
       mapped: new Set(targets).size,
-      warnings: rows.filter((r) => r.transform === "REFERENCE_LOOKUP" || r.null_rule === "PRESERVE_UNKNOWN").length,
+      warnings: rows.filter((r) => r.transform === "LOOKUP" || r.null_rule === "PRESERVE_UNKNOWN").length,
     };
   }, [rows, canonical]);
   const visibleFields = useMemo(
@@ -126,7 +129,7 @@ export function MappingStudio() {
         required: false,
         null_rule: "PRESERVE_UNKNOWN",
         source_priority: "AUTHORITATIVE",
-        override_policy: "TENANT_ALLOWED",
+        override_policy: "CUSTOMER_OVERRIDE_ALLOWED",
       },
     ]);
   };
@@ -456,13 +459,11 @@ export function MappingStudio() {
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => updateRow(i, "transform", e.target.value)}
               >
-                <option>DIRECT</option>
-                <option>TRIM</option>
-                <option>UPPER</option>
-                <option>LOWER</option>
-                <option>DATE_ISO8601</option>
-                <option>REFERENCE_LOOKUP</option>
-                <option>ENUM_MAP</option>
+                {transforms.map((t) => (
+                  <option key={t.code} value={t.code}>
+                    {t.code}
+                  </option>
+                ))}
               </select>
             </button>
           ))}

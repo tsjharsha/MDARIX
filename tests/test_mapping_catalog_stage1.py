@@ -1,5 +1,9 @@
-from backend.app.main import app
 from pathlib import Path
+
+import pytest
+
+from backend.app.db.session import SessionLocal
+from backend.app.main import app
 
 
 def test_mapping_catalog_routes_are_registered():
@@ -18,29 +22,28 @@ def test_mapping_catalog_routes_are_registered():
     assert "/api/v1/admin/configuration/connectors/{configuration_id}/discover-schema" in paths
 
 
-def test_catalog_contract_protects_platform_fields():
+@pytest.fixture
+def catalog_db(monkeypatch):
+    """Real test-database session (Master Data seed) with the platform-admin guard bypassed."""
+    from backend.app import mapping_catalog_router
+
+    monkeypatch.setattr(mapping_catalog_router, "_platform_admin", lambda db, ctx: None)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+def test_catalog_contract_protects_platform_fields(catalog_db):
     from backend.app.mapping_catalog_router import canonical_fields
 
-    class Db:
-        def query(self, model):
-            class Q:
-                def filter(self, *args):
-                    return self
-
-                def first(self):
-                    return type("User", (), {"role": "Administrator"})()
-
-            return Q()
-
-    ctx = type(
-        "Ctx",
-        (),
-        {"user_id": "00000000-0000-0000-0000-000000000000", "tenant_id": "00000000-0000-0000-0000-000000000000"},
-    )()
-    fields = canonical_fields("Complaint", Db(), ctx)
-    protected = next(item for item in fields if item["field_name"] == "external_id")
-    assert protected["mapping_allowed"] is True
-    assert all(item["field_name"] not in {"tenant_id", "audit_id", "provenance_id"} for item in fields)
+    fields = {item["field_name"]: item for item in canonical_fields("COMPLAINT", catalog_db, _ctx())}
+    assert fields["external_id"]["mapping_allowed"] is True
+    for system_field in ("complaint_uuid", "complaint_id", "tenant_id", "source_record_uuid"):
+        assert fields[system_field]["system_managed"] is True
+        assert fields[system_field]["mapping_allowed"] is False
 
 
 def _admin_db():
@@ -66,25 +69,26 @@ def _ctx():
     )()
 
 
-def test_stage3_validation_blocks_duplicate_protected_and_circular_rules():
+def test_stage3_validation_blocks_duplicate_protected_and_circular_rules(catalog_db):
     from backend.app.mapping_catalog_router import validate_mapping, ValidationRequest
 
     result = validate_mapping(
         ValidationRequest(
-            entity_id="Complaint",
+            entity_id="COMPLAINT",
             rules=[
-                {"source": "a", "target": "external_id", "transform": "DIRECT"},
-                {"source": "b", "target": "external_id", "transform": "DIRECT"},
-                {"source": "c", "target": "status", "transform": "DIRECT", "reference_entity": "Complaint"},
-                {"source": "d", "target": "tenant_id", "transform": "DIRECT"},
+                {"source": "a", "target": "external_id", "transform": "DIRECT_COPY"},
+                {"source": "b", "target": "external_id", "transform": "DIRECT_COPY"},
+                {"source": "c", "target": "status", "transform": "DIRECT_COPY", "reference_entity": "COMPLAINT"},
+                {"source": "d", "target": "tenant_id", "transform": "DIRECT_COPY"},
+                {"source": "e", "target": "product_uuid", "transform": "DIRECT_COPY"},
             ],
         ),
-        _admin_db(),
+        catalog_db,
         _ctx(),
     )
     codes = {item["code"] for item in result["errors"]}
     assert result["status"] == "BLOCKED"
-    assert {"DUPLICATE_TARGET", "PROTECTED_FIELD", "CIRCULAR_REFERENCE"} <= codes
+    assert {"DUPLICATE_TARGET", "PROTECTED_FIELD", "CIRCULAR_REFERENCE", "REFERENCE_REQUIRES_LOOKUP"} <= codes
 
 
 def test_stage3_schema_discovery_reports_drift_without_activation():

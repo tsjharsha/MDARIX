@@ -15,8 +15,8 @@ certification are out of scope. Current verified state: [STATUS.md](STATUS.md).
 
 | Path | What lives there |
 |---|---|
-| `backend/app/` | FastAPI application: routers, request context, auth/admin API, DB models and sessions |
-| `infrastructure/database/` | Alembic migrations and database validation scripts |
+| `backend/app/` | FastAPI application: routers, request context, auth/admin API (`access/`), Master Data read model (`master_data/`), DB models and sessions |
+| `infrastructure/database/` | Alembic migrations, Master Data seeds (`seeds/`) and database validation scripts |
 | `ai/`, `genai/`, `retrieval/`, `evidence/`, `graph/` | Evidence extraction, LLM provider abstraction, retrieval, reality graph |
 | `investigation_workspace/`, `investigator/`, `hypothesis_engine/`, `challenger/`, `unknowns/`, `failure_chain/`, `scenario_intelligence/`, `counterfactual/`, `briefs/`, `decision_center/` | Investigation intelligence services |
 | `trust_engine/`, `evaluation/`, `validation/` | Assurance checks, golden-scenario evaluation, CSA package generation |
