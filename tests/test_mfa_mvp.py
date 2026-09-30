@@ -1,5 +1,4 @@
 """Local synthetic-MVP MFA enrollment and challenge regression coverage."""
-import hashlib
 import os
 import uuid
 from datetime import datetime, timedelta, timezone

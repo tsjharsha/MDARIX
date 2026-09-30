@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import Any, Dict, List
+from typing import Any, List
 
 from ai.schemas import EvidenceExtractionResult, ExtractedObservationSchema
 

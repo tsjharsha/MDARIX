@@ -8,8 +8,7 @@ from backend.app.db.session import SessionLocal
 from backend.app.main import app
 from hypothesis_engine.schemas import HypothesisSetRequest
 from hypothesis_engine.service import CompetingHypothesisService
-from investigator.schemas import InvestigationAnalysis, InvestigationAnalysisRequest
-from investigator.service import EvidenceGroundedInvestigatorService
+from investigator.schemas import InvestigationAnalysis
 
 
 client = TestClient(app)

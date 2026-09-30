@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk, EvidenceEntityLink, EvidenceObservation
 from backend.app.db.models.foundation import Evidence, Investigation, ProductVersion
-from backend.app.product360.service import Product360Service, rowdict
+from backend.app.product360.service import Product360Service
 from graph.service import GraphError, RealityGraphService
 from investigation_workspace.schemas import InvestigationWorkspaceRequest, InvestigationWorkspaceResponse
 from retrieval.schemas import RetrievalRequest, RetrievalResponse

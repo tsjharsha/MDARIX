@@ -4,7 +4,6 @@ Both run on top of a freshly generated competing-hypothesis set and challenge
 set for the investigation, and persist their results as AI executions.
 """
 import time
-from sqlalchemy.orm import Session
 from ai.execution import record_ai_execution
 from backend.app.db.models.foundation import AIExecution
 from hypothesis_engine.service import CompetingHypothesisService
@@ -12,9 +11,9 @@ from hypothesis_engine.schemas import HypothesisSetRequest
 from challenger.service import ChallengerService
 from challenger.schemas import ChallengeRequest
 from unknowns.engine import ControlledUnknownsRadar, PROVIDER as U_PROVIDER, MODEL as U_MODEL, ORCHESTRATION_VERSION as U_VERSION
-from unknowns.schemas import UnknownRequest, UnknownResponse, UnknownSet
+from unknowns.schemas import UnknownRequest, UnknownResponse
 from failure_chain.engine import ControlledFailureChain, PROVIDER as F_PROVIDER, MODEL as F_MODEL, ORCHESTRATION_VERSION as F_VERSION
-from failure_chain.schemas import FailureChainRequest, FailureChainResponse, FailureChainSet
+from failure_chain.schemas import FailureChainRequest, FailureChainResponse
 
 class UnknownsFailureChainError(ValueError):
     def __init__(self,code,message): self.code,self.message=code,message

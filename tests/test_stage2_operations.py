@@ -5,7 +5,6 @@ from outbox.worker import OutboxWorker
 def test_outbox_worker_publishes(monkeypatch):
     from backend.app.db.session import SessionLocal
     from backend.app.db.models.stage2 import OutboxEvent
-    from uuid import uuid4
     db=SessionLocal(); tenant=db.execute(__import__('sqlalchemy').text("select id from tenants limit 1")).scalar_one()
     row=OutboxEvent(tenant_id=tenant,event_name='TEST',aggregate_type='Test',payload={'ok':True},occurred_at=datetime.now(timezone.utc))
     db.add(row); db.commit(); db.close()

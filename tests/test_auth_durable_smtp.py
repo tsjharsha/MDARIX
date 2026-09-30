@@ -1,7 +1,5 @@
-from datetime import datetime, timezone
 from auth.emailer import send_activation_email, smtp_configuration_status, EmailDeliveryError
-from auth.durable import hash_token, persist_session, issue_reset, consume
-from backend.app.db.models.stage2 import AuthSession, PasswordResetRequest
+from auth.durable import hash_token
 
 def test_smtp_status_reports_required_production_configuration(monkeypatch):
     for key, value in {

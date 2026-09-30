@@ -1,7 +1,6 @@
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any
 
 from sqlalchemy.orm import Session
 

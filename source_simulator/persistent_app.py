@@ -1,5 +1,4 @@
 """Production-like provider API simulator, isolated from MDARIX storage."""
-import hashlib
 import os
 from fastapi import FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, Field

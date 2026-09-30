@@ -1,25 +1,12 @@
-import datetime as dt
 import uuid
-from collections import defaultdict
 from typing import Any
 
-from sqlalchemy import case, func, or_, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk, EvidenceEntityLink, EvidenceObservation
 from backend.app.db.models.foundation import (
-    Component,
-    ComponentSupplier,
-    Complaint,
     Evidence,
-    InvestigationEvidence,
-    LotBatch,
-    LotComponent,
-    Product,
-    ProductComponent,
-    ProductSupplier,
-    ProductVersion,
-    Supplier,
 )
 from backend.app.db.models.retrieval_intelligence import (
     EMBEDDING_DIMENSION,

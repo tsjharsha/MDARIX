@@ -60,6 +60,11 @@ Architecture gaps:
   outputs are supplied.
 - No reachable UI creates roles, permission sets, personas, connectors,
   approval authorities or SoD policies (backend routes exist).
+- Computed-but-unused values that suggest missing logic (marked `noqa: F841`):
+  deterministic evidence observations are extracted and never persisted
+  (`evidence/services/evidence_service.py`); product/supplier id sets in
+  `ask_mdarix/lifecycle_retrieval.py` and the unknowns map in
+  `failure_chain/engine.py` are built but not used.
 - Deep links to `/platform-admin/*` render the public site (public-path prefix
   match on `/platform`).
 

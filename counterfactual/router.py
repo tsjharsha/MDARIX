@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
-from backend.app.evidence.router import get_default_tenant_id
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from .schemas import CounterfactualRequest, CounterfactualResponse
 from .service import CounterfactualError, CounterfactualService

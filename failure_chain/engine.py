@@ -6,7 +6,7 @@ from .schemas import FailureChain, FailureChainLink, FailureChainSet
 PROVIDER="mdarix-controlled-failure-chain"; MODEL="mdarix-evidence-bounded-chain"; ORCHESTRATION_VERSION="R1-Day14-FailureChain"
 class ControlledFailureChain:
     def generate(self, hs: HypothesisSet, us: UnknownSet | None=None) -> FailureChainSet:
-        now=datetime.now(timezone.utc); chains=[]; all_unknowns={str(u.unknown_id):u for u in (us.unknowns if us else [])}
+        now=datetime.now(timezone.utc); chains=[]; all_unknowns={str(u.unknown_id):u for u in (us.unknowns if us else [])}  # noqa: F841 -- computed but unused (see STATUS.md)
         for h in hs.hypotheses:
             refs=h.source_references[:4]; links=[]; seq=1
             links.append(FailureChainLink(sequence=seq,from_entity_or_state="Controlled product/configuration context",relationship="is associated with",to_entity_or_state=h.statement,epistemic_status="OBSERVED_SOURCE_SUPPORTED" if refs else "UNKNOWN_GAP",evidence_references=refs,temporal_context=h.temporal_consistency,provenance={"source_hypothesis_id":str(h.hypothesis_id),"causal_claim":False})); seq+=1

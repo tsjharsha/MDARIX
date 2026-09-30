@@ -11,7 +11,6 @@ from backend.app.db.models.evidence_intelligence import (
     EvidenceChunk,
     EvidenceEntityLink,
     EvidenceObservation,
-    EvidencePropositionRelation,
 )
 from backend.app.db.models.foundation import AIExecution, Evidence, Tenant
 from backend.app.db.session import SessionLocal
@@ -67,7 +66,7 @@ def run_day8_validation() -> int:
 
         # 3. Process Evidence Intelligence Pipeline
         print(f"[INFO] Processing evidence intelligence for {target_ev.evidence_identifier}...")
-        summary = service.process_evidence_intelligence(db, tenant.id, target_ev.id, reprocess=True)
+        service.process_evidence_intelligence(db, tenant.id, target_ev.id, reprocess=True)
 
         # 4. Source Preservation Verification
         ev_check = db.query(Evidence).filter(Evidence.id == target_ev.id).first()

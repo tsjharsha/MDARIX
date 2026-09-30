@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
-from backend.app.db.models.foundation import AIExecution, Evidence, Investigation, Tenant
+from backend.app.db.models.foundation import AIExecution, Investigation, Tenant
 from backend.app.db.session import SessionLocal
 from investigator.schemas import InvestigationAnalysisRequest
 from investigator.service import EvidenceGroundedInvestigatorService

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any
 from sqlalchemy.orm import Session
 
-from backend.app.db.models.foundation import (AIExecution, AuditEvent, Decision, Evidence, Investigation,
+from backend.app.db.models.foundation import (AuditEvent, Decision, Evidence, Investigation,
     InvestigationBrief, Product, ProductVersion, Hypothesis, Unknown, FailureChain, Scenario)
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceService, InvestigationWorkspaceError

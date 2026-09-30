@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 from concurrent.futures import ThreadPoolExecutor
-import json, os
+import json
 from urllib import request
 
-from .provider import GenAIProvider, redact_context
+from .provider import GenAIProvider
 
 @dataclass(frozen=True)
 class ContractResult:

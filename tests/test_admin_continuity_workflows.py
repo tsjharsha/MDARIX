@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
 
 from backend.app.customer_admin_continuity import replacement_action, validate_support_window
 

@@ -6,17 +6,13 @@ from sqlalchemy.orm import Session
 
 from ai.schemas import EntityLinkCandidateSchema
 from backend.app.db.models.foundation import (
-    Change,
     Complaint,
     Component,
     Control,
-    FailureMode,
     Investigation,
     LotBatch,
-    ManufacturingSite,
     Product,
     ProductVersion,
-    Requirement,
     Risk,
     Supplier,
 )

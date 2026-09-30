@@ -26,7 +26,6 @@ from backend.app.db.models.retrieval_intelligence import (
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
 from evidence.extractors.chunker import EvidenceChunker
-from retrieval.embedding_provider import DeterministicEmbeddingProvider
 from retrieval.schemas import RetrievalRequest
 from retrieval.service import TrustedRetrievalService
 

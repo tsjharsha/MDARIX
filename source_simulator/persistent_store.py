@@ -8,9 +8,7 @@ import hashlib
 import json
 import os
 from sqlalchemy import DateTime, Integer, String, Text, create_engine, select
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
-from source_simulator.provider_catalog import schema_for
 
 class Base(DeclarativeBase):
     pass

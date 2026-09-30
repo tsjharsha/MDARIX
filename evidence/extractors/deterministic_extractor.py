@@ -1,7 +1,6 @@
-import json
 import re
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 from backend.app.db.models.evidence_intelligence import EvidenceObservation

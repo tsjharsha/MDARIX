@@ -1,7 +1,7 @@
 import hashlib, json, re, uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from backend.app.db.models.foundation import AIExecution, AssuranceResult, AssuranceCheck, Evidence, ProductVersion
+from backend.app.db.models.foundation import AIExecution, AssuranceResult, AssuranceCheck, Evidence
 class TrustError(ValueError):
     def __init__(self, code, message): self.code, self.message = code, message
 POLICY="MDARIX_AI_TRUST_POLICY_R1_V1"

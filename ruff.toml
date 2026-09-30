@@ -1,0 +1,12 @@
+# Python lint and format configuration (ruff).
+#   python -m ruff check .     # lint
+#   python -m ruff format .    # format
+line-length = 120
+target-version = "py313"
+extend-exclude = ["frontend", "artifacts", "data/golden/source"]
+
+[lint]
+# Pyflakes (undefined names, unused imports/variables) and syntax errors.
+select = ["F", "E9"]
+# backend/app/db/base.py uses star imports to register every model module.
+ignore = ["F403"]

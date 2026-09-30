@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 import json
-from pathlib import Path
 
 
 @dataclass(frozen=True)

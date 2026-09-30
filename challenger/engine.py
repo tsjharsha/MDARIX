@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime, timezone
 from hypothesis_engine.schemas import Hypothesis, HypothesisSet
 from .schemas import ChallengeSet, InvestigationChallenge

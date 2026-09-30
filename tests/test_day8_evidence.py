@@ -9,18 +9,12 @@ from backend.app.db.models.evidence_intelligence import (
     EvidenceChunk,
     EvidenceEntityLink,
     EvidenceObservation,
-    EvidencePropositionRelation,
 )
 from backend.app.db.models.foundation import (
     AIExecution,
-    Complaint,
     Component,
     Evidence,
-    Investigation,
-    LotBatch,
     Product,
-    ProductVersion,
-    Supplier,
     Tenant,
 )
 from backend.app.db.session import SessionLocal

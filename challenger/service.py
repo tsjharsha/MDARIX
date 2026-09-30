@@ -1,9 +1,9 @@
-import time, uuid
+import time
 from sqlalchemy.orm import Session
 from ai.execution import record_ai_execution
 from backend.app.db.models.foundation import AIExecution
 from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
-from hypothesis_engine.schemas import HypothesisSetRequest, HypothesisSet
+from hypothesis_engine.schemas import HypothesisSetRequest
 from .engine import ControlledChallenger, PROVIDER, MODEL, ORCHESTRATION_VERSION
 from .schemas import ChallengeRequest, ChallengeResponse, ChallengeSet
 

@@ -95,7 +95,7 @@ class EvidenceIntelligenceService:
 
 
         # 3. Deterministic Extraction
-        det_observations = self.deterministic_extractor.extract_deterministic_observations(
+        det_observations = self.deterministic_extractor.extract_deterministic_observations(  # noqa: F841 -- result is never persisted (see STATUS.md)
             db, tenant_id, evidence_id, content, metadata
         )
 

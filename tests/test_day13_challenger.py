@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime, timezone
 from challenger.engine import ControlledChallenger
-from challenger.schemas import ChallengeSet
 from hypothesis_engine.schemas import Hypothesis, HypothesisSet
 
 def hs(**kw):
@@ -16,7 +15,7 @@ def test_challenger_preserves_boundaries_and_temporal_issue():
     assert all(c.provenance['challenge_semantics']=='reasoning_challenge_not_fact' for c in result.challenges)
 
 def test_abstention_is_not_forced_into_contradiction():
-    now=datetime.now(timezone.utc); base=hs(); base.hypotheses[0].evidence_gaps=[]; base.hypotheses[0].assumptions=[]; base.hypotheses[0].alternative_explanations=[]; base.hypotheses[0].temporal_consistency={'status':'CONSISTENT'}; base.hypotheses[0].statement='A supported explanation'
+    base=hs(); base.hypotheses[0].evidence_gaps=[]; base.hypotheses[0].assumptions=[]; base.hypotheses[0].alternative_explanations=[]; base.hypotheses[0].temporal_consistency={'status':'CONSISTENT'}; base.hypotheses[0].statement='A supported explanation'
     result=ControlledChallenger().generate(base)
     assert result.challenges
     assert result.no_material_challenge is True

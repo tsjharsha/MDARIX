@@ -1,7 +1,6 @@
 import datetime as dt
 
 from fastapi.testclient import TestClient
-from sqlalchemy import text
 
 from backend.app.db.models.foundation import Investigation, Tenant
 from backend.app.db.session import SessionLocal

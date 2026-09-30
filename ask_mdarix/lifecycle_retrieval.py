@@ -9,7 +9,7 @@ from backend.app.ai_boundary import build_context
 from backend.app.db.models.foundation import (
     Change, Complaint, Component, ComponentSupplier, Control, Evidence,
     FailureMode, Investigation, InvestigationComplaint, InvestigationEvidence,
-    LotBatch, LotComponent, Product, ProductComponent, ProductVersion,
+    LotBatch, Product, ProductComponent, ProductVersion,
     Requirement, Risk, Supplier, ManufacturingSite,
 )
 
@@ -48,7 +48,7 @@ class LifecycleRetrievalService:
             versions = db.query(ProductVersion).filter(ProductVersion.tenant_id == tenant, ProductVersion.product_id == request.product_id).limit(limit).all() if not request.product_version_id else versions
         if versions and not products:
             products = db.query(Product).filter(Product.tenant_id == tenant, Product.id.in_({row.product_id for row in versions})).limit(limit).all()
-        product_ids = {row.id for row in products}
+        product_ids = {row.id for row in products}  # noqa: F841 -- computed but unused; possible missing filter (see STATUS.md)
         version_ids = {row.id for row in versions}
         if request.product_version_id and versions and request.product_id and versions[0].product_id != request.product_id:
             versions = []
@@ -75,7 +75,7 @@ class LifecycleRetrievalService:
         components = db.query(Component).join(ProductComponent, ProductComponent.component_id == Component.id).filter(Component.tenant_id == tenant, ProductComponent.tenant_id == tenant, ProductComponent.product_version_id.in_(version_ids)).limit(limit).all() if version_ids else []
         component_ids = {row.id for row in components}
         suppliers = db.query(Supplier).join(ComponentSupplier, ComponentSupplier.supplier_id == Supplier.id).filter(Supplier.tenant_id == tenant, ComponentSupplier.tenant_id == tenant, ComponentSupplier.component_id.in_(component_ids)).limit(limit).all() if component_ids else []
-        supplier_ids = {row.id for row in suppliers}
+        supplier_ids = {row.id for row in suppliers}  # noqa: F841 -- computed but unused; possible missing filter (see STATUS.md)
         sites: list[ManufacturingSite] = []
         lots = db.query(LotBatch).filter(LotBatch.tenant_id == tenant, LotBatch.product_version_id.in_(version_ids)).limit(limit).all() if version_ids else []
         requirements = db.query(Requirement).filter(Requirement.tenant_id == tenant, Requirement.product_version_id.in_(version_ids)).limit(limit).all() if version_ids else []
