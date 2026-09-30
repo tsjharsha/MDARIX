@@ -1,736 +1,332 @@
-import { useEffect, useState } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  Bell,
-  Building2,
-  ChevronRight,
-  FileText,
-  LayoutDashboard,
-  LifeBuoy,
-  Search,
-  Settings2,
-  ShieldCheck,
-} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import "./simplified-admin.css";
-import "./tenant-font.css";
-import "./platform-admin-design-system.css";
+import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
+import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
+import "./console/admin-console.css";
 
 type Props = {
   securityContext: { display_name: string; active_role: string | null } | null;
   onNavigate: (view: any) => void;
   initialSection?: string;
 };
-type Customer = {
-  id?: string;
-  customer_id?: string;
-  tenant_id?: string;
-  tenant_name?: string;
-  tenant_key?: string;
-  tenant_identifier?: string;
-  tenant_slug?: string;
-  tenant_status?: string;
-  display_name?: string;
-  name?: string;
-  status?: string;
-  lifecycle_status?: string;
-  provisioning_status?: string;
-  plan?: string;
-  plan_name?: string;
-  plan_code?: string;
-  users?: number;
-  seat_usage?: number;
-  seat_cap?: number;
-  attention?: string;
-  region?: string;
-  primary_region?: string;
-  residency_region?: string;
-  environment?: string;
-  environment_type?: string;
-  environment_count?: number;
-  deployment_model?: string;
-  tenant_type?: string;
-  health_status?: string;
-  last_activity?: string;
-  created_at?: string;
-};
 
-const nav = [
-  ["Overview", LayoutDashboard, "admin"],
-  ["Customers", Building2, "platform-tenants"],
-  ["Tenants", Building2, "platform-tenants"],
-  ["Subscriptions", FileText, "admin-subscriptions"],
-  ["Investigations", Activity, "admin-investigations"],
-  ["System Status", Activity, "admin-operations"],
-  ["Analytics", Activity, "admin-analytics"],
-  ["Platform", Settings2, "admin-config-360"],
-  ["Operations", Activity, "admin-operations"],
-  ["Security", ShieldCheck, "admin-security"],
-  ["Settings", Settings2, "admin-settings"],
-  ["Support", LifeBuoy, "admin-support"],
-  ["Documentation", FileText, "admin-documentation"],
-] as const;
+type Location = { domain: string; item: string };
 
-export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = "Overview" }: Props) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [health, setHealth] = useState<any>(null);
-  const [mappings, setMappings] = useState<any[]>([]);
+const OVERVIEW = "Overview";
+// "Platform Overview" is replaced by the dashboard below; every other domain keeps its real workspaces.
+const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
+const FALLBACK_PLANS = ["ENTERPRISE_TEST", "STARTER", "PROFESSIONAL"];
+
+function locationFor(target: OverviewTarget | string): Location {
+  const domainName = typeof target === "string" ? target : target.domain;
+  const domain = SECTIONS.find((entry) => entry[0] === domainName);
+  if (!domain) return { domain: OVERVIEW, item: OVERVIEW };
+  const requested = typeof target === "string" ? undefined : target.item;
+  const items = domain[3] as readonly string[];
+  return { domain: domain[0], item: requested && items.includes(requested) ? requested : items[0] };
+}
+
+export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = OVERVIEW }: Props) {
+  const [location, setLocation] = useState<Location>(() =>
+    initialSection === "Customers" || initialSection === "Tenants"
+      ? locationFor({ domain: "Customers & Tenants", item: "Customer Directory" })
+      : locationFor(initialSection),
+  );
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [section, setSection] = useState(initialSection);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [customerForm, setCustomerForm] = useState({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" });
+  const [message, setMessage] = useState<{ tone: "good" | "critical"; text: string } | null>(null);
+  const [plans, setPlans] = useState<string[]>(FALLBACK_PLANS);
+  const [customerForm, setCustomerForm] = useState({ company_name: "", tenant_code: "", plan_code: FALLBACK_PLANS[0] });
+
   useEffect(() => {
-    Promise.all([
-      requestJson<any>("/api/v1/platform-admin/customers"),
-      requestJson<any>("/api/v1/admin/health-summary"),
-      requestJson<any>("/api/v1/admin/configuration/data-mappings"),
-    ])
-      .then(([c, h, m]) => {
-        setCustomers(Array.isArray(c) ? c : (c.items ?? c.customers ?? []));
-        setHealth(h);
-        setMappings(Array.isArray(m) ? m : (m.items ?? m.mappings ?? []));
+    if (!showCreate) return;
+    requestJson<any[]>("/api/v1/platform-admin/plans")
+      .then((rows) => {
+        const codes = (Array.isArray(rows) ? rows : []).map((plan) => plan.code).filter(Boolean);
+        if (codes.length) {
+          setPlans(codes);
+          setCustomerForm((form) => (codes.includes(form.plan_code) ? form : { ...form, plan_code: codes[0] }));
+        }
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Some platform data is unavailable."));
-  }, []);
-  const visible = customers.filter((c) =>
-    `${c.display_name ?? c.name ?? ""} ${c.status ?? ""}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  const needsAttention = visible.filter(
-    (c) => c.attention || ["SUSPENDED", "EXPIRED"].includes(String(c.status).toUpperCase()),
-  );
-  const activeNav = nav.find(([label]) => label === section);
-  const sectionDescription: Record<string, string> = {
-    Overview: "Manage customers, platform configuration, integrations, access and operational health.",
-    Tenants: "Manage tenant boundaries, environments, status and tenant administration.",
-    Customers: "Review customer status, plans, people, integrations and attention items.",
-    Subscriptions: "Review plan assignments, entitlements, renewals and expiry posture across customers.",
-    Investigations: "Review authorized investigation activity across the MDARIX customer portfolio.",
-    "System Status": "Monitor service availability, connector health, worker queues and platform incidents.",
-    Analytics: "Review platform-wide usage, investigation throughput and customer health trends.",
-    Platform: "Manage reusable plans, mappings, configuration releases and AI assurance.",
-    Operations: "Monitor exceptions, integrations, jobs, notifications and platform health.",
-    Security: "Review access, audit activity, security events, sessions and policies.",
-    Settings: "Manage low-frequency platform settings and notification configuration.",
-    Support: "Review support requests and governed customer assistance workflows.",
-    Documentation: "Open MDARIX platform guidance, operating procedures and release evidence.",
+      .catch(() => undefined);
+  }, [showCreate]);
+
+  const searchResults = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return [];
+    return SECTIONS.flatMap((domain) =>
+      (domain[3] as readonly string[]).map((item) => ({ domain: domain[0], description: domain[1], item })),
+    )
+      .filter(({ domain, description, item }) => `${domain} ${description} ${item}`.toLowerCase().includes(term))
+      .slice(0, 8);
+  }, [query]);
+
+  const open = (target: OverviewTarget | string) => {
+    setLocation(locationFor(target));
+    setMenuOpen(false);
+    setQuery("");
+    setMessage(null);
   };
-  const openSection = (label: string) => {
-    setSection(label);
-    setSelectedCustomer(null);
-    setMessage("");
+  const activeDomain = SECTIONS.find((domain) => domain[0] === location.domain);
+
+  const signOut = async () => {
+    await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined);
+    window.location.replace("/signin");
   };
+
   const createCustomer = async (event: React.FormEvent) => {
     event.preventDefault();
-    setMessage("");
+    setMessage(null);
     try {
       await requestJson("/api/v1/platform-admin/customers", { method: "POST", body: JSON.stringify(customerForm) });
-      setMessage("Customer and tenant created successfully.");
-      setCustomerForm({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" });
-      const refreshed = await requestJson<any>("/api/v1/platform-admin/customers");
-      setCustomers(Array.isArray(refreshed) ? refreshed : (refreshed.items ?? refreshed.customers ?? []));
+      setMessage({ tone: "good", text: "Customer and tenant created successfully." });
+      setCustomerForm({ company_name: "", tenant_code: "", plan_code: plans[0] });
       setShowCreate(false);
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Customer creation failed.");
+      setRefreshKey((value) => value + 1);
+    } catch (error) {
+      setMessage({ tone: "critical", text: error instanceof Error ? error.message : "Customer creation failed." });
     }
   };
+
   return (
-    <main className="calm-admin-shell">
-      <header className="calm-admin-header">
-        <div className="calm-brand">
-          MDARIX <span>Administrator Control Plane</span>
+    <div className="admin-console">
+      <header className="ac-header">
+        <button
+          type="button"
+          className="ac-menu-toggle"
+          aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((value) => !value)}
+        >
+          {menuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <div className="ac-brand">
+          MDARIX <span>Administrator control plane</span>
         </div>
-        <label className="calm-search">
-          <Search size={17} />
-          <input
-            aria-label="Search customers and platform"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search customers, platform, or audit"
-          />
-        </label>
-        <div className="calm-user">
-          <Bell size={17} />
-          <span>{securityContext?.display_name ?? "Administrator"}</span>
-          <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
+        <div className="ac-search">
+          <label>
+            <Search size={16} aria-hidden="true" />
+            <input
+              aria-label="Search administration sections"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search sections, e.g. subscriptions, MFA, mapping"
+            />
+          </label>
+          {query.trim() && (
+            <div className="ac-search-results" role="listbox" aria-label="Matching sections">
+              {searchResults.length ? (
+                searchResults.map((result) => (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    key={`${result.domain}-${result.item}`}
+                    onClick={() => open(result)}
+                  >
+                    <strong>{result.item}</strong>
+                    <small>{result.domain}</small>
+                  </button>
+                ))
+              ) : (
+                <p className="ac-muted">No matching section.</p>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="ac-user">
+          <span>
+            <strong>{securityContext?.display_name ?? "Administrator"}</strong>
+            <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
+          </span>
+          <button type="button" className="ac-secondary" onClick={signOut} aria-label="Sign out of MDARIX">
+            <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
+          </button>
         </div>
       </header>
-      <div className="calm-admin-body">
-        <aside className="calm-nav" aria-label="Administrator navigation">
-          <p className="calm-nav-label">Administrator control plane</p>
-          {nav.map(([label, Icon]) => (
+
+      <div className="ac-body">
+        <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Administrator navigation">
+          <p className="ac-nav-label">Administrator control plane</p>
+          <button
+            type="button"
+            className={location.domain === OVERVIEW ? "selected" : ""}
+            aria-current={location.domain === OVERVIEW ? "page" : undefined}
+            onClick={() => open(OVERVIEW)}
+          >
+            <LayoutDashboard size={18} aria-hidden="true" />
+            <span>
+              <strong>Overview</strong>
+              <small>Status dashboard</small>
+            </span>
+          </button>
+          {SECTIONS.map(([label, description, Icon, items]) => (
             <button
+              type="button"
               key={label}
-              className={label === section ? "selected" : ""}
-              aria-current={label === section ? "page" : undefined}
-              onClick={() => openSection(label)}
+              className={location.domain === label ? "selected" : ""}
+              aria-current={location.domain === label ? "page" : undefined}
+              onClick={() => open(label)}
             >
-              <Icon size={17} />
-              <span>{label}</span>
-              <ChevronRight size={15} />
+              <Icon size={18} aria-hidden="true" />
+              <span>
+                <strong>{label}</strong>
+                <small>
+                  {description} · {items.length}
+                </small>
+              </span>
             </button>
           ))}
-        </aside>
-        <section className="calm-workspace">
-          <div className="calm-heading">
-            <div>
-              <p className="eyebrow">Administrator control plane · {activeNav?.[0]}</p>
-              <h1>{section === "Overview" ? "Administrator Control Plane" : section}</h1>
-              <p>{sectionDescription[section]}</p>
-            </div>
-            <span className="calm-health">
-              <ShieldCheck size={18} /> {health?.status ?? "Local MVP"}
-            </span>
-          </div>
-          {error && (
-            <div className="calm-alert" role="status">
-              <AlertTriangle size={18} /> {error}
-            </div>
-          )}
+        </nav>
+
+        <main className="ac-main" data-admin-section={`${location.domain}:${location.item}`}>
           {message && (
-            <div className="calm-success" role="status">
-              {message}
-            </div>
-          )}
-          {section === "Customers" && !selectedCustomer && (
-            <section className="calm-panel calm-full-panel">
-              <div className="calm-panel-title">
-                <div>
-                  <p className="eyebrow">Customer directory · list view</p>
-                  <h2>Customers</h2>
-                  <p>Search, review status and open a customer workspace.</p>
-                </div>
-                <button className="calm-primary" onClick={() => setShowCreate(true)}>
-                  + Create customer / tenant
-                </button>
-              </div>
-              <div className="salesforce-toolbar">
-                <span>{visible.length} customers</span>
-                <button onClick={() => setQuery("")}>Clear filters</button>
-              </div>
-              <div className="salesforce-table">
-                <div className="salesforce-head">
-                  <span>Customer</span>
-                  <span>Status</span>
-                  <span>Plan</span>
-                  <span>Users</span>
-                  <span>Attention</span>
-                  <span>Action</span>
-                </div>
-                {visible.map((c, i) => (
-                  <button
-                    className="salesforce-row"
-                    key={c.id ?? c.customer_id ?? i}
-                    onClick={() => setSelectedCustomer(c)}
-                  >
-                    <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
-                    <span className="status-pill">{c.status ?? "Unknown"}</span>
-                    <span>{c.plan ?? "Not assigned"}</span>
-                    <span>{c.users ?? "—"}</span>
-                    <span>{c.attention ?? "—"}</span>
-                    <b>Open ›</b>
-                  </button>
-                ))}
-                {!visible.length && (
-                  <div className="calm-empty">
-                    <strong>No customers found</strong>
-                    <span>Try another search or create a customer/tenant.</span>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-          {section === "Customers" && selectedCustomer && (
-            <section className="calm-panel calm-full-panel">
-              <button className="calm-back" onClick={() => setSelectedCustomer(null)}>
-                ← Back to Customers
+            <div className={`ac-message tone-${message.tone}`} role="status">
+              {message.text}
+              <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
+                <X size={14} />
               </button>
-              <div className="customer-record-heading">
-                <div>
-                  <p className="eyebrow">Customer 360</p>
-                  <h2>{selectedCustomer.display_name ?? selectedCustomer.name ?? "Customer"}</h2>
-                  <span>
-                    {selectedCustomer.status ?? "Status unavailable"} · {selectedCustomer.plan ?? "Plan not assigned"}
-                  </span>
-                </div>
-                <button
-                  className="calm-primary"
-                  onClick={() =>
-                    setMessage("Customer management actions are available through the governed record workflow.")
-                  }
-                >
-                  Manage
-                </button>
-              </div>
-              <div className="record-tabs">
-                <button className="active">Overview</button>
-                <button>People & Access</button>
-                <button>Products & Data</button>
-                <button>Integrations</button>
-                <button>Subscription</button>
-                <button>Activity</button>
-              </div>
-              <div className="customer-record-grid">
-                <article>
-                  <small>Users</small>
-                  <strong>{selectedCustomer.users ?? "—"}</strong>
-                  <span>Current usage</span>
-                </article>
-                <article>
-                  <small>Integrations</small>
-                  <strong>—</strong>
-                  <span>Health data unavailable</span>
-                </article>
-                <article>
-                  <small>License</small>
-                  <strong>{selectedCustomer.plan ?? "—"}</strong>
-                  <span>Commercial plan</span>
-                </article>
-                <article>
-                  <small>Customer ID</small>
-                  <strong>{selectedCustomer.customer_id ?? selectedCustomer.id ?? "—"}</strong>
-                  <span>Immutable identifier</span>
-                </article>
-              </div>
-            </section>
-          )}
-          {section === "Tenants" && !selectedCustomer && (
-            <section className="calm-panel calm-full-panel tenant-directory">
-              <div className="calm-panel-title">
-                <div>
-                  <p className="eyebrow">Tenant directory · list view</p>
-                  <h2>Tenants</h2>
-                  <p>All tenant identity, lifecycle, deployment, capacity and health fields.</p>
-                </div>
-                <button className="calm-primary" onClick={() => setShowCreate(true)}>
-                  + New tenant
-                </button>
-              </div>
-              <div className="salesforce-toolbar">
-                <span>{visible.length} tenants</span>
-                <button onClick={() => setQuery("")}>Clear filters</button>
-              </div>
-              <div className="salesforce-table tenant-table">
-                <div className="salesforce-head">
-                  <span>Tenant / identifier</span>
-                  <span>Customer</span>
-                  <span>Lifecycle</span>
-                  <span>Provisioning</span>
-                  <span>Type / deployment</span>
-                  <span>Region / residency</span>
-                  <span>Environments</span>
-                  <span>Users / seats</span>
-                  <span>Plan</span>
-                  <span>Health</span>
-                  <span>Last activity</span>
-                  <span>Created</span>
-                  <span>Actions</span>
-                </div>
-                {visible.map((c, i) => (
-                  <div className="salesforce-row tenant-row" key={c.id ?? c.tenant_id ?? i}>
-                    <button className="tenant-link" onClick={() => setSelectedCustomer(c)}>
-                      <strong>{c.tenant_name ?? c.display_name ?? c.name ?? "Unnamed tenant"}</strong>
-                      <small>{c.tenant_identifier ?? c.tenant_key ?? c.tenant_id ?? "Identifier unavailable"}</small>
-                      <small>{c.tenant_slug ? `/${c.tenant_slug}` : "Slug unavailable"}</small>
-                    </button>
-                    <span>{c.customer_id ?? "—"}</span>
-                    <span className="status-pill">
-                      {c.lifecycle_status ?? c.tenant_status ?? c.status ?? "Unknown"}
-                    </span>
-                    <span>{c.provisioning_status ?? "Unknown"}</span>
-                    <span>
-                      {c.tenant_type ?? "STANDARD"}
-                      <small>{c.deployment_model ?? "SHARED"}</small>
-                    </span>
-                    <span>
-                      {c.primary_region ?? c.region ?? "—"}
-                      <small>{c.residency_region ?? "Residency unavailable"}</small>
-                    </span>
-                    <span>{c.environment_count ?? c.environment ?? "—"}</span>
-                    <span>
-                      {c.seat_usage ?? c.users ?? "—"} / {c.seat_cap ?? "—"}
-                    </span>
-                    <span>{c.plan_name ?? c.plan_code ?? c.plan ?? "Not assigned"}</span>
-                    <span className="status-pill">{c.health_status ?? "Unknown"}</span>
-                    <span>{c.last_activity ? new Date(c.last_activity).toLocaleString() : "—"}</span>
-                    <span>{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</span>
-                    <span className="tenant-actions">
-                      <button onClick={() => setSelectedCustomer(c)}>Open</button>
-                      <button
-                        onClick={() =>
-                          setMessage("Tenant edit workflow opened from the governed Tenant 360 action bar.")
-                        }
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setMessage("Lifecycle confirmation required before changing tenant status.")}
-                      >
-                        Suspend
-                      </button>
-                      <button
-                        onClick={() => setMessage("Lifecycle confirmation required before reactivating a tenant.")}
-                      >
-                        Reactivate
-                      </button>
-                      <button
-                        onClick={() => setMessage("Archive requires confirmation and optimistic-lock validation.")}
-                      >
-                        Archive
-                      </button>
-                    </span>
-                  </div>
-                ))}
-                {!visible.length && (
-                  <div className="calm-empty">
-                    <strong>No tenants found</strong>
-                    <span>Create a tenant or adjust your search.</span>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-          {section === "Tenants" && selectedCustomer && (
-            <section className="calm-panel calm-full-panel">
-              <button className="calm-back" onClick={() => setSelectedCustomer(null)}>
-                ← Back to Tenants
-              </button>
-              <div className="customer-record-heading">
-                <div>
-                  <p className="eyebrow">Tenant 360</p>
-                  <h2>
-                    {selectedCustomer.tenant_name ??
-                      selectedCustomer.tenant_key ??
-                      selectedCustomer.display_name ??
-                      selectedCustomer.name ??
-                      "Tenant"}
-                  </h2>
-                  <span>
-                    {selectedCustomer.tenant_status ?? selectedCustomer.status ?? "Status unavailable"} ·{" "}
-                    {selectedCustomer.region ?? selectedCustomer.residency_region ?? "Region not assigned"}
-                  </span>
-                </div>
-                <button
-                  className="calm-primary"
-                  onClick={() =>
-                    setMessage("Tenant management actions are available through the governed lifecycle workflow.")
-                  }
-                >
-                  Manage tenant
-                </button>
-              </div>
-              <div className="record-tabs">
-                <button className="active">Overview</button>
-                <button>Environments</button>
-                <button>Security</button>
-                <button>Integrations</button>
-                <button>Audit</button>
-              </div>
-              <div className="customer-record-grid">
-                <article>
-                  <small>Tenant ID</small>
-                  <strong>{selectedCustomer.tenant_id ?? selectedCustomer.id ?? "—"}</strong>
-                  <span>Immutable identifier</span>
-                </article>
-                <article>
-                  <small>Status</small>
-                  <strong>{selectedCustomer.tenant_status ?? selectedCustomer.status ?? "—"}</strong>
-                  <span>Lifecycle status</span>
-                </article>
-                <article>
-                  <small>Region</small>
-                  <strong>{selectedCustomer.region ?? selectedCustomer.residency_region ?? "—"}</strong>
-                  <span>Data residency</span>
-                </article>
-                <article>
-                  <small>Users</small>
-                  <strong>{selectedCustomer.users ?? "—"}</strong>
-                  <span>Tenant users</span>
-                </article>
-              </div>
-            </section>
-          )}
-          {section === "Platform" && (
-            <section className="calm-panel calm-full-panel">
-              <div className="calm-panel-title">
-                <div>
-                  <p className="eyebrow">Customer application integration</p>
-                  <h2>Data Mapping</h2>
-                  <p>Map customer application fields to the MDARIX canonical data model.</p>
-                </div>
-                <button
-                  className="calm-primary"
-                  onClick={() =>
-                    setMessage("Mapping editor ready. Select a customer integration to add or edit field mappings.")
-                  }
-                >
-                  + New mapping
-                </button>
-              </div>
-              <div className="mapping-sheet">
-                <div className="mapping-sheet-head">
-                  <span>Customer field</span>
-                  <span>Source application</span>
-                  <span>MDARIX field</span>
-                  <span>Status</span>
-                </div>
-                {mappings.slice(0, 12).map((row, i) => (
-                  <div className="mapping-sheet-row" key={row.id ?? i}>
-                    <span>{row.source_field ?? row.field_name ?? row.source_object ?? "Source field"}</span>
-                    <span>{row.source_system ?? row.application ?? "Customer application"}</span>
-                    <span>{row.target_field ?? row.target_entity ?? "MDARIX canonical field"}</span>
-                    <em>{row.status ?? "DRAFT"}</em>
-                  </div>
-                ))}
-                {!mappings.length && (
-                  <div className="calm-empty">
-                    <strong>No mappings configured yet</strong>
-                    <span>Create a mapping to connect customer application fields with MDARIX.</span>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
-          {section === "Overview" && (
-            <div className="calm-cards">
-              <article>
-                <Building2 />
-                <strong>
-                  {customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length ||
-                    customers.length}
-                </strong>
-                <span>Active customers</span>
-              </article>
-              <article>
-                <AlertTriangle />
-                <strong>{needsAttention.length}</strong>
-                <span>At risk / attention</span>
-              </article>
-              <article>
-                <Activity />
-                <strong>{health?.metrics?.healthy ?? health?.healthy ?? "—"}</strong>
-                <span>System health</span>
-              </article>
-              <article>
-                <LifeBuoy />
-                <strong>{health?.metrics?.uptime ?? "—"}</strong>
-                <span>Uptime · not configured</span>
-              </article>
             </div>
           )}
-          {section === "Overview" && (
-            <div className="calm-dashboard-grid">
-              <section className="calm-panel">
-                <div className="calm-panel-title">
-                  <div>
-                    <p className="eyebrow">Platform activity</p>
-                    <h2>Recent customer activity</h2>
-                  </div>
-                  <button onClick={() => openSection("Customers")}>
-                    View all customers <ChevronRight size={15} />
+
+          {location.domain === OVERVIEW ? (
+            <>
+              <div className="ac-page-head">
+                <div>
+                  <p className="ac-eyebrow">Administrator control plane</p>
+                  <h1>Platform overview</h1>
+                  <p>Live status across customers, subscriptions, integrations, security and operations.</p>
+                </div>
+                <div className="ac-page-actions">
+                  <span className="ac-muted">
+                    {updatedAt
+                      ? `Updated ${updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                      : "Loading"}
+                  </span>
+                  <button type="button" className="ac-secondary" onClick={() => setRefreshKey((value) => value + 1)}>
+                    <RefreshCw size={16} /> Refresh
                   </button>
                 </div>
-                <div className="calm-table-head">
-                  <span>Customer</span>
-                  <span>Status</span>
-                  <span>Plan</span>
-                  <span>Users</span>
-                </div>
-                {visible.slice(0, 10).map((c, i) => (
-                  <div className="calm-table-row" key={c.id ?? c.customer_id ?? i}>
-                    <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
-                    <span>{c.status ?? "Unknown"}</span>
-                    <span>{c.plan ?? "Not assigned"}</span>
-                    <span>{c.users ?? "—"}</span>
-                  </div>
-                ))}
-                {!visible.length && (
-                  <div className="calm-empty">
-                    <strong>No customer activity available</strong>
-                    <span>Customer activity will appear when records are available.</span>
-                  </div>
-                )}
-                <div className="calm-trend">
-                  <div>
-                    <p className="eyebrow">Revenue trend</p>
-                    <h2>Not configured</h2>
-                    <span>Revenue and MRR are not exposed by the current MVP platform APIs.</span>
-                  </div>
-                  <div className="calm-trend-line" aria-label="Revenue trend unavailable">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </div>
-                </div>
-              </section>
-              <aside className="calm-dashboard-side">
-                <section className="calm-panel">
-                  <div className="calm-panel-title">
-                    <div>
-                      <p className="eyebrow">Customer health</p>
-                      <h2>Portfolio status</h2>
-                    </div>
-                  </div>
-                  <div className="health-line">
-                    <span>Active</span>
-                    <strong>
-                      {customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length ||
-                        customers.length}
-                    </strong>
-                  </div>
-                  <div className="health-line">
-                    <span>Trial</span>
-                    <strong>{customers.filter((c) => String(c.status ?? "").toUpperCase() === "TRIAL").length}</strong>
-                  </div>
-                  <div className="health-line">
-                    <span>Suspended / expired</span>
-                    <strong>
-                      {
-                        customers.filter((c) => ["SUSPENDED", "EXPIRED"].includes(String(c.status ?? "").toUpperCase()))
-                          .length
-                      }
-                    </strong>
-                  </div>
-                </section>
-                <section className="calm-panel">
-                  <div className="calm-panel-title">
-                    <div>
-                      <p className="eyebrow">Quick actions</p>
-                      <h2>Get things done</h2>
-                    </div>
-                  </div>
-                  <button
-                    className="calm-action"
-                    onClick={() => {
-                      setShowCreate(true);
-                      openSection("Customers");
-                    }}
-                  >
-                    + Create customer / tenant
-                  </button>
-                  <button className="calm-action" onClick={() => openSection("Operations")}>
-                    View system alerts
-                  </button>
-                  <button className="calm-action" onClick={() => openSection("Platform")}>
-                    Open data mapping
-                  </button>
-                </section>
-              </aside>
-            </div>
-          )}
-          {section === "Overview" && (
-            <div className="calm-grid">
-              <section className="calm-panel">
-                <div className="calm-panel-title">
-                  <div>
-                    <p className="eyebrow">Requires attention</p>
-                    <h2>What needs action</h2>
-                  </div>
-                  <button onClick={() => openSection("Operations")}>
-                    View operations <ChevronRight size={15} />
-                  </button>
-                </div>
-                {needsAttention.length ? (
-                  needsAttention.slice(0, 4).map((c, i) => (
-                    <div className="calm-attention" key={c.id ?? c.customer_id ?? i}>
-                      <AlertTriangle size={17} />
-                      <div>
-                        <strong>{c.attention ?? `${c.display_name ?? c.name ?? "Customer"} requires review`}</strong>
-                        <span>
-                          {c.display_name ?? c.name ?? "Customer"} · {c.status ?? "Needs attention"}
-                        </span>
-                      </div>
-                      <ChevronRight size={16} />
-                    </div>
-                  ))
-                ) : (
-                  <div className="calm-empty">
-                    <strong>No urgent platform issues</strong>
-                    <span>Healthy systems remain quiet. Exceptions will appear here.</span>
-                  </div>
-                )}
-              </section>
-              <section className="calm-panel">
-                <div className="calm-panel-title">
-                  <div>
-                    <p className="eyebrow">Customers</p>
-                    <h2>Customer directory</h2>
-                  </div>
-                  <button onClick={() => openSection("Customers")}>
-                    Open customers <ChevronRight size={15} />
-                  </button>
-                </div>
-                <div className="calm-list">
-                  {visible.slice(0, 5).map((c, i) => (
-                    <button key={c.id ?? c.customer_id ?? i} onClick={() => openSection("Customers")}>
-                      <span>
-                        <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
-                        <small>{c.plan ?? "Plan not assigned"}</small>
-                      </span>
-                      <em>{c.status ?? "Unknown"}</em>
+              </div>
+              <AdminOverview
+                refreshKey={refreshKey}
+                onOpen={open}
+                onCreateCustomer={() => setShowCreate(true)}
+                onUpdated={setUpdatedAt}
+              />
+              <section className="ac-areas" aria-label="Administration areas">
+                <h2>Administration areas</h2>
+                <div>
+                  {SECTIONS.map(([label, description, Icon, items]) => (
+                    <button type="button" key={label} onClick={() => open(label)}>
+                      <Icon size={20} aria-hidden="true" />
+                      <strong>{label}</strong>
+                      <small>{description}</small>
+                      <em>{items.length} sections</em>
                     </button>
                   ))}
-                  {!visible.length && (
-                    <div className="calm-empty">
-                      <strong>No customers found</strong>
-                      <span>Try a different search.</span>
-                    </div>
-                  )}
                 </div>
               </section>
-            </div>
-          )}
-          {showCreate && (
-            <div className="calm-modal-backdrop" role="presentation">
-              <form className="calm-modal" onSubmit={createCustomer}>
-                <p className="eyebrow">Customer and tenant lifecycle</p>
-                <h2>Create customer / tenant</h2>
-                <label>
-                  Customer name
-                  <input
-                    required
-                    value={customerForm.company_name}
-                    onChange={(e) => setCustomerForm({ ...customerForm, company_name: e.target.value })}
-                  />
-                </label>
-                <label>
-                  Tenant code
-                  <input
-                    required
-                    value={customerForm.tenant_code}
-                    onChange={(e) => setCustomerForm({ ...customerForm, tenant_code: e.target.value })}
-                    placeholder="TENANT_C"
-                  />
-                </label>
-                <label>
-                  Plan
-                  <select
-                    value={customerForm.plan_code}
-                    onChange={(e) => setCustomerForm({ ...customerForm, plan_code: e.target.value })}
-                  >
-                    <option>ENTERPRISE_TEST</option>
-                    <option>STARTER</option>
-                    <option>PROFESSIONAL</option>
-                  </select>
-                </label>
-                <div className="calm-modal-actions">
-                  <button type="button" onClick={() => setShowCreate(false)}>
-                    Cancel
-                  </button>
-                  <button className="calm-primary" type="submit">
-                    Create customer
-                  </button>
+            </>
+          ) : (
+            activeDomain && (
+              <>
+                <div className="ac-page-head">
+                  <div>
+                    <p className="ac-eyebrow">Administrator control plane · {activeDomain[1]}</p>
+                    <h1>{activeDomain[0]}</h1>
+                  </div>
                 </div>
-              </form>
-            </div>
+                <div className="ac-tabs" role="tablist" aria-label={`${activeDomain[0]} sections`}>
+                  {(activeDomain[3] as readonly string[]).map((item) => (
+                    <button
+                      type="button"
+                      role="tab"
+                      key={item}
+                      aria-selected={location.item === item}
+                      className={location.item === item ? "selected" : ""}
+                      onClick={() => setLocation({ domain: activeDomain[0], item })}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+                <div className="ac-workspace" role="tabpanel" aria-label={location.item}>
+                  <PlatformAdminScreen
+                    embedded
+                    securityContext={securityContext}
+                    onNavigate={onNavigate}
+                    initialDomain={location.domain}
+                    initialItem={location.item}
+                    onLocationChange={(domain, item) => {
+                      if (domain === "Platform Overview") open(OVERVIEW);
+                      else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
+                    }}
+                  />
+                </div>
+              </>
+            )
           )}
-        </section>
+        </main>
       </div>
-    </main>
+
+      {showCreate && (
+        <div className="ac-modal-backdrop" role="presentation">
+          <form
+            className="ac-modal"
+            onSubmit={createCustomer}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-customer-title"
+          >
+            <p className="ac-eyebrow">Customer and tenant lifecycle</p>
+            <h2 id="create-customer-title">Create customer / tenant</h2>
+            <label>
+              Customer name
+              <input
+                required
+                value={customerForm.company_name}
+                onChange={(event) => setCustomerForm({ ...customerForm, company_name: event.target.value })}
+              />
+            </label>
+            <label>
+              Tenant code
+              <input
+                required
+                value={customerForm.tenant_code}
+                onChange={(event) => setCustomerForm({ ...customerForm, tenant_code: event.target.value })}
+                placeholder="TENANT_C"
+              />
+            </label>
+            <label>
+              Plan
+              <select
+                value={customerForm.plan_code}
+                onChange={(event) => setCustomerForm({ ...customerForm, plan_code: event.target.value })}
+              >
+                {plans.map((plan) => (
+                  <option key={plan}>{plan}</option>
+                ))}
+              </select>
+            </label>
+            <div className="ac-modal-actions">
+              <button type="button" className="ac-secondary" onClick={() => setShowCreate(false)}>
+                Cancel
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => onNavigate("admin-create-customer")}>
+                Full onboarding
+              </button>
+              <button className="ac-primary" type="submit">
+                Create customer
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }

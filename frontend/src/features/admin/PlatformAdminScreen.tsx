@@ -25,6 +25,10 @@ type PlatformAdminScreenProps = {
   securityContext: { display_name: string; active_role: string | null; tenant_id?: string } | null;
   onNavigate: (view: any) => void;
   initialItem?: string;
+  // Embedded mode: rendered inside the Platform Administrator console, which owns the header and navigation.
+  initialDomain?: string;
+  embedded?: boolean;
+  onLocationChange?: (domain: string, item: string) => void;
 };
 
 type DataKey =
@@ -173,7 +177,7 @@ function LifecycleConfirmationDialog() {
   );
 }
 
-const DOMAINS = [
+export const DOMAINS = [
   ["Platform Overview", "Health, activity and attention", LayoutDashboard, ["Overview"]],
   [
     "Customers & Tenants",
@@ -5099,13 +5103,32 @@ function ControlCenterWorkspace({
   );
 }
 
-export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }: PlatformAdminScreenProps) {
+export function PlatformAdminScreen({
+  securityContext,
+  onNavigate,
+  initialItem,
+  initialDomain,
+  embedded = false,
+  onLocationChange,
+}: PlatformAdminScreenProps) {
   const [data, setData] = useState<AdminData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [, setUnavailable] = useState<string[]>([]);
   const [query, setQuery] = useState("");
-  const [activeDomain, setActiveDomain] = useState(initialItem ? "Data & Configuration" : "Platform Overview");
+  const [activeDomain, setActiveDomain] = useState(
+    initialDomain ?? (initialItem ? "Data & Configuration" : "Platform Overview"),
+  );
   const [activeItem, setActiveItem] = useState(initialItem ?? "Overview");
+
+  // Embedded mode: the host console drives the location and is told about in-workspace navigation.
+  useEffect(() => {
+    if (!embedded) return;
+    if (initialDomain) setActiveDomain(initialDomain);
+    if (initialItem) setActiveItem(initialItem);
+  }, [embedded, initialDomain, initialItem]);
+  useEffect(() => {
+    if (embedded) onLocationChange?.(activeDomain, activeItem);
+  }, [embedded, activeDomain, activeItem]);
   const [collapsedDomain, setCollapsedDomain] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -6164,8 +6187,61 @@ export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }
 
   if (loading)
     return (
-      <div className="content platform-admin-screen">
+      <div className={embedded ? "platform-admin-embedded" : "content platform-admin-screen"}>
         <section className="platform-admin-loading">Loading governed platform data…</section>
+      </div>
+    );
+
+  const workspaceHeading = activeDomain !== "Platform Overview" && (
+    <div className="platform-admin-heading">
+      <div>
+        <button
+          className="platform-admin-back"
+          onClick={() => {
+            setActiveDomain("Platform Overview");
+            setActiveItem("Overview");
+          }}
+        >
+          <ArrowLeft size={15} /> Platform overview
+        </button>
+        <span className="eyebrow">{activeDomain}</span>
+        <h2>{activeItem}</h2>
+        <p>{DOMAINS.find((domain) => domain[0] === activeDomain)?.[1]}</p>
+      </div>
+      <div className="platform-admin-heading-actions">
+        <span>
+          <Clock3 size={14} />{" "}
+          {lastUpdated
+            ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+            : "Awaiting refresh"}
+        </span>
+        <button
+          className="platform-admin-refresh"
+          onClick={() => {
+            setLoading(true);
+            setRefreshVersion((value) => value + 1);
+          }}
+          aria-label="Refresh platform data"
+        >
+          <RefreshCw size={16} /> Refresh
+        </button>
+        {activeDomain === "Customers & Tenants" && (
+          <button className="platform-admin-primary" onClick={() => onNavigate("admin-create-customer")}>
+            <Plus size={16} /> New customer
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  if (embedded)
+    return (
+      <div className="platform-admin-embedded">
+        <LifecycleConfirmationDialog />
+        <section className="platform-admin-workspace" data-admin-view={`${activeDomain}:${activeItem}`}>
+          {workspaceHeading}
+          {renderWorkspace()}
+        </section>
       </div>
     );
 
@@ -6262,47 +6338,7 @@ export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }
           })}
         </aside>
         <main className="platform-admin-workspace" data-admin-view={`${activeDomain}:${activeItem}`}>
-          {activeDomain !== "Platform Overview" && (
-            <div className="platform-admin-heading">
-              <div>
-                <button
-                  className="platform-admin-back"
-                  onClick={() => {
-                    setActiveDomain("Platform Overview");
-                    setActiveItem("Overview");
-                  }}
-                >
-                  <ArrowLeft size={15} /> Platform overview
-                </button>
-                <span className="eyebrow">{activeDomain}</span>
-                <h2>{activeItem}</h2>
-                <p>{DOMAINS.find((domain) => domain[0] === activeDomain)?.[1]}</p>
-              </div>
-              <div className="platform-admin-heading-actions">
-                <span>
-                  <Clock3 size={14} />{" "}
-                  {lastUpdated
-                    ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                    : "Awaiting refresh"}
-                </span>
-                <button
-                  className="platform-admin-refresh"
-                  onClick={() => {
-                    setLoading(true);
-                    setRefreshVersion((value) => value + 1);
-                  }}
-                  aria-label="Refresh platform data"
-                >
-                  <RefreshCw size={16} /> Refresh
-                </button>
-                {activeDomain === "Customers & Tenants" && (
-                  <button className="platform-admin-primary" onClick={() => onNavigate("admin-create-customer")}>
-                    <Plus size={16} /> New customer
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {workspaceHeading}
           {renderWorkspace()}
         </main>
       </div>

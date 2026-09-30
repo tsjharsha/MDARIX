@@ -111,3 +111,21 @@ def test_platform_admin_data_mapping_exposes_external_to_internal_fields():
         assert label in PLATFORM_ADMIN_UI
     for field in ("source_database", "source_schema", "source_table", "target_schema", "target_table"):
         assert field in ROUTER
+
+
+def test_platform_admin_console_overview_uses_live_sources_and_embeds_every_domain():
+    overview = (FRONTEND / "features" / "admin" / "console" / "AdminOverview.tsx").read_text(encoding="utf-8")
+    for endpoint in (
+        "/api/v1/platform-admin/customers",
+        "/api/v1/platform/subscriptions/expiring",
+        "/api/v1/admin/health-summary",
+        "/api/v1/admin/operations-summary",
+        "/api/v1/admin/security-summary",
+        "/api/v1/admin/integrations/runs",
+        "/api/v1/admin/audit-history",
+    ):
+        assert endpoint in overview
+    # Every non-overview domain renders the real workspaces, embedded in the console shell.
+    assert "<PlatformAdminScreen" in SIMPLIFIED_ADMIN_UI and "embedded" in SIMPLIFIED_ADMIN_UI
+    assert "export const DOMAINS" in PLATFORM_ADMIN_UI
+    assert "/api/v1/auth/signout" in SIMPLIFIED_ADMIN_UI

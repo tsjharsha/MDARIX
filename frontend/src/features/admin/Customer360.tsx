@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../app/api";
+import "./record-tabs.css";
 
 export function Customer360() {
   const [record, setRecord] = useState<any>(null);
