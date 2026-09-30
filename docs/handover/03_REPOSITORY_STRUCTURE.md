@@ -13,7 +13,7 @@
 | `investigator`, `hypothesis_engine`, `challenger`, `unknowns`, `failure_chain` | Investigation intelligence services |
 | `object_storage`, `reports`, `outbox`, `communication` | Files, reports, background events and notifications |
 | `tests` | Backend, integration, simulator, isolation, governance and reliability tests |
-| `e2e` | Browser test configuration and evidence workflows |
+| `frontend/e2e` | Playwright browser specs (`frontend/playwright.config.ts`) |
 | `docs` | Documentation index in `docs/README.md`: handover, product, architecture, specs, runbooks, compliance; build-era reports archived under `docs/history/` |
 | `.github` | Hosted CI workflows and release gates |
 

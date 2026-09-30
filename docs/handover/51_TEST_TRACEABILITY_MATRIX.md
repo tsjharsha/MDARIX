@@ -9,6 +9,6 @@
 | Data plane | `tests/test_data_plane_routing.py` | Server-side tenant routing |
 | Security/governance | `tests/test_connector_security.py` and related tests | Authorization, secrets and governance |
 | Frontend | `frontend/src/**/*.test.*` | Component and route behavior |
-| Browser | `e2e` and Playwright configuration | Authenticated visual/accessibility workflows when browsers/fixtures exist |
+| Browser | `frontend/e2e` and `frontend/playwright.config.ts` | Authenticated visual/accessibility workflows when browsers/fixtures exist |
 
 Failures caused by unavailable PostgreSQL, browser downloads, provider credentials or hosted infrastructure must be reported as environment blockers rather than silently converted into passes.
