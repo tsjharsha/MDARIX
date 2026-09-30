@@ -1,4 +1,3 @@
-import os
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,7 +7,8 @@ from backend.app.db.models.foundation import Investigation
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from day14_service import Day14Error, Day14Service
+from backend.app.fault_injection import dependency_failure_simulated
+from failure_chain.service import UnknownsFailureChainError, UnknownsFailureChainService
 from failure_chain.engine import ORCHESTRATION_VERSION as F_VERSION
 from failure_chain.engine import PROVIDER as F_PROVIDER
 from failure_chain.schemas import (
@@ -20,17 +20,15 @@ from unknowns.engine import ORCHESTRATION_VERSION as U_VERSION
 from unknowns.engine import PROVIDER as U_PROVIDER
 from unknowns.schemas import UnknownRequest, UnknownResponse, UnknownSet
 
-router=APIRouter(prefix="/api/v1/investigations",tags=["Day 14 Intelligence"]); service=Day14Service()
+router=APIRouter(prefix="/api/v1/investigations",tags=["Unknowns and Failure Chains"]); service=UnknownsFailureChainService()
 def err(e): return HTTPException(status_code=400,detail={"code":e.code,"message":e.message})
-def _controlled_dependency_failure() -> bool:
-    return os.environ.get("DAY31_LIVE_DEPENDENCY_FAILURE") == "1" and os.environ.get("MDARIX_ENV", "development").lower() != "production"
 def _authorize_investigation(db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> None:
     if db.query(Investigation.id).filter(Investigation.id == investigation_id, Investigation.tenant_id == tenant_id).first() is None:
         raise HTTPException(status_code=404, detail={"code":"INVESTIGATION_NOT_FOUND","message":"Investigation not found"})
 @router.post("/{investigation_id}/unknowns",response_model=UnknownResponse)
 def create_unknowns(investigation_id:uuid.UUID,request:Request,data:UnknownRequest,db:Session=Depends(get_data_plane_db),ctx:AuthenticatedRequestContext=Depends(get_request_context)):
     try:return service.unknowns(db,data.model_copy(update={"tenant_id":uuid.UUID(ctx.tenant_id),"investigation_id":investigation_id}))
-    except Day14Error as e:raise err(e) from e
+    except UnknownsFailureChainError as e:raise err(e) from e
 @router.get("/{investigation_id}/unknowns",response_model=UnknownResponse)
 def latest_unknowns(investigation_id:uuid.UUID,request:Request,db:Session=Depends(get_data_plane_db),ctx:AuthenticatedRequestContext=Depends(get_request_context)):
     item=service.latest(db,uuid.UUID(ctx.tenant_id),investigation_id,U_PROVIDER,U_VERSION,UnknownSet)
@@ -41,13 +39,13 @@ def create_chains(investigation_id:uuid.UUID,request:Request,data:FailureChainRe
     context={"tenant_id":ctx.tenant_id,"user_id":ctx.user_id}; tenant_id=uuid.UUID(ctx.tenant_id); correlation=ctx.correlation_id
     try:
         _authorize_investigation(db, tenant_id, investigation_id)
-        if _controlled_dependency_failure():
-            raise RuntimeError("controlled Day 31 analysis dependency failure")
+        if dependency_failure_simulated():
+            raise RuntimeError("simulated analysis dependency failure")
         result=service.chains(db,data.model_copy(update={"tenant_id":tenant_id,"investigation_id":investigation_id}))
         db.add(make_audit_event(tenant_id=tenant_id,actor_ref=context["user_id"],action="DAY31_FAILURE_CHAIN_EXECUTED",entity_type="Investigation",correlation_id=correlation,details={"result_count":len(result.failure_chain_set.chains),"temporal_mode":data.temporal_mode}))
         db.commit()
         return result
-    except Day14Error as e:raise err(e) from e
+    except UnknownsFailureChainError as e:raise err(e) from e
     except HTTPException:
         raise
     except Exception as exc:

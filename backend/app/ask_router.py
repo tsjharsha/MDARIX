@@ -34,13 +34,11 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"
-DAY27_FAULT_FLAG = "DAY27_LIVE_DEPENDENCY_FAILURE"
-DAY30_FAULT_FLAG = "DAY30_LIVE_DEPENDENCY_FAILURE"
-DAY34_FAULT_FLAG = "DAY34_LIVE_DEPENDENCY_FAILURE"
 _EXTERNAL_WRITE_TERMS = ("trackwise", "sap", "plm", "qms", "capa")
 _EXTERNAL_WRITE_ACTIONS = ("close", "create", "update", "modify", "delete", "send", "change")
 
@@ -251,12 +249,8 @@ def ask(
         # disabled by default, never client-triggered, and fail-closed in
         # production mode. It runs only after all authorization and session
         # ownership checks have succeeded.
-        if (
-            (os.environ.get(DAY27_FAULT_FLAG) == "1" or os.environ.get(DAY30_FAULT_FLAG) == "1" or os.environ.get(DAY34_FAULT_FLAG) == "1")
-            and os.environ.get("MDARIX_ENV", "development").lower() != "production"
-            and (retrieval_requested or lifecycle_requested)
-        ):
-            raise RuntimeError("controlled Day 27 retrieval dependency failure")
+        if dependency_failure_simulated() and (retrieval_requested or lifecycle_requested):
+            raise RuntimeError("simulated retrieval dependency failure")
         retrieval = AuthorizedRetrievalService().retrieve(data_db, AuthorizedRetrievalRequest(
             tenant_id=UUID(context["tenant_id"]),
             product_id=_uuid_or_none(data.product_id), product_identifier=data.product_identifier,

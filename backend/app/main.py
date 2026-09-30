@@ -13,7 +13,7 @@ from backend.app.ask_router import router as ask_router
 from backend.app.auth_router import router as auth_router
 from backend.app.challenger_router import router as challenger_router
 from backend.app.communication_router import router as communication_router
-from backend.app.day14_router import router as day14_router
+from backend.app.unknowns_failure_chain_router import router as unknowns_failure_chain_router
 from backend.app.db.models.stage2 import AuthSession
 from backend.app.db.session import SessionLocal, engine, get_db
 from backend.app.decision_router import router as decision_router
@@ -140,7 +140,7 @@ app.include_router(investigations_router)
 app.include_router(retrieval_router)
 app.include_router(regulatory_router)
 app.include_router(challenger_router)
-app.include_router(day14_router)
+app.include_router(unknowns_failure_chain_router)
 app.include_router(decision_router)
 app.include_router(counterfactual_router)
 app.include_router(brief_router)

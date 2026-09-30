@@ -72,6 +72,8 @@ def main() -> int:
             print(f"{'PASS' if pa else 'FAIL'} | A foreign lifecycle relationship | status={status_fa} | canary_leakage={int(not pa)}")
             print(f"{'PASS' if pb else 'FAIL'} | B foreign lifecycle relationship | status={status_fb} | canary_leakage={int(not pb)}")
             return int(not (status_a == 200 and status_b == 200 and lifecycle_pass(body_a, 'A', 'B') and lifecycle_pass(body_b, 'B', 'A') and pa and pb))
+        # Requires the API server to run with MDARIX_SIMULATE_DEPENDENCY_FAILURE=1
+        # (see backend/app/fault_injection.py).
         if os.environ.get("DAY27_EXPECT_DEPENDENCY_FAILURE") == "1":
             dependency_correlation = "DAY28-LIVE-DEPENDENCY-FAILURE" if os.environ.get("DAY28_EXPECT_DEPENDENCY_FAILURE") == "1" else "DAY27-LIVE-DEPENDENCY-FAILURE-001"
             status, body = ask(sessions[a_email], {
