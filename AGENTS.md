@@ -6,8 +6,10 @@ the verified current state and known issues.
 
 ## Where code goes
 
-- API routes: `backend/app/` routers mounted in `backend/app/main.py`. Put new
-  routes in the router for their domain; do not grow `access_router.py`.
+- API routes: `backend/app/` routers mounted in `backend/app/main.py`. Access,
+  administration and platform endpoints live in `backend/app/access/<domain>.py`
+  (aggregated by `access_router.py`); authorization helpers are in
+  `backend/app/access/authz.py`. Put new routes in the module for their domain.
 - Domain logic: the matching top-level package (`retrieval/`, `evidence/`,
   `investigator/`, `failure_chain/`, ...). No new top-level packages or
   root-level modules without a reason recorded in the commit message.

@@ -1,3 +1,4 @@
+from tests.conftest import access_api_source
 from pathlib import Path
 
 
@@ -7,7 +8,7 @@ def compact(text: str) -> str:
 
 
 ROOT = Path(__file__).parents[1]
-ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
+ROUTER = access_api_source()
 UI = (ROOT / "frontend" / "src" / "features" / "stage2" / "Stage2AdminControlPlane.tsx").read_text(encoding="utf-8")
 
 

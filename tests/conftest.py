@@ -104,6 +104,14 @@ def golden_dataset():
         NormalizationService().normalize_all()
 
 
+def access_api_source() -> str:
+    """Source text of the access/admin/platform API (backend/app/access/*.py) for static contract tests."""
+    from pathlib import Path
+
+    package = Path(__file__).resolve().parents[1] / "backend" / "app" / "access"
+    return "\n".join(path.read_text(encoding="utf-8") for path in sorted(package.glob("*.py")))
+
+
 def golden_investigation_id() -> str:
     """Return the id of golden investigation INV-001 in the synthetic tenant."""
     db = SessionLocal()

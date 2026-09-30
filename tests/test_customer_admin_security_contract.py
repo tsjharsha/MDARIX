@@ -1,3 +1,4 @@
+from tests.conftest import access_api_source
 from pathlib import Path
 
 
@@ -5,7 +6,7 @@ ROOT = Path(__file__).parents[1]
 UI = (ROOT / "frontend" / "src" / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(
     encoding="utf-8"
 )
-ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
+ROUTER = access_api_source()
 
 
 def test_customer_admin_uses_server_scoped_mutation_contracts():

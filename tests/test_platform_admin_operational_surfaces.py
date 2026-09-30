@@ -1,8 +1,9 @@
+from tests.conftest import access_api_source
 from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
+ROUTER = access_api_source()
 SCREEN = (ROOT / "frontend" / "src" / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
 
 

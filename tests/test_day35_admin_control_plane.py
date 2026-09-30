@@ -9,6 +9,7 @@ sets, personas, connectors, approval authorities or SoD policies; the backend
 routes for those exist and are still asserted below.
 """
 
+from tests.conftest import access_api_source
 from pathlib import Path
 
 
@@ -28,7 +29,7 @@ SIMPLIFIED_ADMIN_UI = (FRONTEND / "features" / "admin" / "SimplifiedPlatformAdmi
     encoding="utf-8"
 )
 LIVE_ADMIN_UI = "\n".join((UI, PLATFORM_ADMIN_UI, CUSTOMER_ADMIN_UI, SIMPLIFIED_ADMIN_UI))
-ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
+ROUTER = access_api_source()
 
 
 def test_admin_dashboard_loads_all_control_plane_domains():

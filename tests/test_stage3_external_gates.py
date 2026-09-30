@@ -1,7 +1,7 @@
 import json
 from types import SimpleNamespace
 
-from backend.app.access_router import _provider_get
+from backend.app.access.common import _provider_get
 
 
 class _Response:
@@ -27,7 +27,7 @@ def test_provider_adapter_uses_server_credential_reference_and_sanitizes_respons
         return _Response()
 
     monkeypatch.setenv("TEST_CONNECTOR_TOKEN", "do-not-return")
-    monkeypatch.setattr("backend.app.access_router.urlopen", fake_urlopen)
+    monkeypatch.setattr("backend.app.access.common.urlopen", fake_urlopen)
     row = SimpleNamespace(
         id="connector-1",
         configuration={
@@ -54,7 +54,7 @@ def test_provider_adapter_reports_unconfigured_and_unreachable_without_secrets(m
     def fail(*_args, **_kwargs):
         raise TimeoutError()
 
-    monkeypatch.setattr("backend.app.access_router.urlopen", fail)
+    monkeypatch.setattr("backend.app.access.common.urlopen", fail)
     row.configuration = {"endpoint": "https://provider.invalid/api", "health_path": "health"}
     result = _provider_get(row, "health_path")
     assert result == {"status": "FAILED", "reason": "PROVIDER_UNREACHABLE"}

@@ -30,7 +30,7 @@ golden source file).
 
 Security / correctness (confirmed in code):
 
-1. Privilege escalation: `access_router._is_platform_admin` treats the role
+1. Privilege escalation: `backend/app/access/authz._is_platform_admin` treats the role
    strings `ADMINISTRATOR`/`ADMIN` as platform admin, and customer admins can
    assign those roles (including to themselves via the generic control-plane
    PATCH).
@@ -45,9 +45,11 @@ Security / correctness (confirmed in code):
    new tenants call `send_activation_email` with a missing argument.
 6. Several queries compare `Tenant.status == "active"` while the schema only
    allows upper-case statuses.
-7. RLS is not effective at runtime (superuser connection; `app.tenant_id` is
+7. `GET /api/v1/admin/tenant/lifecycle` returns 500: it reads
+   `Tenant.lifecycle_status`, which does not exist (reproduced 2026-09-30).
+8. RLS is not effective at runtime (superuser connection; `app.tenant_id` is
    set transaction-locally and committed before handler queries).
-8. Evidence file references resolve against the repository root.
+9. Evidence file references resolve against the repository root.
 
 Architecture gaps:
 

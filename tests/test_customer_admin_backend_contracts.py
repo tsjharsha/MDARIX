@@ -1,7 +1,7 @@
-from pathlib import Path
+from tests.conftest import access_api_source
 
 
-ROUTER = Path("backend/app/access_router.py").read_text(encoding="utf-8")
+ROUTER = access_api_source()
 
 
 def test_customer_identity_provider_contract_is_tenant_scoped_and_redacted():
