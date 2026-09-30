@@ -182,6 +182,9 @@ def test_signin_uses_persisted_auth_user_after_service_restart(monkeypatch):
         def filter(self, *args):
             return self
 
+        def order_by(self, *args):
+            return self
+
         def first(self):
             return row
 

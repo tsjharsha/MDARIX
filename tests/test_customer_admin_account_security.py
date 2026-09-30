@@ -254,3 +254,27 @@ def test_session_context_names_the_administrators_tenant(world):
     context = client.get("/api/v1/session/context").json()
     assert context["current_tenant"]["tenant_id"] == str(ids["tenant"])
     assert context["current_tenant"]["tenant_name"].startswith("CA Security A")
+
+
+def test_sign_in_uses_the_active_account_when_an_email_also_has_an_unused_invitation():
+    db = SessionLocal()
+    try:
+        invited_tenant = _tenant(db, "INV")
+        active_tenant = _tenant(db, "ACT")
+        email = f"dual-{uuid.uuid4().hex[:8]}@synthetic.invalid"
+        # The unused invitation is stored first, so an unordered lookup finds it first.
+        invited = _user(db, invited_tenant, "CUSTOMER_ADMIN", "dual-invited")
+        invited.username, invited.status, invited.email_verified = email, "INVITED", False
+        invited.password_hash = _hash(uuid.uuid4().hex)
+        db.flush()
+        active = _user(db, active_tenant, "CUSTOMER_ADMIN", "dual-active")
+        active.username = email
+        db.commit()
+        active_tenant_id = str(active_tenant.id)
+    finally:
+        db.close()
+    client = TestClient(app)
+    for _ in range(3):
+        response = client.post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD})
+        assert response.status_code == 200, response.text
+        assert response.json()["tenant_id"] == active_tenant_id

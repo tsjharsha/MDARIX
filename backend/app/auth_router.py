@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from auth.durable import (
@@ -290,6 +291,21 @@ def verify(data: Verify, db: Session = Depends(get_db)):
         raise fail(e)
 
 
+def _account_for_email(db: Session, email: str):
+    """The account an email signs in as. The same email can exist in several tenants (for example an
+    active account plus an unused invitation), so prefer an ACTIVE, verified account, then the newest."""
+    return (
+        db.query(AuthUser)
+        .filter(AuthUser.username == email)
+        .order_by(
+            case((func.upper(AuthUser.status) == "ACTIVE", 0), else_=1),
+            case((AuthUser.email_verified.is_(True), 0), else_=1),
+            AuthUser.created_at.desc(),
+        )
+        .first()
+    )
+
+
 @router.post("/signin")
 def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
     try:
@@ -311,7 +327,7 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
                     "message": "Too many failed sign-in attempts. Try again later.",
                 },
             )
-        row = db.query(AuthUser).filter(AuthUser.username == identifier).first()
+        row = _account_for_email(db, identifier)
         if not row:
             raise ValueError("INVALID_CREDENTIALS")
         if getattr(row, "password_expires_at", None) and row.password_expires_at <= now:
@@ -412,7 +428,7 @@ def session(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/forgot-password")
 def forgot(data: ResetRequest, db: Session = Depends(get_db)):
-    row = db.query(AuthUser).filter(AuthUser.username == data.email.strip().lower()).first()
+    row = _account_for_email(db, data.email.strip().lower())
     if not row:
         return {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "NOT_SENT"}
     token = issue_reset(db, row.id, row.tenant_id)
