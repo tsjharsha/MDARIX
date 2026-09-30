@@ -1,0 +1,6 @@
+# The golden dataset generator writes LF line endings on every platform.
+# Checking these files out with LF keeps them byte-identical to regenerated
+# output, so ingestion's file checksums (idempotency) are platform-independent.
+data/golden/** text eol=lf
+evaluation/ground_truth/** text eol=lf
+evaluation/scenarios/** text eol=lf

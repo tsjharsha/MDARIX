@@ -60,7 +60,9 @@ def seed_core(conn):
 
 
 def test_database_connection_and_version(conn):
-    assert scalar(conn, "SELECT current_database()") == "mdarix_r1"
+    # The suite runs against the dedicated mdarix_r1_test database locally and
+    # a fresh mdarix_r1 service database in CI.
+    assert scalar(conn, "SELECT current_database()") in {"mdarix_r1", "mdarix_r1_test"}
     assert scalar(conn, "SELECT current_setting('server_version')").startswith("16.")
 
 

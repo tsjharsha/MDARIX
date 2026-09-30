@@ -1,13 +1,18 @@
+import os
+
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
+
+# Same variable scripts/provision_day35_fixture.py uses to set fixture passwords.
+FIXTURE_PASSWORD = os.environ.get("DAY35_FIXTURE_PASSWORD", "LegacyTestPassword123!")
 
 
 def test_authenticated_business_reads_use_registered_tenant_data_plane():
     client = TestClient(app)
     signin = client.post(
         "/api/v1/auth/signin",
-        json={"email": "r1-user-01@synthetic.invalid", "password": "Temp@1234password"},
+        json={"email": "r1-user-01@synthetic.invalid", "password": FIXTURE_PASSWORD},
     )
     assert signin.status_code == 200
 
@@ -23,7 +28,7 @@ def test_business_data_plane_does_not_accept_a_caller_selected_tenant():
     client = TestClient(app)
     signin = client.post(
         "/api/v1/auth/signin",
-        json={"email": "r1-user-01@synthetic.invalid", "password": "Temp@1234password"},
+        json={"email": "r1-user-01@synthetic.invalid", "password": FIXTURE_PASSWORD},
     )
     assert signin.status_code == 200
     response = client.get("/api/v1/data-plane/products?tenant_id=R1_TENANT_2")
@@ -35,7 +40,7 @@ def test_product360_investigation_workspace_and_evidence_use_data_plane():
     client = TestClient(app)
     signin = client.post(
         "/api/v1/auth/signin",
-        json={"email": "r1-user-01@synthetic.invalid", "password": "Temp@1234password"},
+        json={"email": "r1-user-01@synthetic.invalid", "password": FIXTURE_PASSWORD},
     )
     assert signin.status_code == 200
     products = client.get("/api/v1/products").json()
@@ -53,7 +58,7 @@ def test_evidence_intelligence_processing_writes_to_tenant_data_plane():
     client = TestClient(app)
     signin = client.post(
         "/api/v1/auth/signin",
-        json={"email": "r1-user-01@synthetic.invalid", "password": "Temp@1234password"},
+        json={"email": "r1-user-01@synthetic.invalid", "password": FIXTURE_PASSWORD},
     )
     assert signin.status_code == 200
     evidence_id = client.get("/api/v1/evidence").json()[0]["id"]

@@ -196,11 +196,14 @@ def test_entity_linking_resolved_and_unresolved(db_session, setup_test_data):
 
 # 24-30: AI Provenance, Reprocessing & Idempotency
 def test_ai_execution_provenance_recording(db_session, setup_test_data):
-    ai_logs = (
-        db_session.query(AIExecution)
-        .filter(AIExecution.tenant_id == setup_test_data["tenant_id"])
-        .all()
-    )
+    # Only the evidence extractor's executions reference this evidence record;
+    # investigator/hypothesis executions for the same tenant use other providers.
+    evidence_id = str(setup_test_data["evidence_id"])
+    ai_logs = [
+        row
+        for row in db_session.query(AIExecution).filter(AIExecution.tenant_id == setup_test_data["tenant_id"]).all()
+        if (row.evidence_refs or {}).get("evidence_id") == evidence_id
+    ]
     assert len(ai_logs) > 0
     assert ai_logs[0].provider == "google"
     assert ai_logs[0].model_name is not None

@@ -1,13 +1,100 @@
-"""Shared authentication setup for legacy protected-route integration tests."""
-import uuid
-from datetime import datetime, timezone
-import pytest
-from fastapi.testclient import TestClient
-from backend.app.main import app
-from auth.service import _hash, auth_service
-from auth.durable import persist_session
-from backend.app.db.models.foundation import AuthUser, Tenant, TenantMembership
-from backend.app.db.session import SessionLocal
+"""Shared test configuration.
+
+- Local runs default to the dedicated ``mdarix_r1_test`` database so the suite
+  never writes into the demo database (``mdarix_r1``). CI and any caller that
+  exports ``POSTGRES_DB`` explicitly keep their own value. This must run before
+  any backend module is imported, because the engine is created at import time.
+- Every test is marked ``unit``, ``db`` or ``dataplane`` (see ``pytest.ini``).
+- Database tests get the synthetic AcmeCare golden dataset loaded on demand, so
+  they no longer depend on alphabetical file order.
+- Legacy protected-route modules get an authenticated session cookie.
+"""
+import os
+
+os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
+# Tests must not call paid or external services with the developer's .env
+# credentials (Groq, Resend). The deterministic provider path is exercised
+# instead; individual tests that need provider behaviour set their own env.
+# Set MDARIX_TEST_ALLOW_LIVE_PROVIDERS=1 to opt in deliberately.
+if os.environ.get("MDARIX_TEST_ALLOW_LIVE_PROVIDERS") != "1":
+    os.environ["MDARIX_GENAI_PROVIDER"] = "controlled"
+    os.environ["MDARIX_GENAI_API_KEY"] = ""
+    os.environ["MDARIX_GENAI_BASE_URL"] = ""
+    os.environ["RESEND_API_KEY"] = ""
+
+import uuid  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from backend.app.main import app  # noqa: E402
+from auth.service import _hash, auth_service  # noqa: E402
+from auth.durable import persist_session  # noqa: E402
+from backend.app.db.models.foundation import AuthUser, Investigation, Tenant, TenantMembership  # noqa: E402
+from backend.app.db.session import SessionLocal  # noqa: E402
+
+GOLDEN_TENANT_KEY = "ACME_CARE_SYNTHETIC"
+GOLDEN_INVESTIGATION = "INV-001"
+
+# Modules that need the control-plane PostgreSQL database.
+DB_MODULES = {
+    "test_day2_database", "test_day4_ingestion", "test_day5_normalization",
+    "test_day6_reality_graph", "test_day7_product360_temporal", "test_day8_evidence",
+    "test_day9_retrieval", "test_day10_investigation_workspace", "test_day11_ai_investigator",
+    "test_day12_hypothesis_engine", "test_day15_decision_center", "test_day17_briefs",
+    "test_day18_trust_assurance", "test_day23_governance_security", "test_day26_ask_api",
+    "test_day27_authorized_retrieval", "test_day28_lifecycle_retrieval", "test_mfa_mvp",
+    "test_public_signup_onboarding", "test_simulator_ingestion", "test_stage2_operations",
+}
+# Modules that additionally need the four tenant data-plane databases.
+DATAPLANE_MODULES = {"test_data_plane_routing"}
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        module = item.module.__name__.split(".")[-1]
+        if module in DATAPLANE_MODULES:
+            item.add_marker(pytest.mark.db)
+            item.add_marker(pytest.mark.dataplane)
+            item.fixturenames.insert(0, "golden_dataset")
+        elif module in DB_MODULES:
+            item.add_marker(pytest.mark.db)
+            item.fixturenames.insert(0, "golden_dataset")
+        else:
+            item.add_marker(pytest.mark.unit)
+
+
+@pytest.fixture(scope="session")
+def golden_dataset():
+    """Ingest and normalize the synthetic golden dataset once, only if it is missing."""
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == GOLDEN_TENANT_KEY).first()
+        present = tenant is not None and db.query(Investigation).filter(
+            Investigation.tenant_id == tenant.id,
+            Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
+        ).first() is not None
+    finally:
+        db.close()
+    if not present:
+        from ingestion.normalization.service import NormalizationService
+        from ingestion.services.ingestion_service import GOLDEN_SOURCE, IngestionService
+
+        IngestionService(GOLDEN_SOURCE).ingest_all()
+        NormalizationService().normalize_all()
+
+
+def golden_investigation_id() -> str:
+    """Return the id of golden investigation INV-001 in the synthetic tenant."""
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == GOLDEN_TENANT_KEY).one()
+        investigation = db.query(Investigation).filter(
+            Investigation.tenant_id == tenant.id,
+            Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
+        ).one()
+        return str(investigation.id)
+    finally:
+        db.close()
 
 LEGACY_PROTECTED = {
     'test_day6_reality_graph', 'test_day7_product360_temporal', 'test_day8_evidence',

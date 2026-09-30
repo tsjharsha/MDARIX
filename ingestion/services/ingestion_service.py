@@ -222,23 +222,25 @@ class IngestionService:
             try:
                 records = adapter_for(source.path).read_records(source.path)
                 self.validate_headers(source, records, mapping)
-                accepted = warnings = rejected = issues = 0
+                accepted = warnings = rejected = issues = duplicates = 0
                 for record in records:
                     outcome = self.stage_record(conn, tenant_id, str(run_id), source, source_file, checksum, mapping, record)
                     if outcome.status == "ACCEPTED":
                         accepted += 1
                     elif outcome.status == "ACCEPTED_WITH_WARNINGS":
                         warnings += 1
+                    elif outcome.status == "DUPLICATE":
+                        duplicates += 1
                     else:
                         rejected += 1
                     issues += len(outcome.issues)
                 status = "COMPLETED_WITH_WARNINGS" if warnings or rejected else "COMPLETED"
                 conn.execute(
                     text(
-                        "UPDATE ingestion_runs SET ingestion_completed_at=:now, status=:status, total_records=:total, accepted_records=:accepted, warning_records=:warnings, rejected_records=:rejected "
+                        "UPDATE ingestion_runs SET ingestion_completed_at=:now, status=:status, total_records=:total, accepted_records=:accepted, warning_records=:warnings, rejected_records=:rejected, duplicate_source_records=:duplicates "
                         "WHERE id=:run_id"
                     ),
-                    {"now": utcnow(), "status": status, "total": len(records), "accepted": accepted, "warnings": warnings, "rejected": rejected, "run_id": run_id},
+                    {"now": utcnow(), "status": status, "total": len(records), "accepted": accepted, "warnings": warnings, "rejected": rejected, "duplicates": duplicates, "run_id": run_id},
                 )
             except Exception as exc:
                 conn.execute(
@@ -295,7 +297,10 @@ class IngestionService:
         staged_id = conn.execute(
             text(
                 "INSERT INTO staged_source_records (tenant_id, ingestion_run_id, source_system, source_type, record_type, source_file, source_row_index, source_record_id, source_checksum, raw_payload, parsed_payload, candidate_canonical_payload, source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version, created_at) "
-                "VALUES (:tenant_id, :run_id, :source_system, :source_type, :record_type, :source_file, :row_index, :record_id, :checksum, :raw, :parsed, :candidate, :source_ts, :effective_ts, :recorded_ts, :ingestion_ts, :quality, :mapping_version, :now) RETURNING id"
+                "VALUES (:tenant_id, :run_id, :source_system, :source_type, :record_type, :source_file, :row_index, :record_id, :checksum, :raw, :parsed, :candidate, :source_ts, :effective_ts, :recorded_ts, :ingestion_ts, :quality, :mapping_version, :now) "
+                # A file whose bytes changed (for example only line endings) but whose
+                # records did not must not fail the run: identical records are skipped.
+                "ON CONFLICT ON CONSTRAINT uq_staged_source_record_identity DO NOTHING RETURNING id"
             ),
             {
                 "tenant_id": tenant_id,
@@ -318,7 +323,9 @@ class IngestionService:
                 "mapping_version": mapping["mapping_version"],
                 "now": utcnow(),
             },
-        ).scalar_one()
+        ).scalar_one_or_none()
+        if staged_id is None:
+            return RecordOutcome("DUPLICATE", [])
         for issue in issues:
             conn.execute(
                 text(

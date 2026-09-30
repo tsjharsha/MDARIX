@@ -25,13 +25,15 @@ def iso(day: date) -> str:
 
 def write_json(path: Path, data: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8", newline="\n")
 
 
 def write_csv(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+        # LF on every platform so regenerated files are byte-identical to the
+        # committed copies (see .gitattributes) and ingestion checksums stay stable.
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()), lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -392,10 +394,38 @@ def make_aliases() -> list[dict]:
     ]
 
 
+# PLM configuration membership (which components each product version is built
+# from). Source layer only: it is ingested from plm/product_components.csv and
+# does not change the canonical dataset or its manifest hash.
+PRODUCT_VERSION_COMPONENTS = [
+    ("PV-ASTER-A", ["COMP-FW", "COMP-SENSOR"]),
+    ("PV-ASTER-B", ["COMP-FW", "COMP-SENSOR"]),
+    ("PV-ASTER-C", ["COMP-PWR", "COMP-FW", "COMP-SENSOR"]),
+    ("PV-ASTER-D", ["COMP-PWR", "COMP-CAP", "COMP-FW", "COMP-CONN"]),
+    ("PV-NIMBUS-A", ["COMP-PUMP", "COMP-VALVE"]),
+    ("PV-NIMBUS-B", ["COMP-PUMP", "COMP-VALVE", "COMP-SEAL"]),
+]
+
+
+def product_component_rows(versions):
+    effective = {row["product_version_id"]: row["effective_timestamp"] for row in versions}
+    return [
+        {
+            "product_component_id": f"PC-{version_id}-{component_id}",
+            "product_version_id": version_id,
+            "component_id": component_id,
+            "effective_timestamp": effective[version_id],
+        }
+        for version_id, component_ids in PRODUCT_VERSION_COMPONENTS
+        for component_id in component_ids
+    ]
+
+
 def write_source_files(products, versions, components, suppliers, sites, lots, requirements, changes, complaints, investigations, risks, failure_modes, controls, evidence):
     write_csv(SOURCE / "plm" / "products.csv", products)
     write_csv(SOURCE / "plm" / "product_versions.csv", versions)
     write_csv(SOURCE / "plm" / "components.csv", components)
+    write_csv(SOURCE / "plm" / "product_components.csv", product_component_rows(versions))
     write_csv(SOURCE / "plm" / "requirements.csv", requirements)
     write_csv(SOURCE / "plm" / "changes.csv", changes)
     write_csv(SOURCE / "qms" / "complaints.csv", complaints)
@@ -410,6 +440,7 @@ def write_source_files(products, versions, components, suppliers, sites, lots, r
         (EVIDENCE_DIR / f"{item['evidence_id']}.md").write_text(
             f"# {item['title']}\n\n{NOTICE}\n\nType: {item['evidence_type']}\nQuality: {item['quality']}\n\n{item['content']}\n",
             encoding="utf-8",
+            newline="\n",
         )
     write_json(SOURCE / "documents" / "evidence_metadata.json", evidence)
 
@@ -435,6 +466,7 @@ def write_ground_truth(scenarios, anomalies, aliases):
         "False lead: packaging label revision CHG-LABEL-042.\n\n"
         "Expected evaluation behavior: leading hypothesis allowed, causality not established.\n",
         encoding="utf-8",
+        newline="\n",
     )
     write_json(SCENARIOS / "scenario_index.json", {"notice": NOTICE, "scenarios": scenarios})
 

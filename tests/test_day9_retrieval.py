@@ -16,7 +16,7 @@ from backend.app.db.models.foundation import (
     Supplier,
     Tenant,
 )
-from backend.app.db.models.customer_lifecycle import Customer
+from backend.app.customer_lifecycle import build_customer_tenant
 from backend.app.db.models.retrieval_intelligence import (
     EMBEDDING_DIMENSION,
     EMBEDDING_MODEL,
@@ -51,18 +51,17 @@ def retrieval_fixture(db_session):
 
     other_tenant = db_session.query(Tenant).filter(Tenant.tenant_key == "DAY9_OTHER_TENANT").first()
     if other_tenant is None:
-        other_customer = Customer(id=uuid.uuid4(), customer_identifier=f"DAY9-CUSTOMER-{uuid.uuid4().hex[:8]}", legal_name="Day 9 Other Customer", display_name="Day 9 Other Customer", customer_type="DESIGN_PARTNER", country="US", lifecycle_status="ACTIVE", created_at=dt.datetime.now(dt.timezone.utc), updated_at=dt.datetime.now(dt.timezone.utc))
-        db_session.add(other_customer)
-        db_session.flush()
-        other_tenant = Tenant(
-            id=uuid.uuid4(),
-            customer_id=other_customer.id,
+        # Use the production builder so the fixture satisfies the current
+        # tenant schema (platform-issued identifier, uppercase lifecycle status).
+        other_customer, other_tenant = build_customer_tenant(
+            db=db_session,
             tenant_key="DAY9_OTHER_TENANT",
             name="Day 9 Other Tenant",
-            status="active",
-            created_at=dt.datetime.now(dt.timezone.utc),
-            updated_at=dt.datetime.now(dt.timezone.utc),
+            status="ACTIVE",
+            now=dt.datetime.now(dt.timezone.utc),
         )
+        db_session.add(other_customer)
+        db_session.flush()
         db_session.add(other_tenant)
         db_session.commit()
 

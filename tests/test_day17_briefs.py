@@ -1,11 +1,11 @@
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
-from tests.conftest import authenticated_client
+from tests.conftest import authenticated_client, golden_investigation_id
 
-INVESTIGATION_ID = "5a541092-f384-44eb-a832-3137749e7393"
 
 def test_brief_generation_is_versioned_and_grounded():
+    INVESTIGATION_ID = golden_investigation_id()
     client = authenticated_client(app)
     first = client.post(f"/api/v1/investigations/{INVESTIGATION_ID}/briefs", json={"temporal_mode": "current"})
     assert first.status_code == 200
