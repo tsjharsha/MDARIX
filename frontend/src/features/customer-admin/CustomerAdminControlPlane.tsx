@@ -14,7 +14,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { requestJson } from "../../app/apiClient";
+import { signOut, useIdleSignOut } from "../shared/session";
 import "../admin/console/admin-console.css";
 import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
@@ -42,30 +42,6 @@ const NAV: Record<Section, { icon: typeof Users; description: string }> = {
   Audit: { icon: FileClock, description: "Audit trail and exports" },
   Organization: { icon: Building2, description: "Profile and products" },
 };
-
-// Signs the administrator out after this much inactivity, in addition to the server's 60-minute session expiry.
-const IDLE_SIGN_OUT_MS = 30 * 60 * 1000;
-
-async function signOut(reason?: string) {
-  await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined);
-  window.location.replace(reason ? `/signin?reason=${reason}` : "/signin");
-}
-
-function useIdleSignOut() {
-  useEffect(() => {
-    let timer = window.setTimeout(() => void signOut("idle"), IDLE_SIGN_OUT_MS);
-    const reset = () => {
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => void signOut("idle"), IDLE_SIGN_OUT_MS);
-    };
-    const events = ["pointerdown", "keydown", "scroll"] as const;
-    events.forEach((name) => window.addEventListener(name, reset, { passive: true }));
-    return () => {
-      window.clearTimeout(timer);
-      events.forEach((name) => window.removeEventListener(name, reset));
-    };
-  }, []);
-}
 
 export function CustomerAdminControlPlane({
   securityContext,

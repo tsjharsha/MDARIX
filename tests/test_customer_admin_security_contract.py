@@ -53,4 +53,7 @@ def test_customer_admin_risky_actions_are_confirmed():
     assert 'role="alertdialog"' in UI
     for action in ('"SUSPENDED"', '"OFFBOARDED"', "/execute", "/release-action", "/identity-provider"):
         assert action in UI
-    assert "IDLE_SIGN_OUT_MS" in UI
+    assert "useIdleSignOut()" in UI
+    assert "IDLE_SIGN_OUT_MS" in (ROOT / "frontend" / "src" / "features" / "shared" / "session.ts").read_text(
+        encoding="utf-8"
+    )

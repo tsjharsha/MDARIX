@@ -1,0 +1,205 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Bot,
+  Briefcase,
+  Building2,
+  FileSearch,
+  Gavel,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  Radio,
+  Search,
+  ShieldCheck,
+  UserRound,
+  X,
+} from "lucide-react";
+import "../admin/console/admin-console.css";
+import "../customer-admin/customer-admin.css";
+import "./workspace.css";
+import { signOut, useIdleSignOut } from "../shared/session";
+import {
+  WORKSPACE_SECTIONS,
+  WorkspaceContext,
+  sectionAllowed,
+  type SessionContext,
+  type WorkspaceApi,
+  type WorkspaceSection,
+} from "./workspaceContext";
+import { useWorkContext } from "./useWorkContext";
+import { ContextBar } from "./ContextBar";
+import { OverviewSection } from "./sections/Overview";
+import { MyWorkSection } from "./sections/MyWork";
+import { ProductsSection } from "./sections/Products";
+import { SignalsSection } from "./sections/Signals";
+import { InvestigationsSection } from "./sections/Investigations";
+import { EvidenceSection } from "./sections/Evidence";
+import { DecisionsSection } from "./sections/Decisions";
+import { IntelligenceSection } from "./sections/Intelligence";
+import { TrustSection } from "./sections/Trust";
+import { AccountSection } from "./sections/Account";
+
+const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
+  Overview: { icon: LayoutDashboard, description: "Status dashboard", context: false },
+  "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
+  Products: { icon: Package, description: "Product 360 and versions", context: true },
+  Signals: { icon: Radio, description: "Complaints and trends", context: true },
+  Investigations: { icon: FileSearch, description: "Cases and workspace", context: true },
+  Evidence: { icon: Search, description: "Library and provenance", context: true },
+  Decisions: { icon: Gavel, description: "Review, sign and verify", context: true },
+  Intelligence: { icon: Bot, description: "Ask, regulatory, risk", context: true },
+  "Trust & Audit": { icon: ShieldCheck, description: "AI assurance and records", context: true },
+  "My Account": { icon: UserRound, description: "Profile, security, access", context: false },
+};
+
+/** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
+export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
+  home: ["Overview"],
+  "my-work": ["My Work"],
+  products: ["Products"],
+  signals: ["Signals"],
+  story: ["Investigations", "Story"],
+  persona: ["Overview"],
+  ask: ["Intelligence", "Ask MDARIX"],
+  investigations: ["Investigations"],
+  evidence: ["Evidence"],
+  decision: ["Decisions"],
+  assurance: ["Trust & Audit", "AI assurance"],
+  audit: ["Trust & Audit", "Audit trail"],
+  "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
+  "risk-traceability": ["Intelligence", "Risk & traceability"],
+  "signature-verification": ["Decisions", "Verify a signature"],
+};
+
+export function UserWorkspace({ session, initialView }: { session: SessionContext | null; initialView?: string }) {
+  const work = useWorkContext();
+  const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Overview"]);
+  const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
+    section: start[0],
+    tab: start[1],
+    key: 0,
+  });
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
+  useIdleSignOut();
+
+  const visibleSections = useMemo(
+    () => WORKSPACE_SECTIONS.filter((section) => sectionAllowed(section, session?.allowed_menu)),
+    [session?.allowed_menu],
+  );
+  const open = useCallback(
+    (section: WorkspaceSection, tab?: string) => {
+      setLocation((current) => ({ section, tab, key: current.key + 1 }));
+      setMenuOpen(false);
+      setMessage(null);
+      window.scrollTo({ top: 0 });
+    },
+    [setLocation],
+  );
+  const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+
+  // A section the server's menu does not grant is never rendered, even from an old link.
+  useEffect(() => {
+    if (!visibleSections.includes(location.section)) open(visibleSections[0] ?? "My Account");
+  }, [visibleSections, location.section]);
+
+  const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
+  const api: WorkspaceApi = { session, work, open, notify };
+  const { section, tab } = location;
+
+  return (
+    <WorkspaceContext.Provider value={api}>
+      <div className="admin-console user-workspace">
+        <header className="ac-header">
+          <button
+            type="button"
+            className="ac-menu-toggle"
+            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((value) => !value)}
+          >
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <div className="ac-brand">MDARIX</div>
+          <div className="uw-tenant" title="Every screen shows only this organization's data">
+            <Building2 size={15} aria-hidden="true" />
+            <span>{tenantName}</span>
+          </div>
+          <div className="ac-user">
+            <span>
+              <strong>{session?.display_name ?? "User"}</strong>
+              <small>{session?.active_role ?? "No active role"}</small>
+            </span>
+            <button
+              type="button"
+              className="ac-secondary"
+              onClick={() => void signOut()}
+              aria-label="Sign out of MDARIX"
+            >
+              <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
+            </button>
+          </div>
+        </header>
+
+        <div className="ac-body">
+          <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
+            <p className="ac-nav-label">Workspace</p>
+            {visibleSections.map((name) => {
+              const { icon: Icon, description } = NAV[name];
+              return (
+                <button
+                  type="button"
+                  key={name}
+                  className={section === name ? "selected" : ""}
+                  aria-current={section === name ? "page" : undefined}
+                  onClick={() => open(name)}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  <span>
+                    <strong>{name}</strong>
+                    <small>{description}</small>
+                  </span>
+                </button>
+              );
+            })}
+            <p className="ca-nav-scope">
+              Evidence before inference. Authorized humans decide. You see only {tenantName}'s data.
+            </p>
+          </nav>
+
+          <main className="ac-main" data-workspace-section={section}>
+            <div className="ac-page-head">
+              <div>
+                <p className="ac-eyebrow">{tenantName}</p>
+                <h1>{section}</h1>
+                <p>{NAV[section].description}</p>
+              </div>
+            </div>
+            {NAV[section].context && <ContextBar />}
+            {message && (
+              <div className={`ac-message tone-${message.tone}`} role="status">
+                {message.text}
+                <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            <div key={location.key} className="ca-section">
+              {section === "Overview" && <OverviewSection />}
+              {section === "My Work" && <MyWorkSection tab={tab} />}
+              {section === "Products" && <ProductsSection tab={tab} />}
+              {section === "Signals" && <SignalsSection tab={tab} />}
+              {section === "Investigations" && <InvestigationsSection tab={tab} />}
+              {section === "Evidence" && <EvidenceSection tab={tab} />}
+              {section === "Decisions" && <DecisionsSection tab={tab} />}
+              {section === "Intelligence" && <IntelligenceSection tab={tab} />}
+              {section === "Trust & Audit" && <TrustSection tab={tab} />}
+              {section === "My Account" && <AccountSection tab={tab} />}
+            </div>
+          </main>
+        </div>
+      </div>
+    </WorkspaceContext.Provider>
+  );
+}

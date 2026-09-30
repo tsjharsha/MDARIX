@@ -1,0 +1,143 @@
+/* User workspace. Builds on the shared console tokens in ../admin/console/admin-console.css. */
+.uw-tenant {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 320px;
+  margin-left: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 999px;
+  color: #e3edf5;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.uw-tenant span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.uw-tenant select {
+  max-width: 240px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+}
+.uw-tenant select option {
+  color: var(--ac-ink);
+}
+
+/* Context bar */
+.uw-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-context label {
+  display: grid;
+  gap: 4px;
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-context select,
+.uw-context input {
+  min-width: 150px;
+  max-width: 280px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 13px;
+}
+.uw-modes {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+}
+.uw-modes button {
+  height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-right: 1px solid var(--ac-line);
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.uw-modes button:last-child {
+  border-right: 0;
+}
+.uw-modes button.selected {
+  background: var(--ac-teal);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Simple lists */
+.uw-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-list li > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.uw-list small {
+  overflow: hidden;
+  color: var(--ac-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uw-inline-list {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.uw-inline-list svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* Existing full-page screens embedded in a section keep their content but drop their outer page chrome. */
+.uw-embedded > .content {
+  padding: 0;
+}
+.uw-embedded {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .uw-tenant {
+    max-width: 46vw;
+  }
+  .uw-context select,
+  .uw-context input {
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+  .uw-context label {
+    flex: 1 1 140px;
+  }
+}

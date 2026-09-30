@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
 MAIN = frontend_app_source()
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
-INVESTIGATOR_HOME = (ROOT / "frontend" / "src" / "features" / "investigator" / "InvestigatorHome.tsx").read_text(
-    encoding="utf-8"
-)
+WORKSPACE = ROOT / "frontend" / "src" / "features" / "workspace"
+WORKSPACE_CONTEXT = (WORKSPACE / "workspaceContext.tsx").read_text(encoding="utf-8")
+WORKSPACE_OVERVIEW = (WORKSPACE / "sections" / "Overview.tsx").read_text(encoding="utf-8")
 
 
 def test_public_navigation_exposes_required_categories_and_actions():
@@ -59,22 +59,23 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
-    # The authenticated home is InvestigatorHome (the former inline
-    # ApplicationHome was unreferenced and has been removed).
-    assert compact('activeView === "home" && (<><InvestigatorHome') in compact(MAIN)
-    for phrase in (
-        "Quality Investigator workspace",
-        "Connected investigation story",
-        "Needs attention",
-        "Open investigations",
-        "Separate facts from interpretation",
-        "Trace every conclusion",
-        "Recommended next action",
-        "Trust and audit",
+    # Signed-in business users land on the user workspace; its Overview is a live status dashboard.
+    assert compact("if (!isPlatformAdmin && !isCustomerAdmin) return (<><UserWorkspace") in compact(MAIN)
+    # The workflow story is the navigation itself, in order: product -> signal -> case -> evidence -> decision -> trust.
+    order = ["Products", "Signals", "Investigations", "Evidence", "Decisions", "Trust & Audit"]
+    positions = [WORKSPACE_CONTEXT.index(f'"{name}"') for name in order]
+    assert positions == sorted(positions)
+    for endpoint in (
+        "/api/v1/analytics/command-center",
+        "/api/v1/analytics/signals",
+        "/api/v1/analytics/investigations",
+        "/api/v1/analytics/evidence",
     ):
-        assert phrase in INVESTIGATOR_HOME
-    assert 'onNavigate("investigations")' in INVESTIGATOR_HOME
-    assert 'onNavigate("evidence")' in INVESTIGATOR_HOME
+        assert endpoint in WORKSPACE_OVERVIEW
+    for phrase in ("Needs attention", "What to do next", "Open cases", "Latest signals"):
+        assert phrase in WORKSPACE_OVERVIEW
+    assert 'open("Investigations")' in WORKSPACE_OVERVIEW
+    assert 'open("Evidence")' in WORKSPACE_OVERVIEW
 
 
 def test_semantic_design_tokens_cover_business_meaning():
