@@ -45,6 +45,19 @@ def revoke_session(db: Session, raw: str):
         db.commit()
 
 
+def revoke_user_sessions(db: Session, user_id, tenant_id) -> int:
+    """Revoke every live session of one user (caller commits). Used when access is suspended or removed."""
+    rows = (
+        db.query(AuthSession)
+        .filter(AuthSession.user_id == user_id, AuthSession.tenant_id == tenant_id, AuthSession.revoked_at.is_(None))
+        .all()
+    )
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.revoked_at = now
+    return len(rows)
+
+
 def issue_invitation(db: Session, user_id, tenant_id, created_by=None, ttl: int = 3600):
     raw = secrets.token_urlsafe(32)
     now = datetime.now(timezone.utc)

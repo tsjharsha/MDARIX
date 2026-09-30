@@ -336,7 +336,7 @@ def get_customer_lifecycle(request: Request, db: Session = Depends(get_db)):
     return {
         "tenant_id": str(tenant.id),
         "status": tenant.status,
-        "lifecycle_status": tenant.lifecycle_status,
+        "lifecycle_status": tenant.status,  # the tenant status column is its lifecycle status
         "lock_version": tenant.lock_version,
         "customer_admin_actions": ["REQUEST_RENEWAL"],
         "platform_controlled_actions": ["SUSPEND", "REACTIVATE", "TERMINATE", "ARCHIVE"],

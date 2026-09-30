@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from access_control.configuration_safety import safe_configuration
 from access_control.personas import get_persona
+from auth.durable import revoke_user_sessions
 from backend.app.db.models.foundation import (
     ApprovalAuthority,
     AuditEvent,
@@ -37,7 +38,7 @@ from backend.app.access.schemas import (
     ReleaseActionRequest,
     StatusRequest,
 )
-from backend.app.access.authz import _admin_tenant
+from backend.app.access.authz import _admin_tenant, _guard_user_administration
 from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -346,6 +347,13 @@ def update_control_plane_resource(
         raise HTTPException(
             404, detail={"code": "RESOURCE_NOT_FOUND", "message": "Resource is not available for this tenant"}
         )
+    if resource == "users":
+        _guard_user_administration(
+            admin,
+            target=row,
+            new_role=str(payload.values["role"]) if "role" in payload.values else None,
+            changes_access=bool({"role", "status"} & set(payload.values)),
+        )
     if resource == "users" and "email" in payload.values:
         new_email = str(payload.values["email"]).strip().lower()
         if (
@@ -377,6 +385,8 @@ def update_control_plane_resource(
             ) from exc
     for field, value in payload.values.items():
         setattr(row, "username" if resource == "users" and field == "email" else field, value)
+    if resource == "users" and str(payload.values.get("status", "ACTIVE")).upper() != "ACTIVE":
+        revoke_user_sessions(db, row.id, row.tenant_id)
     if hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
     version = getattr(row, "version", "v1")

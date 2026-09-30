@@ -193,7 +193,9 @@ def _admin_target_tenant(
         return payload_tenant_id
     if _is_platform_admin(admin) and company and db is not None:
         matches = (
-            db.query(Tenant).filter(func.lower(Tenant.name) == company.strip().lower(), Tenant.status == "active").all()
+            db.query(Tenant)
+            .filter(func.lower(Tenant.name) == company.strip().lower(), func.upper(Tenant.status) == "ACTIVE")
+            .all()
         )
         if len(matches) == 1:
             return matches[0].id

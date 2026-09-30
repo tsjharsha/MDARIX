@@ -4,6 +4,7 @@ import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from access_control.personas import get_persona
@@ -154,7 +155,9 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         )
         .all()
     ):
-        tenant = db.query(Tenant).filter(Tenant.id == membership.tenant_id, Tenant.status == "active").first()
+        tenant = (
+            db.query(Tenant).filter(Tenant.id == membership.tenant_id, func.upper(Tenant.status) == "ACTIVE").first()
+        )
         if tenant is not None:
             memberships.append(
                 {

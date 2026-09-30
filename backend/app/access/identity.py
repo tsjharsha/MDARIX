@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from access_control.personas import R1_PERSONAS as PERSONAS
 from access_control.personas import get_persona
-from auth.durable import issue_invitation, issue_reset
+from auth.durable import issue_invitation, issue_reset, revoke_user_sessions
 from auth.emailer import (
     EmailDeliveryError,
     send_activation_email,
@@ -41,7 +41,12 @@ from backend.app.access.schemas import (
     UserCreateRequest,
     UserStatusRequest,
 )
-from backend.app.access.authz import _admin_tenant, _is_platform_admin, _require_administrator
+from backend.app.access.authz import (
+    _admin_tenant,
+    _guard_user_administration,
+    _is_platform_admin,
+    _require_administrator,
+)
 from backend.app.access.common import (
     _admin_target_tenant,
     _audit_configuration,
@@ -288,8 +293,26 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    _guard_user_administration(admin, target=user, changes_access=True)
+    previous_status = user.status
+    now = datetime.now(timezone.utc)
     user.status = payload.status
-    user.updated_at = datetime.now(timezone.utc)
+    user.updated_at = now
+    revoked = revoke_user_sessions(db, user.id, user.tenant_id) if payload.status != "ACTIVE" else 0
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            actor_ref=str(admin.id),
+            action="USER_STATUS_CHANGED",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={"sessions_revoked": revoked, "source": "ADMIN_CONTROL_PLANE"},
+            old_values={"status": previous_status},
+            new_values={"status": user.status},
+            created_at=now,
+        )
+    )
     db.commit()
     return {"user_id": str(user.id), "tenant_id": str(user.tenant_id), "status": user.status}
 
@@ -300,6 +323,7 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    _guard_user_administration(admin, target=user)
     if (user.status or "").upper() != "OFFBOARDED":
         raise HTTPException(
             409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Only an offboarded user can be reactivated"}
@@ -369,11 +393,12 @@ def list_users(request: Request, db: Session = Depends(get_db)):
 def create_user(payload: UserCreateRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     target_tenant_id = _admin_target_tenant(admin, payload.target_tenant_id, payload.company, db)
-    if db.query(Tenant).filter(Tenant.id == target_tenant_id, Tenant.status == "active").first() is None:
+    if db.query(Tenant).filter(Tenant.id == target_tenant_id, func.upper(Tenant.status) == "ACTIVE").first() is None:
         raise HTTPException(
             404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer / Tenant ID is not an active tenant UUID"}
         )
     role = payload.role.strip().upper()
+    _guard_user_administration(admin, new_role=role)
     if role == "PLATFORM_ADMIN" and not _is_platform_admin(admin):
         raise HTTPException(
             403,

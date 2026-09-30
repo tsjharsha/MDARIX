@@ -22,8 +22,10 @@ ROOT = Path(__file__).parents[1]
 FRONTEND = ROOT / "frontend" / "src"
 UI = frontend_app_source()
 PLATFORM_ADMIN_UI = (FRONTEND / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
-CUSTOMER_ADMIN_UI = (FRONTEND / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(
-    encoding="utf-8"
+CUSTOMER_ADMIN_UI = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in sorted((FRONTEND / "features" / "customer-admin").rglob("*.ts*"))
+    if ".test." not in path.name
 )
 SIMPLIFIED_ADMIN_UI = (FRONTEND / "features" / "admin" / "SimplifiedPlatformAdminScreen.tsx").read_text(
     encoding="utf-8"

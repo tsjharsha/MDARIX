@@ -29,8 +29,46 @@ def _role_code(user: AuthUser) -> str:
     return (user.role or "").strip().upper().replace(" ", "_")
 
 
+PLATFORM_ROLE_CODES = frozenset({"PLATFORM_ADMIN", "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"})
+
+
+def _is_platform_role(role: str | None) -> bool:
+    return (role or "").strip().upper().replace(" ", "_") in PLATFORM_ROLE_CODES
+
+
 def _is_platform_admin(user: AuthUser) -> bool:
-    return _role_code(user) in {"PLATFORM_ADMIN", "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"}
+    return _is_platform_role(user.role)
+
+
+def _guard_user_administration(
+    admin: AuthUser, target: AuthUser | None = None, new_role: str | None = None, changes_access: bool = False
+) -> None:
+    """Stop privilege escalation and self-lockout in tenant user administration.
+
+    Only platform administrators may grant or change a platform-level role; every spelling the
+    platform-admin check accepts is covered. A customer administrator cannot modify a user who
+    holds a platform role. No administrator can change their own role or status.
+    """
+    if new_role is not None and _is_platform_role(new_role) and not _is_platform_admin(admin):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "PLATFORM_ROLE_NOT_ALLOWED",
+                "message": "Customer administrators cannot assign platform roles",
+            },
+        )
+    if target is None:
+        return
+    if _is_platform_role(target.role) and not _is_platform_admin(admin):
+        raise HTTPException(
+            403,
+            detail={"code": "PLATFORM_USER_PROTECTED", "message": "Platform users can only be changed by the platform"},
+        )
+    if changes_access and target.id == admin.id:
+        raise HTTPException(
+            409,
+            detail={"code": "SELF_CHANGE_NOT_ALLOWED", "message": "You cannot change your own role or status"},
+        )
 
 
 def _is_customer_admin(user: AuthUser) -> bool:
