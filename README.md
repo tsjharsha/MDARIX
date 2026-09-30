@@ -78,7 +78,7 @@ Verify Python imports:
 Verify Python to PostgreSQL connectivity:
 
 ```powershell
-.\.venv\Scripts\python.exe .\day0_db_test.py
+.\.venv\Scripts\python.exe .\scripts\check_database_connection.py
 ```
 
 Expected result includes:

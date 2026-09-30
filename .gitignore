@@ -3,7 +3,6 @@
 __pycache__/
 *.pyc
 node_modules/
-website-next/.next/
 dist/
 build/
 .pytest_cache/
@@ -23,3 +22,6 @@ infrastructure/database/backups/*.dump
 /artifacts/data-plane-backups/
 # Generated MVP validation dumps are local evidence, not repository source.
 /artifacts/data-plane-backups-mvp/*.dump
+# Local object-storage root and Playwright run state are runtime output.
+/.mdarix-object-storage/
+/frontend/test-results/

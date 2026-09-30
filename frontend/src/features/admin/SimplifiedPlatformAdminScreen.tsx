@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, AlertTriangle, Bell, Building2, ChevronRight, FileText, LayoutDashboard, LifeBuoy, Search, Settings2, ShieldCheck, Users } from "lucide-react";
+import { Activity, AlertTriangle, Bell, Building2, ChevronRight, FileText, LayoutDashboard, LifeBuoy, Search, Settings2, ShieldCheck } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import "./simplified-admin.css";
 import "./tenant-font.css";
@@ -7,7 +7,6 @@ import "./platform-admin-design-system.css";
 
 type Props = { securityContext: { display_name: string; active_role: string | null } | null; onNavigate: (view: any) => void; initialSection?: string };
 type Customer = { id?: string; customer_id?: string; tenant_id?: string; tenant_name?: string; tenant_key?: string; tenant_identifier?: string; tenant_slug?: string; tenant_status?: string; display_name?: string; name?: string; status?: string; lifecycle_status?: string; provisioning_status?: string; plan?: string; plan_name?: string; plan_code?: string; users?: number; seat_usage?: number; seat_cap?: number; attention?: string; region?: string; primary_region?: string; residency_region?: string; environment?: string; environment_type?: string; environment_count?: number; deployment_model?: string; tenant_type?: string; health_status?: string; last_activity?: string; created_at?: string };
-const tenantText = (value: unknown, fallback = "—") => value === null || value === undefined || value === "" ? fallback : String(value).toLowerCase();
 
 const nav = [
   ["Overview", LayoutDashboard, "admin"],

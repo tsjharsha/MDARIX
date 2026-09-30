@@ -1,1 +1,0 @@
-"""Governed model-provider boundary."""

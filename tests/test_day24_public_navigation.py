@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
 MAIN = (ROOT / "frontend" / "src" / "main.tsx").read_text(encoding="utf-8")
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
+INVESTIGATOR_HOME = (ROOT / "frontend" / "src" / "features" / "investigator" / "InvestigatorHome.tsx").read_text(encoding="utf-8")
 
 
 def test_public_navigation_exposes_required_categories_and_actions():
@@ -50,22 +51,22 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
+    # The authenticated home is InvestigatorHome (the former inline
+    # ApplicationHome in main.tsx was unreferenced and has been removed).
+    assert 'activeView === "home" && <><InvestigatorHome' in MAIN
     for phrase in (
-        "Ask MDARIX",
-        "What changed before complaints increased?",
-        "Understand product reality",
-        "Follow the evidence",
-        "Review trusted evidence",
-        "Keep humans accountable",
-        "Requires my attention",
-        "Active investigations",
-        "Product signals",
-        "Recent product activity",
-        "Recent decisions & assurance",
+        "Quality Investigator workspace",
+        "Connected investigation story",
+        "Needs attention",
+        "Open investigations",
+        "Separate facts from interpretation",
+        "Trace every conclusion",
+        "Recommended next action",
+        "Trust and audit",
     ):
-        assert phrase in MAIN
-    assert 'onNavigate("investigations")' in MAIN
-    assert 'onNavigate("products")' in MAIN
+        assert phrase in INVESTIGATOR_HOME
+    assert 'onNavigate("investigations")' in INVESTIGATOR_HOME
+    assert 'onNavigate("evidence")' in INVESTIGATOR_HOME
 
 
 def test_semantic_design_tokens_cover_business_meaning():

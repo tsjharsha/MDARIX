@@ -2,6 +2,5 @@
 description = "Synthetic test sentinels and generated build metadata are not credentials."
 paths = [
   '''tests/test_api_connector_contract\.py''',
-  '''tests/test_day26_security_closure\.py''',
-  '''website-next/\.next/.*'''
+  '''tests/test_day26_security_closure\.py'''
 ]

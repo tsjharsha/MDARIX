@@ -335,8 +335,8 @@ function PrivateApplication() {
         {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
         {activeView === "risk-traceability" && <RiskTraceabilityWorkspace />}
         {activeView === "signature-verification" && <SignatureVerificationWorkspace />}
-        {isPlatformAdmin && ["admin", "platform-tenants"].includes(activeView) && new URLSearchParams(window.location.search).get("restore") !== "legacy" && <SimplifiedPlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialSection={activeView === "platform-tenants" ? "Customers" : "Overview"} />}
-        {isPlatformAdmin && ["platform-tenant-health", "admin-config-360", "admin-master-data", "admin-canonical-model", "admin-data-mapping", "admin-transformations", "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies", "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides", "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry", "admin-schema-registry", "admin-transformation-library"].includes(activeView) && !(activeView === "admin" && new URLSearchParams(window.location.search).get("restore") !== "legacy") && <PlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialItem={({ "admin-config-360": "Configuration 360", "admin-master-data": "Master data", "admin-canonical-model": "Canonical data model", "admin-data-mapping": "Data mapping", "admin-transformations": "Transformation library", "admin-validation": "Validation & data quality", "admin-baselines": "Customer baselines & overrides", "admin-mapping-versions": "Mapping versions", "admin-config-releases": "Configuration releases", "admin-config-health": "Configuration health", "admin-config-dependencies": "Dependencies & impact", "admin-reference-data": "Reference data", "admin-validation-rules": "Validation rules", "admin-configuration-sets": "Configuration sets", "admin-customer-baselines": "Customer baselines", "admin-customer-overrides": "Customer overrides", "admin-change-requests": "Change requests", "admin-deployments": "Deployments", "admin-import-export": "Import / Export", "admin-upgrade-center": "Upgrade center", "admin-integration-registry": "Integration registry", "admin-api-registry": "API & contract registry", "admin-schema-registry": "Schema registry", "admin-transformation-library": "Transformation library" } as Record<string, string>)[activeView]} />}
+        {isPlatformAdmin && ["admin", "platform-tenants"].includes(activeView) && <SimplifiedPlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialSection={activeView === "platform-tenants" ? "Customers" : "Overview"} />}
+        {isPlatformAdmin && ["platform-tenant-health", "admin-config-360", "admin-master-data", "admin-canonical-model", "admin-data-mapping", "admin-transformations", "admin-validation", "admin-baselines", "admin-mapping-versions", "admin-config-releases", "admin-config-health", "admin-config-dependencies", "admin-reference-data", "admin-validation-rules", "admin-configuration-sets", "admin-customer-baselines", "admin-customer-overrides", "admin-change-requests", "admin-deployments", "admin-import-export", "admin-upgrade-center", "admin-integration-registry", "admin-api-registry", "admin-schema-registry", "admin-transformation-library"].includes(activeView) && <PlatformAdminScreen securityContext={securityContext} onNavigate={changeView} initialItem={({ "admin-config-360": "Configuration 360", "admin-master-data": "Master data", "admin-canonical-model": "Canonical data model", "admin-data-mapping": "Data mapping", "admin-transformations": "Transformation library", "admin-validation": "Validation & data quality", "admin-baselines": "Customer baselines & overrides", "admin-mapping-versions": "Mapping versions", "admin-config-releases": "Configuration releases", "admin-config-health": "Configuration health", "admin-config-dependencies": "Dependencies & impact", "admin-reference-data": "Reference data", "admin-validation-rules": "Validation rules", "admin-configuration-sets": "Configuration sets", "admin-customer-baselines": "Customer baselines", "admin-customer-overrides": "Customer overrides", "admin-change-requests": "Change requests", "admin-deployments": "Deployments", "admin-import-export": "Import / Export", "admin-upgrade-center": "Upgrade center", "admin-integration-registry": "Integration registry", "admin-api-registry": "API & contract registry", "admin-schema-registry": "Schema registry", "admin-transformation-library": "Transformation library" } as Record<string, string>)[activeView]} />}
         {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
         {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
         {activeView === "admin-subscriptions" && <SubscriptionAdministration />}
@@ -356,84 +356,6 @@ function PrivateApplication() {
   );
 }
 
-function LegacyConsentBanner() {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => { setVisible(localStorage.getItem("mdarix-compliance-consent") !== "accepted"); }, []);
-  if (!visible) return null;
-  const accept = () => { localStorage.setItem("mdarix-compliance-consent", "accepted"); setVisible(false); };
-  return <section className="consent-banner" role="dialog" aria-label="Privacy and compliance consent"><div><strong>Privacy and compliance notice</strong><p>MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. Review your organization’s GDPR/HIPAA obligations before entering regulated data.</p></div><div className="consent-actions"><button className="secondary-action" onClick={() => setVisible(false)}>Dismiss</button><button className="primary-action" onClick={accept}>Acknowledge</button></div></section>;
-}
-
-/* Legacy CustomerAdminHome removed from the active application. CustomerAdminControlPlane owns this route. */
-/*
-function CustomerAdminHome({ securityContext, products, investigations, onNavigate }: { securityContext: { display_name: string; active_role: string | null; tenant_id?: string } | null; products: Product[]; investigations: InvestigationSummary[]; onNavigate: (view: AppView) => void }) {
-  const [section, setSection] = useState("Overview");
-  const [records, setRecords] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [dashboard, setDashboard] = useState<any>(null);
-  useEffect(() => {
-    const selectSection = (event: Event) => setSection((event as CustomEvent<string>).detail);
-    window.addEventListener("customer-admin-section", selectSection);
-    return () => window.removeEventListener("customer-admin-section", selectSection);
-  }, []);
-  useEffect(() => {
-    const endpoints: Record<string, string> = {
-      Overview: "/api/v1/admin/health-summary",
-      Organization: "/api/v1/session/context",
-      Users: "/api/v1/admin/identity/users",
-      "Roles & Access": "/api/v1/admin/identity/roles",
-      Configuration: "/api/v1/admin/configuration/mappings",
-      Integrations: "/api/v1/admin/configuration/connectors",
-      "Plans & Entitlements": "/api/v1/admin/governance/entitlements",
-      Security: "/api/v1/session/context",
-      Audit: "/api/v1/admin/audit-history",
-    };
-    setLoading(true); setError("");
-    api<any>(endpoints[section]).then((value) => {
-      if (Array.isArray(value)) setRecords(value);
-      else if (section === "Overview") setRecords(value.alerts ?? []);
-      else if (section === "Organization" || section === "Security") setRecords([value]);
-      else setRecords(value.items ?? value.entitlements ?? []);
-    }).catch((reason) => { setRecords([]); setError(reason instanceof Error ? reason.message : "Unable to load tenant data"); }).finally(() => setLoading(false));
-  }, [section]);
-  useEffect(() => { api<any>("/api/v1/admin/tenant-dashboard").then(setDashboard).catch(() => setDashboard(null)); }, []);
-  const sections = [
-    ["Overview", ["Tenant overview", "Customer health", "Recent activity"]],
-    ["Organization", ["Organization profile", "Region & data residency"]],
-    ["Users", ["Users", "Invitations", "User status"]],
-    ["Roles & Access", ["Customer roles", "Permission sets", "Field permissions", "Action permissions", "Approval authority", "Effective access"]],
-    ["Configuration", ["Customer configuration", "Product configuration", "Customer mappings", "Reference data overrides"]],
-    ["Integrations", ["Customer connectors", "Connection health", "Integration activity"]],
-    ["Plans & Entitlements", ["View customer entitlements"]],
-    ["Security", ["SSO", "MFA", "Sessions"]],
-    ["Audit", ["Customer audit history", "Access events"]],
-  ] as const;
-  const selectedSection = sections.find(([name]) => name === section) ?? sections[0];
-  return <div className="content customer-admin-page">
-    <section className="customer-admin-hero"><div><p className="eyebrow">Customer administration</p><h1>{securityContext?.display_name ?? "Customer administrator"}</h1><p>Tenant-scoped administration for organization identity, users, roles, configuration, integrations, security, and audit evidence.</p></div><div className="customer-admin-identity"><strong>{securityContext?.active_role ?? "CUSTOMER_ADMIN"}</strong><span>Authenticated tenant</span><code>{securityContext?.tenant_id ?? "Unavailable"}</code><small>Tenant context is server-derived and cannot be changed here.</small></div></section>
-    <div className="customer-admin-layout"><aside className="customer-admin-menu"><p className="eyebrow">Customer administration</p>{sections.map(([name]) => <button key={name} className={section === name ? "selected" : ""} onClick={() => setSection(name)}>{name}</button>)}</aside><main className="customer-admin-workspace"><section className="customer-admin-section-head"><div><span className="eyebrow">{section}</span><h2>{selectedSection[0]}</h2><p>All records and actions are limited to the authenticated tenant.</p></div><span className="tenant-boundary">Tenant-scoped</span></section>{loading && <p className="state-panel">Loading server-derived tenant data…</p>}{error && <p className="field-error" role="alert">{error}</p>}{!loading && !error && <div className="customer-admin-subsections">{selectedSection[1].map((item) => <article key={item}><strong>{item}</strong><p>{section === "Users" ? "Manage users, invitations, status, persona and seat use within this tenant." : section === "Roles & Access" ? "Review roles, personas, field/action policies and effective access. Deny wins." : section === "Configuration" ? "Review mappings, overrides and versioned customer configuration without changing master history." : section === "Integrations" ? "Review tenant connector configuration and health state." : section === "Security" ? "Review tenant sessions, MFA/SSO policy and security context." : section === "Audit" ? "Review immutable tenant-scoped administrative activity." : "View the current tenant-scoped configuration and status."}</p><button className="secondary-link" onClick={() => setSection(section)}>{records.length ? `${records.length} records loaded` : "No records currently require action"}</button></article>)}</div>}{!loading && !error && records.length > 0 && <section className="panel customer-admin-records"><div className="section-title">Server results</div>{records.slice(0, 20).map((record, index) => <article className="customer-admin-record" key={String(record.id ?? record.code ?? record.action ?? index)}><strong>{String(record.display_name ?? record.name ?? record.code ?? record.label ?? record.action ?? "Tenant record")}</strong><span>{String(record.email ?? record.status ?? record.severity ?? record.entity_type ?? "Tenant-scoped")}</span><small>{String(record.tenant_id ?? securityContext?.tenant_id ?? "Authenticated tenant")}</small></article>)}</section>}</main></div>
-    <section className="customer-admin-journey"><span className="eyebrow">Customer investigation journey</span><div><strong>Product context</strong><i>→</i><strong>Signals</strong><i>→</i><strong>Evidence</strong><i>→</i><strong>Review</strong><i>→</i><strong>Decision</strong></div><p>Tenant scope is applied to every request. Customer Administrators cannot select, view, or operate on another tenant.</p></section>
-    <div className="home-insight-grid customer-admin-metrics"><article><span className="eyebrow">Products</span><strong>{dashboard?.metrics?.products ?? products.length}</strong><p>Products available in this tenant</p><button className="secondary-link" onClick={() => onNavigate("products")}>Open Products</button></article><article><span className="eyebrow">Investigations</span><strong>{dashboard?.metrics?.investigations ?? investigations.length}</strong><p>Tenant-scoped investigation workspaces</p><button className="secondary-link" onClick={() => onNavigate("investigations")}>Open Investigations</button></article><article><span className="eyebrow">Users</span><strong>{dashboard?.metrics?.active_users ?? "—"}</strong><p>Active users within the authenticated tenant</p></article><article><span className="eyebrow">Requires attention</span><strong>{dashboard?.health?.alerts?.length ?? "—"}</strong><p>{dashboard?.health?.status === "ATTENTION_REQUIRED" ? "Tenant actions require review" : "No active tenant alerts"}</p></article></div>
-  </div>;
-}
-
-}
-*/
-type AdminHealth = { status: string; metrics: Record<string, number>; alerts: any[]; recent_audit: any[] };
-type AdminData = { users: any[]; roles: any[]; permissions: any[]; memberships: any[]; personas: any[]; entitlements: any[]; connectors: any[]; mappings: any[]; authorities: any[]; sod: any[]; audit: any[]; health: AdminHealth };
-
-function PlatformAdminDashboard({ data, onNavigate }: { data: AdminData | null; onNavigate: (view: AppView) => void }) {
-  const metrics = data?.health.metrics ?? {};
-  const cards = [["Connector failures", metrics.connector_failures ?? 0, "admin-stage2"], ["Pending approvals", metrics.pending_approvals ?? 0, "admin"], ["Pending invitations", metrics.pending_invitations ?? 0, "admin-manage"], ["Security events", metrics.security_events ?? 0, "admin-audit"], ["Mapping issues", metrics.mapping_issues ?? 0, "admin-mapping"], ["Recent audit events", metrics.recent_audit_events ?? 0, "admin-audit"]] as const;
-  return <>
-    <section className="governance-hero"><div><span className="eyebrow">Platform overview</span><h2>Administrator dashboard</h2><p>Tenant-scoped administration: operate customers, identity, integrations, and governance from one tenant-aware control plane.</p></div><div className="governance-status"><ShieldCheck size={22}/><strong>Controlled administration</strong><span>Business records remain outside platform administration.</span></div></section>
-    <section className="admin-metric-grid">{cards.map(([label, value, target]) => <button className={`admin-metric-card ${(value as number) > 0 ? "metric-attention" : ""}`} key={label} onClick={() => onNavigate(target as AppView)}><span>{label}</span><strong>{value}</strong></button>)}</section>
-    <section className={`panel admin-health-panel ${data?.health.status === "ATTENTION_REQUIRED" ? "attention-required" : "health-ok"}`}><div className="section-title"><AlertTriangle size={18}/> Requires attention <small>{data?.health.status === "ATTENTION_REQUIRED" ? "Action recommended" : "No active alerts"}</small></div>{data?.health.alerts.length ? <div className="admin-alert-list">{data.health.alerts.map((alert: any) => <button className="admin-alert" key={alert.code} onClick={() => onNavigate(alert.code.includes("MAPPING") ? "admin-mapping" : alert.code.includes("SECURITY") ? "admin-audit" : "admin-manage")}><strong>{alert.label}</strong><span>{alert.count} · {alert.severity}</span></button>)}</div> : <p>All monitored administrator signals are currently within expected limits.</p>}</section>
-    <section className="panel"><div className="section-title">Recent platform activity</div>{data?.health.recent_audit.slice(0, 5).map((event: any, index: number) => <div className="audit-row" key={`${event.action}-${index}`}><strong>{event.action}</strong><span>{event.entity_type}</span><small>{event.created_at ? String(event.created_at).slice(0, 19).replace("T", " ") : "Server recorded"}</small></div>)}</section>
-    <section className="panel"><div className="section-title">Customer health</div><p>Open Customers / Tenants to review tenant status, plan, capacity, and administrative health.</p><button className="primary-action" onClick={() => onNavigate("admin-customers")}>Open customer health</button></section>
-  </>;
-}
 
 type AdminTenant = { id: string; tenant_key: string; name: string; status: string; created_at?: string | null };
 function PlatformCustomers({ onNavigate }: { onNavigate: (view: AppView) => void }) {
@@ -482,23 +404,6 @@ function Customer360() {
   return <div className="content governance-view customer-record-page"><section className="governance-hero"><div><span className="eyebrow">Customer record</span><h2>{record?.name ?? "Customer 360"}</h2><p>Tenant {record?.tenant_key ?? "metadata"}. Platform administration is server-authorized and business content remains tenant-scoped.</p></div><span className="version-pill">{record?.status ?? "Loading"}</span></section>{error && <section className="panel field-error">{error}</section>}{record && <><nav className="record-tabs" aria-label="Customer record tabs">{tabs.map((item) => <button className={tab === item ? "selected" : ""} key={item} onClick={() => setTab(item)}>{item}</button>)}</nav><section className="record-detail-layout"><article className="panel"><span className="eyebrow">{tab}</span><h3>{tab === "Overview" ? "Customer overview" : `${tab} detail`}</h3><div className="record-field-grid">{(values[tab] ?? []).map(([label, value]: [string, any]) => <div key={label}><small>{label}</small><strong>{String(value)}</strong></div>)}</div>{detail?.error && <p className="field-error" role="alert">{detail.error}</p>}<p className="record-scope-note">Server-derived detail. No tenant identifier supplied by the browser is used as authorization.</p></article><aside className="panel"><div className="section-title">Related records</div><p>Use the tabs to inspect administrators, users, plan, entitlements, integrations, security, usage, and audit evidence.</p><button className="secondary-link" onClick={() => setTab("Audit")}>Open audit history</button></aside></section></>}</div>;
 }
 
-function AdministratorControlPlane({ securityContext, onNavigate }: { securityContext: {display_name:string; active_role:string|null; tenant_id?:string} | null; onNavigate: (view: AppView) => void }) {
-  const [data, setData] = useState<AdminData | null>(null);
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(true);
-  useEffect(() => {
-    const paths = ["users", "roles", "permission-sets", "memberships", "persona-assignments"];
-    Promise.all([
-      api<any[]>("/api/v1/admin/identity/users"), api<any[]>("/api/v1/admin/identity/roles"), api<any[]>("/api/v1/admin/identity/permission-sets"),
-      api<any[]>("/api/v1/admin/identity/memberships"), api<any[]>("/api/v1/admin/identity/persona-assignments"), api<any[]>("/api/v1/admin/governance/entitlements"),
-      api<any[]>("/api/v1/admin/configuration/connectors"), api<any[]>("/api/v1/admin/configuration/mappings"), api<any>("/api/v1/admin/governance/policies"), api<any[]>("/api/v1/admin/audit-history"), api<AdminHealth>("/api/v1/admin/health-summary"),
-    ]).then(([users, roles, permissions, memberships, personas, entitlements, connectors, mappings, policies, audit, health]) => setData({ users, roles, permissions, memberships, personas, entitlements, connectors, mappings, authorities: policies.approval_authorities ?? [], sod: policies.sod_policies ?? [], audit, health })).catch((error) => setMessage(error.message)).finally(() => setBusy(false));
-  }, []);
-  if (busy) return <div className="content"><section className="panel"><span className="eyebrow">Administrator control plane</span><h2>Loading tenant administration…</h2></section></div>;
-  if (!data) return <div className="content"><section className="panel"><h2>Administration unavailable</h2><p>{message}</p></section></div>;
-  return <div className="content governance-view"><PlatformAdminDashboard data={data} onNavigate={onNavigate} /><section className="panel"><div className="section-title">Create customer administrator</div><p className="context-summary" aria-label="Authenticated administrator">{securityContext?.display_name ?? "Authenticated user"} | {securityContext?.active_role ?? "No active role"}</p><CustomerAdminInviteForm onSaved={() => setMessage("Customer administrator invitation created. The user creates their own password from the activation link.")} />{message && <p className="review-success" role="status">{message}</p>}</section></div>;
-}
-
 function CustomerAdminManagement() {
   // The change was recorded in audit history.
   const [users, setUsers] = useState<any[]>([]); const [query, setQuery] = useState(""); const [selected, setSelected] = useState<any | null>(null); const [email, setEmail] = useState(""); const [replacement, setReplacement] = useState({ email: "", display_name: "", company: "", reason: "" }); const [message, setMessage] = useState("");
@@ -516,80 +421,6 @@ function PlatformAdministrationAudit() {
   const [rows, setRows] = useState<any[]>([]); const [retention, setRetention] = useState<any>(null); const [message, setMessage] = useState("");
   useEffect(() => { Promise.all([api<any[]>("/api/v1/admin/audit-history"), api<any>("/api/v1/admin/retention-status")]).then(([events, status]) => { setRows(events); setRetention(status); }).catch((error) => setMessage(error.message)); }, []);
   return <div className="content governance-view"><section className="panel"><div className="section-title"><ShieldCheck size={18}/> Recent platform administration activity</div><p>Server-recorded changes with actor, request metadata, reason, and before/after values.</p><div className="audit-actions"><a className="secondary-link" href="/api/v1/admin/audit-history/export?output_format=CSV">Export CSV</a><a className="secondary-link" href="/api/v1/admin/audit-history/export?output_format=JSON">Export JSON</a><a className="primary-action" href="/api/v1/stage3/compliance-report?output_format=PDF">Download evidence package</a></div>{retention && <div className={`retention-banner ${retention.status === "HEALTHY" ? "healthy" : "attention"}`}><strong>{retention.policy}</strong><span>{retention.total_events} events · {retention.expired} expired · {retention.expiring_within_30_days} expiring within 30 days</span></div>}{message && <p className="field-error">{message}</p>}{rows.map((row) => <div className="audit-row" key={String(row.id)}><strong>{row.action}</strong><span>{row.entity_type ?? "Configuration"} · {row.actor_ref ?? "System"}</span><small>{row.created_at ? String(row.created_at).slice(0, 19).replace("T", " ") : "Server recorded"}{row.source_ip ? ` · ${row.source_ip}` : ""}</small></div>)}{!rows.length && !message && <p>No platform administration activity recorded.</p>}</section></div>;
-}
-
-function CustomerAdminInviteForm({ onSaved }: { onSaved: () => void }) {
-  const [form, setForm] = useState<Record<string, string>>({ role: "CUSTOMER_ADMIN", status: "INVITED" });
-  const [message, setMessage] = useState("");
-  const displayName = form.display_name || [form.first_name, form.last_name].filter(Boolean).join(" ");
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setMessage("");
-    try {
-      const response = await fetch("/api/v1/admin/identity/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email,
-          display_name: displayName,
-          company: form.company,
-          role: "CUSTOMER_ADMIN",
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        const detail = result.detail;
-        const message = Array.isArray(detail) ? detail.map((item: any) => item.msg ?? item.message).join("; ") : detail?.message;
-        throw new Error(message ?? "Customer administrator invitation failed");
-      }
-      setForm({ role: "CUSTOMER_ADMIN", status: "INVITED" });
-      setMessage(result.email_delivery === "SENT" ? "Invitation sent. The customer administrator will create their own password from email." : `Invitation created. SMTP is not configured; development token: ${result.development_token ?? "not returned"}`);
-      onSaved();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Customer administrator invitation failed");
-    }
-  };
-  return <section className="panel admin-forms"><div className="section-title"><ShieldCheck size={18}/> Create customer administrator record</div><p>MDARIX Admin creates the customer administrator identity, tenant membership, and activation invitation. Passwords are never entered, shown, emailed, or stored in this screen.</p><form onSubmit={submit} className="admin-form-grid"><label>First name<input required value={form.first_name ?? ""} onChange={(event) => setForm({ ...form, first_name: event.target.value })} placeholder="First name" /></label><label>Last name<input required value={form.last_name ?? ""} onChange={(event) => setForm({ ...form, last_name: event.target.value })} placeholder="Last name" /></label><label>Display name<input readOnly value={displayName} placeholder="Generated from first and last name" /></label><label>Email<input required type="email" value={form.email ?? ""} onChange={(event) => setForm({ ...form, email: event.target.value })} placeholder="customer.admin@example.com" /></label><label>Administrative role<input readOnly value="CUSTOMER_ADMIN" /></label><label>Status<input readOnly value="INVITED" /></label><label>Company<input required value={form.company ?? ""} onChange={(event) => setForm({ ...form, company: event.target.value })} placeholder="Customer company" /></label><button className="primary-action" type="submit">Send Invitation</button>{message && <p className="field-error" role="status">{message}</p>}</form></section>;
-}
-
-function AdminCreateForms({ onSaved }: { onSaved: () => void }) {
-  const [kind, setKind] = useState("user"); const [form, setForm] = useState<Record<string, string>>({}); const [message, setMessage] = useState("");
-  const fields: Record<string, Array<[string, string, string]>> = {
-    user: [["email", "Email", "email"], ["display_name", "Display name", "text"], ["company", "Company", "text"], ["role", "Role", "text"], ["target_tenant_id", "Target tenant ID (Platform Admin only)", "text"]],
-    role: [["code", "Role code", "text"], ["name", "Role name", "text"], ["version", "Version", "text"]],
-    persona: [["user_id", "User ID", "text"], ["persona_code", "Persona code", "text"]],
-    permission: [["code", "Permission-set code", "text"], ["version", "Version", "text"], ["action_permissions", "Action permissions JSON", "text"]],
-    connector: [["code", "Connector code", "text"], ["connector_type", "Connector type", "text"], ["version", "Version", "text"], ["configuration", "Safe metadata JSON", "text"]],
-    mapping: [["code", "Mapping code", "text"], ["source_system", "Source system", "text"], ["target_entity", "Target entity", "text"], ["version", "Version", "text"], ["mapping_rules", "Mapping rules JSON", "text"]],
-    authority: [["role_name", "Role name", "text"], ["object_type", "Object type", "text"], ["decision_type", "Decision type", "text"]],
-    sod: [["name", "Policy name", "text"], ["object_type", "Object type", "text"], ["decision_type", "Decision type", "text"]],
-  };
-  const endpoints: Record<string, string> = { user: "/api/v1/admin/identity/users", role: "/api/v1/admin/identity/roles", persona: "/api/v1/admin/identity/persona-assignments", permission: "/api/v1/admin/identity/permission-sets", connector: "/api/v1/admin/configuration/connectors", mapping: "/api/v1/admin/configuration/mappings", authority: "/api/v1/admin/governance/approval-authorities", sod: "/api/v1/admin/governance/sod-policies" };
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setMessage(""); try { const body: Record<string, unknown> = { ...form }; if (!body.target_tenant_id) delete body.target_tenant_id; for (const key of ["action_permissions", "configuration", "mapping_rules"]) if (body[key]) body[key] = JSON.parse(String(body[key])); const response = await fetch(endpoints[kind], { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok) throw new Error(result.detail?.message ?? "Request failed"); setForm({}); if (kind === "user") setMessage(result.email_delivery === "SENT" ? "Invitation sent. The user will create their own password from email." : `Invitation created. SMTP is not configured; development token: ${result.development_token ?? "not returned"}`); onSaved(); } catch (error) { setMessage(error instanceof Error ? error.message : "Request failed"); } };
-  return <section className="panel admin-forms"><div className="section-title"><ShieldCheck size={18}/> Create administrator record</div><div className="admin-form-toolbar">{Object.keys(fields).map((key) => <button key={key} className={kind === key ? "selected" : "secondary-link"} onClick={() => { setKind(key); setMessage(""); }}>{key === "permission" ? "Permission set" : key === "sod" ? "SoD policy" : key === "authority" ? "Approval authority" : humanize(key)}</button>)}</div><form onSubmit={submit} className="admin-form-grid">{fields[kind].map(([name, label, type]) => <label key={name}>{label}<input required={name !== "version" && name !== "role"} type={type} value={form[name] ?? ""} onChange={(event) => setForm({ ...form, [name]: event.target.value })} placeholder={name.endsWith("_rules") || name === "configuration" || name === "action_permissions" ? "{}" : label} /></label>)}<button className="primary-action" type="submit">Create {humanize(kind)}</button>{message && <p className="field-error" role="alert">{message}</p>}</form></section>;
-}
-
-function AdminEditForm({ data, onSaved }: { data: AdminData; onSaved: () => void }) {
-  const [resource, setResource] = useState("users"); const [id, setId] = useState(""); const [field, setField] = useState("status"); const [value, setValue] = useState(""); const [message, setMessage] = useState("");
-  const lists: Record<string, any[]> = { users: data.users, roles: data.roles, "permission-sets": data.permissions, "persona-assignments": data.personas, connectors: data.connectors, mappings: data.mappings, "approval-authorities": data.authorities, "sod-policies": data.sod };
-  const fields: Record<string, string[]> = { users: ["display_name", "company", "role", "status"], roles: ["name", "code", "version", "status"], "permission-sets": ["code", "version", "status", "action_permissions"], "persona-assignments": ["persona_code", "status"], connectors: ["code", "connector_type", "version", "status", "configuration"], mappings: ["code", "source_system", "target_entity", "version", "status", "mapping_rules"], "approval-authorities": ["role_name", "object_type", "decision_type", "authority", "version", "status"], "sod-policies": ["name", "object_type", "decision_type", "version", "status"] };
-  const submit = async (event: React.FormEvent) => { event.preventDefault(); setMessage(""); try { let parsed: unknown = value; if (["action_permissions", "configuration", "mapping_rules"].includes(field)) parsed = JSON.parse(value || "{}"); const response = await fetch(`/api/v1/admin/control-plane/${resource}/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ values: { [field]: parsed } }) }); const result = await response.json(); if (!response.ok) throw new Error(result.detail?.message ?? "Update failed"); onSaved(); setValue(""); } catch (error) { setMessage(error instanceof Error ? error.message : "Update failed"); } };
-  return <section className="panel admin-forms"><div className="section-title"><ShieldCheck size={18}/> Edit administrator record</div><form onSubmit={submit} className="admin-form-grid"><label>Resource<select value={resource} onChange={e=>{setResource(e.target.value);setId("");setField(fields[e.target.value][0]);}}>{Object.keys(lists).map(item=><option key={item} value={item}>{humanize(item)}</option>)}</select></label><label>Record<select required value={id} onChange={e=>setId(e.target.value)}><option value="">Select record</option>{lists[resource].map(item=><option key={String(item.id)} value={String(item.id)}>{String(item.email ?? item.code ?? item.name ?? item.persona_code ?? item.id)}</option>)}</select></label><label>Field<select value={field} onChange={e=>setField(e.target.value)}>{fields[resource].map(item=><option key={item}>{item}</option>)}</select></label><label>New value<input required value={value} onChange={e=>setValue(e.target.value)} placeholder={field.includes("permissions") || field.includes("configuration") || field.includes("rules") ? "{}" : "New value"}/></label><button className="primary-action" type="submit" disabled={!id}>Save update</button>{message&&<p className="field-error" role="alert">{message}</p>}</form></section>;
-}
-
-function PublicSite({ path }: { path: string }) {
-  const page = path === "/" ? "home" : path.slice(1);
-  const content: Record<string, {title:string; copy:string}> = {
-    home:{title:"Turn fragmented medical-device lifecycle data into trusted product decisions.",copy:"MDARIX connects quality, product, manufacturing and post-market evidence to reconstruct what happened, investigate why it happened, and support controlled human decisions."},
-    platform:{title:"Medical Device Lifecycle Investigation & Decision Intelligence",copy:"Connect lifecycle evidence, reconstruct product reality, investigate with grounded intelligence, challenge assumptions, and preserve what remains unknown."},
-    solutions:{title:"Clarity for the decisions that matter",copy:"Support complaint investigation, post-market intelligence, product/version impact analysis, supplier investigation, and quality decision support."},
-    "ai-trust":{title:"AI recommends. MDARIX verifies what it can. Authorized humans decide.",copy:"Evidence grounding, citation verification, temporal and ProductVersion validation, provenance, assurance, and human review keep AI in its proper role."},
-    integrations:{title:"Work above the systems you already trust",copy:"Connect QMS, PLM, ERP/MES, CRM, documents, APIs and files through a configuration-driven Integration Gateway."},
-    security:{title:"Designed for controlled, traceable intelligence",copy:"Tenant isolation, role and field authorization, action controls, provenance, and human authority are part of the MDARIX architecture."},
-    "request-demo":{title:"See MDARIX in your lifecycle context",copy:"Tell us what you are trying to understand across product, quality, manufacturing and post-market evidence."},
-  };
-  const item=content[page] ?? content.home;
-  return <div className="public-shell"><header className="public-header"><a className="brand" href="/">MDARIX</a><nav><a href="/platform">Platform</a><a href="/solutions">Solutions</a><a href="/ai-trust">AI Trust</a><a href="/integrations">Integrations</a><a href="/security">Security</a></nav><div className="public-actions"><a href="/signin">Sign in</a><a className="primary-action" href="/request-demo">Request a demo</a></div></header><main className="public-main"><section className="public-hero"><span className="eyebrow">Medical device lifecycle intelligence</span><h1>{item.title}</h1><p>{item.copy}</p><div className="public-cta"><a className="primary-action" href="/request-demo">Request a demo</a><a className="secondary-link" href="/platform">Explore MDARIX →</a></div></section><section className="public-story"><div><span className="eyebrow">One connected reality</span><h2>Connect. Reconstruct. Investigate. Challenge. Decide.</h2></div><div className="story-grid"><article><strong>CONNECT</strong><p>Bring evidence together from existing systems of record.</p></article><article><strong>RECONSTRUCT</strong><p>Understand product, version, component, supplier, lot and complaint relationships across time.</p></article><article><strong>INVESTIGATE</strong><p>Use grounded intelligence while preserving contradictions and unknowns.</p></article><article><strong>DECIDE</strong><p>Support authorized human decisions with traceable evidence.</p></article></div></section></main><footer className="public-footer"><span>MDARIX — System of Intelligence, not System of Record.</span><span>Privacy · Terms · Contact</span></footer></div>;
 }
 
 function AuthPage({ mode }: { mode: string }) {
@@ -610,21 +441,6 @@ function AssuranceView({ view }: { view: Product360 }) {
 
 function AuditTrailView({ view }: { view: Product360 }) {
   return <div className="content governance-view"><section className="governance-hero audit-hero"><div><span className="eyebrow">Traceability</span><h2>Audit Trail</h2><p>Review the recorded context behind product, investigation, evidence, and decision activity.</p></div><div className="governance-status"><FileText size={22}/><strong>Controlled foundation</strong><span>Tenant-scoped activity remains attributable and reviewable.</span></div></section><section className="panel audit-table"><h3>Recent recorded context</h3><div className="audit-row"><strong>Product scope</strong><span>{view.product.product_identifier} · {view.product.name}</span><small>Current workspace</small></div><div className="audit-row"><strong>Version context</strong><span>{view.selected_version?.version_identifier ?? "Not selected"}</span><small>Temporal context preserved</small></div><div className="audit-row"><strong>Evidence access</strong><span>{view.evidence.length} product-linked records</span><small>Tenant-scoped access</small></div><div className="audit-row"><strong>Limitations</strong><span>{view.limitations.length} visible limitations</span><small>Requires review before conclusion</small></div></section></div>;
-}
-
-function ApplicationHome({ view, investigations, onNavigate }: { view: Product360; investigations: InvestigationSummary[]; onNavigate: (view: "products" | "investigations" | "evidence" | "decision") => void }) {
-  const stages = [
-    { key: "products" as const, step: "01", label: "Reconstruct", title: "Understand product reality", copy: "See the selected product version, configuration, suppliers, lots, changes, complaints, and timeline in one temporal context." },
-    { key: "investigations" as const, step: "02", label: "Investigate", title: "Follow the evidence", copy: "Open an investigation workspace that preserves source anchors, relationships, contradictions, and material unknowns." },
-    { key: "evidence" as const, step: "03", label: "Ground", title: "Review trusted evidence", copy: "Inspect the available evidence universe without implying unsupported product links or conclusions." },
-    { key: "decision" as const, step: "04", label: "Decide", title: "Keep humans accountable", copy: "Move grounded findings into controlled review, advisory, approval, rejection, and signature workflows." },
-  ];
-  return <div className="content app-home">
-    <section className="app-story-hero"><div><span className="eyebrow">Ask MDARIX</span><h2>What changed before complaints increased?</h2><p>Start with a product investigation question. MDARIX connects context from existing systems, reconstructs what was true when, challenges explanations, exposes gaps, and preserves the evidence behind the decision.</p><div className="hero-actions"><button className="primary-action" onClick={() => onNavigate("investigations")}>Continue investigation</button><button className="primary-action secondary" onClick={() => onNavigate("products")}>Explore Product 360</button></div></div><div className="story-context"><span>Current investigation context</span><strong>{view.product.name}</strong><p>{view.selected_version?.version_identifier ? `Version ${view.selected_version.version_identifier}` : "No version selected"}</p><div><span>{investigations.length}</span> active investigations <span>{view.evidence.length}</span> linked evidence</div></div></section>
-    <section className="app-story-section"><div className="section-heading"><div><span className="eyebrow">How the work moves</span><h2>A controlled path from reality to decision</h2></div><p>Each stage carries the same product, version, investigation, and temporal context forward.</p></div><div className="app-journey-grid">{stages.map((stage, index) => <article key={stage.step} onClick={() => onNavigate(stage.key)} tabIndex={0} role="button" onKeyDown={event => { if (event.key === "Enter" || event.key === " ") onNavigate(stage.key); }}><div className="journey-step"><span>{stage.step}</span>{index < stages.length - 1 && <i />}</div><strong>{stage.label}</strong><h3>{stage.title}</h3><p>{stage.copy}</p><button>Open {stage.label} <ChevronRight size={16} /></button></article>)}</div></section>
-    <section className="home-insight-grid"><article><span className="eyebrow">Requires my attention</span><strong>{view.limitations.length} visible limitations</strong><p>Review unresolved traceability, missing context, contradictions, and unknowns before moving to a decision.</p></article><article><span className="eyebrow">Active investigations</span><strong>{investigations.length} available workspaces</strong><p>Continue investigation with the selected product, version, and temporal context preserved.</p></article><article><span className="eyebrow">Product signals</span><strong>{view.overview.complaint_count} complaints · {view.overview.lot_count} lots</strong><p>Recent product context is ready for relationship, evidence, and ProductVersion review.</p></article></section>
-    <section className="home-activity"><div><span className="eyebrow">Recent product activity</span><strong>{view.overview.component_count} components in the selected configuration</strong><p>Use Product 360 and the timeline to understand what changed and when it became known.</p></div><div><span className="eyebrow">Recent decisions & assurance</span><strong>Human review remains authoritative</strong><p>AI advisory, assurance, and provenance inform the workflow; controlled human decisions remain distinct.</p></div><button className="primary-action secondary" onClick={() => onNavigate("investigations")}>Continue working <ChevronRight size={16}/></button></section>
-  </div>;
 }
 
 function Product360View({ view }: { view: Product360 }) {
@@ -1143,42 +959,5 @@ function InvestigationWorkspacePanel({ investigationId, temporalMode: mode, asOf
     </section>
   );
 }
-
-/* Shared analysis, metric, panel, and table primitives live in app/ui.tsx. */
-/*
-function LegacyAnalysisPanel({ title, items }: { title: string; items: AnalysisItem[] }) {
-  return (
-    <Panel title={title} icon={<ClipboardList />}>
-      <div className="analysis-list">
-        {items.length === 0 && <p className="empty">No items for this analysis.</p>}
-        {items.map((item) => (
-          <article key={item.item_id}>
-            <span>{item.semantic_type} | {item.grounding_status} | sources {item.source_references.length}</span>
-            <p>{item.statement}</p>
-          </article>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: unknown }) {
-  return <div className="metric">{icon}<span>{label}</span><strong>{String(value)}</strong></div>;
-}
-
-function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
-  return <section className="panel"><div className="section-title">{icon}{title}</div>{children}</section>;
-}
-
-function LegacyDenseTable({ rows, columns }: { rows: Array<Record<string, string | null>>; columns: string[] }) {
-  if (!rows.length) return <p className="empty">No records for this view.</p>;
-  return (
-    <table>
-      <thead><tr>{columns.map((column) => <th key={column}>{column.replace(/_/g, " ")}</th>)}</tr></thead>
-      <tbody>{rows.map((row, index) => <tr key={index}>{columns.map((column) => <td key={column}>{fmt(row[column]) === "Not recorded" ? (row[column] ?? "—") : fmt(row[column])}</td>)}</tr>)}</tbody>
-    </table>
-  );
-}
-*/
 
 createRoot(document.getElementById("root")!).render(<AppErrorBoundary><App /></AppErrorBoundary>);
