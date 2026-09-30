@@ -1,4 +1,5 @@
 """Add tenant-scoped indexes for security and bounded list performance."""
+
 from alembic import op
 
 revision = "v38securityindexes"

@@ -1,4 +1,5 @@
 """Add audit evidence metadata, password lifecycle, and compliance fields."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -8,10 +9,13 @@ down_revision = "ab44dbhardening"
 branch_labels = None
 depends_on = None
 
+
 def upgrade():
     for name, typ in (
-        ("source_ip", sa.String(64)), ("user_agent", sa.String(512)),
-        ("reason", sa.Text()), ("old_values", postgresql.JSONB()),
+        ("source_ip", sa.String(64)),
+        ("user_agent", sa.String(512)),
+        ("reason", sa.Text()),
+        ("old_values", postgresql.JSONB()),
         ("new_values", postgresql.JSONB()),
         ("retention_until", sa.DateTime(timezone=True)),
     ):
@@ -30,6 +34,7 @@ def upgrade():
     )
     op.create_index("ix_password_history_user", "password_history", ["tenant_id", "user_id", "created_at"])
     op.create_index("ix_audit_events_tenant_created", "audit_events", ["tenant_id", "created_at"])
+
 
 def downgrade():
     op.drop_index("ix_audit_events_tenant_created", table_name="audit_events")

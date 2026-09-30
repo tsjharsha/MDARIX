@@ -27,11 +27,20 @@ class QueryInterpreter:
     def interpret(self, question: str) -> InvestigationSpecification:
         normalized = self.normalize(question)
         if not normalized:
-            return InvestigationSpecification(status=InterpretationStatus.INVALID, normalized_question="", limitations=["Question is required"])
+            return InvestigationSpecification(
+                status=InterpretationStatus.INVALID, normalized_question="", limitations=["Question is required"]
+            )
 
         version_queries = re.findall(r"\b(?:rev(?:ision)?|version)\s*([a-z0-9][a-z0-9._-]*)", normalized)
         product_query = self._product_phrase(normalized)
-        intent = "INVESTIGATE_COMPLAINT_SIGNAL" if "complaint" in normalized or "shutdown" in normalized else next((name for name, pattern in _INTENT_PATTERNS if pattern.search(normalized)), "RETRIEVE_INVESTIGATION_CONTEXT")
+        intent = (
+            "INVESTIGATE_COMPLAINT_SIGNAL"
+            if "complaint" in normalized or "shutdown" in normalized
+            else next(
+                (name for name, pattern in _INTENT_PATTERNS if pattern.search(normalized)),
+                "RETRIEVE_INVESTIGATION_CONTEXT",
+            )
+        )
         temporal_mode, start, end, knowledge, temporal_error = self._temporal(normalized)
         ambiguities = []
         if intent == "COMPARE_PRODUCT_VERSIONS" and len(version_queries) < 2:
@@ -39,12 +48,25 @@ class QueryInterpreter:
         if product_query in {"pump", "model x"}:
             ambiguities.append("The product reference may match more than one authorized product")
         if temporal_error:
-            return InvestigationSpecification(status=InterpretationStatus.INVALID, normalized_question=normalized, intent=intent, product_query=product_query, version_queries=version_queries, temporal_mode=temporal_mode, limitations=[temporal_error])
+            return InvestigationSpecification(
+                status=InterpretationStatus.INVALID,
+                normalized_question=normalized,
+                intent=intent,
+                product_query=product_query,
+                version_queries=version_queries,
+                temporal_mode=temporal_mode,
+                limitations=[temporal_error],
+            )
         return InvestigationSpecification(
             status=InterpretationStatus.REQUIRES_CLARIFICATION if ambiguities else InterpretationStatus.READY,
-            normalized_question=normalized, intent=intent, product_query=product_query,
-            version_queries=version_queries, temporal_mode=temporal_mode,
-            event_start=start, event_end=end, knowledge_time=knowledge,
+            normalized_question=normalized,
+            intent=intent,
+            product_query=product_query,
+            version_queries=version_queries,
+            temporal_mode=temporal_mode,
+            event_start=start,
+            event_end=end,
+            knowledge_time=knowledge,
             requested_entities=self._entities(normalized),
             requested_metrics=["complaint_count"] if "complaint" in normalized else [],
             ambiguities=ambiguities,
@@ -54,12 +76,24 @@ class QueryInterpreter:
 
     @staticmethod
     def _product_phrase(question: str) -> str | None:
-        match = re.search(r"(?:for|about|after)\s+([a-z0-9][a-z0-9 -]{1,60}?)(?:\s+rev(?:ision)?\s*[a-z0-9]|\s+between\b|\s+as of\b|$)", question)
+        match = re.search(
+            r"(?:for|about|after)\s+([a-z0-9][a-z0-9 -]{1,60}?)(?:\s+rev(?:ision)?\s*[a-z0-9]|\s+between\b|\s+as of\b|$)",
+            question,
+        )
         return match.group(1).strip() if match else None
 
     @staticmethod
     def _entities(question: str) -> list[str]:
-        return [entity for token, entity in (("complaint", "Complaint"), ("evidence", "Evidence"), ("unknown", "Unknown"), ("change", "Change")) if token in question]
+        return [
+            entity
+            for token, entity in (
+                ("complaint", "Complaint"),
+                ("evidence", "Evidence"),
+                ("unknown", "Unknown"),
+                ("change", "Change"),
+            )
+            if token in question
+        ]
 
     def _temporal(self, question: str):
         by_date = re.search(r"\bby\s+(\d{4}-\d{2}-\d{2})", question)
@@ -70,7 +104,13 @@ class QueryInterpreter:
             return TemporalMode.EVENT_AS_OF, None, parsed, None, None
         if "did we know" in question or "known" in question or "available" in question:
             parsed = self._date_after(question, "as of") or self._date_after(question, "on")
-            return TemporalMode.KNOWN_AS_OF, None, None, parsed, None if parsed else "A valid knowledge date is required"
+            return (
+                TemporalMode.KNOWN_AS_OF,
+                None,
+                None,
+                parsed,
+                None if parsed else "A valid knowledge date is required",
+            )
         if "event" in question and ("as of" in question or "on" in question):
             parsed = self._date_after(question, "as of") or self._date_after(question, "on")
             return TemporalMode.EVENT_AS_OF, None, parsed, None, None if parsed else "A valid event date is required"
@@ -84,7 +124,13 @@ class QueryInterpreter:
             return TemporalMode.EVENT_AS_OF, start, end, None, None
         relative = re.search(r"last\s+(\d+)\s+days?", question)
         if relative:
-            return TemporalMode.EVENT_AS_OF, self.server_today - timedelta(days=int(relative.group(1))), self.server_today, None, None
+            return (
+                TemporalMode.EVENT_AS_OF,
+                self.server_today - timedelta(days=int(relative.group(1))),
+                self.server_today,
+                None,
+                None,
+            )
         if re.search(r"\b(then|that time|when the investigation was opened|when this started)\b", question):
             return TemporalMode.CURRENT, None, None, None, "A resolvable historical time reference is required"
         return TemporalMode.CURRENT, None, None, None, None

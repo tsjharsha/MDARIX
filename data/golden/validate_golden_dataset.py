@@ -101,8 +101,7 @@ def main() -> int:
         fail("Scenario IDs VS001-VS012 are not complete")
 
     pre_rev_b_shutdown = [
-        c for c in data["complaints"]
-        if c["failure_mode"] == "shutdown" and c["event_timestamp"] < "2026-01-18"
+        c for c in data["complaints"] if c["failure_mode"] == "shutdown" and c["event_timestamp"] < "2026-01-18"
     ]
     if len(pre_rev_b_shutdown) < 3:
         fail("VS001 contradiction missing: pre-Rev B shutdown complaints")
@@ -115,7 +114,13 @@ def main() -> int:
         fail("Explicit comparative testing unknown missing")
 
     anomaly_types = {item["type"] for item in data["intentional_anomalies"]}
-    for required in ["identity_variation", "false_correlation", "multiple_causes", "late_arriving_evidence", "duplicate_candidate"]:
+    for required in [
+        "identity_variation",
+        "false_correlation",
+        "multiple_causes",
+        "late_arriving_evidence",
+        "duplicate_candidate",
+    ]:
         if required not in anomaly_types:
             fail(f"Missing anomaly type {required}")
 

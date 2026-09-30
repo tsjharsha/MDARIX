@@ -13,26 +13,59 @@ service = CounterfactualService()
 
 
 def payload(item) -> CounterfactualResponse:
-    return CounterfactualResponse(id=item.id, investigation_id=item.investigation_id, status=item.status, result=item.assumptions["result"], created_at=item.created_at)
+    return CounterfactualResponse(
+        id=item.id,
+        investigation_id=item.investigation_id,
+        status=item.status,
+        result=item.assumptions["result"],
+        created_at=item.created_at,
+    )
 
 
 @router.post("/{investigation_id}/counterfactuals", response_model=CounterfactualResponse)
-def create_counterfactual(investigation_id: uuid.UUID, request: CounterfactualRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def create_counterfactual(
+    investigation_id: uuid.UUID,
+    request: CounterfactualRequest,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     try:
         return payload(service.execute(db, ctx.tenant_id, investigation_id, request))
     except CounterfactualError as exc:
-        raise HTTPException(404 if exc.code.endswith("NOT_FOUND") else 400, detail={"code": exc.code, "message": exc.message}) from exc
+        raise HTTPException(
+            404 if exc.code.endswith("NOT_FOUND") else 400, detail={"code": exc.code, "message": exc.message}
+        ) from exc
 
 
 @router.get("/{investigation_id}/counterfactuals", response_model=list[CounterfactualResponse])
-def list_counterfactuals(investigation_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_counterfactuals(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     return [payload(item) for item in service.list(db, ctx.tenant_id, investigation_id)]
 
 
 @router.get("/counterfactuals/{counterfactual_id}", response_model=CounterfactualResponse)
-def get_counterfactual(counterfactual_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def get_counterfactual(
+    counterfactual_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     from backend.app.db.models.foundation import Scenario
-    item = db.query(Scenario).filter(Scenario.tenant_id == ctx.tenant_id, Scenario.id == counterfactual_id, Scenario.assumptions["kind"].astext == "COUNTERFACTUAL").first()
+
+    item = (
+        db.query(Scenario)
+        .filter(
+            Scenario.tenant_id == ctx.tenant_id,
+            Scenario.id == counterfactual_id,
+            Scenario.assumptions["kind"].astext == "COUNTERFACTUAL",
+        )
+        .first()
+    )
     if not item:
-        raise HTTPException(404, detail={"code": "COUNTERFACTUAL_NOT_FOUND", "message": "Counterfactual is not available for this tenant"})
+        raise HTTPException(
+            404,
+            detail={"code": "COUNTERFACTUAL_NOT_FOUND", "message": "Counterfactual is not available for this tenant"},
+        )
     return payload(item)

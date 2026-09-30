@@ -1,4 +1,5 @@
 """Local synthetic-MVP MFA enrollment and challenge regression coverage."""
+
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -36,11 +37,20 @@ def test_local_mfa_enrollment_invalid_expired_replay_and_signature_gate():
         from backend.app.auth_router import _mfa_hash
         from backend.app.auth_router import hash_token
         from backend.app.db.models.stage2 import AuthSession
+
         session = db.query(AuthSession).filter(AuthSession.session_hash == hash_token(session_token)).first()
         now = datetime.now(timezone.utc)
-        db.add(MfaChallenge(id=uuid.uuid4(), user_id=session.user_id, tenant_id=session.tenant_id,
-                            code_hash=_mfa_hash("123456"), purpose="ENROLLMENT",
-                            expires_at=now - timedelta(minutes=1), created_at=now - timedelta(minutes=2)))
+        db.add(
+            MfaChallenge(
+                id=uuid.uuid4(),
+                user_id=session.user_id,
+                tenant_id=session.tenant_id,
+                code_hash=_mfa_hash("123456"),
+                purpose="ENROLLMENT",
+                expires_at=now - timedelta(minutes=1),
+                created_at=now - timedelta(minutes=2),
+            )
+        )
         db.commit()
     finally:
         db.close()
@@ -64,31 +74,55 @@ def test_local_mfa_enrollment_invalid_expired_replay_and_signature_gate():
         session_token = client.cookies.get("mdarix_session")
         from backend.app.auth_router import hash_token
         from backend.app.db.models.stage2 import AuthSession
+
         session = db.query(AuthSession).filter(AuthSession.session_hash == hash_token(session_token)).first()
         user = db.query(AuthUser).filter(AuthUser.id == session.user_id).first()
         tenant = db.query(Tenant).filter(Tenant.id == session.tenant_id).first()
         investigation = db.query(Investigation).filter(Investigation.tenant_id == tenant.id).first()
         assert user and tenant and investigation
-        db.add(ApprovalAuthority(
-            id=uuid.uuid4(), tenant_id=tenant.id, role_name=user.role,
-            object_type="Decision", decision_type="INVESTIGATION_REVIEW",
-            scope={}, authority="AUTHORIZED", version="mfa-test-v1", status="ACTIVE",
-            effective_from=datetime.now(timezone.utc), created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
-        ))
-        decision = Decision(
-            id=uuid.uuid4(), tenant_id=tenant.id, investigation_id=investigation.id,
-            decision_identifier=f"MFA-{uuid.uuid4().hex[:10]}", decision_type="INVESTIGATION_REVIEW",
-            disposition="REQUIRES_REVIEW", rationale="MFA gate regression", decision_status="REQUIRES_REVIEW",
-            authorized_by_ref="different-reviewer", updated_at=datetime.now(timezone.utc),
-            decision_timestamp=datetime.now(timezone.utc), created_at=datetime.now(timezone.utc),
+        db.add(
+            ApprovalAuthority(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                role_name=user.role,
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                scope={},
+                authority="AUTHORIZED",
+                version="mfa-test-v1",
+                status="ACTIVE",
+                effective_from=datetime.now(timezone.utc),
+                created_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(timezone.utc),
+            )
         )
-        db.add(decision); db.commit(); db.refresh(decision); decision_id = decision.id
+        decision = Decision(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            investigation_id=investigation.id,
+            decision_identifier=f"MFA-{uuid.uuid4().hex[:10]}",
+            decision_type="INVESTIGATION_REVIEW",
+            disposition="REQUIRES_REVIEW",
+            rationale="MFA gate regression",
+            decision_status="REQUIRES_REVIEW",
+            authorized_by_ref="different-reviewer",
+            updated_at=datetime.now(timezone.utc),
+            decision_timestamp=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(decision)
+        db.commit()
+        db.refresh(decision)
+        decision_id = decision.id
         os.environ["MDARIX_REQUIRE_MFA_FOR_SIGNATURES"] = "true"
         denied = client.post(
             f"/api/v1/governance/decisions/{decision.id}/sign",
-            json={"decision": "APPROVE", "remarks": "MFA gate test",
-                  "password": "LegacyTestPassword123!", "object_version": decision.updated_at.isoformat()},
+            json={
+                "decision": "APPROVE",
+                "remarks": "MFA gate test",
+                "password": "LegacyTestPassword123!",
+                "object_version": decision.updated_at.isoformat(),
+            },
         )
         assert denied.status_code == 403
         assert denied.json()["detail"]["code"] == "MFA_REQUIRED"

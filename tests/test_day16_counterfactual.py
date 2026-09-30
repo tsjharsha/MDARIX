@@ -26,7 +26,12 @@ def test_supported_interventions_are_constrained():
 
 def test_request_requires_temporal_date_for_historical_context():
     with pytest.raises(ValidationError):
-        CounterfactualRequest(temporal_mode="event", intervention_type="REMOVE_CHANGE", intervention_target="x", intervention_description="x")
+        CounterfactualRequest(
+            temporal_mode="event",
+            intervention_type="REMOVE_CHANGE",
+            intervention_target="x",
+            intervention_description="x",
+        )
 
 
 def test_current_context_rejects_as_of_at_service_boundary():
@@ -40,17 +45,31 @@ def test_unknown_intervention_is_rejected():
 
 
 def test_baseline_labels_are_readable_and_not_causal():
-    labels = CounterfactualService._labels({"product_context": {"configuration": {"components": [{"name": "Component Rev B"}]}, "changes": [{"change_identifier": "SPC-17"}]}, "evidence_context": [{"title": "validated source"}]})
+    labels = CounterfactualService._labels(
+        {
+            "product_context": {
+                "configuration": {"components": [{"name": "Component Rev B"}]},
+                "changes": [{"change_identifier": "SPC-17"}],
+            },
+            "evidence_context": [{"title": "validated source"}],
+        }
+    )
     assert "Component Rev B" in labels
     assert "SPC-17" in labels
 
 
 def test_result_language_is_controlled():
-    assert "root cause" not in "The intervention weakens the current explanation, but available evidence is insufficient to determine the alternative outcome."
+    assert (
+        "root cause"
+        not in "The intervention weakens the current explanation, but available evidence is insufficient to determine the alternative outcome."
+    )
 
 
 def test_temporal_modes_are_explicit():
-    assert {request(temporal_mode=mode, as_of=None if mode == "current" else datetime.now(timezone.utc)).temporal_mode for mode in ("current", "event", "known")} == {"current", "event", "known"}
+    assert {
+        request(temporal_mode=mode, as_of=None if mode == "current" else datetime.now(timezone.utc)).temporal_mode
+        for mode in ("current", "event", "known")
+    } == {"current", "event", "known"}
 
 
 def test_prompt_injection_is_data_not_an_instruction():

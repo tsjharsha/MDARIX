@@ -9,6 +9,7 @@
   they no longer depend on alphabetical file order.
 - Legacy protected-route modules get an authenticated session cookie.
 """
+
 import os
 
 os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
@@ -37,13 +38,27 @@ GOLDEN_INVESTIGATION = "INV-001"
 
 # Modules that need the control-plane PostgreSQL database.
 DB_MODULES = {
-    "test_day2_database", "test_day4_ingestion", "test_day5_normalization",
-    "test_day6_reality_graph", "test_day7_product360_temporal", "test_day8_evidence",
-    "test_day9_retrieval", "test_day10_investigation_workspace", "test_day11_ai_investigator",
-    "test_day12_hypothesis_engine", "test_day15_decision_center", "test_day17_briefs",
-    "test_day18_trust_assurance", "test_day23_governance_security", "test_day26_ask_api",
-    "test_day27_authorized_retrieval", "test_day28_lifecycle_retrieval", "test_mfa_mvp",
-    "test_public_signup_onboarding", "test_simulator_ingestion", "test_stage2_operations",
+    "test_day2_database",
+    "test_day4_ingestion",
+    "test_day5_normalization",
+    "test_day6_reality_graph",
+    "test_day7_product360_temporal",
+    "test_day8_evidence",
+    "test_day9_retrieval",
+    "test_day10_investigation_workspace",
+    "test_day11_ai_investigator",
+    "test_day12_hypothesis_engine",
+    "test_day15_decision_center",
+    "test_day17_briefs",
+    "test_day18_trust_assurance",
+    "test_day23_governance_security",
+    "test_day26_ask_api",
+    "test_day27_authorized_retrieval",
+    "test_day28_lifecycle_retrieval",
+    "test_mfa_mvp",
+    "test_public_signup_onboarding",
+    "test_simulator_ingestion",
+    "test_stage2_operations",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
@@ -69,10 +84,16 @@ def golden_dataset():
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == GOLDEN_TENANT_KEY).first()
-        present = tenant is not None and db.query(Investigation).filter(
-            Investigation.tenant_id == tenant.id,
-            Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
-        ).first() is not None
+        present = (
+            tenant is not None
+            and db.query(Investigation)
+            .filter(
+                Investigation.tenant_id == tenant.id,
+                Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
+            )
+            .first()
+            is not None
+        )
     finally:
         db.close()
     if not present:
@@ -88,52 +109,119 @@ def golden_investigation_id() -> str:
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == GOLDEN_TENANT_KEY).one()
-        investigation = db.query(Investigation).filter(
-            Investigation.tenant_id == tenant.id,
-            Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
-        ).one()
+        investigation = (
+            db.query(Investigation)
+            .filter(
+                Investigation.tenant_id == tenant.id,
+                Investigation.investigation_identifier == GOLDEN_INVESTIGATION,
+            )
+            .one()
+        )
         return str(investigation.id)
     finally:
         db.close()
 
+
 LEGACY_PROTECTED = {
-    'test_day6_reality_graph', 'test_day7_product360_temporal', 'test_day8_evidence',
-    'test_day9_retrieval', 'test_day10_investigation_workspace', 'test_day11_ai_investigator',
-    'test_day12_hypothesis_engine', 'test_day15_decision_center', 'test_day17_briefs',
-    'test_day18_trust_assurance',
+    "test_day6_reality_graph",
+    "test_day7_product360_temporal",
+    "test_day8_evidence",
+    "test_day9_retrieval",
+    "test_day10_investigation_workspace",
+    "test_day11_ai_investigator",
+    "test_day12_hypothesis_engine",
+    "test_day15_decision_center",
+    "test_day17_briefs",
+    "test_day18_trust_assurance",
 }
+
 
 def authenticated_client(application=app):
     client = TestClient(application)
     db = SessionLocal()
-    tenant = db.query(Tenant).filter(Tenant.tenant_key == 'ACME_CARE_SYNTHETIC').first() or db.query(Tenant).first()
-    user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == 'legacy-test-auth@synthetic.invalid').first()
-    token = auth_service.signin_persisted('legacy-test-auth@synthetic.invalid', 'LegacyTestPassword123!', user_id=user.id, display_name=user.display_name, tenant_id=user.tenant_id, password_hash=user.password_hash, role=user.role, status=user.status, email_verified=user.email_verified)
+    tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.tenant_id == tenant.id, AuthUser.username == "legacy-test-auth@synthetic.invalid")
+        .first()
+    )
+    token = auth_service.signin_persisted(
+        "legacy-test-auth@synthetic.invalid",
+        "LegacyTestPassword123!",
+        user_id=user.id,
+        display_name=user.display_name,
+        tenant_id=user.tenant_id,
+        password_hash=user.password_hash,
+        role=user.role,
+        status=user.status,
+        email_verified=user.email_verified,
+    )
     persist_session(db, token, user.id, user.tenant_id)
-    db.close(); client.cookies.set('mdarix_session', token); return client
+    db.close()
+    client.cookies.set("mdarix_session", token)
+    return client
+
 
 @pytest.fixture(autouse=True)
 def authenticate_legacy_module(request):
-    if request.module.__name__.split('.')[-1] not in LEGACY_PROTECTED:
-        yield; return
+    if request.module.__name__.split(".")[-1] not in LEGACY_PROTECTED:
+        yield
+        return
     db = SessionLocal()
     try:
-        tenant = db.query(Tenant).filter(Tenant.tenant_key == 'ACME_CARE_SYNTHETIC').first() or db.query(Tenant).first()
-        email = 'legacy-test-auth@synthetic.invalid'
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+        email = "legacy-test-auth@synthetic.invalid"
         user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == email).first()
         now = datetime.now(timezone.utc)
         if user is None:
-            user = AuthUser(id=uuid.uuid4(), tenant_id=tenant.id, username=email, display_name='Legacy Test Auth', company='Test', password_hash=_hash('LegacyTestPassword123!'), role='Administrator', status='ACTIVE', email_verified=True, created_at=now, updated_at=now)
-            db.add(user); db.flush()
-        membership = db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant.id, TenantMembership.user_id == user.id).first()
+            user = AuthUser(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                username=email,
+                display_name="Legacy Test Auth",
+                company="Test",
+                password_hash=_hash("LegacyTestPassword123!"),
+                role="Administrator",
+                status="ACTIVE",
+                email_verified=True,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(user)
+            db.flush()
+        membership = (
+            db.query(TenantMembership)
+            .filter(TenantMembership.tenant_id == tenant.id, TenantMembership.user_id == user.id)
+            .first()
+        )
         if membership is None:
-            db.add(TenantMembership(id=uuid.uuid4(), tenant_id=tenant.id, user_id=user.id, status='ACTIVE', is_default=True, created_at=now, updated_at=now))
+            db.add(
+                TenantMembership(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant.id,
+                    user_id=user.id,
+                    status="ACTIVE",
+                    is_default=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         db.commit()
-        token = auth_service.signin_persisted(email, 'LegacyTestPassword123!', user_id=user.id, display_name=user.display_name, tenant_id=user.tenant_id, password_hash=user.password_hash, role=user.role, status=user.status, email_verified=user.email_verified)
+        token = auth_service.signin_persisted(
+            email,
+            "LegacyTestPassword123!",
+            user_id=user.id,
+            display_name=user.display_name,
+            tenant_id=user.tenant_id,
+            password_hash=user.password_hash,
+            role=user.role,
+            status=user.status,
+            email_verified=user.email_verified,
+        )
         persist_session(db, token, user.id, user.tenant_id)
         for value in vars(request.module).values():
-            if not isinstance(value, type) and hasattr(value, 'cookies') and hasattr(value, 'get'):
-                value.cookies.set('mdarix_session', token)
+            if not isinstance(value, type) and hasattr(value, "cookies") and hasattr(value, "get"):
+                value.cookies.set("mdarix_session", token)
         yield
     finally:
         db.close()

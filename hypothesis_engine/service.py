@@ -4,7 +4,13 @@ import uuid
 from sqlalchemy.orm import Session
 
 from ai.execution import record_ai_execution
-from backend.app.db.models.foundation import AIExecution, Evidence, Hypothesis as HypothesisRow, HypothesisEvidence, Unknown
+from backend.app.db.models.foundation import (
+    AIExecution,
+    Evidence,
+    Hypothesis as HypothesisRow,
+    HypothesisEvidence,
+    Unknown,
+)
 from hypothesis_engine.engine import (
     MODEL,
     MODEL_VERSION,
@@ -58,7 +64,11 @@ class CompetingHypothesisService:
 
         hypothesis_set = self.engine.generate(analysis_response.analysis, request.investigator_question)
         accepted, rejected, summary = self.validator.validate(hypothesis_set.hypotheses)
-        status = "INSUFFICIENT_EVIDENCE" if accepted and accepted[0].status == "NO_CURRENTLY_SUPPORTABLE_HYPOTHESIS" else "MIXED_EVIDENCE"
+        status = (
+            "INSUFFICIENT_EVIDENCE"
+            if accepted and accepted[0].status == "NO_CURRENTLY_SUPPORTABLE_HYPOTHESIS"
+            else "MIXED_EVIDENCE"
+        )
         if rejected and not accepted:
             status = "HUMAN_REVIEW_REQUIRED"
         hypothesis_set = hypothesis_set.model_copy(
@@ -80,9 +90,23 @@ class CompetingHypothesisService:
             }
         )
         from genai.grounding import advisory, build_authorized_context
-        grounded = build_authorized_context(db, tenant_id=request.tenant_id, investigation_id=request.investigation_id, temporal_mode=request.temporal_mode, as_of=request.as_of)
-        ai_advisory = advisory(workflow="COMPETING_HYPOTHESES", deterministic_result=hypothesis_set.model_dump(mode="json"), grounded_context=grounded, question=request.investigator_question)
-        hypothesis_set = hypothesis_set.model_copy(update={"provenance": {**hypothesis_set.provenance, "live_provider_advisory": ai_advisory}})
+
+        grounded = build_authorized_context(
+            db,
+            tenant_id=request.tenant_id,
+            investigation_id=request.investigation_id,
+            temporal_mode=request.temporal_mode,
+            as_of=request.as_of,
+        )
+        ai_advisory = advisory(
+            workflow="COMPETING_HYPOTHESES",
+            deterministic_result=hypothesis_set.model_dump(mode="json"),
+            grounded_context=grounded,
+            question=request.investigator_question,
+        )
+        hypothesis_set = hypothesis_set.model_copy(
+            update={"provenance": {**hypothesis_set.provenance, "live_provider_advisory": ai_advisory}}
+        )
 
         ai_execution_id = None
         persisted = False
@@ -100,7 +124,9 @@ class CompetingHypothesisService:
                     "context_snapshot_id": hypothesis_set.context_snapshot_id,
                     "context_snapshot_version": hypothesis_set.context_snapshot_version,
                     "source_analysis_id": str(hypothesis_set.source_analysis_id),
-                    "source_ai_execution_id": str(hypothesis_set.source_ai_execution_id) if hypothesis_set.source_ai_execution_id else None,
+                    "source_ai_execution_id": str(hypothesis_set.source_ai_execution_id)
+                    if hypothesis_set.source_ai_execution_id
+                    else None,
                     "day11_contract": "InvestigationAnalysis",
                 },
                 evidence_refs={
@@ -120,9 +146,13 @@ class CompetingHypothesisService:
             self._materialize_domain_intelligence(db, request, hypothesis_set)
             ai_execution_id = row.id
             persisted = True
-        return HypothesisSetResponse(hypothesis_set=hypothesis_set, persisted=persisted, ai_execution_id=ai_execution_id)
+        return HypothesisSetResponse(
+            hypothesis_set=hypothesis_set, persisted=persisted, ai_execution_id=ai_execution_id
+        )
 
-    def _materialize_domain_intelligence(self, db: Session, request: HypothesisSetRequest, hypothesis_set: HypothesisSet) -> None:
+    def _materialize_domain_intelligence(
+        self, db: Session, request: HypothesisSetRequest, hypothesis_set: HypothesisSet
+    ) -> None:
         """Materialize validated system-derived intelligence idempotently.
 
         AIExecution remains the immutable execution record. These rows are the
@@ -169,27 +199,27 @@ class CompetingHypothesisService:
                     .first()
                 )
                 if exists is None:
-                    db.add(Unknown(
-                        id=uuid.uuid4(),
-                        tenant_id=request.tenant_id,
-                        investigation_id=request.investigation_id,
-                        hypothesis_id=row.id,
-                        category="evidence_gap",
-                        description=unknown_text,
-                        evidence_needed=unknown_text,
-                        status="open",
-                        created_at=now,
-                        updated_at=item.updated_at,
-                    ))
+                    db.add(
+                        Unknown(
+                            id=uuid.uuid4(),
+                            tenant_id=request.tenant_id,
+                            investigation_id=request.investigation_id,
+                            hypothesis_id=row.id,
+                            category="evidence_gap",
+                            description=unknown_text,
+                            evidence_needed=unknown_text,
+                            status="open",
+                            created_at=now,
+                            updated_at=item.updated_at,
+                        )
+                    )
 
             for relationship, relation_type in [
                 *[(rel, "support") for rel in item.supporting_evidence],
                 *[(rel, "contradict") for rel in item.contradicting_evidence],
             ]:
                 identifiers = {
-                    ref.evidence_identifier
-                    for ref in relationship.source_references
-                    if ref.evidence_identifier
+                    ref.evidence_identifier for ref in relationship.source_references if ref.evidence_identifier
                 }
                 for identifier in identifiers:
                     evidence = (
@@ -210,16 +240,18 @@ class CompetingHypothesisService:
                         .first()
                     )
                     if exists is None:
-                        db.add(HypothesisEvidence(
-                            id=uuid.uuid4(),
-                            tenant_id=request.tenant_id,
-                            hypothesis_id=row.id,
-                            evidence_id=evidence.id,
-                            relation_type=relation_type,
-                            rationale=relationship.rationale,
-                            created_by_type="system",
-                            created_at=now,
-                        ))
+                        db.add(
+                            HypothesisEvidence(
+                                id=uuid.uuid4(),
+                                tenant_id=request.tenant_id,
+                                hypothesis_id=row.id,
+                                evidence_id=evidence.id,
+                                relation_type=relation_type,
+                                rationale=relationship.rationale,
+                                created_by_type="system",
+                                created_at=now,
+                            )
+                        )
         db.commit()
 
     def latest(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> HypothesisSetResponse | None:
@@ -236,9 +268,13 @@ class CompetingHypothesisService:
         )
         if not row or not row.structured_output:
             return None
-        return HypothesisSetResponse(hypothesis_set=HypothesisSet.model_validate(row.structured_output), persisted=True, ai_execution_id=row.id)
+        return HypothesisSetResponse(
+            hypothesis_set=HypothesisSet.model_validate(row.structured_output), persisted=True, ai_execution_id=row.id
+        )
 
-    def get(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, hypothesis_id: uuid.UUID) -> HypothesisSetResponse:
+    def get(
+        self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, hypothesis_id: uuid.UUID
+    ) -> HypothesisSetResponse:
         rows = (
             db.query(AIExecution)
             .filter(

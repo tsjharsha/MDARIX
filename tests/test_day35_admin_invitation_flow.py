@@ -10,7 +10,7 @@ NAVIGATION_POLICY = (ROOT / "frontend" / "src" / "app" / "navigationPolicy.ts").
 
 
 def test_admin_invite_does_not_collect_or_store_admin_visible_password():
-    assert "[\"password\", \"Temporary password\"" not in UI
+    assert '["password", "Temporary password"' not in UI
     assert "password_hash=_hash(payload.password)" not in ACCESS_ROUTER
     assert "USER_INVITATION_SENT" in ACCESS_ROUTER
     assert "send_activation_email" in ACCESS_ROUTER
@@ -24,10 +24,10 @@ def test_frontend_navigation_recognizes_platform_and_customer_admin_roles():
 
 
 def test_activation_and_reset_have_dedicated_routes_and_email_links():
-    assert "\"/activate-account\"" in UI
-    assert "\"/reset-password\"" in UI
-    assert "@router.post('/activate-account')" in AUTH_ROUTER
-    assert "@router.post('/reset-password')" in AUTH_ROUTER
+    assert '"/activate-account"' in UI
+    assert '"/reset-password"' in UI
+    assert '@router.post("/activate-account")' in AUTH_ROUTER
+    assert '@router.post("/reset-password")' in AUTH_ROUTER
     assert "send_password_reset_email" in AUTH_ROUTER
     assert "Activate your MDARIX account" in EMAILER
     assert "Reset your MDARIX password" in EMAILER

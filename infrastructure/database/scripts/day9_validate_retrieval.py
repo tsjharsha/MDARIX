@@ -8,7 +8,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from sqlalchemy import text
 
 from backend.app.db.models.foundation import Product, ProductVersion, Tenant
-from backend.app.db.models.retrieval_intelligence import EMBEDDING_DIMENSION, EMBEDDING_MODEL, EvidenceChunkEmbedding, RetrievalQuery
+from backend.app.db.models.retrieval_intelligence import (
+    EMBEDDING_DIMENSION,
+    EMBEDDING_MODEL,
+    EvidenceChunkEmbedding,
+    RetrievalQuery,
+)
 from backend.app.db.session import SessionLocal
 from retrieval.schemas import RetrievalRequest
 from retrieval.service import TrustedRetrievalService
@@ -57,7 +62,10 @@ def run_day9_validation() -> int:
 
         bad_dimension = (
             db.query(EvidenceChunkEmbedding)
-            .filter(EvidenceChunkEmbedding.tenant_id == tenant.id, EvidenceChunkEmbedding.embedding_dimension != EMBEDDING_DIMENSION)
+            .filter(
+                EvidenceChunkEmbedding.tenant_id == tenant.id,
+                EvidenceChunkEmbedding.embedding_dimension != EMBEDDING_DIMENSION,
+            )
             .count()
         )
         if bad_dimension:
@@ -96,12 +104,20 @@ def run_day9_validation() -> int:
         else:
             print("[PASS] Source-anchor coverage for retrieved material results: 100%.")
 
-        product = db.query(Product).filter(Product.tenant_id == tenant.id, Product.product_identifier == "PRD-ASTER-100").first()
+        product = (
+            db.query(Product)
+            .filter(Product.tenant_id == tenant.id, Product.product_identifier == "PRD-ASTER-100")
+            .first()
+        )
         version = None
         if product:
             version = (
                 db.query(ProductVersion)
-                .filter(ProductVersion.tenant_id == tenant.id, ProductVersion.product_id == product.id, ProductVersion.version_identifier == "D")
+                .filter(
+                    ProductVersion.tenant_id == tenant.id,
+                    ProductVersion.product_id == product.id,
+                    ProductVersion.version_identifier == "D",
+                )
                 .first()
             )
         if product and version:
@@ -119,7 +135,10 @@ def run_day9_validation() -> int:
             wrong_context = [
                 result
                 for result in scoped.results
-                if not any(link["entity_type"] == "Product" and link["entity_id"] == str(product.id) for link in result.related_entities)
+                if not any(
+                    link["entity_type"] == "Product" and link["entity_id"] == str(product.id)
+                    for link in result.related_entities
+                )
             ]
             if wrong_context:
                 errors.append("Wrong Product evidence presented as applicable.")

@@ -23,25 +23,49 @@ def error(exc: DecisionCenterError) -> HTTPException:
 
 
 @router.get("/decisions/{decision_id}")
-def get_decision(decision_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def get_decision(
+    decision_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     from backend.app.db.models.foundation import Decision
+
     item = db.query(Decision).filter(Decision.tenant_id == ctx.tenant_id, Decision.id == decision_id).first()
     if not item:
-        raise HTTPException(404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"})
+        raise HTTPException(
+            404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
+        )
     return _decision_payload(item)
 
 
 @router.post("/decisions/{decision_id}/reviews")
-def review_decision(decision_id: uuid.UUID, request: ReviewCreateRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def review_decision(
+    decision_id: uuid.UUID,
+    request: ReviewCreateRequest,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     try:
         review = service.review(db, ctx.tenant_id, decision_id, request)
-        return {"id": review.id, "decision_id": review.decision_id, "disposition": review.disposition, "reviewer_ref": review.reviewer_ref, "comments": review.comments, "review_timestamp": review.review_timestamp}
+        return {
+            "id": review.id,
+            "decision_id": review.decision_id,
+            "disposition": review.disposition,
+            "reviewer_ref": review.reviewer_ref,
+            "comments": review.comments,
+            "review_timestamp": review.review_timestamp,
+        }
     except DecisionCenterError as exc:
         raise error(exc) from exc
 
 
 @router.get("/{investigation_id}/decision-context")
-def decision_context(investigation_id: uuid.UUID, request: DecisionContextRequest = Depends(), db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def decision_context(
+    investigation_id: uuid.UUID,
+    request: DecisionContextRequest = Depends(),
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     try:
         return service.context(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
@@ -49,7 +73,12 @@ def decision_context(investigation_id: uuid.UUID, request: DecisionContextReques
 
 
 @router.post("/{investigation_id}/decision-advisory")
-def decision_advisory(investigation_id: uuid.UUID, request: AdvisoryRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def decision_advisory(
+    investigation_id: uuid.UUID,
+    request: AdvisoryRequest,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     try:
         return service.advisory(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
@@ -57,9 +86,16 @@ def decision_advisory(investigation_id: uuid.UUID, request: AdvisoryRequest, db:
 
 
 @router.post("/{investigation_id}/decisions")
-def create_decision(investigation_id: uuid.UUID, request: DecisionCreateRequest, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def create_decision(
+    investigation_id: uuid.UUID,
+    request: DecisionCreateRequest,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     if request.selected_action not in OPTIONS:
-        raise HTTPException(400, detail={"code": "INVALID_DECISION_OPTION", "message": "Decision option is not controlled"})
+        raise HTTPException(
+            400, detail={"code": "INVALID_DECISION_OPTION", "message": "Decision option is not controlled"}
+        )
     try:
         return _decision_payload(service.create_decision(db, ctx.tenant_id, investigation_id, request))
     except DecisionCenterError as exc:
@@ -67,12 +103,38 @@ def create_decision(investigation_id: uuid.UUID, request: DecisionCreateRequest,
 
 
 @router.get("/{investigation_id}/decisions")
-def list_decisions(investigation_id: uuid.UUID, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def list_decisions(
+    investigation_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
     from backend.app.db.models.foundation import Decision
+
     tenant_id = ctx.tenant_id
     service._investigation(db, tenant_id, investigation_id)
-    return [_decision_payload(item) for item in db.query(Decision).filter(Decision.tenant_id == tenant_id, Decision.investigation_id == investigation_id).order_by(Decision.decision_timestamp.desc()).all()]
+    return [
+        _decision_payload(item)
+        for item in db.query(Decision)
+        .filter(Decision.tenant_id == tenant_id, Decision.investigation_id == investigation_id)
+        .order_by(Decision.decision_timestamp.desc())
+        .all()
+    ]
 
 
 def _decision_payload(item):
-    return {"id": item.id, "decision_identifier": item.decision_identifier, "decision_type": item.decision_type, "decision_status": item.decision_status, "decision_readiness": item.decision_readiness, "selected_action": item.selected_action or item.disposition, "human_decision": item.human_decision, "rationale": item.rationale, "authorized_by_ref": item.authorized_by_ref, "decision_timestamp": item.decision_timestamp, "updated_at": item.updated_at, "temporal_context": item.temporal_context, "limitations": item.limitations, "advisory_execution_id": item.advisory_execution_id}
+    return {
+        "id": item.id,
+        "decision_identifier": item.decision_identifier,
+        "decision_type": item.decision_type,
+        "decision_status": item.decision_status,
+        "decision_readiness": item.decision_readiness,
+        "selected_action": item.selected_action or item.disposition,
+        "human_decision": item.human_decision,
+        "rationale": item.rationale,
+        "authorized_by_ref": item.authorized_by_ref,
+        "decision_timestamp": item.decision_timestamp,
+        "updated_at": item.updated_at,
+        "temporal_context": item.temporal_context,
+        "limitations": item.limitations,
+        "advisory_execution_id": item.advisory_execution_id,
+    }

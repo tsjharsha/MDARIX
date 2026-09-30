@@ -22,7 +22,9 @@ def test_vs009_fixture_preserves_counterfactual_boundaries():
     assert fixture["invariants"]
     assert fixture["expected_affected_relationships"]
     assert fixture["expected_unknowns"]
-    assert all("caused" not in claim.lower() or "definitely" in claim.lower() for claim in fixture["prohibited_conclusions"])
+    assert all(
+        "caused" not in claim.lower() or "definitely" in claim.lower() for claim in fixture["prohibited_conclusions"]
+    )
 
 
 def test_golden_builder_is_idempotent():

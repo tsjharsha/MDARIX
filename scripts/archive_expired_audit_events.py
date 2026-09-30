@@ -3,6 +3,7 @@
 This deliberately does not delete audit rows. It produces a compressed,
 tenant-scoped archive that can be inspected or copied to approved storage.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -27,9 +28,13 @@ def main() -> int:
         grouped = defaultdict(list)
         for event in events:
             grouped[str(event.tenant_id)].append(event)
-        results = [archive_expired_audit_events(items, archive_dir=Path(args.archive_dir)) for items in grouped.values()]
+        results = [
+            archive_expired_audit_events(items, archive_dir=Path(args.archive_dir)) for items in grouped.values()
+        ]
         archived = sum(item["archived"] for item in results)
-        print({"status": "PASS", "tenants_checked": len(results), "archived": archived, "archive_dir": args.archive_dir})
+        print(
+            {"status": "PASS", "tenants_checked": len(results), "archived": archived, "archive_dir": args.archive_dir}
+        )
         return 0
     finally:
         db.close()

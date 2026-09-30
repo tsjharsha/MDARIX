@@ -5,6 +5,7 @@ production compliance claims.  It archives an expired synthetic audit event,
 collects test identifiers and existing browser artifacts, and writes a
 machine-readable manifest for review.
 """
+
 from __future__ import annotations
 
 import json
@@ -49,23 +50,50 @@ def main() -> int:
     tests = {}
     for name, command in test_commands.items():
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
-        tests[name] = {"status": "PASS" if result.returncode == 0 else "FAIL", "command": " ".join(command), "output_tail": (result.stdout + result.stderr)[-2000:]}
+        tests[name] = {
+            "status": "PASS" if result.returncode == 0 else "FAIL",
+            "command": " ".join(command),
+            "output_tail": (result.stdout + result.stderr)[-2000:],
+        }
     screenshots = sorted(str(path.relative_to(ROOT)) for path in (ROOT / "frontend" / "artifacts").glob("*.png"))
     report = {
         "report": "MDARIX_LOCAL_MVP_COMPLIANCE_EVIDENCE",
         "generated_at": now.isoformat(),
         "scope": "Local synthetic MVP validation only; production compliance is not claimed.",
-        "test_ids": ["test_audit_diff_is_redacted_and_contains_only_changed_values", "test_audit_event_captures_request_origin_and_retention", "test_expired_audit_events_are_archived_without_deletion", "test_compliance_report_payload_is_renderable_in_all_formats"],
+        "test_ids": [
+            "test_audit_diff_is_redacted_and_contains_only_changed_values",
+            "test_audit_event_captures_request_origin_and_retention",
+            "test_expired_audit_events_are_archived_without_deletion",
+            "test_compliance_report_payload_is_renderable_in_all_formats",
+        ],
         "tests": tests,
         "retention": retention,
         "archive_exists": Path(retention.get("archive_path", "")).exists(),
         "screenshots": screenshots,
         "audit_ids": ["local-expired-compliance-event"],
-        "browser_workflows": ["audit history", "audit export", "evidence package download", "signature verification", "MFA enrollment/challenge"],
+        "browser_workflows": [
+            "audit history",
+            "audit export",
+            "evidence package download",
+            "signature verification",
+            "MFA enrollment/challenge",
+        ],
         "browser_execution": "See retained Playwright artifacts; live authenticated execution remains environment-dependent.",
     }
     (OUT / "local-compliance-evidence.json").write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
-    print(json.dumps({"status": "PASS" if all(item["status"] == "PASS" for item in tests.values()) and report["archive_exists"] else "FAIL", "report": str(OUT / "local-compliance-evidence.json"), "retention": retention}, indent=2, default=str))
+    print(
+        json.dumps(
+            {
+                "status": "PASS"
+                if all(item["status"] == "PASS" for item in tests.values()) and report["archive_exists"]
+                else "FAIL",
+                "report": str(OUT / "local-compliance-evidence.json"),
+                "retention": retention,
+            },
+            indent=2,
+            default=str,
+        )
+    )
     return 0 if report["archive_exists"] and all(item["status"] == "PASS" for item in tests.values()) else 1
 
 

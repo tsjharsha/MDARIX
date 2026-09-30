@@ -1,4 +1,5 @@
 """Add durable tenant-scoped regulatory document versions."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -46,7 +47,11 @@ def upgrade():
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"]),
         sa.UniqueConstraint("tenant_id", "document_id", "version", name="uq_regulatory_document_version"),
     )
-    op.create_index("ix_regulatory_document_versions_tenant_document", "regulatory_document_versions", ["tenant_id", "document_id", "version"])
+    op.create_index(
+        "ix_regulatory_document_versions_tenant_document",
+        "regulatory_document_versions",
+        ["tenant_id", "document_id", "version"],
+    )
 
 
 def downgrade():

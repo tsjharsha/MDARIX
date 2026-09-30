@@ -1,4 +1,5 @@
 """Explicitly gated Day 35 schema upgrade command."""
+
 import os
 import subprocess
 import sys

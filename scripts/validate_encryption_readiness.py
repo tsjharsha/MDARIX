@@ -4,6 +4,7 @@ This deliberately distinguishes local development from production evidence. It
 never treats a local Docker volume or local filesystem as encrypted production
 storage.
 """
+
 from __future__ import annotations
 
 import os
@@ -36,7 +37,9 @@ def main() -> int:
     else:
         sse = os.getenv("MDARIX_OBJECT_STORAGE_SSE", "AES256")
         bucket = os.getenv("MDARIX_OBJECT_STORAGE_BUCKET")
-        print(f"OBJECT_STORAGE_ENCRYPTION = {'PASS' if bucket and sse in {'AES256', 'aws:kms'} else 'PENDING (bucket/SSE configuration incomplete)'}")
+        print(
+            f"OBJECT_STORAGE_ENCRYPTION = {'PASS' if bucket and sse in {'AES256', 'aws:kms'} else 'PENDING (bucket/SSE configuration incomplete)'}"
+        )
 
     required = {
         "BACKUP_ENCRYPTION_KEY": os.getenv("MDARIX_BACKUP_ENCRYPTION_KEY"),

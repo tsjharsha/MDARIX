@@ -1,4 +1,5 @@
 """Register the four local synthetic customer data planes in the control DB."""
+
 from __future__ import annotations
 
 import sys
@@ -30,11 +31,16 @@ def main() -> None:
             plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenants[tenant_key].id).first()
             if plane is None:
                 plane = TenantDataPlane(
-                    id=uuid.uuid4(), tenant_id=tenants[tenant_key].id,
+                    id=uuid.uuid4(),
+                    tenant_id=tenants[tenant_key].id,
                     database_ref=database_ref,
                     connection_secret_ref=f"MDARIX_DATA_PLANE_{tenant_key}_DATABASE_URL",
-                    region="LOCAL", residency_region="LOCAL", schema_version="mvp-1",
-                    status="ACTIVE", created_at=now, updated_at=now,
+                    region="LOCAL",
+                    residency_region="LOCAL",
+                    schema_version="mvp-1",
+                    status="ACTIVE",
+                    created_at=now,
+                    updated_at=now,
                 )
                 db.add(plane)
             else:

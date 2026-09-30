@@ -4,7 +4,9 @@ from ask_mdarix import QueryInterpreter, InterpretationStatus, TemporalMode
 
 
 def test_normalizes_and_interprets_complaint_version_question():
-    spec = QueryInterpreter(server_today=date(2026, 9, 18)).interpret(" Why did shutdown complaints increase after Rev D? ")
+    spec = QueryInterpreter(server_today=date(2026, 9, 18)).interpret(
+        " Why did shutdown complaints increase after Rev D? "
+    )
     assert spec.status is InterpretationStatus.READY
     assert spec.intent == "INVESTIGATE_COMPLAINT_SIGNAL"
     assert spec.version_queries == ["d"]

@@ -152,25 +152,47 @@ class NormalizationService:
                 },
             ).scalar_one()
 
-            records = conn.execute(
-                text(
-                    "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
-                    "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version "
-                    "FROM staged_source_records WHERE tenant_id=:tenant_id ORDER BY CASE record_type "
-                    "WHEN 'product' THEN 1 WHEN 'product_version' THEN 2 WHEN 'supplier' THEN 3 WHEN 'manufacturing_site' THEN 4 "
-                    "WHEN 'component' THEN 5 WHEN 'lot' THEN 6 WHEN 'requirement' THEN 7 WHEN 'change' THEN 8 "
-                    "WHEN 'risk' THEN 9 WHEN 'failure_mode' THEN 10 WHEN 'control' THEN 11 WHEN 'investigation' THEN 12 "
-                    "WHEN 'complaint' THEN 13 WHEN 'evidence_metadata' THEN 14 WHEN 'evidence_file' THEN 15 ELSE 99 END, "
-                    "source_system, source_file, source_row_index NULLS LAST, source_record_id"
-                ),
-                {"tenant_id": tenant_id},
-            ).mappings().all()
+            records = (
+                conn.execute(
+                    text(
+                        "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
+                        "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version "
+                        "FROM staged_source_records WHERE tenant_id=:tenant_id ORDER BY CASE record_type "
+                        "WHEN 'product' THEN 1 WHEN 'product_version' THEN 2 WHEN 'supplier' THEN 3 WHEN 'manufacturing_site' THEN 4 "
+                        "WHEN 'component' THEN 5 WHEN 'lot' THEN 6 WHEN 'requirement' THEN 7 WHEN 'change' THEN 8 "
+                        "WHEN 'risk' THEN 9 WHEN 'failure_mode' THEN 10 WHEN 'control' THEN 11 WHEN 'investigation' THEN 12 "
+                        "WHEN 'complaint' THEN 13 WHEN 'evidence_metadata' THEN 14 WHEN 'evidence_file' THEN 15 ELSE 99 END, "
+                        "source_system, source_file, source_row_index NULLS LAST, source_record_id"
+                    ),
+                    {"tenant_id": tenant_id},
+                )
+                .mappings()
+                .all()
+            )
 
-            relationships_before = conn.execute(text("SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}).scalar_one()
+            relationships_before = conn.execute(
+                text("SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id"),
+                {"tenant_id": tenant_id},
+            ).scalar_one()
             link_count = 0
             ambiguous = unresolved = conflicts = warnings = errors = matched = 0
             created_before = self.canonical_count(conn, tenant_id)
-            lookup: dict[str, dict[str, str]] = {name: {} for name in ["product", "product_version", "component", "supplier", "manufacturing_site", "lot_batch", "requirement", "change", "complaint", "investigation", "evidence"]}
+            lookup: dict[str, dict[str, str]] = {
+                name: {}
+                for name in [
+                    "product",
+                    "product_version",
+                    "component",
+                    "supplier",
+                    "manufacturing_site",
+                    "lot_batch",
+                    "requirement",
+                    "change",
+                    "complaint",
+                    "investigation",
+                    "evidence",
+                ]
+            }
 
             for record in records:
                 results = self.normalize_record(conn, tenant_id, str(run_id), record, lookup)
@@ -219,7 +241,9 @@ class NormalizationService:
 
     def tenant_id(self) -> str:
         with engine.connect() as conn:
-            tenant_id = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}).scalar_one_or_none()
+            tenant_id = conn.execute(
+                text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}
+            ).scalar_one_or_none()
         if not tenant_id:
             from ingestion.services.ingestion_service import IngestionService
 
@@ -238,7 +262,9 @@ class NormalizationService:
                 {**rule, "match_conditions": json_param(rule["match_conditions"]), "now": now},
             )
 
-    def normalize_record(self, conn, tenant_id: str, run_id: str, record, lookup: dict[str, dict[str, str]]) -> list[LinkResult]:
+    def normalize_record(
+        self, conn, tenant_id: str, run_id: str, record, lookup: dict[str, dict[str, str]]
+    ) -> list[LinkResult]:
         raw = dict(record["raw_payload"])
         record_type = record["record_type"]
         handlers = {
@@ -261,7 +287,9 @@ class NormalizationService:
         }
         handler = handlers.get(record_type)
         if not handler:
-            return [self.issue_link(record, record_type, "UNRESOLVED", "No Day 5 canonical handler for staged record type")]
+            return [
+                self.issue_link(record, record_type, "UNRESOLVED", "No Day 5 canonical handler for staged record type")
+            ]
         return handler(conn, tenant_id, record, raw, lookup)
 
     def product(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
@@ -273,16 +301,40 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :name, :description, 'active', :family, :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, product_identifier) DO UPDATE SET name=EXCLUDED.name, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": business_id, "name": raw["name"], "description": None, "family": raw.get("family_id"), "source_system": record["source_system"], "source_identifier": raw["product_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": business_id,
+                "name": raw["name"],
+                "description": None,
+                "family": raw.get("family_id"),
+                "source_system": record["source_system"],
+                "source_identifier": raw["product_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["product"][raw["product_id"]] = str(product_id)
         lookup["product"][canonical_display] = str(product_id)
-        return [self.matched("product", product_id, business_id, raw["product_identifier"], normalize_product_identifier(raw["product_identifier"]), "PRODUCT_EXACT_ID_V1", record)]
+        return [
+            self.matched(
+                "product",
+                product_id,
+                business_id,
+                raw["product_identifier"],
+                normalize_product_identifier(raw["product_identifier"]),
+                "PRODUCT_EXACT_ID_V1",
+                record,
+            )
+        ]
 
     def product_version(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         product_id = lookup["product"].get(raw["product_id"]) or self.find_product(conn, tenant_id, raw["product_id"])
         if not product_id:
-            return [self.issue_link(record, "product_version", "REQUIRES_HUMAN_REVIEW", "Product context missing for product version")]
+            return [
+                self.issue_link(
+                    record, "product_version", "REQUIRES_HUMAN_REVIEW", "Product context missing for product version"
+                )
+            ]
         version = normalize_revision(raw["version_identifier"])
         product_version_id = conn.execute(
             text(
@@ -290,14 +342,37 @@ class NormalizationService:
                 "VALUES (:tenant_id, :product_id, :version, :description, 'active', :release_ts, :source_system, :source_identifier, :effective_ts, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, product_id, version_identifier) DO UPDATE SET description=EXCLUDED.description, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "product_id": product_id, "version": version, "description": raw.get("source_alias"), "release_ts": parse_source_datetime(raw.get("effective_timestamp")), "source_system": record["source_system"], "source_identifier": raw["product_version_id"], "effective_ts": parse_source_datetime(raw.get("effective_timestamp")), "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "product_id": product_id,
+                "version": version,
+                "description": raw.get("source_alias"),
+                "release_ts": parse_source_datetime(raw.get("effective_timestamp")),
+                "source_system": record["source_system"],
+                "source_identifier": raw["product_version_id"],
+                "effective_ts": parse_source_datetime(raw.get("effective_timestamp")),
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["product_version"][raw["product_version_id"]] = str(product_version_id)
         for value in [raw["version_identifier"], raw.get("source_alias"), raw["product_version_id"]]:
             if value:
-                lookup["product_version"][normalize_product_version_identifier(value) or str(value)] = str(product_version_id)
+                lookup["product_version"][normalize_product_version_identifier(value) or str(value)] = str(
+                    product_version_id
+                )
         source_value = raw.get("source_alias") or raw["version_identifier"]
-        return [self.matched("product_version", product_version_id, raw["product_version_id"], source_value, normalize_product_version_identifier(source_value), "PRODUCT_VERSION_COMPOSITE_V1", record)]
+        return [
+            self.matched(
+                "product_version",
+                product_version_id,
+                raw["product_version_id"],
+                source_value,
+                normalize_product_version_identifier(source_value),
+                "PRODUCT_VERSION_COMPOSITE_V1",
+                record,
+            )
+        ]
 
     def supplier(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         supplier_id = conn.execute(
@@ -306,11 +381,29 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :name, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, supplier_identifier) DO UPDATE SET name=EXCLUDED.name, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["supplier_id"], "name": raw["name"], "source_system": record["source_system"], "source_identifier": raw["supplier_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["supplier_id"],
+                "name": raw["name"],
+                "source_system": record["source_system"],
+                "source_identifier": raw["supplier_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         for value in [raw["supplier_id"], raw["supplier_identifier"], raw["name"], *parse_aliases(raw.get("aliases"))]:
             lookup["supplier"][normalize_identifier(value) or str(value)] = str(supplier_id)
-        return [self.matched("supplier", supplier_id, raw["supplier_id"], raw["name"], normalize_identifier(raw["name"]), "SUPPLIER_ALIAS_V1", record)]
+        return [
+            self.matched(
+                "supplier",
+                supplier_id,
+                raw["supplier_id"],
+                raw["name"],
+                normalize_identifier(raw["name"]),
+                "SUPPLIER_ALIAS_V1",
+                record,
+            )
+        ]
 
     def component(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         supplier_id = lookup["supplier"].get(normalize_identifier(raw.get("supplier_id")))
@@ -320,22 +413,69 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :name, :revision, :description, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, component_identifier, revision) DO UPDATE SET name=EXCLUDED.name, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["component_id"], "name": raw["name"], "revision": normalize_revision(raw.get("revision")), "description": raw.get("description"), "source_system": record["source_system"], "source_identifier": raw["component_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["component_id"],
+                "name": raw["name"],
+                "revision": normalize_revision(raw.get("revision")),
+                "description": raw.get("description"),
+                "source_system": record["source_system"],
+                "source_identifier": raw["component_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["component"][raw["component_id"]] = str(component_id)
-        lookup["component"][normalize_identifier(raw["component_identifier"]) or raw["component_identifier"]] = str(component_id)
+        lookup["component"][normalize_identifier(raw["component_identifier"]) or raw["component_identifier"]] = str(
+            component_id
+        )
         if supplier_id:
-            self.upsert_relationship_table(conn, "component_suppliers", tenant_id, component_id=str(component_id), supplier_id=supplier_id)
-        return [self.matched("component", component_id, raw["component_id"], raw["component_identifier"], f"{normalize_identifier(raw['component_identifier'])}:REV-{normalize_revision(raw.get('revision'))}", "COMPONENT_IDENTIFIER_REVISION_V1", record)]
+            self.upsert_relationship_table(
+                conn, "component_suppliers", tenant_id, component_id=str(component_id), supplier_id=supplier_id
+            )
+        return [
+            self.matched(
+                "component",
+                component_id,
+                raw["component_id"],
+                raw["component_identifier"],
+                f"{normalize_identifier(raw['component_identifier'])}:REV-{normalize_revision(raw.get('revision'))}",
+                "COMPONENT_IDENTIFIER_REVISION_V1",
+                record,
+            )
+        ]
 
     def product_component(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        product_version_id = lookup["product_version"].get(raw.get("product_version_id")) or self.find_product_version_source(conn, tenant_id, raw.get("product_version_id"))
-        component_id = lookup["component"].get(raw.get("component_id")) or self.find_component_source(conn, tenant_id, raw.get("component_id"))
+        product_version_id = lookup["product_version"].get(
+            raw.get("product_version_id")
+        ) or self.find_product_version_source(conn, tenant_id, raw.get("product_version_id"))
+        component_id = lookup["component"].get(raw.get("component_id")) or self.find_component_source(
+            conn, tenant_id, raw.get("component_id")
+        )
         if not product_version_id or not component_id:
-            return [self.issue_link(record, "product_component", "REQUIRES_HUMAN_REVIEW", "Product version or component context missing for configuration relationship")]
-        self.upsert_relationship_table(conn, "product_components", tenant_id, product_version_id=product_version_id, component_id=component_id)
+            return [
+                self.issue_link(
+                    record,
+                    "product_component",
+                    "REQUIRES_HUMAN_REVIEW",
+                    "Product version or component context missing for configuration relationship",
+                )
+            ]
+        self.upsert_relationship_table(
+            conn, "product_components", tenant_id, product_version_id=product_version_id, component_id=component_id
+        )
         business_id = f"{raw['product_version_id']}::{raw['component_id']}"
-        return [self.matched("product_component", component_id, business_id, business_id, business_id, "PRODUCT_COMPONENT_SOURCE_V1", record)]
+        return [
+            self.matched(
+                "product_component",
+                component_id,
+                business_id,
+                business_id,
+                business_id,
+                "PRODUCT_COMPONENT_SOURCE_V1",
+                record,
+            )
+        ]
 
     def site(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         site_id = conn.execute(
@@ -344,38 +484,103 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :name, :location, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, site_identifier) DO UPDATE SET name=EXCLUDED.name, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["site_id"], "name": raw.get("name") or raw.get("site_identifier"), "location": raw.get("location"), "source_system": record["source_system"], "source_identifier": raw["site_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["site_id"],
+                "name": raw.get("name") or raw.get("site_identifier"),
+                "location": raw.get("location"),
+                "source_system": record["source_system"],
+                "source_identifier": raw["site_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["manufacturing_site"][raw["site_id"]] = str(site_id)
         lookup["manufacturing_site"][normalize_identifier(raw.get("site_identifier")) or raw["site_id"]] = str(site_id)
-        return [self.matched("manufacturing_site", site_id, raw["site_id"], raw.get("site_identifier"), normalize_identifier(raw.get("site_identifier")), "SITE_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "manufacturing_site",
+                site_id,
+                raw["site_id"],
+                raw.get("site_identifier"),
+                normalize_identifier(raw.get("site_identifier")),
+                "SITE_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def lot(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        pv_id = lookup["product_version"].get(raw.get("product_version_id")) or self.find_product_version_source(conn, tenant_id, raw.get("product_version_id"))
-        site_id = lookup["manufacturing_site"].get(raw.get("manufacturing_site_id")) or self.find_site_source(conn, tenant_id, raw.get("manufacturing_site_id"))
+        pv_id = lookup["product_version"].get(raw.get("product_version_id")) or self.find_product_version_source(
+            conn, tenant_id, raw.get("product_version_id")
+        )
+        site_id = lookup["manufacturing_site"].get(raw.get("manufacturing_site_id")) or self.find_site_source(
+            conn, tenant_id, raw.get("manufacturing_site_id")
+        )
         lot_id = conn.execute(
             text(
                 "INSERT INTO lot_batches (tenant_id, lot_identifier, product_version_id, manufacturing_site_id, status, source_system, source_identifier, effective_timestamp, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :identifier, :product_version_id, :site_id, 'active', :source_system, :source_identifier, :effective_ts, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, lot_identifier) DO UPDATE SET product_version_id=EXCLUDED.product_version_id, manufacturing_site_id=EXCLUDED.manufacturing_site_id, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["lot_id"], "product_version_id": pv_id, "site_id": site_id, "source_system": record["source_system"], "source_identifier": raw["lot_id"], "effective_ts": parse_source_datetime(raw.get("manufactured_timestamp")), "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["lot_id"],
+                "product_version_id": pv_id,
+                "site_id": site_id,
+                "source_system": record["source_system"],
+                "source_identifier": raw["lot_id"],
+                "effective_ts": parse_source_datetime(raw.get("manufactured_timestamp")),
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["lot_batch"][raw["lot_id"]] = str(lot_id)
         lookup["lot_batch"][normalize_identifier(raw["lot_identifier"]) or raw["lot_identifier"]] = str(lot_id)
-        return [self.matched("lot_batch", lot_id, raw["lot_id"], raw["lot_identifier"], f"{normalize_identifier(raw['lot_identifier'])}:{raw.get('product_version_id')}:{raw.get('manufacturing_site_id')}", "LOT_COMPOSITE_V1", record)]
+        return [
+            self.matched(
+                "lot_batch",
+                lot_id,
+                raw["lot_id"],
+                raw["lot_identifier"],
+                f"{normalize_identifier(raw['lot_identifier'])}:{raw.get('product_version_id')}:{raw.get('manufacturing_site_id')}",
+                "LOT_COMPOSITE_V1",
+                record,
+            )
+        ]
 
     def requirement(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(conn, tenant_id, raw.get("product_id"))
+        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(
+            conn, tenant_id, raw.get("product_id")
+        )
         req_id = conn.execute(
             text(
                 "INSERT INTO requirements (tenant_id, product_id, requirement_identifier, requirement_type, text, status, source_system, source_identifier, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :product_id, :identifier, :type, :text_value, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, requirement_identifier) DO UPDATE SET text=EXCLUDED.text, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "product_id": product_id, "identifier": raw["requirement_id"], "type": raw.get("requirement_type"), "text_value": raw["text"], "source_system": record["source_system"], "source_identifier": raw["requirement_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "product_id": product_id,
+                "identifier": raw["requirement_id"],
+                "type": raw.get("requirement_type"),
+                "text_value": raw["text"],
+                "source_system": record["source_system"],
+                "source_identifier": raw["requirement_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
-        return [self.matched("requirement", req_id, raw["requirement_id"], raw["requirement_identifier"], normalize_identifier(raw["requirement_identifier"]), "REQUIREMENT_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "requirement",
+                req_id,
+                raw["requirement_id"],
+                raw["requirement_identifier"],
+                normalize_identifier(raw["requirement_identifier"]),
+                "REQUIREMENT_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def change(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         change_id = conn.execute(
@@ -384,13 +589,36 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :type, :description, :event_ts, :effective_ts, :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, change_identifier) DO UPDATE SET description=EXCLUDED.description, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["change_id"], "type": raw["change_type"], "description": raw["description"], "event_ts": parse_source_datetime(raw.get("event_timestamp")), "effective_ts": parse_source_datetime(raw.get("effective_timestamp")), "source_system": record["source_system"], "source_identifier": raw["change_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["change_id"],
+                "type": raw["change_type"],
+                "description": raw["description"],
+                "event_ts": parse_source_datetime(raw.get("event_timestamp")),
+                "effective_ts": parse_source_datetime(raw.get("effective_timestamp")),
+                "source_system": record["source_system"],
+                "source_identifier": raw["change_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["change"][raw["change_id"]] = str(change_id)
-        return [self.matched("change", change_id, raw["change_id"], raw["change_identifier"], normalize_identifier(raw["change_identifier"]), "CHANGE_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "change",
+                change_id,
+                raw["change_id"],
+                raw["change_identifier"],
+                normalize_identifier(raw["change_identifier"]),
+                "CHANGE_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def complaint(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        pv_id = lookup["product_version"].get(raw.get("product_version_id")) or lookup["product_version"].get(normalize_product_version_identifier(raw.get("source_product_version")))
+        pv_id = lookup["product_version"].get(raw.get("product_version_id")) or lookup["product_version"].get(
+            normalize_product_version_identifier(raw.get("source_product_version"))
+        )
         product_id = self.product_for_version(conn, tenant_id, pv_id)
         lot_id = lookup["lot_batch"].get(raw.get("lot_id")) if raw.get("lot_id") else None
         complaint_id = conn.execute(
@@ -399,37 +627,111 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :product_id, :pv_id, :lot_id, :event_ts, :complaint_ts, :description, :status, :source_system, :source_identifier, :source_ts, :recorded_ts, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, complaint_identifier) DO UPDATE SET product_version_id=EXCLUDED.product_version_id, lot_batch_id=EXCLUDED.lot_batch_id, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["complaint_id"], "product_id": product_id, "pv_id": pv_id, "lot_id": lot_id, "event_ts": parse_source_datetime(raw.get("event_timestamp")), "complaint_ts": parse_source_datetime(raw.get("event_timestamp")), "description": raw["narrative"], "status": normalize_status(raw.get("data_quality_status")) or "open", "source_system": record["source_system"], "source_identifier": raw["complaint_id"], "source_ts": parse_source_datetime(raw.get("event_timestamp")), "recorded_ts": parse_source_datetime(raw.get("recorded_timestamp")), "ingestion_ts": parse_source_datetime(raw.get("ingestion_timestamp")), "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["complaint_id"],
+                "product_id": product_id,
+                "pv_id": pv_id,
+                "lot_id": lot_id,
+                "event_ts": parse_source_datetime(raw.get("event_timestamp")),
+                "complaint_ts": parse_source_datetime(raw.get("event_timestamp")),
+                "description": raw["narrative"],
+                "status": normalize_status(raw.get("data_quality_status")) or "open",
+                "source_system": record["source_system"],
+                "source_identifier": raw["complaint_id"],
+                "source_ts": parse_source_datetime(raw.get("event_timestamp")),
+                "recorded_ts": parse_source_datetime(raw.get("recorded_timestamp")),
+                "ingestion_ts": parse_source_datetime(raw.get("ingestion_timestamp")),
+                "now": utcnow(),
+            },
         ).scalar_one()
         status = "REQUIRES_HUMAN_REVIEW" if str(raw.get("duplicate_candidate", "")).lower() == "true" else "MATCHED"
         confidence = "AMBIGUOUS" if status == "REQUIRES_HUMAN_REVIEW" else "DETERMINISTIC"
-        return [LinkResult("complaint", str(complaint_id), raw["complaint_id"], raw["complaint_identifier"], normalize_identifier(raw["complaint_identifier"]), "deterministic", "COMPLAINT_SOURCE_ID_V1", status, confidence, {"similar_narrative_not_merged": True}, self.provenance(record))]
+        return [
+            LinkResult(
+                "complaint",
+                str(complaint_id),
+                raw["complaint_id"],
+                raw["complaint_identifier"],
+                normalize_identifier(raw["complaint_identifier"]),
+                "deterministic",
+                "COMPLAINT_SOURCE_ID_V1",
+                status,
+                confidence,
+                {"similar_narrative_not_merged": True},
+                self.provenance(record),
+            )
+        ]
 
     def investigation(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(conn, tenant_id, raw.get("product_id"))
+        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(
+            conn, tenant_id, raw.get("product_id")
+        )
         inv_id = conn.execute(
             text(
                 "INSERT INTO investigations (tenant_id, investigation_identifier, product_id, investigation_question, status, opened_at, source_system, source_identifier, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :identifier, :product_id, :question, :status, :opened_at, :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, investigation_identifier) DO UPDATE SET investigation_question=EXCLUDED.investigation_question, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["investigation_id"], "product_id": product_id, "question": raw["question"], "status": normalize_status(raw.get("status")) or "open", "opened_at": parse_source_datetime(raw.get("opened_at")), "source_system": record["source_system"], "source_identifier": raw["investigation_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["investigation_id"],
+                "product_id": product_id,
+                "question": raw["question"],
+                "status": normalize_status(raw.get("status")) or "open",
+                "opened_at": parse_source_datetime(raw.get("opened_at")),
+                "source_system": record["source_system"],
+                "source_identifier": raw["investigation_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["investigation"][raw["investigation_id"]] = str(inv_id)
-        return [self.matched("investigation", inv_id, raw["investigation_id"], raw["investigation_identifier"], normalize_identifier(raw["investigation_identifier"]), "INVESTIGATION_SOURCE_ID_V1", record)]
+        return [
+            self.matched(
+                "investigation",
+                inv_id,
+                raw["investigation_id"],
+                raw["investigation_identifier"],
+                normalize_identifier(raw["investigation_identifier"]),
+                "INVESTIGATION_SOURCE_ID_V1",
+                record,
+            )
+        ]
 
     def risk(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(conn, tenant_id, raw.get("product_id"))
+        product_id = lookup["product"].get(raw.get("product_id")) or self.find_product(
+            conn, tenant_id, raw.get("product_id")
+        )
         risk_id = conn.execute(
             text(
                 "INSERT INTO risks (tenant_id, product_id, risk_identifier, description, status, source_system, source_identifier, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :product_id, :identifier, :description, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, risk_identifier) DO UPDATE SET description=EXCLUDED.description, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "product_id": product_id, "identifier": raw["risk_id"], "description": raw["description"], "source_system": record["source_system"], "source_identifier": raw["risk_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "product_id": product_id,
+                "identifier": raw["risk_id"],
+                "description": raw["description"],
+                "source_system": record["source_system"],
+                "source_identifier": raw["risk_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup.setdefault("risk", {})[raw["risk_id"]] = str(risk_id)
-        return [self.matched("risk", risk_id, raw["risk_id"], raw["risk_identifier"], normalize_identifier(raw["risk_identifier"]), "RISK_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "risk",
+                risk_id,
+                raw["risk_id"],
+                raw["risk_identifier"],
+                normalize_identifier(raw["risk_identifier"]),
+                "RISK_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def failure_mode(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         failure_mode_id = conn.execute(
@@ -438,10 +740,29 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :name, :description, :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, failure_mode_identifier) DO UPDATE SET name=EXCLUDED.name, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["failure_mode_id"], "name": raw["name"], "description": None, "source_system": record["source_system"], "source_identifier": raw["failure_mode_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["failure_mode_id"],
+                "name": raw["name"],
+                "description": None,
+                "source_system": record["source_system"],
+                "source_identifier": raw["failure_mode_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup.setdefault("failure_mode", {})[raw["failure_mode_id"]] = str(failure_mode_id)
-        return [self.matched("failure_mode", failure_mode_id, raw["failure_mode_id"], raw["failure_mode_identifier"], normalize_identifier(raw["failure_mode_identifier"]), "FAILURE_MODE_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "failure_mode",
+                failure_mode_id,
+                raw["failure_mode_id"],
+                raw["failure_mode_identifier"],
+                normalize_identifier(raw["failure_mode_identifier"]),
+                "FAILURE_MODE_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def control(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         control_id = conn.execute(
@@ -450,35 +771,122 @@ class NormalizationService:
                 "VALUES (:tenant_id, :identifier, :control_type, :description, 'active', :source_system, :source_identifier, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, control_identifier) DO UPDATE SET description=EXCLUDED.description, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["control_id"], "control_type": raw.get("control_type"), "description": raw["description"], "source_system": record["source_system"], "source_identifier": raw["control_id"], "ingestion_ts": record["ingestion_timestamp"], "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["control_id"],
+                "control_type": raw.get("control_type"),
+                "description": raw["description"],
+                "source_system": record["source_system"],
+                "source_identifier": raw["control_id"],
+                "ingestion_ts": record["ingestion_timestamp"],
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup.setdefault("control", {})[raw["control_id"]] = str(control_id)
-        return [self.matched("control", control_id, raw["control_id"], raw["control_identifier"], normalize_identifier(raw["control_identifier"]), "CONTROL_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "control",
+                control_id,
+                raw["control_id"],
+                raw["control_identifier"],
+                normalize_identifier(raw["control_identifier"]),
+                "CONTROL_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def evidence_metadata(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
-        investigation_id = lookup["investigation"].get(raw.get("investigation_id")) or self.find_investigation(conn, tenant_id, raw.get("investigation_id"))
+        investigation_id = lookup["investigation"].get(raw.get("investigation_id")) or self.find_investigation(
+            conn, tenant_id, raw.get("investigation_id")
+        )
         evidence_id = conn.execute(
             text(
                 "INSERT INTO evidence (tenant_id, evidence_identifier, investigation_id, evidence_type, title, source_reference, document_ref, reliability_status, fact_type, content, source_system, source_identifier, source_timestamp, recorded_timestamp, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :identifier, :investigation_id, :type, :title, :source_ref, :document_ref, :quality, 'source_fact', :content, :source_system, :source_identifier, :source_ts, :recorded_ts, :ingestion_ts, :now, :now) "
                 "ON CONFLICT (tenant_id, evidence_identifier) DO UPDATE SET content=EXCLUDED.content, updated_at=EXCLUDED.updated_at RETURNING id"
             ),
-            {"tenant_id": tenant_id, "identifier": raw["evidence_id"], "investigation_id": investigation_id, "type": raw["evidence_type"], "title": raw["title"], "source_ref": raw.get("source"), "document_ref": raw.get("document_path"), "quality": raw.get("quality") or "unreviewed", "content": raw.get("content"), "source_system": record["source_system"], "source_identifier": raw["evidence_id"], "source_ts": parse_source_datetime(raw.get("event_timestamp")), "recorded_ts": parse_source_datetime(raw.get("recorded_timestamp")), "ingestion_ts": parse_source_datetime(raw.get("ingestion_timestamp")), "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "identifier": raw["evidence_id"],
+                "investigation_id": investigation_id,
+                "type": raw["evidence_type"],
+                "title": raw["title"],
+                "source_ref": raw.get("source"),
+                "document_ref": raw.get("document_path"),
+                "quality": raw.get("quality") or "unreviewed",
+                "content": raw.get("content"),
+                "source_system": record["source_system"],
+                "source_identifier": raw["evidence_id"],
+                "source_ts": parse_source_datetime(raw.get("event_timestamp")),
+                "recorded_ts": parse_source_datetime(raw.get("recorded_timestamp")),
+                "ingestion_ts": parse_source_datetime(raw.get("ingestion_timestamp")),
+                "now": utcnow(),
+            },
         ).scalar_one()
         lookup["evidence"][raw["evidence_id"]] = str(evidence_id)
-        return [self.matched("evidence", evidence_id, raw["evidence_id"], raw["evidence_id"], normalize_identifier(raw["evidence_id"]), "EVIDENCE_IDENTIFIER_V1", record)]
+        return [
+            self.matched(
+                "evidence",
+                evidence_id,
+                raw["evidence_id"],
+                raw["evidence_id"],
+                normalize_identifier(raw["evidence_id"]),
+                "EVIDENCE_IDENTIFIER_V1",
+                record,
+            )
+        ]
 
     def evidence_file(self, conn, tenant_id: str, record, raw: dict[str, Any], lookup) -> list[LinkResult]:
         identifier = Path(raw.get("filename") or raw.get("relative_path")).stem
         evidence_id = lookup["evidence"].get(identifier) or self.find_evidence(conn, tenant_id, identifier)
         status = "MATCHED" if evidence_id else "UNRESOLVED"
-        return [LinkResult("evidence", evidence_id, identifier, raw.get("filename"), normalize_identifier(identifier), "deterministic", "EVIDENCE_IDENTIFIER_V1", status, "DETERMINISTIC" if evidence_id else "UNRESOLVED", {"file_checksum_preserved": True}, self.provenance(record))]
+        return [
+            LinkResult(
+                "evidence",
+                evidence_id,
+                identifier,
+                raw.get("filename"),
+                normalize_identifier(identifier),
+                "deterministic",
+                "EVIDENCE_IDENTIFIER_V1",
+                status,
+                "DETERMINISTIC" if evidence_id else "UNRESOLVED",
+                {"file_checksum_preserved": True},
+                self.provenance(record),
+            )
+        ]
 
-    def matched(self, entity_type: str, entity_id: Any, business_id: str, source_value: Any, normalized: Any, rule: str, record) -> LinkResult:
-        return LinkResult(entity_type, str(entity_id), business_id, None if source_value is None else str(source_value), None if normalized is None else str(normalized), "deterministic", rule, "MATCHED", "DETERMINISTIC", {"rule_precedence": rule}, self.provenance(record))
+    def matched(
+        self, entity_type: str, entity_id: Any, business_id: str, source_value: Any, normalized: Any, rule: str, record
+    ) -> LinkResult:
+        return LinkResult(
+            entity_type,
+            str(entity_id),
+            business_id,
+            None if source_value is None else str(source_value),
+            None if normalized is None else str(normalized),
+            "deterministic",
+            rule,
+            "MATCHED",
+            "DETERMINISTIC",
+            {"rule_precedence": rule},
+            self.provenance(record),
+        )
 
     def issue_link(self, record, entity_type: str, status: str, description: str) -> LinkResult:
-        return LinkResult(entity_type, None, None, record["source_record_id"], normalize_identifier(record["source_record_id"]), "deterministic", "UNRESOLVED_IDENTITY_V1", status, "UNRESOLVED", {"description": description}, self.provenance(record))
+        return LinkResult(
+            entity_type,
+            None,
+            None,
+            record["source_record_id"],
+            normalize_identifier(record["source_record_id"]),
+            "deterministic",
+            "UNRESOLVED_IDENTITY_V1",
+            status,
+            "UNRESOLVED",
+            {"description": description},
+            self.provenance(record),
+        )
 
     def link(self, conn, tenant_id: str, run_id: str, staged_id: str, result: LinkResult) -> None:
         conn.execute(
@@ -516,26 +924,92 @@ class NormalizationService:
         for lot_source, lot_id in lookup["lot_batch"].items():
             if not lot_source.startswith("LOT-"):
                 continue
-            row = conn.execute(text("SELECT product_version_id FROM lot_batches WHERE id=:id"), {"id": lot_id}).mappings().one_or_none()
+            row = (
+                conn.execute(text("SELECT product_version_id FROM lot_batches WHERE id=:id"), {"id": lot_id})
+                .mappings()
+                .one_or_none()
+            )
             if row and row["product_version_id"]:
-                self.canonical_relationship(conn, tenant_id, run_id, "lot_batch", lot_id, "product_version", str(row["product_version_id"]), "LOT_BUILT_AS_PRODUCT_VERSION", "LOT_COMPOSITE_V1")
-        for row in conn.execute(text("SELECT product_version_id, component_id FROM product_components WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}).mappings():
-            self.canonical_relationship(conn, tenant_id, run_id, "product_version", str(row["product_version_id"]), "component", str(row["component_id"]), "PRODUCT_VERSION_HAS_COMPONENT", "PRODUCT_COMPONENT_SOURCE_V1")
+                self.canonical_relationship(
+                    conn,
+                    tenant_id,
+                    run_id,
+                    "lot_batch",
+                    lot_id,
+                    "product_version",
+                    str(row["product_version_id"]),
+                    "LOT_BUILT_AS_PRODUCT_VERSION",
+                    "LOT_COMPOSITE_V1",
+                )
+        for row in conn.execute(
+            text("SELECT product_version_id, component_id FROM product_components WHERE tenant_id=:tenant_id"),
+            {"tenant_id": tenant_id},
+        ).mappings():
+            self.canonical_relationship(
+                conn,
+                tenant_id,
+                run_id,
+                "product_version",
+                str(row["product_version_id"]),
+                "component",
+                str(row["component_id"]),
+                "PRODUCT_VERSION_HAS_COMPONENT",
+                "PRODUCT_COMPONENT_SOURCE_V1",
+            )
         for component_id in lookup["component"].values():
             for supplier_id in set(lookup["supplier"].values()):
-                exists = conn.execute(text("SELECT count(*) FROM component_suppliers WHERE tenant_id=:tenant_id AND component_id=:c AND supplier_id=:s"), {"tenant_id": tenant_id, "c": component_id, "s": supplier_id}).scalar_one()
+                exists = conn.execute(
+                    text(
+                        "SELECT count(*) FROM component_suppliers WHERE tenant_id=:tenant_id AND component_id=:c AND supplier_id=:s"
+                    ),
+                    {"tenant_id": tenant_id, "c": component_id, "s": supplier_id},
+                ).scalar_one()
                 if exists:
-                    self.canonical_relationship(conn, tenant_id, run_id, "component", component_id, "supplier", supplier_id, "COMPONENT_SUPPLIED_BY", "COMPONENT_IDENTIFIER_REVISION_V1")
-        return conn.execute(text("SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}).scalar_one()
+                    self.canonical_relationship(
+                        conn,
+                        tenant_id,
+                        run_id,
+                        "component",
+                        component_id,
+                        "supplier",
+                        supplier_id,
+                        "COMPONENT_SUPPLIED_BY",
+                        "COMPONENT_IDENTIFIER_REVISION_V1",
+                    )
+        return conn.execute(
+            text("SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}
+        ).scalar_one()
 
-    def canonical_relationship(self, conn, tenant_id: str, run_id: str, source_type: str, source_id: str, target_type: str, target_id: str, rel_type: str, rule: str) -> None:
+    def canonical_relationship(
+        self,
+        conn,
+        tenant_id: str,
+        run_id: str,
+        source_type: str,
+        source_id: str,
+        target_type: str,
+        target_id: str,
+        rel_type: str,
+        rule: str,
+    ) -> None:
         conn.execute(
             text(
                 "INSERT INTO canonical_relationships (tenant_id, normalization_run_id, source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type, resolution_rule, assertion_status, provenance, created_at) "
                 "VALUES (:tenant_id, :run_id, :source_type, :source_id, :target_type, :target_id, :rel_type, :rule, 'supported', :provenance, :now) "
                 "ON CONFLICT (tenant_id, source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type) DO NOTHING"
             ),
-            {"tenant_id": tenant_id, "run_id": run_id, "source_type": source_type, "source_id": source_id, "target_type": target_type, "target_id": target_id, "rel_type": rel_type, "rule": rule, "provenance": json_param({"causal_claim": False}), "now": utcnow()},
+            {
+                "tenant_id": tenant_id,
+                "run_id": run_id,
+                "source_type": source_type,
+                "source_id": source_id,
+                "target_type": target_type,
+                "target_id": target_id,
+                "rel_type": rel_type,
+                "rule": rule,
+                "provenance": json_param({"causal_claim": False}),
+                "now": utcnow(),
+            },
         )
 
     def upsert_relationship_table(self, conn, table: str, tenant_id: str, **ids: str) -> None:
@@ -569,43 +1043,91 @@ class NormalizationService:
 
     def canonical_count(self, conn, tenant_id: str) -> int:
         total = 0
-        for table in ["products", "product_versions", "components", "suppliers", "manufacturing_sites", "lot_batches", "requirements", "changes", "risks", "failure_modes", "controls", "complaints", "investigations", "evidence"]:
-            total += conn.execute(text(f"SELECT count(*) FROM {table} WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}).scalar_one()
+        for table in [
+            "products",
+            "product_versions",
+            "components",
+            "suppliers",
+            "manufacturing_sites",
+            "lot_batches",
+            "requirements",
+            "changes",
+            "risks",
+            "failure_modes",
+            "controls",
+            "complaints",
+            "investigations",
+            "evidence",
+        ]:
+            total += conn.execute(
+                text(f"SELECT count(*) FROM {table} WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}
+            ).scalar_one()
         return total
 
     def find_product(self, conn, tenant_id: str, source_id: str | None) -> str | None:
         if not source_id:
             return None
-        return conn.execute(text("SELECT id FROM products WHERE tenant_id=:tenant_id AND product_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none()
+        return conn.execute(
+            text("SELECT id FROM products WHERE tenant_id=:tenant_id AND product_identifier=:id"),
+            {"tenant_id": tenant_id, "id": source_id},
+        ).scalar_one_or_none()
 
     def find_product_version_source(self, conn, tenant_id: str, source_id: str | None) -> str | None:
         if not source_id:
             return None
-        return conn.execute(text("SELECT id FROM product_versions WHERE tenant_id=:tenant_id AND source_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none()
+        return conn.execute(
+            text("SELECT id FROM product_versions WHERE tenant_id=:tenant_id AND source_identifier=:id"),
+            {"tenant_id": tenant_id, "id": source_id},
+        ).scalar_one_or_none()
 
     def find_component_source(self, conn, tenant_id: str, source_id: str | None) -> str | None:
         if not source_id:
             return None
-        return conn.execute(text("SELECT id FROM components WHERE tenant_id=:tenant_id AND source_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none()
+        return conn.execute(
+            text("SELECT id FROM components WHERE tenant_id=:tenant_id AND source_identifier=:id"),
+            {"tenant_id": tenant_id, "id": source_id},
+        ).scalar_one_or_none()
 
     def find_site_source(self, conn, tenant_id: str, source_id: str | None) -> str | None:
         if not source_id:
             return None
-        return conn.execute(text("SELECT id FROM manufacturing_sites WHERE tenant_id=:tenant_id AND source_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none()
+        return conn.execute(
+            text("SELECT id FROM manufacturing_sites WHERE tenant_id=:tenant_id AND source_identifier=:id"),
+            {"tenant_id": tenant_id, "id": source_id},
+        ).scalar_one_or_none()
 
     def product_for_version(self, conn, tenant_id: str, product_version_id: str | None) -> str | None:
         if not product_version_id:
             return None
-        return conn.execute(text("SELECT product_id FROM product_versions WHERE tenant_id=:tenant_id AND id=:id"), {"tenant_id": tenant_id, "id": product_version_id}).scalar_one_or_none()
+        return conn.execute(
+            text("SELECT product_id FROM product_versions WHERE tenant_id=:tenant_id AND id=:id"),
+            {"tenant_id": tenant_id, "id": product_version_id},
+        ).scalar_one_or_none()
 
     def find_investigation(self, conn, tenant_id: str, source_id: str | None) -> str | None:
-        return conn.execute(text("SELECT id FROM investigations WHERE tenant_id=:tenant_id AND investigation_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none() if source_id else None
+        return (
+            conn.execute(
+                text("SELECT id FROM investigations WHERE tenant_id=:tenant_id AND investigation_identifier=:id"),
+                {"tenant_id": tenant_id, "id": source_id},
+            ).scalar_one_or_none()
+            if source_id
+            else None
+        )
 
     def find_evidence(self, conn, tenant_id: str, source_id: str | None) -> str | None:
-        return conn.execute(text("SELECT id FROM evidence WHERE tenant_id=:tenant_id AND evidence_identifier=:id"), {"tenant_id": tenant_id, "id": source_id}).scalar_one_or_none() if source_id else None
+        return (
+            conn.execute(
+                text("SELECT id FROM evidence WHERE tenant_id=:tenant_id AND evidence_identifier=:id"),
+                {"tenant_id": tenant_id, "id": source_id},
+            ).scalar_one_or_none()
+            if source_id
+            else None
+        )
 
     def summary(self, conn, run_id: str) -> dict[str, Any]:
-        row = conn.execute(text("SELECT * FROM normalization_runs WHERE id=:run_id"), {"run_id": run_id}).mappings().one()
+        row = (
+            conn.execute(text("SELECT * FROM normalization_runs WHERE id=:run_id"), {"run_id": run_id}).mappings().one()
+        )
         result = dict(row)
         result["id"] = str(result["id"])
         result["tenant_id"] = str(result["tenant_id"])

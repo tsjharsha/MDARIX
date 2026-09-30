@@ -57,4 +57,3 @@ class InvestigationSpecification(BaseModel):
     unknowns: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     retrieval_scope: dict[str, Any] = Field(default_factory=dict)
-

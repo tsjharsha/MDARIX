@@ -1,4 +1,5 @@
 """Replace public tenant creation with pending onboarding requests."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -7,6 +8,7 @@ revision = "z42publiconboarding"
 down_revision = "y41subscriptionlifecycle"
 branch_labels = None
 depends_on = None
+
 
 def upgrade():
     op.create_table(
@@ -21,6 +23,7 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("email", name="uq_onboarding_requests_email"),
     )
+
 
 def downgrade():
     op.drop_table("onboarding_requests")

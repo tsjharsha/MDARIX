@@ -1,4 +1,5 @@
 """Local MVP MFA recovery-code lifecycle primitives."""
+
 import hashlib
 import secrets
 

@@ -9,6 +9,7 @@ from backend.app.db.models.foundation import Evidence
 
 class ContentSecurityError(Exception):
     """Raised when an illegal path traversal or cross-tenant file access attempt is detected."""
+
     pass
 
 
@@ -18,13 +19,11 @@ class EvidenceContentReader:
     def __init__(self, workspace_root: Optional[Path] = None):
         self.workspace_root = workspace_root or Path(os.getcwd())
 
-    def get_evidence_content(self, db: Session, tenant_id: uuid.UUID, evidence_id: uuid.UUID) -> tuple[str, Dict[str, Any]]:
+    def get_evidence_content(
+        self, db: Session, tenant_id: uuid.UUID, evidence_id: uuid.UUID
+    ) -> tuple[str, Dict[str, Any]]:
         """Retrieves raw content and metadata for a tenant-scoped evidence item."""
-        evidence = (
-            db.query(Evidence)
-            .filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id)
-            .first()
-        )
+        evidence = db.query(Evidence).filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id).first()
         if not evidence:
             raise ValueError(f"Evidence {evidence_id} not found for tenant {tenant_id}")
 

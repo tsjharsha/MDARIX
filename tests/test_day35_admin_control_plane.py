@@ -8,6 +8,7 @@ no reachable screen reads governance policies or creates roles, permission
 sets, personas, connectors, approval authorities or SoD policies; the backend
 routes for those exist and are still asserted below.
 """
+
 from pathlib import Path
 
 
@@ -15,8 +16,12 @@ ROOT = Path(__file__).parents[1]
 FRONTEND = ROOT / "frontend" / "src"
 UI = (FRONTEND / "main.tsx").read_text(encoding="utf-8")
 PLATFORM_ADMIN_UI = (FRONTEND / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
-CUSTOMER_ADMIN_UI = (FRONTEND / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(encoding="utf-8")
-SIMPLIFIED_ADMIN_UI = (FRONTEND / "features" / "admin" / "SimplifiedPlatformAdminScreen.tsx").read_text(encoding="utf-8")
+CUSTOMER_ADMIN_UI = (FRONTEND / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(
+    encoding="utf-8"
+)
+SIMPLIFIED_ADMIN_UI = (FRONTEND / "features" / "admin" / "SimplifiedPlatformAdminScreen.tsx").read_text(
+    encoding="utf-8"
+)
 LIVE_ADMIN_UI = "\n".join((UI, PLATFORM_ADMIN_UI, CUSTOMER_ADMIN_UI, SIMPLIFIED_ADMIN_UI))
 ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
 
@@ -87,8 +92,13 @@ def test_platform_admin_data_mapping_exposes_external_to_internal_fields():
     assert endpoint in PLATFORM_ADMIN_UI
     assert '@router.get("/admin/configuration/data-mappings")' in ROUTER
     for label in (
-        "External database", "External table", "External field",
-        "MDARIX table", "MDARIX field", "Transform", "Required",
+        "External database",
+        "External table",
+        "External field",
+        "MDARIX table",
+        "MDARIX field",
+        "Transform",
+        "Required",
     ):
         assert label in PLATFORM_ADMIN_UI
     for field in ("source_database", "source_schema", "source_table", "target_schema", "target_table"):

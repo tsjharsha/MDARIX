@@ -4,8 +4,34 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from investigator.schemas import SourceReference, TemporalMode
 
-ChallengeType = Literal["EVIDENCE_SUFFICIENCY","CONTRADICTORY_EVIDENCE","TEMPORAL_INCONSISTENCY","CAUSAL_LEAP","MISSING_EVIDENCE","UNSUPPORTED_ASSUMPTION","ALTERNATIVE_EXPLANATION","CONFOUNDING_FACTOR","SELECTIVE_EVIDENCE","OVERGENERALIZATION","PREMATURE_CONVERGENCE","TRACEABILITY_GAP","POPULATION_MISMATCH","VERSION_MISMATCH","HISTORICAL_KNOWLEDGE_LIMITATION","INSUFFICIENT_COMPARATIVE_EVIDENCE"]
-ChallengeStatus = Literal["OPEN","MATERIAL","NON_MATERIAL","RESOLVED_BY_EVIDENCE","REQUIRES_MORE_EVIDENCE","REQUIRES_HUMAN_REVIEW","NOT_APPLICABLE"]
+ChallengeType = Literal[
+    "EVIDENCE_SUFFICIENCY",
+    "CONTRADICTORY_EVIDENCE",
+    "TEMPORAL_INCONSISTENCY",
+    "CAUSAL_LEAP",
+    "MISSING_EVIDENCE",
+    "UNSUPPORTED_ASSUMPTION",
+    "ALTERNATIVE_EXPLANATION",
+    "CONFOUNDING_FACTOR",
+    "SELECTIVE_EVIDENCE",
+    "OVERGENERALIZATION",
+    "PREMATURE_CONVERGENCE",
+    "TRACEABILITY_GAP",
+    "POPULATION_MISMATCH",
+    "VERSION_MISMATCH",
+    "HISTORICAL_KNOWLEDGE_LIMITATION",
+    "INSUFFICIENT_COMPARATIVE_EVIDENCE",
+]
+ChallengeStatus = Literal[
+    "OPEN",
+    "MATERIAL",
+    "NON_MATERIAL",
+    "RESOLVED_BY_EVIDENCE",
+    "REQUIRES_MORE_EVIDENCE",
+    "REQUIRES_HUMAN_REVIEW",
+    "NOT_APPLICABLE",
+]
+
 
 class InvestigationChallenge(BaseModel):
     challenge_id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -20,13 +46,14 @@ class InvestigationChallenge(BaseModel):
     temporal_issue: dict[str, Any] | None = None
     alternative_explanation_reference: str | None = None
     missing_information: list[str] = Field(default_factory=list)
-    severity: Literal["LOW","MEDIUM","HIGH","CRITICAL"] = "MEDIUM"
-    materiality: Literal["MATERIAL","NON_MATERIAL"] = "NON_MATERIAL"
+    severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = "MEDIUM"
+    materiality: Literal["MATERIAL", "NON_MATERIAL"] = "NON_MATERIAL"
     status: ChallengeStatus = "OPEN"
     context_snapshot: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
     human_review_status: str = "NOT_REVIEWED"
     created_at: datetime = Field(default_factory=lambda: datetime.now().astimezone())
+
 
 class ChallengeSet(BaseModel):
     challenge_set_id: uuid.UUID = Field(default_factory=uuid.uuid4)
@@ -42,6 +69,7 @@ class ChallengeSet(BaseModel):
     provenance: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
 
+
 class ChallengeRequest(BaseModel):
     tenant_id: uuid.UUID | None = None
     investigation_id: uuid.UUID
@@ -50,6 +78,7 @@ class ChallengeRequest(BaseModel):
     as_of: datetime | None = None
     user_question: str | None = Field(None, max_length=1000)
     persist: bool = True
+
 
 class ChallengeResponse(BaseModel):
     challenge_set: ChallengeSet

@@ -7,7 +7,9 @@ def test_assurance_persists_profile_and_checks():
     # Create a real investigator execution in the golden tenant instead of
     # relying on an execution id that only existed in one local database.
     investigation_id = golden_investigation_id()
-    analysis = client.post(f"/api/v1/investigations/{investigation_id}/analysis", json={"investigation_id": investigation_id})
+    analysis = client.post(
+        f"/api/v1/investigations/{investigation_id}/analysis", json={"investigation_id": investigation_id}
+    )
     assert analysis.status_code == 200
     EXECUTION = analysis.json()["ai_execution_id"]
     response = client.post(f"/api/v1/ai-executions/{EXECUTION}/assurance", json={"output_type": "AI_INVESTIGATOR"})
@@ -17,6 +19,7 @@ def test_assurance_persists_profile_and_checks():
     assert body["configuration_hash"] and len(body["configuration_hash"]) == 64
     assert len(body["checks"]) >= 5
     assert body["human_review_required"] is True
+
 
 def test_foreign_execution_is_not_available():
     response = authenticated_client(app).get("/api/v1/ai-executions/00000000-0000-0000-0000-000000000000/assurance")

@@ -55,7 +55,9 @@ class GroundingValidator:
                 return True
 
         # If character_range exists, verify valid bounds
-        char_range = getattr(anchor, "character_range", None) or (anchor.get("character_range") if isinstance(anchor, dict) else None)
+        char_range = getattr(anchor, "character_range", None) or (
+            anchor.get("character_range") if isinstance(anchor, dict) else None
+        )
         if char_range and len(char_range) == 2:
             start, end = char_range
             if 0 <= start <= end <= len(source_content):

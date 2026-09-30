@@ -5,7 +5,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
 MAIN = (ROOT / "frontend" / "src" / "main.tsx").read_text(encoding="utf-8")
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
-INVESTIGATOR_HOME = (ROOT / "frontend" / "src" / "features" / "investigator" / "InvestigatorHome.tsx").read_text(encoding="utf-8")
+INVESTIGATOR_HOME = (ROOT / "frontend" / "src" / "features" / "investigator" / "InvestigatorHome.tsx").read_text(
+    encoding="utf-8"
+)
 
 
 def test_public_navigation_exposes_required_categories_and_actions():
@@ -40,13 +42,13 @@ def test_public_story_preserves_system_of_record_and_human_authority_boundaries(
 
 def test_private_application_routes_require_authenticated_session():
     assert 'fetch("/api/v1/auth/session")' in MAIN
-    assert 'window.location.replace(`/signin?returnTo=' in MAIN
+    assert "window.location.replace(`/signin?returnTo=" in MAIN
     assert "Customer application routes require an authenticated session" in MAIN
 
 
 def test_mega_menu_supports_escape_and_responsive_navigation():
     assert 'event.key === "Escape"' in SITE
-    assert 'aria-expanded={openMenu === name}' in SITE
+    assert "aria-expanded={openMenu === name}" in SITE
     assert 'aria-controls="public-navigation"' in SITE
 
 
@@ -70,5 +72,16 @@ def test_authenticated_home_tells_and_connects_the_workflow_story():
 
 
 def test_semantic_design_tokens_cover_business_meaning():
-    for token in ("--brand-primary", "--text-primary", "--background-page", "--status-critical", "--ai-advisory", "--evidence", "--contradiction", "--unknown", "--human-decision", "--assurance"):
+    for token in (
+        "--brand-primary",
+        "--text-primary",
+        "--background-page",
+        "--status-critical",
+        "--ai-advisory",
+        "--evidence",
+        "--contradiction",
+        "--unknown",
+        "--human-decision",
+        "--assurance",
+    ):
         assert token in STYLES

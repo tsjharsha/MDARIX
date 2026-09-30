@@ -88,7 +88,9 @@ def main() -> int:
         evidence_cols = {column["name"] for column in inspector.get_columns("evidence")}
         ai_cols = {column["name"] for column in inspector.get_columns("ai_executions")}
         embedding_type = conn.execute(
-            text("SELECT udt_name FROM information_schema.columns WHERE table_name='evidence_embeddings' AND column_name='embedding'")
+            text(
+                "SELECT udt_name FROM information_schema.columns WHERE table_name='evidence_embeddings' AND column_name='embedding'"
+            )
         ).scalar_one()
         check("fact_type" in evidence_cols, "Evidence fact_type column missing")
         check("chain_of_thought" not in ai_cols, "AIExecution must not store hidden chain-of-thought")

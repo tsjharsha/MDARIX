@@ -19,13 +19,22 @@ StatementType = Literal[
     "INSUFFICIENT_EVIDENCE",
 ]
 GroundingStatus = Literal["ACCEPTED", "REJECTED_UNGROUNDED", "INSUFFICIENT_EVIDENCE", "REQUIRES_REVIEW"]
-AnalysisStatus = Literal["COMPLETED", "COMPLETED_WITH_LIMITATIONS", "ABSTAINED_INSUFFICIENT_EVIDENCE", "FAILED_VALIDATION"]
+AnalysisStatus = Literal[
+    "COMPLETED", "COMPLETED_WITH_LIMITATIONS", "ABSTAINED_INSUFFICIENT_EVIDENCE", "FAILED_VALIDATION"
+]
 AnalysisMode = Literal["standard", "leading_question_resistant", "abstention_check"]
 TemporalMode = Literal["current", "event", "known"]
 
 
 class SourceReference(BaseModel):
-    reference_type: Literal["EVIDENCE", "OBSERVATION", "RETRIEVAL_RESULT", "GRAPH_RELATIONSHIP", "DETERMINISTIC_CONTEXT", "WORKSPACE_LIMITATION"]
+    reference_type: Literal[
+        "EVIDENCE",
+        "OBSERVATION",
+        "RETRIEVAL_RESULT",
+        "GRAPH_RELATIONSHIP",
+        "DETERMINISTIC_CONTEXT",
+        "WORKSPACE_LIMITATION",
+    ]
     evidence_id: str | None = None
     evidence_identifier: str | None = None
     chunk_id: str | None = None

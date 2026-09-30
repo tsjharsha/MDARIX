@@ -1,4 +1,5 @@
 """Persist tenant-scoped report jobs and artifact metadata."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql

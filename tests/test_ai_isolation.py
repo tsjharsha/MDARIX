@@ -24,4 +24,3 @@ def test_vector_namespaces_are_tenant_bound():
     assert_tenant_namespace(namespace, "tenant-a")
     with pytest.raises(PermissionError):
         assert_tenant_namespace(namespace, "tenant-b")
-

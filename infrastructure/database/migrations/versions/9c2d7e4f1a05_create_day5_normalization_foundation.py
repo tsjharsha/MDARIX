@@ -36,7 +36,10 @@ def upgrade() -> None:
         sa.Column("warnings", sa.Integer(), server_default="0", nullable=False),
         sa.Column("errors", sa.Integer(), server_default="0", nullable=False),
         sa.Column("provenance", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.CheckConstraint("status in ('RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED')", name="normalization_run_status_allowed"),
+        sa.CheckConstraint(
+            "status in ('RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED')",
+            name="normalization_run_status_allowed",
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_normalization_runs_tenant_id_tenants")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_normalization_runs")),
     )
@@ -79,15 +82,41 @@ def upgrade() -> None:
         sa.Column("provenance", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("resolution_status in ('MATCHED','NEW_CANONICAL_OBJECT','AMBIGUOUS','UNRESOLVED','CONFLICT','REQUIRES_HUMAN_REVIEW')", name="source_canonical_link_status_allowed"),
-        sa.CheckConstraint("confidence_category in ('DETERMINISTIC','AMBIGUOUS','UNRESOLVED','CONFLICT')", name="source_canonical_link_confidence_allowed"),
-        sa.ForeignKeyConstraint(["normalization_run_id"], ["normalization_runs.id"], name=op.f("fk_source_canonical_links_normalization_run_id_normalization_runs")),
-        sa.ForeignKeyConstraint(["staged_source_record_id"], ["staged_source_records.id"], name=op.f("fk_source_canonical_links_staged_source_record_id_staged_source_records")),
-        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_source_canonical_links_tenant_id_tenants")),
+        sa.CheckConstraint(
+            "resolution_status in ('MATCHED','NEW_CANONICAL_OBJECT','AMBIGUOUS','UNRESOLVED','CONFLICT','REQUIRES_HUMAN_REVIEW')",
+            name="source_canonical_link_status_allowed",
+        ),
+        sa.CheckConstraint(
+            "confidence_category in ('DETERMINISTIC','AMBIGUOUS','UNRESOLVED','CONFLICT')",
+            name="source_canonical_link_confidence_allowed",
+        ),
+        sa.ForeignKeyConstraint(
+            ["normalization_run_id"],
+            ["normalization_runs.id"],
+            name=op.f("fk_source_canonical_links_normalization_run_id_normalization_runs"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["staged_source_record_id"],
+            ["staged_source_records.id"],
+            name=op.f("fk_source_canonical_links_staged_source_record_id_staged_source_records"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name=op.f("fk_source_canonical_links_tenant_id_tenants")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_source_canonical_links")),
-        sa.UniqueConstraint("tenant_id", "staged_source_record_id", "canonical_entity_type", "resolution_rule", name="uq_source_canonical_link_identity"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "staged_source_record_id",
+            "canonical_entity_type",
+            "resolution_rule",
+            name="uq_source_canonical_link_identity",
+        ),
     )
-    op.create_index("ix_source_canonical_links_entity", "source_canonical_links", ["tenant_id", "canonical_entity_type", "canonical_entity_id"])
+    op.create_index(
+        "ix_source_canonical_links_entity",
+        "source_canonical_links",
+        ["tenant_id", "canonical_entity_type", "canonical_entity_id"],
+    )
     op.create_index("ix_source_canonical_links_status", "source_canonical_links", ["tenant_id", "resolution_status"])
 
     op.create_table(
@@ -107,14 +136,39 @@ def upgrade() -> None:
         sa.Column("recorded_timestamp", sa.DateTime(timezone=True), nullable=True),
         sa.Column("provenance", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("assertion_status in ('supported','contradicted','hypothesized','unknown')", name="canonical_relationship_assertion_allowed"),
-        sa.ForeignKeyConstraint(["normalization_run_id"], ["normalization_runs.id"], name=op.f("fk_canonical_relationships_normalization_run_id_normalization_runs")),
-        sa.ForeignKeyConstraint(["source_link_id"], ["source_canonical_links.id"], name=op.f("fk_canonical_relationships_source_link_id_source_canonical_links")),
-        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_canonical_relationships_tenant_id_tenants")),
+        sa.CheckConstraint(
+            "assertion_status in ('supported','contradicted','hypothesized','unknown')",
+            name="canonical_relationship_assertion_allowed",
+        ),
+        sa.ForeignKeyConstraint(
+            ["normalization_run_id"],
+            ["normalization_runs.id"],
+            name=op.f("fk_canonical_relationships_normalization_run_id_normalization_runs"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["source_link_id"],
+            ["source_canonical_links.id"],
+            name=op.f("fk_canonical_relationships_source_link_id_source_canonical_links"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name=op.f("fk_canonical_relationships_tenant_id_tenants")
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_canonical_relationships")),
-        sa.UniqueConstraint("tenant_id", "source_entity_type", "source_entity_id", "target_entity_type", "target_entity_id", "relationship_type", name="uq_canonical_relationship_identity"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "source_entity_type",
+            "source_entity_id",
+            "target_entity_type",
+            "target_entity_id",
+            "relationship_type",
+            name="uq_canonical_relationship_identity",
+        ),
     )
-    op.create_index("ix_canonical_relationships_lookup", "canonical_relationships", ["tenant_id", "source_entity_type", "source_entity_id"])
+    op.create_index(
+        "ix_canonical_relationships_lookup",
+        "canonical_relationships",
+        ["tenant_id", "source_entity_type", "source_entity_id"],
+    )
 
     op.create_table(
         "normalization_issues",
@@ -129,8 +183,16 @@ def upgrade() -> None:
         sa.Column("provenance", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("severity in ('INFO','WARNING','ERROR')", name="normalization_issue_severity_allowed"),
-        sa.ForeignKeyConstraint(["normalization_run_id"], ["normalization_runs.id"], name=op.f("fk_normalization_issues_normalization_run_id_normalization_runs")),
-        sa.ForeignKeyConstraint(["staged_source_record_id"], ["staged_source_records.id"], name=op.f("fk_normalization_issues_staged_source_record_id_staged_source_records")),
+        sa.ForeignKeyConstraint(
+            ["normalization_run_id"],
+            ["normalization_runs.id"],
+            name=op.f("fk_normalization_issues_normalization_run_id_normalization_runs"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["staged_source_record_id"],
+            ["staged_source_records.id"],
+            name=op.f("fk_normalization_issues_staged_source_record_id_staged_source_records"),
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_normalization_issues_tenant_id_tenants")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_normalization_issues")),
     )

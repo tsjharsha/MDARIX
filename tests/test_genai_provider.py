@@ -3,6 +3,7 @@ import pytest
 import genai.provider as provider_module
 from genai.provider import GenAIProvider, GenAIUnavailable, redact_context
 
+
 def test_genai_defaults_fail_safe_without_provider(monkeypatch):
     monkeypatch.delenv("MDARIX_GENAI_BASE_URL", raising=False)
     monkeypatch.delenv("MDARIX_GENAI_API_KEY", raising=False)
@@ -11,10 +12,12 @@ def test_genai_defaults_fail_safe_without_provider(monkeypatch):
     assert result.output["human_review_required"] is True
     assert result.output["causality_state"] == "NOT_ESTABLISHED"
 
+
 def test_context_redaction_and_input_limit():
     assert redact_context({"password": "x", "status": "open"}) == {"password": "[REDACTED]", "status": "open"}
     with pytest.raises(GenAIUnavailable, match="TOKEN_LIMIT"):
         GenAIProvider(max_input_tokens=1).complete("a very long prompt", {})
+
 
 def test_provider_outage_is_bounded(monkeypatch):
     monkeypatch.setenv("MDARIX_GENAI_BASE_URL", "http://127.0.0.1:1")
@@ -34,10 +37,12 @@ def test_groq_mode_uses_chat_completions_contract(monkeypatch):
             return False
 
         def read(self):
-            return json.dumps({
-                "choices": [{"message": {"content": "Evidence requires human review."}}],
-                "usage": {"prompt_tokens": 12, "completion_tokens": 7},
-            }).encode()
+            return json.dumps(
+                {
+                    "choices": [{"message": {"content": "Evidence requires human review."}}],
+                    "usage": {"prompt_tokens": 12, "completion_tokens": 7},
+                }
+            ).encode()
 
     def fake_urlopen(request, timeout):
         captured["url"] = request.full_url

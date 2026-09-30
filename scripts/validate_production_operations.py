@@ -9,6 +9,7 @@ Examples:
   $env:MDARIX_OPERATIONAL_URLS='https://app-1.example,https://app-2.example'
   python scripts/validate_production_operations.py
 """
+
 from __future__ import annotations
 
 import os
@@ -27,7 +28,13 @@ def check_url(base: str, path: str) -> tuple[bool, str]:
 
 
 def main() -> int:
-    urls = [item.strip().rstrip("/") for item in os.getenv("MDARIX_OPERATIONAL_URLS", os.getenv("MDARIX_APP_URL", "http://127.0.0.1:8007")).split(",") if item.strip()]
+    urls = [
+        item.strip().rstrip("/")
+        for item in os.getenv("MDARIX_OPERATIONAL_URLS", os.getenv("MDARIX_APP_URL", "http://127.0.0.1:8007")).split(
+            ","
+        )
+        if item.strip()
+    ]
     print("MDARIX PRODUCTION OPERATIONS GATE")
     print(f"TARGETS = {len(urls)}")
 
@@ -57,9 +64,19 @@ def main() -> int:
         print("MONITORING_ALERT_DESTINATION = PENDING (MDARIX_MONITORING_ALERT_WEBHOOK is not configured)")
 
     heartbeat = os.getenv("MDARIX_OUTBOX_HEARTBEAT_TARGET", "").strip()
-    print("OUTBOX_HEARTBEAT = CONFIGURED" if heartbeat else "OUTBOX_HEARTBEAT = PENDING (worker heartbeat target is not configured)")
-    print("OUTBOX_WORKER = PASS (dedicated compose service is declared)" if os.path.exists("docker-compose.yml") else "OUTBOX_WORKER = PENDING")
-    print("PRODUCTION_MONITORING = PENDING (scraping, alert routing, and retained incident evidence require deployed infrastructure)")
+    print(
+        "OUTBOX_HEARTBEAT = CONFIGURED"
+        if heartbeat
+        else "OUTBOX_HEARTBEAT = PENDING (worker heartbeat target is not configured)"
+    )
+    print(
+        "OUTBOX_WORKER = PASS (dedicated compose service is declared)"
+        if os.path.exists("docker-compose.yml")
+        else "OUTBOX_WORKER = PENDING"
+    )
+    print(
+        "PRODUCTION_MONITORING = PENDING (scraping, alert routing, and retained incident evidence require deployed infrastructure)"
+    )
     print("PRODUCTION_MULTI_INSTANCE = PENDING (this gate does not infer deployment from local configuration)")
     return 0 if all(live_ok) and all(ready_ok) else 1
 

@@ -148,11 +148,7 @@ class EntityLinker:
                 return inv.id, "RESOLVED"
 
         elif entity_type == "Risk":
-            risk = (
-                db.query(Risk)
-                .filter(Risk.tenant_id == tenant_id, Risk.risk_identifier == search_key)
-                .first()
-            )
+            risk = db.query(Risk).filter(Risk.tenant_id == tenant_id, Risk.risk_identifier == search_key).first()
             if risk:
                 return risk.id, "RESOLVED"
 

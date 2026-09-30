@@ -15,7 +15,10 @@ PROMPT_TEMPLATE_VERSION = "R1-Day12-Hypothesis-v1"
 class ControlledHypothesisEngine:
     def generate(self, analysis: InvestigationAnalysis, investigator_question: str | None = None) -> HypothesisSet:
         now = datetime.now(timezone.utc)
-        source_refs = analysis.source_references or [ref for item in analysis.accepted_items() for ref in item.source_references][:8]
+        source_refs = (
+            analysis.source_references
+            or [ref for item in analysis.accepted_items() for ref in item.source_references][:8]
+        )
         possible = analysis.possible_explanations
         hypotheses: list[Hypothesis] = []
 
@@ -31,7 +34,9 @@ class ControlledHypothesisEngine:
             source_ai_execution_id=analysis.ai_execution_id,
             context_snapshot_id=analysis.context_snapshot_id,
             context_snapshot_version=analysis.context_snapshot_version,
-            status="INSUFFICIENT_EVIDENCE" if len(hypotheses) == 1 and hypotheses[0].status == "NO_CURRENTLY_SUPPORTABLE_HYPOTHESIS" else "MIXED_EVIDENCE",
+            status="INSUFFICIENT_EVIDENCE"
+            if len(hypotheses) == 1 and hypotheses[0].status == "NO_CURRENTLY_SUPPORTABLE_HYPOTHESIS"
+            else "MIXED_EVIDENCE",
             hypotheses=hypotheses,
             comparison=[self._comparison_row(item) for item in hypotheses],
             validation_summary={},
@@ -56,9 +61,18 @@ class ControlledHypothesisEngine:
             created_at=now,
         )
 
-    def _candidate_hypotheses(self, analysis: InvestigationAnalysis, refs: list[SourceReference], now: datetime, investigator_question: str | None) -> list[Hypothesis]:
+    def _candidate_hypotheses(
+        self,
+        analysis: InvestigationAnalysis,
+        refs: list[SourceReference],
+        now: datetime,
+        investigator_question: str | None,
+    ) -> list[Hypothesis]:
         hypotheses: list[Hypothesis] = []
-        text = " ".join(item.statement for item in analysis.possible_explanations + analysis.questions_to_investigate + analysis.limitations).lower()
+        text = " ".join(
+            item.statement
+            for item in analysis.possible_explanations + analysis.questions_to_investigate + analysis.limitations
+        ).lower()
         explanations = analysis.possible_explanations
 
         if any(term in text for term in ["supplier", "component", "rev b", "comp-pwr", "process"]):
@@ -69,7 +83,11 @@ class ControlledHypothesisEngine:
                     "component_supplier_change",
                     refs,
                     now,
-                    supporting=[item for item in explanations if any(term in item.statement.lower() for term in ["supplier", "component"])],
+                    supporting=[
+                        item
+                        for item in explanations
+                        if any(term in item.statement.lower() for term in ["supplier", "component"])
+                    ],
                     alternatives=[
                         "Manufacturing or lot variation may explain part of the pattern.",
                         "Configuration or use factors may contribute independently of the component change.",
@@ -84,7 +102,11 @@ class ControlledHypothesisEngine:
                     "manufacturing_lot_variation",
                     refs,
                     now,
-                    supporting=[item for item in explanations if any(term in item.statement.lower() for term in ["manufacturing", "lot"])],
+                    supporting=[
+                        item
+                        for item in explanations
+                        if any(term in item.statement.lower() for term in ["manufacturing", "lot"])
+                    ],
                     alternatives=[
                         "Component susceptibility may still be relevant.",
                         "The observed increase may reflect multiple concurrent factors.",
@@ -108,7 +130,9 @@ class ControlledHypothesisEngine:
 
         if investigator_question and self._leading(investigator_question):
             for hypothesis in hypotheses:
-                hypothesis.assumptions.append("The user's premise is treated as a question to test, not as established fact.")
+                hypothesis.assumptions.append(
+                    "The user's premise is treated as a question to test, not as established fact."
+                )
         return hypotheses
 
     def _hypothesis(
@@ -123,7 +147,9 @@ class ControlledHypothesisEngine:
     ) -> Hypothesis:
         support_refs = [ref for item in supporting for ref in item.source_references] or refs[:3]
         contradiction_refs = [ref for item in analysis.contradictions for ref in item.source_references] or refs[:2]
-        limitation_refs = [ref for item in analysis.missing_information + analysis.limitations for ref in item.source_references] or refs[:2]
+        limitation_refs = [
+            ref for item in analysis.missing_information + analysis.limitations for ref in item.source_references
+        ] or refs[:2]
         status = "MIXED_EVIDENCE" if analysis.contradictions or analysis.missing_information else "UNDER_INVESTIGATION"
         return Hypothesis(
             hypothesis_id=uuid.uuid4(),
@@ -133,13 +159,28 @@ class ControlledHypothesisEngine:
             status=status,
             related_objects=self._related_objects(support_refs + contradiction_refs),
             supporting_evidence=[
-                self._relationship("SUPPORTS", "Available analysis contains observations or possible explanations consistent with this hypothesis.", support_refs[:4], analysis)
+                self._relationship(
+                    "SUPPORTS",
+                    "Available analysis contains observations or possible explanations consistent with this hypothesis.",
+                    support_refs[:4],
+                    analysis,
+                )
             ],
             contradicting_evidence=[
-                self._relationship("CONTRADICTS", "Contradictory or tension-bearing evidence must be resolved before this hypothesis can be narrowed.", contradiction_refs[:4], analysis)
+                self._relationship(
+                    "CONTRADICTS",
+                    "Contradictory or tension-bearing evidence must be resolved before this hypothesis can be narrowed.",
+                    contradiction_refs[:4],
+                    analysis,
+                )
             ],
             contextual_evidence=[
-                self._relationship("CONTEXTUAL", "Workspace and temporal context frame this hypothesis but do not prove it.", limitation_refs[:4], analysis)
+                self._relationship(
+                    "CONTEXTUAL",
+                    "Workspace and temporal context frame this hypothesis but do not prove it.",
+                    limitation_refs[:4],
+                    analysis,
+                )
             ],
             unknowns=[item.statement for item in analysis.missing_information[:4]],
             assumptions=[
@@ -166,7 +207,9 @@ class ControlledHypothesisEngine:
             updated_at=now,
         )
 
-    def _no_viable_hypothesis(self, analysis: InvestigationAnalysis, refs: list[SourceReference], now: datetime) -> Hypothesis:
+    def _no_viable_hypothesis(
+        self, analysis: InvestigationAnalysis, refs: list[SourceReference], now: datetime
+    ) -> Hypothesis:
         return Hypothesis(
             hypothesis_id=uuid.uuid4(),
             investigation_id=analysis.investigation_id,
@@ -176,28 +219,44 @@ class ControlledHypothesisEngine:
             supporting_evidence=[],
             contradicting_evidence=[],
             contextual_evidence=[
-                self._relationship("INSUFFICIENT", "Available analysis abstained or lacks enough grounded possible explanations.", refs[:3], analysis)
+                self._relationship(
+                    "INSUFFICIENT",
+                    "Available analysis abstained or lacks enough grounded possible explanations.",
+                    refs[:3],
+                    analysis,
+                )
             ],
             unknowns=[item.statement for item in analysis.missing_information[:4]],
             assumptions=[],
-            temporal_consistency={"status": "INSUFFICIENT_TEMPORAL_EVIDENCE", "rationale": "No viable hypothesis to check temporally."},
+            temporal_consistency={
+                "status": "INSUFFICIENT_TEMPORAL_EVIDENCE",
+                "rationale": "No viable hypothesis to check temporally.",
+            },
             evidence_gaps=[item.statement for item in analysis.limitations[:4]],
             falsification_conditions=["Additional grounded evidence would be required before testing a hypothesis."],
             alternative_explanations=[],
             source_references=refs[:5],
-            context_snapshot={"context_snapshot_id": analysis.context_snapshot_id, "context_snapshot_version": analysis.context_snapshot_version},
+            context_snapshot={
+                "context_snapshot_id": analysis.context_snapshot_id,
+                "context_snapshot_version": analysis.context_snapshot_version,
+            },
             provenance={"source_analysis_id": str(analysis.analysis_id)},
             created_at=now,
             updated_at=now,
         )
 
-    def _relationship(self, rel_type: str, rationale: str, refs: list[SourceReference], analysis: InvestigationAnalysis) -> HypothesisEvidenceRelationship:
+    def _relationship(
+        self, rel_type: str, rationale: str, refs: list[SourceReference], analysis: InvestigationAnalysis
+    ) -> HypothesisEvidenceRelationship:
         return HypothesisEvidenceRelationship(
             relationship_id=f"HER-{uuid.uuid4().hex[:12]}",
             relationship_type=rel_type,
             rationale=rationale,
             source_references=refs,
-            provenance={"source_analysis_id": str(analysis.analysis_id), "relationship_semantics": "evidence_relationship_not_probability"},
+            provenance={
+                "source_analysis_id": str(analysis.analysis_id),
+                "relationship_semantics": "evidence_relationship_not_probability",
+            },
         )
 
     def _temporal_consistency(self, analysis: InvestigationAnalysis) -> dict:
@@ -224,7 +283,9 @@ class ControlledHypothesisEngine:
             "Independent evidence explaining affected lots or use conditions would weaken this hypothesis.",
         ]
         if scope == "component_supplier_change":
-            return common + ["Comparative Rev A / Rev B testing showing no relevant behavioral difference would weaken this hypothesis."]
+            return common + [
+                "Comparative Rev A / Rev B testing showing no relevant behavioral difference would weaken this hypothesis."
+            ]
         if scope == "manufacturing_lot_variation":
             return common + ["Complete lot genealogy showing no lot/process clustering would weaken this hypothesis."]
         return common + ["Evidence isolating one sufficient explanation would weaken a multi-factor explanation."]

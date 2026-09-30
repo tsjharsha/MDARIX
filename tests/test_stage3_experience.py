@@ -1,6 +1,13 @@
 from types import SimpleNamespace
 
-from backend.app.stage3_router import agent_catalog, assurance_summary, product_version_story, reports_catalog, signal_detail, story_view
+from backend.app.stage3_router import (
+    agent_catalog,
+    assurance_summary,
+    product_version_story,
+    reports_catalog,
+    signal_detail,
+    story_view,
+)
 
 
 def _ctx():

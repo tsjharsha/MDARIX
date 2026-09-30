@@ -1,4 +1,5 @@
 """add Day 15 decision context fields"""
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -11,7 +12,9 @@ depends_on = None
 def upgrade() -> None:
     op.add_column("decisions", sa.Column("product_id", sa.UUID(), nullable=True))
     op.add_column("decisions", sa.Column("product_version_id", sa.UUID(), nullable=True))
-    op.add_column("decisions", sa.Column("decision_status", sa.String(length=50), server_default="DRAFT", nullable=False))
+    op.add_column(
+        "decisions", sa.Column("decision_status", sa.String(length=50), server_default="DRAFT", nullable=False)
+    )
     op.add_column("decisions", sa.Column("decision_readiness", sa.String(length=80), nullable=True))
     op.add_column("decisions", sa.Column("selected_action", sa.String(length=120), nullable=True))
     op.add_column("decisions", sa.Column("human_decision", sa.Text(), nullable=True))
@@ -23,5 +26,17 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    for name in ("updated_at", "advisory_execution_id", "context_snapshot", "temporal_context", "limitations", "human_decision", "selected_action", "decision_readiness", "decision_status", "product_version_id", "product_id"):
+    for name in (
+        "updated_at",
+        "advisory_execution_id",
+        "context_snapshot",
+        "temporal_context",
+        "limitations",
+        "human_decision",
+        "selected_action",
+        "decision_readiness",
+        "decision_status",
+        "product_version_id",
+        "product_id",
+    ):
         op.drop_column("decisions", name)

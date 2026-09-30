@@ -24,7 +24,17 @@ def test_pre_model_context_excludes_secret_sentinels_and_hidden_fields():
     result = build_model_context([record], tenant_id="tenant-a", authorized_fields={"id", "title"})
     payload = repr(result.context)
     assert result.context == (({"id": "evidence-a", "title": "authorized evidence"}),)
-    for sentinel in ("TEST_HIDDEN_FIELD_DAY26", "TEST_PASSWORD_SENTINEL_DAY26", "TEST_HASH_SENTINEL_DAY26", "TEST_TOKEN_SENTINEL_DAY26", "TEST_API_KEY_SENTINEL_DAY26", "TEST_CONNECTOR_SECRET_DAY26", "TEST_DB_PASSWORD_DAY26", "TEST_SMTP_SECRET_DAY26", "TEST_AUTH_HEADER_DAY26"):
+    for sentinel in (
+        "TEST_HIDDEN_FIELD_DAY26",
+        "TEST_PASSWORD_SENTINEL_DAY26",
+        "TEST_HASH_SENTINEL_DAY26",
+        "TEST_TOKEN_SENTINEL_DAY26",
+        "TEST_API_KEY_SENTINEL_DAY26",
+        "TEST_CONNECTOR_SECRET_DAY26",
+        "TEST_DB_PASSWORD_DAY26",
+        "TEST_SMTP_SECRET_DAY26",
+        "TEST_AUTH_HEADER_DAY26",
+    ):
         assert sentinel not in payload
 
 
@@ -65,7 +75,11 @@ def test_audit_event_preserves_correlation_and_redacts_sensitive_details():
         action="ASK_QUERY_PROCESSED",
         entity_type="Ask",
         correlation_id="corr-day26",
-        details={"status": "INTERPRETED", "password": "TEST_PASSWORD_SENTINEL_DAY26", "authorization_header": "TEST_AUTH_HEADER_DAY26"},
+        details={
+            "status": "INTERPRETED",
+            "password": "TEST_PASSWORD_SENTINEL_DAY26",
+            "authorization_header": "TEST_AUTH_HEADER_DAY26",
+        },
     )
     assert event.tenant_id == "tenant-a"
     assert event.actor_ref == "user-a"

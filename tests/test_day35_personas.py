@@ -6,7 +6,12 @@ from access_control.personas import R1_PERSONAS, get_persona, validate_persona_a
 def test_r1_contains_exactly_six_canonical_personas():
     assert len(R1_PERSONAS) == 6
     assert {persona.code for persona in R1_PERSONAS} == {
-        "INVESTIGATOR", "PRODUCT_QUALITY", "REVIEWER", "APPROVER", "LEADER", "ADMINISTRATOR"
+        "INVESTIGATOR",
+        "PRODUCT_QUALITY",
+        "REVIEWER",
+        "APPROVER",
+        "LEADER",
+        "ADMINISTRATOR",
     }
 
 

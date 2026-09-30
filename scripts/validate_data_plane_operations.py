@@ -1,4 +1,5 @@
 """Validate data-plane schema, tenant separation, and logical backup readiness."""
+
 from __future__ import annotations
 
 import json
@@ -24,7 +25,10 @@ def main() -> None:
     password = os.getenv("MDARIX_DATA_PLANE_PASSWORD", "change-this-local-secret")
     result = {}
     for tenant_key, (database, port) in PLANES.items():
-        url = os.getenv(f"MDARIX_DATA_PLANE_{tenant_key}_URL", f"postgresql+pg8000://mdarix_data:{password}@localhost:{port}/{database}")
+        url = os.getenv(
+            f"MDARIX_DATA_PLANE_{tenant_key}_URL",
+            f"postgresql+pg8000://mdarix_data:{password}@localhost:{port}/{database}",
+        )
         engine = create_engine(url, future=True, pool_pre_ping=True)
         names = set(inspect(engine).get_table_names())
         missing = sorted(REQUIRED - names)
@@ -35,7 +39,11 @@ def main() -> None:
             # tenant table to query across customer boundaries.
             connection.execute(text("SELECT current_database(), current_user")).one()
         result[tenant_key] = {"database": database, "business_tables": len(names), "status": "PASS"}
-    print(json.dumps({"status": "PASS", "planes": result, "cross_plane_query": "IMPOSSIBLE_BY_DATABASE_BOUNDARY"}, indent=2))
+    print(
+        json.dumps(
+            {"status": "PASS", "planes": result, "cross_plane_query": "IMPOSSIBLE_BY_DATABASE_BOUNDARY"}, indent=2
+        )
+    )
 
 
 if __name__ == "__main__":

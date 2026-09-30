@@ -21,6 +21,7 @@ def test_webhook_signature_and_manual_review_gate():
     assert classify_inbound_event({"id": "evt-1", "type": "email.received"})["status"] == "PENDING_HUMAN_REVIEW"
     assert classify_inbound_event({"id": "evt-2", "type": "email.sent"})["status"] == "REJECTED"
 
+
 def test_sender_domain_is_verified_before_resend_delivery(monkeypatch):
     monkeypatch.setenv("RESEND_API_KEY", "secret-value")
     monkeypatch.setenv("RESEND_FROM_EMAIL", "sender@example.test")
@@ -28,6 +29,7 @@ def test_sender_domain_is_verified_before_resend_delivery(monkeypatch):
     result = ResendProvider().health()
     assert result["configured"] is False
     assert result["sender_domain_verified"] is False
+
 
 def test_bounce_is_a_persistable_review_state():
     result = classify_inbound_event({"id": "evt-bounce", "type": "email.bounced"})

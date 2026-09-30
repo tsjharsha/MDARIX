@@ -3,6 +3,7 @@
 Tenant creation is deliberately centralized so a tenant can never be created
 without its immutable customer identity and lifecycle metadata.
 """
+
 from __future__ import annotations
 
 import re
@@ -54,10 +55,18 @@ def build_customer_tenant(
     # from customer input. The transaction advisory lock prevents concurrent
     # provisioning requests from selecting the same next number.
     db.execute(text("SELECT pg_advisory_xact_lock(73192841)"))
-    issued_customers = [str(value) for (value,) in db.query(Customer.customer_identifier).filter(Customer.customer_identifier.op("~")("^CUS[0-9]+$")).all()]
+    issued_customers = [
+        str(value)
+        for (value,) in db.query(Customer.customer_identifier)
+        .filter(Customer.customer_identifier.op("~")("^CUS[0-9]+$"))
+        .all()
+    ]
     next_customer_number = max((int(value[3:]) for value in issued_customers), default=0) + 1
     generated_customer_identifier = f"CUS{next_customer_number:04d}"
-    issued_tenants = [str(value) for (value,) in db.query(Tenant.tenant_identifier).filter(Tenant.tenant_identifier.op("~")("^TEN[0-9]+$")).all()]
+    issued_tenants = [
+        str(value)
+        for (value,) in db.query(Tenant.tenant_identifier).filter(Tenant.tenant_identifier.op("~")("^TEN[0-9]+$")).all()
+    ]
     next_tenant_number = max((int(value[3:]) for value in issued_tenants), default=0) + 1
     generated_tenant_identifier = f"TEN{next_tenant_number:04d}"
     normalized_key = tenant_key.strip().upper()

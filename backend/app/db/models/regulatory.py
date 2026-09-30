@@ -10,6 +10,7 @@ from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 class RegulatoryDocument(Base):
     """Durable tenant-owned regulatory document identity and lifecycle."""
+
     __tablename__ = "regulatory_documents"
     id = uuid_pk()
     tenant_id = tenant_fk()
@@ -30,6 +31,7 @@ class RegulatoryDocument(Base):
 
 class RegulatoryDocumentVersion(Base):
     """Immutable snapshot of a generated or edited regulatory document."""
+
     __tablename__ = "regulatory_document_versions"
     id = uuid_pk()
     tenant_id = tenant_fk()

@@ -1,4 +1,5 @@
 """Read-only database hardening gate; reports local facts and external gates."""
+
 import sys
 from pathlib import Path
 
@@ -14,10 +15,18 @@ def main() -> int:
     with engine.connect() as conn:
         ssl = conn.execute(text("show ssl")).scalar()
         role = conn.execute(text("select current_user")).scalar()
-        role_flags = conn.execute(text("select rolsuper, rolcreaterole, rolcreatedb from pg_roles where rolname=current_user")).one()
+        role_flags = conn.execute(
+            text("select rolsuper, rolcreaterole, rolcreatedb from pg_roles where rolname=current_user")
+        ).one()
         rls_count = conn.execute(text("select count(*) from pg_class where relrowsecurity")).scalar()
-        tenant_tables = conn.execute(text("select count(distinct table_name) from information_schema.columns where table_schema='public' and column_name='tenant_id'")).scalar()
-        policies = conn.execute(text("select count(*) from pg_policies where policyname='mdarix_tenant_isolation'")).scalar()
+        tenant_tables = conn.execute(
+            text(
+                "select count(distinct table_name) from information_schema.columns where table_schema='public' and column_name='tenant_id'"
+            )
+        ).scalar()
+        policies = conn.execute(
+            text("select count(*) from pg_policies where policyname='mdarix_tenant_isolation'")
+        ).scalar()
         max_conn = conn.execute(text("show max_connections")).scalar()
 
     print(f"DATABASE = PASS ({role})")

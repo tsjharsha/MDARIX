@@ -1,4 +1,3 @@
-
 import pytest
 
 from access_control.configuration_safety import safe_configuration
@@ -6,7 +5,12 @@ from backend.app.access_router import _safe_provider_url
 
 
 def test_managed_secret_reference_is_allowed_but_secret_values_are_not_persistable():
-    assert safe_configuration({"credential_ref": "TRACKWISE_TOKEN", "endpoint": "https://provider.example"})["credential_ref"] == "TRACKWISE_TOKEN"
+    assert (
+        safe_configuration({"credential_ref": "TRACKWISE_TOKEN", "endpoint": "https://provider.example"})[
+            "credential_ref"
+        ]
+        == "TRACKWISE_TOKEN"
+    )
     with pytest.raises(ValueError):
         safe_configuration({"api_token": "secret-value"})
     with pytest.raises(ValueError):

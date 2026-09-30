@@ -1,4 +1,5 @@
 """Explicitly gated provisioning of the deterministic Day 35 identity fixture."""
+
 import os
 import sys
 import uuid
@@ -52,21 +53,50 @@ def main() -> int:
                 )
                 db.add(customer)
                 db.flush()
-                tenant = Tenant(id=uuid.uuid4(), customer_id=customer.id, tenant_key=fixture.key,
-                                tenant_identifier=fixture.key, tenant_slug=fixture.key.lower(),
-                                display_name=fixture.name, name=fixture.name, tenant_type="STANDARD",
-                                deployment_model="SHARED", primary_region="UNSPECIFIED",
-                                residency_region="UNSPECIFIED", cross_border_processing_allowed=False,
-                                provisioning_status="PROVISIONED", status="ACTIVE", lock_version=1,
-                                activated_at=now, created_at=now, updated_at=now)
-                db.add(tenant); db.flush()
+                tenant = Tenant(
+                    id=uuid.uuid4(),
+                    customer_id=customer.id,
+                    tenant_key=fixture.key,
+                    tenant_identifier=fixture.key,
+                    tenant_slug=fixture.key.lower(),
+                    display_name=fixture.name,
+                    name=fixture.name,
+                    tenant_type="STANDARD",
+                    deployment_model="SHARED",
+                    primary_region="UNSPECIFIED",
+                    residency_region="UNSPECIFIED",
+                    cross_border_processing_allowed=False,
+                    provisioning_status="PROVISIONED",
+                    status="ACTIVE",
+                    lock_version=1,
+                    activated_at=now,
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(tenant)
+                db.flush()
             tenants[fixture.key] = tenant
         for fixture in FIXTURE_USERS:
             tenant = tenants[fixture.tenant_key]
-            user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == fixture.email).first()
+            user = (
+                db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == fixture.email).first()
+            )
             if user is None:
-                user = AuthUser(id=uuid.uuid4(), tenant_id=tenant.id, username=fixture.email, display_name=fixture.key, company=tenant.name, password_hash=_hash(password), role=fixture.role, status="ACTIVE", email_verified=True, created_at=now, updated_at=now)
-                db.add(user); db.flush()
+                user = AuthUser(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant.id,
+                    username=fixture.email,
+                    display_name=fixture.key,
+                    company=tenant.name,
+                    password_hash=_hash(password),
+                    role=fixture.role,
+                    status="ACTIVE",
+                    email_verified=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(user)
+                db.flush()
             elif reset_existing:
                 user.password_hash = _hash(password)
                 user.status = "ACTIVE"
@@ -74,11 +104,35 @@ def main() -> int:
                 user.updated_at = now
             membership = db.query(TenantMembership).filter_by(tenant_id=tenant.id, user_id=user.id).first()
             if membership is None:
-                db.add(TenantMembership(id=uuid.uuid4(), tenant_id=tenant.id, user_id=user.id, status="ACTIVE", is_default=True, created_at=now, updated_at=now))
+                db.add(
+                    TenantMembership(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant.id,
+                        user_id=user.id,
+                        status="ACTIVE",
+                        is_default=True,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
             for persona in fixture.personas:
-                assignment = db.query(PersonaAssignment).filter_by(tenant_id=tenant.id, user_id=user.id, persona_code=persona).first()
+                assignment = (
+                    db.query(PersonaAssignment)
+                    .filter_by(tenant_id=tenant.id, user_id=user.id, persona_code=persona)
+                    .first()
+                )
                 if assignment is None:
-                    db.add(PersonaAssignment(id=uuid.uuid4(), tenant_id=tenant.id, user_id=user.id, persona_code=persona, status="ACTIVE", created_at=now, updated_at=now))
+                    db.add(
+                        PersonaAssignment(
+                            id=uuid.uuid4(),
+                            tenant_id=tenant.id,
+                            user_id=user.id,
+                            persona_code=persona,
+                            status="ACTIVE",
+                            created_at=now,
+                            updated_at=now,
+                        )
+                    )
         db.commit()
         print(f"DAY35_FIXTURE_APPLY = PASS ({len(tenants)} tenants, {len(FIXTURE_USERS)} users)")
         print(f"DAY35_FIXTURE_PASSWORD_RESET = {'PASS' if reset_existing else 'NOT_REQUESTED'}")

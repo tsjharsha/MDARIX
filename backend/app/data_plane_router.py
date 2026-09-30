@@ -1,4 +1,5 @@
 """Tenant business-data API backed by the registered customer data plane."""
+
 from __future__ import annotations
 
 import csv
@@ -17,7 +18,13 @@ router = APIRouter(prefix="/api/v1/data-plane", tags=["Tenant Data Plane"])
 
 def _rows(db: Session, table: str, tenant_id: str, limit: int):
     # Table names are constants selected by this module, never request input.
-    return [dict(row) for row in db.execute(text(f"SELECT * FROM {table} WHERE tenant_id = :tenant_id ORDER BY created_at DESC LIMIT :limit"), {"tenant_id": tenant_id, "limit": limit}).mappings()]
+    return [
+        dict(row)
+        for row in db.execute(
+            text(f"SELECT * FROM {table} WHERE tenant_id = :tenant_id ORDER BY created_at DESC LIMIT :limit"),
+            {"tenant_id": tenant_id, "limit": limit},
+        ).mappings()
+    ]
 
 
 def _deps(ctx=Depends(get_request_context), control_db=Depends(get_db), db=Depends(get_data_plane_db)):
@@ -43,13 +50,25 @@ def evidence(limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)):
 
 
 @router.get("/search")
-def search(q: str = Query(..., min_length=1, max_length=120), limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)):
+def search(
+    q: str = Query(..., min_length=1, max_length=120), limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)
+):
     ctx, db = deps
     pattern = f"%{q}%"
     result = []
-    for table, fields in (("products", ("product_identifier", "name")), ("investigations", ("investigation_identifier", "investigation_question")), ("evidence", ("evidence_identifier", "title"))):
+    for table, fields in (
+        ("products", ("product_identifier", "name")),
+        ("investigations", ("investigation_identifier", "investigation_question")),
+        ("evidence", ("evidence_identifier", "title")),
+    ):
         where = " OR ".join(f"{field} ILIKE :pattern" for field in fields)
-        result.extend(dict(row) | {"record_type": table[:-1]} for row in db.execute(text(f"SELECT * FROM {table} WHERE tenant_id = :tenant_id AND ({where}) LIMIT :limit"), {"tenant_id": ctx.tenant_id, "pattern": pattern, "limit": limit}).mappings())
+        result.extend(
+            dict(row) | {"record_type": table[:-1]}
+            for row in db.execute(
+                text(f"SELECT * FROM {table} WHERE tenant_id = :tenant_id AND ({where}) LIMIT :limit"),
+                {"tenant_id": ctx.tenant_id, "pattern": pattern, "limit": limit},
+            ).mappings()
+        )
     return {"tenant_id": ctx.tenant_id, "records": result[:limit]}
 
 
@@ -62,4 +81,8 @@ def export_csv(deps=Depends(_deps)):
     writer.writeheader()
     for row in records:
         writer.writerow({key: row.get(key) for key in writer.fieldnames})
-    return StreamingResponse(iter([output.getvalue()]), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=tenant-products.csv"})
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tenant-products.csv"},
+    )

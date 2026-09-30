@@ -79,7 +79,9 @@ def test_product_investigation_access_preserves_association_outside_historical_s
     assert [item["investigation_identifier"] for item in payload] == [f"INV-{number:03d}" for number in range(1, 8)]
     assert len({item["id"] for item in payload}) == 7
 
-    historical = service.product360(product_id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="event")
+    historical = service.product360(
+        product_id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="event"
+    )
     assert historical.investigations == []
 
 
@@ -128,7 +130,9 @@ def test_product360_event_as_of_does_not_show_future_effective_sections():
     product_id = str(primary_product())
     as_of = datetime(2026, 1, 16, tzinfo=timezone.utc)
     view = service.product360(product_id, version_id="D", as_of=as_of, mode="event")
-    assert all(datetime.fromisoformat(c["effective_timestamp"]) <= as_of for c in view.changes if c["effective_timestamp"])
+    assert all(
+        datetime.fromisoformat(c["effective_timestamp"]) <= as_of for c in view.changes if c["effective_timestamp"]
+    )
     assert all(datetime.fromisoformat(l["manufactured_timestamp"]) <= as_of for l in view.manufacturing["lots"])
 
 
@@ -170,14 +174,20 @@ def test_ground_truth_and_tenant_isolation():
     assert "actual_root_cause" not in payload
     # Verify all Day 7 canonical products share exactly one tenant
     # (Using scoped query to remain robust as subsequent days add test data)
-    assert scalar(
-        "SELECT count(distinct tenant_id) FROM products "
-        "WHERE product_identifier IN ('PRD-ASTER-100', 'PRD-LEGACY-001', 'PRD-MK2-200')"
-    ) == 1
+    assert (
+        scalar(
+            "SELECT count(distinct tenant_id) FROM products "
+            "WHERE product_identifier IN ('PRD-ASTER-100', 'PRD-LEGACY-001', 'PRD-MK2-200')"
+        )
+        == 1
+    )
 
 
 def test_api_timeline_endpoint():
-    response = client.get(f"/api/v1/products/{primary_product()}/timeline", params={"version_id": "D", "mode": "known", "as_of": "2026-02-15T00:00:00Z"})
+    response = client.get(
+        f"/api/v1/products/{primary_product()}/timeline",
+        params={"version_id": "D", "mode": "known", "as_of": "2026-02-15T00:00:00Z"},
+    )
     assert response.status_code == 200
     assert response.json()["mode"] == "known"
 
@@ -186,5 +196,9 @@ def test_day7_validator_passes():
     import subprocess
     import sys
 
-    result = subprocess.run([sys.executable, "infrastructure/database/scripts/day7_validate_product360_temporal.py"], text=True, capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "infrastructure/database/scripts/day7_validate_product360_temporal.py"],
+        text=True,
+        capture_output=True,
+    )
     assert result.returncode == 0, result.stdout + result.stderr

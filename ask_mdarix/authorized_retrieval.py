@@ -4,6 +4,7 @@ This service deliberately resolves only Product, ProductVersion, and Evidence.
 Every query is tenant-scoped and ProductVersion resolution verifies the
 Product relationship before returning a record.
 """
+
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -37,31 +38,66 @@ class AuthorizedRetrievalResult:
 
 
 def _safe_product(row: Product) -> dict[str, Any]:
-    return {"id": str(row.id), "identifier": row.product_identifier, "title": row.name,
-            "description": row.description, "status": row.lifecycle_status,
-            "provenance": {"source_system": row.source_system, "source_identifier": row.source_identifier,
-                           "source_timestamp": row.source_timestamp.isoformat() if row.source_timestamp else None}}
+    return {
+        "id": str(row.id),
+        "identifier": row.product_identifier,
+        "title": row.name,
+        "description": row.description,
+        "status": row.lifecycle_status,
+        "provenance": {
+            "source_system": row.source_system,
+            "source_identifier": row.source_identifier,
+            "source_timestamp": row.source_timestamp.isoformat() if row.source_timestamp else None,
+        },
+    }
 
 
 def _safe_version(row: ProductVersion) -> dict[str, Any]:
-    return {"id": str(row.id), "identifier": row.version_identifier, "title": row.version_identifier,
-            "description": row.description, "status": row.lifecycle_status, "product_id": str(row.product_id),
-            "effective_time": row.release_timestamp.isoformat() if row.release_timestamp else None,
-            "provenance": {"source_system": row.source_system, "source_identifier": row.source_identifier}}
+    return {
+        "id": str(row.id),
+        "identifier": row.version_identifier,
+        "title": row.version_identifier,
+        "description": row.description,
+        "status": row.lifecycle_status,
+        "product_id": str(row.product_id),
+        "effective_time": row.release_timestamp.isoformat() if row.release_timestamp else None,
+        "provenance": {"source_system": row.source_system, "source_identifier": row.source_identifier},
+    }
 
 
 def _safe_evidence(row: Evidence) -> dict[str, Any]:
-    return {"id": str(row.id), "identifier": row.evidence_identifier, "title": row.title,
-            "description": row.content, "status": row.reliability_status, "type": row.evidence_type,
-            "investigation_id": str(row.investigation_id) if row.investigation_id else None,
-            "source_reference": row.source_reference,
-            "provenance": {"source_system": row.source_system, "source_identifier": row.source_identifier,
-                           "source_timestamp": row.source_timestamp.isoformat() if row.source_timestamp else None,
-                           "ingestion_time": row.ingestion_timestamp.isoformat() if row.ingestion_timestamp else None}}
+    return {
+        "id": str(row.id),
+        "identifier": row.evidence_identifier,
+        "title": row.title,
+        "description": row.content,
+        "status": row.reliability_status,
+        "type": row.evidence_type,
+        "investigation_id": str(row.investigation_id) if row.investigation_id else None,
+        "source_reference": row.source_reference,
+        "provenance": {
+            "source_system": row.source_system,
+            "source_identifier": row.source_identifier,
+            "source_timestamp": row.source_timestamp.isoformat() if row.source_timestamp else None,
+            "ingestion_time": row.ingestion_timestamp.isoformat() if row.ingestion_timestamp else None,
+        },
+    }
 
 
 class AuthorizedRetrievalService:
-    AI_FIELDS = {"id", "identifier", "title", "description", "status", "type", "product_id", "investigation_id", "effective_time", "source_reference", "provenance"}
+    AI_FIELDS = {
+        "id",
+        "identifier",
+        "title",
+        "description",
+        "status",
+        "type",
+        "product_id",
+        "investigation_id",
+        "effective_time",
+        "source_reference",
+        "provenance",
+    }
 
     def retrieve(self, db: Session, request: AuthorizedRetrievalRequest) -> AuthorizedRetrievalResult:
         limit = max(1, min(request.limit, 100))
@@ -99,10 +135,25 @@ class AuthorizedRetrievalService:
                 query = query.filter(Evidence.evidence_identifier == request.evidence_identifier)
             evidence = query.limit(limit).all()
 
-        safe_records = [_safe_product(row) for row in products] + [_safe_version(row) for row in versions] + [_safe_evidence(row) for row in evidence]
+        safe_records = (
+            [_safe_product(row) for row in products]
+            + [_safe_version(row) for row in versions]
+            + [_safe_evidence(row) for row in evidence]
+        )
         context: list[dict[str, Any]] = []
         for record in safe_records:
-            built, decision = build_context(record, authorized_fields=self.AI_FIELDS, tenant_id=str(request.tenant_id), record_tenant_id=str(request.tenant_id))
+            built, decision = build_context(
+                record,
+                authorized_fields=self.AI_FIELDS,
+                tenant_id=str(request.tenant_id),
+                record_tenant_id=str(request.tenant_id),
+            )
             if decision.allowed:
                 context.append(built)
-        return AuthorizedRetrievalResult(tuple(_safe_product(row) for row in products), tuple(_safe_version(row) for row in versions), tuple(_safe_evidence(row) for row in evidence), tuple(context), ())
+        return AuthorizedRetrievalResult(
+            tuple(_safe_product(row) for row in products),
+            tuple(_safe_version(row) for row in versions),
+            tuple(_safe_evidence(row) for row in evidence),
+            tuple(context),
+            (),
+        )

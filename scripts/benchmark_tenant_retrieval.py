@@ -7,6 +7,7 @@ The tenant id is used only to resolve the approved data-plane registry record;
 no database URL can be supplied by a caller. Results are internal validation
 evidence, not a production capacity claim.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -24,7 +25,11 @@ from retrieval.service import TrustedRetrievalService
 def run(tenant_id: str, query: str, repeats: int) -> dict:
     control = SessionLocal()
     try:
-        plane = control.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id, TenantDataPlane.status == "ACTIVE").one()
+        plane = (
+            control.query(TenantDataPlane)
+            .filter(TenantDataPlane.tenant_id == tenant_id, TenantDataPlane.status == "ACTIVE")
+            .one()
+        )
         db = session_factory(plane.database_ref, plane.connection_secret_ref)()
     finally:
         control.close()
@@ -37,18 +42,33 @@ def run(tenant_id: str, query: str, repeats: int) -> dict:
         responses = []
         for _ in range(repeats):
             started = time.perf_counter()
-            response = service.retrieve(db, RetrievalRequest(tenant_id=tenant_id, query_text=query, retrieval_mode="hybrid"))
+            response = service.retrieve(
+                db, RetrievalRequest(tenant_id=tenant_id, query_text=query, retrieval_mode="hybrid")
+            )
             latencies.append(round((time.perf_counter() - started) * 1000, 2))
             responses.append(response)
         result_ids = {result.evidence_id for response in responses for result in response.results}
-        owned_ids = {row.id for row in db.query(Evidence.id).filter(Evidence.tenant_id == tenant_id, Evidence.id.in_(result_ids)).all()} if result_ids else set()
+        owned_ids = (
+            {
+                row.id
+                for row in db.query(Evidence.id)
+                .filter(Evidence.tenant_id == tenant_id, Evidence.id.in_(result_ids))
+                .all()
+            }
+            if result_ids
+            else set()
+        )
         return {
             "tenant_id": tenant_id,
             "database_ref": plane.database_ref,
             "indexing": indexing,
             "indexing_ms": indexing_ms,
             "query_repeats": repeats,
-            "query_latency_ms": {"min": min(latencies), "max": max(latencies), "avg": round(sum(latencies) / len(latencies), 2)},
+            "query_latency_ms": {
+                "min": min(latencies),
+                "max": max(latencies),
+                "avg": round(sum(latencies) / len(latencies), 2),
+            },
             "result_counts": [item.results_count for item in responses],
             "tenant_scope_enforced": owned_ids == result_ids,
             "limitations": ["Synthetic validation only; not a production capacity or SLA claim."],

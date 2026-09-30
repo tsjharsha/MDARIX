@@ -8,14 +8,14 @@ SCREEN = (ROOT / "frontend" / "src" / "features" / "admin" / "PlatformAdminScree
 
 def test_operational_admin_endpoints_are_tenant_scoped_and_secret_safe():
     for route in (
-        '/admin/integrations/runs',
-        '/admin/integrations/reconciliation',
-        '/admin/integrations/credentials',
-        '/admin/ai-executions',
+        "/admin/integrations/runs",
+        "/admin/integrations/reconciliation",
+        "/admin/integrations/credentials",
+        "/admin/ai-executions",
     ):
         assert f'@router.get("{route}")' in ROUTER
     assert '"secret_value": None' in ROUTER
-    assert 'secrets_redacted' in ROUTER
+    assert "secrets_redacted" in ROUTER
 
 
 def test_operational_admin_frontend_surfaces_are_connected():

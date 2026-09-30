@@ -4,6 +4,7 @@ This migration is intentionally opt-in.  It must not be applied accidentally
 to a developer database because the application credentials must be switched
 to the generated runtime role before RLS can safely deny missing context.
 """
+
 import os
 
 from alembic import op

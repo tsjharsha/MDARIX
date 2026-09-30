@@ -5,6 +5,7 @@ select ``MDARIX_OBJECT_STORAGE_PROVIDER=s3`` and provide an S3-compatible
 endpoint/bucket and credentials.  Object keys and signed URLs never cross a
 tenant prefix.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -37,7 +38,8 @@ class ObjectStorageService:
                 raise StorageError("S3 provider requires the boto3 dependency") from exc
             self.bucket = os.environ["MDARIX_OBJECT_STORAGE_BUCKET"]
             self.client = boto3.client(
-                "s3", endpoint_url=os.getenv("MDARIX_OBJECT_STORAGE_ENDPOINT"),
+                "s3",
+                endpoint_url=os.getenv("MDARIX_OBJECT_STORAGE_ENDPOINT"),
                 region_name=os.getenv("MDARIX_OBJECT_STORAGE_REGION", "us-east-1"),
                 aws_access_key_id=os.getenv("MDARIX_OBJECT_STORAGE_ACCESS_KEY"),
                 aws_secret_access_key=os.getenv("MDARIX_OBJECT_STORAGE_SECRET_KEY"),
@@ -63,7 +65,7 @@ class ObjectStorageService:
         expected_prefix = f"{tenant_id}/"
         if not str(object_key).startswith(expected_prefix):
             raise FileNotFoundError(object_key)
-        suffix = str(object_key)[len(expected_prefix):]
+        suffix = str(object_key)[len(expected_prefix) :]
         if not suffix or any(part in {"", ".", ".."} for part in PurePosixPath(suffix).parts):
             raise FileNotFoundError(object_key)
         return str(object_key)
@@ -78,7 +80,15 @@ class ObjectStorageService:
         if self.audit:
             self.audit(action, tenant_id, object_key, details)
 
-    def put(self, tenant_id: str, key: str, content: bytes, *, content_type: str = "application/octet-stream", retention_until: datetime | None = None) -> dict:
+    def put(
+        self,
+        tenant_id: str,
+        key: str,
+        content: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+        retention_until: datetime | None = None,
+    ) -> dict:
         if len(content) > self.max_object_bytes:
             raise StorageError("OBJECT_SIZE_QUOTA_EXCEEDED")
         if not self.scan(content, content_type):
@@ -88,10 +98,18 @@ class ObjectStorageService:
             raise StorageError("TENANT_STORAGE_QUOTA_EXCEEDED")
         checksum = hashlib.sha256(content).hexdigest()
         if self.provider == "s3":
-            self.client.put_object(Bucket=self.bucket, Key=object_key, Body=content, ContentType=content_type,
-                                   ServerSideEncryption=os.getenv("MDARIX_OBJECT_STORAGE_SSE", "AES256"),
-                                   Metadata={"tenant-id": str(tenant_id), "sha256": checksum,
-                                            **({"retention-until": retention_until.isoformat()} if retention_until else {})})
+            self.client.put_object(
+                Bucket=self.bucket,
+                Key=object_key,
+                Body=content,
+                ContentType=content_type,
+                ServerSideEncryption=os.getenv("MDARIX_OBJECT_STORAGE_SSE", "AES256"),
+                Metadata={
+                    "tenant-id": str(tenant_id),
+                    "sha256": checksum,
+                    **({"retention-until": retention_until.isoformat()} if retention_until else {}),
+                },
+            )
         else:
             path = self.root / object_key
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -99,6 +117,7 @@ class ObjectStorageService:
             if self.encryption_key:
                 try:
                     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
                     key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
                     if len(key_bytes) not in {16, 24, 32}:
                         raise ValueError("encryption key must decode to 16, 24, or 32 bytes")
@@ -112,15 +131,27 @@ class ObjectStorageService:
             if retention_until:
                 path.with_suffix(path.suffix + ".retention").write_text(retention_until.isoformat(), encoding="utf-8")
         self._audit("OBJECT_STORED", str(tenant_id), object_key, size=len(content), checksum=checksum)
-        return {"tenant_id": str(tenant_id), "object_key": object_key, "size": len(content), "checksum": checksum,
-                "content_type": content_type, "retention_until": retention_until}
+        return {
+            "tenant_id": str(tenant_id),
+            "object_key": object_key,
+            "size": len(content),
+            "checksum": checksum,
+            "content_type": content_type,
+            "retention_until": retention_until,
+        }
 
     def scan(self, content: bytes, content_type: str) -> bool:
         scanner = os.getenv("MDARIX_MALWARE_SCANNER_COMMAND")
         if scanner:
             try:
-                result = subprocess.run(scanner.split(), input=content, stdout=subprocess.PIPE,
-                                        stderr=subprocess.PIPE, timeout=15, check=False)
+                result = subprocess.run(
+                    scanner.split(),
+                    input=content,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=15,
+                    check=False,
+                )
                 return result.returncode == 0
             except (OSError, subprocess.TimeoutExpired):
                 return False
@@ -143,6 +174,7 @@ class ObjectStorageService:
                     raise StorageError("OBJECT_ENCRYPTION_KEY_NOT_CONFIGURED")
                 try:
                     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
                     key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
                     nonce, ciphertext = body[10:22], body[22:]
                     body = AESGCM(key_bytes).decrypt(nonce, ciphertext, expected.encode())
@@ -156,7 +188,9 @@ class ObjectStorageService:
         if expires_seconds < 1 or expires_seconds > 3600:
             raise StorageError("INVALID_SIGNED_URL_REQUEST")
         if self.provider == "s3":
-            return self.client.generate_presigned_url("get_object", Params={"Bucket": self.bucket, "Key": expected}, ExpiresIn=expires_seconds)
+            return self.client.generate_presigned_url(
+                "get_object", Params={"Bucket": self.bucket, "Key": expected}, ExpiresIn=expires_seconds
+            )
         if not self.signing_secret:
             raise StorageError("SIGNED_URL_SECRET_NOT_CONFIGURED")
         expires = int(time.time()) + expires_seconds
@@ -169,6 +203,7 @@ class ObjectStorageService:
         if self.provider != "local" or not signed_url.startswith("local://object?"):
             raise StorageError("SIGNED_URL_VERIFICATION_UNSUPPORTED")
         from urllib.parse import parse_qs, urlparse
+
         query = parse_qs(urlparse(signed_url).query)
         key = query.get("key", [""])[0]
         expires = int(query.get("expires", ["0"])[0])
@@ -176,7 +211,9 @@ class ObjectStorageService:
         expected = self._assert_tenant_key(tenant_id, key)
         if expires < int(time.time()) or not self.signing_secret:
             raise StorageError("SIGNED_URL_EXPIRED")
-        expected_signature = hmac.new(self.signing_secret.encode(), f"{expected}:{expires}".encode(), hashlib.sha256).hexdigest()
+        expected_signature = hmac.new(
+            self.signing_secret.encode(), f"{expected}:{expires}".encode(), hashlib.sha256
+        ).hexdigest()
         if not hmac.compare_digest(signature, expected_signature):
             raise StorageError("INVALID_SIGNED_URL")
         return expected
@@ -191,9 +228,11 @@ class ObjectStorageService:
             try:
                 expires = datetime.fromisoformat(marker.read_text(encoding="utf-8")).timestamp()
                 if expires <= now:
-                    object_path = Path(str(marker)[:-len(".retention")])
-                    if object_path.is_file(): object_path.unlink()
-                    marker.unlink(); deleted += 1
+                    object_path = Path(str(marker)[: -len(".retention")])
+                    if object_path.is_file():
+                        object_path.unlink()
+                    marker.unlink()
+                    deleted += 1
             except (OSError, ValueError):
                 continue
         return deleted

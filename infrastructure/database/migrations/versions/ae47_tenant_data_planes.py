@@ -1,4 +1,5 @@
 """Add server-side tenant data-plane routing metadata."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -26,7 +27,10 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("tenant_id", name="uq_tenant_data_plane_tenant"),
         sa.UniqueConstraint("database_ref", name="uq_tenant_data_plane_database_ref"),
-        sa.CheckConstraint("status in ('PROVISIONING','ACTIVE','SUSPENDED','FAILED','RETIRED')", name="tenant_data_plane_status_allowed"),
+        sa.CheckConstraint(
+            "status in ('PROVISIONING','ACTIVE','SUSPENDED','FAILED','RETIRED')",
+            name="tenant_data_plane_status_allowed",
+        ),
     )
 
 

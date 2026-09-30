@@ -8,14 +8,23 @@ def _admin_db():
     class Db:
         def query(self, model):
             class Q:
-                def filter(self, *args): return self
-                def first(self): return type("User", (), {"role": "Administrator", "status": "ACTIVE"})()
+                def filter(self, *args):
+                    return self
+
+                def first(self):
+                    return type("User", (), {"role": "Administrator", "status": "ACTIVE"})()
+
             return Q()
+
     return Db()
 
 
 def _ctx():
-    return type("Ctx", (), {"user_id": "00000000-0000-0000-0000-000000000000", "tenant_id": "00000000-0000-0000-0000-000000000000"})()
+    return type(
+        "Ctx",
+        (),
+        {"user_id": "00000000-0000-0000-0000-000000000000", "tenant_id": "00000000-0000-0000-0000-000000000000"},
+    )()
 
 
 def test_stage4_application_objects_are_scoped_to_application():

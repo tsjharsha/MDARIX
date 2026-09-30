@@ -21,21 +21,41 @@ from evidence.services.content_reader import EvidenceContentReader
 logger = logging.getLogger(__name__)
 
 
-def build_evidence_summary(evidence: Evidence, observations: list[EvidenceObservation], tenant_id: uuid.UUID) -> Dict[str, Any]:
+def build_evidence_summary(
+    evidence: Evidence, observations: list[EvidenceObservation], tenant_id: uuid.UUID
+) -> Dict[str, Any]:
     """Build a typed, non-inferential summary for frontend and brief consumers."""
-    source = {"id": str(evidence.id), "identifier": evidence.evidence_identifier, "title": evidence.title, "fact_type": evidence.fact_type}
+    source = {
+        "id": str(evidence.id),
+        "identifier": evidence.evidence_identifier,
+        "title": evidence.title,
+        "fact_type": evidence.fact_type,
+    }
     return {
         "facts": [o.statement for o in observations if o.observation_type == "EXPLICIT_SOURCE_STATEMENT"],
         "source_evidence": [source],
-        "derived_observations": [o.statement for o in observations if o.observation_type != "EXPLICIT_SOURCE_STATEMENT"],
+        "derived_observations": [
+            o.statement for o in observations if o.observation_type != "EXPLICIT_SOURCE_STATEMENT"
+        ],
         "supporting_evidence": [],
         "contradictory_evidence": [],
         "unresolved_evidence": [o.statement for o in observations if o.quality_status != "VALIDATED"],
         "missing_evidence": [],
         "unknowns": [],
         "limitations": [limitation for o in observations for limitation in (o.limitations or [])],
-        "provenance": {"tenant_id": str(tenant_id), "evidence_id": str(evidence.id), "source_system": evidence.source_system, "source_reference": evidence.source_reference, "source_timestamp": evidence.source_timestamp.isoformat() if evidence.source_timestamp else None, "ingestion_timestamp": evidence.ingestion_timestamp.isoformat() if evidence.ingestion_timestamp else None},
-        "sufficiency": "SUFFICIENT_FOR_REVIEW" if observations and not any(o.quality_status != "VALIDATED" for o in observations) else "PARTIALLY_SUFFICIENT" if observations else "INSUFFICIENT",
+        "provenance": {
+            "tenant_id": str(tenant_id),
+            "evidence_id": str(evidence.id),
+            "source_system": evidence.source_system,
+            "source_reference": evidence.source_reference,
+            "source_timestamp": evidence.source_timestamp.isoformat() if evidence.source_timestamp else None,
+            "ingestion_timestamp": evidence.ingestion_timestamp.isoformat() if evidence.ingestion_timestamp else None,
+        },
+        "sufficiency": "SUFFICIENT_FOR_REVIEW"
+        if observations and not any(o.quality_status != "VALIDATED" for o in observations)
+        else "PARTIALLY_SUFFICIENT"
+        if observations
+        else "INSUFFICIENT",
         "temporal_context": {"mode": "current", "as_of": None},
     }
 
@@ -60,11 +80,7 @@ class EvidenceIntelligenceService:
     ) -> Dict[str, Any]:
         """Runs full evidence intelligence pipeline for a specific evidence record idempotently."""
 
-        evidence = (
-            db.query(Evidence)
-            .filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id)
-            .first()
-        )
+        evidence = db.query(Evidence).filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id).first()
         if not evidence:
             raise ValueError(f"Evidence record {evidence_id} not found for tenant {tenant_id}")
 
@@ -82,17 +98,27 @@ class EvidenceIntelligenceService:
         content, metadata = self.content_reader.get_evidence_content(db, tenant_id, evidence_id)
 
         # Clear existing extracted records in child-first order if reprocessing
-        obs_ids = [o.id for o in db.query(EvidenceObservation.id).filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id).all()]
+        obs_ids = [
+            o.id
+            for o in db.query(EvidenceObservation.id)
+            .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
+            .all()
+        ]
         if obs_ids:
-            db.query(EvidencePropositionRelation).filter(EvidencePropositionRelation.tenant_id == tenant_id, EvidencePropositionRelation.observation_id.in_(obs_ids)).delete(synchronize_session=False)
-        db.query(EvidenceEntityLink).filter(EvidenceEntityLink.tenant_id == tenant_id, EvidenceEntityLink.evidence_id == evidence_id).delete(synchronize_session=False)
-        db.query(EvidenceObservation).filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id).delete(synchronize_session=False)
+            db.query(EvidencePropositionRelation).filter(
+                EvidencePropositionRelation.tenant_id == tenant_id,
+                EvidencePropositionRelation.observation_id.in_(obs_ids),
+            ).delete(synchronize_session=False)
+        db.query(EvidenceEntityLink).filter(
+            EvidenceEntityLink.tenant_id == tenant_id, EvidenceEntityLink.evidence_id == evidence_id
+        ).delete(synchronize_session=False)
+        db.query(EvidenceObservation).filter(
+            EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id
+        ).delete(synchronize_session=False)
         db.flush()
-
 
         # 2. Chunk Evidence
         chunks = self.chunker.create_chunks_for_evidence(db, tenant_id, evidence_id, content, metadata)
-
 
         # 3. Deterministic Extraction
         det_observations = self.deterministic_extractor.extract_deterministic_observations(  # noqa: F841 -- result is never persisted (see STATUS.md)
@@ -124,13 +150,14 @@ class EvidenceIntelligenceService:
                 extraction_method="GENAI",
                 source_anchor=anchor_dict,
                 quality_status="VALIDATED" if not validated_result.warnings else "LIMITATIONS",
-                limitations=[l.model_dump() for l in validated_result.limitations] if validated_result.limitations else None,
+                limitations=[l.model_dump() for l in validated_result.limitations]
+                if validated_result.limitations
+                else None,
                 ai_execution_id=ai_execution_id,
             )
             db.add(obs_rec)
             db.flush()
             ai_obs_records.append(obs_rec)
-
 
             # Link entities for this observation
             if obs_schema.related_entity_references:
@@ -184,11 +211,7 @@ class EvidenceIntelligenceService:
         evidence_id: uuid.UUID,
     ) -> Dict[str, Any]:
         """Queries evidence record, chunks, observations, entity links, and AI provenance."""
-        evidence = (
-            db.query(Evidence)
-            .filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id)
-            .first()
-        )
+        evidence = db.query(Evidence).filter(Evidence.tenant_id == tenant_id, Evidence.id == evidence_id).first()
         if not evidence:
             raise ValueError(f"Evidence {evidence_id} not found")
 
@@ -230,8 +253,12 @@ class EvidenceIntelligenceService:
                 "document_ref": evidence.document_ref,
                 "reliability_status": evidence.reliability_status,
                 "fact_type": evidence.fact_type,
-                "effective_timestamp": evidence.effective_timestamp.isoformat() if evidence.effective_timestamp else None,
-                "ingestion_timestamp": evidence.ingestion_timestamp.isoformat() if evidence.ingestion_timestamp else None,
+                "effective_timestamp": evidence.effective_timestamp.isoformat()
+                if evidence.effective_timestamp
+                else None,
+                "ingestion_timestamp": evidence.ingestion_timestamp.isoformat()
+                if evidence.ingestion_timestamp
+                else None,
             },
             "evidence_summary": build_evidence_summary(evidence, observations, tenant_id),
             "chunks_count": len(chunks),

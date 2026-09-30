@@ -5,6 +5,7 @@ that a home-grown XML file is an FDA eSTAR submission. This module therefore
 produces a deterministic preparation package that can be reviewed and mapped
 into the current official eSTAR template.
 """
+
 from __future__ import annotations
 
 import io
@@ -30,9 +31,15 @@ def validate_estar_xml(xml_bytes: bytes) -> dict:
     required = {"documentType", "templateVersion", "tenantId", "title", "humanReviewRequired", "sections"}
     present = {child.tag.rsplit("}", 1)[-1] for child in root}
     errors.extend(f"MISSING_{name.upper()}" for name in sorted(required - present))
-    if root.find(f"{{{NS}}}documentType") is not None and root.find(f"{{{NS}}}documentType").text != "ESTAR_510K_PREPARATION":
+    if (
+        root.find(f"{{{NS}}}documentType") is not None
+        and root.find(f"{{{NS}}}documentType").text != "ESTAR_510K_PREPARATION"
+    ):
         errors.append("DOCUMENT_TYPE_INVALID")
-    if root.find(f"{{{NS}}}humanReviewRequired") is not None and root.find(f"{{{NS}}}humanReviewRequired").text != "true":
+    if (
+        root.find(f"{{{NS}}}humanReviewRequired") is not None
+        and root.find(f"{{{NS}}}humanReviewRequired").text != "true"
+    ):
         errors.append("HUMAN_REVIEW_REQUIRED")
     for section in root.findall(f"{{{NS}}}sections/{{{NS}}}section"):
         if not section.get("id") or not section.find(f"{{{NS}}}text").text:
@@ -42,12 +49,17 @@ def validate_estar_xml(xml_bytes: bytes) -> dict:
     return {"valid": not errors, "errors": errors, "schema": "MDARIX eSTAR preparation v1"}
 
 
-def generate_estar_package(*, tenant_id: str, title: str, sections: list[dict], citations: dict, document_version: int = 1) -> dict:
+def generate_estar_package(
+    *, tenant_id: str, title: str, sections: list[dict], citations: dict, document_version: int = 1
+) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     root = ET.Element(f"{{{NS}}}estarPreparation", {"version": "1.0"})
     fields = {
-        "documentType": "ESTAR_510K_PREPARATION", "templateVersion": "MDARIX-eSTAR-prep-1.0",
-        "tenantId": str(tenant_id), "title": title, "humanReviewRequired": "true",
+        "documentType": "ESTAR_510K_PREPARATION",
+        "templateVersion": "MDARIX-eSTAR-prep-1.0",
+        "tenantId": str(tenant_id),
+        "title": title,
+        "humanReviewRequired": "true",
     }
     for name, value in fields.items():
         ET.SubElement(root, f"{{{NS}}}{name}").text = value
@@ -67,12 +79,36 @@ def generate_estar_package(*, tenant_id: str, title: str, sections: list[dict], 
     validation = validate_estar_xml(xml_bytes)
     if not validation["valid"]:
         raise ValueError("ESTAR_PREPARATION_INVALID: " + ",".join(validation["errors"]))
-    pdf_data = {"title": title, "tenant_id": str(tenant_id), "report_version": f"eSTAR-prep-{document_version}", "generated_at": now, "sections": sections, "citation_verification": citations, "limitations": ["Preparation package only; map into the current official FDA eSTAR template before submission."]}
+    pdf_data = {
+        "title": title,
+        "tenant_id": str(tenant_id),
+        "report_version": f"eSTAR-prep-{document_version}",
+        "generated_at": now,
+        "sections": sections,
+        "citation_verification": citations,
+        "limitations": [
+            "Preparation package only; map into the current official FDA eSTAR template before submission."
+        ],
+    }
     pdf_bytes = _render_pdf(pdf_data, f"MDARIX CONTROLLED PREPARATION COPY - {tenant_id} - v{document_version}")
-    manifest = {"package_type": "MDARIX_ESTAR_PREPARATION", "version": "1.0", "document_version": document_version, "tenant_id": str(tenant_id), "xml_validation": validation, "human_review_required": True, "official_template_required": True}
+    manifest = {
+        "package_type": "MDARIX_ESTAR_PREPARATION",
+        "version": "1.0",
+        "document_version": document_version,
+        "tenant_id": str(tenant_id),
+        "xml_validation": validation,
+        "human_review_required": True,
+        "official_template_required": True,
+    }
     package = io.BytesIO()
     with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("manifest.json", json.dumps(manifest, indent=2))
         archive.writestr("estar-preparation.xml", xml_bytes)
         archive.writestr("estar-preparation.pdf", pdf_bytes)
-    return {"content": package.getvalue(), "content_type": "application/zip", "filename": f"{tenant_id}-estar-preparation-v{document_version}.zip", "validation": validation, "manifest": manifest}
+    return {
+        "content": package.getvalue(),
+        "content_type": "application/zip",
+        "filename": f"{tenant_id}-estar-preparation-v{document_version}.zip",
+        "validation": validation,
+        "manifest": manifest,
+    }

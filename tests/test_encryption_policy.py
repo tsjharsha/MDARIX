@@ -15,4 +15,19 @@ def test_encryption_policy_requires_all_protection_controls():
     result = validate_encryption_policy({"tls_application": True, "tls_database": True})
     assert result["valid"] is False
     assert "backup_encryption" in result["missing"]
-    assert validate_encryption_policy({key: True for key in ("tls_application", "tls_database", "database_at_rest", "backup_encryption", "object_storage_encryption", "key_rotation")})["valid"] is True
+    assert (
+        validate_encryption_policy(
+            {
+                key: True
+                for key in (
+                    "tls_application",
+                    "tls_database",
+                    "database_at_rest",
+                    "backup_encryption",
+                    "object_storage_encryption",
+                    "key_rotation",
+                )
+            }
+        )["valid"]
+        is True
+    )

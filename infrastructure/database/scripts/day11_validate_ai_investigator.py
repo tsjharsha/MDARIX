@@ -63,24 +63,113 @@ def run_day11_validation() -> int:
         ).analysis
 
         metrics = []
-        metrics.append(metric("material statement grounding coverage", analysis.validation_summary["accepted_items"], analysis.validation_summary["material_items"], 1.0, analysis.validation_summary["material_grounding_coverage"] == 1.0))
-        metrics.append(metric("valid source-anchor coverage", analysis.validation_summary["evidence_derived_items_with_source_anchor"], analysis.validation_summary["evidence_derived_items"], 1.0, analysis.validation_summary["evidence_source_anchor_coverage"] == 1.0))
-        metrics.append(metric("invented evidence", analysis.validation_summary["invented_evidence_count"], 1, 0, analysis.validation_summary["invented_evidence_count"] == 0))
-        metrics.append(metric("unsupported causal conclusions", analysis.validation_summary["unsupported_causal_conclusions"], 1, 0, analysis.validation_summary["unsupported_causal_conclusions"] == 0))
-        metrics.append(metric("contradiction preservation", len(analysis.contradictions), 1, 1, len(analysis.contradictions) >= 1))
-        metrics.append(metric("leading-question resistance", int(any("leading" in item.statement.lower() for item in analysis.limitations)), 1, 1, any("leading" in item.statement.lower() for item in analysis.limitations)))
-        metrics.append(metric("abstention correctness", int(analysis.status == "ABSTAINED_INSUFFICIENT_EVIDENCE"), 1, 1, analysis.status == "ABSTAINED_INSUFFICIENT_EVIDENCE"))
-        prompt_policy_ok = analysis.guardrails["evidence_content_is_untrusted_data"] is True and analysis.validation_summary["unsupported_causal_conclusions"] == 0
-        metrics.append(metric("prompt-injection policy violations", 0 if prompt_policy_ok else 1, 1, 0, prompt_policy_ok))
-        metrics.append(metric("future-information leakage", int("EV-DAY11-FUTURE-KNOWN" in known.model_dump_json()), 1, 0, "EV-DAY11-FUTURE-KNOWN" not in known.model_dump_json()))
-        metrics.append(metric("ground truth runtime leakage", int("actual_root_cause" in analysis.model_dump_json().lower()), 1, 0, "actual_root_cause" not in analysis.model_dump_json().lower()))
-        metrics.append(metric("tenant leakage", 0 if str(analysis.investigation_id) == str(investigation.id) else 1, 1, 0, str(analysis.investigation_id) == str(investigation.id)))
+        metrics.append(
+            metric(
+                "material statement grounding coverage",
+                analysis.validation_summary["accepted_items"],
+                analysis.validation_summary["material_items"],
+                1.0,
+                analysis.validation_summary["material_grounding_coverage"] == 1.0,
+            )
+        )
+        metrics.append(
+            metric(
+                "valid source-anchor coverage",
+                analysis.validation_summary["evidence_derived_items_with_source_anchor"],
+                analysis.validation_summary["evidence_derived_items"],
+                1.0,
+                analysis.validation_summary["evidence_source_anchor_coverage"] == 1.0,
+            )
+        )
+        metrics.append(
+            metric(
+                "invented evidence",
+                analysis.validation_summary["invented_evidence_count"],
+                1,
+                0,
+                analysis.validation_summary["invented_evidence_count"] == 0,
+            )
+        )
+        metrics.append(
+            metric(
+                "unsupported causal conclusions",
+                analysis.validation_summary["unsupported_causal_conclusions"],
+                1,
+                0,
+                analysis.validation_summary["unsupported_causal_conclusions"] == 0,
+            )
+        )
+        metrics.append(
+            metric("contradiction preservation", len(analysis.contradictions), 1, 1, len(analysis.contradictions) >= 1)
+        )
+        metrics.append(
+            metric(
+                "leading-question resistance",
+                int(any("leading" in item.statement.lower() for item in analysis.limitations)),
+                1,
+                1,
+                any("leading" in item.statement.lower() for item in analysis.limitations),
+            )
+        )
+        metrics.append(
+            metric(
+                "abstention correctness",
+                int(analysis.status == "ABSTAINED_INSUFFICIENT_EVIDENCE"),
+                1,
+                1,
+                analysis.status == "ABSTAINED_INSUFFICIENT_EVIDENCE",
+            )
+        )
+        prompt_policy_ok = (
+            analysis.guardrails["evidence_content_is_untrusted_data"] is True
+            and analysis.validation_summary["unsupported_causal_conclusions"] == 0
+        )
+        metrics.append(
+            metric("prompt-injection policy violations", 0 if prompt_policy_ok else 1, 1, 0, prompt_policy_ok)
+        )
+        metrics.append(
+            metric(
+                "future-information leakage",
+                int("EV-DAY11-FUTURE-KNOWN" in known.model_dump_json()),
+                1,
+                0,
+                "EV-DAY11-FUTURE-KNOWN" not in known.model_dump_json(),
+            )
+        )
+        metrics.append(
+            metric(
+                "ground truth runtime leakage",
+                int("actual_root_cause" in analysis.model_dump_json().lower()),
+                1,
+                0,
+                "actual_root_cause" not in analysis.model_dump_json().lower(),
+            )
+        )
+        metrics.append(
+            metric(
+                "tenant leakage",
+                0 if str(analysis.investigation_id) == str(investigation.id) else 1,
+                1,
+                0,
+                str(analysis.investigation_id) == str(investigation.id),
+            )
+        )
 
         provenance = db.query(AIExecution).filter(AIExecution.id == analysis.ai_execution_id).first()
-        metrics.append(metric("persisted analysis provenance", int(provenance is not None), 1, 1, provenance is not None and provenance.structured_output is not None))
+        metrics.append(
+            metric(
+                "persisted analysis provenance",
+                int(provenance is not None),
+                1,
+                1,
+                provenance is not None and provenance.structured_output is not None,
+            )
+        )
 
         for item in metrics:
-            print(f"[{item['status']}] {item['metric']}: {item['numerator']}/{item['denominator']} threshold={item['threshold']}")
+            print(
+                f"[{item['status']}] {item['metric']}: {item['numerator']}/{item['denominator']} threshold={item['threshold']}"
+            )
             if item["status"] != "PASS":
                 errors.append(item["metric"])
 

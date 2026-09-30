@@ -1,4 +1,5 @@
 """Make enterprise audit events append-only."""
+
 from alembic import op
 
 revision = "o31auditimmutability"

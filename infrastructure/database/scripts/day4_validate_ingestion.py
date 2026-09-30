@@ -24,15 +24,25 @@ def main() -> int:
         check(REQUIRED_TABLES <= tables, f"Missing ingestion tables: {REQUIRED_TABLES - tables}")
 
         completed_files = conn.execute(
-            text("SELECT count(distinct source_file) FROM ingestion_runs WHERE status in ('COMPLETED','COMPLETED_WITH_WARNINGS')")
+            text(
+                "SELECT count(distinct source_file) FROM ingestion_runs WHERE status in ('COMPLETED','COMPLETED_WITH_WARNINGS')"
+            )
         ).scalar_one()
         staged_records = conn.execute(text("SELECT count(*) FROM staged_source_records")).scalar_one()
         issues = conn.execute(text("SELECT count(*) FROM data_quality_issues")).scalar_one()
         mappings = conn.execute(text("SELECT count(*) FROM source_mappings")).scalar_one()
         sources = set(conn.execute(text("SELECT distinct source_system FROM staged_source_records")).scalars())
-        checksum_missing = conn.execute(text("SELECT count(*) FROM ingestion_runs WHERE source_checksum IS NULL OR length(source_checksum) <> 64")).scalar_one()
-        raw_missing = conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload IS NULL OR parsed_payload IS NULL OR candidate_canonical_payload IS NULL")).scalar_one()
-        gt_leaks = conn.execute(text("SELECT count(*) FROM staged_source_records WHERE source_file LIKE '%evaluation/ground_truth%'")).scalar_one()
+        checksum_missing = conn.execute(
+            text("SELECT count(*) FROM ingestion_runs WHERE source_checksum IS NULL OR length(source_checksum) <> 64")
+        ).scalar_one()
+        raw_missing = conn.execute(
+            text(
+                "SELECT count(*) FROM staged_source_records WHERE raw_payload IS NULL OR parsed_payload IS NULL OR candidate_canonical_payload IS NULL"
+            )
+        ).scalar_one()
+        gt_leaks = conn.execute(
+            text("SELECT count(*) FROM staged_source_records WHERE source_file LIKE '%evaluation/ground_truth%'")
+        ).scalar_one()
         duplicate_staged = conn.execute(
             text(
                 "SELECT count(*) FROM ("

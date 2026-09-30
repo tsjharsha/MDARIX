@@ -1,4 +1,5 @@
 """Run the deterministic VS001-VS012 semantic harness without exposing truth data."""
+
 import csv
 import json
 import sys
@@ -18,7 +19,15 @@ def main() -> int:
         writer = csv.DictWriter(stream, fieldnames=["scenario_id", "status"])
         writer.writeheader()
         writer.writerows({"scenario_id": row["scenario_id"], "status": row["status"]} for row in rows)
-    print(json.dumps({"status": result["status"], "scenario_count": len(rows), "ground_truth_runtime_leakage": result["ground_truth_runtime_leakage"]}))
+    print(
+        json.dumps(
+            {
+                "status": result["status"],
+                "scenario_count": len(rows),
+                "ground_truth_runtime_leakage": result["ground_truth_runtime_leakage"],
+            }
+        )
+    )
     return 0 if result["status"] == "PASS" else 1
 
 

@@ -2,7 +2,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).parents[1]
-UI = (ROOT / "frontend" / "src" / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(encoding="utf-8")
+UI = (ROOT / "frontend" / "src" / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(
+    encoding="utf-8"
+)
 ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
 
 
@@ -22,7 +24,7 @@ def test_customer_admin_uses_server_scoped_mutation_contracts():
 
 
 def test_customer_admin_does_not_accept_browser_tenant_as_authority():
-    invite_block = UI[UI.index("const submitInvite"):UI.index("const currentNav")]
+    invite_block = UI[UI.index("const submitInvite") : UI.index("const currentNav")]
     assert "tenant_id" not in invite_block
     assert "Tenant context is server-derived" in UI or "server-derived tenant scope" in UI
 

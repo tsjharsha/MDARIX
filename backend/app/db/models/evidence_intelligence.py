@@ -90,7 +90,9 @@ class EvidenceEntityLink(Base):
 
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
-        ForeignKeyConstraint(["tenant_id", "observation_id"], ["evidence_observations.tenant_id", "evidence_observations.id"]),
+        ForeignKeyConstraint(
+            ["tenant_id", "observation_id"], ["evidence_observations.tenant_id", "evidence_observations.id"]
+        ),
         CheckConstraint("resolution_status in ('RESOLVED','UNRESOLVED')", name="evidence_entity_link_status_allowed"),
         UniqueConstraint("tenant_id", "id", name="uq_evidence_entity_links_tenant_id_id"),
     )
@@ -107,10 +109,13 @@ class EvidencePropositionRelation(Base):
     rationale: Mapped[str | None] = mapped_column(Text)
     created_at = now_tz()
 
-
     __table_args__ = (
-        ForeignKeyConstraint(["tenant_id", "observation_id"], ["evidence_observations.tenant_id", "evidence_observations.id"]),
-        CheckConstraint("relation_type in ('SUPPORT','CONTRADICT','NEUTRAL_CONTEXTUAL')", name="evidence_prop_relation_type_allowed"),
+        ForeignKeyConstraint(
+            ["tenant_id", "observation_id"], ["evidence_observations.tenant_id", "evidence_observations.id"]
+        ),
+        CheckConstraint(
+            "relation_type in ('SUPPORT','CONTRADICT','NEUTRAL_CONTEXTUAL')", name="evidence_prop_relation_type_allowed"
+        ),
         UniqueConstraint("tenant_id", "id", name="uq_evidence_proposition_relations_tenant_id_id"),
     )
 

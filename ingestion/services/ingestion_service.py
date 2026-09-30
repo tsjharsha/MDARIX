@@ -131,7 +131,9 @@ class IngestionService:
         tenant_key = "ACME_CARE_SYNTHETIC"
         now = utcnow()
         with engine.begin() as conn:
-            tenant_id = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:tenant_key"), {"tenant_key": tenant_key}).scalar_one_or_none()
+            tenant_id = conn.execute(
+                text("SELECT id FROM tenants WHERE tenant_key=:tenant_key"), {"tenant_key": tenant_key}
+            ).scalar_one_or_none()
             if tenant_id:
                 return str(tenant_id)
             # ``tenants.customer_id`` is intentionally NOT NULL.  The day-4
@@ -155,21 +157,30 @@ class IngestionService:
                         "now": now,
                     },
                 ).scalar_one()
-            return str(conn.execute(
-                text(
-                    "INSERT INTO tenants "
-                    "(customer_id, tenant_key, tenant_identifier, name, display_name, tenant_slug, tenant_type, deployment_model, primary_region, residency_region, cross_border_processing_allowed, provisioning_status, status, lock_version, created_at, updated_at) "
-                    "VALUES (:customer_id, :tenant_key, 'TENANT-ACME-SYNTHETIC', :name, :name, 'acme-care-synthetic', 'STANDARD', 'SHARED', 'US', 'US', false, 'PROVISIONED', 'ACTIVE', 1, :now, :now) RETURNING id"
-                ),
-                {"customer_id": customer_id, "tenant_key": tenant_key, "name": manifest["fictional_company"], "now": now},
-            ).scalar_one())
+            return str(
+                conn.execute(
+                    text(
+                        "INSERT INTO tenants "
+                        "(customer_id, tenant_key, tenant_identifier, name, display_name, tenant_slug, tenant_type, deployment_model, primary_region, residency_region, cross_border_processing_allowed, provisioning_status, status, lock_version, created_at, updated_at) "
+                        "VALUES (:customer_id, :tenant_key, 'TENANT-ACME-SYNTHETIC', :name, :name, 'acme-care-synthetic', 'STANDARD', 'SHARED', 'US', 'US', false, 'PROVISIONED', 'ACTIVE', 1, :now, :now) RETURNING id"
+                    ),
+                    {
+                        "customer_id": customer_id,
+                        "tenant_key": tenant_key,
+                        "name": manifest["fictional_company"],
+                        "now": now,
+                    },
+                ).scalar_one()
+            )
 
     def ingest_source(self, tenant_id: str, source: SourceFile, initiated_by: str) -> dict[str, Any]:
         if GROUND_TRUTH in source.path.resolve().parents:
             raise ValueError("Ground Truth path must not be ingested")
         mapping = load_mapping(source.mapping_name)
         checksum = file_sha256(source.path)
-        source_file = source.path.relative_to(ROOT).as_posix() if source.path.is_relative_to(ROOT) else source.path.as_posix()
+        source_file = (
+            source.path.relative_to(ROOT).as_posix() if source.path.is_relative_to(ROOT) else source.path.as_posix()
+        )
         now = utcnow()
         self.upsert_mapping(mapping, now)
 
@@ -179,7 +190,12 @@ class IngestionService:
                     "SELECT id FROM ingestion_runs WHERE tenant_id=:tenant_id AND source_system=:source_system "
                     "AND source_file=:source_file AND source_checksum=:checksum AND status in ('COMPLETED','COMPLETED_WITH_WARNINGS')"
                 ),
-                {"tenant_id": tenant_id, "source_system": source.source_system, "source_file": source_file, "checksum": checksum},
+                {
+                    "tenant_id": tenant_id,
+                    "source_system": source.source_system,
+                    "source_file": source_file,
+                    "checksum": checksum,
+                },
             ).scalar_one_or_none()
             if existing:
                 run_id = conn.execute(
@@ -215,7 +231,9 @@ class IngestionService:
                     "now": now,
                     "mapping_version": mapping["mapping_version"],
                     "initiated_by": initiated_by,
-                    "provenance": json.dumps({"schema_version": mapping["schema_version"], "adapter": source.path.suffix.lower()}),
+                    "provenance": json.dumps(
+                        {"schema_version": mapping["schema_version"], "adapter": source.path.suffix.lower()}
+                    ),
                 },
             ).scalar_one()
 
@@ -224,7 +242,9 @@ class IngestionService:
                 self.validate_headers(source, records, mapping)
                 accepted = warnings = rejected = issues = duplicates = 0
                 for record in records:
-                    outcome = self.stage_record(conn, tenant_id, str(run_id), source, source_file, checksum, mapping, record)
+                    outcome = self.stage_record(
+                        conn, tenant_id, str(run_id), source, source_file, checksum, mapping, record
+                    )
                     if outcome.status == "ACCEPTED":
                         accepted += 1
                     elif outcome.status == "ACCEPTED_WITH_WARNINGS":
@@ -240,11 +260,22 @@ class IngestionService:
                         "UPDATE ingestion_runs SET ingestion_completed_at=:now, status=:status, total_records=:total, accepted_records=:accepted, warning_records=:warnings, rejected_records=:rejected, duplicate_source_records=:duplicates "
                         "WHERE id=:run_id"
                     ),
-                    {"now": utcnow(), "status": status, "total": len(records), "accepted": accepted, "warnings": warnings, "rejected": rejected, "duplicates": duplicates, "run_id": run_id},
+                    {
+                        "now": utcnow(),
+                        "status": status,
+                        "total": len(records),
+                        "accepted": accepted,
+                        "warnings": warnings,
+                        "rejected": rejected,
+                        "duplicates": duplicates,
+                        "run_id": run_id,
+                    },
                 )
             except Exception as exc:
                 conn.execute(
-                    text("UPDATE ingestion_runs SET ingestion_completed_at=:now, status='FAILED', error_summary=:error WHERE id=:run_id"),
+                    text(
+                        "UPDATE ingestion_runs SET ingestion_completed_at=:now, status='FAILED', error_summary=:error WHERE id=:run_id"
+                    ),
                     {"now": utcnow(), "error": safe_error(exc), "run_id": run_id},
                 )
                 return self.run_summary(conn, str(run_id))
@@ -285,7 +316,17 @@ class IngestionService:
             if missing:
                 raise ValueError(f"Schema drift: missing required fields {sorted(missing)} in {source.path}")
 
-    def stage_record(self, conn, tenant_id: str, run_id: str, source: SourceFile, source_file: str, file_checksum: str, mapping: dict[str, Any], record: SourceRecord) -> RecordOutcome:
+    def stage_record(
+        self,
+        conn,
+        tenant_id: str,
+        run_id: str,
+        source: SourceFile,
+        source_file: str,
+        file_checksum: str,
+        mapping: dict[str, Any],
+        record: SourceRecord,
+    ) -> RecordOutcome:
         raw = record.raw_payload
         record_id = self.source_record_id(source, raw, record.row_index)
         parsed = dict(raw)
@@ -337,15 +378,36 @@ class IngestionService:
         return RecordOutcome(quality, issues)
 
     def source_record_id(self, source: SourceFile, raw: dict[str, Any], row_index: int | None) -> str:
-        for key in ["complaint_id", "product_component_id", "product_id", "product_version_id", "component_id", "requirement_id", "change_id", "supplier_id", "site_id", "lot_id", "investigation_id", "risk_id", "failure_mode_id", "control_id", "evidence_id", "filename"]:
+        for key in [
+            "complaint_id",
+            "product_component_id",
+            "product_id",
+            "product_version_id",
+            "component_id",
+            "requirement_id",
+            "change_id",
+            "supplier_id",
+            "site_id",
+            "lot_id",
+            "investigation_id",
+            "risk_id",
+            "failure_mode_id",
+            "control_id",
+            "evidence_id",
+            "filename",
+        ]:
             if raw.get(key):
                 return str(raw[key])
         return f"{source.record_type}:{row_index}"
 
     def extract_timestamps(self, raw: dict[str, Any]) -> dict[str, datetime | None]:
         return {
-            "source_timestamp": parse_source_datetime(raw.get("source_timestamp") or raw.get("event_timestamp") or raw.get("manufactured_timestamp")),
-            "effective_timestamp": parse_source_datetime(raw.get("effective_timestamp") or raw.get("manufactured_timestamp")),
+            "source_timestamp": parse_source_datetime(
+                raw.get("source_timestamp") or raw.get("event_timestamp") or raw.get("manufactured_timestamp")
+            ),
+            "effective_timestamp": parse_source_datetime(
+                raw.get("effective_timestamp") or raw.get("manufactured_timestamp")
+            ),
             "recorded_timestamp": parse_source_datetime(raw.get("recorded_timestamp")),
         }
 
@@ -353,27 +415,79 @@ class IngestionService:
         issues: list[dict[str, Any]] = []
         for field in mapping["required_source_fields"]:
             if raw.get(field) in (None, ""):
-                issues.append(issue("MISSING_REQUIRED_FIELD", "ERROR", field, raw.get(field), f"Required source field {field} is missing"))
+                issues.append(
+                    issue(
+                        "MISSING_REQUIRED_FIELD",
+                        "ERROR",
+                        field,
+                        raw.get(field),
+                        f"Required source field {field} is missing",
+                    )
+                )
         if raw.get("lot_id") in (None, "") and ("lot_id" in raw):
-            issues.append(issue("MISSING_LOT_REFERENCE", "WARNING", "lot_id", raw.get("lot_id"), "Source complaint has no lot reference"))
+            issues.append(
+                issue(
+                    "MISSING_LOT_REFERENCE",
+                    "WARNING",
+                    "lot_id",
+                    raw.get("lot_id"),
+                    "Source complaint has no lot reference",
+                )
+            )
         if raw.get("traceability_status") == "incomplete":
-            issues.append(issue("INCOMPLETE_TRACEABILITY", "WARNING", "traceability_status", raw.get("traceability_status"), "Source lot/component traceability is incomplete"))
+            issues.append(
+                issue(
+                    "INCOMPLETE_TRACEABILITY",
+                    "WARNING",
+                    "traceability_status",
+                    raw.get("traceability_status"),
+                    "Source lot/component traceability is incomplete",
+                )
+            )
         if str(raw.get("duplicate_candidate", "")).lower() == "true":
-            issues.append(issue("DUPLICATE_CANDIDATE", "WARNING", "duplicate_candidate", raw.get("duplicate_candidate"), "Source marks this as a duplicate candidate"))
-        for key in ["event_timestamp", "effective_timestamp", "recorded_timestamp", "ingestion_timestamp", "manufactured_timestamp"]:
+            issues.append(
+                issue(
+                    "DUPLICATE_CANDIDATE",
+                    "WARNING",
+                    "duplicate_candidate",
+                    raw.get("duplicate_candidate"),
+                    "Source marks this as a duplicate candidate",
+                )
+            )
+        for key in [
+            "event_timestamp",
+            "effective_timestamp",
+            "recorded_timestamp",
+            "ingestion_timestamp",
+            "manufactured_timestamp",
+        ]:
             if raw.get(key) and len(str(raw.get(key))) == 10:
-                issues.append(issue("DATE_WITHOUT_TIMEZONE", "INFO", key, raw.get(key), "Source provided date without timezone; raw value preserved"))
+                issues.append(
+                    issue(
+                        "DATE_WITHOUT_TIMEZONE",
+                        "INFO",
+                        key,
+                        raw.get(key),
+                        "Source provided date without timezone; raw value preserved",
+                    )
+                )
         return issues
 
     def run_summary(self, conn, run_id: str) -> dict[str, Any]:
-        row = conn.execute(
-            text(
-                "SELECT id, source_system, source_type, source_file, status, total_records, accepted_records, warning_records, rejected_records, duplicate_source_records "
-                "FROM ingestion_runs WHERE id=:run_id"
-            ),
-            {"run_id": run_id},
-        ).mappings().one()
-        quality_count = conn.execute(text("SELECT count(*) FROM data_quality_issues WHERE ingestion_run_id=:run_id"), {"run_id": run_id}).scalar_one()
+        row = (
+            conn.execute(
+                text(
+                    "SELECT id, source_system, source_type, source_file, status, total_records, accepted_records, warning_records, rejected_records, duplicate_source_records "
+                    "FROM ingestion_runs WHERE id=:run_id"
+                ),
+                {"run_id": run_id},
+            )
+            .mappings()
+            .one()
+        )
+        quality_count = conn.execute(
+            text("SELECT count(*) FROM data_quality_issues WHERE ingestion_run_id=:run_id"), {"run_id": run_id}
+        ).scalar_one()
         result = dict(row)
         result["id"] = str(result["id"])
         result["quality_issues"] = quality_count

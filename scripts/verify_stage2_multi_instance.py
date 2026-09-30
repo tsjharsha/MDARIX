@@ -4,6 +4,7 @@ Required checks fail fast: both instances healthy, durable session reuse and
 cross-instance revocation. Optional integrations are reported explicitly as
 PASS, NOT_CONFIGURED, or NOT_EXERCISED; they are never inferred from config.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,21 +28,28 @@ def get(client: httpx.Client, path: str):
 
 
 def main() -> int:
-    processes = [subprocess.Popen([sys.executable, "-m", "uvicorn", "backend.app.main:app",
-                                   "--host", "127.0.0.1", "--port", str(port)],
-                                  cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                 for port in PORTS]
+    processes = [
+        subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "backend.app.main:app", "--host", "127.0.0.1", "--port", str(port)],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        for port in PORTS
+    ]
     try:
         clients = [httpx.Client(base_url=f"http://127.0.0.1:{port}") for port in PORTS]
         try:
             for _ in range(40):
                 if all(get(client, "/health/live").status_code == 200 for client in clients):
                     break
-                time.sleep(.5)
+                time.sleep(0.5)
             else:
                 raise RuntimeError("both application instances did not become live")
             health = [get(client, "/health") for client in clients]
-            if any(response.status_code != 200 or response.json().get("database") != "reachable" for response in health):
+            if any(
+                response.status_code != 200 or response.json().get("database") != "reachable" for response in health
+            ):
                 raise RuntimeError("database health failed on one or more instances")
             print("PASS | instance health | shared database reachable")
 
@@ -68,7 +76,9 @@ def main() -> int:
             finally:
                 shared.close()
 
-            signed_again = clients[0].post("/api/v1/auth/signin", json={"email": EMAIL, "password": PASSWORD}, timeout=15)
+            signed_again = clients[0].post(
+                "/api/v1/auth/signin", json={"email": EMAIL, "password": PASSWORD}, timeout=15
+            )
             signed_again.raise_for_status()
             cookie_again = signed_again.cookies.get("mdarix_session")
             expiring = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}", cookies={"mdarix_session": cookie_again})
@@ -77,19 +87,26 @@ def main() -> int:
             finally:
                 expiring.close()
 
-            with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}", cookies={"mdarix_session": cookie_again}) as authenticated:
-                for label, path in (("SMTP/provider", "/api/v1/communication/provider-health"),
-                                    ("GenAI/provider", "/api/v1/stage3/genai-health"),
-                                    ("REST connector", "/api/v1/integrations/health/REST")):
+            with httpx.Client(
+                base_url=f"http://127.0.0.1:{PORTS[0]}", cookies={"mdarix_session": cookie_again}
+            ) as authenticated:
+                for label, path in (
+                    ("SMTP/provider", "/api/v1/communication/provider-health"),
+                    ("GenAI/provider", "/api/v1/stage3/genai-health"),
+                    ("REST connector", "/api/v1/integrations/health/REST"),
+                ):
                     response = get(authenticated, path)
                     if response.status_code == 200:
                         body = response.json()
                         status = body.get("status", "configured" if body.get("configured") else "NOT_CONFIGURED")
-                        print(f"{('PASS' if status in ('HEALTHY', 'configured') else 'NOT_CONFIGURED')} | {label} | {status}")
+                        print(
+                            f"{('PASS' if status in ('HEALTHY', 'configured') else 'NOT_CONFIGURED')} | {label} | {status}"
+                        )
                     else:
                         print(f"NOT_CONFIGURED | {label} | HTTP {response.status_code}")
 
             from object_storage.service import ObjectStorageService
+
             with tempfile.TemporaryDirectory(prefix="mdarix-storage-check-") as root:
                 previous = os.environ.get("MDARIX_OBJECT_STORAGE_SIGNING_SECRET")
                 os.environ["MDARIX_OBJECT_STORAGE_SIGNING_SECRET"] = "production-like-validation-secret"
@@ -104,7 +121,9 @@ def main() -> int:
                     os.environ["MDARIX_OBJECT_STORAGE_SIGNING_SECRET"] = previous
             print("PASS | object storage | tenant prefix, write, signed URL and verification")
             print("NOT_EXERCISED | outbox retry/dead-letter | requires a controlled failed event and worker deployment")
-            print("NOT_EXERCISED | real SMTP, customer connectors, external provider | credentials/endpoints not supplied")
+            print(
+                "NOT_EXERCISED | real SMTP, customer connectors, external provider | credentials/endpoints not supplied"
+            )
             print("PASS | required production-like checks")
             return 0
         finally:

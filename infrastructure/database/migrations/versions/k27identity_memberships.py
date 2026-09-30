@@ -1,4 +1,5 @@
 """add tenant membership and persona assignment records"""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql

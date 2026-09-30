@@ -11,12 +11,26 @@ class PersonaDefinition:
 
 
 R1_PERSONAS = (
-    PersonaDefinition("INVESTIGATOR", "Quality/PMS Investigator", ("signals", "investigations", "evidence_gaps", "unknowns")),
-    PersonaDefinition("PRODUCT_QUALITY", "Product/Design Quality Engineer", ("products", "revisions", "components", "suppliers", "changes")),
-    PersonaDefinition("REVIEWER", "Regulatory/PMS Reviewer", ("evidence_completeness", "provenance", "contradictions", "limitations")),
-    PersonaDefinition("APPROVER", "Quality/Regulatory Approver", ("decision_briefs", "authority", "segregation_of_duties", "material_changes")),
+    PersonaDefinition(
+        "INVESTIGATOR", "Quality/PMS Investigator", ("signals", "investigations", "evidence_gaps", "unknowns")
+    ),
+    PersonaDefinition(
+        "PRODUCT_QUALITY",
+        "Product/Design Quality Engineer",
+        ("products", "revisions", "components", "suppliers", "changes"),
+    ),
+    PersonaDefinition(
+        "REVIEWER", "Regulatory/PMS Reviewer", ("evidence_completeness", "provenance", "contradictions", "limitations")
+    ),
+    PersonaDefinition(
+        "APPROVER",
+        "Quality/Regulatory Approver",
+        ("decision_briefs", "authority", "segregation_of_duties", "material_changes"),
+    ),
     PersonaDefinition("LEADER", "Product/Quality Leader", ("portfolio_signals", "aging", "decision_load", "risk")),
-    PersonaDefinition("ADMINISTRATOR", "MDARIX Administrator", ("users", "roles", "connectors", "mappings", "plans", "audit")),
+    PersonaDefinition(
+        "ADMINISTRATOR", "MDARIX Administrator", ("users", "roles", "connectors", "mappings", "plans", "audit")
+    ),
 )
 
 PERSONAS_BY_CODE = {persona.code: persona for persona in R1_PERSONAS}

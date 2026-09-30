@@ -35,9 +35,13 @@ def upgrade() -> None:
         sa.Column("embedding", sa.String(), nullable=True),
         sa.Column("indexing_status", sa.String(length=40), server_default="INDEXED", nullable=False),
         sa.Column("failure_reason", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.CheckConstraint("indexing_status in ('INDEXED','FAILED')", name="chunk_embedding_status_allowed"),
-        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_evidence_chunk_embeddings_tenant_id_tenants")),
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name=op.f("fk_evidence_chunk_embeddings_tenant_id_tenants")
+        ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "evidence_id"],
             ["evidence.tenant_id", "evidence.id"],
@@ -94,7 +98,9 @@ def upgrade() -> None:
         sa.Column("top_k", sa.Integer(), nullable=False),
         sa.Column("returned_refs", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("status", sa.String(length=40), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.CheckConstraint("retrieval_mode in ('structured','semantic','hybrid')", name="retrieval_mode_allowed"),
         sa.CheckConstraint("temporal_mode in ('current','event','known')", name="retrieval_temporal_mode_allowed"),
         sa.CheckConstraint(
@@ -110,7 +116,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name=op.f("pk_retrieval_queries")),
         sa.UniqueConstraint("tenant_id", "id", name="uq_retrieval_queries_tenant_id_id"),
     )
-    op.create_index("ix_retrieval_queries_tenant_created", "retrieval_queries", ["tenant_id", "created_at"], unique=False)
+    op.create_index(
+        "ix_retrieval_queries_tenant_created", "retrieval_queries", ["tenant_id", "created_at"], unique=False
+    )
 
 
 def downgrade() -> None:

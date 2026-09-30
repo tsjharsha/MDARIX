@@ -4,23 +4,38 @@ from backend.app.customer_lifecycle import LIFECYCLE_TRANSITIONS, allowed_lifecy
 
 
 def test_lifecycle_matrix_contains_all_governed_states():
-    expected = {"DRAFT", "PENDING_APPROVAL", "PROVISIONING", "PROVISIONED", "PENDING_CUSTOMER_ACTIVATION", "ACTIVE", "EXPIRING_SOON", "EXPIRED", "SUSPENDED", "TERMINATED", "ARCHIVED"}
+    expected = {
+        "DRAFT",
+        "PENDING_APPROVAL",
+        "PROVISIONING",
+        "PROVISIONED",
+        "PENDING_CUSTOMER_ACTIVATION",
+        "ACTIVE",
+        "EXPIRING_SOON",
+        "EXPIRED",
+        "SUSPENDED",
+        "TERMINATED",
+        "ARCHIVED",
+    }
     assert set(LIFECYCLE_TRANSITIONS) == expected
 
 
-@pytest.mark.parametrize("current,target", [
-    ("DRAFT", "PENDING_APPROVAL"),
-    ("PENDING_APPROVAL", "PROVISIONING"),
-    ("PROVISIONING", "PROVISIONED"),
-    ("PROVISIONED", "PENDING_CUSTOMER_ACTIVATION"),
-    ("PENDING_CUSTOMER_ACTIVATION", "ACTIVE"),
-    ("ACTIVE", "SUSPENDED"),
-    ("SUSPENDED", "ACTIVE"),
-    ("ACTIVE", "EXPIRING_SOON"),
-    ("EXPIRING_SOON", "EXPIRED"),
-    ("EXPIRED", "TERMINATED"),
-    ("TERMINATED", "ARCHIVED"),
-])
+@pytest.mark.parametrize(
+    "current,target",
+    [
+        ("DRAFT", "PENDING_APPROVAL"),
+        ("PENDING_APPROVAL", "PROVISIONING"),
+        ("PROVISIONING", "PROVISIONED"),
+        ("PROVISIONED", "PENDING_CUSTOMER_ACTIVATION"),
+        ("PENDING_CUSTOMER_ACTIVATION", "ACTIVE"),
+        ("ACTIVE", "SUSPENDED"),
+        ("SUSPENDED", "ACTIVE"),
+        ("ACTIVE", "EXPIRING_SOON"),
+        ("EXPIRING_SOON", "EXPIRED"),
+        ("EXPIRED", "TERMINATED"),
+        ("TERMINATED", "ARCHIVED"),
+    ],
+)
 def test_allowed_lifecycle_transitions(current, target):
     assert allowed_lifecycle_transition(current, target)
 

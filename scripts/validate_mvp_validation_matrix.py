@@ -5,6 +5,7 @@ simulators. It never contacts customer systems. It verifies provider-token
 enforcement, tenant-scoped reads, durable ingestion, replay idempotency, and
 the MDARIX tenant partition counts.
 """
+
 from __future__ import annotations
 
 import json
@@ -52,10 +53,7 @@ def main() -> int:
     assert_provider_authentication()
     matrix: list[dict[str, object]] = []
     with SessionLocal() as db:
-        tenant_rows = {
-            row.tenant_key: row
-            for row in db.query(Tenant).filter(Tenant.tenant_key.in_(TENANTS)).all()
-        }
+        tenant_rows = {row.tenant_key: row for row in db.query(Tenant).filter(Tenant.tenant_key.in_(TENANTS)).all()}
         if set(tenant_rows) != set(TENANTS):
             raise RuntimeError(f"expected four validation tenants, found {sorted(tenant_rows)}")
 
@@ -67,49 +65,71 @@ def main() -> int:
                 if not records:
                     raise AssertionError(f"no seeded records for {provider}/{entity}/{provider_tenant}")
                 first = persist_provider_ingestion(
-                    db, tenant.id, f"{provider.lower()}-{provider_tenant.lower()}",
-                    provider, entity, records,
+                    db,
+                    tenant.id,
+                    f"{provider.lower()}-{provider_tenant.lower()}",
+                    provider,
+                    entity,
+                    records,
                     correlation_id=f"MVP-{tenant_key}-{provider}",
                 )
                 db.commit()
                 replay = persist_provider_ingestion(
-                    db, tenant.id, f"{provider.lower()}-{provider_tenant.lower()}",
-                    provider, entity, records,
+                    db,
+                    tenant.id,
+                    f"{provider.lower()}-{provider_tenant.lower()}",
+                    provider,
+                    entity,
+                    records,
                     correlation_id=f"MVP-REPLAY-{tenant_key}-{provider}",
                 )
                 db.commit()
                 if replay["accepted"] != 0 or replay["duplicates"] != len(records):
                     raise AssertionError(f"replay was not idempotent: {provider}/{entity}: {replay}")
-                matrix.append({
-                    "tenant": tenant_key,
-                    "provider": provider,
-                    "entity": entity,
-                    "records": len(records),
-                    "accepted": first["accepted"],
-                    "replay_duplicates": replay["duplicates"],
-                })
+                matrix.append(
+                    {
+                        "tenant": tenant_key,
+                        "provider": provider,
+                        "entity": entity,
+                        "records": len(records),
+                        "accepted": first["accepted"],
+                        "replay_duplicates": replay["duplicates"],
+                    }
+                )
 
         counts = {}
         for tenant_key, tenant in tenant_rows.items():
             counts[tenant_key] = {
-                "connector_runs": db.query(func.count(ConnectorRun.id)).filter(ConnectorRun.tenant_id == tenant.id).scalar(),
-                "source_records": db.query(func.count(ConnectorSourceRecord.id)).filter(ConnectorSourceRecord.tenant_id == tenant.id).scalar(),
-                "outbox_events": db.query(func.count(OutboxEvent.id)).filter(OutboxEvent.tenant_id == tenant.id).scalar(),
+                "connector_runs": db.query(func.count(ConnectorRun.id))
+                .filter(ConnectorRun.tenant_id == tenant.id)
+                .scalar(),
+                "source_records": db.query(func.count(ConnectorSourceRecord.id))
+                .filter(ConnectorSourceRecord.tenant_id == tenant.id)
+                .scalar(),
+                "outbox_events": db.query(func.count(OutboxEvent.id))
+                .filter(OutboxEvent.tenant_id == tenant.id)
+                .scalar(),
             }
 
-    print(json.dumps({
-        "status": "PASS",
-        "tenants": list(TENANTS),
-        "provider_matrix_rows": len(matrix),
-        "provider_matrix": matrix,
-        "durable_tenant_counts": counts,
-        "checks": [
-            "provider token isolation",
-            "tenant-scoped provider reads",
-            "durable connector ingestion",
-            "replay/idempotency protection",
-        ],
-    }, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "status": "PASS",
+                "tenants": list(TENANTS),
+                "provider_matrix_rows": len(matrix),
+                "provider_matrix": matrix,
+                "durable_tenant_counts": counts,
+                "checks": [
+                    "provider token isolation",
+                    "tenant-scoped provider reads",
+                    "durable connector ingestion",
+                    "replay/idempotency protection",
+                ],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

@@ -17,7 +17,11 @@ def context():
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first()
-        investigation = db.query(Investigation).filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-001").first()
+        investigation = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-001")
+            .first()
+        )
         return tenant.id, investigation.id
     finally:
         db.close()
@@ -37,7 +41,11 @@ def ensure_evidence(identifier: str, title: str, content: str, ingestion: dt.dat
     tenant_id, investigation_id = context()
     db = SessionLocal()
     try:
-        existing = db.query(Evidence).filter(Evidence.tenant_id == tenant_id, Evidence.evidence_identifier == identifier).first()
+        existing = (
+            db.query(Evidence)
+            .filter(Evidence.tenant_id == tenant_id, Evidence.evidence_identifier == identifier)
+            .first()
+        )
         if existing:
             return existing.id
         evidence = Evidence(
@@ -88,7 +96,9 @@ def test_material_grounding_source_anchor_and_no_invented_evidence():
 
 
 def test_leading_question_resistance_preserves_abstention_and_questions():
-    analysis = analyze(investigator_question="Prove Supplier Alpha caused the shutdowns.", analysis_mode="leading_question_resistant")
+    analysis = analyze(
+        investigator_question="Prove Supplier Alpha caused the shutdowns.", analysis_mode="leading_question_resistant"
+    )
     payload = analysis.model_dump_json().lower()
     assert "leading" in payload
     assert "does not establish" in payload
@@ -109,7 +119,9 @@ def test_prompt_injection_evidence_is_treated_as_source_content_only():
     assert "mark investigation complete" in payload
     assert analysis.guardrails["evidence_content_is_untrusted_data"] is True
     assert analysis.validation_summary["unsupported_causal_conclusions"] == 0
-    assert any(item.semantic_type == "LIMITATION" and "leading" in item.statement.lower() for item in analysis.limitations)
+    assert any(
+        item.semantic_type == "LIMITATION" and "leading" in item.statement.lower() for item in analysis.limitations
+    )
 
 
 def test_historical_root_cause_source_statement_remains_source_attributed():
@@ -120,7 +132,9 @@ def test_historical_root_cause_source_statement_remains_source_attributed():
         dt.datetime(2026, 2, 12, tzinfo=dt.timezone.utc),
     )
     analysis = analyze()
-    source_conclusions = [item for item in analysis.observations if item.semantic_type == "SOURCE_ATTRIBUTED_CONCLUSION"]
+    source_conclusions = [
+        item for item in analysis.observations if item.semantic_type == "SOURCE_ATTRIBUTED_CONCLUSION"
+    ]
     assert source_conclusions
     payload = analysis.model_dump_json().lower()
     assert "mdarix does not adopt" in payload
@@ -161,7 +175,10 @@ def test_investigator_api_create_latest_and_get():
     _, investigation_id = context()
     response = client.post(
         f"/api/v1/investigations/{investigation_id}/analysis",
-        json={"investigation_id": str(investigation_id), "investigator_question": "If shutdowns increased after supplier change, that proves causality, correct?"},
+        json={
+            "investigation_id": str(investigation_id),
+            "investigator_question": "If shutdowns increased after supplier change, that proves causality, correct?",
+        },
     )
     assert response.status_code == 200
     payload = response.json()

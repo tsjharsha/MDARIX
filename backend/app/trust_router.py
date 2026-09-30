@@ -8,13 +8,36 @@ from backend.app.request_context import AuthenticatedRequestContext, get_request
 from trust_engine.schemas import AssuranceRequest, AssuranceResponse
 from trust_engine.service import TrustEngine, TrustError
 
-router=APIRouter(prefix="/api/v1",tags=["AI Trust Assurance"]); service=TrustEngine()
-def fail(e): return HTTPException(status_code=404 if e.code.endswith("NOT_FOUND") else 400,detail={"code":e.code,"message":e.message})
-@router.post("/ai-executions/{execution_id}/assurance",response_model=AssuranceResponse)
-def assure(execution_id:uuid.UUID,request:AssuranceRequest,db:Session=Depends(get_data_plane_db),ctx:AuthenticatedRequestContext=Depends(get_request_context)):
-  try:return service.evaluate(db,ctx.tenant_id,execution_id,request)
-  except TrustError as e:raise fail(e) from e
-@router.get("/ai-executions/{execution_id}/assurance",response_model=AssuranceResponse)
-def get_assurance(execution_id:uuid.UUID,db:Session=Depends(get_data_plane_db),ctx:AuthenticatedRequestContext=Depends(get_request_context)):
-  try:return service.get(db,ctx.tenant_id,execution_id)
-  except TrustError as e:raise fail(e) from e
+router = APIRouter(prefix="/api/v1", tags=["AI Trust Assurance"])
+service = TrustEngine()
+
+
+def fail(e):
+    return HTTPException(
+        status_code=404 if e.code.endswith("NOT_FOUND") else 400, detail={"code": e.code, "message": e.message}
+    )
+
+
+@router.post("/ai-executions/{execution_id}/assurance", response_model=AssuranceResponse)
+def assure(
+    execution_id: uuid.UUID,
+    request: AssuranceRequest,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    try:
+        return service.evaluate(db, ctx.tenant_id, execution_id, request)
+    except TrustError as e:
+        raise fail(e) from e
+
+
+@router.get("/ai-executions/{execution_id}/assurance", response_model=AssuranceResponse)
+def get_assurance(
+    execution_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    try:
+        return service.get(db, ctx.tenant_id, execution_id)
+    except TrustError as e:
+        raise fail(e) from e

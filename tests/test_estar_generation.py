@@ -8,7 +8,14 @@ def test_estar_xml_and_package_validate():
     result = generate_estar_package(
         tenant_id="tenant-a",
         title="510(k) preparation",
-        sections=[{"claim_id": "A1", "text": "Risk control evidence is available.", "confidence": "HIGH", "citation_ids": ["c1"]}],
+        sections=[
+            {
+                "claim_id": "A1",
+                "text": "Risk control evidence is available.",
+                "confidence": "HIGH",
+                "citation_ids": ["c1"],
+            }
+        ],
         citations={"verified": [{"citation_id": "c1"}], "rejected": [], "all_verified": True},
     )
     assert result["validation"]["valid"] is True

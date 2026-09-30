@@ -13,9 +13,14 @@ def test_ask_structured_contract_preserves_uncertainty_and_scope():
             evidence=({"id": "e1", "provenance": {"source_system": "QMS"}},),
             limitations=("RELATIONSHIPS_ARE_NOT_CAUSAL",),
         ),
-        lifecycle={"root_entity": {"product_id": "p1", "product_version_id": "v1"}, "limitations": ["UNREPRESENTED_RELATIONSHIPS_OMITTED"]},
+        lifecycle={
+            "root_entity": {"product_id": "p1", "product_version_id": "v1"},
+            "limitations": ["UNREPRESENTED_RELATIONSHIPS_OMITTED"],
+        },
         intelligence={"hypotheses": [{"id": "h1"}], "unknowns": [{"id": "u1"}]},
-        spec=SimpleNamespace(temporal_mode=SimpleNamespace(value="CURRENT"), event_start=None, event_end=None, knowledge_time=None),
+        spec=SimpleNamespace(
+            temporal_mode=SimpleNamespace(value="CURRENT"), event_start=None, event_end=None, knowledge_time=None
+        ),
     )
 
     assert result["status"] == "READY_FOR_REVIEW"
@@ -32,7 +37,9 @@ def test_ask_structured_contract_abstains_without_records():
         retrieval=SimpleNamespace(evidence=(), limitations=()),
         lifecycle=None,
         intelligence=None,
-        spec=SimpleNamespace(temporal_mode=SimpleNamespace(value="KNOWN_AS_OF"), event_start=None, event_end=None, knowledge_time=None),
+        spec=SimpleNamespace(
+            temporal_mode=SimpleNamespace(value="KNOWN_AS_OF"), event_start=None, event_end=None, knowledge_time=None
+        ),
     )
 
     assert result["status"] == "INSUFFICIENT_EVIDENCE"

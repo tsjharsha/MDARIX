@@ -1,4 +1,5 @@
 """Authenticated, non-chat Ask MDARIX control-plane endpoint."""
+
 import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -63,11 +64,18 @@ class AskRequest(BaseModel):
 def _authenticated_context(request: Request, db: Session | None = None) -> dict:
     if db is not None and os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}:
         ctx = get_request_context(request, db)
-        return {"user_id": ctx.user_id, "tenant_id": ctx.tenant_id, "active_role": ctx.active_role_id or "Viewer", "correlation_id": ctx.correlation_id}
+        return {
+            "user_id": ctx.user_id,
+            "tenant_id": ctx.tenant_id,
+            "active_role": ctx.active_role_id or "Viewer",
+            "correlation_id": ctx.correlation_id,
+        }
     try:
         return auth_service.context(request.cookies.get("mdarix_session", ""))
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}) from exc
+        raise HTTPException(
+            status_code=401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}
+        ) from exc
 
 
 def _has_ask_entitlement(db: Session, tenant_id: str) -> bool:
@@ -89,16 +97,20 @@ def _has_ask_entitlement(db: Session, tenant_id: str) -> bool:
     return row is not None
 
 
-def _record_audit(db: Session, *, tenant_id: UUID | str, actor: str, action: str, correlation_id: str, details: dict | None = None) -> None:
+def _record_audit(
+    db: Session, *, tenant_id: UUID | str, actor: str, action: str, correlation_id: str, details: dict | None = None
+) -> None:
     """Record only safe Ask lifecycle metadata through the existing audit model."""
-    db.add(make_audit_event(
-        tenant_id=tenant_id,
-        actor_ref=actor,
-        action=action,
-        entity_type="Ask",
-        correlation_id=correlation_id,
-        details=details or {},
-    ))
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor,
+            action=action,
+            entity_type="Ask",
+            correlation_id=correlation_id,
+            details=details or {},
+        )
+    )
 
 
 def _temporal_audit_details(spec) -> dict:
@@ -114,28 +126,54 @@ def _temporal_audit_details(spec) -> dict:
 
 def _is_external_write_request(question: str) -> bool:
     normalized = question.casefold()
-    return any(term in normalized for term in _EXTERNAL_WRITE_TERMS) and any(action in normalized for action in _EXTERNAL_WRITE_ACTIONS)
+    return any(term in normalized for term in _EXTERNAL_WRITE_TERMS) and any(
+        action in normalized for action in _EXTERNAL_WRITE_ACTIONS
+    )
 
 
-def _validate_product_version_scope(db: Session, *, tenant_id: UUID, product_version_id: UUID | None, product_id: UUID | None, investigation_id: UUID | None) -> None:
+def _validate_product_version_scope(
+    db: Session,
+    *,
+    tenant_id: UUID,
+    product_version_id: UUID | None,
+    product_id: UUID | None,
+    investigation_id: UUID | None,
+) -> None:
     if product_version_id is None:
         return
-    version = db.query(ProductVersion).filter(
-        ProductVersion.tenant_id == tenant_id,
-        ProductVersion.id == product_version_id,
-    ).first()
+    version = (
+        db.query(ProductVersion)
+        .filter(
+            ProductVersion.tenant_id == tenant_id,
+            ProductVersion.id == product_version_id,
+        )
+        .first()
+    )
     if version is None:
-        raise HTTPException(status_code=404, detail={"code": "PRODUCT_VERSION_NOT_FOUND", "message": "ProductVersion is not available for this tenant"})
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "PRODUCT_VERSION_NOT_FOUND", "message": "ProductVersion is not available for this tenant"},
+        )
     effective_product_id = product_id
     if effective_product_id is None and investigation_id is not None:
-        investigation = db.query(Investigation).filter(
-            Investigation.tenant_id == tenant_id,
-            Investigation.id == investigation_id,
-        ).first()
+        investigation = (
+            db.query(Investigation)
+            .filter(
+                Investigation.tenant_id == tenant_id,
+                Investigation.id == investigation_id,
+            )
+            .first()
+        )
         if investigation is not None:
             effective_product_id = investigation.product_id
     if effective_product_id is not None and version.product_id != effective_product_id:
-        raise HTTPException(status_code=422, detail={"code": "PRODUCT_VERSION_SCOPE_MISMATCH", "message": "ProductVersion is not compatible with the requested Product scope"})
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PRODUCT_VERSION_SCOPE_MISMATCH",
+                "message": "ProductVersion is not compatible with the requested Product scope",
+            },
+        )
 
 
 def _structured_intelligence(*, retrieval, lifecycle, intelligence, spec) -> dict:
@@ -179,25 +217,63 @@ def ask(
     db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_plane_db),
 ) -> dict:
-    context = _authenticated_context(request, db) if os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"} else _authenticated_context(request)
+    context = (
+        _authenticated_context(request, db)
+        if os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}
+        else _authenticated_context(request)
+    )
     correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
     tenant = db.query(Tenant).filter(Tenant.id == context["tenant_id"]).first()
     if tenant is None or str(tenant.status).lower() not in {"active", "enabled"}:
         if tenant is not None:
-            _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_AUTHORIZATION_DENIED", correlation_id=correlation_id, details={"reason": "TENANT_UNAVAILABLE"})
+            _record_audit(
+                db,
+                tenant_id=context["tenant_id"],
+                actor=context["user_id"],
+                action="ASK_AUTHORIZATION_DENIED",
+                correlation_id=correlation_id,
+                details={"reason": "TENANT_UNAVAILABLE"},
+            )
             db.commit()
-        raise HTTPException(status_code=403, detail={"code": "TENANT_UNAVAILABLE", "message": "Tenant is not available"})
+        raise HTTPException(
+            status_code=403, detail={"code": "TENANT_UNAVAILABLE", "message": "Tenant is not available"}
+        )
     if not _has_ask_entitlement(db, context["tenant_id"]):
-        _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_AUTHORIZATION_DENIED", correlation_id=correlation_id, details={"reason": "ASK_NOT_ENTITLED"})
+        _record_audit(
+            db,
+            tenant_id=context["tenant_id"],
+            actor=context["user_id"],
+            action="ASK_AUTHORIZATION_DENIED",
+            correlation_id=correlation_id,
+            details={"reason": "ASK_NOT_ENTITLED"},
+        )
         db.commit()
-        raise HTTPException(status_code=403, detail={"code": "ASK_NOT_ENTITLED", "message": "Ask MDARIX is not enabled for this tenant"})
+        raise HTTPException(
+            status_code=403, detail={"code": "ASK_NOT_ENTITLED", "message": "Ask MDARIX is not enabled for this tenant"}
+        )
 
     if _is_external_write_request(data.question):
-        _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_AUTHORIZATION_DENIED", correlation_id=correlation_id, details={"reason": "EXTERNAL_WRITE_DISABLED"})
+        _record_audit(
+            db,
+            tenant_id=context["tenant_id"],
+            actor=context["user_id"],
+            action="ASK_AUTHORIZATION_DENIED",
+            correlation_id=correlation_id,
+            details={"reason": "EXTERNAL_WRITE_DISABLED"},
+        )
         db.commit()
-        raise HTTPException(status_code=403, detail={"code": "EXTERNAL_WRITE_DISABLED", "message": "External system write-back is disabled in R1"})
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "EXTERNAL_WRITE_DISABLED", "message": "External system write-back is disabled in R1"},
+        )
 
-    _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_QUERY_RECEIVED", correlation_id=correlation_id)
+    _record_audit(
+        db,
+        tenant_id=context["tenant_id"],
+        actor=context["user_id"],
+        action="ASK_QUERY_RECEIVED",
+        correlation_id=correlation_id,
+    )
     _validate_product_version_scope(
         data_db,
         tenant_id=UUID(context["tenant_id"]),
@@ -207,43 +283,87 @@ def ask(
     )
     if data.session_id:
         try:
-            session = data_db.query(InvestigationSessionRecord).filter(
-                InvestigationSessionRecord.id == UUID(data.session_id),
-                InvestigationSessionRecord.tenant_id == UUID(context["tenant_id"]),
-                InvestigationSessionRecord.owner_user_id == context["user_id"],
-                InvestigationSessionRecord.status == "ACTIVE",
-            ).first()
+            session = (
+                data_db.query(InvestigationSessionRecord)
+                .filter(
+                    InvestigationSessionRecord.id == UUID(data.session_id),
+                    InvestigationSessionRecord.tenant_id == UUID(context["tenant_id"]),
+                    InvestigationSessionRecord.owner_user_id == context["user_id"],
+                    InvestigationSessionRecord.status == "ACTIVE",
+                )
+                .first()
+            )
         except (ValueError, TypeError):
             session = None
         if session is None:
-            _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_AUTHORIZATION_DENIED", correlation_id=correlation_id, details={"reason": "ASK_SESSION_NOT_FOUND"})
+            _record_audit(
+                db,
+                tenant_id=context["tenant_id"],
+                actor=context["user_id"],
+                action="ASK_AUTHORIZATION_DENIED",
+                correlation_id=correlation_id,
+                details={"reason": "ASK_SESSION_NOT_FOUND"},
+            )
             db.commit()
-            raise HTTPException(status_code=404, detail={"code": "ASK_SESSION_NOT_FOUND", "message": "Investigation session is not available"})
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "ASK_SESSION_NOT_FOUND", "message": "Investigation session is not available"},
+            )
     else:
         session = InvestigationSessionRecord(
-            tenant_id=UUID(context["tenant_id"]), owner_user_id=context["user_id"],
-            correlation_id=correlation_id, created_at=datetime.now(timezone.utc), updated_at=datetime.now(timezone.utc),
+            tenant_id=UUID(context["tenant_id"]),
+            owner_user_id=context["user_id"],
+            correlation_id=correlation_id,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
         )
         data_db.add(session)
         data_db.flush()
 
     if data.investigation_id:
         investigation_id = _uuid_or_none(data.investigation_id)
-        investigation = data_db.query(Investigation).filter(
-            Investigation.id == investigation_id,
-            Investigation.tenant_id == UUID(context["tenant_id"]),
-        ).first() if investigation_id else None
+        investigation = (
+            data_db.query(Investigation)
+            .filter(
+                Investigation.id == investigation_id,
+                Investigation.tenant_id == UUID(context["tenant_id"]),
+            )
+            .first()
+            if investigation_id
+            else None
+        )
         if investigation is None:
-            _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_AUTHORIZATION_DENIED", correlation_id=correlation_id, details={"reason": "INVESTIGATION_NOT_FOUND"})
+            _record_audit(
+                db,
+                tenant_id=context["tenant_id"],
+                actor=context["user_id"],
+                action="ASK_AUTHORIZATION_DENIED",
+                correlation_id=correlation_id,
+                details={"reason": "INVESTIGATION_NOT_FOUND"},
+            )
             db.commit()
-            raise HTTPException(status_code=404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"})
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"},
+            )
 
     # The server-side session context is authoritative. Client tenant, owner,
     # role, entitlement, and session fields are deliberately ignored as authority.
     spec = QueryInterpreter().interpret(data.question)
     plan = build_retrieval_plan(spec)
-    retrieval_requested = any((data.product_id, data.product_identifier, data.product_version_id, data.product_version_identifier, data.evidence_id, data.evidence_identifier))
-    lifecycle_requested = any((data.product_id, data.product_version_id, data.complaint_id, data.investigation_id, data.evidence_id))
+    retrieval_requested = any(
+        (
+            data.product_id,
+            data.product_identifier,
+            data.product_version_id,
+            data.product_version_identifier,
+            data.evidence_id,
+            data.evidence_identifier,
+        )
+    )
+    lifecycle_requested = any(
+        (data.product_id, data.product_version_id, data.complaint_id, data.investigation_id, data.evidence_id)
+    )
     try:
         # Test/development-only live validation seam. It is server-configured,
         # disabled by default, never client-triggered, and fail-closed in
@@ -251,29 +371,70 @@ def ask(
         # ownership checks have succeeded.
         if dependency_failure_simulated() and (retrieval_requested or lifecycle_requested):
             raise RuntimeError("simulated retrieval dependency failure")
-        retrieval = AuthorizedRetrievalService().retrieve(data_db, AuthorizedRetrievalRequest(
-            tenant_id=UUID(context["tenant_id"]),
-            product_id=_uuid_or_none(data.product_id), product_identifier=data.product_identifier,
-            product_version_id=_uuid_or_none(data.product_version_id), product_version_identifier=data.product_version_identifier,
-            evidence_id=_uuid_or_none(data.evidence_id), evidence_identifier=data.evidence_identifier,
-            limit=plan.limit or 25,
-        ))
-        lifecycle = LifecycleRetrievalService().retrieve(data_db, LifecycleRetrievalRequest(
-            tenant_id=UUID(context["tenant_id"]),
-            product_id=_uuid_or_none(data.product_id),
-            product_version_id=_uuid_or_none(data.product_version_id),
-            complaint_id=_uuid_or_none(data.complaint_id),
-            investigation_id=_uuid_or_none(data.investigation_id),
-            evidence_id=_uuid_or_none(data.evidence_id),
-            limit=plan.limit or 25,
-        )) if lifecycle_requested else None
+        retrieval = AuthorizedRetrievalService().retrieve(
+            data_db,
+            AuthorizedRetrievalRequest(
+                tenant_id=UUID(context["tenant_id"]),
+                product_id=_uuid_or_none(data.product_id),
+                product_identifier=data.product_identifier,
+                product_version_id=_uuid_or_none(data.product_version_id),
+                product_version_identifier=data.product_version_identifier,
+                evidence_id=_uuid_or_none(data.evidence_id),
+                evidence_identifier=data.evidence_identifier,
+                limit=plan.limit or 25,
+            ),
+        )
+        lifecycle = (
+            LifecycleRetrievalService().retrieve(
+                data_db,
+                LifecycleRetrievalRequest(
+                    tenant_id=UUID(context["tenant_id"]),
+                    product_id=_uuid_or_none(data.product_id),
+                    product_version_id=_uuid_or_none(data.product_version_id),
+                    complaint_id=_uuid_or_none(data.complaint_id),
+                    investigation_id=_uuid_or_none(data.investigation_id),
+                    evidence_id=_uuid_or_none(data.evidence_id),
+                    limit=plan.limit or 25,
+                ),
+            )
+            if lifecycle_requested
+            else None
+        )
     except Exception as exc:
-        _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_RETRIEVAL_FAILED", correlation_id=correlation_id, details={"reason": "RETRIEVAL_UNAVAILABLE"})
+        _record_audit(
+            db,
+            tenant_id=context["tenant_id"],
+            actor=context["user_id"],
+            action="ASK_RETRIEVAL_FAILED",
+            correlation_id=correlation_id,
+            details={"reason": "RETRIEVAL_UNAVAILABLE"},
+        )
         db.commit()
-        raise HTTPException(status_code=503, detail={"code": "RETRIEVAL_UNAVAILABLE", "message": "Authorized retrieval is temporarily unavailable", "correlation_id": correlation_id}) from exc
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "RETRIEVAL_UNAVAILABLE",
+                "message": "Authorized retrieval is temporarily unavailable",
+                "correlation_id": correlation_id,
+            },
+        ) from exc
     if retrieval_requested or lifecycle_requested:
-        _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_RETRIEVAL_EXECUTED", correlation_id=correlation_id, details={"result_count": len(retrieval.ai_context)})
-    _record_audit(db, tenant_id=context["tenant_id"], actor=context["user_id"], action="ASK_QUERY_PROCESSED", correlation_id=correlation_id, details={"status": "INTERPRETED", **_temporal_audit_details(spec)})
+        _record_audit(
+            db,
+            tenant_id=context["tenant_id"],
+            actor=context["user_id"],
+            action="ASK_RETRIEVAL_EXECUTED",
+            correlation_id=correlation_id,
+            details={"result_count": len(retrieval.ai_context)},
+        )
+    _record_audit(
+        db,
+        tenant_id=context["tenant_id"],
+        actor=context["user_id"],
+        action="ASK_QUERY_PROCESSED",
+        correlation_id=correlation_id,
+        details={"status": "INTERPRETED", **_temporal_audit_details(spec)},
+    )
     session.updated_at = datetime.now(timezone.utc)
     data_db.commit()
     db.commit()
@@ -281,29 +442,61 @@ def ask(
     if data.investigation_id:
         investigation_id = _uuid_or_none(data.investigation_id)
         if investigation_id is not None:
-            hypotheses = data_db.query(Hypothesis).filter(
-                Hypothesis.tenant_id == UUID(context["tenant_id"]),
-                Hypothesis.investigation_id == investigation_id,
-            ).all()
+            hypotheses = (
+                data_db.query(Hypothesis)
+                .filter(
+                    Hypothesis.tenant_id == UUID(context["tenant_id"]),
+                    Hypothesis.investigation_id == investigation_id,
+                )
+                .all()
+            )
             hypothesis_ids = [item.id for item in hypotheses]
-            unknowns = data_db.query(Unknown).filter(
-                Unknown.tenant_id == UUID(context["tenant_id"]),
-                Unknown.investigation_id == investigation_id,
-            ).all()
-            links = data_db.query(HypothesisEvidence).filter(
-                HypothesisEvidence.tenant_id == UUID(context["tenant_id"]),
-                HypothesisEvidence.hypothesis_id.in_(hypothesis_ids) if hypothesis_ids else False,
-            ).all()
+            unknowns = (
+                data_db.query(Unknown)
+                .filter(
+                    Unknown.tenant_id == UUID(context["tenant_id"]),
+                    Unknown.investigation_id == investigation_id,
+                )
+                .all()
+            )
+            links = (
+                data_db.query(HypothesisEvidence)
+                .filter(
+                    HypothesisEvidence.tenant_id == UUID(context["tenant_id"]),
+                    HypothesisEvidence.hypothesis_id.in_(hypothesis_ids) if hypothesis_ids else False,
+                )
+                .all()
+            )
             evidence_ids = [link.evidence_id for link in links]
-            evidence_rows = data_db.query(Evidence).filter(
-                Evidence.tenant_id == UUID(context["tenant_id"]),
-                Evidence.id.in_(evidence_ids) if evidence_ids else False,
-            ).all()
+            evidence_rows = (
+                data_db.query(Evidence)
+                .filter(
+                    Evidence.tenant_id == UUID(context["tenant_id"]),
+                    Evidence.id.in_(evidence_ids) if evidence_ids else False,
+                )
+                .all()
+            )
             evidence_by_id = {row.id: row for row in evidence_rows}
             intelligence = {
-                "hypotheses": [{"id": str(row.id), "statement": row.statement, "status": row.status, "origin": row.origin} for row in hypotheses],
-                "unknowns": [{"id": str(row.id), "category": row.category, "description": row.description, "status": row.status} for row in unknowns],
-                "provenance": [{"hypothesis_id": str(link.hypothesis_id), "evidence_id": str(link.evidence_id), "evidence_identifier": evidence_by_id[link.evidence_id].evidence_identifier, "relation_type": link.relation_type, "created_by_type": link.created_by_type} for link in links if link.evidence_id in evidence_by_id],
+                "hypotheses": [
+                    {"id": str(row.id), "statement": row.statement, "status": row.status, "origin": row.origin}
+                    for row in hypotheses
+                ],
+                "unknowns": [
+                    {"id": str(row.id), "category": row.category, "description": row.description, "status": row.status}
+                    for row in unknowns
+                ],
+                "provenance": [
+                    {
+                        "hypothesis_id": str(link.hypothesis_id),
+                        "evidence_id": str(link.evidence_id),
+                        "evidence_identifier": evidence_by_id[link.evidence_id].evidence_identifier,
+                        "relation_type": link.relation_type,
+                        "created_by_type": link.created_by_type,
+                    }
+                    for link in links
+                    if link.evidence_id in evidence_by_id
+                ],
                 "counts": {"hypotheses": len(hypotheses), "unknowns": len(unknowns), "provenance": len(links)},
             }
     return {
@@ -315,15 +508,27 @@ def ask(
         "active_role": context["active_role"],
         "specification": spec.model_dump(mode="json"),
         "retrieval_plan": plan.__dict__,
-        "execution": "AUTHORIZED_LIFECYCLE_RETRIEVAL" if lifecycle_requested else ("AUTHORIZED_RETRIEVAL_FOUNDATION" if retrieval_requested else "CONTROLLED_FOUNDATION_ONLY"),
-        "retrieval": {"products": retrieval.products, "product_versions": retrieval.product_versions, "evidence": retrieval.evidence, "count": len(retrieval.ai_context)},
+        "execution": "AUTHORIZED_LIFECYCLE_RETRIEVAL"
+        if lifecycle_requested
+        else ("AUTHORIZED_RETRIEVAL_FOUNDATION" if retrieval_requested else "CONTROLLED_FOUNDATION_ONLY"),
+        "retrieval": {
+            "products": retrieval.products,
+            "product_versions": retrieval.product_versions,
+            "evidence": retrieval.evidence,
+            "count": len(retrieval.ai_context),
+        },
         "ai_safe_context": retrieval.ai_context,
         "lifecycle": lifecycle,
         "intelligence": intelligence,
         "structured_intelligence": _structured_intelligence(
-            retrieval=retrieval, lifecycle=lifecycle, intelligence=intelligence, spec=spec,
+            retrieval=retrieval,
+            lifecycle=lifecycle,
+            intelligence=intelligence,
+            spec=spec,
         ),
-        "message": "Question interpreted and bounded authorized lifecycle retrieval completed. Relationships are not causal and no human decision conclusion is generated." if (retrieval_requested or lifecycle_requested) else "Question interpreted. Add an authorized lifecycle scope to execute bounded retrieval.",
+        "message": "Question interpreted and bounded authorized lifecycle retrieval completed. Relationships are not causal and no human decision conclusion is generated."
+        if (retrieval_requested or lifecycle_requested)
+        else "Question interpreted. Add an authorized lifecycle scope to execute bounded retrieval.",
     }
 
 

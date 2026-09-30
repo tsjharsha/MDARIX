@@ -19,7 +19,9 @@ INTERPRETIVE_TYPES = {
 
 
 class GroundingValidator:
-    def validate_items(self, items: list[AnalysisItem]) -> tuple[list[AnalysisItem], list[AnalysisItem], dict[str, int]]:
+    def validate_items(
+        self, items: list[AnalysisItem]
+    ) -> tuple[list[AnalysisItem], list[AnalysisItem], dict[str, int]]:
         accepted: list[AnalysisItem] = []
         rejected: list[AnalysisItem] = []
         evidence_derived = 0
@@ -37,13 +39,17 @@ class GroundingValidator:
             else:
                 rejected.append(checked)
 
-        return accepted, rejected, {
-            "material_items": len(items),
-            "accepted_items": len(accepted),
-            "rejected_items": len(rejected),
-            "evidence_derived_items": evidence_derived,
-            "evidence_derived_items_with_source_anchor": anchored,
-        }
+        return (
+            accepted,
+            rejected,
+            {
+                "material_items": len(items),
+                "accepted_items": len(accepted),
+                "rejected_items": len(rejected),
+                "evidence_derived_items": evidence_derived,
+                "evidence_derived_items_with_source_anchor": anchored,
+            },
+        )
 
     def validate_item(self, item: AnalysisItem) -> GroundingStatus:
         if item.semantic_type in FACTUAL_TYPES and not item.source_references:
@@ -55,4 +61,6 @@ class GroundingValidator:
         return "ACCEPTED"
 
     def _requires_evidence_anchor(self, item: AnalysisItem) -> bool:
-        return any(ref.reference_type in {"EVIDENCE", "OBSERVATION", "RETRIEVAL_RESULT"} for ref in item.source_references)
+        return any(
+            ref.reference_type in {"EVIDENCE", "OBSERVATION", "RETRIEVAL_RESULT"} for ref in item.source_references
+        )

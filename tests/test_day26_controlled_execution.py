@@ -18,10 +18,14 @@ def test_unresolved_question_cannot_execute_retrieval():
 
 
 def test_model_context_filters_before_model_boundary():
-    result = build_model_context([
-        {"tenant_id": "a", "id": "1", "title": "safe", "password": "bad", "hidden": "bad"},
-        {"tenant_id": "b", "id": "2", "title": "cross tenant"},
-    ], tenant_id="a", authorized_fields={"id", "title"})
+    result = build_model_context(
+        [
+            {"tenant_id": "a", "id": "1", "title": "safe", "password": "bad", "hidden": "bad"},
+            {"tenant_id": "b", "id": "2", "title": "cross tenant"},
+        ],
+        tenant_id="a",
+        authorized_fields={"id", "title"},
+    )
     assert result.context == ({"id": "1", "title": "safe"},)
     assert all("password" not in item and "hidden" not in item for item in result.context)
     assert result.response["model_invocation"] == "NOT_IMPLEMENTED"

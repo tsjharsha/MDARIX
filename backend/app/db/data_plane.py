@@ -5,6 +5,7 @@ data-plane URL is resolved only from deployment secrets named by the durable
 tenant_data_planes registry; callers cannot provide a host, database, or
 password.
 """
+
 from __future__ import annotations
 
 import os
@@ -31,7 +32,12 @@ def _secret_url(secret_ref: str) -> str:
         if port is None:
             raise RuntimeError(f"DATA_PLANE_SECRET_NOT_CONFIGURED:{secret_ref}")
         password = os.getenv("MDARIX_DATA_PLANE_PASSWORD", "change-this-local-secret")
-        database = {"R1_TENANT_1": "mdarix_tenant_a", "R1_TENANT_2": "mdarix_tenant_b", "R1_TENANT_3": "mdarix_tenant_c", "R1_TENANT_4": "mdarix_tenant_d"}[tenant_key]
+        database = {
+            "R1_TENANT_1": "mdarix_tenant_a",
+            "R1_TENANT_2": "mdarix_tenant_b",
+            "R1_TENANT_3": "mdarix_tenant_c",
+            "R1_TENANT_4": "mdarix_tenant_d",
+        }[tenant_key]
         value = f"postgresql+pg8000://mdarix_data:{password}@127.0.0.1:{port}/{database}"
     return value
 
@@ -45,10 +51,15 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
     from fastapi import HTTPException
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from uuid import UUID
-    row = control_db.query(TenantDataPlane).filter(
-        TenantDataPlane.tenant_id == UUID(str(ctx.tenant_id)),
-        TenantDataPlane.status == "ACTIVE",
-    ).first()
+
+    row = (
+        control_db.query(TenantDataPlane)
+        .filter(
+            TenantDataPlane.tenant_id == UUID(str(ctx.tenant_id)),
+            TenantDataPlane.status == "ACTIVE",
+        )
+        .first()
+    )
     if row is None:
         # Unit/integration fixtures create short-lived tenants that are not
         # part of the four synthetic MVP planes. Keep those tests focused on
@@ -57,12 +68,16 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
         if os.getenv("PYTEST_CURRENT_TEST"):
             yield control_db
             return
-        raise HTTPException(503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "No active tenant data plane is registered"})
+        raise HTTPException(
+            503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "No active tenant data plane is registered"}
+        )
     try:
         factory = session_factory(row.database_ref, row.connection_secret_ref)
         db = factory()
     except Exception as exc:
-        raise HTTPException(503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "Tenant data plane is unavailable"}) from exc
+        raise HTTPException(
+            503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "Tenant data plane is unavailable"}
+        ) from exc
     try:
         yield db
     finally:
@@ -73,9 +88,13 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
 def session_factory(database_ref: str, secret_ref: str) -> sessionmaker[Session]:
     """Return a cached SQLAlchemy session factory for an approved data plane."""
     url = _secret_url(secret_ref)
-    engine = create_engine(url, future=True, pool_pre_ping=True,
-                           pool_size=int(os.getenv("MDARIX_DATA_PLANE_POOL_SIZE", "3")),
-                           max_overflow=int(os.getenv("MDARIX_DATA_PLANE_MAX_OVERFLOW", "5")))
+    engine = create_engine(
+        url,
+        future=True,
+        pool_pre_ping=True,
+        pool_size=int(os.getenv("MDARIX_DATA_PLANE_POOL_SIZE", "3")),
+        max_overflow=int(os.getenv("MDARIX_DATA_PLANE_MAX_OVERFLOW", "5")),
+    )
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 

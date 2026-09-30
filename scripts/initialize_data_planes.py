@@ -4,6 +4,7 @@ This is additive and idempotent. It uses the same versioned SQLAlchemy models
 as MDARIX, so the validation databases have the business schema required for
 the later route-by-route cutover.
 """
+
 from __future__ import annotations
 
 import os
@@ -93,16 +94,29 @@ def main() -> None:
         with engine.begin() as connection:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         with engine.begin() as connection:
-            for statement in BUSINESS_SCHEMA.split(';'):
+            for statement in BUSINESS_SCHEMA.split(";"):
                 if statement.strip():
                     connection.execute(text(statement))
             with SessionLocal() as control_session:
                 tenant_id = control_session.query(Tenant.id).filter(Tenant.tenant_key == tenant_key).scalar()
             if tenant_id is None:
                 raise RuntimeError(f"Missing control-plane tenant: {tenant_key}")
-            for table in ("products", "product_versions", "components", "suppliers", "lot_batches", "complaints", "investigations", "evidence", "source_records"):
+            for table in (
+                "products",
+                "product_versions",
+                "components",
+                "suppliers",
+                "lot_batches",
+                "complaints",
+                "investigations",
+                "evidence",
+                "source_records",
+            ):
                 connection.execute(text(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS tenant_id uuid"))
-                connection.execute(text(f"UPDATE {table} SET tenant_id = :tenant_id WHERE tenant_id IS NULL"), {"tenant_id": str(tenant_id)})
+                connection.execute(
+                    text(f"UPDATE {table} SET tenant_id = :tenant_id WHERE tenant_id IS NULL"),
+                    {"tenant_id": str(tenant_id)},
+                )
                 connection.execute(text(f"CREATE INDEX IF NOT EXISTS ix_{table}_tenant_id ON {table}(tenant_id)"))
         print(f"INITIALIZED {tenant_key} {database}")
 

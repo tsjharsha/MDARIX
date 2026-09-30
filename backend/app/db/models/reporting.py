@@ -8,6 +8,7 @@ from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 class ReportJob(Base):
     """Durable tenant-scoped report job and artifact metadata."""
+
     __tablename__ = "report_jobs"
     id = uuid_pk()
     tenant_id = tenant_fk()

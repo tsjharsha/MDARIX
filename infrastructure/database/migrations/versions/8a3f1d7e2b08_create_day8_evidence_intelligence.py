@@ -26,7 +26,9 @@ def upgrade() -> None:
         sa.Column("source_anchor", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("token_count", sa.Integer(), nullable=True),
         sa.Column("checksum", sa.String(length=128), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_evidence_chunks_tenant_id_tenants")),
         sa.ForeignKeyConstraint(
             ["tenant_id", "evidence_id"],
@@ -58,7 +60,9 @@ def upgrade() -> None:
         sa.Column("quality_status", sa.String(length=40), server_default="VALIDATED", nullable=False),
         sa.Column("limitations", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("ai_execution_id", sa.UUID(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.CheckConstraint(
             "observation_type in ('EXPLICIT_SOURCE_STATEMENT','STRUCTURED_EXTRACTION','DETERMINISTIC_DERIVATION','AI_EXTRACTED_OBSERVATION')",
             name="evidence_obs_type_allowed",
@@ -104,7 +108,9 @@ def upgrade() -> None:
         sa.Column("raw_reference", sa.Text(), nullable=True),
         sa.Column("resolution_status", sa.String(length=40), server_default="RESOLVED", nullable=False),
         sa.Column("confidence_score", sa.String(length=40), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.CheckConstraint(
             "resolution_status in ('RESOLVED','UNRESOLVED')",
             name="evidence_entity_link_status_allowed",
@@ -138,12 +144,16 @@ def upgrade() -> None:
         sa.Column("proposition_text", sa.Text(), nullable=False),
         sa.Column("relation_type", sa.String(length=40), nullable=False),
         sa.Column("rationale", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
+        ),
         sa.CheckConstraint(
             "relation_type in ('SUPPORT','CONTRADICT','NEUTRAL_CONTEXTUAL')",
             name="evidence_prop_relation_type_allowed",
         ),
-        sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_evidence_proposition_relations_tenant_id_tenants")),
+        sa.ForeignKeyConstraint(
+            ["tenant_id"], ["tenants.id"], name=op.f("fk_evidence_proposition_relations_tenant_id_tenants")
+        ),
         sa.ForeignKeyConstraint(
             ["tenant_id", "observation_id"],
             ["evidence_observations.tenant_id", "evidence_observations.id"],

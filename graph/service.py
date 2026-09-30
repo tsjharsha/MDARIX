@@ -101,14 +101,22 @@ class RealityGraphService:
         tenant_id = tenant_id or self.tenant_id()
         table, business_col, label_col = NODE_TYPES[entity_type]
         with self.connection() as conn:
-            row = conn.execute(
-                text(f"SELECT *, {business_col} AS business_identifier, {label_col} AS display_value FROM {table} WHERE tenant_id=:tenant_id AND id=:id"),
-                {"tenant_id": tenant_id, "id": entity_id},
-            ).mappings().one_or_none()
+            row = (
+                conn.execute(
+                    text(
+                        f"SELECT *, {business_col} AS business_identifier, {label_col} AS display_value FROM {table} WHERE tenant_id=:tenant_id AND id=:id"
+                    ),
+                    {"tenant_id": tenant_id, "id": entity_id},
+                )
+                .mappings()
+                .one_or_none()
+            )
             if not row:
                 raise GraphError("NODE_NOT_FOUND", f"{entity_type} node not found")
             source_count = conn.execute(
-                text("SELECT count(*) FROM source_canonical_links WHERE tenant_id=:tenant_id AND canonical_entity_type=:entity_type AND canonical_entity_id=:id"),
+                text(
+                    "SELECT count(*) FROM source_canonical_links WHERE tenant_id=:tenant_id AND canonical_entity_type=:entity_type AND canonical_entity_id=:id"
+                ),
                 {"tenant_id": tenant_id, "entity_type": entity_type, "id": entity_id},
             ).scalar_one()
         return GraphNode(
@@ -133,11 +141,26 @@ class RealityGraphService:
     def get_relationship_detail(self, relationship_key: str, tenant_id: str | None = None) -> RelationshipDetail:
         tenant_id = tenant_id or self.tenant_id()
         rel = self.get_relationship(relationship_key, tenant_id)
-        provenance = [{"assertion_type": rel.assertion_type, "derivation_rule": rel.metadata.get("derivation_rule"), "source": rel.metadata.get("source")}]
+        provenance = [
+            {
+                "assertion_type": rel.assertion_type,
+                "derivation_rule": rel.metadata.get("derivation_rule"),
+                "source": rel.metadata.get("source"),
+            }
+        ]
         evidence = self.evidence_for_relationship(rel, tenant_id)
         return RelationshipDetail(relationship=rel, provenance=provenance, evidence=evidence)
 
-    def get_neighbors(self, entity_type: str, entity_id: str, depth: int = 1, direction: str = "both", relationship_type: str | None = None, target_entity_type: str | None = None, tenant_id: str | None = None) -> GraphResponse:
+    def get_neighbors(
+        self,
+        entity_type: str,
+        entity_id: str,
+        depth: int = 1,
+        direction: str = "both",
+        relationship_type: str | None = None,
+        target_entity_type: str | None = None,
+        tenant_id: str | None = None,
+    ) -> GraphResponse:
         self.validate_depth(depth)
         entity_type = self.clean_entity_type(entity_type)
         if relationship_type:
@@ -157,9 +180,17 @@ class RealityGraphService:
                 continue
             for rel in all_rels:
                 adjacent: tuple[str, str] | None = None
-                if direction in {"both", "out"} and rel.source_entity_type == current_type and rel.source_entity_id == current_id:
+                if (
+                    direction in {"both", "out"}
+                    and rel.source_entity_type == current_type
+                    and rel.source_entity_id == current_id
+                ):
                     adjacent = (rel.target_entity_type, rel.target_entity_id)
-                if direction in {"both", "in"} and rel.target_entity_type == current_type and rel.target_entity_id == current_id:
+                if (
+                    direction in {"both", "in"}
+                    and rel.target_entity_type == current_type
+                    and rel.target_entity_id == current_id
+                ):
                     adjacent = (rel.source_entity_type, rel.source_entity_id)
                 if not adjacent:
                     continue
@@ -177,10 +208,20 @@ class RealityGraphService:
     def get_product_graph(self, product_id: str, depth: int = 2, tenant_id: str | None = None) -> GraphResponse:
         return self.get_neighbors("product", product_id, depth=min(depth, MAX_DEPTH), tenant_id=tenant_id)
 
-    def get_investigation_graph(self, investigation_id: str, depth: int = 2, tenant_id: str | None = None) -> GraphResponse:
+    def get_investigation_graph(
+        self, investigation_id: str, depth: int = 2, tenant_id: str | None = None
+    ) -> GraphResponse:
         return self.get_neighbors("investigation", investigation_id, depth=min(depth, MAX_DEPTH), tenant_id=tenant_id)
 
-    def get_path(self, source_type: str, source_id: str, target_type: str, target_id: str, max_depth: int = 4, tenant_id: str | None = None) -> GraphResponse:
+    def get_path(
+        self,
+        source_type: str,
+        source_id: str,
+        target_type: str,
+        target_id: str,
+        max_depth: int = 4,
+        tenant_id: str | None = None,
+    ) -> GraphResponse:
         self.validate_depth(max_depth, max_allowed=5)
         source_type = self.clean_entity_type(source_type)
         target_type = self.clean_entity_type(target_type)
@@ -197,9 +238,15 @@ class RealityGraphService:
                 rels = {}
                 for rel in path:
                     rels[rel.id] = rel
-                    nodes[node_key(rel.source_entity_type, rel.source_entity_id)] = self.get_node(rel.source_entity_type, rel.source_entity_id, tenant_id)
-                    nodes[node_key(rel.target_entity_type, rel.target_entity_id)] = self.get_node(rel.target_entity_type, rel.target_entity_id, tenant_id)
-                return self.response(nodes, rels, tenant_id, len(path), warnings=["Graph path shows connectivity, not causality."])
+                    nodes[node_key(rel.source_entity_type, rel.source_entity_id)] = self.get_node(
+                        rel.source_entity_type, rel.source_entity_id, tenant_id
+                    )
+                    nodes[node_key(rel.target_entity_type, rel.target_entity_id)] = self.get_node(
+                        rel.target_entity_type, rel.target_entity_id, tenant_id
+                    )
+                return self.response(
+                    nodes, rels, tenant_id, len(path), warnings=["Graph path shows connectivity, not causality."]
+                )
             if len(path) >= max_depth:
                 continue
             for rel in all_rels:
@@ -226,7 +273,21 @@ class RealityGraphService:
             self.add_day5_relationships(conn, tenant_id, rels)
         return list(rels.values())
 
-    def add_rel(self, rels: dict[str, GraphRelationship], rel_type: str, source_type: str, source_id: Any, target_type: str, target_id: Any, assertion_type: str, effective_from=None, recorded_at=None, evidence_count: int = 0, provenance_count: int = 1, rule: str = "deterministic_projection") -> None:
+    def add_rel(
+        self,
+        rels: dict[str, GraphRelationship],
+        rel_type: str,
+        source_type: str,
+        source_id: Any,
+        target_type: str,
+        target_id: Any,
+        assertion_type: str,
+        effective_from=None,
+        recorded_at=None,
+        evidence_count: int = 0,
+        provenance_count: int = 1,
+        rule: str = "deterministic_projection",
+    ) -> None:
         sid, tid = str(source_id), str(target_id)
         rid = relationship_id(rel_type, source_type, sid, target_type, tid)
         rels[rid] = GraphRelationship(
@@ -248,30 +309,110 @@ class RealityGraphService:
         )
 
     def add_product_versions(self, conn, tenant_id, rels):
-        for row in conn.execute(text("SELECT id, product_id, release_timestamp FROM product_versions WHERE tenant_id=:t"), {"t": tenant_id}).mappings():
-            self.add_rel(rels, "PRODUCT_HAS_VERSION", "product", row["product_id"], "product_version", row["id"], "DETERMINISTICALLY_DERIVED", row["release_timestamp"])
+        for row in conn.execute(
+            text("SELECT id, product_id, release_timestamp FROM product_versions WHERE tenant_id=:t"), {"t": tenant_id}
+        ).mappings():
+            self.add_rel(
+                rels,
+                "PRODUCT_HAS_VERSION",
+                "product",
+                row["product_id"],
+                "product_version",
+                row["id"],
+                "DETERMINISTICALLY_DERIVED",
+                row["release_timestamp"],
+            )
 
     def add_lots(self, conn, tenant_id, rels):
-        rows = conn.execute(text("SELECT id, product_version_id, manufacturing_site_id, effective_timestamp FROM lot_batches WHERE tenant_id=:t"), {"t": tenant_id}).mappings()
+        rows = conn.execute(
+            text(
+                "SELECT id, product_version_id, manufacturing_site_id, effective_timestamp FROM lot_batches WHERE tenant_id=:t"
+            ),
+            {"t": tenant_id},
+        ).mappings()
         for row in rows:
             if row["product_version_id"]:
-                self.add_rel(rels, "LOT_FOR_PRODUCT_VERSION", "lot_batch", row["id"], "product_version", row["product_version_id"], "SOURCE_ASSERTED", row["effective_timestamp"])
+                self.add_rel(
+                    rels,
+                    "LOT_FOR_PRODUCT_VERSION",
+                    "lot_batch",
+                    row["id"],
+                    "product_version",
+                    row["product_version_id"],
+                    "SOURCE_ASSERTED",
+                    row["effective_timestamp"],
+                )
             if row["manufacturing_site_id"]:
-                self.add_rel(rels, "LOT_PRODUCED_AT_SITE", "lot_batch", row["id"], "manufacturing_site", row["manufacturing_site_id"], "SOURCE_ASSERTED", row["effective_timestamp"])
+                self.add_rel(
+                    rels,
+                    "LOT_PRODUCED_AT_SITE",
+                    "lot_batch",
+                    row["id"],
+                    "manufacturing_site",
+                    row["manufacturing_site_id"],
+                    "SOURCE_ASSERTED",
+                    row["effective_timestamp"],
+                )
 
     def add_complaints(self, conn, tenant_id, rels):
-        rows = conn.execute(text("SELECT id, product_id, product_version_id, lot_batch_id, event_timestamp, recorded_timestamp FROM complaints WHERE tenant_id=:t"), {"t": tenant_id}).mappings()
+        rows = conn.execute(
+            text(
+                "SELECT id, product_id, product_version_id, lot_batch_id, event_timestamp, recorded_timestamp FROM complaints WHERE tenant_id=:t"
+            ),
+            {"t": tenant_id},
+        ).mappings()
         for row in rows:
             if row["product_id"]:
-                self.add_rel(rels, "COMPLAINT_ASSOCIATED_WITH_PRODUCT", "complaint", row["id"], "product", row["product_id"], "SOURCE_ASSERTED", row["event_timestamp"], row["recorded_timestamp"])
+                self.add_rel(
+                    rels,
+                    "COMPLAINT_ASSOCIATED_WITH_PRODUCT",
+                    "complaint",
+                    row["id"],
+                    "product",
+                    row["product_id"],
+                    "SOURCE_ASSERTED",
+                    row["event_timestamp"],
+                    row["recorded_timestamp"],
+                )
             if row["product_version_id"]:
-                self.add_rel(rels, "COMPLAINT_ASSOCIATED_WITH_VERSION", "complaint", row["id"], "product_version", row["product_version_id"], "SOURCE_ASSERTED", row["event_timestamp"], row["recorded_timestamp"])
+                self.add_rel(
+                    rels,
+                    "COMPLAINT_ASSOCIATED_WITH_VERSION",
+                    "complaint",
+                    row["id"],
+                    "product_version",
+                    row["product_version_id"],
+                    "SOURCE_ASSERTED",
+                    row["event_timestamp"],
+                    row["recorded_timestamp"],
+                )
             if row["lot_batch_id"]:
-                self.add_rel(rels, "COMPLAINT_ASSOCIATED_WITH_LOT", "complaint", row["id"], "lot_batch", row["lot_batch_id"], "SOURCE_ASSERTED", row["event_timestamp"], row["recorded_timestamp"])
+                self.add_rel(
+                    rels,
+                    "COMPLAINT_ASSOCIATED_WITH_LOT",
+                    "complaint",
+                    row["id"],
+                    "lot_batch",
+                    row["lot_batch_id"],
+                    "SOURCE_ASSERTED",
+                    row["event_timestamp"],
+                    row["recorded_timestamp"],
+                )
 
     def add_investigations(self, conn, tenant_id, rels):
-        for row in conn.execute(text("SELECT id, product_id, opened_at FROM investigations WHERE tenant_id=:t"), {"t": tenant_id}).mappings():
-            self.add_rel(rels, "INVESTIGATION_ASSOCIATED_WITH_PRODUCT", "investigation", row["id"], "product", row["product_id"], "SOURCE_ASSERTED", row["opened_at"])
+        for row in conn.execute(
+            text("SELECT id, product_id, opened_at FROM investigations WHERE tenant_id=:t"), {"t": tenant_id}
+        ).mappings():
+            self.add_rel(
+                rels,
+                "INVESTIGATION_ASSOCIATED_WITH_PRODUCT",
+                "investigation",
+                row["id"],
+                "product",
+                row["product_id"],
+                "SOURCE_ASSERTED",
+                row["opened_at"],
+            )
         for row in conn.execute(
             text(
                 "SELECT i.id AS investigation_id, e.id AS evidence_id "
@@ -282,29 +423,99 @@ class RealityGraphService:
             ),
             {"t": tenant_id},
         ).mappings():
-            self.add_rel(rels, "INVESTIGATION_USES_EVIDENCE", "investigation", row["investigation_id"], "evidence", row["evidence_id"], "SOURCE_ASSERTED", evidence_count=1)
-        for row in conn.execute(text("SELECT i.id investigation_id, c.id complaint_id FROM investigations i JOIN complaints c ON c.tenant_id=i.tenant_id AND c.product_id=i.product_id WHERE i.tenant_id=:t"), {"t": tenant_id}).mappings():
-            self.add_rel(rels, "INVESTIGATION_INCLUDES_COMPLAINT", "investigation", row["investigation_id"], "complaint", row["complaint_id"], "DETERMINISTICALLY_DERIVED")
+            self.add_rel(
+                rels,
+                "INVESTIGATION_USES_EVIDENCE",
+                "investigation",
+                row["investigation_id"],
+                "evidence",
+                row["evidence_id"],
+                "SOURCE_ASSERTED",
+                evidence_count=1,
+            )
+        for row in conn.execute(
+            text(
+                "SELECT i.id investigation_id, c.id complaint_id FROM investigations i JOIN complaints c ON c.tenant_id=i.tenant_id AND c.product_id=i.product_id WHERE i.tenant_id=:t"
+            ),
+            {"t": tenant_id},
+        ).mappings():
+            self.add_rel(
+                rels,
+                "INVESTIGATION_INCLUDES_COMPLAINT",
+                "investigation",
+                row["investigation_id"],
+                "complaint",
+                row["complaint_id"],
+                "DETERMINISTICALLY_DERIVED",
+            )
 
     def add_risks(self, conn, tenant_id, rels):
-        for row in conn.execute(text("SELECT id, product_id FROM risks WHERE tenant_id=:t AND product_id IS NOT NULL"), {"t": tenant_id}).mappings():
-            self.add_rel(rels, "RISK_ASSOCIATED_WITH_PRODUCT", "risk", row["id"], "product", row["product_id"], "SOURCE_ASSERTED")
+        for row in conn.execute(
+            text("SELECT id, product_id FROM risks WHERE tenant_id=:t AND product_id IS NOT NULL"), {"t": tenant_id}
+        ).mappings():
+            self.add_rel(
+                rels, "RISK_ASSOCIATED_WITH_PRODUCT", "risk", row["id"], "product", row["product_id"], "SOURCE_ASSERTED"
+            )
 
     def add_changes(self, conn, tenant_id, rels):
-        rows = conn.execute(text("SELECT id, change_identifier, change_type, event_timestamp, effective_timestamp FROM changes WHERE tenant_id=:t"), {"t": tenant_id}).mappings()
+        rows = conn.execute(
+            text(
+                "SELECT id, change_identifier, change_type, event_timestamp, effective_timestamp FROM changes WHERE tenant_id=:t"
+            ),
+            {"t": tenant_id},
+        ).mappings()
         for row in rows:
             if "COMP-PWR" in row["change_identifier"]:
-                component = conn.execute(text("SELECT id FROM components WHERE tenant_id=:t AND component_identifier='COMP-PWR'"), {"t": tenant_id}).scalar_one_or_none()
+                component = conn.execute(
+                    text("SELECT id FROM components WHERE tenant_id=:t AND component_identifier='COMP-PWR'"),
+                    {"t": tenant_id},
+                ).scalar_one_or_none()
                 if component:
-                    self.add_rel(rels, "CHANGE_AFFECTS_COMPONENT", "change", row["id"], "component", component, "SOURCE_ASSERTED", row["effective_timestamp"], row["event_timestamp"])
+                    self.add_rel(
+                        rels,
+                        "CHANGE_AFFECTS_COMPONENT",
+                        "change",
+                        row["id"],
+                        "component",
+                        component,
+                        "SOURCE_ASSERTED",
+                        row["effective_timestamp"],
+                        row["event_timestamp"],
+                    )
             if "PROD-D" in row["change_identifier"]:
-                pv = conn.execute(text("SELECT id FROM product_versions WHERE tenant_id=:t AND version_identifier='D'"), {"t": tenant_id}).scalar_one_or_none()
+                pv = conn.execute(
+                    text("SELECT id FROM product_versions WHERE tenant_id=:t AND version_identifier='D'"),
+                    {"t": tenant_id},
+                ).scalar_one_or_none()
                 if pv:
-                    self.add_rel(rels, "CHANGE_AFFECTS_PRODUCT_VERSION", "change", row["id"], "product_version", pv, "SOURCE_ASSERTED", row["effective_timestamp"], row["event_timestamp"])
+                    self.add_rel(
+                        rels,
+                        "CHANGE_AFFECTS_PRODUCT_VERSION",
+                        "change",
+                        row["id"],
+                        "product_version",
+                        pv,
+                        "SOURCE_ASSERTED",
+                        row["effective_timestamp"],
+                        row["event_timestamp"],
+                    )
             if "SUP-PROC" in row["change_identifier"]:
-                sup = conn.execute(text("SELECT id FROM suppliers WHERE tenant_id=:t AND supplier_identifier='SUP-NOVACAP'"), {"t": tenant_id}).scalar_one_or_none()
+                sup = conn.execute(
+                    text("SELECT id FROM suppliers WHERE tenant_id=:t AND supplier_identifier='SUP-NOVACAP'"),
+                    {"t": tenant_id},
+                ).scalar_one_or_none()
                 if sup:
-                    self.add_rel(rels, "CHANGE_AFFECTS_SUPPLIER", "change", row["id"], "supplier", sup, "SOURCE_ASSERTED", row["effective_timestamp"], row["event_timestamp"])
+                    self.add_rel(
+                        rels,
+                        "CHANGE_AFFECTS_SUPPLIER",
+                        "change",
+                        row["id"],
+                        "supplier",
+                        sup,
+                        "SOURCE_ASSERTED",
+                        row["effective_timestamp"],
+                        row["event_timestamp"],
+                    )
 
     def add_version_components(self, conn, tenant_id, rels):
         rows = conn.execute(
@@ -315,25 +526,78 @@ class RealityGraphService:
             {"t": tenant_id},
         ).mappings()
         for row in rows:
-            self.add_rel(rels, "VERSION_USES_COMPONENT", "product_version", row["product_version_id"], "component", row["component_id"], "DETERMINISTICALLY_DERIVED", rule="DAY6_VERSION_COMPONENT_PROJECTION_V1")
+            self.add_rel(
+                rels,
+                "VERSION_USES_COMPONENT",
+                "product_version",
+                row["product_version_id"],
+                "component",
+                row["component_id"],
+                "DETERMINISTICALLY_DERIVED",
+                rule="DAY6_VERSION_COMPONENT_PROJECTION_V1",
+            )
 
     def add_day5_relationships(self, conn, tenant_id, rels):
-        rows = conn.execute(text("SELECT source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type, effective_timestamp, recorded_timestamp, resolution_rule FROM canonical_relationships WHERE tenant_id=:t"), {"t": tenant_id}).mappings()
+        rows = conn.execute(
+            text(
+                "SELECT source_entity_type, source_entity_id, target_entity_type, target_entity_id, relationship_type, effective_timestamp, recorded_timestamp, resolution_rule FROM canonical_relationships WHERE tenant_id=:t"
+            ),
+            {"t": tenant_id},
+        ).mappings()
         mapping = {"LOT_BUILT_AS_PRODUCT_VERSION": "LOT_FOR_PRODUCT_VERSION"}
         for row in rows:
             rel_type = mapping.get(row["relationship_type"], row["relationship_type"])
             if rel_type in RELATIONSHIP_TYPES:
-                self.add_rel(rels, rel_type, row["source_entity_type"], row["source_entity_id"], row["target_entity_type"], row["target_entity_id"], "DETERMINISTICALLY_DERIVED", row["effective_timestamp"], row["recorded_timestamp"], rule=row["resolution_rule"])
+                self.add_rel(
+                    rels,
+                    rel_type,
+                    row["source_entity_type"],
+                    row["source_entity_id"],
+                    row["target_entity_type"],
+                    row["target_entity_id"],
+                    "DETERMINISTICALLY_DERIVED",
+                    row["effective_timestamp"],
+                    row["recorded_timestamp"],
+                    rule=row["resolution_rule"],
+                )
 
     def evidence_for_relationship(self, rel: GraphRelationship, tenant_id: str) -> list[dict[str, Any]]:
         if rel.evidence_count == 0 and "EVIDENCE" not in rel.type:
             return []
         with self.connection() as conn:
-            rows = conn.execute(text("SELECT evidence_identifier, title, reliability_status FROM evidence WHERE tenant_id=:t LIMIT 5"), {"t": tenant_id}).mappings().all()
+            rows = (
+                conn.execute(
+                    text(
+                        "SELECT evidence_identifier, title, reliability_status FROM evidence WHERE tenant_id=:t LIMIT 5"
+                    ),
+                    {"t": tenant_id},
+                )
+                .mappings()
+                .all()
+            )
             return [dict(row) for row in rows]
 
-    def response(self, nodes: dict[str, GraphNode], rels: dict[str, GraphRelationship], tenant_id: str, depth: int, warnings: list[str] | None = None) -> GraphResponse:
-        return GraphResponse(nodes=list(nodes.values()), relationships=list(rels.values()), metadata={"tenant_id": tenant_id, "depth": depth, "generated_at": now_iso(), "warnings": warnings or [], "node_count": len(nodes), "relationship_count": len(rels), "max_depth": MAX_DEPTH})
+    def response(
+        self,
+        nodes: dict[str, GraphNode],
+        rels: dict[str, GraphRelationship],
+        tenant_id: str,
+        depth: int,
+        warnings: list[str] | None = None,
+    ) -> GraphResponse:
+        return GraphResponse(
+            nodes=list(nodes.values()),
+            relationships=list(rels.values()),
+            metadata={
+                "tenant_id": tenant_id,
+                "depth": depth,
+                "generated_at": now_iso(),
+                "warnings": warnings or [],
+                "node_count": len(nodes),
+                "relationship_count": len(rels),
+                "max_depth": MAX_DEPTH,
+            },
+        )
 
     def validate_depth(self, depth: int, max_allowed: int = MAX_DEPTH) -> None:
         if depth < 0 or depth > max_allowed:

@@ -47,7 +47,10 @@ class NormalizationRun(Base):
     provenance: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
-        CheckConstraint("status in ('RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED')", name="normalization_run_status_allowed"),
+        CheckConstraint(
+            "status in ('RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED')",
+            name="normalization_run_status_allowed",
+        ),
         Index("ix_normalization_runs_tenant_started", "tenant_id", "started_at"),
     )
 
@@ -77,8 +80,12 @@ class SourceCanonicalLink(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False)
-    staged_source_record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("staged_source_records.id"), nullable=False)
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
+    )
+    staged_source_record_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("staged_source_records.id"), nullable=False
+    )
     canonical_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
     canonical_entity_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     canonical_business_identifier: Mapped[str | None] = mapped_column(String(255))
@@ -95,9 +102,21 @@ class SourceCanonicalLink(Base):
     updated_at = tz(False)
 
     __table_args__ = (
-        CheckConstraint("resolution_status in ('MATCHED','NEW_CANONICAL_OBJECT','AMBIGUOUS','UNRESOLVED','CONFLICT','REQUIRES_HUMAN_REVIEW')", name="source_canonical_link_status_allowed"),
-        CheckConstraint("confidence_category in ('DETERMINISTIC','AMBIGUOUS','UNRESOLVED','CONFLICT')", name="source_canonical_link_confidence_allowed"),
-        UniqueConstraint("tenant_id", "staged_source_record_id", "canonical_entity_type", "resolution_rule", name="uq_source_canonical_link_identity"),
+        CheckConstraint(
+            "resolution_status in ('MATCHED','NEW_CANONICAL_OBJECT','AMBIGUOUS','UNRESOLVED','CONFLICT','REQUIRES_HUMAN_REVIEW')",
+            name="source_canonical_link_status_allowed",
+        ),
+        CheckConstraint(
+            "confidence_category in ('DETERMINISTIC','AMBIGUOUS','UNRESOLVED','CONFLICT')",
+            name="source_canonical_link_confidence_allowed",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "staged_source_record_id",
+            "canonical_entity_type",
+            "resolution_rule",
+            name="uq_source_canonical_link_identity",
+        ),
         Index("ix_source_canonical_links_entity", "tenant_id", "canonical_entity_type", "canonical_entity_id"),
         Index("ix_source_canonical_links_status", "tenant_id", "resolution_status"),
     )
@@ -108,8 +127,12 @@ class CanonicalRelationship(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False)
-    source_link_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("source_canonical_links.id"))
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
+    )
+    source_link_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("source_canonical_links.id")
+    )
     source_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
     source_entity_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     target_entity_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -123,8 +146,19 @@ class CanonicalRelationship(Base):
     created_at = tz(False)
 
     __table_args__ = (
-        CheckConstraint("assertion_status in ('supported','contradicted','hypothesized','unknown')", name="canonical_relationship_assertion_allowed"),
-        UniqueConstraint("tenant_id", "source_entity_type", "source_entity_id", "target_entity_type", "target_entity_id", "relationship_type", name="uq_canonical_relationship_identity"),
+        CheckConstraint(
+            "assertion_status in ('supported','contradicted','hypothesized','unknown')",
+            name="canonical_relationship_assertion_allowed",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "source_entity_type",
+            "source_entity_id",
+            "target_entity_type",
+            "target_entity_id",
+            "relationship_type",
+            name="uq_canonical_relationship_identity",
+        ),
         Index("ix_canonical_relationships_lookup", "tenant_id", "source_entity_type", "source_entity_id"),
     )
 
@@ -134,8 +168,12 @@ class NormalizationIssue(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    normalization_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False)
-    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("staged_source_records.id"))
+    normalization_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("normalization_runs.id"), nullable=False
+    )
+    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("staged_source_records.id")
+    )
     issue_code: Mapped[str] = mapped_column(String(80), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     entity_type: Mapped[str | None] = mapped_column(String(80))

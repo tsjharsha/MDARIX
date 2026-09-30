@@ -40,7 +40,9 @@ class ControlledInvestigatorProvider:
         items["evidence_relationships"].extend(self._relationships(workspace))
         items["contradictions"].extend(self._contradictions(workspace, evidence_refs))
         items["missing_information"].extend(self._missing_information(workspace))
-        items["possible_explanations"].extend(self._possible_explanations(workspace, evidence_refs, investigator_question))
+        items["possible_explanations"].extend(
+            self._possible_explanations(workspace, evidence_refs, investigator_question)
+        )
         items["questions_to_investigate"].extend(self._questions(workspace, evidence_refs, investigator_question))
         items["limitations"].extend(self._limitations(workspace, evidence_refs, investigator_question, analysis_mode))
 
@@ -108,12 +110,17 @@ class ControlledInvestigatorProvider:
             refs = self._refs_for_evidence(evidence)
             statement = f"Evidence {evidence['evidence_identifier']} is available in the investigation context: {evidence['title']}."
             observations = evidence.get("observations", [])
-            evidence_text = " ".join([statement] + [str(chunk.get("excerpt", "")) for chunk in evidence.get("chunks", [])])
+            evidence_text = " ".join(
+                [statement] + [str(chunk.get("excerpt", "")) for chunk in evidence.get("chunks", [])]
+            )
             semantic_type = "OBSERVATION"
             if "root cause:" in evidence_text.lower():
                 semantic_type = "SOURCE_ATTRIBUTED_CONCLUSION"
                 statement = f"Historical source evidence {evidence['evidence_identifier']} contains a source-attributed root-cause statement; MDARIX does not adopt it as an established fact."
-            elif any(term in evidence_text.lower() for term in ["ignore previous instructions", "declare component", "mark investigation complete"]):
+            elif any(
+                term in evidence_text.lower()
+                for term in ["ignore previous instructions", "declare component", "mark investigation complete"]
+            ):
                 semantic_type = "OBSERVATION"
                 statement = f"Evidence {evidence['evidence_identifier']} contains instruction-like source text that is treated only as evidence data: {evidence_text[:240]}"
             if observations:
@@ -135,8 +142,19 @@ class ControlledInvestigatorProvider:
     def _priority_evidence(self, workspace: InvestigationWorkspaceResponse) -> list[dict[str, Any]]:
         selected: list[dict[str, Any]] = []
         for evidence in workspace.evidence_context:
-            text = " ".join([str(evidence.get("title", ""))] + [str(chunk.get("excerpt", "")) for chunk in evidence.get("chunks", [])]).lower()
-            if any(term in text for term in ["root cause:", "ignore previous instructions", "declare component", "mark investigation complete"]):
+            text = " ".join(
+                [str(evidence.get("title", ""))]
+                + [str(chunk.get("excerpt", "")) for chunk in evidence.get("chunks", [])]
+            ).lower()
+            if any(
+                term in text
+                for term in [
+                    "root cause:",
+                    "ignore previous instructions",
+                    "declare component",
+                    "mark investigation complete",
+                ]
+            ):
                 selected.append(evidence)
         for evidence in workspace.evidence_context:
             if evidence not in selected:
@@ -153,7 +171,11 @@ class ControlledInvestigatorProvider:
                 self._item(
                     "TEMPORAL_PATTERN",
                     f"Change context {label} is present in the deterministic product timeline.",
-                    [SourceReference(reference_type="DETERMINISTIC_CONTEXT", context_path=f"product_context.changes.{label}")],
+                    [
+                        SourceReference(
+                            reference_type="DETERMINISTIC_CONTEXT", context_path=f"product_context.changes.{label}"
+                        )
+                    ],
                     "Derived from Product 360 context, not from AI inference.",
                 )
             )
@@ -178,13 +200,21 @@ class ControlledInvestigatorProvider:
                 self._item(
                     "DETERMINISTIC_RELATIONSHIP",
                     f"Reality Graph relationship {rel_type} is present as deterministic context only.",
-                    [SourceReference(reference_type="GRAPH_RELATIONSHIP", graph_relationship_id=rid, context_path="relationship_context.relationships")],
+                    [
+                        SourceReference(
+                            reference_type="GRAPH_RELATIONSHIP",
+                            graph_relationship_id=rid,
+                            context_path="relationship_context.relationships",
+                        )
+                    ],
                     "Graph connectivity is not treated as causality.",
                 )
             )
         return items
 
-    def _contradictions(self, workspace: InvestigationWorkspaceResponse, evidence_refs: list[SourceReference]) -> list[AnalysisItem]:
+    def _contradictions(
+        self, workspace: InvestigationWorkspaceResponse, evidence_refs: list[SourceReference]
+    ) -> list[AnalysisItem]:
         text = self._all_text(workspace)
         items: list[AnalysisItem] = []
         if "shutdown" in text and ("validation" in text or "passed" in text):
@@ -212,11 +242,27 @@ class ControlledInvestigatorProvider:
         for limitation in workspace.limitations:
             code = limitation.get("code", "LIMITATION")
             refs = [SourceReference(reference_type="WORKSPACE_LIMITATION", context_path=f"limitations.{code}")]
-            semantic = "INSUFFICIENT_EVIDENCE" if code in {"NO_RELEVANT_EVIDENCE", "INSUFFICIENT_RELEVANT_EVIDENCE"} else "MISSING_INFORMATION"
-            items.append(self._item(semantic, limitation.get("description", code), refs, "Workspace limitation surfaced without converting missing information into a negative fact."))
+            semantic = (
+                "INSUFFICIENT_EVIDENCE"
+                if code in {"NO_RELEVANT_EVIDENCE", "INSUFFICIENT_RELEVANT_EVIDENCE"}
+                else "MISSING_INFORMATION"
+            )
+            items.append(
+                self._item(
+                    semantic,
+                    limitation.get("description", code),
+                    refs,
+                    "Workspace limitation surfaced without converting missing information into a negative fact.",
+                )
+            )
         return items
 
-    def _possible_explanations(self, workspace: InvestigationWorkspaceResponse, evidence_refs: list[SourceReference], investigator_question: str | None) -> list[AnalysisItem]:
+    def _possible_explanations(
+        self,
+        workspace: InvestigationWorkspaceResponse,
+        evidence_refs: list[SourceReference],
+        investigator_question: str | None,
+    ) -> list[AnalysisItem]:
         text = f"{workspace.investigation.get('investigation_question', '')} {investigator_question or ''} {self._all_text(workspace)}".lower()
         explanations = []
         if any(term in text for term in ["supplier", "novacap", "alpha", "process"]):
@@ -232,10 +278,25 @@ class ControlledInvestigatorProvider:
                 "Manufacturing lot effects should be examined because traceability and lot context can affect whether an apparent component association is real or confounded."
             )
         if not explanations:
-            explanations.append("Available evidence is insufficient to identify a stronger possible explanation without further investigation.")
-        return [self._item("POSSIBLE_EXPLANATION", statement, evidence_refs[:5], "Possible explanation only; not a hypothesis ranking or root-cause conclusion.") for statement in explanations[:4]]
+            explanations.append(
+                "Available evidence is insufficient to identify a stronger possible explanation without further investigation."
+            )
+        return [
+            self._item(
+                "POSSIBLE_EXPLANATION",
+                statement,
+                evidence_refs[:5],
+                "Possible explanation only; not a hypothesis ranking or root-cause conclusion.",
+            )
+            for statement in explanations[:4]
+        ]
 
-    def _questions(self, workspace: InvestigationWorkspaceResponse, evidence_refs: list[SourceReference], investigator_question: str | None) -> list[AnalysisItem]:
+    def _questions(
+        self,
+        workspace: InvestigationWorkspaceResponse,
+        evidence_refs: list[SourceReference],
+        investigator_question: str | None,
+    ) -> list[AnalysisItem]:
         prompts = [
             "Are shutdown rates materially different across relevant product versions, lots, and time windows?",
             "Which affected complaints can be traced to specific suppliers, components, manufacturing sites, or lots?",
@@ -244,15 +305,33 @@ class ControlledInvestigatorProvider:
             "Are there unaffected lots using the same component or supplier process that should be used as context?",
         ]
         if investigator_question and self._looks_leading(investigator_question):
-            prompts.insert(0, "What evidence supports or contradicts the premise in the user's question, and what evidence is still missing?")
-        return [self._item("INVESTIGATIVE_QUESTION", question, evidence_refs[:4], "Question is grounded in the investigation context and does not presume causality.") for question in prompts[:6]]
+            prompts.insert(
+                0,
+                "What evidence supports or contradicts the premise in the user's question, and what evidence is still missing?",
+            )
+        return [
+            self._item(
+                "INVESTIGATIVE_QUESTION",
+                question,
+                evidence_refs[:4],
+                "Question is grounded in the investigation context and does not presume causality.",
+            )
+            for question in prompts[:6]
+        ]
 
-    def _limitations(self, workspace: InvestigationWorkspaceResponse, evidence_refs: list[SourceReference], investigator_question: str | None, analysis_mode: str) -> list[AnalysisItem]:
+    def _limitations(
+        self,
+        workspace: InvestigationWorkspaceResponse,
+        evidence_refs: list[SourceReference],
+        investigator_question: str | None,
+        analysis_mode: str,
+    ) -> list[AnalysisItem]:
         limitations = [
             self._item(
                 "INSUFFICIENT_EVIDENCE",
                 "Available evidence is insufficient to establish causality or root cause.",
-                evidence_refs[:5] or [SourceReference(reference_type="DETERMINISTIC_CONTEXT", context_path="guardrails")],
+                evidence_refs[:5]
+                or [SourceReference(reference_type="DETERMINISTIC_CONTEXT", context_path="guardrails")],
                 "Abstention is the correct behavior when evidence does not support a causal conclusion.",
             ),
             self._item(
@@ -330,4 +409,7 @@ class ControlledInvestigatorProvider:
 
     def _looks_leading(self, text: str) -> bool:
         lowered = text.lower()
-        return any(term in lowered for term in ["prove", "confirm", "caused", "root cause", "ignore contradictory", "give me the answer"])
+        return any(
+            term in lowered
+            for term in ["prove", "confirm", "caused", "root cause", "ignore contradictory", "give me the answer"]
+        )

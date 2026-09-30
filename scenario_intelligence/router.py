@@ -22,7 +22,9 @@ def _context(request: Request) -> dict:
 
 
 @router.post("/{investigation_id}/scenarios", response_model=ScenarioResponse)
-def execute_scenario(investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_data_plane_db)):
+def execute_scenario(
+    investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_data_plane_db)
+):
     context = _context(request)
     tenant_id = uuid.UUID(context["tenant_id"])
     correlation = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
@@ -30,7 +32,22 @@ def execute_scenario(investigation_id: uuid.UUID, request: Request, data: Scenar
         if dependency_failure_simulated():
             raise RuntimeError("simulated scenario dependency failure")
         result = service.execute(db, tenant_id, investigation_id, data, context["user_id"])
-        db.add(make_audit_event(tenant_id=tenant_id, actor_ref=context["user_id"], action="DAY32_SCENARIO_EXECUTED", entity_type="Investigation", entity_id=investigation_id, correlation_id=correlation, details={"scenario_type": data.scenario_type, "temporal_mode": data.temporal_mode, "persist": data.persist, "status": result["status"]}))
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=context["user_id"],
+                action="DAY32_SCENARIO_EXECUTED",
+                entity_type="Investigation",
+                entity_id=investigation_id,
+                correlation_id=correlation,
+                details={
+                    "scenario_type": data.scenario_type,
+                    "temporal_mode": data.temporal_mode,
+                    "persist": data.persist,
+                    "status": result["status"],
+                },
+            )
+        )
         db.commit()
         return result
     except ScenarioError as exc:
@@ -40,6 +57,27 @@ def execute_scenario(investigation_id: uuid.UUID, request: Request, data: Scenar
         raise
     except Exception as exc:
         db.rollback()
-        db.add(make_audit_event(tenant_id=tenant_id, actor_ref=context["user_id"], action="DAY32_DEPENDENCY_FAILED", entity_type="Investigation", entity_id=investigation_id, correlation_id=correlation, details={"reason": "DEPENDENCY_UNAVAILABLE", "operation": "SCENARIO", "temporal_mode": data.temporal_mode}))
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=context["user_id"],
+                action="DAY32_DEPENDENCY_FAILED",
+                entity_type="Investigation",
+                entity_id=investigation_id,
+                correlation_id=correlation,
+                details={
+                    "reason": "DEPENDENCY_UNAVAILABLE",
+                    "operation": "SCENARIO",
+                    "temporal_mode": data.temporal_mode,
+                },
+            )
+        )
         db.commit()
-        raise HTTPException(status_code=503, detail={"code": "DEPENDENCY_UNAVAILABLE", "message": "Scenario dependency is temporarily unavailable", "correlation_id": correlation}) from exc
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "DEPENDENCY_UNAVAILABLE",
+                "message": "Scenario dependency is temporarily unavailable",
+                "correlation_id": correlation,
+            },
+        ) from exc

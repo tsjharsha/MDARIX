@@ -31,7 +31,11 @@ def main() -> int:
         service.get_node(rel.target_entity_type, rel.target_entity_id, tenant_id)
         if rel.provenance_count < 1:
             fail(f"Relationship lacks provenance: {rel.id}")
-    product_nodes = [service.get_node("product", rel.source_entity_id, tenant_id) for rel in relationships if rel.type == "PRODUCT_HAS_VERSION"]
+    product_nodes = [
+        service.get_node("product", rel.source_entity_id, tenant_id)
+        for rel in relationships
+        if rel.type == "PRODUCT_HAS_VERSION"
+    ]
     if not product_nodes:
         fail("Product graph has no product-version relationships.")
     product_id = product_nodes[0].canonical_entity_id

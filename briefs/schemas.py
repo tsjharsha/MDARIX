@@ -3,10 +3,12 @@ from datetime import datetime
 from typing import Any, Literal
 from pydantic import BaseModel
 
+
 class BriefCreateRequest(BaseModel):
     temporal_mode: Literal["current", "event", "known"] = "current"
     as_of: datetime | None = None
     generated_by: str = "MDARIX-Controlled-Brief-Assembler"
+
 
 class BriefResponse(BaseModel):
     id: uuid.UUID
@@ -21,6 +23,7 @@ class BriefResponse(BaseModel):
     provenance: dict[str, Any]
     limitations: dict[str, Any] | None
     created_at: datetime | None
+
 
 class BriefListResponse(BaseModel):
     briefs: list[BriefResponse]

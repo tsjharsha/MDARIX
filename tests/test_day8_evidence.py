@@ -44,9 +44,12 @@ def setup_test_data(db_session):
     # Dummy tenant_b UUID for cross-tenant boundary isolation tests
     tenant_b_id = uuid.UUID("99999999-9999-4999-9999-999999999999")
 
-
     # Create canonical objects for linking
-    prod = db_session.query(Product).filter(Product.tenant_id == tenant.id, Product.product_identifier == "PRD-001").first()
+    prod = (
+        db_session.query(Product)
+        .filter(Product.tenant_id == tenant.id, Product.product_identifier == "PRD-001")
+        .first()
+    )
     if not prod:
         prod = Product(
             id=uuid.uuid4(),
@@ -59,7 +62,11 @@ def setup_test_data(db_session):
         db_session.add(prod)
         db_session.commit()
 
-    comp_rev_b = db_session.query(Component).filter(Component.tenant_id == tenant.id, Component.component_identifier == "CMP-REV-B").first()
+    comp_rev_b = (
+        db_session.query(Component)
+        .filter(Component.tenant_id == tenant.id, Component.component_identifier == "CMP-REV-B")
+        .first()
+    )
     if not comp_rev_b:
         comp_rev_b = Component(
             id=uuid.uuid4(),
@@ -74,7 +81,11 @@ def setup_test_data(db_session):
         db_session.commit()
 
     # Create test evidence record if not present
-    ev = db_session.query(Evidence).filter(Evidence.tenant_id == tenant.id, Evidence.evidence_identifier == "EV-DAY8-001").first()
+    ev = (
+        db_session.query(Evidence)
+        .filter(Evidence.tenant_id == tenant.id, Evidence.evidence_identifier == "EV-DAY8-001")
+        .first()
+    )
     if not ev:
         ev = Evidence(
             id=uuid.uuid4(),
@@ -108,8 +119,6 @@ def setup_test_data(db_session):
         "product_id": prod.id,
         "component_id": comp_rev_b.id,
     }
-
-
 
 
 # 1-7: Evidence Identity, Source Preservation, Metadata, Content Access, Tenant Isolation
@@ -207,9 +216,13 @@ def test_ai_execution_provenance_recording(db_session, setup_test_data):
 def test_idempotent_extraction_reprocessing(db_session, setup_test_data):
     service = EvidenceIntelligenceService()
     # First run
-    s1 = service.process_evidence_intelligence(db_session, setup_test_data["tenant_id"], setup_test_data["evidence_id"], reprocess=False)
+    s1 = service.process_evidence_intelligence(
+        db_session, setup_test_data["tenant_id"], setup_test_data["evidence_id"], reprocess=False
+    )
     # Second run without reprocess flag should return cached summary without duplicate chunks
-    s2 = service.process_evidence_intelligence(db_session, setup_test_data["tenant_id"], setup_test_data["evidence_id"], reprocess=False)
+    s2 = service.process_evidence_intelligence(
+        db_session, setup_test_data["tenant_id"], setup_test_data["evidence_id"], reprocess=False
+    )
     assert s1["chunks_count"] == s2["chunks_count"]
     assert s1["observations_count"] == s2["observations_count"]
 
@@ -217,7 +230,11 @@ def test_idempotent_extraction_reprocessing(db_session, setup_test_data):
 # 31-37: Support, Contradiction, Propositions & Abstention
 def test_proposition_support_contradiction(db_session, setup_test_data):
     service = EvidenceIntelligenceService()
-    obs = db_session.query(EvidenceObservation).filter(EvidenceObservation.evidence_id == setup_test_data["evidence_id"]).first()
+    obs = (
+        db_session.query(EvidenceObservation)
+        .filter(EvidenceObservation.evidence_id == setup_test_data["evidence_id"])
+        .first()
+    )
     assert obs is not None
 
     prop_rel = service.associate_proposition_relation(

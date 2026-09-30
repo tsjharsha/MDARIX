@@ -24,35 +24,68 @@ def scalar(conn, sql: str, **params):
 def main() -> int:
     with engine.connect() as conn:
         tenant_id = scalar(conn, "SELECT id FROM tenants WHERE tenant_key=:tenant_key", tenant_key=TENANT_KEY)
-        run = conn.execute(
-            text(
-                "SELECT * FROM normalization_runs WHERE tenant_id=:tenant_id AND status in ('COMPLETED','COMPLETED_WITH_WARNINGS') "
-                "ORDER BY completed_at DESC LIMIT 1"
-            ),
-            {"tenant_id": tenant_id},
-        ).mappings().one_or_none()
+        run = (
+            conn.execute(
+                text(
+                    "SELECT * FROM normalization_runs WHERE tenant_id=:tenant_id AND status in ('COMPLETED','COMPLETED_WITH_WARNINGS') "
+                    "ORDER BY completed_at DESC LIMIT 1"
+                ),
+                {"tenant_id": tenant_id},
+            )
+            .mappings()
+            .one_or_none()
+        )
         if not run:
             fail("No completed Day 5 normalization run found.")
         run_id = run["id"]
 
         checks = {
             "products": scalar(conn, "SELECT count(*) FROM products WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "product_versions": scalar(conn, "SELECT count(*) FROM product_versions WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "components": scalar(conn, "SELECT count(*) FROM components WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
+            "product_versions": scalar(
+                conn, "SELECT count(*) FROM product_versions WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
+            "components": scalar(
+                conn, "SELECT count(*) FROM components WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
             "suppliers": scalar(conn, "SELECT count(*) FROM suppliers WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "sites": scalar(conn, "SELECT count(*) FROM manufacturing_sites WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
+            "sites": scalar(
+                conn, "SELECT count(*) FROM manufacturing_sites WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
             "lots": scalar(conn, "SELECT count(*) FROM lot_batches WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "requirements": scalar(conn, "SELECT count(*) FROM requirements WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
+            "requirements": scalar(
+                conn, "SELECT count(*) FROM requirements WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
             "changes": scalar(conn, "SELECT count(*) FROM changes WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "complaints": scalar(conn, "SELECT count(*) FROM complaints WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "investigations": scalar(conn, "SELECT count(*) FROM investigations WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
+            "complaints": scalar(
+                conn, "SELECT count(*) FROM complaints WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
+            "investigations": scalar(
+                conn, "SELECT count(*) FROM investigations WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
             "evidence": scalar(conn, "SELECT count(*) FROM evidence WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "links": scalar(conn, "SELECT count(*) FROM source_canonical_links WHERE tenant_id=:tenant_id AND normalization_run_id=:run_id", tenant_id=tenant_id, run_id=run_id),
+            "links": scalar(
+                conn,
+                "SELECT count(*) FROM source_canonical_links WHERE tenant_id=:tenant_id AND normalization_run_id=:run_id",
+                tenant_id=tenant_id,
+                run_id=run_id,
+            ),
             "rules": scalar(conn, "SELECT count(*) FROM identity_rules WHERE active=true"),
-            "relationships": scalar(conn, "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "product_components": scalar(conn, "SELECT count(*) FROM product_components WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
-            "product_component_relationships": scalar(conn, "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id AND relationship_type='PRODUCT_VERSION_HAS_COMPONENT'", tenant_id=tenant_id),
-            "ground_truth_links": scalar(conn, "SELECT count(*) FROM source_canonical_links WHERE provenance::text LIKE '%ground_truth%' AND provenance::text NOT LIKE '%ground_truth_used%false%'", tenant_id=tenant_id),
+            "relationships": scalar(
+                conn, "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
+            "product_components": scalar(
+                conn, "SELECT count(*) FROM product_components WHERE tenant_id=:tenant_id", tenant_id=tenant_id
+            ),
+            "product_component_relationships": scalar(
+                conn,
+                "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id AND relationship_type='PRODUCT_VERSION_HAS_COMPONENT'",
+                tenant_id=tenant_id,
+            ),
+            "ground_truth_links": scalar(
+                conn,
+                "SELECT count(*) FROM source_canonical_links WHERE provenance::text LIKE '%ground_truth%' AND provenance::text NOT LIKE '%ground_truth_used%false%'",
+                tenant_id=tenant_id,
+            ),
         }
 
         minimums = {
@@ -98,7 +131,11 @@ def main() -> int:
         if duplicate_canonicals:
             fail("Duplicate canonical products detected.")
 
-        causal_edges = scalar(conn, "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id AND relationship_type ILIKE '%CAUSE%'", tenant_id=tenant_id)
+        causal_edges = scalar(
+            conn,
+            "SELECT count(*) FROM canonical_relationships WHERE tenant_id=:tenant_id AND relationship_type ILIKE '%CAUSE%'",
+            tenant_id=tenant_id,
+        )
         if causal_edges:
             fail("Day 5 created causal relationships.")
 

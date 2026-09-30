@@ -86,7 +86,10 @@ class RetrievalQuery(Base):
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         CheckConstraint("retrieval_mode in ('structured','semantic','hybrid')", name="retrieval_mode_allowed"),
         CheckConstraint("temporal_mode in ('current','event','known')", name="retrieval_temporal_mode_allowed"),
-        CheckConstraint("status in ('COMPLETED','NO_RELEVANT_EVIDENCE','INSUFFICIENT_RELEVANT_EVIDENCE','FAILED')", name="retrieval_status_allowed"),
+        CheckConstraint(
+            "status in ('COMPLETED','NO_RELEVANT_EVIDENCE','INSUFFICIENT_RELEVANT_EVIDENCE','FAILED')",
+            name="retrieval_status_allowed",
+        ),
         UniqueConstraint("tenant_id", "id", name="uq_retrieval_queries_tenant_id_id"),
     )
 

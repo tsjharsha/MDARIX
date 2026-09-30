@@ -1,4 +1,5 @@
 """Tenant-safe context construction and optional GenAI advisory augmentation."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -13,18 +14,69 @@ from investigation_workspace.service import InvestigationWorkspaceService
 
 
 CONTEXT_POLICY_VERSION = "R1-GROUNDED-AI-CONTEXT-v1"
-ALLOWED_KEYS = frozenset({
-    "id", "investigation_identifier", "investigation_question", "status", "opened_at", "closed_at",
-    "product_id", "product_version_id", "product", "selected_version", "overview", "configuration",
-    "changes", "manufacturing", "complaints", "risks", "controls", "provenance", "limitations",
-    "mode", "as_of", "event_time_distinct_from_known_time", "late_arriving_evidence_count",
-    "evidence_identifier", "evidence_type", "title", "source_reference", "reliability_status", "fact_type",
-    "temporal", "effective_timestamp", "recorded_timestamp", "ingestion_timestamp", "chunks", "chunk_id",
-    "sequence_number", "source_anchor", "excerpt", "materialized", "observations", "observation_id",
-    "statement", "observation_type", "extraction_method", "quality_status", "entity_links", "entity_type",
-    "entity_id", "raw_reference", "resolution_status", "nodes", "relationships", "metadata", "warning",
-    "relationship_semantics", "unknowns", "missing_evidence", "contradictions", "hypotheses",
-})
+ALLOWED_KEYS = frozenset(
+    {
+        "id",
+        "investigation_identifier",
+        "investigation_question",
+        "status",
+        "opened_at",
+        "closed_at",
+        "product_id",
+        "product_version_id",
+        "product",
+        "selected_version",
+        "overview",
+        "configuration",
+        "changes",
+        "manufacturing",
+        "complaints",
+        "risks",
+        "controls",
+        "provenance",
+        "limitations",
+        "mode",
+        "as_of",
+        "event_time_distinct_from_known_time",
+        "late_arriving_evidence_count",
+        "evidence_identifier",
+        "evidence_type",
+        "title",
+        "source_reference",
+        "reliability_status",
+        "fact_type",
+        "temporal",
+        "effective_timestamp",
+        "recorded_timestamp",
+        "ingestion_timestamp",
+        "chunks",
+        "chunk_id",
+        "sequence_number",
+        "source_anchor",
+        "excerpt",
+        "materialized",
+        "observations",
+        "observation_id",
+        "statement",
+        "observation_type",
+        "extraction_method",
+        "quality_status",
+        "entity_links",
+        "entity_type",
+        "entity_id",
+        "raw_reference",
+        "resolution_status",
+        "nodes",
+        "relationships",
+        "metadata",
+        "warning",
+        "relationship_semantics",
+        "unknowns",
+        "missing_evidence",
+        "contradictions",
+        "hypotheses",
+    }
+)
 PROHIBITED_FRAGMENTS = ("password", "secret", "token", "credential", "cookie", "authorization", "api_key")
 
 
@@ -108,7 +160,9 @@ def advisory(
         f"User question: {question or 'None supplied'}."
     )
     try:
-        result = client.complete(prompt, {"grounded_context": grounded_context, "controlled_result": deterministic_result})
+        result = client.complete(
+            prompt, {"grounded_context": grounded_context, "controlled_result": deterministic_result}
+        )
         return {
             "status": "PROVIDER_COMPLETED",
             "provider_output": result.output,

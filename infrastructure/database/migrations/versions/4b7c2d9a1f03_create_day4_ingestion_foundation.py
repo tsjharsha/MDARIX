@@ -37,7 +37,10 @@ def upgrade() -> None:
         sa.Column("configuration_version", sa.String(length=80), server_default="day4.v1", nullable=False),
         sa.Column("initiated_by", sa.String(length=120), server_default="day4-cli", nullable=False),
         sa.Column("provenance", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.CheckConstraint("status in ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED','ALREADY_INGESTED')", name="ingestion_run_status_allowed"),
+        sa.CheckConstraint(
+            "status in ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED','ALREADY_INGESTED')",
+            name="ingestion_run_status_allowed",
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_ingestion_runs_tenant_id_tenants")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_ingestion_runs")),
     )
@@ -78,11 +81,25 @@ def upgrade() -> None:
         sa.Column("data_quality_status", sa.String(length=40), nullable=False),
         sa.Column("mapping_version", sa.String(length=80), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("data_quality_status in ('ACCEPTED','ACCEPTED_WITH_WARNINGS','REJECTED','SKIPPED_DUPLICATE_SOURCE')", name="staged_record_quality_status_allowed"),
-        sa.ForeignKeyConstraint(["ingestion_run_id"], ["ingestion_runs.id"], name=op.f("fk_staged_source_records_ingestion_run_id_ingestion_runs")),
+        sa.CheckConstraint(
+            "data_quality_status in ('ACCEPTED','ACCEPTED_WITH_WARNINGS','REJECTED','SKIPPED_DUPLICATE_SOURCE')",
+            name="staged_record_quality_status_allowed",
+        ),
+        sa.ForeignKeyConstraint(
+            ["ingestion_run_id"],
+            ["ingestion_runs.id"],
+            name=op.f("fk_staged_source_records_ingestion_run_id_ingestion_runs"),
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_staged_source_records_tenant_id_tenants")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_staged_source_records")),
-        sa.UniqueConstraint("tenant_id", "source_system", "source_file", "source_record_id", "source_checksum", name="uq_staged_source_record_identity"),
+        sa.UniqueConstraint(
+            "tenant_id",
+            "source_system",
+            "source_file",
+            "source_record_id",
+            "source_checksum",
+            name="uq_staged_source_record_identity",
+        ),
     )
     op.create_table(
         "data_quality_issues",
@@ -98,14 +115,26 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=40), server_default="open", nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint("severity in ('INFO','WARNING','ERROR')", name="data_quality_issue_severity_allowed"),
-        sa.ForeignKeyConstraint(["ingestion_run_id"], ["ingestion_runs.id"], name=op.f("fk_data_quality_issues_ingestion_run_id_ingestion_runs")),
-        sa.ForeignKeyConstraint(["staged_source_record_id"], ["staged_source_records.id"], name=op.f("fk_data_quality_issues_staged_source_record_id_staged_source_records")),
+        sa.ForeignKeyConstraint(
+            ["ingestion_run_id"],
+            ["ingestion_runs.id"],
+            name=op.f("fk_data_quality_issues_ingestion_run_id_ingestion_runs"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["staged_source_record_id"],
+            ["staged_source_records.id"],
+            name=op.f("fk_data_quality_issues_staged_source_record_id_staged_source_records"),
+        ),
         sa.ForeignKeyConstraint(["tenant_id"], ["tenants.id"], name=op.f("fk_data_quality_issues_tenant_id_tenants")),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_data_quality_issues")),
     )
-    op.create_index("ix_ingestion_runs_source_file_checksum", "ingestion_runs", ["source_system", "source_file", "source_checksum"])
+    op.create_index(
+        "ix_ingestion_runs_source_file_checksum", "ingestion_runs", ["source_system", "source_file", "source_checksum"]
+    )
     op.create_index("ix_staged_source_records_run", "staged_source_records", ["ingestion_run_id"])
-    op.create_index("ix_staged_source_records_source", "staged_source_records", ["source_system", "record_type", "source_record_id"])
+    op.create_index(
+        "ix_staged_source_records_source", "staged_source_records", ["source_system", "record_type", "source_record_id"]
+    )
 
 
 def downgrade() -> None:

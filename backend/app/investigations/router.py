@@ -92,7 +92,9 @@ def get_latest_investigation_analysis(
     tenant_id = ctx.tenant_id
     result = investigator_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
-        raise HTTPException(status_code=404, detail={"code": "ANALYSIS_NOT_FOUND", "message": "No investigation analysis exists"})
+        raise HTTPException(
+            status_code=404, detail={"code": "ANALYSIS_NOT_FOUND", "message": "No investigation analysis exists"}
+        )
     return result
 
 
@@ -134,7 +136,9 @@ def list_latest_hypotheses(
     tenant_id = ctx.tenant_id
     result = hypothesis_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
-        raise HTTPException(status_code=404, detail={"code": "HYPOTHESIS_SET_NOT_FOUND", "message": "No hypothesis set exists"})
+        raise HTTPException(
+            status_code=404, detail={"code": "HYPOTHESIS_SET_NOT_FOUND", "message": "No hypothesis set exists"}
+        )
     return result
 
 

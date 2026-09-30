@@ -36,7 +36,9 @@ class DeterministicExtractor:
             observations.append(obs)
 
         # 2. Extract explicit test results (e.g., PASS / FAIL)
-        test_matches = re.finditer(r"(validation|test|result|status)[:\s]+(PASS|FAILED|PASSED|FAIL|COMPLETED)", content, re.IGNORECASE)
+        test_matches = re.finditer(
+            r"(validation|test|result|status)[:\s]+(PASS|FAILED|PASSED|FAIL|COMPLETED)", content, re.IGNORECASE
+        )
         for m in test_matches:
             obs = EvidenceObservation(
                 id=uuid.uuid4(),

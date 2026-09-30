@@ -93,20 +93,20 @@ def run_day8_validation() -> int:
             unanchored = [o for o in observations if not o.source_anchor]
             if unanchored:
                 errors.append(f"{len(unanchored)} material observations missing source anchors.")
-                print(f"[FAIL] Source anchor coverage: {((len(observations)-len(unanchored))/len(observations))*100:.1f}%")
+                print(
+                    f"[FAIL] Source anchor coverage: {((len(observations) - len(unanchored)) / len(observations)) * 100:.1f}%"
+                )
             else:
-                print(f"[PASS] Material accepted observation source-anchor coverage: 100% ({len(observations)}/{len(observations)}).")
+                print(
+                    f"[PASS] Material accepted observation source-anchor coverage: 100% ({len(observations)}/{len(observations)})."
+                )
 
         # 7. Entity Links Verification
         links = db.query(EvidenceEntityLink).filter(EvidenceEntityLink.evidence_id == target_ev.id).all()
         print(f"[PASS] Entity linking generated {len(links)} links (resolved + unresolved references).")
 
         # 8. AIExecution Provenance Verification
-        ai_execs = (
-            db.query(AIExecution)
-            .filter(AIExecution.tenant_id == tenant.id)
-            .all()
-        )
+        ai_execs = db.query(AIExecution).filter(AIExecution.tenant_id == tenant.id).all()
         if not ai_execs:
             errors.append("No AIExecution provenance recorded.")
             print("[FAIL] AIExecution provenance missing.")
@@ -139,6 +139,7 @@ def run_day8_validation() -> int:
     except Exception as e:
         print(f"[ERROR] Exception during validation: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
     finally:

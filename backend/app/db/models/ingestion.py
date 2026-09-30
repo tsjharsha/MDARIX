@@ -48,7 +48,10 @@ class IngestionRun(Base):
     provenance: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
-        CheckConstraint("status in ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED','ALREADY_INGESTED')", name="ingestion_run_status_allowed"),
+        CheckConstraint(
+            "status in ('PENDING','RUNNING','COMPLETED','COMPLETED_WITH_WARNINGS','FAILED','ALREADY_INGESTED')",
+            name="ingestion_run_status_allowed",
+        ),
         Index("ix_ingestion_runs_source_file_checksum", "source_system", "source_file", "source_checksum"),
     )
 
@@ -76,7 +79,9 @@ class StagedSourceRecord(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False)
+    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False
+    )
     source_system: Mapped[str] = mapped_column(String(80), nullable=False)
     source_type: Mapped[str] = mapped_column(String(80), nullable=False)
     record_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -97,8 +102,18 @@ class StagedSourceRecord(Base):
     created_at = tz(False)
 
     __table_args__ = (
-        CheckConstraint("data_quality_status in ('ACCEPTED','ACCEPTED_WITH_WARNINGS','REJECTED','SKIPPED_DUPLICATE_SOURCE')", name="staged_record_quality_status_allowed"),
-        UniqueConstraint("tenant_id", "source_system", "source_file", "source_record_id", "source_checksum", name="uq_staged_source_record_identity"),
+        CheckConstraint(
+            "data_quality_status in ('ACCEPTED','ACCEPTED_WITH_WARNINGS','REJECTED','SKIPPED_DUPLICATE_SOURCE')",
+            name="staged_record_quality_status_allowed",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "source_system",
+            "source_file",
+            "source_record_id",
+            "source_checksum",
+            name="uq_staged_source_record_identity",
+        ),
         Index("ix_staged_source_records_run", "ingestion_run_id"),
         Index("ix_staged_source_records_source", "source_system", "record_type", "source_record_id"),
     )
@@ -109,8 +124,12 @@ class DataQualityIssue(Base):
 
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False)
-    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("staged_source_records.id"))
+    ingestion_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("ingestion_runs.id"), nullable=False
+    )
+    staged_source_record_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("staged_source_records.id")
+    )
     issue_code: Mapped[str] = mapped_column(String(80), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False)
     field: Mapped[str | None] = mapped_column(String(120))

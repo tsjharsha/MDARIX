@@ -1,4 +1,5 @@
 """Reusable authenticated, tenant-scoped request context."""
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
@@ -27,59 +28,166 @@ def set_database_tenant_context(db: Session, tenant_id: str) -> None:
     """
     db.execute(text("select set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
 
+
 @dataclass(frozen=True)
 class AuthenticatedRequestContext:
-    user_id: str; session_id: str; tenant_id: str; membership_id: str | None; active_role_id: str | None; persona: str | None; permission_set_ids: tuple[str, ...]; plan_id: str | None; entitlements: dict; correlation_id: str
+    user_id: str
+    session_id: str
+    tenant_id: str
+    membership_id: str | None
+    active_role_id: str | None
+    persona: str | None
+    permission_set_ids: tuple[str, ...]
+    plan_id: str | None
+    entitlements: dict
+    correlation_id: str
+
 
 def get_request_context(request: Request, db: Session = Depends(get_db)) -> AuthenticatedRequestContext:
-    token = request.cookies.get('mdarix_session')
-    if not token: raise HTTPException(401, detail={'code':'UNAUTHENTICATED','message':'Authentication required'})
-    durable = db.query(AuthSession).filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None), AuthSession.expires_at > datetime.now(timezone.utc)).first()
-    if durable is None or not hasattr(durable, 'user_id'):
+    token = request.cookies.get("mdarix_session")
+    if not token:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    durable = (
+        db.query(AuthSession)
+        .filter(
+            AuthSession.session_hash == hash_token(token),
+            AuthSession.revoked_at.is_(None),
+            AuthSession.expires_at > datetime.now(timezone.utc),
+        )
+        .first()
+    )
+    if durable is None or not hasattr(durable, "user_id"):
         # Legacy in-process sessions are a narrowly scoped test compatibility
         # path. They are disabled by default, including in development, and
         # can only be enabled explicitly for legacy unit tests. This prevents
         # an accidental environment mismatch from weakening authentication.
         import os
+
         legacy_fallback = (
-            os.getenv('MDARIX_ENV', 'development').lower() == 'development'
-            and os.getenv('MDARIX_ALLOW_LEGACY_AUTH_FALLBACK', '').lower() == 'true'
+            os.getenv("MDARIX_ENV", "development").lower() == "development"
+            and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
         )
         if not legacy_fallback:
-            raise HTTPException(401, detail={'code':'UNAUTHENTICATED','message':'Authentication required'})
+            raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
         try:
             legacy = auth_service.context(token)
         except ValueError:
-            raise HTTPException(401, detail={'code':'UNAUTHENTICATED','message':'Authentication required'})
+            raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
         try:
-            legacy_user_id = UUID(str(legacy['user_id']))
-            set_database_tenant_context(db, str(legacy['tenant_id']))
-            user = db.query(AuthUser).filter(AuthUser.id == legacy_user_id, AuthUser.tenant_id == legacy['tenant_id'], AuthUser.status == 'ACTIVE').first()
+            legacy_user_id = UUID(str(legacy["user_id"]))
+            set_database_tenant_context(db, str(legacy["tenant_id"]))
+            user = (
+                db.query(AuthUser)
+                .filter(
+                    AuthUser.id == legacy_user_id,
+                    AuthUser.tenant_id == legacy["tenant_id"],
+                    AuthUser.status == "ACTIVE",
+                )
+                .first()
+            )
         except (ValueError, TypeError):
-            user = db.query(AuthUser).filter(AuthUser.username == str(legacy['user_id']).lower(), AuthUser.tenant_id == legacy['tenant_id'], AuthUser.status == 'ACTIVE').first()
-        if user is not None and str(user.tenant_id) != str(legacy['tenant_id']):
-            raise HTTPException(401, detail={'code':'UNAUTHENTICATED','message':'Authentication required'})
+            user = (
+                db.query(AuthUser)
+                .filter(
+                    AuthUser.username == str(legacy["user_id"]).lower(),
+                    AuthUser.tenant_id == legacy["tenant_id"],
+                    AuthUser.status == "ACTIVE",
+                )
+                .first()
+            )
+        if user is not None and str(user.tenant_id) != str(legacy["tenant_id"]):
+            raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
         if user is None:
             # Legacy unit-test clients do not create a database user. This
             # compatibility identity is development-only and never reaches
             # production deployments.
-            return AuthenticatedRequestContext(str(legacy['user_id']), token, str(legacy['tenant_id']), None, legacy.get('active_role') or 'Viewer', None, (), None, {}, request.headers.get('X-Correlation-ID') or str(uuid4()))
-        membership = db.query(TenantMembership).filter(TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id, TenantMembership.status == 'ACTIVE').first()
+            return AuthenticatedRequestContext(
+                str(legacy["user_id"]),
+                token,
+                str(legacy["tenant_id"]),
+                None,
+                legacy.get("active_role") or "Viewer",
+                None,
+                (),
+                None,
+                {},
+                request.headers.get("X-Correlation-ID") or str(uuid4()),
+            )
+        membership = (
+            db.query(TenantMembership)
+            .filter(
+                TenantMembership.user_id == user.id,
+                TenantMembership.tenant_id == user.tenant_id,
+                TenantMembership.status == "ACTIVE",
+            )
+            .first()
+        )
         role_id = None
         role_name = user.role
-        assignment = db.query(RoleAssignment).filter(RoleAssignment.tenant_id == user.tenant_id, RoleAssignment.user_id == user.id, RoleAssignment.status == 'ACTIVE').first()
-        if assignment is not None and hasattr(assignment, 'role_id'):
+        assignment = (
+            db.query(RoleAssignment)
+            .filter(
+                RoleAssignment.tenant_id == user.tenant_id,
+                RoleAssignment.user_id == user.id,
+                RoleAssignment.status == "ACTIVE",
+            )
+            .first()
+        )
+        if assignment is not None and hasattr(assignment, "role_id"):
             role_id = str(assignment.role_id)
-            role_row = db.query(RoleDefinition).filter(RoleDefinition.tenant_id == user.tenant_id, RoleDefinition.id == assignment.role_id, RoleDefinition.status == 'ACTIVE').first()
+            role_row = (
+                db.query(RoleDefinition)
+                .filter(
+                    RoleDefinition.tenant_id == user.tenant_id,
+                    RoleDefinition.id == assignment.role_id,
+                    RoleDefinition.status == "ACTIVE",
+                )
+                .first()
+            )
             if role_row is not None:
                 role_name = role_row.name
-        return AuthenticatedRequestContext(str(user.id), token, str(user.tenant_id), str(membership.id) if membership else None, role_id or role_name, None, (), None, {}, request.headers.get('X-Correlation-ID') or str(uuid4()))
+        return AuthenticatedRequestContext(
+            str(user.id),
+            token,
+            str(user.tenant_id),
+            str(membership.id) if membership else None,
+            role_id or role_name,
+            None,
+            (),
+            None,
+            {},
+            request.headers.get("X-Correlation-ID") or str(uuid4()),
+        )
     durable.last_seen_at = datetime.now(timezone.utc)
     set_database_tenant_context(db, str(durable.tenant_id))
-    if hasattr(db, 'commit'):
+    if hasattr(db, "commit"):
         db.commit()
     user_id, tenant_id = str(durable.user_id), str(durable.tenant_id)
-    user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id, AuthUser.status == 'ACTIVE').first()
-    if user is None: raise HTTPException(401, detail={'code':'UNAUTHENTICATED','message':'Authentication required'})
-    membership = db.query(TenantMembership).filter(TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id, TenantMembership.status == 'ACTIVE').first()
-    return AuthenticatedRequestContext(user_id, token, tenant_id, str(membership.id) if membership else None, None, None, (), None, {}, request.headers.get('X-Correlation-ID') or str(uuid4()))
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE")
+        .first()
+    )
+    if user is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    membership = (
+        db.query(TenantMembership)
+        .filter(
+            TenantMembership.user_id == user.id,
+            TenantMembership.tenant_id == user.tenant_id,
+            TenantMembership.status == "ACTIVE",
+        )
+        .first()
+    )
+    return AuthenticatedRequestContext(
+        user_id,
+        token,
+        tenant_id,
+        str(membership.id) if membership else None,
+        None,
+        None,
+        (),
+        None,
+        {},
+        request.headers.get("X-Correlation-ID") or str(uuid4()),
+    )

@@ -38,14 +38,24 @@ def main() -> int:
     if any("root cause" in str(item).lower() for item in [view.overview, view.limitations]):
         if not any("no root-cause conclusion" in item["description"].lower() for item in view.limitations):
             fail("Unsupported root-cause wording detected.")
-    event_as_of = service.temporal_reality(primary.id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="event")
-    known_as_of = service.temporal_reality(primary.id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="known")
+    event_as_of = service.temporal_reality(
+        primary.id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="event"
+    )
+    known_as_of = service.temporal_reality(
+        primary.id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="known"
+    )
     if event_as_of.event_count < known_as_of.event_count:
         fail("Event-as-of should not be narrower than known-as-of for the same date.")
     if not any(event.late_arriving for event in service.temporal_reality(primary.id, version_id="D").events):
         fail("Late-arriving evidence not represented.")
     payload = view.model_dump_json()
-    for forbidden in ["hidden_ground_truth", "actual_root_cause", "correct_answer", "expected_conclusion", "prohibited_conclusions"]:
+    for forbidden in [
+        "hidden_ground_truth",
+        "actual_root_cause",
+        "correct_answer",
+        "expected_conclusion",
+        "prohibited_conclusions",
+    ]:
         if forbidden in payload:
             fail(f"Ground Truth leakage detected: {forbidden}")
     with engine.connect() as conn:

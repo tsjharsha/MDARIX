@@ -1,4 +1,5 @@
 """create versioned investigation briefs"""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -7,6 +8,7 @@ revision = "d17b1e4c8a01"
 down_revision = "c15d0e7a2b01"
 branch_labels = None
 depends_on = None
+
 
 def upgrade() -> None:
     op.create_table(
@@ -32,9 +34,12 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True)),
         sa.ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("tenant_id", "investigation_id", "brief_version", name="uq_briefs_tenant_investigation_version"),
+        sa.UniqueConstraint(
+            "tenant_id", "investigation_id", "brief_version", name="uq_briefs_tenant_investigation_version"
+        ),
         sa.UniqueConstraint("tenant_id", "id", name="uq_briefs_tenant_id_id"),
     )
+
 
 def downgrade() -> None:
     op.drop_table("investigation_briefs")

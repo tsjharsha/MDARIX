@@ -13,6 +13,7 @@ Order matters: the golden AcmeCare dataset is ingested before the Day 35
 fixtures and demo expansion, because the demo seed attaches its products to
 the golden tenant when it exists.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -49,25 +50,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--recreate", action="store_true", help="drop and recreate the *_test database first")
     args = parser.parse_args()
-    if os.getenv('MDARIX_ENV') != 'test':
-        raise SystemExit('Refusing test database writes: set MDARIX_ENV=test')
+    if os.getenv("MDARIX_ENV") != "test":
+        raise SystemExit("Refusing test database writes: set MDARIX_ENV=test")
     env = os.environ.copy()
-    env.setdefault('POSTGRES_DB', 'mdarix_r1_test')
-    env.setdefault('MDARIX_DB_HARDENING_APPLY', '1')
-    env['DAY35_FIXTURE_APPLY'] = '1'
-    env['PYTHONPATH'] = str(ROOT) + os.pathsep + env.get('PYTHONPATH', '')
-    if not env.get('DAY35_FIXTURE_PASSWORD'):
-        raise SystemExit('DAY35_FIXTURE_PASSWORD is required and must be test-only')
+    env.setdefault("POSTGRES_DB", "mdarix_r1_test")
+    env.setdefault("MDARIX_DB_HARDENING_APPLY", "1")
+    env["DAY35_FIXTURE_APPLY"] = "1"
+    env["PYTHONPATH"] = str(ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    if not env.get("DAY35_FIXTURE_PASSWORD"):
+        raise SystemExit("DAY35_FIXTURE_PASSWORD is required and must be test-only")
     if args.recreate:
-        os.environ['POSTGRES_DB'] = env['POSTGRES_DB']
-        recreate_database(env['POSTGRES_DB'])
-    run(sys.executable, '-m', 'alembic', 'upgrade', 'head', env=env)
-    run(sys.executable, '-m', 'ingestion.services.ingestion_service', env=env)
-    run(sys.executable, '-m', 'ingestion.normalization.cli', env=env)
-    run(sys.executable, 'scripts/provision_day35_fixture.py', env=env)
-    run(sys.executable, 'scripts/seed_demo_expansion.py', env=env)
-    print('TEST_ENVIRONMENT_READY')
+        os.environ["POSTGRES_DB"] = env["POSTGRES_DB"]
+        recreate_database(env["POSTGRES_DB"])
+    run(sys.executable, "-m", "alembic", "upgrade", "head", env=env)
+    run(sys.executable, "-m", "ingestion.services.ingestion_service", env=env)
+    run(sys.executable, "-m", "ingestion.normalization.cli", env=env)
+    run(sys.executable, "scripts/provision_day35_fixture.py", env=env)
+    run(sys.executable, "scripts/seed_demo_expansion.py", env=env)
+    print("TEST_ENVIRONMENT_READY")
     return 0
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     raise SystemExit(main())

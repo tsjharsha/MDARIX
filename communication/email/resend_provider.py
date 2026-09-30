@@ -16,10 +16,18 @@ class ResendProvider:
     def health(self) -> dict[str, object]:
         sender_domain = parseaddr(self.sender or "")[1].split("@")[-1] if "@" in parseaddr(self.sender or "")[1] else ""
         verified_domain = os.getenv("RESEND_VERIFIED_DOMAIN", "")
-        return {"provider": "resend", "configured": bool(self.api_key and self.sender and (not verified_domain or sender_domain == verified_domain)),
-                "api_key_present": bool(self.api_key), "sender_present": bool(self.sender),
-                "reply_to_present": bool(self.reply_to), "sender_domain": sender_domain,
-                "verified_domain_configured": bool(verified_domain), "sender_domain_verified": bool(sender_domain and (not verified_domain or sender_domain == verified_domain))}
+        return {
+            "provider": "resend",
+            "configured": bool(
+                self.api_key and self.sender and (not verified_domain or sender_domain == verified_domain)
+            ),
+            "api_key_present": bool(self.api_key),
+            "sender_present": bool(self.sender),
+            "reply_to_present": bool(self.reply_to),
+            "sender_domain": sender_domain,
+            "verified_domain_configured": bool(verified_domain),
+            "sender_domain_verified": bool(sender_domain and (not verified_domain or sender_domain == verified_domain)),
+        }
 
     def send(self, message: EmailMessage) -> str:
         if not self.api_key or not self.sender:
@@ -32,7 +40,12 @@ class ResendProvider:
         reply_to = message.reply_to or self.reply_to
         if reply_to:
             payload["reply_to"] = [reply_to]
-        request = Request(self.endpoint, data=json.dumps(payload).encode(), headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}, method="POST")
+        request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode(),
+            headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+            method="POST",
+        )
         try:
             with urlopen(request, timeout=20) as response:
                 data = json.loads(response.read().decode() or "{}")

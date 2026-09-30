@@ -18,7 +18,9 @@ def provider_health(ctx: AuthenticatedRequestContext = Depends(get_request_conte
 async def resend_webhook(request: Request, x_resend_signature: str | None = Header(default=None)):
     body = await request.body()
     if not verify_webhook(body, x_resend_signature):
-        raise HTTPException(401, detail={"code": "INVALID_WEBHOOK_SIGNATURE", "message": "Webhook authentication failed"})
+        raise HTTPException(
+            401, detail={"code": "INVALID_WEBHOOK_SIGNATURE", "message": "Webhook authentication failed"}
+        )
     try:
         event = json.loads(body.decode())
     except (UnicodeDecodeError, json.JSONDecodeError):

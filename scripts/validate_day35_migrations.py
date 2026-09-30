@@ -1,4 +1,5 @@
 """Non-mutating validation of the Day 35 Alembic migration chain."""
+
 import re
 from pathlib import Path
 

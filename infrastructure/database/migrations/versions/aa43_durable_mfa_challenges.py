@@ -1,4 +1,5 @@
 """Add durable single-use MFA challenge storage."""
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -7,6 +8,7 @@ revision = "aa43durablemfa"
 down_revision = "z42publiconboarding"
 branch_labels = None
 depends_on = None
+
 
 def upgrade():
     op.create_table(
@@ -24,6 +26,7 @@ def upgrade():
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_mfa_challenge_user", "mfa_challenges", ["tenant_id", "user_id", "purpose", "expires_at"])
+
 
 def downgrade():
     op.drop_index("ix_mfa_challenge_user", table_name="mfa_challenges")

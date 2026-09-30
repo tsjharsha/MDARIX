@@ -12,15 +12,21 @@ class ModelBoundaryResult:
     response: dict[str, Any]
 
 
-def build_model_context(records: list[Mapping[str, Any]], *, tenant_id: str, authorized_fields: set[str]) -> ModelBoundaryResult:
+def build_model_context(
+    records: list[Mapping[str, Any]], *, tenant_id: str, authorized_fields: set[str]
+) -> ModelBoundaryResult:
     safe: list[dict[str, Any]] = []
     decisions: list[AIBoundaryDecision] = []
     for record in records:
-        context, decision = build_context(record, authorized_fields=authorized_fields, tenant_id=tenant_id, record_tenant_id=record.get("tenant_id"))
+        context, decision = build_context(
+            record, authorized_fields=authorized_fields, tenant_id=tenant_id, record_tenant_id=record.get("tenant_id")
+        )
         decisions.append(decision)
         if decision.allowed:
             safe.append(context)
-    return ModelBoundaryResult("READY", tuple(safe), tuple(decisions), {"type": "CONTROLLED_CONTEXT", "model_invocation": "NOT_IMPLEMENTED"})
+    return ModelBoundaryResult(
+        "READY", tuple(safe), tuple(decisions), {"type": "CONTROLLED_CONTEXT", "model_invocation": "NOT_IMPLEMENTED"}
+    )
 
 
 def dependency_failure(code: str = "AI_UNAVAILABLE") -> dict[str, str]:

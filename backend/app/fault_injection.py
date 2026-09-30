@@ -9,6 +9,7 @@ The switch is server-configured only (never client-triggered), off by default
 and ignored whenever ``MDARIX_ENV=production``. It replaces the former
 per-day flags (DAY27/DAY30/DAY31/DAY32/DAY34_LIVE_DEPENDENCY_FAILURE).
 """
+
 import os
 
 SIMULATE_DEPENDENCY_FAILURE_FLAG = "MDARIX_SIMULATE_DEPENDENCY_FAILURE"

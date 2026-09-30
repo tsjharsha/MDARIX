@@ -13,7 +13,16 @@ class EntitlementDecision:
     limits: Mapping[str, object]
 
 
-def evaluate_entitlement(*, feature: str, plan_active: bool, feature_enabled: bool, assignment_active: bool, effective_from: datetime | None = None, now: datetime | None = None, limits: Mapping[str, object] | None = None) -> EntitlementDecision:
+def evaluate_entitlement(
+    *,
+    feature: str,
+    plan_active: bool,
+    feature_enabled: bool,
+    assignment_active: bool,
+    effective_from: datetime | None = None,
+    now: datetime | None = None,
+    limits: Mapping[str, object] | None = None,
+) -> EntitlementDecision:
     if not feature.strip():
         return EntitlementDecision(feature, False, "FEATURE_REQUIRED", {})
     current = now or datetime.now().astimezone()

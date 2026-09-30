@@ -43,7 +43,16 @@ def test_invalid_node():
 
 def test_supported_node_types():
     values = ids()
-    for entity_type, key in [("product", "product"), ("product_version", "version"), ("component", "component"), ("supplier", "supplier"), ("lot_batch", "lot"), ("complaint", "complaint"), ("investigation", "investigation"), ("evidence", "evidence")]:
+    for entity_type, key in [
+        ("product", "product"),
+        ("product_version", "version"),
+        ("component", "component"),
+        ("supplier", "supplier"),
+        ("lot_batch", "lot"),
+        ("complaint", "complaint"),
+        ("investigation", "investigation"),
+        ("evidence", "evidence"),
+    ]:
         assert service.get_node(entity_type, values[key]).canonical_entity_id == values[key]
 
 
@@ -121,12 +130,18 @@ def test_temporal_and_historical_relationships():
 
 def test_tenant_isolation_and_no_cross_tenant_edges():
     tenant_id = service.tenant_id()
-    assert all(service.get_node(r.source_entity_type, r.source_entity_id).tenant_id == tenant_id for r in service.all_relationships(tenant_id)[:20])
+    assert all(
+        service.get_node(r.source_entity_type, r.source_entity_id).tenant_id == tenant_id
+        for r in service.all_relationships(tenant_id)[:20]
+    )
 
 
 def test_unresolved_relationship_handling():
     assert one("SELECT count(*) FROM complaints WHERE lot_batch_id IS NULL") > 0
-    assert all(r.type != "COMPLAINT_ASSOCIATED_WITH_LOT" or r.target_entity_id for r in service.all_relationships(service.tenant_id()))
+    assert all(
+        r.type != "COMPLAINT_ASSOCIATED_WITH_LOT" or r.target_entity_id
+        for r in service.all_relationships(service.tenant_id())
+    )
 
 
 def test_duplicate_edge_prevention():
@@ -148,7 +163,10 @@ def test_vs001_graph_path_and_contradictions():
     values = ids()
     graph = service.get_path("change", values["change"], "complaint", values["complaint"], max_depth=5)
     assert any(r.type == "CHANGE_AFFECTS_SUPPLIER" for r in graph.relationships)
-    assert one("SELECT count(*) FROM complaints WHERE event_timestamp < '2026-01-18' AND description LIKE '%shutdown%'") >= 3
+    assert (
+        one("SELECT count(*) FROM complaints WHERE event_timestamp < '2026-01-18' AND description LIKE '%shutdown%'")
+        >= 3
+    )
 
 
 def test_vs002_false_correlation_preserved():
@@ -158,7 +176,12 @@ def test_vs002_false_correlation_preserved():
 
 def test_vs003_missing_evidence_and_vs004_conflicting_evidence():
     assert one("SELECT count(*) FROM source_canonical_links WHERE human_review_status='required'") >= 1
-    assert one("SELECT count(*) FROM evidence WHERE content LIKE '%validation test passed%' OR content LIKE '%shutdown complaints existed before%'") >= 2
+    assert (
+        one(
+            "SELECT count(*) FROM evidence WHERE content LIKE '%validation test passed%' OR content LIKE '%shutdown complaints existed before%'"
+        )
+        >= 2
+    )
 
 
 def test_vs005_to_vs012_preservation():
@@ -176,7 +199,16 @@ def test_api_smoke_product_investigation_relationship_path():
     assert client.get(f"/api/v1/graph/investigations/{values['investigation']}").status_code == 200
     rel = next(r for r in service.all_relationships(service.tenant_id()) if r.type == "PRODUCT_HAS_VERSION")
     assert client.get(f"/api/v1/graph/relationships/{rel.id}").status_code == 200
-    path = client.get("/api/v1/graph/paths", params={"source_type": "change", "source_id": values["change"], "target_type": "complaint", "target_id": values["complaint"], "max_depth": 5})
+    path = client.get(
+        "/api/v1/graph/paths",
+        params={
+            "source_type": "change",
+            "source_id": values["change"],
+            "target_type": "complaint",
+            "target_id": values["complaint"],
+            "max_depth": 5,
+        },
+    )
     assert path.status_code == 200
 
 
@@ -184,5 +216,9 @@ def test_day6_validator_passes():
     import subprocess
     import sys
 
-    result = subprocess.run([sys.executable, "infrastructure/database/scripts/day6_validate_reality_graph.py"], text=True, capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "infrastructure/database/scripts/day6_validate_reality_graph.py"],
+        text=True,
+        capture_output=True,
+    )
     assert result.returncode == 0, result.stdout + result.stderr

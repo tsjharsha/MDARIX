@@ -31,38 +31,82 @@ def test_repeat_ingestion_is_idempotent():
 
 def test_qms_source_fidelity_and_missing_lot_warning():
     with engine.connect() as conn:
-        row = conn.execute(
-            text(
-                "SELECT raw_payload, candidate_canonical_payload FROM staged_source_records "
-                "WHERE source_system='QMS' AND record_type='complaint' AND source_record_id='CMP-0001' LIMIT 1"
+        row = (
+            conn.execute(
+                text(
+                    "SELECT raw_payload, candidate_canonical_payload FROM staged_source_records "
+                    "WHERE source_system='QMS' AND record_type='complaint' AND source_record_id='CMP-0001' LIMIT 1"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
         assert row["raw_payload"]["source_product_version"] == "Product-100 / Revision C"
         assert row["candidate_canonical_payload"]["candidate_product_version"] == "Product-100 / Revision C"
         assert "actual_root_cause" not in row["raw_payload"]
-        assert conn.execute(text("SELECT count(*) FROM data_quality_issues WHERE issue_code='MISSING_LOT_REFERENCE'")).scalar_one() > 0
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM data_quality_issues WHERE issue_code='MISSING_LOT_REFERENCE'")
+            ).scalar_one()
+            > 0
+        )
 
 
 def test_temporal_fidelity_late_arriving_complaint_data():
     with engine.connect() as conn:
-        row = conn.execute(
-            text(
-                "SELECT raw_payload, source_timestamp, recorded_timestamp, ingestion_timestamp "
-                "FROM staged_source_records WHERE source_system='QMS' AND record_type='complaint' "
-                "AND raw_payload->>'event_timestamp' < raw_payload->>'ingestion_timestamp' LIMIT 1"
+        row = (
+            conn.execute(
+                text(
+                    "SELECT raw_payload, source_timestamp, recorded_timestamp, ingestion_timestamp "
+                    "FROM staged_source_records WHERE source_system='QMS' AND record_type='complaint' "
+                    "AND raw_payload->>'event_timestamp' < raw_payload->>'ingestion_timestamp' LIMIT 1"
+                )
             )
-        ).mappings().one()
+            .mappings()
+            .one()
+        )
         assert row["raw_payload"]["event_timestamp"] <= row["raw_payload"]["recorded_timestamp"]
         assert row["source_timestamp"] != row["ingestion_timestamp"]
 
 
 def test_vs001_observable_data_is_staged_without_conclusion():
     with engine.connect() as conn:
-        assert conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Rev D%'")).scalar_one() > 0
-        assert conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Component Rev B%' OR raw_payload::text LIKE '%Rev B%'")).scalar_one() > 0
-        assert conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%shutdown%'")).scalar_one() > 0
-        assert conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Comparative Rev A versus Rev B testing unavailable%'")).scalar_one() > 0
-        assert conn.execute(text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Component/supplier change is the leading hypothesis%'")).scalar_one() == 0
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Rev D%'")
+            ).scalar_one()
+            > 0
+        )
+        assert (
+            conn.execute(
+                text(
+                    "SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Component Rev B%' OR raw_payload::text LIKE '%Rev B%'"
+                )
+            ).scalar_one()
+            > 0
+        )
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%shutdown%'")
+            ).scalar_one()
+            > 0
+        )
+        assert (
+            conn.execute(
+                text(
+                    "SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Comparative Rev A versus Rev B testing unavailable%'"
+                )
+            ).scalar_one()
+            > 0
+        )
+        assert (
+            conn.execute(
+                text(
+                    "SELECT count(*) FROM staged_source_records WHERE raw_payload::text LIKE '%Component/supplier change is the leading hypothesis%'"
+                )
+            ).scalar_one()
+            == 0
+        )
 
 
 def test_ground_truth_path_is_rejected():
@@ -85,5 +129,10 @@ def test_day4_validator_passes():
     import subprocess
     import sys
 
-    result = subprocess.run([sys.executable, "infrastructure/database/scripts/day4_validate_ingestion.py"], cwd=Path(__file__).resolve().parents[1], text=True, capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "infrastructure/database/scripts/day4_validate_ingestion.py"],
+        cwd=Path(__file__).resolve().parents[1],
+        text=True,
+        capture_output=True,
+    )
     assert result.returncode == 0, result.stdout + result.stderr

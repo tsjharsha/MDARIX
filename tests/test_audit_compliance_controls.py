@@ -15,7 +15,15 @@ def test_audit_diff_is_redacted_and_contains_only_changed_values():
 
 def test_audit_event_captures_request_origin_and_retention():
     request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"), headers={"user-agent": "pytest"})
-    event = make_audit_event(tenant_id="tenant-a", actor_ref="user-a", action="UPDATE", entity_type="Test", request=request, old_values={"status": "DRAFT"}, new_values={"status": "ACTIVE"})
+    event = make_audit_event(
+        tenant_id="tenant-a",
+        actor_ref="user-a",
+        action="UPDATE",
+        entity_type="Test",
+        request=request,
+        old_values={"status": "DRAFT"},
+        new_values={"status": "ACTIVE"},
+    )
     assert event.source_ip == "127.0.0.1"
     assert event.user_agent == "pytest"
     assert event.old_values == {"status": "DRAFT"}
@@ -25,7 +33,22 @@ def test_audit_event_captures_request_origin_and_retention():
 
 def test_expired_audit_events_are_archived_without_deletion(tmp_path):
     now = datetime.now(timezone.utc)
-    event = SimpleNamespace(id="e1", tenant_id="tenant-a", actor_ref="u1", action="UPDATE", entity_type="Test", entity_id=None, details={}, source_ip="127.0.0.1", user_agent="pytest", reason="test", old_values={"a": 1}, new_values={"a": 2}, retention_until=now - timedelta(days=1), created_at=now - timedelta(days=2))
+    event = SimpleNamespace(
+        id="e1",
+        tenant_id="tenant-a",
+        actor_ref="u1",
+        action="UPDATE",
+        entity_type="Test",
+        entity_id=None,
+        details={},
+        source_ip="127.0.0.1",
+        user_agent="pytest",
+        reason="test",
+        old_values={"a": 1},
+        new_values={"a": 2},
+        retention_until=now - timedelta(days=1),
+        created_at=now - timedelta(days=2),
+    )
     result = archive_expired_audit_events([event], archive_dir=tmp_path, now=now)
     assert result["status"] == "ARCHIVED"
     archive = next(tmp_path.glob("*.jsonl.gz"))

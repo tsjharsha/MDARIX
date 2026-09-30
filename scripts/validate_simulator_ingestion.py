@@ -1,4 +1,5 @@
 """Validate provider read -> tenant-scoped outbox enqueue and idempotency."""
+
 import os
 from uuid import UUID
 
@@ -23,7 +24,8 @@ def main():
         db.commit()
     finally:
         db.close()
-    print(f"PROVIDER_READ={len(records)} OUTBOX_CREATED={first} REPLAY_DUPLICATES={len(records)-second}")
+    print(f"PROVIDER_READ={len(records)} OUTBOX_CREATED={first} REPLAY_DUPLICATES={len(records) - second}")
+
 
 if __name__ == "__main__":
     main()

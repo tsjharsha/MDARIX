@@ -117,8 +117,14 @@ class TrustedRetrievalService:
             raise RetrievalError("tenant_id is required for trusted retrieval")
 
         query_vector = self.embedding_provider.embed_text(request.query_text)
-        structured = self._structured_candidates(db, request) if request.retrieval_mode in {"structured", "hybrid"} else {}
-        semantic = self._semantic_candidates(db, request, query_vector) if request.retrieval_mode in {"semantic", "hybrid"} else {}
+        structured = (
+            self._structured_candidates(db, request) if request.retrieval_mode in {"structured", "hybrid"} else {}
+        )
+        semantic = (
+            self._semantic_candidates(db, request, query_vector)
+            if request.retrieval_mode in {"semantic", "hybrid"}
+            else {}
+        )
 
         merged = self._merge_candidates(structured, semantic)
         results = [self._materialize_result(db, request, candidate) for candidate in merged]
@@ -182,18 +188,28 @@ class TrustedRetrievalService:
         if request.evidence_types:
             q = q.filter(Evidence.evidence_type.in_(request.evidence_types))
         if request.date_from:
-            q = q.filter(or_(Evidence.effective_timestamp >= request.date_from, Evidence.ingestion_timestamp >= request.date_from))
+            q = q.filter(
+                or_(
+                    Evidence.effective_timestamp >= request.date_from, Evidence.ingestion_timestamp >= request.date_from
+                )
+            )
         if request.date_to:
-            q = q.filter(or_(Evidence.effective_timestamp <= request.date_to, Evidence.ingestion_timestamp <= request.date_to))
+            q = q.filter(
+                or_(Evidence.effective_timestamp <= request.date_to, Evidence.ingestion_timestamp <= request.date_to)
+            )
         q = self._apply_temporal(q, request)
         q = self._apply_lifecycle_filters(q, request)
         return q
 
     def _apply_temporal(self, q, request: RetrievalRequest):
         if request.temporal_mode == "event" and request.event_as_of:
-            q = q.filter(or_(Evidence.effective_timestamp.is_(None), Evidence.effective_timestamp <= request.event_as_of))
+            q = q.filter(
+                or_(Evidence.effective_timestamp.is_(None), Evidence.effective_timestamp <= request.event_as_of)
+            )
         if request.temporal_mode == "known" and request.knowledge_as_of:
-            q = q.filter(Evidence.ingestion_timestamp.is_not(None), Evidence.ingestion_timestamp <= request.knowledge_as_of)
+            q = q.filter(
+                Evidence.ingestion_timestamp.is_not(None), Evidence.ingestion_timestamp <= request.knowledge_as_of
+            )
         return q
 
     def _apply_lifecycle_filters(self, q, request: RetrievalRequest):
@@ -208,9 +224,7 @@ class TrustedRetrievalService:
         for entity_type, entity_id in entity_filters.items():
             if entity_id:
                 q = q.filter(
-                    Evidence.id.in_(
-                        self._evidence_ids_for_entity_filter(request.tenant_id, entity_type, entity_id)
-                    )
+                    Evidence.id.in_(self._evidence_ids_for_entity_filter(request.tenant_id, entity_type, entity_id))
                 )
         if request.investigation_id:
             q = q.filter(
@@ -233,7 +247,9 @@ class TrustedRetrievalService:
 
     def _investigation_evidence_ids(self, tenant_id: uuid.UUID, investigation_id: uuid.UUID):
         return (
-            text("SELECT evidence_id FROM investigation_evidence WHERE tenant_id=:tenant_id AND investigation_id=:investigation_id")
+            text(
+                "SELECT evidence_id FROM investigation_evidence WHERE tenant_id=:tenant_id AND investigation_id=:investigation_id"
+            )
             .bindparams(tenant_id=tenant_id, investigation_id=investigation_id)
             .columns(evidence_id=Evidence.id.type)
         )
@@ -255,10 +271,16 @@ class TrustedRetrievalService:
             }
         return candidates
 
-    def _semantic_candidates(self, db: Session, request: RetrievalRequest, query_vector: list[float]) -> dict[uuid.UUID, dict[str, Any]]:
+    def _semantic_candidates(
+        self, db: Session, request: RetrievalRequest, query_vector: list[float]
+    ) -> dict[uuid.UUID, dict[str, Any]]:
         vector = vector_literal(query_vector)
         filters = ["ec.tenant_id = :tenant_id", "emb.indexing_status = 'INDEXED'"]
-        params: dict[str, Any] = {"tenant_id": request.tenant_id, "query_vector": vector, "limit": max(request.top_k * 4, 20)}
+        params: dict[str, Any] = {
+            "tenant_id": request.tenant_id,
+            "query_vector": vector,
+            "limit": max(request.top_k * 4, 20),
+        }
         if request.evidence_types:
             filters.append("e.evidence_type = ANY(:evidence_types)")
             params["evidence_types"] = request.evidence_types
@@ -288,14 +310,18 @@ class TrustedRetrievalService:
         }
         return self._context_filter_candidate_ids(db, request, raw)
 
-    def _context_filter_candidate_ids(self, db: Session, request: RetrievalRequest, candidates: dict[uuid.UUID, dict[str, Any]]):
+    def _context_filter_candidate_ids(
+        self, db: Session, request: RetrievalRequest, candidates: dict[uuid.UUID, dict[str, Any]]
+    ):
         if not candidates:
             return candidates
         allowed_rows = self._base_query(db, request).filter(EvidenceChunk.id.in_(list(candidates))).all()
         allowed = {chunk.id for chunk, _ in allowed_rows}
         return {chunk_id: data for chunk_id, data in candidates.items() if chunk_id in allowed}
 
-    def _merge_candidates(self, structured: dict[uuid.UUID, dict[str, Any]], semantic: dict[uuid.UUID, dict[str, Any]]) -> list[dict[str, Any]]:
+    def _merge_candidates(
+        self, structured: dict[uuid.UUID, dict[str, Any]], semantic: dict[uuid.UUID, dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         merged = dict(structured)
         for chunk_id, item in semantic.items():
             if chunk_id in merged:
@@ -308,11 +334,17 @@ class TrustedRetrievalService:
             item["method"] = "hybrid" if len(item["methods"]) > 1 else next(iter(item["methods"]))
         return sorted(merged.values(), key=lambda item: item["score"], reverse=True)
 
-    def _materialize_result(self, db: Session, request: RetrievalRequest, candidate: dict[str, Any]) -> RetrievalResult | None:
+    def _materialize_result(
+        self, db: Session, request: RetrievalRequest, candidate: dict[str, Any]
+    ) -> RetrievalResult | None:
         row = (
             db.query(EvidenceChunk, Evidence)
             .join(Evidence, Evidence.id == EvidenceChunk.evidence_id)
-            .filter(EvidenceChunk.tenant_id == request.tenant_id, Evidence.tenant_id == request.tenant_id, EvidenceChunk.id == candidate["chunk_id"])
+            .filter(
+                EvidenceChunk.tenant_id == request.tenant_id,
+                Evidence.tenant_id == request.tenant_id,
+                EvidenceChunk.id == candidate["chunk_id"],
+            )
             .first()
         )
         if not row:
@@ -379,7 +411,9 @@ class TrustedRetrievalService:
             return True
         return evidence.ingestion_timestamp is not None and evidence.ingestion_timestamp <= request.knowledge_as_of
 
-    def _structured_reasons(self, db: Session, request: RetrievalRequest, evidence: Evidence, chunk: EvidenceChunk) -> list[str]:
+    def _structured_reasons(
+        self, db: Session, request: RetrievalRequest, evidence: Evidence, chunk: EvidenceChunk
+    ) -> list[str]:
         reasons = ["tenant match"]
         requested = [
             ("Product", request.product_id),

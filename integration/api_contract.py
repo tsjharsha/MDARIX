@@ -4,6 +4,7 @@ Transport is intentionally independent of FastAPI and persistence.  Callers
 provide a request function in tests or use ``fetch_page`` in production.  No
 credential value is ever included in returned diagnostics.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -75,7 +76,12 @@ def schema_fingerprint(fields: list[str] | set[str]) -> str:
 def compare_schema(expected: list[str] | set[str], actual: list[str] | set[str]) -> dict[str, Any]:
     expected_set, actual_set = set(expected), set(actual)
     missing, added = sorted(expected_set - actual_set), sorted(actual_set - expected_set)
-    return {"status": "MATCH" if not missing and not added else "DRIFT", "missing": missing, "added": added, "fingerprint": schema_fingerprint(actual_set)}
+    return {
+        "status": "MATCH" if not missing and not added else "DRIFT",
+        "missing": missing,
+        "added": added,
+        "fingerprint": schema_fingerprint(actual_set),
+    }
 
 
 def _request(url: str, headers: dict[str, str], timeout: float) -> tuple[int, dict[str, str], bytes]:
@@ -123,8 +129,19 @@ def fetch_page(
         except Exception as error:
             failure = normalize_failure(error)
             if not failure.retryable or attempts >= max_attempts:
-                raise RuntimeError(json.dumps({"code": failure.code, "category": failure.category, "retryable": failure.retryable, "attempts": attempts})) from error
-            delay = failure.retry_after_seconds if failure.retry_after_seconds is not None else min(2 ** (attempts - 1), 8)
+                raise RuntimeError(
+                    json.dumps(
+                        {
+                            "code": failure.code,
+                            "category": failure.category,
+                            "retryable": failure.retryable,
+                            "attempts": attempts,
+                        }
+                    )
+                ) from error
+            delay = (
+                failure.retry_after_seconds if failure.retry_after_seconds is not None else min(2 ** (attempts - 1), 8)
+            )
             time.sleep(delay)
     raise RuntimeError("PROVIDER_REQUEST_FAILED")
 

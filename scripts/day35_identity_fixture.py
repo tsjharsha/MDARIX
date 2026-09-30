@@ -3,6 +3,7 @@
 This command is non-mutating by default. Database provisioning requires the
 explicit DAY35_FIXTURE_APPLY=1 gate and is intentionally left to the operator.
 """
+
 import json
 import os
 import sys

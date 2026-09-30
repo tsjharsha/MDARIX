@@ -1,6 +1,10 @@
 from validation.csa_package import (
-    TESTS, build_package, build_evidence_manifest, render_customer_instructions,
-    render_markdown, render_validation_summary,
+    TESTS,
+    build_package,
+    build_evidence_manifest,
+    render_customer_instructions,
+    render_markdown,
+    render_validation_summary,
 )
 
 

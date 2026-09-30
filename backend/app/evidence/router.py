@@ -17,9 +17,9 @@ def get_default_tenant_id(db: Session) -> uuid.UUID:
     """Legacy compatibility guard: anonymous default-tenant access is forbidden."""
     raise HTTPException(status_code=401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
 
+
 def tenant_context(ctx: AuthenticatedRequestContext) -> uuid.UUID:
     return uuid.UUID(ctx.tenant_id)
-
 
 
 @router.get("", response_model=list[dict[str, Any]])
@@ -55,7 +55,12 @@ def list_evidence(
 
 
 @router.get("/{evidence_id}")
-def get_evidence_detail(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_detail(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns evidence detail summary including chunks, observations, links, and provenance."""
     tenant_id = tenant_context(ctx)
     try:
@@ -66,11 +71,19 @@ def get_evidence_detail(evidence_id: str, request: Request, db: Session = Depend
     try:
         return service.get_evidence_intelligence_summary(db, tenant_id, ev_uuid)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail={"code":"EVIDENCE_NOT_FOUND","message":"Evidence is not available for this tenant"}) from exc
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "EVIDENCE_NOT_FOUND", "message": "Evidence is not available for this tenant"},
+        ) from exc
 
 
 @router.get("/{evidence_id}/content")
-def get_evidence_content(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_content(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns secure tenant-isolated raw content of an evidence record."""
     tenant_id = tenant_context(ctx)
     try:
@@ -82,20 +95,36 @@ def get_evidence_content(evidence_id: str, request: Request, db: Session = Depen
         content, metadata = service.content_reader.get_evidence_content(db, tenant_id, ev_uuid)
         return {"content": content, "metadata": metadata}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail={"code":"EVIDENCE_NOT_FOUND","message":"Evidence is not available for this tenant"}) from exc
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "EVIDENCE_NOT_FOUND", "message": "Evidence is not available for this tenant"},
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=403, detail={"code":"EVIDENCE_CONTENT_UNAVAILABLE","message":"Evidence content is unavailable"}) from exc
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "EVIDENCE_CONTENT_UNAVAILABLE", "message": "Evidence content is unavailable"},
+        ) from exc
 
 
 @router.get("/{evidence_id}/chunks")
-def get_evidence_chunks(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_chunks(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns chunk list and locators for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {"evidence_id": evidence_id, "chunks_count": summary["chunks_count"], "chunks": summary["chunks"]}
 
 
 @router.get("/{evidence_id}/observations")
-def get_evidence_observations(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_observations(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns extracted observations and source anchors for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -106,7 +135,12 @@ def get_evidence_observations(evidence_id: str, request: Request, db: Session = 
 
 
 @router.get("/{evidence_id}/provenance")
-def get_evidence_provenance(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_provenance(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns AI execution provenance records for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -117,7 +151,12 @@ def get_evidence_provenance(evidence_id: str, request: Request, db: Session = De
 
 
 @router.get("/{evidence_id}/related-entities")
-def get_evidence_related_entities(evidence_id: str, request: Request, db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)) -> dict[str, Any]:
+def get_evidence_related_entities(
+    evidence_id: str,
+    request: Request,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+) -> dict[str, Any]:
     """Returns canonical entity links and unresolved entity references for an evidence item."""
     summary = get_evidence_detail(evidence_id, request, db, ctx)
     return {
@@ -145,4 +184,7 @@ def process_evidence_intelligence(
     try:
         return service.process_evidence_intelligence(db, tenant_id, ev_uuid, reprocess=reprocess)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail={"code":"EVIDENCE_NOT_FOUND","message":"Evidence is not available for this tenant"}) from exc
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "EVIDENCE_NOT_FOUND", "message": "Evidence is not available for this tenant"},
+        ) from exc

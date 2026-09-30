@@ -26,7 +26,8 @@ def smtp_configuration_status() -> dict[str, object]:
         "present": {name: bool(value) for name, value in required.items()},
         "port_present": bool(os.getenv("MDARIX_SMTP_PORT")),
         "app_url_present": bool(os.getenv("MDARIX_APP_URL")),
-        "sender_domain_verified": bool(os.getenv("MDARIX_SMTP_VERIFIED_DOMAIN")) and parseaddr(required["sender"] or "")[1].endswith("@" + os.getenv("MDARIX_SMTP_VERIFIED_DOMAIN", "")),
+        "sender_domain_verified": bool(os.getenv("MDARIX_SMTP_VERIFIED_DOMAIN"))
+        and parseaddr(required["sender"] or "")[1].endswith("@" + os.getenv("MDARIX_SMTP_VERIFIED_DOMAIN", "")),
     }
 
 
@@ -51,11 +52,7 @@ def _send_link_email(recipient: str, token: str, *, subject: str, path: str, int
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
-    message.set_content(
-        f"{intro}\n\n"
-        f"{app_url}{path}?token={token}\n\n"
-        "This link expires in one hour."
-    )
+    message.set_content(f"{intro}\n\n{app_url}{path}?token={token}\n\nThis link expires in one hour.")
     port = int(os.getenv("MDARIX_SMTP_PORT", "587"))
     try:
         with smtplib.SMTP(host, port, timeout=15) as client:
@@ -63,7 +60,9 @@ def _send_link_email(recipient: str, token: str, *, subject: str, path: str, int
             client.login(username, password)
             client.send_message(message)
     except (smtplib.SMTPException, OSError) as exc:
-        raise EmailDeliveryError("SMTP delivery failed. Verify the sender address, Gmail App Password, and network access.") from exc
+        raise EmailDeliveryError(
+            "SMTP delivery failed. Verify the sender address, Gmail App Password, and network access."
+        ) from exc
     return "SENT"
 
 

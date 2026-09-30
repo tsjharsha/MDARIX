@@ -9,6 +9,7 @@ from backend.app.db.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class WorkerMetrics:
     cycles: int = 0
@@ -23,50 +24,117 @@ class WorkerMetrics:
     def snapshot(self):
         return asdict(self)
 
+
 class OutboxWorker:
     def __init__(self, publisher, max_attempts=5, base_delay_seconds=2, alert=None):
-        if max_attempts < 1: raise ValueError("max_attempts must be positive")
-        self.publisher = publisher; self.max_attempts = max_attempts; self.base_delay_seconds = base_delay_seconds
-        self.alert = alert; self.metrics = WorkerMetrics()
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        self.publisher = publisher
+        self.max_attempts = max_attempts
+        self.base_delay_seconds = base_delay_seconds
+        self.alert = alert
+        self.metrics = WorkerMetrics()
+
     def process_once(self, limit=50):
-        db=SessionLocal(); now=datetime.now(timezone.utc); stats={'published':0,'failed':0,'dead_lettered':0,'stale_recovered':0}; worker_id = getattr(self, "worker_id", None) or str(uuid.uuid4()); self.worker_id = worker_id
+        db = SessionLocal()
+        now = datetime.now(timezone.utc)
+        stats = {"published": 0, "failed": 0, "dead_lettered": 0, "stale_recovered": 0}
+        worker_id = getattr(self, "worker_id", None) or str(uuid.uuid4())
+        self.worker_id = worker_id
         try:
-            rows=db.query(OutboxEvent).filter(OutboxEvent.published_at.is_(None), OutboxEvent.dead_lettered_at.is_(None), (OutboxEvent.next_attempt_at.is_(None) | (OutboxEvent.next_attempt_at <= now))).order_by(OutboxEvent.occurred_at).limit(limit).with_for_update(skip_locked=True).all()
+            rows = (
+                db.query(OutboxEvent)
+                .filter(
+                    OutboxEvent.published_at.is_(None),
+                    OutboxEvent.dead_lettered_at.is_(None),
+                    (OutboxEvent.next_attempt_at.is_(None) | (OutboxEvent.next_attempt_at <= now)),
+                )
+                .order_by(OutboxEvent.occurred_at)
+                .limit(limit)
+                .with_for_update(skip_locked=True)
+                .all()
+            )
             for row in rows:
-                row.claimed_by = worker_id; row.claimed_at = now
+                row.claimed_by = worker_id
+                row.claimed_at = now
                 try:
                     self.publisher(row.event_name, row.payload)
-                    row.published_at = now; row.next_attempt_at = None; row.last_error = None; row.claimed_by = None; row.claimed_at = None; stats['published'] += 1
+                    row.published_at = now
+                    row.next_attempt_at = None
+                    row.last_error = None
+                    row.claimed_by = None
+                    row.claimed_at = None
+                    stats["published"] += 1
                 except Exception as exc:
-                    row.attempts += 1; row.last_error = f"{type(exc).__name__}: delivery failed"; stats['failed'] += 1
+                    row.attempts += 1
+                    row.last_error = f"{type(exc).__name__}: delivery failed"
+                    stats["failed"] += 1
                     self.metrics.last_error = row.last_error
                     logger.warning("outbox delivery failed event=%s attempt=%s", row.id, row.attempts)
                     if row.attempts >= self.max_attempts:
-                        row.dead_lettered_at = now; row.next_attempt_at = None; row.claimed_by = None; row.claimed_at = None; stats['dead_lettered'] += 1
+                        row.dead_lettered_at = now
+                        row.next_attempt_at = None
+                        row.claimed_by = None
+                        row.claimed_at = None
+                        stats["dead_lettered"] += 1
                         logger.error("outbox dead-letter alert event=%s attempts=%s", row.id, row.attempts)
                         if self.alert is not None:
                             try:
-                                self.alert({"type": "OUTBOX_DEAD_LETTERED", "event_id": str(row.id), "event_name": row.event_name, "attempts": row.attempts, "error": row.last_error})
+                                self.alert(
+                                    {
+                                        "type": "OUTBOX_DEAD_LETTERED",
+                                        "event_id": str(row.id),
+                                        "event_name": row.event_name,
+                                        "attempts": row.attempts,
+                                        "error": row.last_error,
+                                    }
+                                )
                             except Exception as alert_exc:
                                 self.metrics.last_error = f"{type(alert_exc).__name__}: alert delivery failed"
                                 logger.exception("outbox alert delivery failed event=%s", row.id)
                     else:
-                        row.next_attempt_at = now + timedelta(seconds=min(300, self.base_delay_seconds ** row.attempts))
+                        row.next_attempt_at = now + timedelta(seconds=min(300, self.base_delay_seconds**row.attempts))
             db.commit()
-            self.metrics.cycles += 1; self.metrics.published += stats['published']; self.metrics.failed += stats['failed']; self.metrics.dead_lettered += stats['dead_lettered']; self.metrics.last_cycle_at = now.isoformat(); self.metrics.heartbeat_at = now.isoformat()
+            self.metrics.cycles += 1
+            self.metrics.published += stats["published"]
+            self.metrics.failed += stats["failed"]
+            self.metrics.dead_lettered += stats["dead_lettered"]
+            self.metrics.last_cycle_at = now.isoformat()
+            self.metrics.heartbeat_at = now.isoformat()
             return stats
-        finally: db.close()
+        finally:
+            db.close()
 
     def recover_stale_claims(self, timeout_seconds: int = 300) -> int:
         """Return abandoned claims to the queue after a crashed worker."""
-        if timeout_seconds < 1: raise ValueError("timeout_seconds must be positive")
-        db = SessionLocal(); now = datetime.now(timezone.utc); cutoff = now - timedelta(seconds=timeout_seconds)
+        if timeout_seconds < 1:
+            raise ValueError("timeout_seconds must be positive")
+        db = SessionLocal()
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(seconds=timeout_seconds)
         try:
-            rows = db.query(OutboxEvent).filter(OutboxEvent.published_at.is_(None), OutboxEvent.dead_lettered_at.is_(None), OutboxEvent.claimed_at.is_not(None), OutboxEvent.claimed_at < cutoff).with_for_update(skip_locked=True).all()
+            rows = (
+                db.query(OutboxEvent)
+                .filter(
+                    OutboxEvent.published_at.is_(None),
+                    OutboxEvent.dead_lettered_at.is_(None),
+                    OutboxEvent.claimed_at.is_not(None),
+                    OutboxEvent.claimed_at < cutoff,
+                )
+                .with_for_update(skip_locked=True)
+                .all()
+            )
             for row in rows:
-                row.claimed_by = None; row.claimed_at = None; row.next_attempt_at = now; row.last_error = "STALE_WORKER_CLAIM_RECOVERED"
-            db.commit(); self.metrics.stale_recovered += len(rows); self.metrics.heartbeat_at = now.isoformat(); return len(rows)
-        finally: db.close()
+                row.claimed_by = None
+                row.claimed_at = None
+                row.next_attempt_at = now
+                row.last_error = "STALE_WORKER_CLAIM_RECOVERED"
+            db.commit()
+            self.metrics.stale_recovered += len(rows)
+            self.metrics.heartbeat_at = now.isoformat()
+            return len(rows)
+        finally:
+            db.close()
 
     def run_forever(self, *, limit=50, interval_seconds=5, stop=None):
         """Continuously drain the outbox until a shutdown signal is received."""
@@ -75,8 +143,16 @@ class OutboxWorker:
         while not stopped():
             started = time.monotonic()
             stats = self.process_once(limit=limit)
-            logger.info("outbox metrics=%s cycle_published=%s cycle_failed=%s cycle_dead_lettered=%s duration_ms=%s", self.metrics.snapshot(), stats['published'], stats['failed'], stats['dead_lettered'], int((time.monotonic() - started) * 1000))
-            if stopped(): break
+            logger.info(
+                "outbox metrics=%s cycle_published=%s cycle_failed=%s cycle_dead_lettered=%s duration_ms=%s",
+                self.metrics.snapshot(),
+                stats["published"],
+                stats["failed"],
+                stats["dead_lettered"],
+                int((time.monotonic() - started) * 1000),
+            )
+            if stopped():
+                break
             time.sleep(max(0, interval_seconds))
         logger.info("outbox worker stopped gracefully")
 
@@ -84,7 +160,13 @@ class OutboxWorker:
     def replay(db, event_id):
         """Make one dead-lettered event eligible for a controlled replay."""
         row = db.query(OutboxEvent).filter(OutboxEvent.id == event_id).with_for_update().one_or_none()
-        if row is None: raise ValueError("OUTBOX_EVENT_NOT_FOUND")
-        row.dead_lettered_at = None; row.next_attempt_at = datetime.now(timezone.utc); row.last_error = None; row.claimed_by = None; row.claimed_at = None
-        db.commit(); logger.warning("outbox replay requested event=%s", event_id)
+        if row is None:
+            raise ValueError("OUTBOX_EVENT_NOT_FOUND")
+        row.dead_lettered_at = None
+        row.next_attempt_at = datetime.now(timezone.utc)
+        row.last_error = None
+        row.claimed_by = None
+        row.claimed_at = None
+        db.commit()
+        logger.warning("outbox replay requested event=%s", event_id)
         return row

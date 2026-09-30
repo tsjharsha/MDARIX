@@ -9,7 +9,9 @@ from backend.app.db.base import Base
 
 class InvestigationSessionRecord(Base):
     __tablename__ = "investigation_sessions"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     owner_user_id: Mapped[str] = mapped_column(String(254), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="ACTIVE")

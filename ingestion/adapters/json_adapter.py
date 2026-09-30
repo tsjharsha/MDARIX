@@ -11,7 +11,11 @@ class JSONSourceAdapter(BaseSourceAdapter):
     def read_records(self, path: Path) -> list[SourceRecord]:
         self.validate_file(path)
         payload = json.loads(path.read_text(encoding="utf-8"))
-        records = payload if isinstance(payload, list) else payload.get("records", payload.get("evidence", payload if isinstance(payload, list) else []))
+        records = (
+            payload
+            if isinstance(payload, list)
+            else payload.get("records", payload.get("evidence", payload if isinstance(payload, list) else []))
+        )
         if isinstance(records, dict):
             records = [records]
         if not isinstance(records, list):

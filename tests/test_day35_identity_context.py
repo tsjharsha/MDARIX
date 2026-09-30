@@ -16,7 +16,9 @@ def explicit_legacy_test_mode(monkeypatch):
 
 def request_with_cookie(token: str = "") -> Request:
     headers = [(b"cookie", f"mdarix_session={token}".encode())] if token else []
-    return Request({"type": "http", "method": "GET", "path": "/api/v1/me/context", "headers": headers, "query_string": b""})
+    return Request(
+        {"type": "http", "method": "GET", "path": "/api/v1/me/context", "headers": headers, "query_string": b""}
+    )
 
 
 class FakeQuery:
@@ -50,7 +52,9 @@ def active_user(tenant_id="tenant-a", role="Viewer"):
 
 
 def test_context_uses_authenticated_persisted_user(monkeypatch):
-    monkeypatch.setattr(access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"})
+    monkeypatch.setattr(
+        access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"}
+    )
 
     result = access_router.context(request_with_cookie("session-a"), FakeDb(active_user()))
 
@@ -69,7 +73,9 @@ def test_context_requires_authentication():
 
 
 def test_context_rejects_session_tenant_mismatch(monkeypatch):
-    monkeypatch.setattr(access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-b"})
+    monkeypatch.setattr(
+        access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-b"}
+    )
 
     with pytest.raises(HTTPException) as error:
         access_router.context(request_with_cookie("session-a"), FakeDb(active_user("tenant-a")))
@@ -79,7 +85,9 @@ def test_context_rejects_session_tenant_mismatch(monkeypatch):
 
 
 def test_active_role_rejects_unassigned_role(monkeypatch):
-    monkeypatch.setattr(access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"})
+    monkeypatch.setattr(
+        access_router.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"}
+    )
 
     with pytest.raises(HTTPException) as error:
         access_router.active_role(

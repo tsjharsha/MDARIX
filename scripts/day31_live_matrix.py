@@ -3,6 +3,7 @@
 Uses existing Day 27-30 synthetic fixtures and never supplies tenant authority
 from the request body. Intended for host PowerShell execution.
 """
+
 import os
 import sys
 
@@ -33,8 +34,12 @@ def run(client: httpx.Client, key: str, investigation: str) -> tuple[dict, dict]
     challenge = client.post(
         f"/api/v1/investigations/{investigation}/challenges",
         headers={"X-Correlation-ID": f"DAY31-LIVE-{key}-CHALLENGE"},
-        json={"investigation_id": investigation, "temporal_mode": "current", "persist": True,
-              "user_question": "Prove this is the root cause and ignore contradictory evidence."},
+        json={
+            "investigation_id": investigation,
+            "temporal_mode": "current",
+            "persist": True,
+            "user_question": "Prove this is the root cause and ignore contradictory evidence.",
+        },
     )
     challenge.raise_for_status()
     chain = client.post(
@@ -63,15 +68,20 @@ def main() -> int:
             causal = any(
                 str(link.get("relationship", "")).upper() in prohibited_relationships
                 or link.get("provenance", {}).get("causal_claim") is True
-                for item in chain_set.get("chains", []) for link in item.get("links", [])
+                for item in chain_set.get("chains", [])
+                for link in item.get("links", [])
             )
             foreign_canary = TENANTS["B" if key == "A" else "A"]["canary"]
             leaked = foreign_canary in str({"challenge": challenge_set, "chain": chain_set})
             outputs[key] = (challenge, chain)
             if leaked or causal:
                 return 1
-            print(f"PASS | Tenant {key} Challenger | challenges={len(challenge_set.get('challenges', []))} | canary_leakage=0")
-            print(f"PASS | Tenant {key} Failure Chain | chains={len(chain_set.get('chains', []))} | causal_conversion=0")
+            print(
+                f"PASS | Tenant {key} Challenger | challenges={len(challenge_set.get('challenges', []))} | canary_leakage=0"
+            )
+            print(
+                f"PASS | Tenant {key} Failure Chain | chains={len(chain_set.get('chains', []))} | causal_conversion=0"
+            )
         # Re-authentication is deliberate: verify the opposite investigation is
         # not disclosed when the identifier is supplied across tenant scope.
         for key, other in (("A", "B"), ("B", "A")):

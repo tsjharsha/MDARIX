@@ -3,6 +3,7 @@
 Only public metadata and links are stored here. Full ISO text must be supplied
 under the customer's license and is never bundled into the repository.
 """
+
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -20,23 +21,35 @@ class RegulatorySource:
 
 OFFICIAL_SOURCES = {
     "FDA-510K": RegulatorySource(
-        "FDA-510K", "FDA", "Premarket Notification 510(k)",
+        "FDA-510K",
+        "FDA",
+        "Premarket Notification 510(k)",
         "https://www.fda.gov/medical-devices/premarket-submissions/premarket-notification-510k",
-        "US", "Public FDA guidance and submission information.",
+        "US",
+        "Public FDA guidance and submission information.",
     ),
     "EU-MDR-2017-745": RegulatorySource(
-        "EU-MDR-2017-745", "EUR-Lex", "Regulation (EU) 2017/745 on medical devices",
-        "https://eur-lex.europa.eu/eli/reg/2017/745/oj", "EU",
+        "EU-MDR-2017-745",
+        "EUR-Lex",
+        "Regulation (EU) 2017/745 on medical devices",
+        "https://eur-lex.europa.eu/eli/reg/2017/745/oj",
+        "EU",
         "Public EUR-Lex regulation text.",
     ),
     "ISO-13485": RegulatorySource(
-        "ISO-13485", "ISO", "ISO 13485 medical devices quality management systems",
-        "https://www.iso.org/standard/59752.html", "INTERNATIONAL",
+        "ISO-13485",
+        "ISO",
+        "ISO 13485 medical devices quality management systems",
+        "https://www.iso.org/standard/59752.html",
+        "INTERNATIONAL",
         "Metadata/link only; licensed standard text required for clause ingestion.",
     ),
     "ISO-14971": RegulatorySource(
-        "ISO-14971", "ISO", "ISO 14971 application of risk management to medical devices",
-        "https://www.iso.org/standard/72704.html", "INTERNATIONAL",
+        "ISO-14971",
+        "ISO",
+        "ISO 14971 application of risk management to medical devices",
+        "https://www.iso.org/standard/72704.html",
+        "INTERNATIONAL",
         "Metadata/link only; licensed standard text required for clause ingestion.",
     ),
 }
@@ -64,16 +77,18 @@ def verify_citations(citations: list[dict]) -> dict:
                 raise ValueError("citation URL is not on the registered official domain")
             if not citation.get("clause"):
                 raise ValueError("citation clause is required")
-            verified.append({
-                **citation,
-                "source_id": source.source_id,
-                "authority": source.authority,
-                "source_title": source.title,
-                "official_url": source.url,
-                "jurisdiction": source.jurisdiction,
-                "traceability_key": f"{source.source_id}:{citation['clause']}",
-                "verified": True,
-            })
+            verified.append(
+                {
+                    **citation,
+                    "source_id": source.source_id,
+                    "authority": source.authority,
+                    "source_title": source.title,
+                    "official_url": source.url,
+                    "jurisdiction": source.jurisdiction,
+                    "traceability_key": f"{source.source_id}:{citation['clause']}",
+                    "verified": True,
+                }
+            )
         except (ValueError, TypeError) as exc:
             rejected.append({"citation": citation, "reason": str(exc)})
     return {"verified": verified, "rejected": rejected, "all_verified": not rejected}

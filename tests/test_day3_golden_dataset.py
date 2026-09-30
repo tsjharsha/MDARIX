@@ -8,7 +8,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CANONICAL = ROOT / "data" / "golden" / "canonical" / "r1_canonical_golden_dataset.json"
 MANIFEST = ROOT / "data" / "golden" / "GOLDEN_DATASET_MANIFEST.json"
 GROUND = ROOT / "evaluation" / "ground_truth"
-FORBIDDEN_APP_KEYS = {"hidden_ground_truth", "correct_answer", "actual_root_cause", "expected_conclusion", "prohibited_conclusions"}
+FORBIDDEN_APP_KEYS = {
+    "hidden_ground_truth",
+    "correct_answer",
+    "actual_root_cause",
+    "expected_conclusion",
+    "prohibited_conclusions",
+}
 
 
 def load(path):
@@ -44,7 +50,11 @@ def test_expected_record_counts():
 
 def test_unique_ids_and_relationships():
     data = load(CANONICAL)
-    for collection, key in [("complaints", "complaint_id"), ("evidence", "evidence_id"), ("investigations", "investigation_id")]:
+    for collection, key in [
+        ("complaints", "complaint_id"),
+        ("evidence", "evidence_id"),
+        ("investigations", "investigation_id"),
+    ]:
         values = [row[key] for row in data[collection]]
         assert len(values) == len(set(values))
     version_ids = {row["product_version_id"] for row in data["product_versions"]}
@@ -62,7 +72,9 @@ def test_all_12_scenarios_exist():
 
 def test_primary_scenario_required_contradictions_and_unknowns():
     data = load(CANONICAL)
-    pre_rev_b = [c for c in data["complaints"] if c["failure_mode"] == "shutdown" and c["event_timestamp"] < "2026-01-18"]
+    pre_rev_b = [
+        c for c in data["complaints"] if c["failure_mode"] == "shutdown" and c["event_timestamp"] < "2026-01-18"
+    ]
     assert len(pre_rev_b) >= 3
     assert any(e["title"] == "Rev B qualification passed" for e in data["evidence"])
     assert any(l["traceability_status"] == "incomplete" for l in data["lots"])
@@ -102,14 +114,21 @@ def test_deterministic_generation_hash_matches_manifest():
 
 def test_generator_is_repeatable():
     before = load(MANIFEST)["canonical_sha256"]
-    result = subprocess.run([sys.executable, "data/golden/generators/generate_r1_golden_dataset.py"], cwd=ROOT, text=True, capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "data/golden/generators/generate_r1_golden_dataset.py"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     after = load(MANIFEST)["canonical_sha256"]
     assert after == before
 
 
 def test_validator_passes():
-    result = subprocess.run([sys.executable, "data/golden/validate_golden_dataset.py"], cwd=ROOT, text=True, capture_output=True)
+    result = subprocess.run(
+        [sys.executable, "data/golden/validate_golden_dataset.py"], cwd=ROOT, text=True, capture_output=True
+    )
     assert result.returncode == 0, result.stdout + result.stderr
 
 

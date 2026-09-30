@@ -28,12 +28,15 @@ def test_provider_adapter_uses_server_credential_reference_and_sanitizes_respons
 
     monkeypatch.setenv("TEST_CONNECTOR_TOKEN", "do-not-return")
     monkeypatch.setattr("backend.app.access_router.urlopen", fake_urlopen)
-    row = SimpleNamespace(id="connector-1", configuration={
-        "endpoint": "https://provider.invalid/api",
-        "health_path": "health",
-        "credential_ref": "TEST_CONNECTOR_TOKEN",
-        "timeout_seconds": 3,
-    })
+    row = SimpleNamespace(
+        id="connector-1",
+        configuration={
+            "endpoint": "https://provider.invalid/api",
+            "health_path": "health",
+            "credential_ref": "TEST_CONNECTOR_TOKEN",
+            "timeout_seconds": 3,
+        },
+    )
     result = _provider_get(row, "health_path")
     assert result["status"] == "HEALTHY"
     assert captured == {

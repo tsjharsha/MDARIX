@@ -17,7 +17,12 @@ from investigator.provider import (
     PROVIDER,
     ControlledInvestigatorProvider,
 )
-from investigator.schemas import AnalysisItem, InvestigationAnalysis, InvestigationAnalysisRequest, InvestigationAnalysisResponse
+from investigator.schemas import (
+    AnalysisItem,
+    InvestigationAnalysis,
+    InvestigationAnalysisRequest,
+    InvestigationAnalysisResponse,
+)
 
 
 class InvestigatorError(ValueError):
@@ -66,9 +71,23 @@ class EvidenceGroundedInvestigatorService:
         )
         analysis = self._validate_analysis(analysis)
         from genai.grounding import advisory, build_authorized_context
-        grounded = build_authorized_context(db, tenant_id=request.tenant_id, investigation_id=request.investigation_id, temporal_mode=request.temporal_mode, as_of=request.as_of)
-        ai_advisory = advisory(workflow="INVESTIGATION_SYNTHESIS", deterministic_result=analysis.model_dump(mode="json"), grounded_context=grounded, question=request.investigator_question)
-        analysis = analysis.model_copy(update={"model_provenance": {**analysis.model_provenance, "live_provider_advisory": ai_advisory}})
+
+        grounded = build_authorized_context(
+            db,
+            tenant_id=request.tenant_id,
+            investigation_id=request.investigation_id,
+            temporal_mode=request.temporal_mode,
+            as_of=request.as_of,
+        )
+        ai_advisory = advisory(
+            workflow="INVESTIGATION_SYNTHESIS",
+            deterministic_result=analysis.model_dump(mode="json"),
+            grounded_context=grounded,
+            question=request.investigator_question,
+        )
+        analysis = analysis.model_copy(
+            update={"model_provenance": {**analysis.model_provenance, "live_provider_advisory": ai_advisory}}
+        )
         persisted = False
         ai_execution_id = None
 
@@ -90,8 +109,12 @@ class EvidenceGroundedInvestigatorService:
                     "day10_contract": "InvestigationWorkspaceResponse",
                 },
                 evidence_refs={
-                    "evidence_identifiers": [evidence.get("evidence_identifier") for evidence in workspace.evidence_context],
-                    "retrieval_query_id": str(workspace.retrieval_context.retrieval_query_id) if workspace.retrieval_context else None,
+                    "evidence_identifiers": [
+                        evidence.get("evidence_identifier") for evidence in workspace.evidence_context
+                    ],
+                    "retrieval_query_id": str(workspace.retrieval_context.retrieval_query_id)
+                    if workspace.retrieval_context
+                    else None,
                 },
                 structured_input={
                     "investigation_id": str(request.investigation_id),
@@ -104,7 +127,9 @@ class EvidenceGroundedInvestigatorService:
                 structured_output=analysis.model_dump(mode="json"),
                 validation_status=analysis.status,
                 latency_ms=int((time.time() - start) * 1000),
-                error_state=None if analysis.status != "FAILED_VALIDATION" else "Grounding validation rejected material statements",
+                error_state=None
+                if analysis.status != "FAILED_VALIDATION"
+                else "Grounding validation rejected material statements",
                 requestor_ref="MDARIX-AI-Investigator",
             )
             analysis.ai_execution_id = exec_record.id
@@ -115,7 +140,9 @@ class EvidenceGroundedInvestigatorService:
 
         return InvestigationAnalysisResponse(analysis=analysis, persisted=persisted, ai_execution_id=ai_execution_id)
 
-    def latest(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> InvestigationAnalysisResponse | None:
+    def latest(
+        self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID
+    ) -> InvestigationAnalysisResponse | None:
         row = (
             db.query(AIExecution)
             .filter(
@@ -133,7 +160,9 @@ class EvidenceGroundedInvestigatorService:
         analysis.ai_execution_id = row.id
         return InvestigationAnalysisResponse(analysis=analysis, persisted=True, ai_execution_id=row.id)
 
-    def get(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, analysis_id: uuid.UUID) -> InvestigationAnalysisResponse:
+    def get(
+        self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, analysis_id: uuid.UUID
+    ) -> InvestigationAnalysisResponse:
         rows = (
             db.query(AIExecution)
             .filter(
@@ -155,12 +184,21 @@ class EvidenceGroundedInvestigatorService:
         accepted, rejected, summary = self.grounding_validator.validate_items(analysis.accepted_items())
         grouped = self._regroup(accepted)
         evidence_denominator = summary["evidence_derived_items"]
-        evidence_coverage = 1.0 if evidence_denominator == 0 else summary["evidence_derived_items_with_source_anchor"] / evidence_denominator
-        material_coverage = 1.0 if summary["material_items"] == 0 else summary["accepted_items"] / summary["material_items"]
+        evidence_coverage = (
+            1.0
+            if evidence_denominator == 0
+            else summary["evidence_derived_items_with_source_anchor"] / evidence_denominator
+        )
+        material_coverage = (
+            1.0 if summary["material_items"] == 0 else summary["accepted_items"] / summary["material_items"]
+        )
         status = "COMPLETED_WITH_LIMITATIONS"
         if rejected:
             status = "FAILED_VALIDATION"
-        elif any(item.semantic_type == "INSUFFICIENT_EVIDENCE" for item in grouped["limitations"] + grouped["missing_information"]):
+        elif any(
+            item.semantic_type == "INSUFFICIENT_EVIDENCE"
+            for item in grouped["limitations"] + grouped["missing_information"]
+        ):
             status = "ABSTAINED_INSUFFICIENT_EVIDENCE"
 
         return analysis.model_copy(

@@ -4,8 +4,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from investigator.schemas import SourceReference, TemporalMode
 
-LinkStatus=Literal["OBSERVED_SOURCE_SUPPORTED","DETERMINISTICALLY_DERIVED","HYPOTHESIZED","CONTRADICTED","UNKNOWN_GAP"]
-ChainStatus=Literal["SUPPORTED_WITH_LIMITATIONS","BROKEN_CHAIN","MIXED_EVIDENCE","ABSTAINED","REQUIRES_HUMAN_REVIEW"]
+LinkStatus = Literal[
+    "OBSERVED_SOURCE_SUPPORTED", "DETERMINISTICALLY_DERIVED", "HYPOTHESIZED", "CONTRADICTED", "UNKNOWN_GAP"
+]
+ChainStatus = Literal[
+    "SUPPORTED_WITH_LIMITATIONS", "BROKEN_CHAIN", "MIXED_EVIDENCE", "ABSTAINED", "REQUIRES_HUMAN_REVIEW"
+]
+
+
 class FailureChainLink(BaseModel):
     link_id: str = Field(default_factory=lambda: f"FCL-{uuid.uuid4().hex[:12]}")
     sequence: int
@@ -18,6 +24,8 @@ class FailureChainLink(BaseModel):
     unknowns: list[uuid.UUID] = Field(default_factory=list)
     temporal_context: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
+
+
 class FailureChain(BaseModel):
     chain_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     investigation_id: uuid.UUID
@@ -38,6 +46,8 @@ class FailureChain(BaseModel):
     human_review_status: str = "NOT_REVIEWED"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class FailureChainSet(BaseModel):
     failure_chain_set_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     investigation_id: uuid.UUID
@@ -50,6 +60,8 @@ class FailureChainSet(BaseModel):
     guardrails: dict[str, Any] = Field(default_factory=dict)
     provenance: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class FailureChainRequest(BaseModel):
     tenant_id: uuid.UUID | None = None
     investigation_id: uuid.UUID
@@ -58,6 +70,8 @@ class FailureChainRequest(BaseModel):
     temporal_mode: TemporalMode = "current"
     as_of: datetime | None = None
     persist: bool = True
+
+
 class FailureChainResponse(BaseModel):
     failure_chain_set: FailureChainSet
     persisted: bool

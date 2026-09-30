@@ -17,7 +17,11 @@ def ids():
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first()
-        investigation = db.query(Investigation).filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-001").first()
+        investigation = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-001")
+            .first()
+        )
         TrustedRetrievalService().index_evidence_chunks(db, tenant.id)
         return tenant.id, investigation.id
     finally:

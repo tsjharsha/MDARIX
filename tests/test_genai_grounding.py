@@ -18,11 +18,23 @@ class _Provider:
 def test_context_is_tenant_scoped_fail_closed_and_excludes_sensitive_fields(monkeypatch):
     tenant_id, investigation_id = uuid4(), uuid4()
     payload = {
-        "investigation": {"id": str(investigation_id), "investigation_question": "What changed?", "owner_ref": "hidden"},
+        "investigation": {
+            "id": str(investigation_id),
+            "investigation_question": "What changed?",
+            "owner_ref": "hidden",
+        },
         "product_context": {"product": {"id": "p1", "title": "Device", "password": "never"}},
         "temporal_context": {"mode": "current", "as_of": None},
         "relationship_context": {"relationships": []},
-        "evidence_context": [{"evidence_identifier": "EV-1", "title": "Complaint", "source_reference": "TW-1", "token": "never", "content": "not allowlisted"}],
+        "evidence_context": [
+            {
+                "evidence_identifier": "EV-1",
+                "title": "Complaint",
+                "source_reference": "TW-1",
+                "token": "never",
+                "content": "not allowlisted",
+            }
+        ],
         "limitations": [],
     }
     monkeypatch.setattr(
@@ -35,7 +47,9 @@ def test_context_is_tenant_scoped_fail_closed_and_excludes_sensitive_fields(monk
     assert context["field_policy"] == "SERVER_ALLOWLIST_FAIL_CLOSED"
     assert "password" not in serialized and "token" not in serialized and "owner_ref" not in serialized
     assert context["evidence_context"][0]["evidence_identifier"] == "EV-1"
-    assert source_provenance(context) == [{"evidence_identifier": "EV-1", "title": "Complaint", "source_reference": "TW-1", "temporal": None}]
+    assert source_provenance(context) == [
+        {"evidence_identifier": "EV-1", "title": "Complaint", "source_reference": "TW-1", "temporal": None}
+    ]
 
 
 def test_advisory_is_non_authoritative_and_requires_human_review():
