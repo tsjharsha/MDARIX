@@ -1,0 +1,51 @@
+.tenant-directory,
+.tenant-directory * {
+  font-family: inherit;
+  font-weight: 400;
+}
+
+.tenant-directory h2,
+.tenant-directory .eyebrow,
+.tenant-directory .salesforce-head,
+.tenant-directory .status-pill,
+.tenant-directory .tenant-link strong,
+.tenant-directory .tenant-actions,
+.tenant-directory .tenant-actions button {
+  font-weight: 400;
+}
+
+.tenant-directory .tenant-link strong {
+  color: inherit;
+}
+
+/* Keep scrolling at the page level rather than creating a second Tenant pane. */
+.tenant-directory {
+  overflow: visible;
+}
+
+.tenant-directory .salesforce-table,
+.tenant-directory .tenant-table {
+  overflow: visible;
+  min-width: 0;
+}
+
+.tenant-directory .tenant-table .salesforce-head {
+  min-width: 0;
+}
+
+/* Consistent sentence-case presentation without changing stored values. */
+.tenant-directory .tenant-row > span,
+.tenant-directory .tenant-row small,
+.tenant-directory .tenant-link,
+.tenant-directory .tenant-link strong,
+.tenant-directory .tenant-link small,
+.tenant-directory .tenant-actions {
+  text-transform: lowercase;
+}
+
+.tenant-directory .tenant-row > span::first-letter,
+.tenant-directory .tenant-link strong::first-letter,
+.tenant-directory .tenant-link small::first-letter,
+.tenant-directory .tenant-actions::first-letter {
+  text-transform: uppercase;
+}

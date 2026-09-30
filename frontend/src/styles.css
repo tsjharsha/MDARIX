@@ -1394,6 +1394,13 @@ th {
 @media (max-width:620px) { .public-shell .medtech-home-grid { padding:0 20px 56px; } .public-shell .medtech-home-grid article { grid-template-columns:1fr; } }
 /* Product 360 keeps its detailed capability content but omits the generic upper banner. */
 html[data-public-path="/platform/product-360"] .public-shell .public-hero { display:none; }
+html[data-public-path="/"] .public-shell .public-hero { grid-template-columns:1fr; }
+html[data-public-path="/"] .public-shell .medtech-hero-visual { width:100%; max-width:none; }
+html[data-public-path="/"] .public-shell .medtech-hero-visual img { width:100%; }
+html[data-public-path="/platform/product-360"] .public-shell .capability-intro { grid-template-columns:1fr; }
+html[data-public-path="/platform/product-360"] .public-shell .capability-visual { width:100%; min-height:340px; }
+html[data-public-path^="/platform/"] .public-shell .capability-intro { grid-template-columns:1fr; }
+html[data-public-path^="/platform/"] .public-shell .capability-visual { width:100%; min-height:340px; }
 html[data-public-path="/platform/product-360"] .public-shell .capability-visual { min-height:340px; background:#f1f8fa url('/medtech-product-360-hero.png') center/cover no-repeat; }
 html[data-public-path="/platform/product-360"] .public-shell .capability-visual::after { display:none; }
 html[data-public-path="/platform/product-360"] .public-shell .capability-visual::before { display:none; }
@@ -1422,6 +1429,84 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual {
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::before,
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual .visual-node { display:none; }
+html[data-public-path="/platform/challenger"] .public-shell .public-hero,
+html[data-public-path="/platform/ai-assurance"] .public-shell .public-hero,
+html[data-public-path="/platform/ai-provenance"] .public-shell .public-hero,
+html[data-public-path="/platform/human-review"] .public-shell .public-hero,
+html[data-public-path="/platform/audit-trail"] .public-shell .public-hero,
+html[data-public-path="/platform/enterprise-administration"] .public-shell .public-hero { display:none; }
+html[data-public-path="/platform/challenger"] .public-shell .capability-visual,
+html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual,
+html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual,
+html[data-public-path="/platform/human-review"] .public-shell .capability-visual,
+html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual,
+html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual { min-height:340px; background-position:center; background-size:cover; }
+html[data-public-path="/platform/challenger"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-challenger.png') center/cover no-repeat; }
+html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-ai-assurance.png') center/cover no-repeat; }
+html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-ai-provenance.png') center/cover no-repeat; }
+html[data-public-path="/platform/human-review"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-human-review.png') center/cover no-repeat; }
+html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-audit-trail.png') center/cover no-repeat; }
+html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual { background:#f1f8fa url('/medtech-hero-enterprise-administration.png') center/cover no-repeat; }
+html[data-public-path="/platform/challenger"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/human-review"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual::after,
+html[data-public-path="/platform/challenger"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/human-review"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual::before,
+html[data-public-path="/platform/challenger"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/human-review"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual .visual-node,
+html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual .visual-node { display:none; }
+html[data-public-path="/solutions"][data-public-hash="complaints"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="changes"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="affected"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="supplier"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="evidence"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="challenge"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="unknowns"] .public-shell .public-hero { display:none; }
+html[data-public-path="/solutions"][data-public-hash="quality-leaders"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="investigators"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="regulatory"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="product"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="supplier-quality"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="manufacturing"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="executives"] .public-shell .public-hero { display:none; }
+html[data-public-path="/solutions"][data-public-hash="complaint-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="version-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="change-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="supplier-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="component-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="lot-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="risk-investigation"] .public-shell .public-hero,
+html[data-public-path="/solutions"][data-public-hash="cross-system"] .public-shell .public-hero { display:none; }
+.public-shell .solution-hero-visual { margin:34px 0; border:1px solid var(--site-line); border-radius:20px; overflow:hidden; background:#eef7f5; }
+.public-shell .solution-hero-visual img { display:block; width:100%; height:340px; object-fit:cover; }
+.public-shell .solution-hero-visual figcaption { padding:14px 18px; color:var(--site-muted); font-size:14px; }
+.public-shell .resource-source-grid { grid-template-columns:repeat(4,1fr); }
+.public-shell .resource-source-grid h3 { margin:14px 0 8px; color:var(--site-ink); font-size:20px; line-height:1.2; }
+.public-shell .resource-source-grid article { min-height:260px; }
+.public-shell .resource-meta { display:flex; justify-content:space-between; gap:12px; color:var(--site-muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+.public-shell .resource-meta span { color:var(--site-teal); font-weight:700; }
+.public-shell .resource-hero-editorial { order:-2; margin:0 6vw 72px; padding:42px; border:1px solid var(--site-line); border-radius:24px; background:linear-gradient(135deg,#fff,#edf7f5); box-shadow:0 24px 70px rgba(16,42,59,.07); }
+.public-shell .resource-hero-intro { max-width:780px; }
+.public-shell .resource-hero-intro h2 { margin:14px 0; color:var(--site-ink); font-size:clamp(34px,4.5vw,62px); line-height:1.04; letter-spacing:-.04em; }
+.public-shell .resource-hero-intro p { color:var(--site-muted); font-size:19px; line-height:1.6; }
+.public-shell .resource-hero-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:32px; }
+.public-shell .resource-hero-grid figure { margin:0; overflow:hidden; border:1px solid var(--site-line); border-radius:16px; background:#fff; }
+.public-shell .resource-hero-grid img { display:block; width:100%; height:220px; object-fit:cover; }
+.public-shell .resource-hero-grid figcaption { padding:14px 16px; color:var(--site-ink); font-weight:700; }
+html[data-public-path="/resources"] .public-shell .public-hero { display:none; }
+@media (max-width:900px) { .public-shell .resource-source-grid { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:900px) { .public-shell .resource-hero-grid { grid-template-columns:1fr; } }
+@media (max-width:620px) { .public-shell .resource-source-grid { grid-template-columns:1fr; } .public-shell .resource-hero-editorial { margin:0 20px 48px; padding:26px; } }
 /* Investigation uses a dedicated MedTech review image instead of the generic journey diagram. */
 html[data-public-path="/platform/investigation"] .public-shell .public-hero { display:none; }
 html[data-public-path="/platform/investigation"] .public-shell .capability-visual { min-height:340px; background:#eef8f6 url('/medtech-product-360-device.png') center/cover no-repeat; }
@@ -1646,3 +1731,4 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .investigation-tab-summary h3 { margin:5px 0; color:#12324a; }.investigation-tab-summary p { margin:0; color:#527284; max-width:680px; }
 .investigation-tab-status { display:flex; align-items:flex-end; flex-direction:column; gap:5px; white-space:nowrap; color:#087b73; }.investigation-tab-status strong { font-size:18px; }.investigation-tab-status span { color:#527284; font-size:12px; }
 @media (max-width: 650px) { .investigation-tab-summary { align-items:flex-start; flex-direction:column; }.investigation-tab-status { align-items:flex-start; white-space:normal; } }
+.calm-admin-shell{min-height:100vh;background:#f6fafb;color:#12324a}.calm-admin-header{display:flex;align-items:center;gap:22px;min-height:70px;padding:0 30px;border-bottom:1px solid #d7e6e9;background:#fff}.calm-brand{font-size:22px;font-weight:850;letter-spacing:.06em;color:#12324a;white-space:nowrap}.calm-brand span{margin-left:14px;padding-left:14px;border-left:1px solid #c8dce1;font-size:12px;font-weight:500;letter-spacing:0;color:#557087}.calm-search{display:flex;align-items:center;gap:8px;max-width:520px;flex:1;margin:auto;padding:10px 13px;border:1px solid #c6dce2;border-radius:8px;background:#fbfefe;color:#68808d}.calm-search input{width:100%;border:0;outline:0;background:transparent;color:#12324a;font:inherit}.calm-user{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;white-space:nowrap}.calm-user small{color:#557087;font-weight:500}.calm-admin-body{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 70px)}.calm-nav{padding:30px 16px;border-right:1px solid #d7e6e9;background:#eef7f9}.calm-nav-label{margin:0 12px 16px;color:#5b7483;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.calm-nav button{display:flex;align-items:center;gap:11px;width:100%;margin:4px 0;padding:12px;border:0;border-radius:8px;background:transparent;color:#365b6f;text-align:left;font:inherit;cursor:pointer}.calm-nav button svg:last-child{margin-left:auto}.calm-nav button:hover,.calm-nav button.selected{background:#d7efeb;color:#0e6d68;font-weight:800}.calm-workspace{max-width:1400px;width:100%;margin:0 auto;padding:34px 42px}.calm-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:30px;padding-bottom:25px;border-bottom:1px solid #d7e6e9}.calm-heading h1{margin:5px 0;font-size:clamp(30px,4vw,48px);letter-spacing:-.04em;font-weight:650}.calm-heading p:not(.eyebrow){margin:0;color:#617b8b}.calm-health{display:flex;align-items:center;gap:8px;padding:12px 15px;border:1px solid #a9d8d1;border-radius:8px;background:#fff;color:#0e6d68;font-weight:750}.calm-alert{display:flex;align-items:center;gap:9px;margin:18px 0;padding:13px 15px;border:1px solid #efcf91;border-radius:8px;background:#fff8e8;color:#805b1f}.calm-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:25px 0}.calm-cards article{display:grid;grid-template-columns:auto 1fr;column-gap:11px;padding:18px;border:1px solid #d4e5e9;border-radius:10px;background:#fff}.calm-cards svg{grid-row:span 2;color:#0e817b}.calm-cards strong{font-size:26px;color:#12324a}.calm-cards span{color:#678090;font-size:13px}.calm-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.calm-panel{padding:22px;border:1px solid #d4e5e9;border-radius:11px;background:#fff}.calm-panel-title{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;margin-bottom:17px}.calm-panel h2{margin:3px 0;font-size:22px}.calm-panel-title button{display:flex;align-items:center;gap:4px;border:0;background:none;color:#0e6d68;font-weight:750;cursor:pointer}.calm-attention{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid #e4eef0}.calm-attention>svg:first-child{color:#c88a1e}.calm-attention div{display:grid;gap:4px;flex:1}.calm-attention span,.calm-empty span{color:#678090;font-size:13px}.calm-empty{display:grid;gap:6px;padding:20px 0;color:#365b6f}.calm-list{display:grid}.calm-list button{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0;border:0;border-top:1px solid #e4eef0;background:none;text-align:left;cursor:pointer}.calm-list button span{display:grid;gap:4px}.calm-list small{color:#678090}.calm-list em{font-style:normal;color:#0e6d68;font-size:12px;font-weight:800}@media(max-width:850px){.calm-admin-header{padding:0 18px}.calm-user span,.calm-user small{display:none}.calm-admin-body{grid-template-columns:1fr}.calm-nav{display:flex;gap:5px;overflow:auto;padding:10px;border-right:0;border-bottom:1px solid #d7e6e9}.calm-nav-label{display:none}.calm-nav button{min-width:max-content;margin:0}.calm-nav button svg:last-child{display:none}.calm-workspace{padding:24px 18px}.calm-cards{grid-template-columns:repeat(2,1fr)}.calm-grid{grid-template-columns:1fr}.calm-heading{display:block}.calm-health{width:max-content;margin-top:15px}}@media(max-width:520px){.calm-brand span,.calm-search{display:none}.calm-cards{grid-template-columns:1fr 1fr}.calm-cards article{padding:13px}.calm-cards strong{font-size:22px}}

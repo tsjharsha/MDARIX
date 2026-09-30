@@ -1130,7 +1130,7 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
     if db.query(Tenant).filter(Tenant.tenant_key == key).first():
         raise HTTPException(409, detail={"code": "TENANT_EXISTS", "message": "Tenant code already exists"})
     now = datetime.now(timezone.utc)
-    customer, tenant = build_customer_tenant(tenant_key=key, name=payload.company_name, status=payload.status, now=now)
+    customer, tenant = build_customer_tenant(db=db, tenant_key=key, name=payload.company_name, status=payload.status, now=now)
     db.add(customer); db.add(tenant); db.flush()
     plan = db.query(PlanDefinition).filter(PlanDefinition.code == payload.plan_code, PlanDefinition.status == "ACTIVE").first()
     if plan is None:
@@ -1148,7 +1148,7 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
             existing.enabled = True; existing.limits = limits; existing.updated_at = now
     db.add(AuditEvent(id=uuid.uuid4(), tenant_id=admin.tenant_id, actor_ref=str(admin.id), action="CUSTOMER_CREATED", entity_type="Tenant", entity_id=tenant.id, details={"tenant_key": key, "plan_code": payload.plan_code, "licensed_users_limit": payload.licensed_users_limit, "customer_admin_limit": payload.customer_admin_limit}, created_at=now))
     db.commit()
-    return {"id": str(tenant.id), "tenant_key": tenant.tenant_key, "name": tenant.name, "status": tenant.status, "plan_code": payload.plan_code, "limits": {"licensed_users_limit": payload.licensed_users_limit, "customer_admin_limit": payload.customer_admin_limit, "connector_limit": payload.connector_limit}}
+    return {"id": str(tenant.id), "customer_id": str(customer.id), "customer_identifier": customer.customer_identifier, "tenant_key": tenant.tenant_key, "tenant_identifier": tenant.tenant_identifier, "name": tenant.name, "status": tenant.status, "plan_code": payload.plan_code, "limits": {"licensed_users_limit": payload.licensed_users_limit, "customer_admin_limit": payload.customer_admin_limit, "connector_limit": payload.connector_limit}}
 
 
 @router.post("/platform-admin/customers/import")
@@ -1189,7 +1189,7 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     key = payload.tenant_code.strip().upper(); email = payload.customer_admin_email.strip().lower(); now = datetime.now(timezone.utc)
     tenant = db.query(Tenant).filter(Tenant.tenant_key == key).first()
     if tenant is None:
-        customer, tenant = build_customer_tenant(tenant_key=key, name=payload.company_name, status="PROVISIONING", now=now, region=payload.region, residency_region=payload.residency)
+        customer, tenant = build_customer_tenant(db=db, tenant_key=key, name=payload.company_name, status="PROVISIONING", now=now, region=payload.region, residency_region=payload.residency)
         db.add(customer); db.add(tenant); db.flush()
         plan = db.query(PlanDefinition).filter(PlanDefinition.code == payload.plan_code, PlanDefinition.status == "ACTIVE").first()
         if plan is None:
@@ -1227,7 +1227,7 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     tenant.updated_at = now
     db.add(AuditEvent(id=uuid.uuid4(), tenant_id=admin.tenant_id, actor_ref=str(admin.id), action="TENANT_PROVISIONED", entity_type="Tenant", entity_id=tenant.id, details={"tenant_key": key, "region": payload.region, "residency": payload.residency, "customer_admin_id": str(user.id), "invitation": invite_state, "email_delivery": delivery, "prerequisites": prerequisites}, created_at=now))
     db.commit()
-    return {"tenant_id": str(tenant.id), "tenant_key": key, "status": tenant.status, "customer_admin_id": str(user.id), "customer_admin_email": email, "invitation": invite_state, "email_delivery": delivery, "prerequisites": prerequisites, "job_id": str(job.id), "job_identifier": job.job_identifier, "idempotent_retry_safe": True}
+    return {"customer_id": str(customer.id), "customer_identifier": customer.customer_identifier, "tenant_id": str(tenant.id), "tenant_key": key, "tenant_identifier": tenant.tenant_identifier, "status": tenant.status, "customer_admin_id": str(user.id), "customer_admin_email": email, "invitation": invite_state, "email_delivery": delivery, "prerequisites": prerequisites, "job_id": str(job.id), "job_identifier": job.job_identifier, "idempotent_retry_safe": True}
 
 
 def _validate_onboarding_payload(payload: CustomerProvisionRequest, db: Session) -> dict:

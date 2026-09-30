@@ -11,6 +11,7 @@ from datetime import datetime
 
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import Tenant
+from sqlalchemy import text
 
 LIFECYCLE_TRANSITIONS: dict[str, frozenset[str]] = {
     "DRAFT": frozenset({"PENDING_APPROVAL"}),
@@ -37,6 +38,7 @@ def _slug(value: str) -> str:
 
 def build_customer_tenant(
     *,
+    db,
     tenant_key: str,
     name: str,
     status: str,
@@ -48,11 +50,21 @@ def build_customer_tenant(
 ) -> tuple[Customer, Tenant]:
     customer_id = uuid.uuid4()
     tenant_id = uuid.uuid4()
+    # Tenant identifiers are platform-issued, sequential, and never derived
+    # from customer input. The transaction advisory lock prevents concurrent
+    # provisioning requests from selecting the same next number.
+    db.execute(text("SELECT pg_advisory_xact_lock(73192841)"))
+    issued_customers = [str(value) for (value,) in db.query(Customer.customer_identifier).filter(Customer.customer_identifier.op("~")("^CUS[0-9]+$")).all()]
+    next_customer_number = max((int(value[3:]) for value in issued_customers), default=0) + 1
+    generated_customer_identifier = f"CUS{next_customer_number:04d}"
+    issued_tenants = [str(value) for (value,) in db.query(Tenant.tenant_identifier).filter(Tenant.tenant_identifier.op("~")("^TEN[0-9]+$")).all()]
+    next_tenant_number = max((int(value[3:]) for value in issued_tenants), default=0) + 1
+    generated_tenant_identifier = f"TEN{next_tenant_number:04d}"
     normalized_key = tenant_key.strip().upper()
     lifecycle_status = status.strip().upper()
     customer = Customer(
         id=customer_id,
-        customer_identifier=f"CUST-{customer_id.hex[:12].upper()}",
+        customer_identifier=generated_customer_identifier,
         legal_name=name.strip(),
         display_name=name.strip(),
         customer_type=customer_type,
@@ -66,7 +78,7 @@ def build_customer_tenant(
         id=tenant_id,
         customer_id=customer_id,
         tenant_key=normalized_key,
-        tenant_identifier=normalized_key,
+        tenant_identifier=generated_tenant_identifier,
         name=name.strip(),
         display_name=name.strip(),
         tenant_slug=f"{_slug(normalized_key)}-{tenant_id.hex[:8]}",
