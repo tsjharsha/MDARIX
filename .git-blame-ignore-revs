@@ -1,0 +1,6 @@
+# Mechanical formatting commits (no behaviour change). Use with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# ruff format (Python)
+0cef2e5d24092ca67e7159e8eaef69e18e97cc54
+# prettier (frontend)
+f63ee455e2b39bd4e1a64bb9c9307334f5e6eab2

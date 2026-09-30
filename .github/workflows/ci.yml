@@ -67,6 +67,8 @@ jobs:
       - run: npm.cmd --prefix frontend ci
       - run: npm.cmd --prefix frontend audit --audit-level=high
       - run: npm.cmd --prefix frontend run build
+      - run: npm.cmd --prefix frontend run lint
+      - run: npm.cmd --prefix frontend run format:check
       - name: Run frontend tests
         run: npm.cmd --prefix frontend test -- --run
 
@@ -164,9 +166,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - run: python -m pip install -r requirements.txt pip-audit ruff
+      # ruff is pinned to the version used to format the repository.
+      - run: python -m pip install -r requirements.txt pip-audit ruff==0.16.9
       - run: pip-audit -r requirements.txt
-      - run: ruff check backend auth access_control integration outbox scripts --select F --ignore F403
+      - run: ruff check .
+      - run: ruff format --check .
       - uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

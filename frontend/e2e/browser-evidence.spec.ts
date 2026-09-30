@@ -2,7 +2,15 @@ import { test, expect } from "@playwright/test";
 import { injectAxe } from "axe-playwright";
 import { writeFileSync } from "node:fs";
 
+// Credentials come from the environment so no password or personal address is
+// committed. CI provides DAY35_FIXTURE_PASSWORD for the seeded fixture users.
+const E2E_PASSWORD = process.env.E2E_PASSWORD ?? process.env.DAY35_FIXTURE_PASSWORD ?? "";
+const PLATFORM_ADMIN_EMAIL = process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "r1-user-01@synthetic.invalid";
+// A Customer Administrator in a second tenant (Tenant B).
+const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "";
+
 async function signIn(page: any, email: string, password: string) {
+  if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
   await page.goto("/signin");
   await page.getByLabel("User ID or work email").fill(email);
   await page.getByLabel("Password").fill(password);
@@ -35,7 +43,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("authenticated Platform Admin workflow and screenshots", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     const consent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
@@ -58,7 +66,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("authenticated admin accessibility evidence", async ({ page }, testInfo) => {
     test.setTimeout(60_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const onboardingConsent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
     await onboardingConsent
@@ -81,7 +89,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("Platform Admin navigation opens every domain and subsection", async ({ page }) => {
     test.setTimeout(60_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("complementary", { name: "Platform administration domains" });
     const domains: Record<string, string[]> = {
@@ -125,7 +133,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("admin workflows expose actionable Customer/Tenant 360 and onboarding states", async ({ page }) => {
     test.setTimeout(90_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("complementary", { name: "Platform administration domains" });
     await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
@@ -162,7 +170,7 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin/mapping-studio");
     await expect(page.getByText(/Mapping Studio/i).first()).toBeVisible();
     expect(await page.locator("button, input, select").count()).toBeGreaterThan(0);
@@ -172,7 +180,8 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated Customer Admin workflow and screenshot", async ({ page }, testInfo) => {
-    await signIn(page, "stelikicherla3008@gmail.com", "Temp@1234password");
+    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
+    await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/customer-admin");
     await expect(page.locator("body")).not.toContainText("Checking your session");
     await expect(page.locator("body")).toContainText(/customer administration/i);
@@ -180,11 +189,12 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("Tenant A and Tenant B browser sessions cannot cross-read customer admin data", async ({ browser }) => {
+    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
     test.setTimeout(60_000);
     const tenantA = await browser.newPage();
     const tenantB = await browser.newPage();
-    await signIn(tenantA, "r1-user-01@synthetic.invalid", "Temp@1234password");
-    await signIn(tenantB, "stelikicherla3008@gmail.com", "Temp@1234password");
+    await signIn(tenantA, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
+    await signIn(tenantB, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     const contextA = await tenantA.request.get("/api/v1/session/context");
     const contextB = await tenantB.request.get("/api/v1/session/context");
     expect(contextA.ok()).toBeTruthy();
@@ -209,7 +219,7 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("protected routes expose a nonblank state", async ({ page }) => {
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     for (const route of ["/app/admin", "/app/customer-admin", "/app/admin/mapping-studio", "/app/decision"]) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
@@ -219,7 +229,7 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("home workflow is keyboard reachable", async ({ page }, testInfo) => {
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app");
     await expect(page.locator("body")).not.toBeEmpty();
     await page.waitForTimeout(1500);
@@ -231,7 +241,7 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated AI workflow surfaces grounded review state", async ({ page }, testInfo) => {
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/ask");
     await expect(page.locator("body")).not.toBeEmpty();
     await expect(page.locator("body")).toContainText(/Ask MDARIX|authorized|human review/i);
@@ -244,7 +254,7 @@ test.describe("MDARIX browser evidence", () => {
 
   test("authenticated AI workflow surfaces remain usable across review stages", async ({ page }, testInfo) => {
     test.setTimeout(90_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     const workflows = [
       ["/app/ask", /ask mdarix|authorized|human review/i, "ask"],
       ["/app/investigations", /investigat|hypothes|evidence|review/i, "investigation"],
@@ -272,7 +282,7 @@ test.describe("MDARIX browser evidence", () => {
     page,
   }, testInfo) => {
     test.setTimeout(90_000);
-    await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     await expect(page.locator("body")).toContainText(/platform administration|control plane/i, { timeout: 20_000 });
     await page

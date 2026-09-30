@@ -80,3 +80,8 @@ npm.cmd --prefix frontend run build
 Markers are assigned automatically in `tests/conftest.py`: `unit` (no database),
 `db` (control-plane test database) and `dataplane` (also needs the four tenant
 databases; excluded by default).
+
+## Conventions
+
+Engineering conventions for people and AI assistants are in
+[AGENTS.md](AGENTS.md) (imported by [CLAUDE.md](CLAUDE.md)).
