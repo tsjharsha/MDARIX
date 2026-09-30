@@ -87,8 +87,8 @@ def _client(email, tenant_id):
     token = auth_service.signin(email, "Correct current password 123")
     db = SessionLocal()
     now = datetime.now(timezone.utc)
-    # The governance fixture grants approval authority to the synthetic
-    # Viewer role; keep the persisted identity aligned with that fixture.
+    # The governance bootstrap grants approval authority to the Approver role
+    # only (never to read-only Viewers); these signers are Approvers.
     user = AuthUser(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -96,7 +96,7 @@ def _client(email, tenant_id):
         display_name=email.split("@")[0],
         company="Day23",
         password_hash=_hash("Correct current password 123"),
-        role="Viewer",
+        role="Approver",
         status="ACTIVE",
         email_verified=True,
         created_at=now,
@@ -333,7 +333,7 @@ def test_api_signing_security_matrix():
         )
         entitlement.enabled = True
         db.commit()
-        authority = db.query(ApprovalAuthority).filter_by(tenant_id=tenant.id, role_name="Viewer").first()
+        authority = db.query(ApprovalAuthority).filter_by(tenant_id=tenant.id, role_name="Approver").first()
         authority.status = "REVOKED"
         db.commit()
         no_authority = _decision(db, tenant.id, investigation, creator)

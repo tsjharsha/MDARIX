@@ -561,12 +561,20 @@ def generate_report(
 
 @router.get("/compliance-report")
 def compliance_report(
+    request: Request,
     output_format: str = "PDF",
     db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Generate a tenant-scoped audit and signature verification report."""
+    """Generate a tenant-scoped audit and signature verification report.
+
+    The report carries the full audit trail (source IPs, before/after values), so it is limited to the
+    same administrators who can read the audit history.
+    """
+    from backend.app.access.authz import _require_administrator
+
+    _require_administrator(request, db)
     fmt = output_format.upper()
     if fmt not in {"JSON", "CSV", "PDF", "WORD", "DOC", "ESTAR_XML"}:
         raise HTTPException(

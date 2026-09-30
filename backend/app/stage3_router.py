@@ -88,7 +88,7 @@ def signals_summary(
     rows = _rows(
         db,
         """
-        SELECT complaint_identifier AS signal_id, description, severity, status, event_timestamp
+        SELECT complaint_identifier AS signal_id, description, NULL AS severity, status, event_timestamp
         FROM complaints WHERE tenant_id = :tenant_id
         ORDER BY event_timestamp DESC NULLS LAST LIMIT 100
     """,

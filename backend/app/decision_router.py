@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from decision_center.schemas import (
     AdvisoryRequest,
@@ -43,8 +44,27 @@ def review_decision(
     decision_id: uuid.UUID,
     request: ReviewCreateRequest,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    from backend.app.db.models.foundation import Decision
+    from backend.app.governance_router import approval_denial, session_actor, tenant
+
+    # The reviewer is the signed-in user; a name in the request body is never trusted.
+    request = request.model_copy(update={"reviewer_ref": ctx.user_id})
+    if request.disposition.strip().upper() == "APPROVED":
+        # Approving through a review decides the case, so it needs the same authority and separation of
+        # duties as a signature.
+        decision = db.query(Decision).filter(Decision.tenant_id == ctx.tenant_id, Decision.id == decision_id).first()
+        if decision is None:
+            raise HTTPException(
+                404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
+            )
+        actor = session_actor(control_db, ctx)
+        organization = tenant(control_db, actor)  # same tenant check and policy setup as signing
+        denial = approval_denial(control_db, organization.id, actor["active_role"], decision, ctx.user_id)
+        if denial:
+            raise HTTPException(403, detail={"code": denial[0], "message": denial[1]})
     try:
         review = service.review(db, ctx.tenant_id, decision_id, request)
         return {
@@ -96,6 +116,8 @@ def create_decision(
         raise HTTPException(
             400, detail={"code": "INVALID_DECISION_OPTION", "message": "Decision option is not controlled"}
         )
+    # The author is the signed-in user; a name in the request body is never trusted.
+    request = request.model_copy(update={"authorized_by_ref": ctx.user_id})
     try:
         return _decision_payload(service.create_decision(db, ctx.tenant_id, investigation_id, request))
     except DecisionCenterError as exc:

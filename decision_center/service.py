@@ -79,6 +79,8 @@ class DecisionCenterService:
                     include_retrieval=True,
                     retrieval_top_k=8,
                 ),
+                # Read Product 360 from the same tenant data plane as the investigation.
+                data_plane_engine=db.get_bind(),
             )
         except InvestigationWorkspaceError as exc:
             raise DecisionCenterError(exc.code, exc.message) from exc

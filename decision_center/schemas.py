@@ -18,13 +18,15 @@ class DecisionCreateRequest(DecisionContextRequest):
     decision_type: str = "INVESTIGATION_DISPOSITION"
     selected_action: str
     rationale: str = Field(min_length=1, max_length=10000)
-    authorized_by_ref: str = Field(min_length=1, max_length=255)
+    # Ignored if sent: the server records the signed-in user as the author.
+    authorized_by_ref: str | None = Field(default=None, max_length=255)
 
 
 class ReviewCreateRequest(BaseModel):
     disposition: str = Field(min_length=1, max_length=80)
     comments: str | None = Field(default=None, max_length=10000)
-    reviewer_ref: str = Field(min_length=1, max_length=255)
+    # Ignored if sent: the server records the signed-in user as the reviewer.
+    reviewer_ref: str | None = Field(default=None, max_length=255)
 
 
 class DecisionResponse(BaseModel):

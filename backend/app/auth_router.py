@@ -26,6 +26,7 @@ from backend.app.db.models.stage2 import (
     PasswordHistory,
 )
 from backend.app.db.session import get_db
+from backend.app.request_context import ensure_tenant_access
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -345,6 +346,8 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
             status=row.status,
             email_verified=row.email_verified,
         )
+        # Checked only after the password is verified, so it cannot be used to probe accounts.
+        ensure_tenant_access(db, row)
         if throttle:
             throttle.failure_count = 0
             throttle.locked_until = None
@@ -415,6 +418,7 @@ def session(request: Request, db: Session = Depends(get_db)):
     )
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    ensure_tenant_access(db, user)
     row.last_seen_at = datetime.now(timezone.utc)
     db.commit()
     return {
@@ -426,10 +430,28 @@ def session(request: Request, db: Session = Depends(get_db)):
     }
 
 
+# Account states an administrator imposed. A password reset or activation link must never lift them.
+ADMIN_BLOCKED_STATUSES = frozenset({"SUSPENDED", "OFFBOARDED", "LOCKED", "DISABLED"})
+
+
+def _admin_blocked(row) -> bool:
+    return str(getattr(row, "status", "") or "").upper() in ADMIN_BLOCKED_STATUSES
+
+
+def _activate_invited_memberships(db: Session, row) -> None:
+    """Promote only INVITED memberships; a suspended membership stays suspended."""
+    db.query(TenantMembership).filter(
+        TenantMembership.tenant_id == row.tenant_id,
+        TenantMembership.user_id == row.id,
+        TenantMembership.status == "INVITED",
+    ).update({"status": "ACTIVE", "updated_at": datetime.now(timezone.utc)})
+
+
 @router.post("/forgot-password")
 def forgot(data: ResetRequest, db: Session = Depends(get_db)):
     row = _account_for_email(db, data.email.strip().lower())
-    if not row:
+    # Same answer for unknown and blocked accounts, so the response reveals nothing.
+    if not row or _admin_blocked(row):
         return {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "NOT_SENT"}
     token = issue_reset(db, row.id, row.tenant_id)
     delivery = send_password_reset_email(row.username, token)
@@ -445,7 +467,7 @@ def reset(data: Reset, db: Session = Depends(get_db)):
     try:
         user_id = consume(db, data.token, "reset")
         row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
-        if row is None:
+        if row is None or _admin_blocked(row):
             raise ValueError("INVALID_RESET")
         now = datetime.now(timezone.utc)
         if _password_reuse(db, row, data.password):
@@ -455,9 +477,7 @@ def reset(data: Reset, db: Session = Depends(get_db)):
         row.email_verified = True
         row.updated_at = now
         _record_password_change(db, row, row.password_hash, now)
-        db.query(TenantMembership).filter(
-            TenantMembership.tenant_id == row.tenant_id, TenantMembership.user_id == row.id
-        ).update({"status": "ACTIVE", "updated_at": datetime.now(timezone.utc)})
+        _activate_invited_memberships(db, row)
         db.commit()
         return {"status": "PASSWORD_RESET"}
     except ValueError:
@@ -474,7 +494,7 @@ def activate(data: Reset, db: Session = Depends(get_db)):
     try:
         user_id = consume(db, data.token, "activation")
         row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
-        if row is None:
+        if row is None or _admin_blocked(row):
             raise ValueError("INVALID_ACTIVATION")
         now = datetime.now(timezone.utc)
         if _password_reuse(db, row, data.password):
@@ -484,10 +504,7 @@ def activate(data: Reset, db: Session = Depends(get_db)):
         row.email_verified = True
         row.updated_at = now
         _record_password_change(db, row, row.password_hash, now)
-        db.commit()
-        db.query(TenantMembership).filter(
-            TenantMembership.tenant_id == row.tenant_id, TenantMembership.user_id == row.id
-        ).update({"status": "ACTIVE", "updated_at": datetime.now(timezone.utc)})
+        _activate_invited_memberships(db, row)
         db.commit()
         return {"status": "ACTIVE", "user_id": str(row.id), "email": row.username}
     except ValueError as e:

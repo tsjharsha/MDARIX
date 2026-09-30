@@ -59,6 +59,8 @@ class EvidenceGroundedInvestigatorService:
                     include_retrieval=True,
                     retrieval_top_k=request.retrieval_top_k,
                 ),
+                # Read Product 360 from the same tenant data plane as the investigation.
+                data_plane_engine=db.get_bind(),
             )
         except InvestigationWorkspaceError as exc:
             raise InvestigatorError(exc.code, exc.message) from exc

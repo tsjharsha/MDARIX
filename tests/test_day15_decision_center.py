@@ -7,6 +7,7 @@ from backend.app.db.session import engine
 from backend.app.main import app
 from decision_center.service import DecisionCenterService
 from decision_center.schemas import DecisionContextRequest
+from tests.test_customer_admin_account_security import _client_for, _user
 
 client = TestClient(app)
 service = DecisionCenterService()
@@ -80,11 +81,29 @@ def test_human_decision_requires_rationale_and_review():
     assert created.status_code == 200
     decision_id = created.json()["id"]
     assert created.json()["decision_status"] == "REQUIRES_REVIEW"
-    review = client.post(
+    # The author cannot approve their own decision (segregation of duties)...
+    own = client.post(
         f"/api/v1/investigations/decisions/{decision_id}/reviews",
         json={"disposition": "APPROVED", "reviewer_ref": "reviewer", "comments": "Human review completed."},
     )
-    assert review.status_code == 200
+    assert own.status_code == 403
+    assert own.json()["detail"]["code"] == "SOD_DENIED"
+    # ...a different user holding approval authority can.
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.id == primary_investigation()[1]).one()
+        approver = _client_for(db, _user(db, tenant, "Approver", "day15-approver"))
+        db.commit()
+    finally:
+        db.close()
+    review = approver.post(
+        f"/api/v1/investigations/decisions/{decision_id}/reviews",
+        json={"disposition": "APPROVED", "comments": "Human review completed."},
+    )
+    assert review.status_code == 200, review.text
     assert client.get(f"/api/v1/investigations/decisions/{decision_id}").json()["decision_status"] == "DECIDED"
 
 

@@ -276,10 +276,11 @@ def switch_tenant(payload: TenantSwitchRequest, request: Request, db: Session = 
 def entitlement(feature_code: str, request: Request, db: Session = Depends(get_db)):
     user = _authenticated_user(request, db)
     now = datetime.now(timezone.utc)
+    # Select the entitlement itself: its limits are what the caller needs.
     row = (
-        db.query(TenantPlanAssignment)
-        .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
-        .join(FeatureEntitlement, FeatureEntitlement.plan_id == PlanDefinition.id)
+        db.query(FeatureEntitlement)
+        .join(PlanDefinition, PlanDefinition.id == FeatureEntitlement.plan_id)
+        .join(TenantPlanAssignment, TenantPlanAssignment.plan_id == PlanDefinition.id)
         .filter(
             TenantPlanAssignment.tenant_id == user.tenant_id,
             TenantPlanAssignment.status == "ACTIVE",
@@ -294,5 +295,5 @@ def entitlement(feature_code: str, request: Request, db: Session = Depends(get_d
     return {
         "feature": feature_code,
         "entitled": row is not None,
-        "limits": (row[0].limits if isinstance(row, tuple) else row.limits) if row else {},
+        "limits": (row.limits or {}) if row else {},
     }

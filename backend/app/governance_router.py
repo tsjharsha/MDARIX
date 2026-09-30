@@ -66,6 +66,40 @@ def audit(
     )
 
 
+# The demo bootstrap grants decision approval to this role only. Read-only roles never receive it by default.
+DEFAULT_APPROVER_ROLE = "Approver"
+
+
+def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tuple[str, str] | None:
+    """Why this user may not approve this decision, or None when they may.
+
+    Shared by signing and by review approval so both enforce the same rules:
+    an ACTIVE approval authority for the user's role, and segregation of duties (no self-approval).
+    """
+    authority = (
+        db.query(ApprovalAuthority)
+        .filter_by(
+            tenant_id=tenant_id,
+            role_name=role_name,
+            object_type="Decision",
+            decision_type="INVESTIGATION_REVIEW",
+            authority="AUTHORIZED",
+            status="ACTIVE",
+        )
+        .first()
+    )
+    if not authority:
+        return "APPROVAL_AUTHORITY_DENIED", "Active role lacks approval authority"
+    sod = (
+        db.query(SegregationOfDutiesPolicy)
+        .filter_by(tenant_id=tenant_id, object_type="Decision", decision_type="INVESTIGATION_REVIEW", status="ACTIVE")
+        .first()
+    )
+    if sod and sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
+        return "SOD_DENIED", "Approval by another authorized user is required"
+    return None
+
+
 def bootstrap(db, tenant):
     plan = db.query(PlanDefinition).filter_by(code="R1_GOVERNANCE_DEMO").first()
     now = NOW()
@@ -119,7 +153,10 @@ def bootstrap(db, tenant):
     if (
         not db.query(ApprovalAuthority)
         .filter_by(
-            tenant_id=tenant.id, role_name="Viewer", object_type="Decision", decision_type="INVESTIGATION_REVIEW"
+            tenant_id=tenant.id,
+            role_name=DEFAULT_APPROVER_ROLE,
+            object_type="Decision",
+            decision_type="INVESTIGATION_REVIEW",
         )
         .first()
     ):
@@ -127,7 +164,7 @@ def bootstrap(db, tenant):
             ApprovalAuthority(
                 id=uuid.uuid4(),
                 tenant_id=tenant.id,
-                role_name="Viewer",
+                role_name=DEFAULT_APPROVER_ROLE,
                 object_type="Decision",
                 decision_type="INVESTIGATION_REVIEW",
                 scope={},
@@ -268,35 +305,12 @@ def sign(
         raise HTTPException(
             409, detail={"code": "STALE_OBJECT_VERSION", "message": "Decision changed; re-review the current version"}
         )
-    authority = (
-        db.query(ApprovalAuthority)
-        .filter_by(
-            tenant_id=t.id,
-            role_name=actor["active_role"],
-            object_type="Decision",
-            decision_type="INVESTIGATION_REVIEW",
-            authority="AUTHORIZED",
-            status="ACTIVE",
-        )
-        .first()
-    )
-    if not authority:
-        audit(db, t, actor["user_id"], "APPROVAL_AUTHORITY_DENIED", decision_id)
+    denial = approval_denial(db, t.id, actor["active_role"], item, actor["user_id"])
+    if denial:
+        code, message = denial
+        audit(db, t, actor["user_id"], code, decision_id)
         db.commit()
-        raise HTTPException(
-            403, detail={"code": "APPROVAL_AUTHORITY_DENIED", "message": "Active role lacks approval authority"}
-        )
-    sod = (
-        db.query(SegregationOfDutiesPolicy)
-        .filter_by(tenant_id=t.id, object_type="Decision", decision_type="INVESTIGATION_REVIEW", status="ACTIVE")
-        .first()
-    )
-    if sod and sod.creator_cannot_approve and item.authorized_by_ref == actor["user_id"]:
-        audit(db, t, actor["user_id"], "SOD_DENIED", decision_id)
-        db.commit()
-        raise HTTPException(
-            403, detail={"code": "SOD_DENIED", "message": "Approval by another authorized user is required"}
-        )
+        raise HTTPException(403, detail={"code": code, "message": message})
     if not payload.remarks.strip():
         raise HTTPException(400, detail={"code": "REMARKS_REQUIRED", "message": "Remarks are required"})
     try:

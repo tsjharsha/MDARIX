@@ -14,6 +14,7 @@ from backend.app.db.models.foundation import (
     AuthUser,
     RoleAssignment,
     RoleDefinition,
+    Tenant,
     TenantMembership,
 )
 from backend.app.db.models.stage2 import AuthSession
@@ -27,6 +28,30 @@ def set_database_tenant_context(db: Session, tenant_id: str) -> None:
     previous tenant after the request completes.
     """
     db.execute(text("select set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
+
+
+# Organization and membership states that end access. Other states (for example INVITED, PROVISIONED or
+# EXPIRING_SOON) are left to the lifecycle workflows; users with no membership row are legacy and unaffected.
+BLOCKED_TENANT_STATUSES = frozenset({"SUSPENDED", "TERMINATED", "ARCHIVED"})
+BLOCKED_MEMBERSHIP_STATUSES = frozenset({"SUSPENDED", "REVOKED", "REMOVED", "OFFBOARDED", "RETIRED", "INACTIVE"})
+
+
+def ensure_tenant_access(db: Session, user) -> None:
+    """Refuse access when the user's organization or their membership in it has been suspended or revoked."""
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    if tenant is None or str(tenant.status or "").upper() in BLOCKED_TENANT_STATUSES:
+        raise HTTPException(
+            403, detail={"code": "TENANT_ACCESS_SUSPENDED", "message": "Access to this organization is suspended"}
+        )
+    memberships = db.query(TenantMembership).filter(
+        TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id
+    )
+    if memberships.filter(TenantMembership.status == "ACTIVE").first() is not None:
+        return
+    if memberships.filter(TenantMembership.status.in_(sorted(BLOCKED_MEMBERSHIP_STATUSES))).first() is not None:
+        raise HTTPException(
+            403, detail={"code": "MEMBERSHIP_SUSPENDED", "message": "Your access to this organization is suspended"}
+        )
 
 
 @dataclass(frozen=True)
@@ -97,6 +122,8 @@ def get_request_context(request: Request, db: Session = Depends(get_db)) -> Auth
             )
         if user is not None and str(user.tenant_id) != str(legacy["tenant_id"]):
             raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+        if user is not None:
+            ensure_tenant_access(db, user)
         if user is None:
             # Legacy unit-test clients do not create a database user. This
             # compatibility identity is development-only and never reaches
@@ -170,6 +197,7 @@ def get_request_context(request: Request, db: Session = Depends(get_db)) -> Auth
     )
     if user is None:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    ensure_tenant_access(db, user)
     membership = (
         db.query(TenantMembership)
         .filter(
