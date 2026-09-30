@@ -1,3 +1,4 @@
+from tests.conftest import frontend_app_source
 from pathlib import Path
 
 
@@ -8,7 +9,7 @@ def compact(text: str) -> str:
 
 ROOT = Path(__file__).resolve().parents[1]
 SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
-MAIN = (ROOT / "frontend" / "src" / "main.tsx").read_text(encoding="utf-8")
+MAIN = frontend_app_source()
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
 INVESTIGATOR_HOME = (ROOT / "frontend" / "src" / "features" / "investigator" / "InvestigatorHome.tsx").read_text(
     encoding="utf-8"
@@ -59,7 +60,7 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
     # The authenticated home is InvestigatorHome (the former inline
-    # ApplicationHome in main.tsx was unreferenced and has been removed).
+    # ApplicationHome was unreferenced and has been removed).
     assert compact('activeView === "home" && (<><InvestigatorHome') in compact(MAIN)
     for phrase in (
         "Quality Investigator workspace",

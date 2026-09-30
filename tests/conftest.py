@@ -112,6 +112,15 @@ def access_api_source() -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in sorted(package.glob("*.py")))
 
 
+def frontend_app_source() -> str:
+    """Source of the authenticated web app (main.tsx, app/ and features/) for static UI contract tests."""
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "frontend" / "src"
+    files = [src / "main.tsx", *sorted((src / "app").rglob("*.ts*")), *sorted((src / "features").rglob("*.tsx"))]
+    return "\n".join(path.read_text(encoding="utf-8") for path in files if not path.name.endswith(".test.ts"))
+
+
 def golden_investigation_id() -> str:
     """Return the id of golden investigation INV-001 in the synthetic tenant."""
     db = SessionLocal()

@@ -1,4 +1,4 @@
-from tests.conftest import access_api_source
+from tests.conftest import access_api_source, frontend_app_source
 from pathlib import Path
 
 
@@ -6,7 +6,7 @@ ROOT = Path(__file__).parents[1]
 ACCESS_ROUTER = access_api_source()
 AUTH_ROUTER = (ROOT / "backend" / "app" / "auth_router.py").read_text(encoding="utf-8")
 EMAILER = (ROOT / "auth" / "emailer.py").read_text(encoding="utf-8")
-UI = (ROOT / "frontend" / "src" / "main.tsx").read_text(encoding="utf-8")
+UI = frontend_app_source()
 NAVIGATION_POLICY = (ROOT / "frontend" / "src" / "app" / "navigationPolicy.ts").read_text(encoding="utf-8")
 
 

@@ -9,7 +9,7 @@ sets, personas, connectors, approval authorities or SoD policies; the backend
 routes for those exist and are still asserted below.
 """
 
-from tests.conftest import access_api_source
+from tests.conftest import access_api_source, frontend_app_source
 from pathlib import Path
 
 
@@ -20,7 +20,7 @@ def compact(text: str) -> str:
 
 ROOT = Path(__file__).parents[1]
 FRONTEND = ROOT / "frontend" / "src"
-UI = (FRONTEND / "main.tsx").read_text(encoding="utf-8")
+UI = frontend_app_source()
 PLATFORM_ADMIN_UI = (FRONTEND / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
 CUSTOMER_ADMIN_UI = (FRONTEND / "features" / "customer-admin" / "CustomerAdminControlPlane.tsx").read_text(
     encoding="utf-8"

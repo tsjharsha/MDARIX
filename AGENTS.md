@@ -15,8 +15,9 @@ the verified current state and known issues.
   root-level modules without a reason recorded in the commit message.
 - Database schema: SQLAlchemy models in `backend/app/db/models/` plus an Alembic
   migration in `infrastructure/database/migrations/versions/` for every change.
-- Frontend screens: `frontend/src/features/<area>/`. Keep `main.tsx` to routing
-  and the application shell. Use `app/apiClient.ts` (`requestJson`) for new API
+- Frontend screens: `frontend/src/features/<area>/`. `main.tsx` only boots the
+  app; the authenticated shell and view routing are in `app/App.tsx`, shared
+  types in `app/types.ts`. Use `app/apiClient.ts` (`requestJson`) for new API
   calls instead of raw `fetch`.
 - Scripts: `scripts/`. Documentation: see `docs/README.md`; `docs/history/` is an
   archive and must not be edited to describe the present.

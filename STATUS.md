@@ -19,7 +19,8 @@ production: several security issues below must be fixed first.
 | Frontend unit tests | `npm --prefix frontend test` | 14 passed (3 files) |
 | Frontend production build | `npm --prefix frontend run build` | Succeeds (single 668 kB JS chunk, size warning) |
 | Data-plane tests | `python -m pytest -m dataplane` | Not run in this pass (need registered tenant data planes; they write to them) |
-| Browser / Playwright e2e | `npm --prefix frontend run test:e2e` | Not run in this pass; the spec contains stale selectors for the Simplified admin screen |
+| Browser: public site | `playwright test e2e/public-shell.spec.ts --project=chromium` | 3 passed (load, keyboard/axe critical, every header/footer link) |
+| Browser: authenticated app | `browser-evidence.spec.ts`, each test run individually against the local stack | 4 passed, 2 skipped (need `E2E_CUSTOMER_ADMIN_EMAIL`), 7 failed; the same 7 fail on the code before this cleanup (stale assertions for the Simplified admin screen and older copy) |
 | CI (GitHub Actions) | `.github/workflows/ci.yml` | Not re-run for this branch |
 
 Before this cleanup the same suite on a fresh database gave 443 passed, 12
