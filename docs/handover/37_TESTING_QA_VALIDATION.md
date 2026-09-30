@@ -3,12 +3,16 @@
 ## Main commands
 
 ```powershell
-python -m pytest -q
+$env:MDARIX_ENV = "test"; $env:DAY35_FIXTURE_PASSWORD = "<test-only password>"
+python scripts/prepare_test_environment.py --recreate   # builds mdarix_r1_test
+python -m pytest -q                  # unit + db tests (data-plane tests excluded)
+python -m pytest -q -m unit          # no database required
+python -m pytest -q -m dataplane     # opt-in: needs the four tenant data planes
 npm.cmd --prefix frontend test -- --run
 npm.cmd --prefix frontend run build
 ```
 
-Targeted connector contract validation currently passes independently. Database-backed tests require the configured local PostgreSQL service and correct SSL mode/password.
+Local runs use the dedicated `mdarix_r1_test` database (set in `tests/conftest.py`) and never the demo database; tests never call Groq or Resend with developer credentials unless `MDARIX_TEST_ALLOW_LIVE_PROVIDERS=1`. The golden AcmeCare dataset is loaded on demand, so test order does not matter. Current results are recorded in `STATUS.md`.
 
 ## Test categories
 

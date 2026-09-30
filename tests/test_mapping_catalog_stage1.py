@@ -74,12 +74,12 @@ def test_stage3_suggestions_are_advisory_until_human_decision():
 
 def test_stage1_architecture_deliverables_exist():
     required = [
-        "MAPPING_SOURCE_SYSTEM_ARCHITECTURE.md",
-        "MAPPING_CANONICAL_DATA_MODEL.md",
-        "MAPPING_SOURCE_FIELD_CATALOG.md",
-        "MAPPING_TARGET_FIELD_CATALOG.md",
-        "MAPPING_SOURCE_OF_TRUTH_POLICY.md",
-        "MAPPING_INITIAL_FIELD_MATRIX.md",
-        "MAPPING_STAGE1_REPORT.md",
+        "architecture/mapping/MAPPING_SOURCE_SYSTEM_ARCHITECTURE.md",
+        "architecture/mapping/MAPPING_CANONICAL_DATA_MODEL.md",
+        "architecture/mapping/MAPPING_SOURCE_FIELD_CATALOG.md",
+        "architecture/mapping/MAPPING_TARGET_FIELD_CATALOG.md",
+        "architecture/mapping/MAPPING_SOURCE_OF_TRUTH_POLICY.md",
+        "architecture/mapping/MAPPING_INITIAL_FIELD_MATRIX.md",
+        "history/stage-reports/MAPPING_STAGE1_REPORT.md",
     ]
-    assert all((Path("docs") / name).exists() for name in required)
+    assert all((Path(__file__).resolve().parents[1] / "docs" / name).exists() for name in required)

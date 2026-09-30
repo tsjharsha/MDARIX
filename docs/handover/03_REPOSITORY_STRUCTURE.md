@@ -14,9 +14,11 @@
 | `object_storage`, `reports`, `outbox`, `communication` | Files, reports, background events and notifications |
 | `tests` | Backend, integration, simulator, isolation, governance and reliability tests |
 | `e2e` | Browser test configuration and evidence workflows |
-| `docs` | Architecture, day reports, diagrams, evidence and handover documentation |
+| `docs` | Documentation index in `docs/README.md`: handover, product, architecture, specs, runbooks, compliance; build-era reports archived under `docs/history/` |
 | `.github` | Hosted CI workflows and release gates |
 
 ## Current inventory snapshot
 
 At the time of handover generation the repository contained approximately 1,042 tracked/untracked files, 363 Python files, 36 TypeScript/TSX files, 452 Markdown/text/Mermaid documents and 39 Alembic migration files. These counts are inventory aids, not product requirements.
+
+The 2026-09-30 cleanup removed the abandoned `website-next/` app, the unused `intelligence/` package, the legacy stateless simulator (`source_simulator/app.py`), root-level day-numbered code (`day14_service.py` is now `failure_chain/service.py`; `day0_db_test.py` is now `scripts/check_database_connection.py`) and moved all day/stage reports from the repository root and `docs/` into `docs/history/`.

@@ -18,5 +18,5 @@ def test_stage2_ui_covers_catalog_subscription_model_and_mapping_governance():
 
 
 def test_stage2_documentation_deliverables_exist():
-    for name in ("ADMIN_PLANS_SUBSCRIPTIONS.md", "ADMIN_IDENTITY_ACCESS.md", "ADMIN_CONNECTOR_CATALOG.md", "ADMIN_CANONICAL_DATA_MODEL.md", "ADMIN_MASTER_MAPPING.md", "ADMIN_MAPPING_IMPACT.md", "ADMIN_STAGE2_IMPLEMENTATION_REPORT.md"):
+    for name in ("architecture/admin/ADMIN_PLANS_SUBSCRIPTIONS.md", "architecture/admin/ADMIN_IDENTITY_ACCESS.md", "architecture/admin/ADMIN_CONNECTOR_CATALOG.md", "architecture/admin/ADMIN_CANONICAL_DATA_MODEL.md", "architecture/admin/ADMIN_MASTER_MAPPING.md", "architecture/admin/ADMIN_MAPPING_IMPACT.md", "history/stage-reports/ADMIN_STAGE2_IMPLEMENTATION_REPORT.md"):
         assert (ROOT / "docs" / name).exists()

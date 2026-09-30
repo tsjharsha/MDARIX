@@ -1,94 +1,82 @@
 # MDARIX R1
 
-MDARIX R1 development foundation for Release 1.
+MDARIX is a medical-device investigation and decision-intelligence platform: a
+*system of intelligence* that sits above QMS, PLM, ERP, MES and supplier systems,
+reconstructs product and temporal context, and helps investigators work through
+evidence, competing explanations and unknowns while a human keeps decision
+authority.
 
-This repository contains the MDARIX MVP 1.0 controlled synthetic-demo implementation. The frozen scope and demo script are in [`docs/MVP_SCOPE_AND_DEMO_READINESS.md`](docs/MVP_SCOPE_AND_DEMO_READINESS.md).
+This repository is the **internal synthetic MVP**. It runs on synthetic tenants,
+seeded data, eight provider simulators and local Docker infrastructure. Real
+customer integrations, hosted production operations and compliance
+certification are out of scope. Current verified state: [STATUS.md](STATUS.md).
 
-The MVP uses synthetic tenants, seeded records, provider simulators, and local infrastructure for validation. Real customer integrations, hosted production operations, and production compliance evidence are explicitly outside the current demo scope.
+## Repository layout
 
-## Local Development Prerequisites
+| Path | What lives there |
+|---|---|
+| `backend/app/` | FastAPI application: routers, request context, auth/admin API, DB models and sessions |
+| `infrastructure/database/` | Alembic migrations and database validation scripts |
+| `ai/`, `genai/`, `retrieval/`, `evidence/`, `graph/` | Evidence extraction, LLM provider abstraction, retrieval, reality graph |
+| `investigation_workspace/`, `investigator/`, `hypothesis_engine/`, `challenger/`, `unknowns/`, `failure_chain/`, `scenario_intelligence/`, `counterfactual/`, `briefs/`, `decision_center/` | Investigation intelligence services |
+| `trust_engine/`, `evaluation/`, `validation/` | Assurance checks, golden-scenario evaluation, CSA package generation |
+| `ask_mdarix/`, `regulatory_intelligence/` | Ask MDARIX interpretation/retrieval, regulatory drafting and eSTAR preparation |
+| `auth/`, `access_control/`, `security/` | Local auth service, policy/persona/entitlement helpers, security contracts |
+| `ingestion/`, `integration/`, `source_simulator/`, `outbox/` | File ingestion + normalization, provider connector contract, simulators, outbox worker |
+| `communication/`, `object_storage/`, `reports/` | Email (Resend), object storage, report/export rendering |
+| `data/golden/` | Deterministic synthetic dataset (AcmeCare) and its generator |
+| `frontend/` | React/Vite app: public website, Platform/Customer admin, investigator workspace |
+| `tests/` | Backend test suite (see *Tests*) |
+| `scripts/` | Setup, seeding, data-plane, validation and evidence scripts |
+| `docs/` | Documentation — start at [docs/README.md](docs/README.md) |
+| `artifacts/` | Generated validation evidence (not source) |
 
-- Windows 11
-- Docker Desktop with Docker Compose
-- Git
-- GitHub CLI
-- Node.js and npm
-- Python 3.13 virtual environment at `.venv`
+## Local setup (Windows)
 
-The project Python interpreter is:
-
-```powershell
-.\.venv\Scripts\python.exe
-```
-
-Global Python installations are not used by MDARIX R1.
-
-## PostgreSQL Foundation
-
-Day 0 uses PostgreSQL 16 with pgvector in Docker.
-
-- Container: `mdarix-r1-postgres`
-- Network: `mdarix-r1_default`
-- Persistent volume: `mdarix-r1-postgres-data`
-- Database: `mdarix_r1`
-- Application role: `mdarix_app`
-- Host port: `localhost:5433`
-- Container port: `5432`
-- Vector extension: `pgvector`
-
-Start the database with Docker Compose from the repository root:
-
-```powershell
-docker compose up -d
-```
-
-If Docker is not available on the shell PATH, use the installed Docker CLI path or add it to the current session PATH.
-
-## Environment Variables
-
-Use `.env` locally and never commit it. `.env.example` contains placeholders only.
-
-Required local variables:
-
-```text
-POSTGRES_DB=mdarix_r1
-POSTGRES_USER=mdarix_app
-POSTGRES_PASSWORD=CHANGE_ME
-```
-
-## Python Foundation
-
-MDARIX R1 Windows development uses `pg8000` for PostgreSQL connectivity. `psycopg` is not required for this environment because Windows Application Control blocked its native DLL, and security controls must not be weakened.
-
-Day 0 Python packages:
-
-- pg8000
-- python-dotenv
-- SQLAlchemy
-- Alembic
-- Pydantic
-- pytest
-
-Verify Python imports:
+Prerequisites: Docker Desktop, Python 3.13 with a virtual environment at `.venv`,
+Node.js/npm, Git. MDARIX uses `pg8000` for PostgreSQL (psycopg's native DLL is
+blocked by Windows Application Control on the development machine).
 
 ```powershell
-.\.venv\Scripts\python.exe -c "import pg8000, dotenv, sqlalchemy, alembic, pydantic, pytest; print('imports ok')"
-```
-
-Verify Python to PostgreSQL connectivity:
-
-```powershell
+copy .env.example .env                      # then fill in local values; never commit .env
+docker compose up -d                        # control plane, 4 tenant data planes, simulators, worker, Mailpit, MinIO
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe .\scripts\check_database_connection.py
+$env:MDARIX_DB_HARDENING_APPLY = "1"         # the hardening migration is opt-in and required to reach head
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-Expected result includes:
+Run the API and the web app:
 
-- Database `mdarix_r1`
-- User `mdarix_app`
-- PostgreSQL 16
-- pgvector enabled
-- Vector SQL test passing
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8007
+npm.cmd --prefix frontend install
+npm.cmd --prefix frontend run dev            # http://127.0.0.1:5177 (proxies /api to :8007)
+```
 
-## Day 0 Scope
+Tenant data planes are registered and populated by the scripts in `scripts/`
+(`initialize_data_planes.py`, `expand_data_plane_schema.py`,
+`register_mvp_data_planes.py`); see
+[docs/architecture/CURRENT_DATABASE_ARCHITECTURE.md](docs/architecture/CURRENT_DATABASE_ARCHITECTURE.md).
 
-Day 0 is complete only when the reproducible engineering foundation passes validation. Product and business functionality begin after Day 0 and are not included in this foundation commit.
+## Tests
+
+The backend suite runs against a dedicated `mdarix_r1_test` database, never the
+demo database, and never calls Groq or Resend with your `.env` credentials.
+
+```powershell
+# one-time (or --recreate to rebuild): migrate, load golden data, fixtures, demo seed
+$env:MDARIX_ENV = "test"; $env:DAY35_FIXTURE_PASSWORD = "<test-only password>"
+.\.venv\Scripts\python.exe .\scripts\prepare_test_environment.py --recreate
+
+.\.venv\Scripts\python.exe -m pytest                 # unit + database tests
+.\.venv\Scripts\python.exe -m pytest -m unit         # fast, no database needed
+.\.venv\Scripts\python.exe -m pytest -m dataplane    # opt-in: needs the tenant data planes
+
+npm.cmd --prefix frontend test
+npm.cmd --prefix frontend run build
+```
+
+Markers are assigned automatically in `tests/conftest.py`: `unit` (no database),
+`db` (control-plane test database) and `dataplane` (also needs the four tenant
+databases; excluded by default).
