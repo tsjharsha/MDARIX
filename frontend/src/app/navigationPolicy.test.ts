@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { APP_ROUTES, viewFromPath } from "./router";
-import { AUTH_ENDPOINTS, allowedViewsForRole, apiErrorMessage, clearTenantScopedCache, isCustomerAdminRole, isPlatformAdminRole, MOBILE_FOCUS_ORDER } from "./navigationPolicy";
+import {
+  AUTH_ENDPOINTS,
+  allowedViewsForRole,
+  apiErrorMessage,
+  clearTenantScopedCache,
+  isCustomerAdminRole,
+  isPlatformAdminRole,
+  MOBILE_FOCUS_ORDER,
+} from "./navigationPolicy";
 
 describe("authentication and role navigation", () => {
   it("uses the session, signin, and signout API contracts", () => {
-    expect(AUTH_ENDPOINTS).toEqual({ session: "/api/v1/auth/session", signin: "/api/v1/auth/signin", signout: "/api/v1/auth/signout" });
+    expect(AUTH_ENDPOINTS).toEqual({
+      session: "/api/v1/auth/session",
+      signin: "/api/v1/auth/signin",
+      signout: "/api/v1/auth/signout",
+    });
   });
 
   it("recognizes platform and customer administrator roles", () => {
@@ -34,8 +46,18 @@ describe("authentication and role navigation", () => {
 
 describe("tenant cache and API failure boundaries", () => {
   it("clears tenant and context cache entries while preserving unrelated settings", () => {
-    const values = new Map([["mdarix:tenant:a:products", "a"], ["mdarix:context:a", "a"], ["mdarix:ui:theme", "dark"]]);
-    const storage = { get length() { return values.size; }, key: (index: number) => [...values.keys()][index] ?? null, removeItem: (key: string) => values.delete(key) };
+    const values = new Map([
+      ["mdarix:tenant:a:products", "a"],
+      ["mdarix:context:a", "a"],
+      ["mdarix:ui:theme", "dark"],
+    ]);
+    const storage = {
+      get length() {
+        return values.size;
+      },
+      key: (index: number) => [...values.keys()][index] ?? null,
+      removeItem: (key: string) => values.delete(key),
+    };
     expect(clearTenantScopedCache(storage)).toBe(2);
     expect(values.has("mdarix:ui:theme")).toBe(true);
   });

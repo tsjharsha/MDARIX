@@ -1,5 +1,11 @@
 from pathlib import Path
 
+
+def compact(text: str) -> str:
+    """Drop all whitespace so assertions survive formatter line wrapping."""
+    return "".join(text.split())
+
+
 ROOT = Path(__file__).parents[1]
 ROUTER = (ROOT / "backend" / "app" / "access_router.py").read_text(encoding="utf-8")
 UI = (ROOT / "frontend" / "src" / "features" / "stage2" / "Stage2AdminControlPlane.tsx").read_text(encoding="utf-8")
@@ -20,7 +26,7 @@ def test_stage2_platform_endpoints_exist_and_are_platform_scoped():
 def test_stage2_ui_covers_catalog_subscription_model_and_mapping_governance():
     for endpoint in ("plans", "customers", "canonical-model", "mapping-impact"):
         assert endpoint in UI
-    assert "released versions are immutable" in UI
+    assert compact("released versions are immutable") in compact(UI)
 
 
 def test_stage2_documentation_deliverables_exist():

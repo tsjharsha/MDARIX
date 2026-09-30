@@ -3,9 +3,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Segoe UI", "Arial", "sans-serif"]
-      }
-    }
+        sans: ["Inter", "Segoe UI", "Arial", "sans-serif"],
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };

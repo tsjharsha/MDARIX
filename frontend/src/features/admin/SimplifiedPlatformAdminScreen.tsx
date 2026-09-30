@@ -1,12 +1,60 @@
 import { useEffect, useState } from "react";
-import { Activity, AlertTriangle, Bell, Building2, ChevronRight, FileText, LayoutDashboard, LifeBuoy, Search, Settings2, ShieldCheck } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  Building2,
+  ChevronRight,
+  FileText,
+  LayoutDashboard,
+  LifeBuoy,
+  Search,
+  Settings2,
+  ShieldCheck,
+} from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import "./simplified-admin.css";
 import "./tenant-font.css";
 import "./platform-admin-design-system.css";
 
-type Props = { securityContext: { display_name: string; active_role: string | null } | null; onNavigate: (view: any) => void; initialSection?: string };
-type Customer = { id?: string; customer_id?: string; tenant_id?: string; tenant_name?: string; tenant_key?: string; tenant_identifier?: string; tenant_slug?: string; tenant_status?: string; display_name?: string; name?: string; status?: string; lifecycle_status?: string; provisioning_status?: string; plan?: string; plan_name?: string; plan_code?: string; users?: number; seat_usage?: number; seat_cap?: number; attention?: string; region?: string; primary_region?: string; residency_region?: string; environment?: string; environment_type?: string; environment_count?: number; deployment_model?: string; tenant_type?: string; health_status?: string; last_activity?: string; created_at?: string };
+type Props = {
+  securityContext: { display_name: string; active_role: string | null } | null;
+  onNavigate: (view: any) => void;
+  initialSection?: string;
+};
+type Customer = {
+  id?: string;
+  customer_id?: string;
+  tenant_id?: string;
+  tenant_name?: string;
+  tenant_key?: string;
+  tenant_identifier?: string;
+  tenant_slug?: string;
+  tenant_status?: string;
+  display_name?: string;
+  name?: string;
+  status?: string;
+  lifecycle_status?: string;
+  provisioning_status?: string;
+  plan?: string;
+  plan_name?: string;
+  plan_code?: string;
+  users?: number;
+  seat_usage?: number;
+  seat_cap?: number;
+  attention?: string;
+  region?: string;
+  primary_region?: string;
+  residency_region?: string;
+  environment?: string;
+  environment_type?: string;
+  environment_count?: number;
+  deployment_model?: string;
+  tenant_type?: string;
+  health_status?: string;
+  last_activity?: string;
+  created_at?: string;
+};
 
 const nav = [
   ["Overview", LayoutDashboard, "admin"],
@@ -25,28 +73,664 @@ const nav = [
 ] as const;
 
 export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = "Overview" }: Props) {
-  const [customers, setCustomers] = useState<Customer[]>([]); const [health, setHealth] = useState<any>(null); const [mappings, setMappings] = useState<any[]>([]); const [query, setQuery] = useState(""); const [error, setError] = useState(""); const [message, setMessage] = useState(""); const [section, setSection] = useState(initialSection); const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null); const [showCreate, setShowCreate] = useState(false); const [customerForm, setCustomerForm] = useState({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" });
-  useEffect(() => { Promise.all([requestJson<any>("/api/v1/platform-admin/customers"), requestJson<any>("/api/v1/admin/health-summary"), requestJson<any>("/api/v1/admin/configuration/data-mappings")]).then(([c, h, m]) => { setCustomers(Array.isArray(c) ? c : c.items ?? c.customers ?? []); setHealth(h); setMappings(Array.isArray(m) ? m : m.items ?? m.mappings ?? []); }).catch((e) => setError(e instanceof Error ? e.message : "Some platform data is unavailable.")); }, []);
-  const visible = customers.filter((c) => `${c.display_name ?? c.name ?? ""} ${c.status ?? ""}`.toLowerCase().includes(query.toLowerCase()));
-  const needsAttention = visible.filter((c) => c.attention || ["SUSPENDED", "EXPIRED"].includes(String(c.status).toUpperCase()));
-  const activeNav = nav.find(([label]) => label === section); const sectionDescription: Record<string, string> = { Overview: "Manage customers, platform configuration, integrations, access and operational health.", Tenants: "Manage tenant boundaries, environments, status and tenant administration.", Customers: "Review customer status, plans, people, integrations and attention items.", Subscriptions: "Review plan assignments, entitlements, renewals and expiry posture across customers.", Investigations: "Review authorized investigation activity across the MDARIX customer portfolio.", "System Status": "Monitor service availability, connector health, worker queues and platform incidents.", Analytics: "Review platform-wide usage, investigation throughput and customer health trends.", Platform: "Manage reusable plans, mappings, configuration releases and AI assurance.", Operations: "Monitor exceptions, integrations, jobs, notifications and platform health.", Security: "Review access, audit activity, security events, sessions and policies.", Settings: "Manage low-frequency platform settings and notification configuration.", Support: "Review support requests and governed customer assistance workflows.", Documentation: "Open MDARIX platform guidance, operating procedures and release evidence." };
-  const openSection = (label: string) => { setSection(label); setSelectedCustomer(null); setMessage(""); };
-  const createCustomer = async (event: React.FormEvent) => { event.preventDefault(); setMessage(""); try { await requestJson("/api/v1/platform-admin/customers", { method: "POST", body: JSON.stringify(customerForm) }); setMessage("Customer and tenant created successfully."); setCustomerForm({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" }); const refreshed = await requestJson<any>("/api/v1/platform-admin/customers"); setCustomers(Array.isArray(refreshed) ? refreshed : refreshed.items ?? refreshed.customers ?? []); setShowCreate(false); } catch (e) { setMessage(e instanceof Error ? e.message : "Customer creation failed."); } };
-  return <main className="calm-admin-shell">
-    <header className="calm-admin-header"><div className="calm-brand">MDARIX <span>Administrator Control Plane</span></div><label className="calm-search"><Search size={17}/><input aria-label="Search customers and platform" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search customers, platform, or audit" /></label><div className="calm-user"><Bell size={17}/><span>{securityContext?.display_name ?? "Administrator"}</span><small>{securityContext?.active_role ?? "Platform Administrator"}</small></div></header>
-    <div className="calm-admin-body"><aside className="calm-nav" aria-label="Administrator navigation"><p className="calm-nav-label">Administrator control plane</p>{nav.map(([label, Icon]) => <button key={label} className={label === section ? "selected" : ""} aria-current={label === section ? "page" : undefined} onClick={() => openSection(label)}><Icon size={17}/><span>{label}</span><ChevronRight size={15}/></button>)}</aside>
-      <section className="calm-workspace"><div className="calm-heading"><div><p className="eyebrow">Administrator control plane · {activeNav?.[0]}</p><h1>{section === "Overview" ? "Administrator Control Plane" : section}</h1><p>{sectionDescription[section]}</p></div><span className="calm-health"><ShieldCheck size={18}/> {health?.status ?? "Local MVP"}</span></div>
-        {error && <div className="calm-alert" role="status"><AlertTriangle size={18}/> {error}</div>}
-        {message && <div className="calm-success" role="status">{message}</div>}
-        {section === "Customers" && !selectedCustomer && <section className="calm-panel calm-full-panel"><div className="calm-panel-title"><div><p className="eyebrow">Customer directory · list view</p><h2>Customers</h2><p>Search, review status and open a customer workspace.</p></div><button className="calm-primary" onClick={() => setShowCreate(true)}>+ Create customer / tenant</button></div><div className="salesforce-toolbar"><span>{visible.length} customers</span><button onClick={() => setQuery("")}>Clear filters</button></div><div className="salesforce-table"><div className="salesforce-head"><span>Customer</span><span>Status</span><span>Plan</span><span>Users</span><span>Attention</span><span>Action</span></div>{visible.map((c, i) => <button className="salesforce-row" key={c.id ?? c.customer_id ?? i} onClick={() => setSelectedCustomer(c)}><strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong><span className="status-pill">{c.status ?? "Unknown"}</span><span>{c.plan ?? "Not assigned"}</span><span>{c.users ?? "—"}</span><span>{c.attention ?? "—"}</span><b>Open ›</b></button>)}{!visible.length && <div className="calm-empty"><strong>No customers found</strong><span>Try another search or create a customer/tenant.</span></div>}</div></section>}
-        {section === "Customers" && selectedCustomer && <section className="calm-panel calm-full-panel"><button className="calm-back" onClick={() => setSelectedCustomer(null)}>← Back to Customers</button><div className="customer-record-heading"><div><p className="eyebrow">Customer 360</p><h2>{selectedCustomer.display_name ?? selectedCustomer.name ?? "Customer"}</h2><span>{selectedCustomer.status ?? "Status unavailable"} · {selectedCustomer.plan ?? "Plan not assigned"}</span></div><button className="calm-primary" onClick={() => setMessage("Customer management actions are available through the governed record workflow.")}>Manage</button></div><div className="record-tabs"><button className="active">Overview</button><button>People & Access</button><button>Products & Data</button><button>Integrations</button><button>Subscription</button><button>Activity</button></div><div className="customer-record-grid"><article><small>Users</small><strong>{selectedCustomer.users ?? "—"}</strong><span>Current usage</span></article><article><small>Integrations</small><strong>—</strong><span>Health data unavailable</span></article><article><small>License</small><strong>{selectedCustomer.plan ?? "—"}</strong><span>Commercial plan</span></article><article><small>Customer ID</small><strong>{selectedCustomer.customer_id ?? selectedCustomer.id ?? "—"}</strong><span>Immutable identifier</span></article></div></section>}
-        {section === "Tenants" && !selectedCustomer && <section className="calm-panel calm-full-panel tenant-directory"><div className="calm-panel-title"><div><p className="eyebrow">Tenant directory · list view</p><h2>Tenants</h2><p>All tenant identity, lifecycle, deployment, capacity and health fields.</p></div><button className="calm-primary" onClick={() => setShowCreate(true)}>+ New tenant</button></div><div className="salesforce-toolbar"><span>{visible.length} tenants</span><button onClick={() => setQuery("")}>Clear filters</button></div><div className="salesforce-table tenant-table"><div className="salesforce-head"><span>Tenant / identifier</span><span>Customer</span><span>Lifecycle</span><span>Provisioning</span><span>Type / deployment</span><span>Region / residency</span><span>Environments</span><span>Users / seats</span><span>Plan</span><span>Health</span><span>Last activity</span><span>Created</span><span>Actions</span></div>{visible.map((c, i) => <div className="salesforce-row tenant-row" key={c.id ?? c.tenant_id ?? i}><button className="tenant-link" onClick={() => setSelectedCustomer(c)}><strong>{c.tenant_name ?? c.display_name ?? c.name ?? "Unnamed tenant"}</strong><small>{c.tenant_identifier ?? c.tenant_key ?? c.tenant_id ?? "Identifier unavailable"}</small><small>{c.tenant_slug ? `/${c.tenant_slug}` : "Slug unavailable"}</small></button><span>{c.customer_id ?? "—"}</span><span className="status-pill">{c.lifecycle_status ?? c.tenant_status ?? c.status ?? "Unknown"}</span><span>{c.provisioning_status ?? "Unknown"}</span><span>{c.tenant_type ?? "STANDARD"}<small>{c.deployment_model ?? "SHARED"}</small></span><span>{c.primary_region ?? c.region ?? "—"}<small>{c.residency_region ?? "Residency unavailable"}</small></span><span>{c.environment_count ?? c.environment ?? "—"}</span><span>{c.seat_usage ?? c.users ?? "—"} / {c.seat_cap ?? "—"}</span><span>{c.plan_name ?? c.plan_code ?? c.plan ?? "Not assigned"}</span><span className="status-pill">{c.health_status ?? "Unknown"}</span><span>{c.last_activity ? new Date(c.last_activity).toLocaleString() : "—"}</span><span>{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</span><span className="tenant-actions"><button onClick={() => setSelectedCustomer(c)}>Open</button><button onClick={() => setMessage("Tenant edit workflow opened from the governed Tenant 360 action bar.")}>Edit</button><button onClick={() => setMessage("Lifecycle confirmation required before changing tenant status.")}>Suspend</button><button onClick={() => setMessage("Lifecycle confirmation required before reactivating a tenant.")}>Reactivate</button><button onClick={() => setMessage("Archive requires confirmation and optimistic-lock validation.")}>Archive</button></span></div>)}{!visible.length && <div className="calm-empty"><strong>No tenants found</strong><span>Create a tenant or adjust your search.</span></div>}</div></section>}
-        {section === "Tenants" && selectedCustomer && <section className="calm-panel calm-full-panel"><button className="calm-back" onClick={() => setSelectedCustomer(null)}>← Back to Tenants</button><div className="customer-record-heading"><div><p className="eyebrow">Tenant 360</p><h2>{selectedCustomer.tenant_name ?? selectedCustomer.tenant_key ?? selectedCustomer.display_name ?? selectedCustomer.name ?? "Tenant"}</h2><span>{selectedCustomer.tenant_status ?? selectedCustomer.status ?? "Status unavailable"} · {selectedCustomer.region ?? selectedCustomer.residency_region ?? "Region not assigned"}</span></div><button className="calm-primary" onClick={() => setMessage("Tenant management actions are available through the governed lifecycle workflow.")}>Manage tenant</button></div><div className="record-tabs"><button className="active">Overview</button><button>Environments</button><button>Security</button><button>Integrations</button><button>Audit</button></div><div className="customer-record-grid"><article><small>Tenant ID</small><strong>{selectedCustomer.tenant_id ?? selectedCustomer.id ?? "—"}</strong><span>Immutable identifier</span></article><article><small>Status</small><strong>{selectedCustomer.tenant_status ?? selectedCustomer.status ?? "—"}</strong><span>Lifecycle status</span></article><article><small>Region</small><strong>{selectedCustomer.region ?? selectedCustomer.residency_region ?? "—"}</strong><span>Data residency</span></article><article><small>Users</small><strong>{selectedCustomer.users ?? "—"}</strong><span>Tenant users</span></article></div></section>}
-        {section === "Platform" && <section className="calm-panel calm-full-panel"><div className="calm-panel-title"><div><p className="eyebrow">Customer application integration</p><h2>Data Mapping</h2><p>Map customer application fields to the MDARIX canonical data model.</p></div><button className="calm-primary" onClick={() => setMessage("Mapping editor ready. Select a customer integration to add or edit field mappings.")}>+ New mapping</button></div><div className="mapping-sheet"><div className="mapping-sheet-head"><span>Customer field</span><span>Source application</span><span>MDARIX field</span><span>Status</span></div>{mappings.slice(0, 12).map((row, i) => <div className="mapping-sheet-row" key={row.id ?? i}><span>{row.source_field ?? row.field_name ?? row.source_object ?? "Source field"}</span><span>{row.source_system ?? row.application ?? "Customer application"}</span><span>{row.target_field ?? row.target_entity ?? "MDARIX canonical field"}</span><em>{row.status ?? "DRAFT"}</em></div>)}{!mappings.length && <div className="calm-empty"><strong>No mappings configured yet</strong><span>Create a mapping to connect customer application fields with MDARIX.</span></div>}</div></section>}
-        {section === "Overview" && <div className="calm-cards"><article><Building2/><strong>{customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length || customers.length}</strong><span>Active customers</span></article><article><AlertTriangle/><strong>{needsAttention.length}</strong><span>At risk / attention</span></article><article><Activity/><strong>{health?.metrics?.healthy ?? health?.healthy ?? "—"}</strong><span>System health</span></article><article><LifeBuoy/><strong>{health?.metrics?.uptime ?? "—"}</strong><span>Uptime · not configured</span></article></div>}
-        {section === "Overview" && <div className="calm-dashboard-grid"><section className="calm-panel"><div className="calm-panel-title"><div><p className="eyebrow">Platform activity</p><h2>Recent customer activity</h2></div><button onClick={() => openSection("Customers")}>View all customers <ChevronRight size={15}/></button></div><div className="calm-table-head"><span>Customer</span><span>Status</span><span>Plan</span><span>Users</span></div>{visible.slice(0, 10).map((c, i) => <div className="calm-table-row" key={c.id ?? c.customer_id ?? i}><strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong><span>{c.status ?? "Unknown"}</span><span>{c.plan ?? "Not assigned"}</span><span>{c.users ?? "—"}</span></div>)}{!visible.length && <div className="calm-empty"><strong>No customer activity available</strong><span>Customer activity will appear when records are available.</span></div>}<div className="calm-trend"><div><p className="eyebrow">Revenue trend</p><h2>Not configured</h2><span>Revenue and MRR are not exposed by the current MVP platform APIs.</span></div><div className="calm-trend-line" aria-label="Revenue trend unavailable"><i/><i/><i/><i/><i/></div></div></section><aside className="calm-dashboard-side"><section className="calm-panel"><div className="calm-panel-title"><div><p className="eyebrow">Customer health</p><h2>Portfolio status</h2></div></div><div className="health-line"><span>Active</span><strong>{customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length || customers.length}</strong></div><div className="health-line"><span>Trial</span><strong>{customers.filter((c) => String(c.status ?? "").toUpperCase() === "TRIAL").length}</strong></div><div className="health-line"><span>Suspended / expired</span><strong>{customers.filter((c) => ["SUSPENDED", "EXPIRED"].includes(String(c.status ?? "").toUpperCase())).length}</strong></div></section><section className="calm-panel"><div className="calm-panel-title"><div><p className="eyebrow">Quick actions</p><h2>Get things done</h2></div></div><button className="calm-action" onClick={() => { setShowCreate(true); openSection("Customers"); }}>+ Create customer / tenant</button><button className="calm-action" onClick={() => openSection("Operations")}>View system alerts</button><button className="calm-action" onClick={() => openSection("Platform")}>Open data mapping</button></section></aside></div>}
-        {section === "Overview" && <div className="calm-grid"><section className="calm-panel"><div className="calm-panel-title"><div><p className="eyebrow">Requires attention</p><h2>What needs action</h2></div><button onClick={() => openSection("Operations")}>View operations <ChevronRight size={15}/></button></div>{needsAttention.length ? needsAttention.slice(0, 4).map((c, i) => <div className="calm-attention" key={c.id ?? c.customer_id ?? i}><AlertTriangle size={17}/><div><strong>{c.attention ?? `${c.display_name ?? c.name ?? "Customer"} requires review`}</strong><span>{c.display_name ?? c.name ?? "Customer"} · {c.status ?? "Needs attention"}</span></div><ChevronRight size={16}/></div>) : <div className="calm-empty"><strong>No urgent platform issues</strong><span>Healthy systems remain quiet. Exceptions will appear here.</span></div>}</section>
-          <section className="calm-panel"><div className="calm-panel-title"><div><p className="eyebrow">Customers</p><h2>Customer directory</h2></div><button onClick={() => openSection("Customers")}>Open customers <ChevronRight size={15}/></button></div><div className="calm-list">{visible.slice(0, 5).map((c, i) => <button key={c.id ?? c.customer_id ?? i} onClick={() => openSection("Customers")}><span><strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong><small>{c.plan ?? "Plan not assigned"}</small></span><em>{c.status ?? "Unknown"}</em></button>)}{!visible.length && <div className="calm-empty"><strong>No customers found</strong><span>Try a different search.</span></div>}</div></section></div>}
-        {showCreate && <div className="calm-modal-backdrop" role="presentation"><form className="calm-modal" onSubmit={createCustomer}><p className="eyebrow">Customer and tenant lifecycle</p><h2>Create customer / tenant</h2><label>Customer name<input required value={customerForm.company_name} onChange={(e) => setCustomerForm({ ...customerForm, company_name: e.target.value })} /></label><label>Tenant code<input required value={customerForm.tenant_code} onChange={(e) => setCustomerForm({ ...customerForm, tenant_code: e.target.value })} placeholder="TENANT_C" /></label><label>Plan<select value={customerForm.plan_code} onChange={(e) => setCustomerForm({ ...customerForm, plan_code: e.target.value })}><option>ENTERPRISE_TEST</option><option>STARTER</option><option>PROFESSIONAL</option></select></label><div className="calm-modal-actions"><button type="button" onClick={() => setShowCreate(false)}>Cancel</button><button className="calm-primary" type="submit">Create customer</button></div></form></div>}
-      </section></div></main>;
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [health, setHealth] = useState<any>(null);
+  const [mappings, setMappings] = useState<any[]>([]);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [section, setSection] = useState(initialSection);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" });
+  useEffect(() => {
+    Promise.all([
+      requestJson<any>("/api/v1/platform-admin/customers"),
+      requestJson<any>("/api/v1/admin/health-summary"),
+      requestJson<any>("/api/v1/admin/configuration/data-mappings"),
+    ])
+      .then(([c, h, m]) => {
+        setCustomers(Array.isArray(c) ? c : (c.items ?? c.customers ?? []));
+        setHealth(h);
+        setMappings(Array.isArray(m) ? m : (m.items ?? m.mappings ?? []));
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Some platform data is unavailable."));
+  }, []);
+  const visible = customers.filter((c) =>
+    `${c.display_name ?? c.name ?? ""} ${c.status ?? ""}`.toLowerCase().includes(query.toLowerCase()),
+  );
+  const needsAttention = visible.filter(
+    (c) => c.attention || ["SUSPENDED", "EXPIRED"].includes(String(c.status).toUpperCase()),
+  );
+  const activeNav = nav.find(([label]) => label === section);
+  const sectionDescription: Record<string, string> = {
+    Overview: "Manage customers, platform configuration, integrations, access and operational health.",
+    Tenants: "Manage tenant boundaries, environments, status and tenant administration.",
+    Customers: "Review customer status, plans, people, integrations and attention items.",
+    Subscriptions: "Review plan assignments, entitlements, renewals and expiry posture across customers.",
+    Investigations: "Review authorized investigation activity across the MDARIX customer portfolio.",
+    "System Status": "Monitor service availability, connector health, worker queues and platform incidents.",
+    Analytics: "Review platform-wide usage, investigation throughput and customer health trends.",
+    Platform: "Manage reusable plans, mappings, configuration releases and AI assurance.",
+    Operations: "Monitor exceptions, integrations, jobs, notifications and platform health.",
+    Security: "Review access, audit activity, security events, sessions and policies.",
+    Settings: "Manage low-frequency platform settings and notification configuration.",
+    Support: "Review support requests and governed customer assistance workflows.",
+    Documentation: "Open MDARIX platform guidance, operating procedures and release evidence.",
+  };
+  const openSection = (label: string) => {
+    setSection(label);
+    setSelectedCustomer(null);
+    setMessage("");
+  };
+  const createCustomer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage("");
+    try {
+      await requestJson("/api/v1/platform-admin/customers", { method: "POST", body: JSON.stringify(customerForm) });
+      setMessage("Customer and tenant created successfully.");
+      setCustomerForm({ company_name: "", tenant_code: "", plan_code: "ENTERPRISE_TEST" });
+      const refreshed = await requestJson<any>("/api/v1/platform-admin/customers");
+      setCustomers(Array.isArray(refreshed) ? refreshed : (refreshed.items ?? refreshed.customers ?? []));
+      setShowCreate(false);
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Customer creation failed.");
+    }
+  };
+  return (
+    <main className="calm-admin-shell">
+      <header className="calm-admin-header">
+        <div className="calm-brand">
+          MDARIX <span>Administrator Control Plane</span>
+        </div>
+        <label className="calm-search">
+          <Search size={17} />
+          <input
+            aria-label="Search customers and platform"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search customers, platform, or audit"
+          />
+        </label>
+        <div className="calm-user">
+          <Bell size={17} />
+          <span>{securityContext?.display_name ?? "Administrator"}</span>
+          <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
+        </div>
+      </header>
+      <div className="calm-admin-body">
+        <aside className="calm-nav" aria-label="Administrator navigation">
+          <p className="calm-nav-label">Administrator control plane</p>
+          {nav.map(([label, Icon]) => (
+            <button
+              key={label}
+              className={label === section ? "selected" : ""}
+              aria-current={label === section ? "page" : undefined}
+              onClick={() => openSection(label)}
+            >
+              <Icon size={17} />
+              <span>{label}</span>
+              <ChevronRight size={15} />
+            </button>
+          ))}
+        </aside>
+        <section className="calm-workspace">
+          <div className="calm-heading">
+            <div>
+              <p className="eyebrow">Administrator control plane · {activeNav?.[0]}</p>
+              <h1>{section === "Overview" ? "Administrator Control Plane" : section}</h1>
+              <p>{sectionDescription[section]}</p>
+            </div>
+            <span className="calm-health">
+              <ShieldCheck size={18} /> {health?.status ?? "Local MVP"}
+            </span>
+          </div>
+          {error && (
+            <div className="calm-alert" role="status">
+              <AlertTriangle size={18} /> {error}
+            </div>
+          )}
+          {message && (
+            <div className="calm-success" role="status">
+              {message}
+            </div>
+          )}
+          {section === "Customers" && !selectedCustomer && (
+            <section className="calm-panel calm-full-panel">
+              <div className="calm-panel-title">
+                <div>
+                  <p className="eyebrow">Customer directory · list view</p>
+                  <h2>Customers</h2>
+                  <p>Search, review status and open a customer workspace.</p>
+                </div>
+                <button className="calm-primary" onClick={() => setShowCreate(true)}>
+                  + Create customer / tenant
+                </button>
+              </div>
+              <div className="salesforce-toolbar">
+                <span>{visible.length} customers</span>
+                <button onClick={() => setQuery("")}>Clear filters</button>
+              </div>
+              <div className="salesforce-table">
+                <div className="salesforce-head">
+                  <span>Customer</span>
+                  <span>Status</span>
+                  <span>Plan</span>
+                  <span>Users</span>
+                  <span>Attention</span>
+                  <span>Action</span>
+                </div>
+                {visible.map((c, i) => (
+                  <button
+                    className="salesforce-row"
+                    key={c.id ?? c.customer_id ?? i}
+                    onClick={() => setSelectedCustomer(c)}
+                  >
+                    <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
+                    <span className="status-pill">{c.status ?? "Unknown"}</span>
+                    <span>{c.plan ?? "Not assigned"}</span>
+                    <span>{c.users ?? "—"}</span>
+                    <span>{c.attention ?? "—"}</span>
+                    <b>Open ›</b>
+                  </button>
+                ))}
+                {!visible.length && (
+                  <div className="calm-empty">
+                    <strong>No customers found</strong>
+                    <span>Try another search or create a customer/tenant.</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          {section === "Customers" && selectedCustomer && (
+            <section className="calm-panel calm-full-panel">
+              <button className="calm-back" onClick={() => setSelectedCustomer(null)}>
+                ← Back to Customers
+              </button>
+              <div className="customer-record-heading">
+                <div>
+                  <p className="eyebrow">Customer 360</p>
+                  <h2>{selectedCustomer.display_name ?? selectedCustomer.name ?? "Customer"}</h2>
+                  <span>
+                    {selectedCustomer.status ?? "Status unavailable"} · {selectedCustomer.plan ?? "Plan not assigned"}
+                  </span>
+                </div>
+                <button
+                  className="calm-primary"
+                  onClick={() =>
+                    setMessage("Customer management actions are available through the governed record workflow.")
+                  }
+                >
+                  Manage
+                </button>
+              </div>
+              <div className="record-tabs">
+                <button className="active">Overview</button>
+                <button>People & Access</button>
+                <button>Products & Data</button>
+                <button>Integrations</button>
+                <button>Subscription</button>
+                <button>Activity</button>
+              </div>
+              <div className="customer-record-grid">
+                <article>
+                  <small>Users</small>
+                  <strong>{selectedCustomer.users ?? "—"}</strong>
+                  <span>Current usage</span>
+                </article>
+                <article>
+                  <small>Integrations</small>
+                  <strong>—</strong>
+                  <span>Health data unavailable</span>
+                </article>
+                <article>
+                  <small>License</small>
+                  <strong>{selectedCustomer.plan ?? "—"}</strong>
+                  <span>Commercial plan</span>
+                </article>
+                <article>
+                  <small>Customer ID</small>
+                  <strong>{selectedCustomer.customer_id ?? selectedCustomer.id ?? "—"}</strong>
+                  <span>Immutable identifier</span>
+                </article>
+              </div>
+            </section>
+          )}
+          {section === "Tenants" && !selectedCustomer && (
+            <section className="calm-panel calm-full-panel tenant-directory">
+              <div className="calm-panel-title">
+                <div>
+                  <p className="eyebrow">Tenant directory · list view</p>
+                  <h2>Tenants</h2>
+                  <p>All tenant identity, lifecycle, deployment, capacity and health fields.</p>
+                </div>
+                <button className="calm-primary" onClick={() => setShowCreate(true)}>
+                  + New tenant
+                </button>
+              </div>
+              <div className="salesforce-toolbar">
+                <span>{visible.length} tenants</span>
+                <button onClick={() => setQuery("")}>Clear filters</button>
+              </div>
+              <div className="salesforce-table tenant-table">
+                <div className="salesforce-head">
+                  <span>Tenant / identifier</span>
+                  <span>Customer</span>
+                  <span>Lifecycle</span>
+                  <span>Provisioning</span>
+                  <span>Type / deployment</span>
+                  <span>Region / residency</span>
+                  <span>Environments</span>
+                  <span>Users / seats</span>
+                  <span>Plan</span>
+                  <span>Health</span>
+                  <span>Last activity</span>
+                  <span>Created</span>
+                  <span>Actions</span>
+                </div>
+                {visible.map((c, i) => (
+                  <div className="salesforce-row tenant-row" key={c.id ?? c.tenant_id ?? i}>
+                    <button className="tenant-link" onClick={() => setSelectedCustomer(c)}>
+                      <strong>{c.tenant_name ?? c.display_name ?? c.name ?? "Unnamed tenant"}</strong>
+                      <small>{c.tenant_identifier ?? c.tenant_key ?? c.tenant_id ?? "Identifier unavailable"}</small>
+                      <small>{c.tenant_slug ? `/${c.tenant_slug}` : "Slug unavailable"}</small>
+                    </button>
+                    <span>{c.customer_id ?? "—"}</span>
+                    <span className="status-pill">
+                      {c.lifecycle_status ?? c.tenant_status ?? c.status ?? "Unknown"}
+                    </span>
+                    <span>{c.provisioning_status ?? "Unknown"}</span>
+                    <span>
+                      {c.tenant_type ?? "STANDARD"}
+                      <small>{c.deployment_model ?? "SHARED"}</small>
+                    </span>
+                    <span>
+                      {c.primary_region ?? c.region ?? "—"}
+                      <small>{c.residency_region ?? "Residency unavailable"}</small>
+                    </span>
+                    <span>{c.environment_count ?? c.environment ?? "—"}</span>
+                    <span>
+                      {c.seat_usage ?? c.users ?? "—"} / {c.seat_cap ?? "—"}
+                    </span>
+                    <span>{c.plan_name ?? c.plan_code ?? c.plan ?? "Not assigned"}</span>
+                    <span className="status-pill">{c.health_status ?? "Unknown"}</span>
+                    <span>{c.last_activity ? new Date(c.last_activity).toLocaleString() : "—"}</span>
+                    <span>{c.created_at ? new Date(c.created_at).toLocaleDateString() : "—"}</span>
+                    <span className="tenant-actions">
+                      <button onClick={() => setSelectedCustomer(c)}>Open</button>
+                      <button
+                        onClick={() =>
+                          setMessage("Tenant edit workflow opened from the governed Tenant 360 action bar.")
+                        }
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setMessage("Lifecycle confirmation required before changing tenant status.")}
+                      >
+                        Suspend
+                      </button>
+                      <button
+                        onClick={() => setMessage("Lifecycle confirmation required before reactivating a tenant.")}
+                      >
+                        Reactivate
+                      </button>
+                      <button
+                        onClick={() => setMessage("Archive requires confirmation and optimistic-lock validation.")}
+                      >
+                        Archive
+                      </button>
+                    </span>
+                  </div>
+                ))}
+                {!visible.length && (
+                  <div className="calm-empty">
+                    <strong>No tenants found</strong>
+                    <span>Create a tenant or adjust your search.</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          {section === "Tenants" && selectedCustomer && (
+            <section className="calm-panel calm-full-panel">
+              <button className="calm-back" onClick={() => setSelectedCustomer(null)}>
+                ← Back to Tenants
+              </button>
+              <div className="customer-record-heading">
+                <div>
+                  <p className="eyebrow">Tenant 360</p>
+                  <h2>
+                    {selectedCustomer.tenant_name ??
+                      selectedCustomer.tenant_key ??
+                      selectedCustomer.display_name ??
+                      selectedCustomer.name ??
+                      "Tenant"}
+                  </h2>
+                  <span>
+                    {selectedCustomer.tenant_status ?? selectedCustomer.status ?? "Status unavailable"} ·{" "}
+                    {selectedCustomer.region ?? selectedCustomer.residency_region ?? "Region not assigned"}
+                  </span>
+                </div>
+                <button
+                  className="calm-primary"
+                  onClick={() =>
+                    setMessage("Tenant management actions are available through the governed lifecycle workflow.")
+                  }
+                >
+                  Manage tenant
+                </button>
+              </div>
+              <div className="record-tabs">
+                <button className="active">Overview</button>
+                <button>Environments</button>
+                <button>Security</button>
+                <button>Integrations</button>
+                <button>Audit</button>
+              </div>
+              <div className="customer-record-grid">
+                <article>
+                  <small>Tenant ID</small>
+                  <strong>{selectedCustomer.tenant_id ?? selectedCustomer.id ?? "—"}</strong>
+                  <span>Immutable identifier</span>
+                </article>
+                <article>
+                  <small>Status</small>
+                  <strong>{selectedCustomer.tenant_status ?? selectedCustomer.status ?? "—"}</strong>
+                  <span>Lifecycle status</span>
+                </article>
+                <article>
+                  <small>Region</small>
+                  <strong>{selectedCustomer.region ?? selectedCustomer.residency_region ?? "—"}</strong>
+                  <span>Data residency</span>
+                </article>
+                <article>
+                  <small>Users</small>
+                  <strong>{selectedCustomer.users ?? "—"}</strong>
+                  <span>Tenant users</span>
+                </article>
+              </div>
+            </section>
+          )}
+          {section === "Platform" && (
+            <section className="calm-panel calm-full-panel">
+              <div className="calm-panel-title">
+                <div>
+                  <p className="eyebrow">Customer application integration</p>
+                  <h2>Data Mapping</h2>
+                  <p>Map customer application fields to the MDARIX canonical data model.</p>
+                </div>
+                <button
+                  className="calm-primary"
+                  onClick={() =>
+                    setMessage("Mapping editor ready. Select a customer integration to add or edit field mappings.")
+                  }
+                >
+                  + New mapping
+                </button>
+              </div>
+              <div className="mapping-sheet">
+                <div className="mapping-sheet-head">
+                  <span>Customer field</span>
+                  <span>Source application</span>
+                  <span>MDARIX field</span>
+                  <span>Status</span>
+                </div>
+                {mappings.slice(0, 12).map((row, i) => (
+                  <div className="mapping-sheet-row" key={row.id ?? i}>
+                    <span>{row.source_field ?? row.field_name ?? row.source_object ?? "Source field"}</span>
+                    <span>{row.source_system ?? row.application ?? "Customer application"}</span>
+                    <span>{row.target_field ?? row.target_entity ?? "MDARIX canonical field"}</span>
+                    <em>{row.status ?? "DRAFT"}</em>
+                  </div>
+                ))}
+                {!mappings.length && (
+                  <div className="calm-empty">
+                    <strong>No mappings configured yet</strong>
+                    <span>Create a mapping to connect customer application fields with MDARIX.</span>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+          {section === "Overview" && (
+            <div className="calm-cards">
+              <article>
+                <Building2 />
+                <strong>
+                  {customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length ||
+                    customers.length}
+                </strong>
+                <span>Active customers</span>
+              </article>
+              <article>
+                <AlertTriangle />
+                <strong>{needsAttention.length}</strong>
+                <span>At risk / attention</span>
+              </article>
+              <article>
+                <Activity />
+                <strong>{health?.metrics?.healthy ?? health?.healthy ?? "—"}</strong>
+                <span>System health</span>
+              </article>
+              <article>
+                <LifeBuoy />
+                <strong>{health?.metrics?.uptime ?? "—"}</strong>
+                <span>Uptime · not configured</span>
+              </article>
+            </div>
+          )}
+          {section === "Overview" && (
+            <div className="calm-dashboard-grid">
+              <section className="calm-panel">
+                <div className="calm-panel-title">
+                  <div>
+                    <p className="eyebrow">Platform activity</p>
+                    <h2>Recent customer activity</h2>
+                  </div>
+                  <button onClick={() => openSection("Customers")}>
+                    View all customers <ChevronRight size={15} />
+                  </button>
+                </div>
+                <div className="calm-table-head">
+                  <span>Customer</span>
+                  <span>Status</span>
+                  <span>Plan</span>
+                  <span>Users</span>
+                </div>
+                {visible.slice(0, 10).map((c, i) => (
+                  <div className="calm-table-row" key={c.id ?? c.customer_id ?? i}>
+                    <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
+                    <span>{c.status ?? "Unknown"}</span>
+                    <span>{c.plan ?? "Not assigned"}</span>
+                    <span>{c.users ?? "—"}</span>
+                  </div>
+                ))}
+                {!visible.length && (
+                  <div className="calm-empty">
+                    <strong>No customer activity available</strong>
+                    <span>Customer activity will appear when records are available.</span>
+                  </div>
+                )}
+                <div className="calm-trend">
+                  <div>
+                    <p className="eyebrow">Revenue trend</p>
+                    <h2>Not configured</h2>
+                    <span>Revenue and MRR are not exposed by the current MVP platform APIs.</span>
+                  </div>
+                  <div className="calm-trend-line" aria-label="Revenue trend unavailable">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </div>
+              </section>
+              <aside className="calm-dashboard-side">
+                <section className="calm-panel">
+                  <div className="calm-panel-title">
+                    <div>
+                      <p className="eyebrow">Customer health</p>
+                      <h2>Portfolio status</h2>
+                    </div>
+                  </div>
+                  <div className="health-line">
+                    <span>Active</span>
+                    <strong>
+                      {customers.filter((c) => String(c.status ?? "").toUpperCase() === "ACTIVE").length ||
+                        customers.length}
+                    </strong>
+                  </div>
+                  <div className="health-line">
+                    <span>Trial</span>
+                    <strong>{customers.filter((c) => String(c.status ?? "").toUpperCase() === "TRIAL").length}</strong>
+                  </div>
+                  <div className="health-line">
+                    <span>Suspended / expired</span>
+                    <strong>
+                      {
+                        customers.filter((c) => ["SUSPENDED", "EXPIRED"].includes(String(c.status ?? "").toUpperCase()))
+                          .length
+                      }
+                    </strong>
+                  </div>
+                </section>
+                <section className="calm-panel">
+                  <div className="calm-panel-title">
+                    <div>
+                      <p className="eyebrow">Quick actions</p>
+                      <h2>Get things done</h2>
+                    </div>
+                  </div>
+                  <button
+                    className="calm-action"
+                    onClick={() => {
+                      setShowCreate(true);
+                      openSection("Customers");
+                    }}
+                  >
+                    + Create customer / tenant
+                  </button>
+                  <button className="calm-action" onClick={() => openSection("Operations")}>
+                    View system alerts
+                  </button>
+                  <button className="calm-action" onClick={() => openSection("Platform")}>
+                    Open data mapping
+                  </button>
+                </section>
+              </aside>
+            </div>
+          )}
+          {section === "Overview" && (
+            <div className="calm-grid">
+              <section className="calm-panel">
+                <div className="calm-panel-title">
+                  <div>
+                    <p className="eyebrow">Requires attention</p>
+                    <h2>What needs action</h2>
+                  </div>
+                  <button onClick={() => openSection("Operations")}>
+                    View operations <ChevronRight size={15} />
+                  </button>
+                </div>
+                {needsAttention.length ? (
+                  needsAttention.slice(0, 4).map((c, i) => (
+                    <div className="calm-attention" key={c.id ?? c.customer_id ?? i}>
+                      <AlertTriangle size={17} />
+                      <div>
+                        <strong>{c.attention ?? `${c.display_name ?? c.name ?? "Customer"} requires review`}</strong>
+                        <span>
+                          {c.display_name ?? c.name ?? "Customer"} · {c.status ?? "Needs attention"}
+                        </span>
+                      </div>
+                      <ChevronRight size={16} />
+                    </div>
+                  ))
+                ) : (
+                  <div className="calm-empty">
+                    <strong>No urgent platform issues</strong>
+                    <span>Healthy systems remain quiet. Exceptions will appear here.</span>
+                  </div>
+                )}
+              </section>
+              <section className="calm-panel">
+                <div className="calm-panel-title">
+                  <div>
+                    <p className="eyebrow">Customers</p>
+                    <h2>Customer directory</h2>
+                  </div>
+                  <button onClick={() => openSection("Customers")}>
+                    Open customers <ChevronRight size={15} />
+                  </button>
+                </div>
+                <div className="calm-list">
+                  {visible.slice(0, 5).map((c, i) => (
+                    <button key={c.id ?? c.customer_id ?? i} onClick={() => openSection("Customers")}>
+                      <span>
+                        <strong>{c.display_name ?? c.name ?? "Unnamed customer"}</strong>
+                        <small>{c.plan ?? "Plan not assigned"}</small>
+                      </span>
+                      <em>{c.status ?? "Unknown"}</em>
+                    </button>
+                  ))}
+                  {!visible.length && (
+                    <div className="calm-empty">
+                      <strong>No customers found</strong>
+                      <span>Try a different search.</span>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+          {showCreate && (
+            <div className="calm-modal-backdrop" role="presentation">
+              <form className="calm-modal" onSubmit={createCustomer}>
+                <p className="eyebrow">Customer and tenant lifecycle</p>
+                <h2>Create customer / tenant</h2>
+                <label>
+                  Customer name
+                  <input
+                    required
+                    value={customerForm.company_name}
+                    onChange={(e) => setCustomerForm({ ...customerForm, company_name: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Tenant code
+                  <input
+                    required
+                    value={customerForm.tenant_code}
+                    onChange={(e) => setCustomerForm({ ...customerForm, tenant_code: e.target.value })}
+                    placeholder="TENANT_C"
+                  />
+                </label>
+                <label>
+                  Plan
+                  <select
+                    value={customerForm.plan_code}
+                    onChange={(e) => setCustomerForm({ ...customerForm, plan_code: e.target.value })}
+                  >
+                    <option>ENTERPRISE_TEST</option>
+                    <option>STARTER</option>
+                    <option>PROFESSIONAL</option>
+                  </select>
+                </label>
+                <div className="calm-modal-actions">
+                  <button type="button" onClick={() => setShowCreate(false)}>
+                    Cancel
+                  </button>
+                  <button className="calm-primary" type="submit">
+                    Create customer
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </section>
+      </div>
+    </main>
+  );
 }

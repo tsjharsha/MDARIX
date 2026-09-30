@@ -22,12 +22,20 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
         credentials: "same-origin",
         ...init,
         signal: controller.signal,
-        headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}), ...init.headers },
+        headers: {
+          Accept: "application/json",
+          ...(init.body ? { "Content-Type": "application/json" } : {}),
+          ...init.headers,
+        },
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         const detail = payload?.detail;
-        throw new ApiError(detail?.message ?? `${response.status} ${response.statusText}`, response.status, detail?.code);
+        throw new ApiError(
+          detail?.message ?? `${response.status} ${response.statusText}`,
+          response.status,
+          detail?.code,
+        );
       }
       return payload as T;
     } catch (error) {

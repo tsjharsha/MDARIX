@@ -12,6 +12,11 @@ routes for those exist and are still asserted below.
 from pathlib import Path
 
 
+def compact(text: str) -> str:
+    """Drop all whitespace so assertions survive formatter line wrapping."""
+    return "".join(text.split())
+
+
 ROOT = Path(__file__).parents[1]
 FRONTEND = ROOT / "frontend" / "src"
 UI = (FRONTEND / "main.tsx").read_text(encoding="utf-8")
@@ -83,7 +88,9 @@ def test_admin_edit_workflow_covers_every_editable_resource():
 
 def test_admin_route_renders_the_simplified_platform_admin_shell():
     assert "<SimplifiedPlatformAdminScreen" in UI
-    assert '["admin", "platform-tenants"].includes(activeView) && <SimplifiedPlatformAdminScreen' in UI
+    assert compact('["admin", "platform-tenants"].includes(activeView) && (<SimplifiedPlatformAdminScreen') in compact(
+        UI
+    )
     assert "Administrator control plane" in SIMPLIFIED_ADMIN_UI
 
 

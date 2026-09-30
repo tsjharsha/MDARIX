@@ -9,7 +9,10 @@ async function signIn(page: any, email: string, password: string) {
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/app/);
   const consent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
-  await consent.waitFor({ state: "visible", timeout: 2000 }).then(() => consent.getByRole("button", { name: /acknowledge/i }).click()).catch(() => undefined);
+  await consent
+    .waitFor({ state: "visible", timeout: 2000 })
+    .then(() => consent.getByRole("button", { name: /acknowledge/i }).click())
+    .catch(() => undefined);
 }
 
 test.describe("MDARIX browser evidence", () => {
@@ -34,13 +37,21 @@ test.describe("MDARIX browser evidence", () => {
     test.setTimeout(90_000);
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
     const consent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
-    if (await consent.isVisible().catch(() => false)) await consent.getByRole("button", { name: /acknowledge/i }).click();
-    for (const [route, name, expected] of [["/app/admin", "admin", /administrator control plane|platform administration|govern the mdarix platform/i], ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i], ["/app/decision", "decision", /decision center|decision readiness/i]] as const) {
+    if (await consent.isVisible().catch(() => false))
+      await consent.getByRole("button", { name: /acknowledge/i }).click();
+    for (const [route, name, expected] of [
+      ["/app/admin", "admin", /administrator control plane|platform administration|govern the mdarix platform/i],
+      ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i],
+      ["/app/decision", "decision", /decision center|decision readiness/i],
+    ] as const) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
       await expect(page.locator("body")).not.toContainText("Loading tenant administration");
       await expect(page.locator("body")).not.toContainText("Administration unavailable");
-      await expect(page.locator("body")).toContainText(/platform administration|govern the mdarix platform|command center/i, { timeout: 20_000 });
+      await expect(page.locator("body")).toContainText(
+        /platform administration|govern the mdarix platform|command center/i,
+        { timeout: 20_000 },
+      );
       await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-admin-${name}.png`, fullPage: true });
     }
   });
@@ -50,7 +61,10 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
     await page.goto("/app/admin");
     const onboardingConsent = page.getByRole("dialog", { name: /privacy and compliance consent/i });
-    await onboardingConsent.waitFor({ state: "visible", timeout: 2000 }).then(() => onboardingConsent.getByRole("button", { name: /acknowledge/i }).click()).catch(() => undefined);
+    await onboardingConsent
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => onboardingConsent.getByRole("button", { name: /acknowledge/i }).click())
+      .catch(() => undefined);
     await expect(page.locator("main.platform-admin-workspace")).toBeVisible();
     await injectAxe(page);
     const axeResults = await page.evaluate(async () => await (window as any).axe.run(document));
@@ -59,7 +73,10 @@ test.describe("MDARIX browser evidence", () => {
       body: JSON.stringify(axeResults, null, 2),
       contentType: "application/json",
     });
-    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-admin-accessibility.png`, fullPage: true });
+    await page.screenshot({
+      path: `artifacts/browser-${testInfo.project.name}-admin-accessibility.png`,
+      fullPage: true,
+    });
   });
 
   test("Platform Admin navigation opens every domain and subsection", async ({ page }) => {
@@ -68,21 +85,40 @@ test.describe("MDARIX browser evidence", () => {
     await page.goto("/app/admin");
     const navigation = page.getByRole("complementary", { name: "Platform administration domains" });
     const domains: Record<string, string[]> = {
-      "Customers & Tenants": ["Customer Directory", "Customer 360", "Tenant Management", "Tenant 360", "Customer Onboarding", "Customer Administrators", "Tenant Health"],
+      "Customers & Tenants": [
+        "Customer Directory",
+        "Customer 360",
+        "Tenant Management",
+        "Tenant 360",
+        "Customer Onboarding",
+        "Customer Administrators",
+        "Tenant Health",
+      ],
       "Plans & Licensing": ["Plans", "Entitlements", "Subscriptions", "Expirations", "Reminder rules"],
       "Identity & Access": ["Platform users", "Platform roles", "Permission sets", "MFA & SSO", "Sessions"],
       "Data & Configuration": ["Master data", "Data mapping", "Mapping versions", "Configuration releases"],
-      "Integrations": ["Connector catalog", "Customer integrations", "Webhooks", "Integration health", "Failures & logs"],
-      "AI Control Center": ["AI overview", "Models & versions", "Agents", "Prompts", "Evaluations", "Guardrails", "AI executions"],
-      "Security": ["Security overview", "Tenant isolation", "Encryption & residency", "Retention", "Access reviews"],
-      "Operations": ["System health", "Jobs & queues", "Storage", "Incidents", "System settings"],
+      Integrations: ["Connector catalog", "Customer integrations", "Webhooks", "Integration health", "Failures & logs"],
+      "AI Control Center": [
+        "AI overview",
+        "Models & versions",
+        "Agents",
+        "Prompts",
+        "Evaluations",
+        "Guardrails",
+        "AI executions",
+      ],
+      Security: ["Security overview", "Tenant isolation", "Encryption & residency", "Retention", "Access reviews"],
+      Operations: ["System health", "Jobs & queues", "Storage", "Incidents", "System settings"],
     };
     for (const [domain, items] of Object.entries(domains)) {
       await navigation.getByRole("button", { name: new RegExp(`^${domain}`) }).click();
       for (const item of items) {
         await navigation.getByRole("button", { name: item, exact: true }).click();
         await expect(page.getByRole("heading", { name: item, exact: true, level: 2 })).toBeVisible();
-        await expect(page.locator("main.platform-admin-workspace")).toHaveAttribute("data-admin-view", `${domain}:${item}`);
+        await expect(page.locator("main.platform-admin-workspace")).toHaveAttribute(
+          "data-admin-view",
+          `${domain}:${item}`,
+        );
       }
     }
   });
@@ -100,7 +136,15 @@ test.describe("MDARIX browser evidence", () => {
       await customerLink.click();
       const detailTabs = page.getByRole("navigation", { name: /customer detail tabs/i });
       await expect(detailTabs).toBeVisible();
-      for (const tab of ["Overview", "Administrators", "Environments", "Subscription", "Integrations", "Security", "Audit"]) {
+      for (const tab of [
+        "Overview",
+        "Administrators",
+        "Environments",
+        "Subscription",
+        "Integrations",
+        "Security",
+        "Audit",
+      ]) {
         const tabButton = detailTabs.getByRole("button", { name: tab, exact: true });
         if (await tabButton.count()) {
           await tabButton.click();
@@ -214,7 +258,9 @@ test.describe("MDARIX browser evidence", () => {
       await expect(page.locator("body")).not.toBeEmpty();
       await expect(page.locator("body")).not.toContainText(/Administration unavailable|blank page/i);
       await expect(page.locator("body")).toContainText(expected, { timeout: 20_000 });
-      const firstControl = page.locator("a:visible,button:visible,input:visible,select:visible,textarea:visible").first();
+      const firstControl = page
+        .locator("a:visible,button:visible,input:visible,select:visible,textarea:visible")
+        .first();
       await expect(firstControl).toBeVisible();
       await firstControl.focus();
       await expect(firstControl).toBeFocused();
@@ -222,12 +268,17 @@ test.describe("MDARIX browser evidence", () => {
     }
   });
 
-  test("authenticated compliance evidence workflow exposes audit, package, signature, and MFA controls", async ({ page }, testInfo) => {
+  test("authenticated compliance evidence workflow exposes audit, package, signature, and MFA controls", async ({
+    page,
+  }, testInfo) => {
     test.setTimeout(90_000);
     await signIn(page, "r1-user-01@synthetic.invalid", "Temp@1234password");
     await page.goto("/app/admin");
     await expect(page.locator("body")).toContainText(/platform administration|control plane/i, { timeout: 20_000 });
-    await page.getByRole("button", { name: /^Customers & tenants$/i }).last().click();
+    await page
+      .getByRole("button", { name: /^Customers & tenants$/i })
+      .last()
+      .click();
     await page.getByText("Tenant Audit", { exact: true }).click();
     await expect(page.getByRole("button", { name: /export csv/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /create evidence package/i })).toBeVisible();
@@ -235,7 +286,10 @@ test.describe("MDARIX browser evidence", () => {
 
     await page.goto("/app/decision");
     await expect(page.locator("body")).toContainText(/decision|signature|review|human/i, { timeout: 20_000 });
-    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-signature.png`, fullPage: true });
+    await page.screenshot({
+      path: `artifacts/browser-${testInfo.project.name}-compliance-signature.png`,
+      fullPage: true,
+    });
 
     await page.goto("/mfa?setup=1");
     await expect(page.locator("body")).toContainText(/MFA|authenticator|identity/i, { timeout: 20_000 });

@@ -1,6 +1,11 @@
 from pathlib import Path
 
 
+def compact(text: str) -> str:
+    """Drop all whitespace so assertions survive formatter line wrapping."""
+    return "".join(text.split())
+
+
 ROOT = Path(__file__).resolve().parents[1]
 SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
 MAIN = (ROOT / "frontend" / "src" / "main.tsx").read_text(encoding="utf-8")
@@ -55,7 +60,7 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 def test_authenticated_home_tells_and_connects_the_workflow_story():
     # The authenticated home is InvestigatorHome (the former inline
     # ApplicationHome in main.tsx was unreferenced and has been removed).
-    assert 'activeView === "home" && <><InvestigatorHome' in MAIN
+    assert compact('activeView === "home" && (<><InvestigatorHome') in compact(MAIN)
     for phrase in (
         "Quality Investigator workspace",
         "Connected investigation story",
