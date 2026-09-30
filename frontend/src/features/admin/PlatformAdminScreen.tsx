@@ -536,7 +536,7 @@ function ControlCenterWorkspace({ domain, item, data, metrics }: { domain: strin
 export function PlatformAdminScreen({ securityContext, onNavigate, initialItem }: PlatformAdminScreenProps) {
   const [data, setData] = useState<AdminData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
-  const [unavailable, setUnavailable] = useState<string[]>([]);
+  const [, setUnavailable] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [activeDomain, setActiveDomain] = useState(initialItem ? "Data & Configuration" : "Platform Overview");
   const [activeItem, setActiveItem] = useState(initialItem ?? "Overview");
