@@ -18,9 +18,10 @@ from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
 from backend.app.runtime_env import is_local
 
-# Free-trial workspaces have no dedicated database: their registry row names this marker, and their business data
-# lives in the control database, keyed and filtered by tenant like every other tenant-owned table there.
-TRIAL_SHARED_DATA_PLANE = "MDARIX_TRIAL_SHARED_CONTROL_PLANE"
+# Workspaces without a dedicated database (free trials, the AcmeCare demo) name this marker in their registry row;
+# their business data lives in the control database, keyed by tenant and isolated by row-level security.
+SHARED_CONTROL_DATA_PLANE = "MDARIX_TRIAL_SHARED_CONTROL_PLANE"
+TRIAL_SHARED_DATA_PLANE = SHARED_CONTROL_DATA_PLANE  # original name, kept for existing imports
 
 
 def _secret_url(secret_ref: str) -> str:

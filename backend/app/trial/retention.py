@@ -138,9 +138,9 @@ def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
     return due
 
 
-def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime | None = None) -> dict:
-    """Delete one closed trial's records, close its accounts and archive it. Commits; returns what was removed."""
-    now = now or datetime.now(timezone.utc)
+def delete_tenant_records(db: Session, tenant_id: uuid.UUID) -> tuple[dict[str, int], list[str]]:
+    """Delete one tenant's business and AI records (not identity, plan or audit). Returns deleted counts per table
+    and any tables whose rows could not be deleted. Does not commit."""
     remaining = _existing_tables(db)
     deleted: dict[str, int] = {}
     # Child tables are listed first; the passes cover any foreign key this ordering misses.
@@ -160,6 +160,13 @@ def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime
             progress = True
         if not remaining or not progress:
             break
+    return deleted, remaining
+
+
+def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime | None = None) -> dict:
+    """Delete one closed trial's records, close its accounts and archive it. Commits; returns what was removed."""
+    now = now or datetime.now(timezone.utc)
+    deleted, remaining = delete_tenant_records(db, tenant_id)
 
     user_ids = [user_id for (user_id,) in db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id)]
     db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).update(
