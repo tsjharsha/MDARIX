@@ -15,6 +15,8 @@ import os
 os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
 # The application fails safe to production when MDARIX_ENV is unset; the suite exercises development behaviour.
 os.environ.setdefault("MDARIX_ENV", "development")
+# Existing retrieval tests pin the word-hash embedding; tests of the local language model choose it explicitly.
+os.environ.setdefault("MDARIX_EMBEDDING_PROVIDER", "deterministic")
 # Tests must not call paid or external services with the developer's .env
 # credentials (Groq, Resend). The deterministic provider path is exercised
 # instead; individual tests that need provider behaviour set their own env.

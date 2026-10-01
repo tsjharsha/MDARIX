@@ -23,6 +23,14 @@ EMBEDDING_MODEL_VERSION = "1.0"
 EMBEDDING_PIPELINE_VERSION = "R1-Day9"
 RETRIEVAL_CONFIG_VERSION = "R1-Day9"
 
+# The local language model (ONNX on CPU, nothing leaves the server). Rows of both models share the embedding column;
+# each search compares only vectors of the model that made the query vector.
+LOCAL_EMBEDDING_DIMENSION = 384
+LOCAL_EMBEDDING_PROVIDER = "mdarix-local"
+LOCAL_EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
+LOCAL_EMBEDDING_MODEL_VERSION = "fastembed-0.8.1"
+LOCAL_EMBEDDING_PIPELINE_VERSION = "R1-MVP-P3"
+
 
 def now_tz():
     return mapped_column(DateTime(timezone=True), nullable=False, server_default=text("CURRENT_TIMESTAMP"))
@@ -42,7 +50,7 @@ class EvidenceChunkEmbedding(Base):
     embedding_dimension: Mapped[int] = mapped_column(nullable=False)
     pipeline_version: Mapped[str] = mapped_column(String(120), nullable=False)
     distance_metric: Mapped[str] = mapped_column(String(40), nullable=False, server_default="cosine")
-    embedding: Mapped[object | None] = mapped_column(Vector(EMBEDDING_DIMENSION))
+    embedding: Mapped[object | None] = mapped_column(Vector())
     indexing_status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="INDEXED")
     failure_reason: Mapped[str | None] = mapped_column(Text)
     created_at = now_tz()

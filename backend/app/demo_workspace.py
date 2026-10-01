@@ -202,7 +202,11 @@ def reset_demo(db: Session) -> dict:
     spec.loader.exec_module(expansion)
     expansion.run()
     tenant = _tenant(db)
-    _audit(db, tenant.id, "DEMO_WORKSPACE_RESET", {"deleted": deleted}, now)
+    # Make the restored story searchable again (chunks and vectors were cleared with the rest).
+    from retrieval.indexing import index_tenant_evidence
+
+    indexing = index_tenant_evidence(db, tenant.id)["indexing"]
+    _audit(db, tenant.id, "DEMO_WORKSPACE_RESET", {"deleted": deleted, "indexed": indexing["indexed"]}, now)
     db.commit()
     return {"deleted": deleted, **status(db)}
 

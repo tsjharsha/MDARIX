@@ -23,11 +23,12 @@ from backend.app.db.base import Base
 class Vector(UserDefinedType):
     cache_ok = True
 
-    def __init__(self, dimensions: int):
+    def __init__(self, dimensions: int | None = None):
         self.dimensions = dimensions
 
     def get_col_spec(self, **kw: object) -> str:
-        return f"vector({self.dimensions})"
+        # No dimension: the column holds vectors of several embedding models (each row records its model).
+        return "vector" if self.dimensions is None else f"vector({self.dimensions})"
 
 
 def uuid_pk() -> Mapped[uuid.UUID]:

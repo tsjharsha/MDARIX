@@ -9,15 +9,16 @@ from backend.app.db.models.foundation import (
     Evidence,
 )
 from backend.app.db.models.retrieval_intelligence import (
-    EMBEDDING_DIMENSION,
-    EMBEDDING_MODEL,
-    EMBEDDING_MODEL_VERSION,
-    EMBEDDING_PIPELINE_VERSION,
     RETRIEVAL_CONFIG_VERSION,
     EvidenceChunkEmbedding,
     RetrievalQuery,
 )
-from retrieval.embedding_provider import DeterministicEmbeddingProvider, vector_literal
+from retrieval.embedding_provider import (
+    EmbeddingProvider,
+    EmbeddingUnavailable,
+    active_embedding_provider,
+    vector_literal,
+)
 from retrieval.schemas import RetrievalRequest, RetrievalResponse, RetrievalResult
 
 
@@ -26,8 +27,8 @@ class RetrievalError(Exception):
 
 
 class TrustedRetrievalService:
-    def __init__(self, embedding_provider: DeterministicEmbeddingProvider | None = None):
-        self.embedding_provider = embedding_provider or DeterministicEmbeddingProvider()
+    def __init__(self, embedding_provider: EmbeddingProvider | None = None):
+        self.embedding_provider = embedding_provider or active_embedding_provider()
 
     def index_evidence_chunks(self, db: Session, tenant_id: uuid.UUID, reprocess: bool = False) -> dict[str, Any]:
         metadata = self.embedding_provider.model_metadata()
@@ -56,10 +57,10 @@ class TrustedRetrievalService:
                 )
                 .first()
             )
-            if existing and not reprocess:
+            if existing and existing.indexing_status == "INDEXED" and not reprocess:
                 skipped += 1
                 continue
-            if existing and reprocess:
+            if existing:  # reprocess, or retry an earlier failure
                 db.delete(existing)
                 db.flush()
 
@@ -116,24 +117,28 @@ class TrustedRetrievalService:
         if request.tenant_id is None:
             raise RetrievalError("tenant_id is required for trusted retrieval")
 
-        query_vector = self.embedding_provider.embed_text(request.query_text)
+        metadata = self.embedding_provider.model_metadata()
+        limitations: list[str] = []
         structured = (
             self._structured_candidates(db, request) if request.retrieval_mode in {"structured", "hybrid"} else {}
         )
-        semantic = (
-            self._semantic_candidates(db, request, query_vector)
-            if request.retrieval_mode in {"semantic", "hybrid"}
-            else {}
-        )
+        semantic: dict[uuid.UUID, dict[str, Any]] = {}
+        if request.retrieval_mode in {"semantic", "hybrid"}:
+            try:
+                query_vector = self.embedding_provider.embed_query(request.query_text)
+            except EmbeddingUnavailable:
+                # Never silently compare against another model's vectors: report it and keep structured matches.
+                limitations.append("Semantic search is unavailable (embedding model not loaded); structured only.")
+            else:
+                semantic = self._semantic_candidates(db, request, query_vector, metadata)
 
         merged = self._merge_candidates(structured, semantic)
-        results = [self._materialize_result(db, request, candidate) for candidate in merged]
+        results = [self._materialize_result(db, request, candidate, metadata) for candidate in merged]
         results = [r for r in results if r is not None]
         results.sort(key=lambda item: item.retrieval_score, reverse=True)
         results = results[: request.top_k]
 
         status = "COMPLETED"
-        limitations: list[str] = []
         if not results:
             status = "NO_RELEVANT_EVIDENCE"
             limitations.append("No relevant tenant-scoped, context-valid evidence was retrieved.")
@@ -149,8 +154,8 @@ class TrustedRetrievalService:
             retrieval_mode=request.retrieval_mode,
             temporal_mode=request.temporal_mode,
             filters=self._filter_payload(request),
-            embedding_model=EMBEDDING_MODEL,
-            embedding_model_version=EMBEDDING_MODEL_VERSION,
+            embedding_model=metadata.model,
+            embedding_model_version=metadata.model_version,
             retrieval_config_version=RETRIEVAL_CONFIG_VERSION,
             top_k=request.top_k,
             returned_refs=[
@@ -272,14 +277,25 @@ class TrustedRetrievalService:
         return candidates
 
     def _semantic_candidates(
-        self, db: Session, request: RetrievalRequest, query_vector: list[float]
+        self, db: Session, request: RetrievalRequest, query_vector: list[float], metadata
     ) -> dict[uuid.UUID, dict[str, Any]]:
         vector = vector_literal(query_vector)
-        filters = ["ec.tenant_id = :tenant_id", "emb.indexing_status = 'INDEXED'"]
+        dimension = int(metadata.dimension)  # an int from the provider, safe to place in the cast
+        # Only vectors of the query's own model are comparable (the column holds several models).
+        filters = [
+            "ec.tenant_id = :tenant_id",
+            "emb.indexing_status = 'INDEXED'",
+            "emb.embedding_model = :embedding_model",
+            "emb.model_version = :model_version",
+            "emb.embedding_dimension = :dimension",
+        ]
         params: dict[str, Any] = {
             "tenant_id": request.tenant_id,
             "query_vector": vector,
             "limit": max(request.top_k * 4, 20),
+            "embedding_model": metadata.model,
+            "model_version": metadata.model_version,
+            "dimension": dimension,
         }
         if request.evidence_types:
             filters.append("e.evidence_type = ANY(:evidence_types)")
@@ -291,12 +307,12 @@ class TrustedRetrievalService:
             filters.append("(e.ingestion_timestamp IS NOT NULL AND e.ingestion_timestamp <= :knowledge_as_of)")
             params["knowledge_as_of"] = request.knowledge_as_of
         sql = text(
-            "SELECT ec.id AS chunk_id, 1 - (emb.embedding <=> (:query_vector)::vector) AS score "
+            f"SELECT ec.id AS chunk_id, 1 - (emb.embedding::vector({dimension}) <=> (:query_vector)::vector) AS score "
             "FROM evidence_chunk_embeddings emb "
             "JOIN evidence_chunks ec ON ec.tenant_id=emb.tenant_id AND ec.id=emb.chunk_id "
             "JOIN evidence e ON e.tenant_id=ec.tenant_id AND e.id=ec.evidence_id "
             f"WHERE {' AND '.join(filters)} "
-            "ORDER BY emb.embedding <=> (:query_vector)::vector LIMIT :limit"
+            f"ORDER BY emb.embedding::vector({dimension}) <=> (:query_vector)::vector LIMIT :limit"
         )
         rows = db.execute(sql, params).all()
         raw = {
@@ -335,7 +351,7 @@ class TrustedRetrievalService:
         return sorted(merged.values(), key=lambda item: item["score"], reverse=True)
 
     def _materialize_result(
-        self, db: Session, request: RetrievalRequest, candidate: dict[str, Any]
+        self, db: Session, request: RetrievalRequest, candidate: dict[str, Any], metadata
     ) -> RetrievalResult | None:
         row = (
             db.query(EvidenceChunk, Evidence)
@@ -397,10 +413,10 @@ class TrustedRetrievalService:
                 if isinstance(limitation, dict)
             ],
             provenance={
-                "embedding_model": EMBEDDING_MODEL,
-                "embedding_model_version": EMBEDDING_MODEL_VERSION,
-                "embedding_dimension": EMBEDDING_DIMENSION,
-                "embedding_pipeline_version": EMBEDDING_PIPELINE_VERSION,
+                "embedding_model": metadata.model,
+                "embedding_model_version": metadata.model_version,
+                "embedding_dimension": metadata.dimension,
+                "embedding_pipeline_version": metadata.pipeline_version,
                 "retrieval_config_version": RETRIEVAL_CONFIG_VERSION,
                 "retrieval_score_semantics": "retrieval relevance only; not truth, confidence, evidence strength, or causality",
             },

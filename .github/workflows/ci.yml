@@ -47,6 +47,11 @@ jobs:
       - run: python -m pip install pip-audit
       - run: python -m pip check
       - run: pip-audit -r requirements.txt
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: .model-cache
+          key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
       - name: Apply complete schema and runtime hardening
         run: alembic upgrade head
       - name: Give the runtime role a login
