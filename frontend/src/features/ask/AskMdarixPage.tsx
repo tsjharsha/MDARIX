@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Info, Search } from "lucide-react";
 import { Inline, Markdown } from "../shared/Markdown";
+import { useCan } from "../workspace/workspaceContext";
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -19,6 +20,8 @@ type Source = {
   title?: string;
   source_reference?: string;
   temporal?: { effective_timestamp?: string };
+  found_by?: "search" | "investigation";
+  relevance?: number;
 };
 
 const asText = (item: unknown) => (typeof item === "string" ? item : JSON.stringify(item));
@@ -41,6 +44,7 @@ export function AskMdarixPage({
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const canAsk = useCan("ai.run");
   const ask = async () => {
     if (!question.trim() || loading) return;
     setError("");
@@ -90,13 +94,19 @@ export function AskMdarixPage({
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="What is known, what changed, and what evidence is missing?"
         />
-        <button className="primary-action" onClick={ask} disabled={!question.trim() || loading}>
-          {loading ? "Retrieving authorized context…" : "Ask MDARIX"}
-        </button>
+        {canAsk ? (
+          <button className="primary-action" onClick={ask} disabled={!question.trim() || loading}>
+            {loading ? "Searching your records…" : "Ask MDARIX"}
+          </button>
+        ) : (
+          <p className="ask-hint" role="note">
+            <Info size={14} aria-hidden="true" /> View only: your role cannot ask MDARIX questions.
+          </p>
+        )}
         {!investigationId && (
           <p className="ask-hint">
-            <Info size={14} aria-hidden="true" /> No investigation is selected, so the answer cannot use your records.
-            Choose one in the bar above for an evidence-based answer.
+            <Info size={14} aria-hidden="true" /> No investigation is selected, so MDARIX searches all of your records.
+            Choose one in the bar above to focus the answer on that case.
           </p>
         )}
         {error && (
@@ -116,6 +126,8 @@ function AskAnswer({ result }: { result: any }) {
   const sources = listOf(response.sources_provenance) as Source[];
   const citations = new Set(sources.map((source) => source.evidence_identifier).filter(Boolean) as string[]);
   const grounded = response.grounding?.tenant_scope_enforced === true;
+  const searched = response.grounding?.searched_tenant_evidence === true;
+  const unverified = listOf(response.answer_check?.unverified_citations).map(asText);
   const sections = SECTIONS.map(([key, title]) => [title, listOf(response[key])] as const).filter(
     ([, items]) => items.length > 0,
   );
@@ -129,9 +141,13 @@ function AskAnswer({ result }: { result: any }) {
             <span className="ask-badge is-good">
               <CheckCircle2 size={14} aria-hidden="true" /> Based on this investigation&apos;s records
             </span>
+          ) : searched ? (
+            <span className="ask-badge is-good">
+              <Search size={14} aria-hidden="true" /> Based on a search of your records
+            </span>
           ) : (
             <span className="ask-badge is-warn">
-              <AlertTriangle size={14} aria-hidden="true" /> Not linked to an investigation
+              <AlertTriangle size={14} aria-hidden="true" /> No matching records found
             </span>
           )}
           <span className="ask-badge">Human review required</span>
@@ -144,6 +160,13 @@ function AskAnswer({ result }: { result: any }) {
         <p className="ask-unavailable">
           <AlertTriangle size={16} aria-hidden="true" /> The AI answer is not available right now.{" "}
           {notes[0] ?? "Please try again in a moment."}
+        </p>
+      )}
+
+      {unverified.length > 0 && (
+        <p className="ask-unavailable" role="note">
+          <AlertTriangle size={16} aria-hidden="true" /> The answer mentions {unverified.join(", ")}, which MDARIX did
+          not give it. Treat that part with caution.
         </p>
       )}
 
@@ -171,10 +194,23 @@ function AskAnswer({ result }: { result: any }) {
                   <span className="md-cite is-known">{source.evidence_identifier ?? "Evidence"}</span>{" "}
                   <strong>{source.title ?? "Untitled evidence"}</strong>
                   <small>
-                    {[source.source_reference, formatDate(source.temporal?.effective_timestamp)]
+                    {[
+                      source.found_by === "search" ? "Found by search" : null,
+                      source.source_reference,
+                      formatDate(source.temporal?.effective_timestamp),
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </small>
+                  {typeof source.relevance === "number" && (
+                    <span
+                      className="ask-relevance"
+                      role="img"
+                      aria-label={`Relevance ${Math.round(Math.max(0, Math.min(1, source.relevance)) * 100)}%`}
+                    >
+                      <span style={{ width: `${Math.max(0, Math.min(1, source.relevance)) * 100}%` }} />
+                    </span>
+                  )}
                 </div>
               </li>
             ))}

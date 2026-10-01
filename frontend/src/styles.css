@@ -10581,6 +10581,21 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   display: block;
   color: #6b7c8b;
 }
+.ask-relevance {
+  display: block;
+  overflow: hidden;
+  width: 120px;
+  height: 5px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #edf1f5;
+}
+.ask-relevance span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: #087b78;
+}
 .ask-details {
   color: #6b7c8b;
   font-size: 13px;
