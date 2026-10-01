@@ -1,7 +1,8 @@
 """Turn connector records into the tenant's products, lots and complaints through a released mapping.
 
-A connector names a mapping (configuration "mapping_code"). Only a RELEASED or ACTIVE mapping of the same tenant is
-used. Its rules use the integration gateway format: {source_field: {"target_field": "<Entity>.<column>",
+A connector names a mapping (configuration "mapping_code"). Only a RELEASED mapping of the same tenant is used
+(released through the governed workflow: request approval, approval by a second administrator, release). Its rules
+use the integration gateway format: {source_field: {"target_field": "<Entity>.<column>",
 "transform": "trim|lower|upper|string|date|boolean|identity"}}, where <column> is a column of the import template
 (see backend/app/trial/imports.py TEMPLATES). Mapped records go through the same checked import as CSV uploads, so a
 batch with any problem writes nothing.
@@ -21,7 +22,8 @@ from integration.gateway import transform
 # Canonical mapping targets and the import template that receives them.
 TARGET_TEMPLATES = {"Product": "products", "ProductVersion": "products", "Lot": "lots", "LotBatch": "lots"}
 TARGET_TEMPLATES["Complaint"] = "complaints"
-USABLE_STATUSES = {"RELEASED", "ACTIVE"}
+# Only a mapping that a second administrator approved and that was then released can write records.
+USABLE_STATUSES = {"RELEASED"}
 
 
 class MappingNotUsable(ValueError):

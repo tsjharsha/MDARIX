@@ -287,7 +287,7 @@ class StatusRequest(BaseModel):
 
 
 class ReleaseActionRequest(BaseModel):
-    action: str = Field(pattern="^(REQUEST_APPROVAL|PROMOTE|ROLLBACK)$")
+    action: str = Field(pattern="^(REQUEST_APPROVAL|APPROVE|PROMOTE|ROLLBACK)$")
     reason: str = Field(min_length=10, max_length=1000)
     expected_status: str | None = None
 

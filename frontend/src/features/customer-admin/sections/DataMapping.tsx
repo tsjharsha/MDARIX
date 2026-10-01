@@ -12,7 +12,9 @@ type Tab = (typeof TABS)[number];
 // Release transitions the server allows (see /release-action): only offer the ones valid for the current status.
 const RELEASE_ACTIONS = [
   { action: "REQUEST_APPROVAL", label: "Request approval", from: ["DRAFT", "VALIDATION", "READY_FOR_APPROVAL"] },
-  { action: "PROMOTE", label: "Release", from: ["APPROVED", "ACTIVE"] },
+  // Approval must come from a different administrator than the one who requested it (the server enforces this).
+  { action: "APPROVE", label: "Approve", from: ["READY_FOR_APPROVAL"] },
+  { action: "PROMOTE", label: "Release", from: ["APPROVED"] },
   { action: "ROLLBACK", label: "Roll back", from: ["RELEASED", "ACTIVE"] },
 ] as const;
 

@@ -47,6 +47,10 @@ from backend.app.request_context import get_request_context
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
 
+# Mapping states reachable only through the release workflow (request approval -> approve -> release).
+GOVERNED_MAPPING_STATUSES = frozenset({"READY_FOR_APPROVAL", "APPROVED", "ACTIVE", "RELEASED"})
+
+
 @router.post("/admin/configuration/connectors")
 def create_connector(payload: ConnectorRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
@@ -598,7 +602,7 @@ def preview_mapping(
         .filter(
             MappingConfiguration.id == configuration_id,
             MappingConfiguration.tenant_id == admin.tenant_id,
-            MappingConfiguration.status == "ACTIVE",
+            MappingConfiguration.status.notin_(["RETIRED", "SUPERSEDED"]),
         )
         .first()
     )
@@ -630,6 +634,15 @@ def activate_mapping(
         raise HTTPException(
             404,
             detail={"code": "MAPPING_NOT_FOUND", "message": "Mapping configuration is not available for this tenant"},
+        )
+    if payload.status in GOVERNED_MAPPING_STATUSES:
+        # Approval and release only through /release-action, where a second administrator approves.
+        raise HTTPException(
+            409,
+            detail={
+                "code": "MAPPING_STATUS_GOVERNED",
+                "message": "Use the release workflow (request approval, approve, release) for this status.",
+            },
         )
     row.status = payload.status
     row.updated_at = datetime.now(timezone.utc)
@@ -718,7 +731,8 @@ def mapping_release_action(
     has_rules = bool(rules.get("rules", rules)) if isinstance(rules, dict) else bool(rules)
     transitions = {
         "REQUEST_APPROVAL": ("READY_FOR_APPROVAL", {"DRAFT", "VALIDATION", "READY_FOR_APPROVAL"}),
-        "PROMOTE": ("RELEASED", {"APPROVED", "ACTIVE"}),
+        "APPROVE": ("APPROVED", {"READY_FOR_APPROVAL"}),
+        "PROMOTE": ("RELEASED", {"APPROVED"}),
         "ROLLBACK": ("SUPERSEDED", {"RELEASED", "ACTIVE"}),
     }
     target, allowed = transitions[payload.action]
@@ -730,7 +744,27 @@ def mapping_release_action(
                 "message": f"Cannot {payload.action.lower()} a {current} release.",
             },
         )
-    if payload.action in {"REQUEST_APPROVAL", "PROMOTE"} and not has_rules:
+    if payload.action == "APPROVE":
+        requester = (
+            db.query(AuditEvent.actor_ref)
+            .filter(
+                AuditEvent.entity_type == "MappingConfiguration",
+                AuditEvent.entity_id == row.id,
+                AuditEvent.action == "MAPPING_RELEASE_REQUEST_APPROVAL",
+            )
+            .order_by(AuditEvent.created_at.desc())
+            .first()
+        )
+        if requester is None or requester[0] == str(admin.id):
+            # Segregation of duties: the administrator who asked for approval cannot also approve.
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "SOD_DENIED",
+                    "message": "A different administrator from the one who requested approval must approve.",
+                },
+            )
+    if payload.action in {"REQUEST_APPROVAL", "APPROVE", "PROMOTE"} and not has_rules:
         raise HTTPException(
             409,
             detail={

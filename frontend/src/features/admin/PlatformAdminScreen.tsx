@@ -4539,7 +4539,7 @@ function ConfigurationReleasesWorkspace({ data }: { data: AdminData }) {
     evidence: row.audit_event_id ?? row.last_audit_id ?? "Audit evidence recorded on governed mutation",
   }));
   const visible = filter === "ALL" ? releases : releases.filter((row: any) => row.release_status === filter);
-  const transition = async (action: "REQUEST_APPROVAL" | "PROMOTE" | "ROLLBACK") => {
+  const transition = async (action: "REQUEST_APPROVAL" | "APPROVE" | "PROMOTE" | "ROLLBACK") => {
     if (!selected) return;
     try {
       const result = await requestJson<any>(
@@ -4641,9 +4641,13 @@ function ConfigurationReleasesWorkspace({ data }: { data: AdminData }) {
                 Request approval
               </button>
               <button
-                disabled={!["APPROVED", "ACTIVE"].includes(selected.release_status)}
-                onClick={() => void transition("PROMOTE")}
+                disabled={selected.release_status !== "READY_FOR_APPROVAL"}
+                onClick={() => void transition("APPROVE")}
+                title="Must be a different administrator from the one who requested approval"
               >
+                Approve
+              </button>
+              <button disabled={selected.release_status !== "APPROVED"} onClick={() => void transition("PROMOTE")}>
                 Promote release
               </button>
               <button
@@ -4656,6 +4660,7 @@ function ConfigurationReleasesWorkspace({ data }: { data: AdminData }) {
             </div>
             <p className="platform-admin-muted">
               Transitions are server-authorized, optimistic-lock protected, dependency-gated, and audit recorded.
+              Approval needs a second administrator; only released mappings can import data.
             </p>
           </aside>
         ) : (

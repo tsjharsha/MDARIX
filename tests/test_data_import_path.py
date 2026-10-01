@@ -72,6 +72,22 @@ def _complaint_source(identifier: str):
         ).scalar()
 
 
+def _action(client, mapping_id: str, action: str):
+    return client.post(
+        f"/api/v1/admin/configuration/mappings/{mapping_id}/release-action",
+        json={"action": action, "reason": f"{action.title()} after review of the field mapping"},
+    )
+
+
+def _release(admin, mapping_id: str) -> None:
+    """The governed workflow: request approval, approval by a second administrator, release."""
+    assert _action(admin, mapping_id, "REQUEST_APPROVAL").status_code == 200
+    second_admin = _client_with_role("CUSTOMER_ADMIN")
+    approved = _action(second_admin, mapping_id, "APPROVE")
+    assert approved.status_code == 200, approved.text
+    assert _action(admin, mapping_id, "PROMOTE").status_code == 200
+
+
 def _released_complaint_connector(admin, product_id: str) -> str:
     mapping = admin.post(
         "/api/v1/admin/configuration/mappings",
@@ -91,9 +107,7 @@ def _released_complaint_connector(admin, product_id: str) -> str:
     assert mapping.status_code == 200, mapping.text
     body = mapping.json()
     mapping_id = body.get("mapping_id") or body.get("id")
-    assert admin.patch(
-        f"/api/v1/admin/configuration/mappings/{mapping_id}/status", json={"status": "RELEASED"}
-    ).is_success
+    _release(admin, mapping_id)
     code = mapping.json().get("code") or body["code"]
     connector = admin.post(
         "/api/v1/admin/configuration/connectors",
@@ -133,3 +147,52 @@ def test_mapped_connector_records_become_complaints_and_a_bad_batch_writes_nothi
     ).json()
     assert blocked["canonical_import"]["status"] == "BLOCKED"
     assert _complaint_source(f"TW2-{product_id}") is None
+
+
+def _draft_mapping(admin) -> str:
+    created = admin.post(
+        "/api/v1/admin/configuration/mappings",
+        json={
+            "code": f"GOV-{uuid.uuid4().hex[:6]}",
+            "source_system": "TRACKWISE",
+            "target_entity": "Complaint",
+            "mapping_rules": {"complaint_number": {"target_field": "Complaint.complaint_id", "transform": "trim"}},
+        },
+    ).json()
+    return created.get("mapping_id") or created["id"]
+
+
+def test_mappings_cannot_skip_approval():
+    admin = authenticated_client()
+    mapping_id = _draft_mapping(admin)
+    for status in ("READY_FOR_APPROVAL", "APPROVED", "ACTIVE", "RELEASED"):
+        refused = admin.patch(f"/api/v1/admin/configuration/mappings/{mapping_id}/status", json={"status": status})
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "MAPPING_STATUS_GOVERNED"
+    # Promotion needs an approval first, and the requester cannot approve their own request.
+    assert _action(admin, mapping_id, "PROMOTE").status_code == 409
+    assert _action(admin, mapping_id, "REQUEST_APPROVAL").status_code == 200
+    own = _action(admin, mapping_id, "APPROVE")
+    assert own.status_code == 403 and own.json()["detail"]["code"] == "SOD_DENIED"
+    assert _action(admin, mapping_id, "PROMOTE").status_code == 409
+
+
+def test_an_approved_but_unreleased_mapping_cannot_import():
+    admin = authenticated_client()
+    mapping_id = _draft_mapping(admin)
+    assert _action(admin, mapping_id, "REQUEST_APPROVAL").status_code == 200
+    assert _action(_client_with_role("CUSTOMER_ADMIN"), mapping_id, "APPROVE").status_code == 200
+    code = next(
+        item["code"]
+        for item in admin.get("/api/v1/admin/configuration/mappings").json()
+        if (item.get("id") or item.get("mapping_id")) == mapping_id
+    )
+    connector = admin.post(
+        "/api/v1/admin/configuration/connectors",
+        json={"code": f"gov-{uuid.uuid4().hex[:6]}", "connector_type": "REST", "configuration": {"mapping_code": code}},
+    ).json()
+    admin.patch(f"/api/v1/admin/configuration/connectors/{connector['connector_id']}/status", json={"status": "ACTIVE"})
+    run = admin.post(
+        f"/api/v1/admin/configuration/connectors/{connector['connector_id']}/execute",
+        json={"records": [{"complaint_number": "GOV-1"}], "source_system": "TRACKWISE"},
+    ).json()
+    assert run["canonical_import"]["status"] == "BLOCKED"
