@@ -17,6 +17,7 @@ from backend.app.customer_lifecycle import (
     build_customer_tenant,
 )
 from backend.app.db.models.customer_lifecycle import (
+    Customer,
     CustomerDomain,
     CustomerOnboardingDraft,
     DomainVerification,
@@ -157,7 +158,7 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     )
     if invitation is None and payload.invitation_required:
         token = issue_invitation(db, user.id, tenant.id, admin.id)
-        delivery = send_activation_email(user.username, token)
+        delivery = send_activation_email(user.username, token, payload.company_name)
         invite_state = "SENT" if delivery != "NOT_CONFIGURED" else "CREATED"
     else:
         delivery = "ALREADY_CREATED"
@@ -263,9 +264,11 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
         )
     )
     db.commit()
+    # On an idempotent retry the tenant already existed, so load its customer rather than the one built above.
+    customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     return {
-        "customer_id": str(customer.id),
-        "customer_identifier": customer.customer_identifier,
+        "customer_id": str(customer.id) if customer else None,
+        "customer_identifier": customer.customer_identifier if customer else None,
         "tenant_id": str(tenant.id),
         "tenant_key": key,
         "tenant_identifier": tenant.tenant_identifier,

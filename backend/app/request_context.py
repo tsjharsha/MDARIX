@@ -36,6 +36,20 @@ BLOCKED_TENANT_STATUSES = frozenset({"SUSPENDED", "TERMINATED", "ARCHIVED"})
 BLOCKED_MEMBERSHIP_STATUSES = frozenset({"SUSPENDED", "REVOKED", "REMOVED", "OFFBOARDED", "RETIRED", "INACTIVE"})
 
 
+def _ensure_trial_open(db: Session, tenant_id) -> None:
+    """A Free Trial workspace closes on its end date, even if no admin has run the subscription job."""
+    from backend.app.trial.service import trial_has_ended
+
+    if trial_has_ended(db, tenant_id):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "TRIAL_ENDED",
+                "message": "Your MDARIX free trial has ended. Contact us to continue with your data intact.",
+            },
+        )
+
+
 def ensure_tenant_access(db: Session, user) -> None:
     """Refuse access when the user's organization or their membership in it has been suspended or revoked."""
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
@@ -46,6 +60,7 @@ def ensure_tenant_access(db: Session, user) -> None:
     memberships = db.query(TenantMembership).filter(
         TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id
     )
+    _ensure_trial_open(db, tenant.id)
     if memberships.filter(TenantMembership.status == "ACTIVE").first() is not None:
         return
     if memberships.filter(TenantMembership.status.in_(sorted(BLOCKED_MEMBERSHIP_STATUSES))).first() is not None:

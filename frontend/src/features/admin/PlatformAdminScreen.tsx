@@ -20,6 +20,7 @@ import {
   Users,
 } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
+import { TrialRequestsWorkspace } from "./TrialRequestsWorkspace";
 
 type PlatformAdminScreenProps = {
   securityContext: { display_name: string; active_role: string | null; tenant_id?: string } | null;
@@ -5783,37 +5784,40 @@ export function PlatformAdminScreen({
         );
       if (["Customer Onboarding"].includes(activeItem))
         return (
-          <section className="platform-admin-card platform-admin-process">
-            <div>
-              <span className="eyebrow">Governed onboarding</span>
-              <h3>Provision a customer tenant</h3>
-              <p>
-                Create immutable customer and tenant identities, assign commercial access, establish security controls,
-                and invite the first Customer Administrator.
-              </p>
-            </div>
-            <ol>
-              <li>
-                <strong>Organization</strong>
-                <span>Legal identity and approved domains</span>
-              </li>
-              <li>
-                <strong>Tenant boundary</strong>
-                <span>Region, residency and immutable identifier</span>
-              </li>
-              <li>
-                <strong>Commercial access</strong>
-                <span>Plan version, seats and entitlements</span>
-              </li>
-              <li>
-                <strong>Security baseline</strong>
-                <span>MFA, configuration and isolation checks</span>
-              </li>
-            </ol>
-            <button className="platform-admin-primary" onClick={() => onNavigate("admin-create-customer")}>
-              <Plus size={15} /> Start provisioning
-            </button>
-          </section>
+          <>
+            <TrialRequestsWorkspace />
+            <section className="platform-admin-card platform-admin-process">
+              <div>
+                <span className="eyebrow">Governed onboarding</span>
+                <h3>Provision a customer tenant</h3>
+                <p>
+                  Create immutable customer and tenant identities, assign commercial access, establish security
+                  controls, and invite the first Customer Administrator.
+                </p>
+              </div>
+              <ol>
+                <li>
+                  <strong>Organization</strong>
+                  <span>Legal identity and approved domains</span>
+                </li>
+                <li>
+                  <strong>Tenant boundary</strong>
+                  <span>Region, residency and immutable identifier</span>
+                </li>
+                <li>
+                  <strong>Commercial access</strong>
+                  <span>Plan version, seats and entitlements</span>
+                </li>
+                <li>
+                  <strong>Security baseline</strong>
+                  <span>MFA, configuration and isolation checks</span>
+                </li>
+              </ol>
+              <button className="platform-admin-primary" onClick={() => onNavigate("admin-create-customer")}>
+                <Plus size={15} /> Start provisioning
+              </button>
+            </section>
+          </>
         );
       if (
         [

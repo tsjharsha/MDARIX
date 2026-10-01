@@ -16,12 +16,12 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
     ],
   },
   signup: {
-    eyebrow: "Get started",
-    title: "A private MDARIX workspace for your team.",
+    eyebrow: "Free 30-day trial",
+    title: "See MDARIX on a real investigation in minutes.",
     points: [
-      [ShieldCheck, "Set up for your organization", "We create an isolated workspace for your company."],
-      [UserCheck, "Secure invitation", "Your first administrator receives an email to activate the account."],
-      [FileSearch, "Bring a real question", "We walk through an investigation with you on day one."],
+      [ShieldCheck, "Your own private workspace", "Approved by our team and isolated from every other customer."],
+      [FileSearch, "Ready-made sample data", "Explore a full device investigation before sharing anything."],
+      [UserCheck, "Then try your own data", "Simple CSV templates, checked for personal data before import."],
     ],
   },
   security: {
@@ -123,7 +123,7 @@ export function AuthPage({ mode }: { mode: string }) {
                 : "forgot-password";
     const body =
       mode === "signup"
-        ? { email, password, display_name: name, organization: company }
+        ? { email, display_name: name, organization: company }
         : mode === "signin"
           ? { email, password }
           : mode === "verify-email"
@@ -144,7 +144,7 @@ export function AuthPage({ mode }: { mode: string }) {
         setToken(data.development_token ?? "");
         setMessage(
           data.status === "ONBOARDING_REQUEST_ACCEPTED"
-            ? `Thank you, your request is in. We will set up a private MDARIX workspace for ${company || "your organization"} and email ${email} an invitation to activate your account.`
+            ? `Thank you, your request is in. Once it is approved, we email ${email} an invitation to activate your free trial workspace for ${company || "your organization"}.`
             : `Account created. Your User ID is ${data.user_id}.`,
         );
       } else if (mode === "verify-email") {
@@ -241,7 +241,7 @@ export function AuthPage({ mode }: { mode: string }) {
           {mode === "signin"
             ? "Sign in to MDARIX"
             : mode === "signup"
-              ? "Create your MDARIX account"
+              ? "Start your free trial"
               : mode === "verify-email"
                 ? "Verify your email"
                 : mode === "activate-account"
@@ -254,7 +254,7 @@ export function AuthPage({ mode }: { mode: string }) {
           {mode === "signin"
             ? "Use your work email or User ID to open your workspace."
             : mode === "signup"
-              ? "Tell us who you are. We set up your organization's workspace and send you a secure invitation."
+              ? "30 days, up to 3 users, no credit card. You will create your password from the invitation email."
               : mode === "forgot-password"
                 ? "Enter your work email and we will send you a secure reset link."
                 : "Use the secure link or token from your email."}
@@ -295,7 +295,7 @@ export function AuthPage({ mode }: { mode: string }) {
             onChange={(e) => setEmail(e.target.value)}
           />
         )}{" "}
-        {mode !== "forgot-password" && mode !== "verify-email" && (
+        {mode !== "forgot-password" && mode !== "verify-email" && mode !== "signup" && (
           <>
             <input
               aria-label="Password"
@@ -308,16 +308,14 @@ export function AuthPage({ mode }: { mode: string }) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            {(mode === "signup" || isTokenPassword) && (
-              <small>Password is created by the user and never shown to administrators.</small>
-            )}
+            {isTokenPassword && <small>Password is created by the user and never shown to administrators.</small>}
           </>
         )}
         <button className="primary-action" type="submit">
           {mode === "signin"
             ? "Sign in"
             : mode === "signup"
-              ? "Create account"
+              ? "Request free trial"
               : mode === "verify-email"
                 ? "Verify email"
                 : mode === "activate-account"
@@ -342,7 +340,7 @@ export function AuthPage({ mode }: { mode: string }) {
           <p className="auth-links auth-links-split">
             <a href="/forgot-password">Forgot password?</a>
             <span>
-              New to MDARIX? <a href="/signup">Create account</a>
+              New to MDARIX? <a href="/signup">Start free trial</a>
             </span>
           </p>
         ) : mode === "signup" ? (
@@ -351,7 +349,7 @@ export function AuthPage({ mode }: { mode: string }) {
           </p>
         ) : (
           <p className="auth-links">
-            <a href="/signin">Return to sign in</a> · <a href="/signup">Create account</a>
+            <a href="/signin">Return to sign in</a> · <a href="/signup">Start free trial</a>
             {mode !== "verify-email" && (
               <>
                 {" "}

@@ -17,6 +17,10 @@ from sqlalchemy.orm import Session, sessionmaker
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
 
+# Free-trial workspaces have no dedicated database: their registry row names this marker, and their business data
+# lives in the control database, keyed and filtered by tenant like every other tenant-owned table there.
+TRIAL_SHARED_DATA_PLANE = "MDARIX_TRIAL_SHARED_CONTROL_PLANE"
+
 
 def _secret_url(secret_ref: str) -> str:
     value = os.getenv(secret_ref)
@@ -71,6 +75,9 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
         raise HTTPException(
             503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "No active tenant data plane is registered"}
         )
+    if row.connection_secret_ref == TRIAL_SHARED_DATA_PLANE:
+        yield control_db
+        return
     try:
         factory = session_factory(row.database_ref, row.connection_secret_ref)
         db = factory()

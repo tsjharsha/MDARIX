@@ -288,7 +288,7 @@ export function PublicMegaSite({ path }: { path: string }) {
             <p>Evidence-first investigation intelligence for medical-device teams.</p>
             <div className="ms-cta-row">
               <a className="ms-btn ms-btn-light" href="/signup">
-                Get started
+                Start free trial
               </a>
               <a className="ms-btn ms-btn-ghost-light" href="/signin">
                 Sign in

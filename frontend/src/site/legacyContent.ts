@@ -301,8 +301,8 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
   },
   "/request-demo": {
     eyebrow: "Get started",
-    title: "Explore MDARIX in your lifecycle context.",
-    copy: "Create an account, verify your email, sign in, and enter the tenant-scoped application.",
+    title: "Try MDARIX free for 30 days.",
+    copy: "Your own private workspace, ready-made sample data, and simple templates to try your own records. No credit card, no integration project.",
   },
   "/company": {
     eyebrow: "Company",

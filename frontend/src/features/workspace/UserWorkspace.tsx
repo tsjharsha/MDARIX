@@ -10,6 +10,7 @@ import {
   Menu,
   Package,
   Radio,
+  Rocket,
   Search,
   ShieldCheck,
   UserRound,
@@ -39,8 +40,11 @@ import { DecisionsSection } from "./sections/Decisions";
 import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
+import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
+import { requestJson } from "../../app/apiClient";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
+  "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
   Overview: { icon: LayoutDashboard, description: "Status dashboard", context: false },
   "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
   Products: { icon: Package, description: "Product 360 and versions", context: true },
@@ -82,11 +86,22 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
+  const [trial, setTrial] = useState<TrialStatus | null>(null);
   useIdleSignOut();
 
+  useEffect(() => {
+    requestJson<TrialStatus>("/api/v1/trial/status")
+      .then(setTrial)
+      .catch(() => setTrial(null));
+  }, []);
+
   const visibleSections = useMemo(
-    () => WORKSPACE_SECTIONS.filter((section) => sectionAllowed(section, session?.allowed_menu)),
-    [session?.allowed_menu],
+    () =>
+      WORKSPACE_SECTIONS.filter(
+        (section) =>
+          (section !== "Getting started" || trial?.is_trial) && sectionAllowed(section, session?.allowed_menu),
+      ),
+    [session?.allowed_menu, trial?.is_trial],
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
@@ -98,6 +113,12 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     [setLocation],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+
+  // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
+  useEffect(() => {
+    if (trial?.is_trial && (initialView ?? "home") === "home")
+      setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));
+  }, [trial?.is_trial]);
 
   // A section the server's menu does not grant is never rendered, even from an old link.
   useEffect(() => {
@@ -126,6 +147,11 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             <Building2 size={15} aria-hidden="true" />
             <span>{tenantName}</span>
           </div>
+          {trial?.is_trial && (
+            <button type="button" className="uw-trial-badge" onClick={() => open("Getting started")}>
+              Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+            </button>
+          )}
           <div className="ac-user">
             <span>
               <strong>{session?.display_name ?? "User"}</strong>
@@ -186,6 +212,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
               </div>
             )}
             <div key={location.key} className="ca-section">
+              {section === "Getting started" && <GettingStartedSection />}
               {section === "Overview" && <OverviewSection />}
               {section === "My Work" && <MyWorkSection tab={tab} />}
               {section === "Products" && <ProductsSection tab={tab} />}

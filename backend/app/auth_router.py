@@ -33,7 +33,8 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 class Signup(BaseModel):
     email: str = Field(min_length=3, max_length=254)
-    password: str = Field(min_length=12, max_length=128)
+    # Not stored: the password is created from the invitation after approval. Accepted for older clients.
+    password: str | None = Field(default=None, max_length=128)
     display_name: str = Field(min_length=1, max_length=120)
     organization: str = Field(min_length=1, max_length=160)
 

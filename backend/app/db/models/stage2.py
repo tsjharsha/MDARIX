@@ -108,7 +108,7 @@ class PasswordResetRequest(Base):
 
 
 class OnboardingRequest(Base):
-    """Public signup intent; it never creates a tenant or active identity."""
+    """Public free-trial request; it never creates a tenant or identity until a Platform Admin approves it."""
 
     __tablename__ = "onboarding_requests"
     id = _id()
@@ -118,6 +118,11 @@ class OnboardingRequest(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="PENDING_REVIEW")
     created_at = _ts(False)
     updated_at = _ts(False)
+    # Review outcome (md04): who decided, when, why, and the trial workspace an approval created.
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reviewed_at = _ts()
+    decision_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class AuthenticationEvent(Base):

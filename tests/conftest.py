@@ -70,6 +70,7 @@ DB_MODULES = {
     "test_mapping_studio_stage4",
     "test_master_data",
     "test_mfa_mvp",
+    "test_free_trial",
     "test_public_signup_onboarding",
     "test_simulator_ingestion",
     "test_stage2_operations",

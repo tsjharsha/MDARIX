@@ -1519,3 +1519,40 @@
     opacity: 1;
   }
 }
+.ms-trial-steps {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 0;
+  list-style: none;
+}
+.ms-trial-steps li {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.ms-trial-steps li > span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ms-teal);
+  color: #fff;
+  font-weight: 700;
+}
+.ms-trial-steps strong {
+  color: var(--ms-ink);
+}
+.ms-trial-steps p {
+  margin-top: 2px;
+  color: var(--ms-ink-2);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.ms-trial-steps-note {
+  margin-top: 18px;
+  color: var(--ms-muted);
+  font-size: 14px;
+}

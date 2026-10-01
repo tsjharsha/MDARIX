@@ -31,7 +31,9 @@ def smtp_configuration_status() -> dict[str, object]:
     }
 
 
-def _send_link_email(recipient: str, token: str, *, subject: str, path: str, intro: str) -> str:
+def _send_link_email(
+    recipient: str, token: str, *, subject: str, path: str, intro: str, valid_for: str = "one hour"
+) -> str:
     """Send a controlled account link when SMTP is configured.
 
     Returns a delivery state so callers never claim an email was sent when the
@@ -52,7 +54,7 @@ def _send_link_email(recipient: str, token: str, *, subject: str, path: str, int
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
-    message.set_content(f"{intro}\n\n{app_url}{path}?token={token}\n\nThis link expires in one hour.")
+    message.set_content(f"{intro}\n\n{app_url}{path}?token={token}\n\nThis link expires in {valid_for}.")
     port = int(os.getenv("MDARIX_SMTP_PORT", "587"))
     try:
         with smtplib.SMTP(host, port, timeout=15) as client:
@@ -76,13 +78,14 @@ def send_verification_email(recipient: str, token: str) -> str:
     )
 
 
-def send_activation_email(recipient: str, token: str, organization: str) -> str:
+def send_activation_email(recipient: str, token: str, organization: str, valid_for: str = "one hour") -> str:
     return _send_link_email(
         recipient,
         token,
         subject="Activate your MDARIX account",
         path="/activate-account",
         intro=f"You have been invited to MDARIX for {organization}. Create your password here:",
+        valid_for=valid_for,
     )
 
 

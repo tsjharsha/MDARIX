@@ -106,7 +106,7 @@ function CtaBand() {
             Request a demo <ArrowRight size={16} aria-hidden="true" />
           </a>
           <a className="ms-btn ms-btn-ghost-light" href="/signup">
-            Get started free
+            Start free trial
           </a>
         </div>
       </Reveal>
@@ -998,14 +998,37 @@ export function CompanyPage() {
           <span className="ms-eyebrow">{contact.eyebrow}</span>
           <h2 id="contact-title">{contact.title}</h2>
           <p>{contact.copy}</p>
-          <ol className="ms-numbered">
-            <li>Create your account and verify your email.</li>
-            <li>Sign in to your organization's own workspace.</li>
-            <li>Bring a real investigation question; we walk through it with you.</li>
+          <ol className="ms-trial-steps">
+            {[
+              [
+                "Request your free trial",
+                "Tell us your name, company and work email. We review every request, usually within one business day.",
+              ],
+              [
+                "Explore a ready-made investigation",
+                "Activate your account from the invitation email. Your private workspace opens with sample data: products, lots, complaints and an investigation to follow.",
+              ],
+              [
+                "Try it on your own data",
+                "Download the CSV templates for products, lots and complaints. Every file is checked for problems and personal data before import, and insights appear straight away.",
+              ],
+            ].map(([title, text], index) => (
+              <li key={title}>
+                <span aria-hidden="true">{index + 1}</span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{text}</p>
+                </div>
+              </li>
+            ))}
           </ol>
+          <p className="ms-trial-steps-note">
+            30 days · up to 3 users · 5,000 uploaded rows. Want live connections to your QMS, PLM or ERP? Ask about
+            becoming a design partner.
+          </p>
           <div className="ms-cta-row">
             <a className="ms-btn ms-btn-primary" href="/signup">
-              Get started <ArrowRight size={16} aria-hidden="true" />
+              Start free trial <ArrowRight size={16} aria-hidden="true" />
             </a>
             <a className="ms-btn ms-btn-outline" href="/signin">
               Sign in

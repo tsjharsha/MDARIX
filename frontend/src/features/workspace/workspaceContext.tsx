@@ -2,6 +2,8 @@ import { createContext, useContext } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
 
 export const WORKSPACE_SECTIONS = [
+  // Shown only in free-trial workspaces (see UserWorkspace).
+  "Getting started",
   "Overview",
   "My Work",
   "Products",
@@ -18,6 +20,7 @@ export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
 /** Server menu keys (session context `allowed_menu`) that grant each section. My Account is always available. */
 export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
+  "Getting started": ["home"],
   Overview: ["home"],
   "My Work": ["home", "investigations"],
   Products: ["products"],
