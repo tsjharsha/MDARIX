@@ -232,3 +232,36 @@ def test_trial_closes_on_its_end_date():
         assert db.query(Tenant).filter(Tenant.id == uuid.UUID(approval["tenant_id"])).one().status == "ACTIVE"
     finally:
         db.close()
+
+
+def test_ask_mdarix_is_grounded_in_the_trial_sample_investigation():
+    user, approval, _ = _approved_trial_client()
+    db = SessionLocal()
+    try:
+        from backend.app.db.models.foundation import Investigation
+
+        investigation = (
+            db.query(Investigation)
+            .filter(
+                Investigation.tenant_id == uuid.UUID(approval["tenant_id"]),
+                Investigation.investigation_identifier == "SAMPLE-INV-001",
+            )
+            .one()
+        )
+        investigation_id = str(investigation.id)
+    finally:
+        db.close()
+    answer = user.post(
+        "/api/v1/stage3/interactions",
+        json={
+            "prompt": "Why did pressure-alarm complaints rise after Rev B?",
+            "investigation_id": investigation_id,
+            "page_context": "ASK_MDARIX",
+            "temporal_mode": "CURRENT",
+        },
+    )
+    assert answer.status_code == 200, answer.text
+    response = answer.json()["response"]
+    assert response["grounding"]["tenant_scope_enforced"] is True
+    cited = {item["evidence_identifier"] for item in response["sources_provenance"]}
+    assert cited and all(identifier.startswith("SAMPLE-EV-") for identifier in cited)

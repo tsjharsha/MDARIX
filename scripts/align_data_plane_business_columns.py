@@ -1,4 +1,4 @@
-"""Add missing business columns to the preserved synthetic bootstrap tables."""
+"""Add missing business and audit columns to the preserved synthetic bootstrap tables."""
 
 from __future__ import annotations
 
@@ -14,6 +14,8 @@ TABLES = (
     "complaints",
     "investigations",
     "evidence",
+    # Audit rows are written to the data plane too (e.g. Ask MDARIX); keep the z45 hash-chain columns in step.
+    "audit_events",
 )
 CONTAINERS = (
     "mdarix-r1-tenant-a-data-1",

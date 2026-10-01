@@ -118,6 +118,9 @@ def build_authorized_context(
     as_of: datetime | None = None,
 ) -> dict[str, Any]:
     """Build context from tenant-scoped services; request-supplied tenant identity is never accepted."""
+    # Read product context from the tenant's own data plane, as the investigation workspace route does.
+    bind = getattr(db, "get_bind", None)
+    data_plane = {"data_plane_engine": bind()} if callable(bind) else {}
     workspace = InvestigationWorkspaceService().workspace(
         db,
         InvestigationWorkspaceRequest(
@@ -128,6 +131,7 @@ def build_authorized_context(
             as_of=as_of,
             include_retrieval=False,
         ),
+        **data_plane,
     )
     raw = workspace.model_dump(mode="json")
     return {
