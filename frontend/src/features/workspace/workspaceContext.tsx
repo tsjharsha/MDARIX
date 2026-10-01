@@ -44,6 +44,7 @@ export type SessionContext = {
   permissions?: unknown;
   allowed_menu?: string[];
   allowed_actions?: unknown;
+  business_permissions?: string[];
   memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
   current_tenant?: { tenant_id?: string; tenant_name?: string; tenant_key?: string };
   plan?: { code?: string; name?: string; version?: string } | null;
@@ -81,6 +82,17 @@ export function useWorkspace(): WorkspaceApi {
   const value = useContext(WorkspaceContext);
   if (!value) throw new Error("useWorkspace must be used inside the user workspace");
   return value;
+}
+
+export type BusinessPermission = "records.write" | "ai.run" | "data.export" | "regulatory.approve";
+
+/** Whether the signed-in role may perform a business action, from the server's own rule (session context).
+ * Only hides controls the server would refuse; when permissions are unknown (outside the workspace, older
+ * sessions) controls stay visible and the server still decides. */
+export function useCan(permission: BusinessPermission): boolean {
+  const value = useContext(WorkspaceContext);
+  const granted = value?.session?.business_permissions;
+  return !Array.isArray(granted) || granted.includes(permission);
 }
 
 export function sectionAllowed(section: WorkspaceSection, allowedMenu: string[] | undefined) {

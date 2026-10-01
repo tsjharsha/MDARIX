@@ -58,6 +58,11 @@ def effective_role(db: Session, ctx: AuthenticatedRequestContext) -> str | None:
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == ctx.tenant_id).first()
     if user is None:
         return None
+    return role_of_user(db, user)
+
+
+def role_of_user(db: Session, user: AuthUser) -> str | None:
+    """An active role assignment, else the account's role."""
     assigned = (
         db.query(RoleDefinition.name)
         .join(RoleAssignment, RoleAssignment.role_id == RoleDefinition.id)

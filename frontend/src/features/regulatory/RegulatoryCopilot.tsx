@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { requestJson } from "../../app/apiClient";
+import { useCan } from "../workspace/workspaceContext";
 
 type DocumentRow = {
   id: string;
@@ -27,6 +28,9 @@ export function RegulatoryCopilot() {
   const [selected, setSelected] = useState<DocumentDetail | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const canDraft = useCan("ai.run");
+  const canWrite = useCan("records.write");
+  const canApprove = useCan("regulatory.approve");
   const load = async () => {
     try {
       setRows(await requestJson<DocumentRow[]>("/api/v1/regulatory/documents"));
@@ -128,9 +132,15 @@ export function RegulatoryCopilot() {
             placeholder="Controlled preparation title"
           />
         </label>
-        <button className="primary-action" disabled={busy} onClick={() => void generate()}>
-          {busy ? "Generating…" : "Generate draft"}
-        </button>
+        {canDraft ? (
+          <button className="primary-action" disabled={busy} onClick={() => void generate()}>
+            {busy ? "Generating…" : "Generate draft"}
+          </button>
+        ) : (
+          <p className="helper-copy" role="note">
+            View only: your role cannot generate drafts.
+          </p>
+        )}
       </section>
       <section className="regulatory-split">
         <article className="panel">
@@ -190,9 +200,9 @@ export function RegulatoryCopilot() {
               {selected.document.status}
             </p>
             <div className="toolbar">
-              <button onClick={() => void transition("IN_REVIEW")}>Submit for human review</button>
-              <button onClick={() => void transition("APPROVED")}>Approve / sign</button>
-              <button onClick={() => void transition("ARCHIVED")}>Archive</button>
+              {canWrite && <button onClick={() => void transition("IN_REVIEW")}>Submit for human review</button>}
+              {canApprove && <button onClick={() => void transition("APPROVED")}>Approve / sign</button>}
+              {canWrite && <button onClick={() => void transition("ARCHIVED")}>Archive</button>}
             </div>
             {selected.versions.map((version) => (
               <article className="regulatory-version" key={version.id}>

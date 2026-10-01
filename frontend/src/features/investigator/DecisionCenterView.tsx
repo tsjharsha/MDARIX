@@ -3,6 +3,7 @@ import { AlertTriangle, CircleDot, ClipboardList, FileText, GitBranch, Network, 
 import { Panel } from "../../app/ui";
 import { TemporalMode, DecisionContext } from "../../app/types";
 import { api } from "../../app/api";
+import { useCan } from "../workspace/workspaceContext";
 
 export function DecisionCenterView({
   investigationId,
@@ -24,6 +25,8 @@ export function DecisionCenterView({
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const rationaleRef = useRef<HTMLTextAreaElement>(null);
   const [rationaleError, setRationaleError] = useState("");
+  const canRunAi = useCan("ai.run");
+  const canWrite = useCan("records.write");
   useEffect(() => {
     let active = true;
     const params = new URLSearchParams({ temporal_mode: temporalMode });
@@ -199,12 +202,20 @@ export function DecisionCenterView({
               </p>
             )}
             <div className="toolbar">
-              <button className="primary-action secondary" onClick={runAdvisory}>
-                Generate AI Advisory
-              </button>
-              <button className="primary-action" onClick={recordDecision}>
-                Record Human Decision
-              </button>
+              {canRunAi && (
+                <button className="primary-action secondary" onClick={runAdvisory}>
+                  Generate AI Advisory
+                </button>
+              )}
+              {canWrite ? (
+                <button className="primary-action" onClick={recordDecision}>
+                  Record Human Decision
+                </button>
+              ) : (
+                <span className="context-summary" role="note">
+                  View only: your role cannot record decisions.
+                </span>
+              )}
             </div>
             {advisory && (
               <div className="advisory-box">

@@ -14,7 +14,7 @@ import { requestJson } from "../../../app/apiClient";
 import { BarList, Empty, Panel, RingMeter, StatTile } from "../../admin/console/charts";
 import type { Slice } from "../../admin/console/dashboardModel";
 import { useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 
 export type TrialStatus = {
   is_trial: boolean;
@@ -360,6 +360,7 @@ function ImportPanel({ trial, onImported }: { trial: TrialStatus | null; onImpor
   const templates = trial?.templates ?? [];
   const [entity, setEntity] = useState("products");
   const [file, setFile] = useState<File | null>(null);
+  const canImport = useCan("records.write");
   const [report, setReport] = useState<CheckReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
@@ -467,9 +468,15 @@ function ImportPanel({ trial, onImported }: { trial: TrialStatus | null; onImpor
             }}
           />
         </label>
-        <button type="button" className="ac-primary" disabled={!file || busy} onClick={check}>
-          {busy && !report ? "Checking…" : "Check file"}
-        </button>
+        {canImport ? (
+          <button type="button" className="ac-primary" disabled={!file || busy} onClick={check}>
+            {busy && !report ? "Checking…" : "Check file"}
+          </button>
+        ) : (
+          <p className="ac-muted" role="note">
+            View only: your role cannot import data.
+          </p>
+        )}
       </div>
       {message && (
         <p className={`uw-trial-message is-${message.tone}`} role="status">
@@ -524,7 +531,7 @@ function ImportPanel({ trial, onImported }: { trial: TrialStatus | null; onImpor
               </table>
             </div>
           )}
-          {report.ready && (
+          {report.ready && canImport && (
             <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
               <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${report.rows} rows`}
             </button>

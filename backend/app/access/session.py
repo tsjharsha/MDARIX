@@ -24,6 +24,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import RoleSwitch, TenantSwitchRequest
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
+from backend.app.access.permissions import permissions_for_role, role_of_user
 from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -231,6 +232,9 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "feature_toggles": {item["feature_code"]: item["enabled"] for item in entitlements},
         "allowed_menu": allowed_menu,
         "allowed_actions": base.get("permissions", {}),
+        # The business permissions the API enforces (records.write, ai.run, data.export, regulatory.approve), from
+        # the same rule as require_permission, so the interface can hide what the server would refuse.
+        "business_permissions": sorted(permissions_for_role(role_of_user(db, user))),
         "policy_version": base.get("role_version", "legacy"),
         "environment": environment(),
     }
