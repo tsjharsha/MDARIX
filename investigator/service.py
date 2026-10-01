@@ -23,6 +23,7 @@ from investigator.schemas import (
     InvestigationAnalysisRequest,
     InvestigationAnalysisResponse,
 )
+from backend.app.db.tenant_scope import scoped_bind
 
 
 class InvestigatorError(ValueError):
@@ -60,7 +61,7 @@ class EvidenceGroundedInvestigatorService:
                     retrieval_top_k=request.retrieval_top_k,
                 ),
                 # Read Product 360 from the same tenant data plane as the investigation.
-                data_plane_engine=db.get_bind(),
+                data_plane_engine=scoped_bind(db),
             )
         except InvestigationWorkspaceError as exc:
             raise InvestigatorError(exc.code, exc.message) from exc

@@ -29,6 +29,7 @@ from backend.app.db.models.stage2 import (
 from backend.app.db.session import get_db
 from backend.app.request_context import ensure_tenant_access
 from backend.app.runtime_env import is_development
+from backend.app.db.tenant_scope import bind_system, bind_tenant
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -124,6 +125,7 @@ def mfa_enroll(request: Request, db: Session = Depends(get_db)):
     user = db.query(AuthUser).filter(AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id).first()
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    bind_tenant(db, user.tenant_id)
     code = f"{secrets.randbelow(1000000):06d}"
     now = datetime.now(timezone.utc)
     db.query(MfaChallenge).filter(
@@ -152,6 +154,13 @@ def mfa_enroll(request: Request, db: Session = Depends(get_db)):
 @router.post("/mfa/verify-enrollment")
 def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends(get_db)):
     token = request.cookies.get("mdarix_session", "")
+    current = (
+        db.query(AuthSession)
+        .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
+        .first()
+    )
+    if current is not None:
+        bind_tenant(db, current.tenant_id)
     challenge = (
         db.query(MfaChallenge)
         .join(AuthSession, AuthSession.user_id == MfaChallenge.user_id)
@@ -198,6 +207,7 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
     )
     if not session:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    bind_tenant(db, session.tenant_id)
     user = (
         db.query(AuthUser)
         .filter(AuthUser.id == session.user_id, AuthUser.tenant_id == session.tenant_id, AuthUser.status == "ACTIVE")
@@ -345,6 +355,7 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
         row = _account_for_email(db, identifier)
         if not row:
             raise ValueError("INVALID_CREDENTIALS")
+        bind_tenant(db, row.tenant_id)
         if getattr(row, "password_expires_at", None) and row.password_expires_at <= now:
             raise HTTPException(
                 403, detail={"code": "PASSWORD_EXPIRED", "message": "Password change is required before sign-in."}
@@ -432,6 +443,7 @@ def session(request: Request, db: Session = Depends(get_db)):
     )
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    bind_tenant(db, user.tenant_id)
     ensure_tenant_access(db, user)
     row.last_seen_at = datetime.now(timezone.utc)
     db.commit()
@@ -467,6 +479,7 @@ def forgot(data: ResetRequest, db: Session = Depends(get_db)):
     # Same answer for unknown and blocked accounts, so the response reveals nothing.
     if not row or _admin_blocked(row):
         return {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "NOT_SENT"}
+    bind_tenant(db, row.tenant_id)
     token = issue_reset(db, row.id, row.tenant_id)
     delivery = send_password_reset_email(row.username, token)
     return {
@@ -479,10 +492,12 @@ def forgot(data: ResetRequest, db: Session = Depends(get_db)):
 @router.post("/reset-password")
 def reset(data: Reset, db: Session = Depends(get_db)):
     try:
+        bind_system(db, "redeem single-use password reset token")
         user_id = consume(db, data.token, "reset")
         row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
         if row is None or _admin_blocked(row):
             raise ValueError("INVALID_RESET")
+        bind_tenant(db, row.tenant_id)
         now = datetime.now(timezone.utc)
         if _password_reuse(db, row, data.password):
             raise ValueError("PASSWORD_REUSE_NOT_ALLOWED")
@@ -506,10 +521,12 @@ def reset(data: Reset, db: Session = Depends(get_db)):
 @router.post("/activate-account")
 def activate(data: Reset, db: Session = Depends(get_db)):
     try:
+        bind_system(db, "redeem single-use activation token")
         user_id = consume(db, data.token, "activation")
         row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
         if row is None or _admin_blocked(row):
             raise ValueError("INVALID_ACTIVATION")
+        bind_tenant(db, row.tenant_id)
         now = datetime.now(timezone.utc)
         if _password_reuse(db, row, data.password):
             raise ValueError("PASSWORD_REUSE_NOT_ALLOWED")

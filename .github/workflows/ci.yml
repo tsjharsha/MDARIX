@@ -24,6 +24,9 @@ jobs:
       MDARIX_DB_HARDENING_APPLY: '1'
       # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
       MDARIX_ENV: development
+      # The API connects as the least-privilege runtime role, so tests exercise Postgres row-level security.
+      MDARIX_DB_RUNTIME_USER: mdarix_runtime
+      MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -46,6 +49,8 @@ jobs:
       - run: pip-audit -r requirements.txt
       - name: Apply complete schema and runtime hardening
         run: alembic upgrade head
+      - name: Give the runtime role a login
+        run: python scripts/configure_runtime_role.py
       - name: Seed deterministic test identities
         env:
           DAY35_FIXTURE_APPLY: '1'
@@ -87,6 +92,9 @@ jobs:
       MDARIX_DB_HARDENING_APPLY: '1'
       # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
       MDARIX_ENV: development
+      # The API connects as the least-privilege runtime role, so tests exercise Postgres row-level security.
+      MDARIX_DB_RUNTIME_USER: mdarix_runtime
+      MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
       DAY35_FIXTURE_APPLY: '1'
       DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:
@@ -107,6 +115,7 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install -r requirements.txt
       - run: alembic upgrade head
+      - run: python scripts/configure_runtime_role.py
       - run: python scripts/provision_day35_fixture.py
       - name: Start backend
         shell: bash
@@ -191,6 +200,9 @@ jobs:
       MDARIX_DB_HARDENING_APPLY: '1'
       # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
       MDARIX_ENV: development
+      # The API connects as the least-privilege runtime role, so tests exercise Postgres row-level security.
+      MDARIX_DB_RUNTIME_USER: mdarix_runtime
+      MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
       DAY35_FIXTURE_APPLY: '1'
       DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:
@@ -212,6 +224,7 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - run: docker compose config --quiet
       - run: alembic upgrade head
+      - run: python scripts/configure_runtime_role.py
       - run: python scripts/provision_day35_fixture.py
       # MinIO is an optional local object-storage service. The hosted runner
       # does not require it for the contract/integration tests below, and the

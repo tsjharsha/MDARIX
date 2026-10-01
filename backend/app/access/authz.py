@@ -10,6 +10,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.request_context import get_request_context
 from backend.app.runtime_env import is_development
+from backend.app.db.tenant_scope import bind_system
 
 
 def _require_administrator(request: Request, db: Session) -> AuthUser:
@@ -81,6 +82,9 @@ def _require_platform_admin(request: Request, db: Session) -> AuthUser:
         raise HTTPException(
             403, detail={"code": "PLATFORM_ADMIN_REQUIRED", "message": "Platform administrator role required"}
         )
+    # Platform administration spans tenants (customer directory, provisioning, trials), so only after the role is
+    # verified does this request leave its own tenant's row-level scope.
+    bind_system(db, "platform administrator")
     return user
 
 

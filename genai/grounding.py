@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from genai.provider import GenAIProvider, GenAIUnavailable
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceService
+from backend.app.db.tenant_scope import scoped_bind
 
 
 CONTEXT_POLICY_VERSION = "R1-GROUNDED-AI-CONTEXT-v1"
@@ -119,8 +120,7 @@ def build_authorized_context(
 ) -> dict[str, Any]:
     """Build context from tenant-scoped services; request-supplied tenant identity is never accepted."""
     # Read product context from the tenant's own data plane, as the investigation workspace route does.
-    bind = getattr(db, "get_bind", None)
-    data_plane = {"data_plane_engine": bind()} if callable(bind) else {}
+    data_plane = {"data_plane_engine": scoped_bind(db)} if hasattr(db, "connection") else {}
     workspace = InvestigationWorkspaceService().workspace(
         db,
         InvestigationWorkspaceRequest(

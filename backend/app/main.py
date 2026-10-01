@@ -46,6 +46,7 @@ from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
 from scenario_intelligence.router import router as scenario_router
 from backend.app.runtime_env import is_production_like
+from backend.app.db.tenant_scope import scoped_bind
 
 _production_like = is_production_like()
 _docs_enabled = os.getenv("MDARIX_ENABLE_API_DOCS", "true" if not _production_like else "false").lower() == "true"
@@ -312,7 +313,7 @@ def get_path(
 def list_products(
     ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)
 ) -> list[ProductSummary]:
-    return product360_service.list_products(ctx.tenant_id, db_engine=data_db.get_bind())
+    return product360_service.list_products(ctx.tenant_id, db_engine=scoped_bind(data_db))
 
 
 @app.get("/api/v1/products/{product_id}/investigations")
@@ -322,7 +323,7 @@ def list_product_investigations(
     data_db: Session = Depends(get_data_plane_db),
 ) -> list[dict]:
     try:
-        return product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=data_db.get_bind())
+        return product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=scoped_bind(data_db))
     except Product360Error as exc:
         raise product_error(exc) from exc
 
@@ -364,7 +365,7 @@ def get_product360(
 ) -> Product360Response:
     try:
         result = product360_service.product360(
-            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind()
+            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=scoped_bind(data_db)
         )
         _product360_audit(db, result, mode, as_of, ctx)
         return result
@@ -385,12 +386,12 @@ def get_timeline(
 ) -> TemporalRealityResponse:
     try:
         result = product360_service.temporal_reality(
-            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind()
+            product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=scoped_bind(data_db)
         )
         _product360_audit(
             db,
             product360_service.product360(
-                product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=data_db.get_bind()
+                product_id, version_id, as_of, mode, ctx.tenant_id, db_engine=scoped_bind(data_db)
             ),
             mode,
             as_of,

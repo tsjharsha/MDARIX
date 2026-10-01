@@ -22,6 +22,7 @@ from investigator.schemas import (
 )
 from investigator.service import EvidenceGroundedInvestigatorService, InvestigatorError
 from backend.app.access.permissions import AI_RUN, require_permission
+from backend.app.db.tenant_scope import scoped_bind
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Workspace"])
 service = InvestigationWorkspaceService()
@@ -64,7 +65,7 @@ def get_investigation_workspace(
         retrieval_top_k=retrieval_top_k,
     )
     try:
-        return service.workspace(data_db, request, data_plane_engine=data_db.get_bind())
+        return service.workspace(data_db, request, data_plane_engine=scoped_bind(data_db))
     except InvestigationWorkspaceError as exc:
         raise workspace_error(exc) from exc
 

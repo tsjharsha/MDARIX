@@ -8,6 +8,7 @@ from backend.app.db.models.foundation import AuditEvent, Decision, HumanReview, 
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceService, InvestigationWorkspaceError
 from decision_center.schemas import AdvisoryRequest, DecisionContextRequest, DecisionCreateRequest, ReviewCreateRequest
+from backend.app.db.tenant_scope import scoped_bind
 
 OPTIONS = [
     "CONTINUE_INVESTIGATION",
@@ -80,7 +81,7 @@ class DecisionCenterService:
                     retrieval_top_k=8,
                 ),
                 # Read Product 360 from the same tenant data plane as the investigation.
-                data_plane_engine=db.get_bind(),
+                data_plane_engine=scoped_bind(db),
             )
         except InvestigationWorkspaceError as exc:
             raise DecisionCenterError(exc.code, exc.message) from exc

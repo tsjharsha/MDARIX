@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from auth.durable import hash_token
@@ -20,6 +19,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.stage2 import AuthSession
 from backend.app.db.session import get_db
 from backend.app.runtime_env import is_development
+from backend.app.db.tenant_scope import bind_tenant
 
 
 def set_database_tenant_context(db: Session, tenant_id: str) -> None:
@@ -28,7 +28,7 @@ def set_database_tenant_context(db: Session, tenant_id: str) -> None:
     SET LOCAL is transaction-scoped, so a pooled connection cannot retain a
     previous tenant after the request completes.
     """
-    db.execute(text("select set_config('app.tenant_id', :tenant_id, true)"), {"tenant_id": str(tenant_id)})
+    bind_tenant(db, tenant_id)
 
 
 # Organization and membership states that end access. Other states (for example INVITED, PROVISIONED or

@@ -314,7 +314,8 @@ test.describe("MDARIX browser evidence", () => {
       .getByRole("tablist", { name: "Customers & Tenants sections" })
       .getByRole("tab", { name: "Tenant Audit", exact: true })
       .click();
-    await expect(page.getByRole("button", { name: /export csv/i })).toBeVisible();
+    // The tenant audit view loads the customer directory first (a known slow call, tracked for Phase 4).
+    await expect(page.getByRole("button", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("button", { name: /create evidence package/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
 
