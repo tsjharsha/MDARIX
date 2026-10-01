@@ -13,11 +13,26 @@ class ContentSecurityError(Exception):
     pass
 
 
+# Evidence files live in one storage folder: MDARIX_EVIDENCE_STORAGE_ROOT, or the golden dataset folder by default.
+# References are relative paths inside it; nothing else on the server (application code, .env) can ever be read.
+_DEFAULT_STORAGE_ROOT = Path(__file__).resolve().parents[2] / "data" / "golden"
+ALLOWED_EVIDENCE_SUFFIXES = {".md", ".txt", ".csv", ".json"}
+
+
+def evidence_storage_root() -> Path:
+    configured = os.getenv("MDARIX_EVIDENCE_STORAGE_ROOT", "").strip()
+    return Path(configured).resolve() if configured else _DEFAULT_STORAGE_ROOT.resolve()
+
+
 class EvidenceContentReader:
-    """Securely reads and resolves evidence content from DB records or tenant-scoped local storage."""
+    """Securely reads and resolves evidence content from DB records or the evidence storage folder."""
 
     def __init__(self, workspace_root: Optional[Path] = None):
-        self.workspace_root = workspace_root or Path(os.getcwd())
+        self._configured_root = workspace_root
+
+    @property
+    def workspace_root(self) -> Path:
+        return (self._configured_root or evidence_storage_root()).resolve()
 
     def get_evidence_content(
         self, db: Session, tenant_id: uuid.UUID, evidence_id: uuid.UUID
@@ -47,32 +62,37 @@ class EvidenceContentReader:
             return evidence.content, metadata
 
         # 2. File-backed evidence reference resolving with strict path traversal defense
-        if evidence.document_ref:
+        # source_reference is a citation label (e.g. "TW-1"), never a file path, so only document_ref is read.
+        if evidence.document_ref and "://" not in evidence.document_ref.replace("file://", ""):
             safe_content = self.read_file_reference(evidence.document_ref)
-            return safe_content, metadata
-
-        if evidence.source_reference:
-            safe_content = self.read_file_reference(evidence.source_reference)
             return safe_content, metadata
 
         # Default fallback string if no content text is populated
         return f"Evidence record: {evidence.title} ({evidence.evidence_type})", metadata
 
     def read_file_reference(self, file_ref: str) -> str:
-        """Resolves file reference safely, preventing path traversal attacks."""
-        # Sanitize and resolve target path
-        clean_ref = file_ref.replace("file:///", "").replace("file://", "")
-        target_path = Path(clean_ref).resolve()
-
-        # Check path traversal
+        """Read a relative reference inside the evidence storage folder; anything else is refused."""
+        clean_ref = file_ref.replace("file:///", "").replace("file://", "").replace("\\", "/").strip()
+        relative = Path(clean_ref)
+        if (
+            not clean_ref
+            or relative.is_absolute()
+            or relative.drive
+            or clean_ref.startswith("/")
+            or ".." in relative.parts
+            or relative.suffix.lower() not in ALLOWED_EVIDENCE_SUFFIXES
+        ):
+            raise ContentSecurityError("Access denied: evidence references must be relative paths in evidence storage.")
+        root = self.workspace_root
+        target_path = (root / relative).resolve()
+        # Resolving follows links, so a link pointing outside the storage folder is refused too.
         try:
-            target_path.relative_to(self.workspace_root.resolve())
+            target_path.relative_to(root)
         except ValueError:
-            # If path is outside workspace, reject path traversal
-            raise ContentSecurityError(f"Access denied: file path {clean_ref} is outside the allowed tenant workspace.")
+            raise ContentSecurityError("Access denied: evidence reference is outside evidence storage.")
 
-        if not target_path.exists():
-            return f"File reference {clean_ref} not found on disk."
+        if not target_path.is_file():
+            return "The referenced evidence file is not available."
 
         with open(target_path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
