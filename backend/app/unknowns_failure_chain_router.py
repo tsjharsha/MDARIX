@@ -51,6 +51,8 @@ def create_unknowns(
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    # Same tenant check as failure chains: another tenant's investigation is simply not found.
+    _authorize_investigation(db, uuid.UUID(ctx.tenant_id), investigation_id)
     try:
         return service.unknowns(
             db, data.model_copy(update={"tenant_id": uuid.UUID(ctx.tenant_id), "investigation_id": investigation_id})

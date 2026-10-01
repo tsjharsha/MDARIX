@@ -134,7 +134,10 @@ def list_decisions(
     from backend.app.db.models.foundation import Decision
 
     tenant_id = ctx.tenant_id
-    service._investigation(db, tenant_id, investigation_id)
+    try:
+        service._investigation(db, tenant_id, investigation_id)
+    except DecisionCenterError as exc:
+        raise error(exc) from exc
     return [
         _decision_payload(item)
         for item in db.query(Decision)
