@@ -38,6 +38,7 @@ from backend.app.stage3_router import router as stage3_router
 from backend.app.stage3_workflow_router import router as stage3_workflow_router
 from backend.app.trust_router import router as trust_router
 from backend.app.trial.router import router as trial_router
+from backend.app.data_import_router import router as data_import_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -188,6 +189,7 @@ app.include_router(communication_router)
 app.include_router(stage3_workflow_router)
 app.include_router(mapping_catalog_router)
 app.include_router(trial_router)
+app.include_router(data_import_router)
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

@@ -1,8 +1,9 @@
-"""CSV templates, checks, import and automatic insights for free-trial workspaces.
+"""Validated import of products, lots and complaints: CSV uploads (trials and workspaces) and mapped connector records.
 
-Every file is checked in full before anything is written: only template columns are accepted, references must
+Every batch is checked in full before anything is written: only template columns are accepted, references must
 resolve inside the tenant, and text that looks like personal data (emails, phone numbers, dates of birth, patient
-or record numbers, named people) is rejected. A file with any problem imports nothing.
+or record numbers, named people) is rejected. A batch with any problem imports nothing. An ImportPolicy sets the
+source label recorded on each row and any row or file limits (free trials have both).
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import csv
 import io
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 
 from fastapi import HTTPException
@@ -22,14 +24,35 @@ from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import TRIAL_FILE_LIMIT_BYTES, TRIAL_ROW_LIMIT
 
 UPLOAD_SOURCE = "TRIAL_UPLOAD"
+WORKSPACE_UPLOAD_SOURCE = "CSV_IMPORT"
 MAX_ISSUES = 50
+
+
+@dataclass(frozen=True)
+class ImportPolicy:
+    source: str
+    row_limit: int | None = None
+    file_limit_bytes: int = 10 * 1024 * 1024
+    file_too_large: str = "Files can be up to 10 MB"
+    limit_label: str = "your workspace"
+
+
+TRIAL_POLICY = ImportPolicy(
+    source=UPLOAD_SOURCE,
+    row_limit=TRIAL_ROW_LIMIT,
+    file_limit_bytes=TRIAL_FILE_LIMIT_BYTES,
+    file_too_large="Files can be up to 2 MB during the free trial",
+    limit_label="your trial",
+)
+WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
 COMPLAINT_STATUSES = {"open", "closed", "under investigation"}
 
 TEMPLATES: dict[str, dict] = {
     "products": {
         "title": "Products and versions",
-        "required": ["product_id", "product_name", "version"],
-        "optional": ["product_family", "version_release_date"],
+        "required": ["product_id", "product_name"],
+        # A version is optional so sources that only list products (e.g. a PLM product list) can load them.
+        "optional": ["version", "product_family", "version_release_date"],
         "example": [
             ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev C", "Infusion therapy", "2026-03-15"],
             ["PUMP-200", "AquaFlow 200 Infusion Pump", "Rev D", "Infusion therapy", "2026-07-01"],
@@ -109,13 +132,11 @@ class _Report:
             self.issues.append({"row": row, "column": column, "message": message})
 
 
-def _parse(entity: str, raw: bytes, report: _Report) -> list[tuple[int, dict]]:
+def _parse(entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIAL_POLICY) -> list[tuple[int, dict]]:
     if entity not in TEMPLATES:
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
-    if len(raw) > TRIAL_FILE_LIMIT_BYTES:
-        raise HTTPException(
-            413, detail={"code": "FILE_TOO_LARGE", "message": "Files can be up to 2 MB during the free trial"}
-        )
+    if len(raw) > policy.file_limit_bytes:
+        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
     try:
         text = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -243,7 +264,7 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> in
             if product is None and row["product_id"] not in new_products:
                 new_products.add(row["product_id"])
                 new += 1
-            if product is None or lookup.version(product, row["version"]) is None:
+            if row.get("version") and (product is None or lookup.version(product, row["version"]) is None):
                 new += 1
             continue
         product = lookup.product(row["product_id"])
@@ -282,33 +303,59 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> in
     return new
 
 
-def uploaded_rows(db: Session, tenant_id) -> int:
+def rows_from_records(entity: str, records: list[dict], report: _Report) -> list[tuple[int, dict]]:
+    """Mapped connector records as template rows (record number instead of a file line)."""
+    if entity not in TEMPLATES:
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
+    spec = TEMPLATES[entity]
+    allowed = set(spec["required"] + spec["optional"])
+    rows = []
+    for number, record in enumerate(records, 1):
+        unknown = sorted(set(record) - allowed)
+        if unknown:
+            report.add(number, unknown[0], f"Field '{unknown[0]}' is not part of the {entity} template.")
+            continue
+        rows.append((number, {column: str(record.get(column) or "").strip() for column in record}))
+    if not records:
+        report.add(None, None, "No records to import.")
+    return rows
+
+
+def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
     total = 0
     for model in (Product, ProductVersion, LotBatch, Complaint):
         total += (
-            db.query(func.count(model.id))
-            .filter(model.tenant_id == tenant_id, model.source_system == UPLOAD_SOURCE)
-            .scalar()
+            db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, model.source_system == source).scalar()
             or 0
         )
     return int(total)
 
 
-def check_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
+def check_file(db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY) -> dict:
     report = _Report()
-    rows = _parse(entity, raw, report)
+    rows = _parse(entity, raw, report, policy)
+    return _check_rows(db, tenant_id, entity, rows, report, policy)
+
+
+def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
+    report = _Report()
+    rows = rows_from_records(entity, records, report)
+    return _check_rows(db, tenant_id, entity, rows, report, policy)
+
+
+def _check_rows(db: Session, tenant_id, entity: str, rows, report: _Report, policy: ImportPolicy) -> dict:
     new_rows = 0
     if rows:
         _check_values(entity, rows, report)
         if not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report)
-    used = uploaded_rows(db, tenant_id)
-    if new_rows and used + new_rows > TRIAL_ROW_LIMIT:
+    used = uploaded_rows(db, tenant_id, policy.source)
+    if policy.row_limit is not None and new_rows and used + new_rows > policy.row_limit:
         report.add(
             None,
             None,
-            f"This file adds {new_rows} records; your trial has {max(TRIAL_ROW_LIMIT - used, 0)} of "
-            f"{TRIAL_ROW_LIMIT} left.",
+            f"This file adds {new_rows} records; {policy.limit_label} has {max(policy.row_limit - used, 0)} of "
+            f"{policy.row_limit} left.",
         )
     return {
         "entity": entity,
@@ -320,14 +367,14 @@ def check_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
         "ready": bool(rows) and report.error_count == 0,
         "preview": [row for _, row in rows[:8]],
         "rows_used": used,
-        "row_limit": TRIAL_ROW_LIMIT,
+        "row_limit": policy.row_limit,
     }
 
 
-def _stamp(now: datetime, row_date: datetime | None = None) -> dict:
+def _stamp(now: datetime, row_date: datetime | None = None, source: str = UPLOAD_SOURCE) -> dict:
     when = row_date or now
     return {
-        "source_system": UPLOAD_SOURCE,
+        "source_system": source,
         "source_timestamp": when,
         "effective_timestamp": when,
         "recorded_timestamp": now,
@@ -337,13 +384,26 @@ def _stamp(now: datetime, row_date: datetime | None = None) -> dict:
     }
 
 
-def import_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
-    report = check_file(db, tenant_id, entity, raw)
+def import_file(db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY) -> dict:
+    report = check_file(db, tenant_id, entity, raw, policy)
     if not report["ready"]:
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
-    rows = _parse(entity, raw, _Report())
+    return _write_rows(db, tenant_id, entity, _parse(entity, raw, _Report(), policy), policy)
+
+
+def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
+    report = check_records(db, tenant_id, entity, records, policy)
+    if not report["ready"]:
+        raise HTTPException(
+            422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
+        )
+    return _write_rows(db, tenant_id, entity, rows_from_records(entity, records, _Report()), policy)
+
+
+def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy) -> dict:
+    source = policy.source
     lookup = _Lookup(db, tenant_id)
     now = datetime.now(timezone.utc)
     created = updated = 0
@@ -359,16 +419,19 @@ def import_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
                     product_family=row.get("product_family") or None,
                     lifecycle_status="active",
                     source_identifier=row["product_id"],
-                    **_stamp(now),
+                    **_stamp(now, None, source),
                 )
                 db.add(product)
                 db.flush()
                 lookup.products[row["product_id"]] = product
                 created += 1
-            elif product.source_system == UPLOAD_SOURCE:
+            elif product.source_system == source:
                 product.name = row["product_name"]
                 product.product_family = row.get("product_family") or product.product_family
                 product.updated_at = now
+            if not row.get("version"):
+                db.flush()
+                continue
             released = _date(row["version_release_date"]) if row.get("version_release_date") else None
             version = lookup.version(product, row["version"])
             if version is None:
@@ -380,7 +443,7 @@ def import_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
                     lifecycle_status="active",
                     release_timestamp=released,
                     source_identifier=f"{row['product_id']}:{row['version']}",
-                    **_stamp(now, released),
+                    **_stamp(now, released, source),
                 )
                 db.add(version)
                 lookup.versions[(row["product_id"], row["version"])] = version
@@ -405,7 +468,7 @@ def import_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
                     product_version_id=version.id if version else None,
                     status="active",
                     source_identifier=row["lot_id"],
-                    **_stamp(now, built),
+                    **_stamp(now, built, source),
                 )
                 db.add(lot)
                 lookup.lots[row["lot_id"]] = lot
@@ -443,7 +506,7 @@ def import_file(db: Session, tenant_id, entity: str, raw: bytes) -> dict:
                     complaint_identifier=row["complaint_id"],
                     source_identifier=row["complaint_id"],
                     **values,
-                    **_stamp(now, received or event),
+                    **_stamp(now, received or event, source),
                 )
             )
             created += 1

@@ -40,6 +40,9 @@ from backend.app.access.schemas import (
 )
 from backend.app.access.authz import _admin_tenant, _guard_user_administration
 from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
+from backend.app.access.connector_mapping import MappingNotUsable, import_connector_records, released_mapping
+from backend.app.db.data_plane import get_data_plane_db
+from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -463,7 +466,10 @@ def provider_schema(configuration_id: uuid.UUID, request: Request, db: Session =
 
 @router.post("/admin/configuration/connectors/{configuration_id}/execute")
 def execute_connector(
-    configuration_id: uuid.UUID, payload: ConnectorRunRequest, request: Request, db: Session = Depends(get_db)
+    configuration_id: uuid.UUID,
+    payload: ConnectorRunRequest,
+    request: Request,
+    db: Session = Depends(get_db),
 ):
     admin = _admin_tenant(request, db)
     row = (
@@ -538,6 +544,27 @@ def execute_connector(
         records,
     )
     result = connector.read_records()
+    # With a released mapping, the records also become the tenant's products, lots or complaints through the same
+    # checked import as CSV uploads (all or nothing). The raw records are staged in the outbox either way.
+    canonical_import = None
+    mapping_code = (row.configuration or {}).get("mapping_code")
+    if mapping_code and result:
+        try:
+            mapping = released_mapping(db, admin.tenant_id, str(mapping_code))
+        except MappingNotUsable as exc:
+            canonical_import = {"status": "BLOCKED", "reason": str(exc)}
+        else:
+            # The tenant's data plane is opened only when a mapping is configured.
+            sessions = get_data_plane_db(get_request_context(request, db), db)
+            data = next(sessions)
+            try:
+                canonical_import = import_connector_records(data, admin.tenant_id, row.code, mapping, result)
+                if canonical_import.get("status") == "IMPORTED":
+                    data.commit()
+                else:
+                    data.rollback()
+            finally:
+                sessions.close()
     for record in result:
         db.add(
             OutboxEvent(
@@ -557,6 +584,7 @@ def execute_connector(
         "records_read": len(result),
         "outbox_enqueued": len(result),
         "records": result,
+        "canonical_import": canonical_import,
     }
 
 

@@ -1,0 +1,119 @@
+"""Workspace data import: products, lots and complaints from CSV into the tenant's own records (Product 360).
+
+The same validated import the free trial uses (backend/app/trial/imports.py): the whole file is checked first and
+nothing is written unless every row passes. Needs permission to change records. Free-trial workspaces keep their row
+and file limits; other workspaces use the workspace policy. Each import is audited.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
+from sqlalchemy.orm import Session
+
+from backend.app.access.permissions import RECORDS_WRITE, require_permission
+from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.models.foundation import AuditEvent
+from backend.app.db.session import get_db
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.trial import imports
+from backend.app.trial.service import trial_subscription
+
+router = APIRouter(prefix="/api/v1/data/import", tags=["Data import"])
+
+
+def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPolicy:
+    is_trial = trial_subscription(db, uuid.UUID(str(ctx.tenant_id))) is not None
+    return imports.TRIAL_POLICY if is_trial else imports.WORKSPACE_POLICY
+
+
+async def _body(request: Request, policy: imports.ImportPolicy) -> bytes:
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > policy.file_limit_bytes:
+        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
+    raw = await request.body()
+    if len(raw) > policy.file_limit_bytes:
+        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
+    return raw
+
+
+@router.get("/templates")
+def import_templates(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    policy = _policy(db, ctx)
+    return {
+        "row_limit": policy.row_limit,
+        "file_limit_bytes": policy.file_limit_bytes,
+        "templates": [
+            {
+                "entity": entity,
+                "title": spec["title"],
+                "required": spec["required"],
+                "optional": spec["optional"],
+                "download": f"/api/v1/data/import/templates/{entity}.csv",
+            }
+            for entity, spec in imports.TEMPLATES.items()
+        ],
+    }
+
+
+@router.get("/templates/{entity}.csv")
+def import_template(entity: str, ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    if entity not in imports.TEMPLATES:
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
+    return Response(
+        imports.template_csv(entity),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="mdarix-{entity}-template.csv"'},
+    )
+
+
+@router.post("/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+async def check_import(
+    entity: str,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    policy = _policy(db, ctx)
+    return imports.check_file(data, uuid.UUID(str(ctx.tenant_id)), entity, await _body(request, policy), policy)
+
+
+@router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+async def run_import(
+    entity: str,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    policy = _policy(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    raw = await _body(request, policy)
+    try:
+        result = imports.import_file(data, tenant_id, entity, raw, policy)
+        data.commit()
+    except HTTPException:
+        data.rollback()
+        raise
+    except Exception as exc:
+        data.rollback()
+        raise HTTPException(
+            500, detail={"code": "IMPORT_FAILED", "message": "The import failed; nothing was saved"}
+        ) from exc
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=str(ctx.user_id),
+            action="DATA_IMPORTED",
+            entity_type="DataImport",
+            details={**result, "source": policy.source},
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    return result

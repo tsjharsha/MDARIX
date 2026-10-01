@@ -41,6 +41,7 @@ EXEMPT = {
     ("POST", "/api/v1/ask/"): "AI permission checked in the route (Ask resolves its own session)",
     ("GET", "/api/v1/stage3/reports/jobs/{job_id}"): "read-only job status; the download is guarded",
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",
+    ("GET", "/api/v1/data/import/templates/{entity}.csv"): "blank CSV template, no customer data",
 }
 
 
