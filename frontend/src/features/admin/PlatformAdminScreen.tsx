@@ -4802,7 +4802,7 @@ function ApiContractRegistryWorkspace() {
   const [tab, setTab] = useState("endpoints");
   const [selected, setSelected] = useState<any>(null);
   useEffect(() => {
-    api<any>("/openapi.json")
+    api<any>("/api/v1/platform-admin/api-contract")
       .then(setSpec)
       .catch((cause: any) => setError(cause?.message ?? "OpenAPI contract is unavailable."));
   }, []);

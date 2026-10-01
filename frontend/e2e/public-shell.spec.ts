@@ -18,7 +18,8 @@ test.describe("public MDARIX shell", () => {
   });
 
   test("verifies every public header and footer link resolves to a nonblank route", async ({ page }) => {
-    test.setTimeout(120_000);
+    // Visits every header, menu and footer link (about 100 pages).
+    test.setTimeout(240_000);
     await page.goto("/");
     const hrefs = new Set<string>();
     const collect = async () => {
@@ -29,8 +30,15 @@ test.describe("public MDARIX shell", () => {
       }
     };
     await collect();
-    for (const menu of await page.locator("#public-navigation > button").all()) {
-      await menu.click();
+    // On small screens the navigation sits behind the menu button; open it before each menu.
+    const openMobileMenu = async () => {
+      const toggle = page.getByRole("button", { name: "Open menu" });
+      if (await toggle.isVisible()) await toggle.click();
+    };
+    const count = await page.locator("#public-navigation > button").count();
+    for (let index = 0; index < count; index += 1) {
+      await openMobileMenu();
+      await page.locator("#public-navigation > button").nth(index).click();
       await collect();
       await page.keyboard.press("Escape");
     }

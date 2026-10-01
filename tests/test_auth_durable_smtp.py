@@ -1,3 +1,5 @@
+import os
+
 from auth.emailer import send_activation_email, smtp_configuration_status, EmailDeliveryError
 from auth.durable import hash_token
 
@@ -75,3 +77,11 @@ def test_smtp_failure_is_controlled_and_secret_free(monkeypatch):
 
 def test_durable_token_hash_is_one_way():
     assert hash_token("raw-token") != "raw-token" and hash_token("raw-token") == hash_token("raw-token")
+
+
+def test_test_suite_can_never_send_real_email():
+    # conftest blanks the SMTP settings from the developer's .env; account emails must report NOT_CONFIGURED.
+    if os.environ.get("MDARIX_TEST_ALLOW_LIVE_PROVIDERS") == "1":
+        return
+    assert smtp_configuration_status()["configured"] is False
+    assert send_activation_email("nobody@synthetic.invalid", "token", "Synthetic") == "NOT_CONFIGURED"

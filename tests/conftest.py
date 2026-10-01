@@ -22,6 +22,17 @@ if os.environ.get("MDARIX_TEST_ALLOW_LIVE_PROVIDERS") != "1":
     os.environ["MDARIX_GENAI_API_KEY"] = ""
     os.environ["MDARIX_GENAI_BASE_URL"] = ""
     os.environ["RESEND_API_KEY"] = ""
+    # Account emails go through SMTP (auth/emailer.py loads .env itself). Present-but-empty values stop
+    # python-dotenv from filling them in, so no test can send a real email. Tests that exercise SMTP patch
+    # smtplib and set their own values.
+    for _smtp_key in (
+        "MDARIX_SMTP_HOST",
+        "MDARIX_SMTP_USERNAME",
+        "MDARIX_SMTP_PASSWORD",
+        "MDARIX_SMTP_FROM",
+        "MDARIX_SMTP_VERIFIED_DOMAIN",
+    ):
+        os.environ[_smtp_key] = ""
 
 import uuid  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402

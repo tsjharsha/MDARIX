@@ -22,6 +22,17 @@ from backend.app.access.common import _audit_configuration, _safe_connector_summ
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
 
+@router.get("/platform-admin/api-contract")
+def api_contract(request: Request, db: Session = Depends(get_db)):
+    """The API contract (OpenAPI) for the platform's API registry.
+
+    The public /openapi.json is switched off in production-like environments; platform administrators still
+    need the contract, so it is served here behind the platform-admin check.
+    """
+    _require_platform_admin(request, db)
+    return request.app.openapi()
+
+
 @router.get("/platform-admin/ai/models")
 def get_platform_ai_models(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
