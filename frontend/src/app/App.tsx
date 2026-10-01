@@ -34,10 +34,10 @@ export function App() {
       "/product-lifecycle",
       "/trust",
       "/resources",
-      "/pricing",
       "/company",
       // Former pages; the site redirects them to the section that now holds their content.
       "/why-mdarix",
+      "/pricing",
       "/plans",
       "/roadmap",
       "/capabilities",

@@ -1,4 +1,85 @@
-import React, { useState } from "react";
+import React, { useState, type ReactNode } from "react";
+import { FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+
+const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
+  signin: {
+    eyebrow: "Investigation intelligence",
+    title: "Evidence before inference. Humans decide.",
+    points: [
+      [ShieldCheck, "Your organization's own workspace", "Every record you see belongs to your tenant only."],
+      [
+        FileSearch,
+        "Evidence-linked investigations",
+        "Complaints, versions, lots and suppliers connected in one place.",
+      ],
+      [UserCheck, "People make the decisions", "AI suggests and cites its evidence; authorized reviewers decide."],
+    ],
+  },
+  signup: {
+    eyebrow: "Get started",
+    title: "A private MDARIX workspace for your team.",
+    points: [
+      [ShieldCheck, "Set up for your organization", "We create an isolated workspace for your company."],
+      [UserCheck, "Secure invitation", "Your first administrator receives an email to activate the account."],
+      [FileSearch, "Bring a real question", "We walk through an investigation with you on day one."],
+    ],
+  },
+  security: {
+    eyebrow: "Account security",
+    title: "Your access is protected at every step.",
+    points: [
+      [LockKeyhole, "Single-use secure links", "Activation and reset links expire and work only once."],
+      [ShieldCheck, "Strong passwords and MFA", "Passwords are yours alone and never shown to administrators."],
+      [UserCheck, "Every sign-in is audited", "Access events are recorded for your administrators."],
+    ],
+  },
+};
+
+// Shared frame for every sign-in and account page: website brand, light med-tech backdrop, value panel and the form.
+function AuthFrame({ mode, children }: { mode: string; children: ReactNode }) {
+  const aside = ASIDE[mode] ?? ASIDE.security;
+  return (
+    <div className="auth-page">
+      <header className="auth-page-top">
+        <a className="auth-brand" href="/" aria-label="MDARIX home">
+          <span className="auth-logo" aria-hidden="true">
+            M
+          </span>
+          MDARIX<small>Product intelligence</small>
+        </a>
+        <a className="auth-back" href="/">
+          Back to website
+        </a>
+      </header>
+      <main className="auth-page-body">
+        <section className="auth-aside" aria-label="About MDARIX">
+          <span className="auth-eyebrow">{aside.eyebrow}</span>
+          <h2>{aside.title}</h2>
+          <ul>
+            {aside.points.map(([Icon, title, text]) => (
+              <li key={title}>
+                <span aria-hidden="true">
+                  <Icon size={18} />
+                </span>
+                <div>
+                  <strong>{title}</strong>
+                  <p>{text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+        {children}
+      </main>
+      <footer className="auth-page-foot">
+        <span>MDARIX · System of Intelligence, not System of Record</span>
+        <span>
+          <LockKeyhole size={13} aria-hidden="true" /> Encrypted connection · Tenant-isolated data
+        </span>
+      </footer>
+    </div>
+  );
+}
 
 export function AuthPage({ mode }: { mode: string }) {
   const [message, setMessage] = useState("");
@@ -58,12 +139,13 @@ export function AuthPage({ mode }: { mode: string }) {
     const data = await response.json();
     if (response.ok) {
       if (mode === "signup") {
-        setUserId(data.user_id);
+        // Sign-up records a request; the account itself is created when the workspace is set up.
+        if (data.user_id) setUserId(data.user_id);
         setToken(data.development_token ?? "");
         setMessage(
-          data.email_delivery === "SENT"
-            ? `Account created. Your User ID is ${data.user_id}. A verification email was sent.`
-            : `Account created. Your User ID is ${data.user_id}. Email delivery is not configured on this host; use the controlled verification link below.`,
+          data.status === "ONBOARDING_REQUEST_ACCEPTED"
+            ? `Thank you, your request is in. We will set up a private MDARIX workspace for ${company || "your organization"} and email ${email} an invitation to activate your account.`
+            : `Account created. Your User ID is ${data.user_id}.`,
         );
       } else if (mode === "verify-email") {
         setMessage("Email verified. You can now sign in with your User ID and password.");
@@ -96,10 +178,7 @@ export function AuthPage({ mode }: { mode: string }) {
   };
   if (isMfa)
     return (
-      <div className="auth-shell">
-        <a className="brand" href="/">
-          MDARIX
-        </a>
+      <AuthFrame mode="security">
         <form className="auth-card" onSubmit={submit}>
           <span className="eyebrow">Account security</span>
           <h1>{mfaEnrollment ? "Enroll an authenticator" : "Verify your identity"}</h1>
@@ -152,13 +231,10 @@ export function AuthPage({ mode }: { mode: string }) {
             <a href="/mfa?setup=1">Set up MFA</a> · <a href="/signin">Return to sign in</a>
           </p>
         </form>
-      </div>
+      </AuthFrame>
     );
   return (
-    <div className="auth-shell">
-      <a className="brand" href="/">
-        MDARIX
-      </a>
+    <AuthFrame mode={mode === "signin" || mode === "signup" ? mode : "security"}>
       <form className="auth-card" onSubmit={submit}>
         <span className="eyebrow">{mode === "signin" ? "Welcome back" : "MDARIX access"}</span>
         <h1>
@@ -174,6 +250,15 @@ export function AuthPage({ mode }: { mode: string }) {
                     ? "Create a new password"
                     : "Reset your password"}
         </h1>
+        <p className="auth-lead">
+          {mode === "signin"
+            ? "Use your work email or User ID to open your workspace."
+            : mode === "signup"
+              ? "Tell us who you are. We set up your organization's workspace and send you a secure invitation."
+              : mode === "forgot-password"
+                ? "Enter your work email and we will send you a secure reset link."
+                : "Use the secure link or token from your email."}
+        </p>
         {mode === "signup" && (
           <>
             <input
@@ -253,11 +338,29 @@ export function AuthPage({ mode }: { mode: string }) {
             )}
           </p>
         )}
-        <p className="auth-links">
-          <a href="/signup">Create account</a> · <a href="/signin">Sign in</a> ·{" "}
-          <a href="/verify-email">Verify email</a> · <a href="/forgot-password">Forgot password?</a>
-        </p>
+        {mode === "signin" ? (
+          <p className="auth-links auth-links-split">
+            <a href="/forgot-password">Forgot password?</a>
+            <span>
+              New to MDARIX? <a href="/signup">Create account</a>
+            </span>
+          </p>
+        ) : mode === "signup" ? (
+          <p className="auth-links">
+            Already have an account? <a href="/signin">Sign in</a>
+          </p>
+        ) : (
+          <p className="auth-links">
+            <a href="/signin">Return to sign in</a> · <a href="/signup">Create account</a>
+            {mode !== "verify-email" && (
+              <>
+                {" "}
+                · <a href="/verify-email">Verify email</a>
+              </>
+            )}
+          </p>
+        )}
       </form>
-    </div>
+    </AuthFrame>
   );
 }

@@ -11,7 +11,7 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
-import { menus, pages, postMarketResources, pricingPlans } from "./legacyContent";
+import { menus, pages, postMarketResources } from "./legacyContent";
 import {
   capabilityStatus,
   img,
@@ -30,7 +30,6 @@ export const SITE_PAGES = [
   "/product-lifecycle",
   "/trust",
   "/resources",
-  "/pricing",
   "/company",
 ] as const;
 export type SitePage = (typeof SITE_PAGES)[number];
@@ -941,59 +940,6 @@ export function ResourcesPage() {
         </div>
       </section>
       <CtaBand />
-    </>
-  );
-}
-
-/* ------------------------------------------------------------------------------------------------ Pricing */
-
-export function PricingPage() {
-  const pricing = pages["/pricing"];
-  const plans = pages["/plans"];
-  return (
-    <>
-      <section className="ms-page-hero ms-page-hero-center">
-        <div className="ms-page-hero-copy">
-          <span className="ms-eyebrow">{pricing.eyebrow}</span>
-          <h1>{pricing.title}</h1>
-          <p>{pricing.copy}</p>
-        </div>
-      </section>
-      <section className="ms-section">
-        <p className="ms-disclaimer">Illustrative early-access pricing. Plans and billing are not yet enabled.</p>
-        <div className="ms-pricing">
-          {pricingPlans.map((plan, index) => (
-            <Reveal key={plan.name} delay={index * 80} className={`ms-plan ${plan.featured ? "ms-plan-featured" : ""}`}>
-              {plan.featured && <span className="ms-plan-badge">Most popular</span>}
-              <h2>{plan.name}</h2>
-              <p>{plan.note}</p>
-              <div className="ms-plan-price">{plan.price}</div>
-              <small>{plan.cadence}</small>
-              <ul>
-                {plan.features.map((feature) => (
-                  <li key={feature}>
-                    <Check size={15} aria-hidden="true" /> {feature}
-                  </li>
-                ))}
-              </ul>
-              <a
-                className={`ms-btn ${plan.featured ? "ms-btn-primary" : "ms-btn-outline"}`}
-                href={plan.name === "Enterprise" ? "/company#contact" : "/signup"}
-              >
-                {plan.action}
-              </a>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-      <section className="ms-section ms-band" id="early-access">
-        <SectionHead eyebrow={plans.eyebrow} title={plans.title} copy={plans.copy} />
-        <Reveal className="ms-center">
-          <a className="ms-btn ms-btn-primary" href="/signup">
-            Get started <ArrowRight size={16} aria-hidden="true" />
-          </a>
-        </Reveal>
-      </section>
     </>
   );
 }

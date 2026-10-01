@@ -7,7 +7,6 @@ import {
   HomePage,
   LifecyclePage,
   PlatformPage,
-  PricingPage,
   ResourcesPage,
   SITE_PAGES,
   SolutionsPage,
@@ -22,7 +21,9 @@ const LEGACY_PAGES: Record<string, string> = {
   "/ai-trust": "/trust#ai",
   "/security": "/trust#security",
   "/integrations": "/trust#integrations",
-  "/plans": "/pricing#early-access",
+  // Pricing was removed until plans and billing are offered; its links go to Get started.
+  "/pricing": "/company#contact",
+  "/plans": "/company#contact",
   "/capabilities": "/platform",
   "/roadmap": "/product-lifecycle#roadmap",
   "/request-demo": "/company#contact",
@@ -150,7 +151,6 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     links: [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
-      ["Plans & pricing", "/pricing"],
       ["Request a demo", "/company#contact"],
     ],
   },
@@ -233,9 +233,6 @@ export function PublicMegaSite({ path }: { path: string }) {
           <a href="/resources" className={page === "/resources" ? "is-current" : ""} onClick={closeMenus}>
             Resources
           </a>
-          <a href="/pricing" className={page === "/pricing" ? "is-current" : ""} onClick={closeMenus}>
-            Pricing
-          </a>
           <a href="/company" className={page === "/company" ? "is-current" : ""} onClick={closeMenus}>
             Company
           </a>
@@ -276,7 +273,6 @@ export function PublicMegaSite({ path }: { path: string }) {
         {page === "/product-lifecycle" && <LifecyclePage />}
         {page === "/trust" && <TrustPage />}
         {page === "/resources" && <ResourcesPage />}
-        {page === "/pricing" && <PricingPage />}
         {page === "/company" && <CompanyPage />}
       </main>
 
@@ -327,7 +323,6 @@ function pageTitle(page: SitePage) {
     "/product-lifecycle": "Product lifecycle",
     "/trust": "Trust",
     "/resources": "Resources",
-    "/pricing": "Plans & pricing",
     "/company": "Company",
   }[page];
 }
