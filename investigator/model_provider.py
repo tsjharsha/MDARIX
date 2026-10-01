@@ -40,7 +40,7 @@ MIN_ACCEPTED_CITED = 2  # below this the rule-based analysis is used
 
 FORBIDDEN_CLAIMS = re.compile(
     r"(?i)\b("
-    r"(is|was|are|were) the root cause|root cause (is|was) |root-caused"
+    r"(is|was|are|were) the root cause|root cause (is|was) (?!(not|un|still|yet)\b)|root-caused"
     r"|caused (the|these|this|all)\b|proven (cause|causal)|establishes causality|confirms? causality|definitively caused"
     r"|\d+(\.\d+)?\s*% (probability|likelihood|chance)"
     r"|(must|should) (be )?(file|filed|report) (an? )?(mdr|vigilance)|recall (is|was) required|approve the (release|decision)"
@@ -262,10 +262,16 @@ def _reference(evidence: dict[str, Any]) -> SourceReference:
     )
 
 
+DASHES = "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"
+TYPOGRAPHIC = re.compile("[" + DASHES + "\u00a0\u2007\u202f]")
+
+
 def parse_json_reply(answer: str | None) -> dict[str, Any]:
     """The model's JSON reply as a dict, or ModelAnalysisUnavailable."""
     if not answer:
         raise ModelAnalysisUnavailable("MODEL_EMPTY_RESPONSE")
+    # Typographic hyphens and narrow spaces (LOT\u2011010, Rev\u202fB) become plain ones, so text and identifiers match.
+    answer = TYPOGRAPHIC.sub(lambda match: "-" if match.group() in DASHES else " ", answer)
     try:
         parsed = json.loads(_strip_fences(answer))
     except ValueError as exc:

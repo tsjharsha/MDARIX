@@ -25,9 +25,55 @@ class BriefError(ValueError):
         self.code, self.message = code, message
 
 
+def _same_point_in_time(temporal_context: dict, mode: str, cutoff) -> bool:
+    """Whether an analysis was made for the brief's view: same temporal mode and, if historical, same as-of time."""
+    if (temporal_context or {}).get("mode") != mode:
+        return False
+    if mode == "current":
+        return True
+    as_of = (temporal_context or {}).get("as_of")
+    try:
+        return as_of is not None and cutoff is not None and datetime.fromisoformat(as_of) == cutoff
+    except (TypeError, ValueError):
+        return False
+
+
 class BriefService:
-    def __init__(self):
+    def __init__(self, model_writer=None):
         self.workspace = InvestigationWorkspaceService()
+        self._model_writer = model_writer
+
+    def _model_brief(self, db, tenant_id, investigation_id, evidence, mode, cutoff) -> tuple[dict | None, dict]:
+        """A model-drafted brief from the latest checked analysis, hypotheses and challenges, or why not."""
+        from briefs.model_writer import ModelBriefWriter
+        from challenger.service import ChallengerService
+        from hypothesis_engine.service import CompetingHypothesisService
+        from investigator.model_provider import ModelAnalysisUnavailable
+        from investigator.service import EvidenceGroundedInvestigatorService
+
+        analysis = EvidenceGroundedInvestigatorService().latest(db, tenant_id, investigation_id)
+        hypotheses = CompetingHypothesisService().latest(db, tenant_id, investigation_id)
+        challenges = ChallengerService().latest(db, tenant_id, investigation_id)
+        analysis = analysis.analysis if analysis else None
+        if analysis is not None and not _same_point_in_time(analysis.temporal_context, mode, cutoff):
+            # The brief must describe the same point in time as the analysis it is drafted from.
+            return None, {"hypothesis_set": None, "challenge_set": None, "fallback_reason": "ANALYSIS_FOR_ANOTHER_TIME"}
+        hypothesis_set = hypotheses.hypothesis_set if hypotheses else None
+        challenge_set = challenges.challenge_set if challenges else None
+        known = {e.evidence_identifier for e in evidence}
+        if analysis is not None:
+            known |= {
+                ref.evidence_identifier
+                for item in analysis.accepted_items()
+                for ref in item.source_references
+                if ref.evidence_identifier
+            }
+        sources = {"hypothesis_set": hypothesis_set, "challenge_set": challenge_set}
+        try:
+            writer = self._model_writer or ModelBriefWriter()
+            return writer.draft(analysis, hypothesis_set, challenge_set, known), sources
+        except ModelAnalysisUnavailable as exc:
+            return None, {**sources, "fallback_reason": exc.reason}
 
     def _investigation(self, db, tenant_id, investigation_id):
         row = (
@@ -212,25 +258,69 @@ class BriefService:
             },
             "limitations": limitations,
         }
-        from genai.grounding import advisory, build_authorized_context
+        ai_brief, sources = self._model_brief(db, tenant_id, investigation_id, evidence, request.temporal_mode, cutoff)
+        if ai_brief is not None:
+            hypothesis_set, challenge_set = sources["hypothesis_set"], sources["challenge_set"]
+            sections = ai_brief["sections"]
+            content["ai_brief"] = {"label": "AI DRAFT — HUMAN REVIEW REQUIRED", **ai_brief}
+            content["executive_summary"] = {
+                **content["executive_summary"],
+                "text": ai_brief["headline"],
+                "observed_facts": [item["statement"] for item in sections["what_we_know"]],
+                "ai_interpretation": [item["statement"] for item in sections["leading_hypotheses"]],
+            }
+            if hypothesis_set is not None:
+                for key, attribute in (
+                    ("supporting_evidence", "supporting_evidence"),
+                    ("contradicting_evidence", "contradicting_evidence"),
+                ):
+                    content[key] = [
+                        {
+                            "hypothesis": item.statement,
+                            "evidence": ref.evidence_identifier,
+                            "why": relation.rationale,
+                        }
+                        for item in hypothesis_set.hypotheses
+                        for relation in getattr(item, attribute)
+                        for ref in relation.source_references[:1]
+                    ]
+            if challenge_set is not None:
+                content["ai_challenger_findings"] = [
+                    {
+                        "type": item.challenge_type,
+                        "statement": item.statement,
+                        "severity": item.severity,
+                        "evidence": [ref.evidence_identifier for ref in item.evidence_references],
+                        "missing": item.missing_information,
+                    }
+                    for item in challenge_set.challenges
+                ]
+            content["ai_advisory"] = {
+                "label": "AI ADVISORY — HUMAN REVIEW REQUIRED",
+                "status": "NOT_NEEDED",
+                "message": "The language model drafted this brief; see ai_brief.",
+            }
+        else:
+            content["ai_brief"] = {"author": "RULES", "fallback_reason": sources.get("fallback_reason")}
+            from genai.grounding import advisory, build_authorized_context
 
-        grounded = build_authorized_context(
-            db,
-            tenant_id=tenant_id,
-            investigation_id=investigation_id,
-            product_version_id=version.id if version else None,
-            temporal_mode=request.temporal_mode,
-            as_of=cutoff,
-        )
-        content["ai_advisory"] = {
-            "label": "AI ADVISORY — HUMAN REVIEW REQUIRED",
-            **advisory(
-                workflow="DECISION_BRIEF_DRAFT",
-                deterministic_result=content,
-                grounded_context=grounded,
-                question=inv.investigation_question,
-            ),
-        }
+            grounded = build_authorized_context(
+                db,
+                tenant_id=tenant_id,
+                investigation_id=investigation_id,
+                product_version_id=version.id if version else None,
+                temporal_mode=request.temporal_mode,
+                as_of=cutoff,
+            )
+            content["ai_advisory"] = {
+                "label": "AI ADVISORY — HUMAN REVIEW REQUIRED",
+                **advisory(
+                    workflow="DECISION_BRIEF_DRAFT",
+                    deterministic_result=content,
+                    grounded_context=grounded,
+                    question=inv.investigation_question,
+                ),
+            }
         provenance = {
             "investigation_id": str(inv.id),
             "product_id": str(inv.product_id),
@@ -242,6 +332,7 @@ class BriefService:
             "scenario_ids": [str(s.id) for s in scenarios],
             "decision_id": str(decision.id) if decision else None,
             "assembler": "MDARIX-Controlled-Brief-Assembler-v1",
+            "drafted_by": "LANGUAGE_MODEL" if ai_brief is not None else "RULES",
             "ground_truth_references": [],
             "generated_at": now.isoformat(),
         }

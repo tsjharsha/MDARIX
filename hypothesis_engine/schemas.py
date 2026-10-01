@@ -66,6 +66,8 @@ class HypothesisSetRequest(BaseModel):
     temporal_mode: TemporalMode = "current"
     as_of: datetime | None = None
     investigator_question: str | None = Field(None, max_length=1000)
+    # The analysis the user is looking at; reused (not re-run) when it belongs to this investigation and view.
+    source_analysis_id: uuid.UUID | None = None
     regenerate: bool = True
     persist: bool = True
 

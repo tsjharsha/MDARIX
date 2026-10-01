@@ -54,8 +54,9 @@ class CompetingHypothesisService:
         if request.tenant_id is None:
             raise HypothesisEngineError("TENANT_REQUIRED", "tenant_id is required")
         start = time.time()
+        analysis_response = self._shown_analysis(db, request)
         try:
-            analysis_response = self.investigator_service.analyze(
+            analysis_response = analysis_response or self.investigator_service.analyze(
                 db,
                 InvestigationAnalysisRequest(
                     tenant_id=request.tenant_id,
@@ -163,6 +164,22 @@ class CompetingHypothesisService:
         return HypothesisSetResponse(
             hypothesis_set=hypothesis_set, persisted=persisted, ai_execution_id=ai_execution_id
         )
+
+    def _shown_analysis(self, db: Session, request: HypothesisSetRequest):
+        """The saved analysis the user is looking at, if it is for this investigation and the same point in time."""
+        if request.source_analysis_id is None:
+            return None
+        try:
+            shown = self.investigator_service.get(
+                db, request.tenant_id, request.investigation_id, request.source_analysis_id
+            )
+        except InvestigatorError:
+            return None
+        context = shown.analysis.temporal_context or {}
+        as_of = request.as_of.isoformat() if request.as_of else None
+        if context.get("mode") != request.temporal_mode or context.get("as_of") != as_of:
+            return None
+        return shown
 
     def _with_model_hypotheses(self, analysis, request: HypothesisSetRequest, rules: HypothesisSet) -> HypothesisSet:
         """Model-written competing hypotheses when the analysis was model-written; otherwise the rule set."""

@@ -135,6 +135,7 @@ def test_without_a_configured_model_the_rules_write_the_analysis():
 def test_the_causal_claim_check():
     for claim in [
         "The supplier change is the root cause.",
+        "The root cause is the capacitor.",
         "This caused the shutdowns.",
         "There is a 70% probability it was the capacitor.",
         "The manufacturer must file an MDR.",
@@ -144,6 +145,8 @@ def test_the_causal_claim_check():
     for allowed in [
         "The supplier change may be associated with the shutdowns.",
         "Root cause has not been established.",
+        "Root cause is not established yet.",
+        "The root cause is still unknown.",
         "Shutdowns are consistent with a power fault.",
         "Validation passed, which is inconsistent with the hypothesis that Rev B caused the shutdowns.",
         "It is not established whether the change caused the shutdowns.",

@@ -4,7 +4,9 @@ from ai.execution import record_ai_execution
 from backend.app.db.models.foundation import AIExecution
 from hypothesis_engine.service import CompetingHypothesisService, HypothesisEngineError
 from hypothesis_engine.schemas import HypothesisSetRequest
+from investigator.model_provider import ModelAnalysisUnavailable
 from .engine import ControlledChallenger, PROVIDER, MODEL, ORCHESTRATION_VERSION
+from .model_engine import ModelChallenger
 from .schemas import ChallengeRequest, ChallengeResponse, ChallengeSet
 
 
@@ -14,9 +16,10 @@ class ChallengerError(ValueError):
 
 
 class ChallengerService:
-    def __init__(self, hypothesis_service=None, engine=None):
+    def __init__(self, hypothesis_service=None, engine=None, model_engine=None):
         self.hypothesis_service = hypothesis_service or CompetingHypothesisService()
         self.engine = engine or ControlledChallenger()
+        self.model_engine = model_engine or ModelChallenger()
 
     def generate(self, db: Session, request: ChallengeRequest):
         if request.tenant_id is None:
@@ -42,23 +45,27 @@ class ChallengerService:
                 raise ChallengerError(e.code, e.message) from e
         started = time.time()
         result = self.engine.generate(hs, request.user_question)
+        result = self._with_model_challenges(hs, request, result)
         persisted = False
         execution_id = None
-        from genai.grounding import advisory, build_authorized_context
+        if result.provenance.get("author") == "LANGUAGE_MODEL":
+            live_advisory = {"status": "NOT_NEEDED", "reason": "The language model wrote these challenges."}
+        else:
+            from genai.grounding import advisory, build_authorized_context
 
-        grounded = build_authorized_context(
-            db,
-            tenant_id=request.tenant_id,
-            investigation_id=request.investigation_id,
-            temporal_mode=request.temporal_mode,
-            as_of=request.as_of,
-        )
-        live_advisory = advisory(
-            workflow="AI_CHALLENGER",
-            deterministic_result=result.model_dump(mode="json"),
-            grounded_context=grounded,
-            question=request.user_question,
-        )
+            grounded = build_authorized_context(
+                db,
+                tenant_id=request.tenant_id,
+                investigation_id=request.investigation_id,
+                temporal_mode=request.temporal_mode,
+                as_of=request.as_of,
+            )
+            live_advisory = advisory(
+                workflow="AI_CHALLENGER",
+                deterministic_result=result.model_dump(mode="json"),
+                grounded_context=grounded,
+                question=request.user_question,
+            )
         result = result.model_copy(
             update={"provenance": {**result.provenance, "live_provider_advisory": live_advisory}}
         )
@@ -68,9 +75,11 @@ class ChallengerService:
                 tenant_id=request.tenant_id,
                 investigation_id=request.investigation_id,
                 provider=PROVIDER,
-                model_name=MODEL,
-                model_version="1.0",
-                prompt_template_version="R1-Day13-Challenger-v1",
+                model_name=result.provenance.get("model_analysis", {}).get("model", MODEL),
+                model_version=result.provenance.get("model_analysis", {}).get("model_version", "1.0"),
+                prompt_template_version=result.provenance.get("model_analysis", {}).get(
+                    "prompt_template_version", "R1-Day13-Challenger-v1"
+                ),
                 orchestration_version=ORCHESTRATION_VERSION,
                 context_refs={
                     "context_snapshot_id": result.context_snapshot_id,
@@ -91,6 +100,39 @@ class ChallengerService:
             persisted = True
             execution_id = row.id
         return ChallengeResponse(challenge_set=result, persisted=persisted, ai_execution_id=execution_id)
+
+    def _with_model_challenges(self, hs, request, rules):
+        """Model-written challenges for model-written hypotheses; otherwise the rule-based challenges."""
+        try:
+            challenges, dropped, provenance = self.model_engine.generate(hs, request.user_question)
+        except ModelAnalysisUnavailable as exc:
+            return rules.model_copy(
+                update={
+                    "provenance": {
+                        **rules.provenance,
+                        "author": "RULES",
+                        "fallback_reason": exc.reason,
+                        "model_attempt": exc.detail,
+                    }
+                }
+            )
+        return rules.model_copy(
+            update={
+                "challenges": challenges,
+                "no_material_challenge": not any(item.materiality == "MATERIAL" for item in challenges),
+                "validation_summary": {
+                    **rules.validation_summary,
+                    "invented_evidence": 0,
+                    "model_items_dropped_by_checks": len(dropped),
+                },
+                "provenance": {
+                    **rules.provenance,
+                    "author": "LANGUAGE_MODEL",
+                    "model_analysis": provenance,
+                    "checks_dropped": dropped,
+                },
+            }
+        )
 
     def latest(self, db, tenant_id, investigation_id):
         row = (

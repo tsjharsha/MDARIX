@@ -33,7 +33,32 @@ class UnknownsFailureChainError(ValueError):
 
 
 class UnknownsFailureChainService:
+    def _current_inputs(self, db, request):
+        """The latest saved hypotheses and their challenges, when they were made for this same view.
+
+        Reusing them keeps unknowns and failure chains consistent with what the user was just shown, and avoids
+        regenerating (and re-calling the language model for) the same analysis three times per action. The view is
+        the temporal mode and as-of time, as recorded in the hypothesis set's context snapshot.
+        """
+        as_of = request.as_of.isoformat() if request.as_of else None
+        latest_hypotheses = CompetingHypothesisService().latest(db, request.tenant_id, request.investigation_id)
+        if latest_hypotheses is None:
+            return None
+        hs = latest_hypotheses.hypothesis_set
+        if not str(hs.context_snapshot_id).endswith(f":{request.temporal_mode}:{as_of}"):
+            return None
+        latest_challenges = ChallengerService().latest(db, request.tenant_id, request.investigation_id)
+        if (
+            latest_challenges is None
+            or latest_challenges.challenge_set.source_hypothesis_set_id != hs.hypothesis_set_id
+        ):
+            return None
+        return hs, latest_challenges.challenge_set
+
     def _inputs(self, db, request):
+        reused = self._current_inputs(db, request)
+        if reused is not None:
+            return reused
         hs = (
             CompetingHypothesisService()
             .generate(
