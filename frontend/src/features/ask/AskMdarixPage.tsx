@@ -1,13 +1,34 @@
 import { useState } from "react";
+import { AlertTriangle, CheckCircle2, FileText, Info } from "lucide-react";
+import { Inline, Markdown } from "../shared/Markdown";
 
-function displayValue(value: unknown): string {
-  if (Array.isArray(value))
-    return value.length
-      ? value.map((item) => (typeof item === "string" ? item : JSON.stringify(item))).join(" ")
-      : "None recorded";
-  if (value && typeof value === "object") return JSON.stringify(value, null, 2);
-  return value == null || value === "" ? "None recorded" : String(value);
-}
+// Structured sections the service may return. Only sections with content are shown.
+const SECTIONS: [string, string][] = [
+  ["what_is_known", "What is known"],
+  ["relevant_evidence", "Relevant evidence"],
+  ["what_may_be_related", "What may be related"],
+  ["contradictions", "Contradictions"],
+  ["unknowns", "Unknowns"],
+  ["missing_evidence", "Missing evidence"],
+  ["suggested_next_questions", "Suggested next questions"],
+  ["suggested_next_actions", "Suggested next actions"],
+];
+
+type Source = {
+  evidence_identifier?: string;
+  title?: string;
+  source_reference?: string;
+  temporal?: { effective_timestamp?: string };
+};
+
+const asText = (item: unknown) => (typeof item === "string" ? item : JSON.stringify(item));
+const listOf = (value: unknown): unknown[] => (Array.isArray(value) ? value.filter((item) => item != null) : []);
+const formatDate = (value: unknown) => {
+  const date = typeof value === "string" ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
+    : null;
+};
 
 export function AskMdarixPage({
   investigationId,
@@ -47,7 +68,6 @@ export function AskMdarixPage({
       setLoading(false);
     }
   };
-  const response = result?.response || {};
   return (
     <div className="content">
       <section className="product-header">
@@ -73,31 +93,114 @@ export function AskMdarixPage({
         <button className="primary-action" onClick={ask} disabled={!question.trim() || loading}>
           {loading ? "Retrieving authorized context…" : "Ask MDARIX"}
         </button>
+        {!investigationId && (
+          <p className="ask-hint">
+            <Info size={14} aria-hidden="true" /> No investigation is selected, so the answer cannot use your records.
+            Choose one in the bar above for an evidence-based answer.
+          </p>
+        )}
         {error && (
           <p className="error" role="alert">
             {error}
           </p>
         )}
       </section>
-      {result && (
-        <section className="panel">
-          <div className="section-title">Structured response</div>
-          {response.provider_output?.answer && (
-            <article className="decision-items">
-              <strong>AI advisory</strong>
-              <span>{response.provider_output.answer}</span>
-            </article>
-          )}
-          {Object.entries(response)
-            .filter(([key]) => key !== "provider_output")
-            .map(([key, value]) => (
-              <article className="decision-items" key={key}>
-                <strong>{key.replace(/_/g, " ")}</strong>
-                <span style={{ whiteSpace: "pre-wrap" }}>{displayValue(value)}</span>
-              </article>
-            ))}
-        </section>
-      )}
+      {result && <AskAnswer result={result} />}
     </div>
+  );
+}
+
+function AskAnswer({ result }: { result: any }) {
+  const response = result?.response ?? {};
+  const answer: string | null = response.provider_output?.answer ?? null;
+  const sources = listOf(response.sources_provenance) as Source[];
+  const citations = new Set(sources.map((source) => source.evidence_identifier).filter(Boolean) as string[]);
+  const grounded = response.grounding?.tenant_scope_enforced === true;
+  const sections = SECTIONS.map(([key, title]) => [title, listOf(response[key])] as const).filter(
+    ([, items]) => items.length > 0,
+  );
+  const notes = listOf(response.limitations).map(asText);
+  return (
+    <section className="panel ask-answer" aria-labelledby="ask-answer-title">
+      <header className="ask-answer-head">
+        <h3 id="ask-answer-title">MDARIX answer</h3>
+        <div className="ask-answer-badges">
+          {grounded ? (
+            <span className="ask-badge is-good">
+              <CheckCircle2 size={14} aria-hidden="true" /> Based on this investigation&apos;s records
+            </span>
+          ) : (
+            <span className="ask-badge is-warn">
+              <AlertTriangle size={14} aria-hidden="true" /> Not linked to an investigation
+            </span>
+          )}
+          <span className="ask-badge">Human review required</span>
+        </div>
+      </header>
+
+      {answer ? (
+        <Markdown source={answer} citations={citations} />
+      ) : (
+        <p className="ask-unavailable">
+          <AlertTriangle size={16} aria-hidden="true" /> The AI answer is not available right now.{" "}
+          {notes[0] ?? "Please try again in a moment."}
+        </p>
+      )}
+
+      {sections.map(([title, items]) => (
+        <div className="ask-section" key={title}>
+          <h4>{title}</h4>
+          <ul>
+            {items.map((item, index) => (
+              <li key={index}>
+                <Inline text={asText(item)} citations={citations} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+
+      {sources.length > 0 && (
+        <div className="ask-section">
+          <h4>Sources used ({sources.length})</h4>
+          <ul className="ask-sources">
+            {sources.map((source, index) => (
+              <li key={source.evidence_identifier ?? index}>
+                <FileText size={15} aria-hidden="true" />
+                <div>
+                  <span className="md-cite is-known">{source.evidence_identifier ?? "Evidence"}</span>{" "}
+                  <strong>{source.title ?? "Untitled evidence"}</strong>
+                  <small>
+                    {[source.source_reference, formatDate(source.temporal?.effective_timestamp)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {answer && notes.length > 0 && (
+        <p className="ask-note">
+          <Info size={14} aria-hidden="true" /> {notes.join(" ")} AI suggestions are advisory; a person decides.
+        </p>
+      )}
+
+      <details className="ask-details">
+        <summary>Technical details</summary>
+        <dl>
+          <dt>Interaction</dt>
+          <dd>{result.interaction_id ?? "—"}</dd>
+          <dt>Context policy</dt>
+          <dd>{response.grounding?.policy_version ?? "—"}</dd>
+          <dt>Tenant scope enforced</dt>
+          <dd>{grounded ? "Yes" : "No"}</dd>
+          <dt>Field policy</dt>
+          <dd>{response.grounding?.field_policy ?? "—"}</dd>
+        </dl>
+      </details>
+    </section>
   );
 }

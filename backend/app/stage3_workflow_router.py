@@ -60,6 +60,22 @@ class SupplierEvidenceRequestPayload(BaseModel):
     supplier_id: uuid.UUID | None = None
 
 
+# Ask MDARIX wraps the user's question with the same guardrails as the other advisory workflows, and asks for a
+# short, consistently structured Markdown answer that cites evidence identifiers. The stored prompt stays as typed.
+ASK_INSTRUCTIONS = (
+    "You are MDARIX, an investigation assistant for medical-device quality teams. Answer the user's question using "
+    "only the authorized context provided. Write at most 250 words of Markdown with exactly these sections: "
+    "'## Answer' (two or three sentences), '## What the evidence shows' (bullets; cite evidence identifiers in "
+    "square brackets, for example [EV-001]), '## What is missing' (bullets), and '## Suggested next steps' (at most "
+    "three bullets). Do not use tables. If the context does not answer the question, say so plainly and name the "
+    "records that would. Do not invent facts, claim causality or root cause, or make a regulatory or human decision."
+)
+
+
+def ask_prompt(question: str) -> str:
+    return f"{ASK_INSTRUCTIONS}\n\nUser question: {question}"
+
+
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
@@ -116,7 +132,7 @@ def create_interaction(
                 temporal_mode=payload.temporal_mode,
                 as_of=payload.temporal_cutoff,
             )
-        result = provider.complete(payload.prompt, grounded)
+        result = provider.complete(ask_prompt(payload.prompt), grounded)
         response["provider_output"] = result.output
         if payload.investigation_id:
             from genai.grounding import source_provenance
