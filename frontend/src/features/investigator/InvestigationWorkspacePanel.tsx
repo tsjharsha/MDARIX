@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CircleDot, ClipboardList, FileText, GitBranch, Network, ShieldCheck } from "lucide-react";
 import { humanize } from "../../app/format";
-import { AnalysisPanel, Metric, Panel } from "../../app/ui";
+import { Metric, Panel } from "../../app/ui";
+import { AnalysisVisual, BriefVisual, ChallengeBoard, HypothesisBoard, UnknownsBoard } from "./AnalysisVisuals";
 import {
   TemporalMode,
   InvestigationWorkspace,
@@ -13,6 +14,7 @@ import {
   ChallengeSet,
 } from "../../app/types";
 import { api } from "../../app/api";
+import { useCan } from "../workspace/workspaceContext";
 
 export function InvestigationTabSummary({
   activeTab,
@@ -161,6 +163,8 @@ export function InvestigationWorkspacePanel({
   const [actionStatus, setActionStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const requestSequence = useRef(0);
+  // Viewers can read every result; only roles allowed to run AI see the run buttons (the server enforces it too).
+  const canRun = useCan("ai.run");
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
@@ -239,6 +243,8 @@ export function InvestigationWorkspacePanel({
       temporal_mode: mode,
       as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
       investigator_question: "Generate competing hypotheses from the validated investigation analysis.",
+      // Build on the analysis on screen instead of running it again.
+      source_analysis_id: analysis?.analysis_id ?? null,
     };
     fetch(`/api/v1/investigations/${investigationId}/hypotheses`, {
       method: "POST",
@@ -283,7 +289,8 @@ export function InvestigationWorkspacePanel({
     fetch(`/api/v1/investigations/${investigationId}/challenges`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      // Challenge the hypotheses on screen instead of regenerating them.
+      body: JSON.stringify({ ...body, hypothesis_set_id: hypothesisSet?.hypothesis_set_id ?? null }),
     })
       .then((response) => {
         if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
@@ -407,21 +414,29 @@ export function InvestigationWorkspacePanel({
               </button>
             ))}
           </div>
-          <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
-            {" "}
-            {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
-          </button>
-          <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
-            {" "}
-            {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
-          </button>
-          <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
-            {" "}
-            {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
-          </button>
-          <button className="primary-action" onClick={generateBrief}>
-            Generate Investigation Brief
-          </button>
+          {canRun ? (
+            <>
+              <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+                {" "}
+                {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
+              </button>
+              <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+                {" "}
+                {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
+              </button>
+              <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+                {" "}
+                {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
+              </button>
+              <button className="primary-action" onClick={generateBrief}>
+                Generate Investigation Brief
+              </button>
+            </>
+          ) : (
+            <span className="context-summary" role="note">
+              View only: your role can review results but not run AI analysis.
+            </span>
+          )}
         </div>
       </div>
       <div className="workflow-tabs" role="tablist" aria-label="Investigation workflow">
@@ -538,141 +553,53 @@ export function InvestigationWorkspacePanel({
       <section id="workflow-analysis" className="workflow-action">
         <h3>Analysis</h3>
         <p>Grounded observations and possible explanations for the selected context.</p>
-        <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
-          {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
-        </button>
+        {canRun && (
+          <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+            {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
+          </button>
+        )}
       </section>
-      {analysis && (
-        <div className="analysis-grid">
-          <AnalysisPanel title="Key Observations" items={analysis.observations.slice(0, 4)} />
-          <AnalysisPanel title="Possible Explanations" items={analysis.possible_explanations.slice(0, 4)} />
-          <AnalysisPanel title="Contradictory Evidence" items={analysis.contradictions.slice(0, 4)} />
-          <AnalysisPanel title="Missing Information" items={analysis.missing_information.slice(0, 4)} />
-          <AnalysisPanel title="Questions To Investigate" items={analysis.questions_to_investigate.slice(0, 5)} />
-          <Panel title="Validation / Provenance" icon={<ShieldCheck />}>
-            <div className="guardrail-list">
-              <p>
-                <strong>Status:</strong> {analysis.status}
-              </p>
-              <p>
-                <strong>Grounding:</strong> {String(analysis.validation_summary.material_grounding_coverage)}
-              </p>
-              <p>
-                <strong>Source anchors:</strong> {String(analysis.validation_summary.evidence_source_anchor_coverage)}
-              </p>
-              <p>
-                <strong>Provider:</strong> {String(analysis.model_provenance.provider)}
-              </p>
-            </div>
-          </Panel>
-        </div>
-      )}
+      {analysis && <AnalysisVisual analysis={analysis} />}
       <section id="workflow-hypotheses" className="workflow-action">
         <h3>Competing hypotheses</h3>
         <p>Preserves support, contradiction, gaps, and falsification conditions without choosing a winner.</p>
-        <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
-          {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
-        </button>
+        {canRun && (
+          <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+            {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
+          </button>
+        )}
       </section>
       {hypothesisSet && (
         <div className="hypothesis-section">
           <div className="section-title">
             <GitBranch size={18} /> Competing Hypotheses
           </div>
-          {hypothesisSet.hypotheses.length === 0 && (
-            <div className="empty-result">
-              No supportable hypotheses are available for the selected temporal context. This is a controlled
-              abstention, not a negative conclusion.
-            </div>
-          )}
-          <div className="hypothesis-grid">
-            {hypothesisSet.hypotheses.map((hypothesis) => (
-              <article className="hypothesis-card" key={hypothesis.hypothesis_id}>
-                <span className="category">{hypothesis.status}</span>
-                <h3>{hypothesis.statement}</h3>
-                <p>
-                  <strong>Temporal fit:</strong> {hypothesis.temporal_consistency.status}
-                </p>
-                <p>
-                  <strong>Support:</strong>{" "}
-                  {hypothesis.supporting_evidence[0]?.rationale ?? "No supporting evidence recorded."}
-                </p>
-                <p>
-                  <strong>Contradiction:</strong>{" "}
-                  {hypothesis.contradicting_evidence[0]?.rationale ?? "No contradiction recorded."}
-                </p>
-                <p>
-                  <strong>Gap:</strong> {hypothesis.evidence_gaps[0] ?? "No gap recorded."}
-                </p>
-                <p>
-                  <strong>Would weaken:</strong>{" "}
-                  {hypothesis.falsification_conditions[0] ?? "No falsification condition recorded."}
-                </p>
-              </article>
-            ))}
-          </div>
-          <Panel title="Hypothesis Validation" icon={<ShieldCheck />}>
-            <div className="guardrail-list">
-              <p>
-                <strong>Status:</strong> {hypothesisSet.status}
-              </p>
-              <p>
-                <strong>Grounding:</strong> {String(hypothesisSet.validation_summary.material_grounding_coverage)}
-              </p>
-              <p>
-                <strong>Source anchors:</strong> {String(hypothesisSet.validation_summary.source_anchor_coverage)}
-              </p>
-              <p>
-                <strong>No winner score:</strong>{" "}
-                {hypothesisSet.comparison.every((row) => row.no_winner_score) ? "Preserved" : "Check required"}
-              </p>
-            </div>
-          </Panel>
+          <HypothesisBoard set={hypothesisSet} />
         </div>
       )}
       <section id="workflow-challenger" className="workflow-action">
         <h3>Challenger, unknowns, and failure chain</h3>
         <p>Surfaces challenges and material unknowns. An unresolved failure chain is a valid controlled result.</p>
-        <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
-          {pendingAction === "Run Unknowns & Chain" ? "Running controlled checks…" : "Run Challenger, Unknowns & Chain"}
-        </button>
+        {canRun && (
+          <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+            {pendingAction === "Run Unknowns & Chain"
+              ? "Running controlled checks…"
+              : "Run Challenger, Unknowns & Chain"}
+          </button>
+        )}
       </section>
       {challengeSet && (
-        <div className="analysis-grid">
-          <Panel title="AI Challenger" icon={<ShieldCheck />}>
-            <div className="analysis-list">
-              {challengeSet.challenges.length === 0 && <p className="empty">No material challenge identified.</p>}
-              {challengeSet.challenges.map((item) => (
-                <article key={item.challenge_id}>
-                  <span>
-                    {item.challenge_type} | {item.status} | {item.materiality}
-                  </span>
-                  <p>{item.statement}</p>
-                  <small>{item.rationale}</small>
-                </article>
-              ))}
-            </div>
-          </Panel>
+        <div className="hypothesis-section">
+          <div className="section-title">
+            <ShieldCheck size={18} /> Challenger review
+          </div>
+          <ChallengeBoard set={challengeSet} />
         </div>
       )}
       {unknownSet && (
         <div id="workflow-unknowns" className="analysis-grid">
           <Panel title="Unknowns Radar" icon={<AlertTriangle />}>
-            <div className="analysis-list">
-              {unknownSet.unknowns.length === 0 && <p className="empty">No material unknowns identified.</p>}
-              {unknownSet.unknowns.map((item) => (
-                <article key={item.unknown_id}>
-                  <span>
-                    {item.category} | {item.status} | {item.materiality}
-                  </span>
-                  <p>
-                    <strong>{item.statement}</strong>
-                  </p>
-                  <p>Why it matters: {item.why_it_matters}</p>
-                  <small>Resolution: {item.resolution_requirement}</small>
-                </article>
-              ))}
-            </div>
+            <UnknownsBoard set={unknownSet} />
           </Panel>
           <div id="workflow-failure-chain">
             <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
@@ -731,13 +658,15 @@ export function InvestigationWorkspacePanel({
             aria-label="Counterfactual target"
             placeholder="Readable target, e.g. Component Rev B"
           />
-          <button
-            className="primary-action"
-            onClick={runCounterfactual}
-            disabled={counterfactualStatus === "VALIDATING"}
-          >
-            {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
-          </button>
+          {canRun && (
+            <button
+              className="primary-action"
+              onClick={runCounterfactual}
+              disabled={counterfactualStatus === "VALIDATING"}
+            >
+              {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
+            </button>
+          )}
         </div>
         <p className="action-feedback" role="status">
           Status: {counterfactualStatus}
@@ -782,30 +711,16 @@ export function InvestigationWorkspacePanel({
         {!brief ? (
           <>
             <p>Assemble a versioned, evidence-grounded package for human review.</p>
-            <button className="primary-action" onClick={generateBrief}>
-              Generate Investigation Brief
-            </button>
+            {canRun && (
+              <button className="primary-action" onClick={generateBrief}>
+                Generate Investigation Brief
+              </button>
+            )}
           </>
         ) : (
           <>
             <h2>{brief.title}</h2>
-            <p>
-              Version {brief.brief_version} · {brief.status} · {brief.temporal_mode}
-            </p>
-            <div className="advisory-box">
-              <strong>AI-assisted content requires human review.</strong>
-              <p>This Brief does not establish root cause or causality.</p>
-            </div>
-            {Object.entries(brief.content).map(([key, value]) => (
-              <article key={key}>
-                <h3>{humanize(key)}</h3>
-                <pre>{JSON.stringify(value, null, 2)}</pre>
-              </article>
-            ))}
-            <details>
-              <summary>Provenance</summary>
-              <pre>{JSON.stringify(brief.provenance, null, 2)}</pre>
-            </details>
+            <BriefVisual brief={brief} />
           </>
         )}
       </section>

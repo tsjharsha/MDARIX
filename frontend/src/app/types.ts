@@ -83,6 +83,8 @@ export type AnalysisItem = {
 export type InvestigationAnalysis = {
   analysis_id: string;
   status: string;
+  analysis_author?: "LANGUAGE_MODEL" | "RULES";
+  summary?: string | null;
   observations: AnalysisItem[];
   temporal_patterns: AnalysisItem[];
   evidence_relationships: AnalysisItem[];
@@ -129,6 +131,7 @@ export type HypothesisSet = {
   comparison: Array<Record<string, string | number | boolean>>;
   validation_summary: Record<string, number | string>;
   guardrails: Record<string, boolean>;
+  provenance?: Record<string, any>;
 };
 
 export type UnknownSet = {
@@ -168,7 +171,11 @@ export type ChallengeSet = {
     rationale: string;
     materiality: string;
     status: string;
+    severity?: string;
+    evidence_references?: unknown[];
+    missing_information?: string[];
   }>;
+  provenance?: Record<string, any>;
 };
 
 export type EvidenceSummary = {
