@@ -18,6 +18,7 @@ import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 
 export type TrialStatus = {
   is_trial: boolean;
+  is_owner?: boolean;
   expires_at?: string;
   days_left?: number;
   limits?: { users: number; rows: number; file_bytes: number };
@@ -174,7 +175,7 @@ export function GettingStartedSection() {
             <StatTile
               label="Users"
               value={trial?.usage ? `${trial.usage.users} of ${trial.limits?.users}` : null}
-              detail="Ask us to add colleagues"
+              detail={trial?.is_owner ? "Invite colleagues below" : "Your trial team"}
               icon={<CheckCircle2 size={18} />}
             />
             <StatTile
@@ -220,7 +221,138 @@ export function GettingStartedSection() {
       />
 
       <InsightsPanel insights={insights.data} state={insights.state} error={insights.error} />
+
+      <TeamPanel onChanged={status.reload} />
     </div>
+  );
+}
+
+type TeamMember = {
+  id: string;
+  display_name: string;
+  email: string;
+  status: string;
+  is_owner: boolean;
+  is_you: boolean;
+};
+type Team = { can_invite: boolean; limit: number; seats_used: number; members: TeamMember[] };
+
+function TeamPanel({ onChanged }: { onChanged: () => void }) {
+  const team = useResource<Team>("/api/v1/trial/team");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string; link?: string } | null>(null);
+  const data = team.data;
+  const full = !!data && data.seats_used >= data.limit;
+
+  const send = async (path: string, body?: object) => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestJson<any>(path, {
+        method: "POST",
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const sent = result.email_delivery === "SENT";
+      setMessage({
+        tone: "good",
+        text: sent
+          ? `Invitation emailed to ${result.email}. The link is valid for 72 hours.`
+          : `Email is not set up on this server. Send ${result.email} this one-time link (valid 72 hours):`,
+        link: !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined,
+      });
+      setName("");
+      setEmail("");
+      team.reload();
+      onChanged();
+    } catch (error) {
+      setMessage({ tone: "bad", text: error instanceof Error ? error.message : "The invitation could not be sent." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel
+      title="Your team"
+      eyebrow={data ? `${data.seats_used} of ${data.limit} users` : "Team"}
+      state={team.state}
+      error={team.error}
+    >
+      {data && (
+        <>
+          <ul className="uw-team">
+            {data.members.map((member) => (
+              <li key={member.id}>
+                <div>
+                  <strong>
+                    {member.display_name}
+                    {member.is_you && <span className="uw-team-tag">You</span>}
+                    {member.is_owner && <span className="uw-team-tag">Trial owner</span>}
+                  </strong>
+                  <small>{member.email}</small>
+                </div>
+                <span className={`uw-team-status ${member.status === "ACTIVE" ? "is-active" : ""}`}>
+                  {member.status === "ACTIVE" ? "Active" : "Invited"}
+                </span>
+                {data.can_invite && member.status === "INVITED" && (
+                  <button
+                    type="button"
+                    className="ac-link"
+                    disabled={busy}
+                    onClick={() => send(`/api/v1/trial/team/${member.id}/resend-invitation`)}
+                  >
+                    Resend invitation
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {data.can_invite && !full && (
+            <form
+              className="uw-team-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void send("/api/v1/trial/team", { email: email.trim(), display_name: name.trim() });
+              }}
+            >
+              <label>
+                Colleague's name
+                <input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
+              </label>
+              <label>
+                Work email
+                <input
+                  required
+                  type="email"
+                  maxLength={254}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </label>
+              <button type="submit" className="ac-primary" disabled={busy}>
+                {busy ? "Sending…" : "Invite colleague"}
+              </button>
+            </form>
+          )}
+          {data.can_invite && full && (
+            <p className="uw-trial-note">
+              All {data.limit} trial seats are in use. Contact us to add more people as a design partner.
+            </p>
+          )}
+          {!data.can_invite && (
+            <p className="uw-trial-note">The person who started this trial can invite colleagues.</p>
+          )}
+          {message && (
+            <div className={`uw-trial-message is-${message.tone}`} role="status">
+              <span>{message.text}</span>
+              {message.link && <code className="uw-team-link">{message.link}</code>}
+            </div>
+          )}
+        </>
+      )}
+    </Panel>
   );
 }
 

@@ -265,3 +265,110 @@ def test_ask_mdarix_is_grounded_in_the_trial_sample_investigation():
     assert response["grounding"]["tenant_scope_enforced"] is True
     cited = {item["evidence_identifier"] for item in response["sources_provenance"]}
     assert cited and all(identifier.startswith("SAMPLE-EV-") for identifier in cited)
+
+
+def _activate_and_sign_in(email: str, token: str) -> TestClient:
+    client = TestClient(app)
+    assert client.post("/api/v1/auth/activate-account", json={"token": token, "password": PASSWORD}).status_code == 200
+    assert client.post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD}).status_code == 200
+    return client
+
+
+def test_trial_owner_invites_colleagues_up_to_the_user_limit():
+    owner, approval, owner_email = _approved_trial_client()
+    assert owner.get("/api/v1/trial/status").json()["is_owner"] is True
+
+    first = f"colleague-{uuid.uuid4().hex[:8]}@example.invalid"
+    invited = owner.post("/api/v1/trial/team", json={"email": first, "display_name": "Casey Review"})
+    assert invited.status_code == 200, invited.text
+    second = f"colleague-{uuid.uuid4().hex[:8]}@example.invalid"
+    assert owner.post("/api/v1/trial/team", json={"email": second, "display_name": "Robin QA"}).status_code == 200
+    # Three users is the limit, an existing account cannot be invited again, and bad input is refused.
+    full = owner.post("/api/v1/trial/team", json={"email": "extra@example.invalid", "display_name": "Extra"})
+    assert full.status_code == 409 and full.json()["detail"]["code"] == "TRIAL_USER_LIMIT_REACHED"
+    assert owner.post("/api/v1/trial/team", json={"email": owner_email, "display_name": "Me"}).status_code == 409
+
+    roster = owner.get("/api/v1/trial/team").json()
+    assert roster["seats_used"] == 3 and roster["can_invite"] is True
+    assert [member["is_owner"] for member in roster["members"]].count(True) == 1
+
+    colleague = _activate_and_sign_in(first, _activation_token(invited.json(), first))
+    assert colleague.get("/api/v1/trial/status").json()["is_owner"] is False
+    # A colleague works in the same workspace but cannot invite or administer.
+    assert colleague.get("/api/v1/analytics/command-center").json()["counts"]["products"] == 3
+    refused = colleague.post("/api/v1/trial/team", json={"email": "x@example.invalid", "display_name": "X"})
+    assert refused.status_code == 403
+    assert colleague.get("/api/v1/platform-admin/trial-requests").status_code == 403
+
+
+def test_closed_trial_data_is_deleted_after_30_days():
+    user, approval, email = _approved_trial_client()
+    _recent, recent_approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        for target, ended in (
+            (tenant_id, now - timedelta(days=31)),
+            (uuid.UUID(recent_approval["tenant_id"]), now - timedelta(days=10)),
+        ):
+            row = db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.tenant_id == target).one()
+            row.expires_at = ended
+        db.commit()
+    finally:
+        db.close()
+
+    admin = authenticated_client()
+    due = {item["tenant_id"] for item in admin.get("/api/v1/platform-admin/trial-retention").json()["due"]}
+    assert approval["tenant_id"] in due and recent_approval["tenant_id"] not in due
+    assert TestClient(app).post("/api/v1/platform-admin/trial-retention/run").status_code == 401
+    run = admin.post("/api/v1/platform-admin/trial-retention/run").json()
+    purged = next(item for item in run["trials"] if item["tenant_id"] == approval["tenant_id"])
+    assert purged["deleted_records"]["products"] == 3 and purged["not_deleted_tables"] == []
+
+    db = SessionLocal()
+    try:
+        assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 0
+        assert db.query(Tenant).filter(Tenant.id == tenant_id).one().status == "ARCHIVED"
+        assert db.query(AuthUser).filter(AuthUser.username == email).one().status == "REMOVED"
+        # The trial that closed 10 days ago keeps its data.
+        assert db.query(Product).filter(Product.tenant_id == uuid.UUID(recent_approval["tenant_id"])).count() == 3
+    finally:
+        db.close()
+    assert user.get("/api/v1/trial/status").status_code == 401
+    assert TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD}).status_code != 200
+    queue = admin.get("/api/v1/platform-admin/trial-requests").json()["items"]
+    assert next(item for item in queue if item["tenant_id"] == approval["tenant_id"])["data_deleted"] is True
+
+
+def test_new_trial_request_alerts_the_platform_admin(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        "auth.emailer.send_trial_request_alert", lambda recipient, **details: sent.append((recipient, details))
+    )
+    monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "admin-alerts@example.invalid")
+    email = _request_trial("Alerted Devices")
+    assert sent == [
+        (
+            "admin-alerts@example.invalid",
+            {"organization": "Alerted Devices", "display_name": "Taylor Quality", "email": email},
+        )
+    ]
+    # Repeating the same request does not alert again.
+    again = TestClient(app).post(
+        "/api/v1/auth/signup",
+        json={"email": email, "display_name": "Taylor Quality", "organization": "Alerted Devices"},
+    )
+    assert again.status_code == 200 and len(sent) == 1
+
+
+def test_a_failing_alert_never_breaks_sign_up(monkeypatch):
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("smtp down")
+
+    monkeypatch.setattr("auth.emailer.send_trial_request_alert", boom)
+    monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "admin-alerts@example.invalid")
+    _request_trial("Resilient Devices")  # asserts the sign-up still succeeds
+    monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "")
+    monkeypatch.setattr("auth.emailer.send_trial_request_alert", lambda *a, **k: (_ for _ in ()).throw(AssertionError))
+    _request_trial("Quiet Devices")  # no alert address configured: nothing is sent

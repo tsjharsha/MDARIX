@@ -21,7 +21,7 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser, Complaint, Lo
 from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.trial import imports
+from backend.app.trial import imports, retention, team
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import (
     TRIAL_FILE_LIMIT_BYTES,
@@ -39,6 +39,11 @@ router = APIRouter(prefix="/api/v1", tags=["Free trial"])
 
 class DeclineRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
+
+
+class ColleagueInvite(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+    display_name: str = Field(min_length=1, max_length=120)
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin queue
@@ -115,6 +120,7 @@ def trial_status(
     )
     return {
         "is_trial": True,
+        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
         "plan": "Free Trial",
         "starts_at": subscription.starts_at.isoformat(),
         "expires_at": subscription.expires_at.isoformat(),
@@ -221,3 +227,55 @@ def trial_insights(
 ):
     _require_trial(db, ctx)
     return imports.insights(data, uuid.UUID(str(ctx.tenant_id)))
+
+
+# ------------------------------------------------------------------------------------------- Trial team
+
+
+def _current_user(db: Session, ctx: AuthenticatedRequestContext) -> AuthUser:
+    user = db.query(AuthUser).filter(AuthUser.id == uuid.UUID(str(ctx.user_id))).first()
+    if user is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    return user
+
+
+@router.get("/trial/team")
+def trial_team(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    _require_trial(db, ctx)
+    return team.team(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx))
+
+
+@router.post("/trial/team")
+def invite_trial_colleague(
+    payload: ColleagueInvite,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return team.invite_colleague(db, tenant_id, _current_user(db, ctx), payload.email, payload.display_name)
+
+
+@router.post("/trial/team/{user_id}/resend-invitation")
+def resend_trial_colleague_invitation(
+    user_id: uuid.UUID,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    _require_trial(db, ctx)
+    return team.resend_colleague_invitation(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id)
+
+
+# ------------------------------------------------------------------------------------------- Data retention
+
+
+@router.get("/platform-admin/trial-retention")
+def trial_retention_preview(request: Request, db: Session = Depends(get_db)):
+    _require_platform_admin(request, db)
+    return {"retention_days": retention.RETENTION_DAYS, "due": retention.trials_due(db)}
+
+
+@router.post("/platform-admin/trial-retention/run")
+def run_trial_retention(request: Request, db: Session = Depends(get_db)):
+    admin = _require_platform_admin(request, db)
+    return retention.run_retention(db, str(admin.id))

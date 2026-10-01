@@ -128,6 +128,18 @@ def _trial_tenant_key(organization: str) -> str:
     return f"TRIAL_{stem}_{secrets.token_hex(3).upper()}"
 
 
+def _owner_status(db: Session, row: OnboardingRequest) -> str | None:
+    """The requester's account status once approved: INVITED until they activate, then ACTIVE."""
+    if row.tenant_id is None:
+        return None
+    status = (
+        db.query(AuthUser.status)
+        .filter(AuthUser.tenant_id == row.tenant_id, AuthUser.username == row.email.strip().lower())
+        .scalar()
+    )
+    return status
+
+
 def serialize_request(db: Session, row: OnboardingRequest) -> dict:
     tenant = db.query(Tenant).filter(Tenant.id == row.tenant_id).first() if row.tenant_id else None
     subscription = trial_subscription(db, row.tenant_id) if row.tenant_id else None
@@ -144,6 +156,10 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
         "tenant_key": tenant.tenant_key if tenant else None,
         "tenant_identifier": tenant.tenant_identifier if tenant else None,
         "trial_expires_at": subscription.expires_at.isoformat() if subscription else None,
+        # Closed trials keep their data for 30 days (trial.retention), then it is deleted and the workspace archived.
+        "data_delete_after": (subscription.expires_at + timedelta(days=30)).isoformat() if subscription else None,
+        "data_deleted": bool(tenant and tenant.status == "ARCHIVED"),
+        "owner_status": _owner_status(db, row),
     }
 
 

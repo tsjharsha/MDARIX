@@ -10599,3 +10599,13 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+.trial-queue-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.trial-queue-pill.is-active {
+  background: #e3f2f1;
+  color: #06625f;
+}

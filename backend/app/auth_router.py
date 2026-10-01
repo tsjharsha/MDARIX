@@ -1,9 +1,10 @@
 import hashlib
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
@@ -235,8 +236,21 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
     }
 
 
+def _alert_trial_request(organization: str, display_name: str, email: str) -> None:
+    """Email the Platform Admin about a new trial request. Runs after the response; failures are only logged."""
+    recipient = os.getenv("MDARIX_TRIAL_ALERT_EMAIL", "").strip()
+    if not recipient:
+        return
+    from auth.emailer import send_trial_request_alert
+
+    try:
+        send_trial_request_alert(recipient, organization=organization, display_name=display_name, email=email)
+    except Exception as exc:  # the request is already saved; an alert failure must never surface to the visitor
+        logging.getLogger(__name__).warning("Trial request alert failed: %s", type(exc).__name__)
+
+
 @router.post("/signup")
-def signup(data: Signup, db: Session = Depends(get_db)):
+def signup(data: Signup, background: BackgroundTasks, db: Session = Depends(get_db)):
     try:
         email = data.email.strip().lower()
         if db.query(AuthUser).filter(AuthUser.username == email).first():
@@ -260,6 +274,7 @@ def signup(data: Signup, db: Session = Depends(get_db)):
         )
         db.add(request)
         db.commit()
+        background.add_task(_alert_trial_request, request.organization, request.display_name, email)
         return {
             "status": "ONBOARDING_REQUEST_ACCEPTED",
             "request_id": str(request.id),

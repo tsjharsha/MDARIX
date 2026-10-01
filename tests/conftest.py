@@ -31,6 +31,7 @@ if os.environ.get("MDARIX_TEST_ALLOW_LIVE_PROVIDERS") != "1":
         "MDARIX_SMTP_PASSWORD",
         "MDARIX_SMTP_FROM",
         "MDARIX_SMTP_VERIFIED_DOMAIN",
+        "MDARIX_TRIAL_ALERT_EMAIL",
     ):
         os.environ[_smtp_key] = ""
 

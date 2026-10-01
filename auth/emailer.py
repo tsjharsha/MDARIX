@@ -39,6 +39,14 @@ def _send_link_email(
     Returns a delivery state so callers never claim an email was sent when the
     host has no configured mail provider.
     """
+    app_url = os.getenv("MDARIX_APP_URL", "http://127.0.0.1:5178")
+    return _send_email(
+        recipient, subject, f"{intro}\n\n{app_url}{path}?token={token}\n\nThis link expires in {valid_for}."
+    )
+
+
+def _send_email(recipient: str, subject: str, body: str) -> str:
+    """Send one plain-text email through the configured SMTP provider; NOT_CONFIGURED when there is none."""
     host = os.getenv("MDARIX_SMTP_HOST")
     username = os.getenv("MDARIX_SMTP_USERNAME")
     password = os.getenv("MDARIX_SMTP_PASSWORD")
@@ -49,12 +57,11 @@ def _send_link_email(
     if verified_domain and not parseaddr(sender)[1].endswith("@" + verified_domain):
         raise EmailDeliveryError("SMTP sender domain is not verified")
 
-    app_url = os.getenv("MDARIX_APP_URL", "http://127.0.0.1:5178")
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
-    message.set_content(f"{intro}\n\n{app_url}{path}?token={token}\n\nThis link expires in {valid_for}.")
+    message.set_content(body)
     port = int(os.getenv("MDARIX_SMTP_PORT", "587"))
     try:
         with smtplib.SMTP(host, port, timeout=15) as client:
@@ -96,4 +103,17 @@ def send_password_reset_email(recipient: str, token: str) -> str:
         subject="Reset your MDARIX password",
         path="/reset-password",
         intro="Reset your MDARIX password by opening this link:",
+    )
+
+
+def send_trial_request_alert(recipient: str, *, organization: str, display_name: str, email: str) -> str:
+    """Tell the Platform Admin that a free-trial request is waiting for review."""
+    app_url = os.getenv("MDARIX_APP_URL", "http://127.0.0.1:5178")
+    return _send_email(
+        recipient,
+        f"New MDARIX free trial request: {organization}",
+        "A new free trial request is waiting for review.\n\n"
+        f"Company: {organization}\nName: {display_name}\nEmail: {email}\n\n"
+        "Review it in Platform Admin > Customers & Tenants > Customer Onboarding:\n"
+        f"{app_url}/app/admin\n",
     )
