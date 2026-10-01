@@ -1,6 +1,8 @@
 alembic==1.20.0
 boto3>=1.35,<2
 cryptography>=50,<51
+# Local embedding model (ONNX on CPU): evidence text is never sent out to be indexed.
+fastembed==0.8.1
 fastapi==0.141.1
 httpx==0.28.1
 pg8000==1.31.5
