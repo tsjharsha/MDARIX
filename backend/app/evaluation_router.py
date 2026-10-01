@@ -71,6 +71,38 @@ def run_evaluation(
     }
 
 
+GOLDEN_TENANT_KEY = "ACME_CARE_SYNTHETIC"
+
+
+@router.get("/golden/latest")
+def latest_golden_evaluation(ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """The latest honest evaluation of the real AI pipeline on the synthetic golden scenarios (Trust page).
+
+    The run belongs to the synthetic golden tenant, so it is read in a separate, short-lived system-scope session
+    limited to that one record; the caller's own session and tenant scope are untouched.
+    """
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.session import RuntimeSessionLocal
+    from backend.app.db.tenant_scope import bind_system
+    from evaluation.real_pipeline import EVALUATION_VERSION, trust_summary
+
+    session = RuntimeSessionLocal()
+    try:
+        bind_system(session, "read the published golden evaluation (synthetic data)")
+        row = (
+            session.query(EvaluationRun)
+            .join(Tenant, Tenant.id == EvaluationRun.tenant_id)
+            .filter(Tenant.tenant_key == GOLDEN_TENANT_KEY, EvaluationRun.suite_version == EVALUATION_VERSION)
+            .order_by(EvaluationRun.completed_at.desc())
+            .first()
+        )
+        if row is None:
+            return {"status": "NOT_RUN_YET", "evaluation": None}
+        return {"status": "AVAILABLE", "evaluation": trust_summary(row.results, row.completed_at)}
+    finally:
+        session.close()
+
+
 @router.get("/runs/{run_id}")
 def get_evaluation(
     run_id: uuid.UUID,

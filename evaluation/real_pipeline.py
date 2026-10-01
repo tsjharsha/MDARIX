@@ -182,6 +182,13 @@ def _investigation_evidence(db: Session, tenant_id: uuid.UUID, investigation_id:
     return {row.evidence_identifier for row in rows}
 
 
+def _model_name() -> str:
+    from genai.provider import GenAIProvider
+
+    provider = GenAIProvider()
+    return f"{provider.provider_name}:{provider.model}"
+
+
 def run_real_golden_suite(
     db: Session, tenant_key: str = "ACME_CARE_SYNTHETIC", pause_seconds: float = 0.0, services=None
 ):
@@ -209,9 +216,11 @@ def run_real_golden_suite(
     passed = sum(1 for result in results if result["status"] == "PASS")
     specific = [result for result in results if result.get("specific_expectations")]
     model_written = sum(1 for result in results if result.get("analysis_author") == "LANGUAGE_MODEL")
+    authors = [result.get("analysis_author") for result in results if result.get("analysis_author") == "LANGUAGE_MODEL"]
     return {
         "evaluation_version": EVALUATION_VERSION,
         "tenant": tenant_key,
+        "model": _model_name() if authors else "MDARIX rules (no language model configured)",
         "passed": passed,
         "total": len(results),
         "model_written": model_written,
@@ -219,4 +228,76 @@ def run_real_golden_suite(
         "passed_with_specific_expectations": sum(1 for result in specific if result["status"] == "PASS"),
         "thresholds": {"match": MATCH_THRESHOLD, "prohibited": PROHIBITED_THRESHOLD},
         "results": results,
+    }
+
+
+def record_run(db: Session, report: dict[str, Any], started_at, tenant_key: str = "ACME_CARE_SYNTHETIC") -> uuid.UUID:
+    """Save the report as an evaluation run of the golden tenant (synthetic data), for the Trust page."""
+    import hashlib
+    import json
+    from datetime import datetime, timezone
+
+    from backend.app.db.models.foundation import EvaluationRun
+    from evaluation.harness import DATASET_VERSION
+
+    tenant = db.query(Tenant).filter(Tenant.tenant_key == tenant_key).one()
+    configuration = {"model": report.get("model"), "evaluation_version": EVALUATION_VERSION, **report["thresholds"]}
+    now = datetime.now(timezone.utc)
+    row = EvaluationRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        suite_version=EVALUATION_VERSION,
+        dataset_version=DATASET_VERSION,
+        release_version="MDARIX-R1",
+        configuration_hash=hashlib.sha256(json.dumps(configuration, sort_keys=True).encode()).hexdigest(),
+        status="COMPLETED",
+        results=json.loads(json.dumps(report, default=str)),
+        started_at=started_at,
+        completed_at=now,
+        created_at=now,
+    )
+    db.add(row)
+    db.commit()
+    return row.id
+
+
+def trust_summary(results: dict[str, Any], completed_at=None) -> dict[str, Any]:
+    """What the Trust page shows: headline numbers and, per scenario, each check with its evidence of matching."""
+    scenarios = []
+    for result in results.get("results", []):
+        scenarios.append(
+            {
+                "scenario_id": result.get("scenario_id"),
+                "title": result.get("title"),
+                "status": result.get("status"),
+                "specific_expectations": result.get("specific_expectations", 0),
+                "written_by": result.get("analysis_author"),
+                "seconds": result.get("seconds"),
+                "checks": [
+                    {
+                        "check": check["check"],
+                        "status": check["status"],
+                        "matches": [
+                            {"expected": item.get("expected"), "similarity": item.get("similarity")}
+                            for item in check.get("details") or []
+                            if isinstance(item, dict) and "expected" in item
+                        ],
+                    }
+                    for check in result.get("checks", [])
+                ],
+                "error": result.get("error"),
+            }
+        )
+    return {
+        "evaluation_version": results.get("evaluation_version"),
+        "completed_at": completed_at.isoformat() if completed_at else results.get("generated_at"),
+        "model": results.get("model"),
+        "passed": results.get("passed"),
+        "total": results.get("total"),
+        "with_specific_expectations": results.get("with_specific_expectations"),
+        "passed_with_specific_expectations": results.get("passed_with_specific_expectations"),
+        "model_written": results.get("model_written"),
+        "thresholds": results.get("thresholds"),
+        "scenarios": scenarios,
+        "data_notice": "Synthetic test scenarios only. Internal assurance, not regulatory certification.",
     }

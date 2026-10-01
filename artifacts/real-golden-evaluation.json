@@ -1,7 +1,8 @@
 {
   "evaluation_version": "MDARIX_R1_REAL_PIPELINE_EVAL_V1",
   "tenant": "ACME_CARE_SYNTHETIC",
-  "passed": 9,
+  "model": "groq:openai/gpt-oss-120b",
+  "passed": 8,
   "total": 12,
   "model_written": 12,
   "with_specific_expectations": 4,
@@ -22,12 +23,12 @@
       "fallback_reason": null,
       "counts": {
         "observations": 7,
-        "contradictions": 3,
+        "contradictions": 2,
         "missing_information": 10,
-        "hypotheses": 3,
-        "statements_dropped_by_checks": 2
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
       },
-      "seconds": 14.5,
+      "seconds": 17.3,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -35,13 +36,13 @@
           "details": [
             {
               "expected": "Pre-Rev B shutdown complaints",
-              "similarity": 0.814,
-              "matched": "Shutdown complaints existed before Component Rev B was introduced, indicating other factors."
+              "similarity": 0.806,
+              "matched": "Shutdown complaints existed before Component Rev B was introduced, indicating other factors may be involved."
             },
             {
               "expected": "Rev B validation passed",
-              "similarity": 0.794,
-              "matched": "Validation test passed yet shutdown complaints increased after Rev D deployment."
+              "similarity": 0.784,
+              "matched": "Validation test passed versus increased shutdown complaints after Rev D."
             }
           ]
         },
@@ -51,8 +52,8 @@
           "details": [
             {
               "expected": "Comparative Rev A vs Rev B testing unavailable",
-              "similarity": 0.923,
-              "matched": "Why was a controlled comparative Rev A vs Rev B test not performed?"
+              "similarity": 0.922,
+              "matched": "Why was a controlled comparative test between Rev A and Rev B not performed?"
             }
           ]
         },
@@ -77,19 +78,19 @@
       "scenario_id": "VS002",
       "title": "False Correlation",
       "investigation": "INV-002",
-      "status": "PASS",
+      "status": "FAIL",
       "specific_expectations": 0,
       "analysis_author": "LANGUAGE_MODEL",
       "hypotheses_author": "LANGUAGE_MODEL",
       "fallback_reason": null,
       "counts": {
-        "observations": 3,
+        "observations": 2,
         "contradictions": 0,
         "missing_information": 10,
-        "hypotheses": 3,
+        "hypotheses": 4,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 9.9,
+      "seconds": 9.7,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -103,8 +104,21 @@
         },
         {
           "check": "NO_PROHIBITED",
-          "status": "PASS",
-          "details": []
+          "status": "FAIL",
+          "details": [
+            {
+              "prohibited": "causality, certainty or a regulatory decision",
+              "statement": "absence of data does not prove lack of effect, only that evidence is missing"
+            },
+            {
+              "prohibited": "causality, certainty or a regulatory decision",
+              "statement": "absence of data does not prove lack of effect, only that evidence is missing"
+            },
+            {
+              "prohibited": "causality, certainty or a regulatory decision",
+              "statement": "absence of data does not prove lack of effect, only that evidence is missing"
+            }
+          ]
         },
         {
           "check": "CITATIONS_VALID",
@@ -128,13 +142,13 @@
       "hypotheses_author": "LANGUAGE_MODEL",
       "fallback_reason": null,
       "counts": {
-        "observations": 3,
-        "contradictions": 1,
+        "observations": 2,
+        "contradictions": 0,
         "missing_information": 10,
-        "hypotheses": 4,
+        "hypotheses": 3,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 11.5,
+      "seconds": 7.1,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -147,8 +161,8 @@
           "details": [
             {
               "expected": "Comparative Rev A vs Rev B testing unavailable",
-              "similarity": 0.658,
-              "matched": "Whether test reports were generated but stored elsewhere."
+              "similarity": 0.705,
+              "matched": "Power Regulation Module performance data for lots using Rev B."
             }
           ]
         },
@@ -182,10 +196,10 @@
         "observations": 3,
         "contradictions": 0,
         "missing_information": 10,
-        "hypotheses": 3,
-        "statements_dropped_by_checks": 0
+        "hypotheses": 2,
+        "statements_dropped_by_checks": 4
       },
-      "seconds": 8.6,
+      "seconds": 8.0,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -193,13 +207,13 @@
           "details": [
             {
               "expected": "Pre-Rev B shutdown complaints",
-              "similarity": 0.423,
-              "matched": "A risk\u2011analysis excerpt, which typically includes dates, yet it does not\u2014suggesting the omission may not be systematic."
+              "similarity": 0.542,
+              "matched": "absence of dates could be specific to this component rather than a systemic rule"
             },
             {
               "expected": "Rev B validation passed",
-              "similarity": 0.431,
-              "matched": "A risk\u2011analysis excerpt, which typically includes dates, yet it does not\u2014suggesting the omission may not be systematic."
+              "similarity": 0.585,
+              "matched": "the same generic record could be intentionally abstract, not implying missing dates for this component"
             }
           ]
         },
@@ -238,10 +252,10 @@
         "observations": 3,
         "contradictions": 0,
         "missing_information": 10,
-        "hypotheses": 4,
+        "hypotheses": 3,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 10.0,
+      "seconds": 7.6,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -281,12 +295,12 @@
       "fallback_reason": null,
       "counts": {
         "observations": 3,
-        "contradictions": 1,
+        "contradictions": 0,
         "missing_information": 10,
-        "hypotheses": 3,
+        "hypotheses": 4,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 7.6,
+      "seconds": 14.0,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -328,10 +342,10 @@
         "observations": 3,
         "contradictions": 1,
         "missing_information": 10,
-        "hypotheses": 4,
+        "hypotheses": 3,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 8.5,
+      "seconds": 10.2,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -370,13 +384,13 @@
       "hypotheses_author": "LANGUAGE_MODEL",
       "fallback_reason": null,
       "counts": {
-        "observations": 4,
+        "observations": 5,
         "contradictions": 1,
         "missing_information": 10,
         "hypotheses": 4,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 8.9,
+      "seconds": 8.3,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -416,12 +430,12 @@
       "fallback_reason": null,
       "counts": {
         "observations": 3,
-        "contradictions": 1,
-        "missing_information": 10,
-        "hypotheses": 4,
-        "statements_dropped_by_checks": 0
+        "contradictions": 0,
+        "missing_information": 8,
+        "hypotheses": 2,
+        "statements_dropped_by_checks": 2
       },
-      "seconds": 10.6,
+      "seconds": 7.4,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -466,7 +480,7 @@
         "hypotheses": 4,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 13.3,
+      "seconds": 10.1,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -506,12 +520,12 @@
       "fallback_reason": null,
       "counts": {
         "observations": 3,
-        "contradictions": 1,
-        "missing_information": 8,
+        "contradictions": 0,
+        "missing_information": 10,
         "hypotheses": 3,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 8.5,
+      "seconds": 8.4,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -553,10 +567,10 @@
         "observations": 3,
         "contradictions": 1,
         "missing_information": 10,
-        "hypotheses": 3,
+        "hypotheses": 4,
         "statements_dropped_by_checks": 0
       },
-      "seconds": 8.2,
+      "seconds": 9.3,
       "checks": [
         {
           "check": "CONTRADICTIONS_FOUND",
@@ -569,8 +583,8 @@
           "details": [
             {
               "expected": "Comparative Rev A vs Rev B testing unavailable",
-              "similarity": 0.691,
-              "matched": "compare synthetic outputs with any available empirical data"
+              "similarity": 0.67,
+              "matched": "Review system documentation on handling synthetic inputs"
             }
           ]
         },
@@ -592,5 +606,5 @@
       ]
     }
   ],
-  "generated_at": "2026-10-01T19:00:17.687335+00:00"
+  "generated_at": "2026-10-01T19:18:27.831854+00:00"
 }

@@ -1,9 +1,9 @@
 """Run the honest golden evaluation (VS001-VS012) on the real pipeline and save the report.
 
-    python scripts/run_real_evaluation.py [--pause 20] [--out artifacts/real-golden-evaluation.json]
+    python scripts/run_real_evaluation.py [--pause 20] [--record] [--out artifacts/real-golden-evaluation.json]
 
 Uses the configured language model (MDARIX_GENAI_*) or, without one, the rule-based pipeline - the report says which.
-Nothing is saved to the database.
+Analyses are not saved; --record saves the evaluation report itself so the Trust page can show it.
 """
 
 from __future__ import annotations
@@ -18,20 +18,25 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from backend.app.db.session import SessionLocal  # noqa: E402
-from evaluation.real_pipeline import run_real_golden_suite  # noqa: E402
+from evaluation.real_pipeline import record_run, run_real_golden_suite  # noqa: E402
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--pause", type=float, default=0.0, help="seconds between scenarios (provider rate limits)")
     parser.add_argument("--out", default=str(ROOT / "artifacts" / "real-golden-evaluation.json"))
+    parser.add_argument("--record", action="store_true", help="save the run for the Trust page")
     args = parser.parse_args()
+    started = datetime.now(timezone.utc)
     db = SessionLocal()
     try:
         report = run_real_golden_suite(db, pause_seconds=args.pause)
+        report["generated_at"] = datetime.now(timezone.utc).isoformat()
+        if args.record:
+            db.rollback()  # the pipeline saved nothing; start the recording cleanly
+            print(f"Recorded evaluation run {record_run(db, report, started)}")
     finally:
         db.close()
-    report["generated_at"] = datetime.now(timezone.utc).isoformat()
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")

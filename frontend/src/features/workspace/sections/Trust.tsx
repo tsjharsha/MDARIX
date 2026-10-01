@@ -6,6 +6,7 @@ import { Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
 import { NeedsProduct, RecordTable } from "./common";
 import { Limitations } from "./Products";
 import { AuditTab } from "./AuditTab";
+import { TrustEvaluation } from "./TrustEvaluation";
 
 const TABS = ["AI assurance", "Audit trail", "Data limitations"] as const;
 type Tab = (typeof TABS)[number];
@@ -46,6 +47,7 @@ function Assurance() {
   const guardrails = Object.entries((summary.data?.guardrails ?? {}) as Record<string, string>);
   return (
     <>
+      <TrustEvaluation />
       <Panel
         eyebrow="Declared by the AI service"
         title="Guardrails on every AI answer"
