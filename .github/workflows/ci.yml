@@ -96,7 +96,8 @@ jobs:
       MDARIX_DB_RUNTIME_USER: mdarix_runtime
       MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
       DAY35_FIXTURE_APPLY: '1'
-      DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
+      # Disposable per-run password for the seeded fixture accounts (never a shared or real password).
+      DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -204,7 +205,8 @@ jobs:
       MDARIX_DB_RUNTIME_USER: mdarix_runtime
       MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
       DAY35_FIXTURE_APPLY: '1'
-      DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
+      # Disposable per-run password for the seeded fixture accounts (never a shared or real password).
+      DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!
     services:
       postgres:
         image: pgvector/pgvector:pg16

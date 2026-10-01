@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 PORTS = tuple(int(value) for value in os.getenv("MDARIX_MULTI_INSTANCE_PORTS", "8021,8022").split(","))
 EMAIL = os.getenv("MDARIX_TEST_EMAIL", "r1-user-01@synthetic.invalid")
-PASSWORD = os.getenv("DAY35_FIXTURE_PASSWORD", "Temp@1234password")
+PASSWORD = os.environ["DAY35_FIXTURE_PASSWORD"]  # no default: fixture passwords come from the environment
 
 
 def get(client: httpx.Client, path: str):
