@@ -1,0 +1,596 @@
+{
+  "evaluation_version": "MDARIX_R1_REAL_PIPELINE_EVAL_V1",
+  "tenant": "ACME_CARE_SYNTHETIC",
+  "passed": 9,
+  "total": 12,
+  "model_written": 12,
+  "with_specific_expectations": 4,
+  "passed_with_specific_expectations": 1,
+  "thresholds": {
+    "match": 0.75,
+    "prohibited": 0.85
+  },
+  "results": [
+    {
+      "scenario_id": "VS001",
+      "title": "Supplier Change Correlation",
+      "investigation": "INV-001",
+      "status": "PASS",
+      "specific_expectations": 6,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 7,
+        "contradictions": 3,
+        "missing_information": 10,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 2
+      },
+      "seconds": 14.5,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Pre-Rev B shutdown complaints",
+              "similarity": 0.814,
+              "matched": "Shutdown complaints existed before Component Rev B was introduced, indicating other factors."
+            },
+            {
+              "expected": "Rev B validation passed",
+              "similarity": 0.794,
+              "matched": "Validation test passed yet shutdown complaints increased after Rev D deployment."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Comparative Rev A vs Rev B testing unavailable",
+              "similarity": 0.923,
+              "matched": "Why was a controlled comparative Rev A vs Rev B test not performed?"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS002",
+      "title": "False Correlation",
+      "investigation": "INV-002",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 0,
+        "missing_information": 10,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 9.9,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS003",
+      "title": "Missing Evidence",
+      "investigation": "INV-003",
+      "status": "FAIL",
+      "specific_expectations": 1,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 11.5,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Comparative Rev A vs Rev B testing unavailable",
+              "similarity": 0.658,
+              "matched": "Whether test reports were generated but stored elsewhere."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS004",
+      "title": "Conflicting Evidence",
+      "investigation": "INV-004",
+      "status": "FAIL",
+      "specific_expectations": 2,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 0,
+        "missing_information": 10,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 8.6,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Pre-Rev B shutdown complaints",
+              "similarity": 0.423,
+              "matched": "A risk\u2011analysis excerpt, which typically includes dates, yet it does not\u2014suggesting the omission may not be systematic."
+            },
+            {
+              "expected": "Rev B validation passed",
+              "similarity": 0.431,
+              "matched": "A risk\u2011analysis excerpt, which typically includes dates, yet it does not\u2014suggesting the omission may not be systematic."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS005",
+      "title": "Incorrect Timeline",
+      "investigation": "INV-005",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 0,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 10.0,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS006",
+      "title": "Shared Component Exposure",
+      "investigation": "INV-006",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 7.6,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS007",
+      "title": "Premature Closure",
+      "investigation": "INV-007",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 8.5,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS008",
+      "title": "Control Failure",
+      "investigation": "INV-008",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 4,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 8.9,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS009",
+      "title": "Counterfactual",
+      "investigation": "INV-009",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 10.6,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS010",
+      "title": "AI Model Change",
+      "investigation": "INV-010",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 0,
+        "missing_information": 10,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 13.3,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS011",
+      "title": "Multiple Causes",
+      "investigation": "INV-010",
+      "status": "PASS",
+      "specific_expectations": 0,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 8,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 8.5,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS012",
+      "title": "Correct Abstention",
+      "investigation": "INV-010",
+      "status": "FAIL",
+      "specific_expectations": 1,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 10,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 8.2,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Comparative Rev A vs Rev B testing unavailable",
+              "similarity": 0.691,
+              "matched": "compare synthetic outputs with any available empirical data"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    }
+  ],
+  "generated_at": "2026-10-01T19:00:17.687335+00:00"
+}
