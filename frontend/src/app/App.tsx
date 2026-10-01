@@ -28,21 +28,25 @@ export function App() {
   if (
     publicPath === "/" ||
     [
+      // Current website pages.
       "/platform",
+      "/solutions",
       "/product-lifecycle",
-      "/why-mdarix",
+      "/trust",
       "/resources",
-      "/plans",
       "/pricing",
+      "/company",
+      // Former pages; the site redirects them to the section that now holds their content.
+      "/why-mdarix",
+      "/plans",
       "/roadmap",
       "/capabilities",
-      "/solutions",
       "/ai-trust",
       "/integrations",
       "/security",
-      "/company",
       "/request-demo",
-    ].some((route) => publicPath.startsWith(route))
+      // Match whole path segments only, so app routes such as /platform-admin/... are never sent to the website.
+    ].some((route) => publicPath === route || publicPath.startsWith(`${route}/`))
   )
     return <PublicMegaSite path={publicPath} />;
   if (

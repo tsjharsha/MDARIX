@@ -8,7 +8,14 @@ def compact(text: str) -> str:
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SITE = (ROOT / "frontend" / "src" / "PublicMegaSite.tsx").read_text(encoding="utf-8")
+# The public website: the shell plus its pages, content and motion modules.
+SITE = "\n".join(
+    path.read_text(encoding="utf-8")
+    for path in [
+        ROOT / "frontend" / "src" / "PublicMegaSite.tsx",
+        *sorted((ROOT / "frontend" / "src" / "site").glob("*.ts*")),
+    ]
+)
 MAIN = frontend_app_source()
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
 WORKSPACE = ROOT / "frontend" / "src" / "features" / "workspace"
@@ -92,3 +99,22 @@ def test_semantic_design_tokens_cover_business_meaning():
         "--assurance",
     ):
         assert token in STYLES
+
+
+def test_website_is_consolidated_and_every_former_url_still_resolves():
+    for page in ("/platform", "/solutions", "/product-lifecycle", "/trust", "/resources", "/pricing", "/company"):
+        assert f'"{page}"' in SITE
+    # Former top-level pages redirect to the section that now holds their content.
+    for legacy in (
+        "/why-mdarix",
+        "/ai-trust",
+        "/security",
+        "/integrations",
+        "/plans",
+        "/capabilities",
+        "/roadmap",
+        "/request-demo",
+    ):
+        assert f'"{legacy}"' in SITE
+    # App routes such as /platform-admin/... must never be captured by the website's /platform prefix.
+    assert "publicPath.startsWith(`${route}/`)" in MAIN

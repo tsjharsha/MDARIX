@@ -1,1247 +1,185 @@
-import React, { useEffect, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
+import "./site/site.css";
+import { lifecycleStages, platformGroups, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
+import {
+  CompanyPage,
+  HomePage,
+  LifecyclePage,
+  PlatformPage,
+  PricingPage,
+  ResourcesPage,
+  SITE_PAGES,
+  SolutionsPage,
+  TrustPage,
+  type SitePage,
+} from "./site/pages";
 
-type MenuItem = { label: string; href: string; future?: boolean; description?: string };
-type MenuGroup = { title: string; items: MenuItem[] };
-const current = (label: string, href: string, description?: string): MenuItem => ({ label, href, description });
-const future = (label: string, anchor: string): MenuItem => ({ label, href: `/platform/${anchor}` });
-
-const menus: Record<string, MenuGroup[]> = {
-  Platform: [
-    {
-      title: "Product Intelligence",
-      items: [
-        current("Product 360", "/platform/product-360", "See product, version, configuration, and lifecycle context."),
-        current(
-          "Product Reality Graph",
-          "/platform/reality-graph",
-          "Connect product, supplier, lot, complaint, change, and evidence relationships.",
-        ),
-        current(
-          "ProductVersion Intelligence",
-          "/platform/product-version",
-          "Compare revisions, scope, and impact with traceable context.",
-        ),
-        current(
-          "Timeline Intelligence",
-          "/platform/timeline",
-          "Understand what changed, when it became effective, and when it became known.",
-        ),
-      ],
-    },
-    {
-      title: "Investigation Intelligence",
-      items: [
-        current(
-          "Ask MDARIX",
-          "/platform/ask-mdarix",
-          "Ask a controlled investigation question and preserve its scope.",
-        ),
-        current("Investigation Workspace", "/platform/investigation"),
-        current("Evidence Intelligence", "/platform/evidence"),
-        current("Hypothesis Intelligence", "/platform/hypotheses"),
-        current("AI Challenger", "/platform/challenger"),
-        current("Unknowns Radar", "/platform/unknowns"),
-      ],
-    },
-    {
-      title: "Decision Intelligence",
-      items: [
-        current("Failure Chain Intelligence", "/platform/failure-chain"),
-        current("Counterfactual Analysis", "/platform/counterfactual"),
-        current("Decision Center", "/platform/decision-center"),
-        current("Investigation Brief", "/platform/investigation-brief"),
-      ],
-    },
-    {
-      title: "Trust & Governance",
-      items: [
-        current("AI Assurance", "/platform/ai-assurance"),
-        current("AI Provenance", "/platform/ai-provenance"),
-        current("Human Review & Approval", "/platform/human-review"),
-        current("Audit Trail", "/platform/audit-trail"),
-        current("Enterprise Administration", "/platform/enterprise-administration"),
-      ],
-    },
-  ],
-  Solutions: [
-    {
-      title: "By Challenge",
-      items: [
-        current("Investigate Complaint Increases", "/solutions#complaints"),
-        current("Understand Product Changes", "/solutions#changes"),
-        current("Find Affected Products & Lots", "/solutions#affected"),
-        current("Investigate Supplier Issues", "/solutions#supplier"),
-        current("Connect Fragmented Evidence", "/solutions#evidence"),
-        current("Challenge Suspected Root Causes", "/solutions#challenge"),
-        current("Identify Missing Evidence", "/solutions#unknowns"),
-      ],
-    },
-    {
-      title: "By Role",
-      items: [
-        current("Quality Leaders", "/solutions#quality-leaders", "See the full investigation picture."),
-        current("Investigators / QA", "/solutions#investigators", "Move from signal to evidence."),
-        current("Regulatory Affairs", "/solutions#regulatory", "Prepare traceable review context."),
-        current("Product / R&D", "/solutions#product", "Connect changes to outcomes."),
-        current("Supplier Quality", "/solutions#supplier-quality", "Follow supplier and component relationships."),
-        current("Manufacturing Quality", "/solutions#manufacturing", "Understand affected lots and changes."),
-        current("Executives", "/solutions#executives", "Review decision-ready assurance."),
-      ],
-    },
-    {
-      title: "By Investigation",
-      items: [
-        current("Complaint Investigation", "/solutions#complaint-investigation"),
-        current("ProductVersion Investigation", "/solutions#version-investigation"),
-        current("Change Investigation", "/solutions#change-investigation"),
-        current("Supplier Investigation", "/solutions#supplier-investigation"),
-        current("Component Investigation", "/solutions#component-investigation"),
-        current("Lot / Batch Investigation", "/solutions#lot-investigation"),
-        current("Risk & Failure Investigation", "/solutions#risk-investigation"),
-        current("Cross-System Investigation", "/solutions#cross-system"),
-      ],
-    },
-    {
-      title: "Investigate with MDARIX",
-      items: [
-        current(
-          "Why did complaints increase after Rev D?",
-          "/platform/investigation",
-          "Follow a signal through product version, change, component, supplier, lots, evidence, hypotheses, unknowns, assurance, and human decision.",
-        ),
-      ],
-    },
-  ],
-  "Product Lifecycle": [
-    {
-      title: "Discover & Define",
-      items: [
-        future("Product Strategy", "strategy"),
-        future("User / Clinical Need", "clinical-need"),
-        future("Product Requirements", "requirements"),
-      ],
-    },
-    {
-      title: "Develop & Prove",
-      items: [
-        future("Design & Development", "design"),
-        future("Design Controls", "design-controls"),
-        future("Verification & Validation", "verification"),
-        future("Clinical Intelligence", "clinical"),
-        future("Regulatory Intelligence", "regulatory"),
-      ],
-    },
-    {
-      title: "Build & Release",
-      items: [
-        future("Manufacturing Intelligence", "manufacturing"),
-        current("Supplier Intelligence", "/platform/supplier-intelligence"),
-        current("Component Intelligence", "/platform/component-intelligence"),
-        current("Lot / Batch Intelligence", "/platform/lot-batch-intelligence"),
-        current("Change Intelligence", "/platform/change-intelligence"),
-      ],
-    },
-    {
-      title: "Monitor, Improve & Evolve",
-      items: [
-        current("Complaint Intelligence", "/solutions#complaints"),
-        current("Post-Market Investigation", "/platform/investigation"),
-        future("Signal Intelligence", "signal"),
-        current("Evidence Intelligence", "/platform/evidence"),
-        future("CAPA Intelligence", "capa"),
-        future("Field Action / Recall Intelligence", "recall"),
-        current("Product Change Intelligence", "/platform/timeline"),
-        future("Continuous Monitoring", "monitoring"),
-        future("Product Retirement", "retirement"),
-      ],
-    },
-  ],
-  Trust: [
-    {
-      title: "A Different Intelligence Layer",
-      items: [
-        current("Not Another QMS", "/why-mdarix#not-qms", "Keep existing systems of record."),
-        current(
-          "Product Reality",
-          "/why-mdarix#product-reality",
-          "Understand relationships across lifecycle information.",
-        ),
-        current("Investigation Intelligence", "/why-mdarix#investigation", "Investigate across connected context."),
-        current(
-          "Evidence Before Inference",
-          "/why-mdarix#evidence",
-          "Separate facts, interpretations, hypotheses, and decisions.",
-        ),
-      ],
-    },
-    {
-      title: "Trustworthy Investigation",
-      items: [
-        current("Challenge the Explanation", "/why-mdarix#challenge"),
-        current("AI You Can Inspect", "/why-mdarix#inspectable-ai"),
-        current("Humans Decide", "/why-mdarix#humans-decide"),
-      ],
-    },
-    {
-      title: "Questions MDARIX Helps Explore",
-      items: [
-        current("What changed before the signal?", "/solutions#changes"),
-        current("Which versions and lots are affected?", "/solutions#affected"),
-        current("What evidence contradicts the cause?", "/solutions#challenge"),
-        current("What information is still missing?", "/solutions#unknowns"),
-      ],
-    },
-    {
-      title: "Trust Foundations",
-      items: [
-        current("AI Assurance", "/platform/ai-assurance"),
-        current("Security & Access", "/security"),
-        current("Plans & Entitlements", "/plans"),
-        current("Integration Approach", "/integrations"),
-      ],
-    },
-  ],
-  Company: [
-    {
-      title: "Company",
-      items: [
-        current("Why MDARIX", "/why-mdarix", "Evidence-first investigation intelligence for medical-device teams."),
-        current("Our approach", "/company", "A governed intelligence layer above existing systems of record."),
-        current("Contact", "/request-demo", "Discuss your investigation workflow with MDARIX."),
-      ],
-    },
-    {
-      title: "Trust",
-      items: [
-        current("Security & access", "/security"),
-        current("AI assurance", "/ai-trust"),
-        current("Integration approach", "/integrations"),
-      ],
-    },
-  ],
+// The website was consolidated from ~65 URLs into 8 pages. Every old URL lands on the section that now holds its
+// content, so existing links and bookmarks keep working.
+const LEGACY_PAGES: Record<string, string> = {
+  "/why-mdarix": "/trust#principles",
+  "/ai-trust": "/trust#ai",
+  "/security": "/trust#security",
+  "/integrations": "/trust#integrations",
+  "/plans": "/pricing#early-access",
+  "/capabilities": "/platform",
+  "/roadmap": "/product-lifecycle#roadmap",
+  "/request-demo": "/company#contact",
 };
+const LIFECYCLE_SLUGS = new Set(lifecycleStages.flatMap((stage) => stage.items.map((item) => item.slug)));
+const PLATFORM_SLUGS = new Set(
+  platformGroups.flatMap((group) => group.capabilities.map((capability) => capability.slug)),
+);
 
-// Keep the lifecycle menu distinct from the platform's generic investigation pages.
-const lifecycleMonitorGroup = menus["Product Lifecycle"].find((group) => group.title === "Monitor, Improve & Evolve");
-if (lifecycleMonitorGroup) {
-  lifecycleMonitorGroup.items = lifecycleMonitorGroup.items.map((item) =>
-    item.label === "Post-Market Investigation"
-      ? current(item.label, "/platform/post-market-surveillance")
-      : item.label === "Evidence Intelligence"
-        ? current(item.label, "/platform/lifecycle-evidence-intelligence")
-        : item,
-  );
+export function resolveSitePath(path: string, hash: string): { page: SitePage; hash: string } {
+  const clean = path.replace(/\/+$/, "") || "/";
+  if ((SITE_PAGES as readonly string[]).includes(clean)) return { page: clean as SitePage, hash };
+  if (clean.startsWith("/platform/")) {
+    const slug = clean.slice("/platform/".length);
+    if (PLATFORM_SLUGS.has(slug)) return { page: "/platform", hash: slug };
+    if (LIFECYCLE_SLUGS.has(slug) || FUTURE_LIFECYCLE.has(slug)) return { page: "/product-lifecycle", hash: slug };
+    return { page: "/platform", hash: "" };
+  }
+  const legacy = LEGACY_PAGES[clean];
+  if (legacy) {
+    const [page, anchor] = legacy.split("#");
+    // A legacy page's own anchor (e.g. /why-mdarix#not-qms or /roadmap#capa) wins over the default section.
+    return { page: page as SitePage, hash: hash || anchor || "" };
+  }
+  return { page: "/", hash: "" };
 }
 
-const pages: Record<string, { eyebrow: string; title: string; copy: string }> = {
-  "/": {
-    eyebrow: "Product investigation intelligence for medical devices",
-    title: "Turn post-market signals into defensible product decisions.",
-    copy: "Connect complaints, product context, lifecycle evidence, risk, and human review in one governed investigation story.",
-  },
-  "/platform": {
-    eyebrow: "Platform & AI",
-    title: "A connected intelligence layer for product investigation.",
-    copy: "Reconstruct product reality, investigate competing explanations, expose contradictions and unknowns, and preserve traceable human decisions.",
-  },
-  "/solutions": {
-    eyebrow: "Solutions",
-    title: "Start with the question your team needs to answer.",
-    copy: "Investigate complaint increases, product changes, affected lots, supplier issues, fragmented evidence, suspected causes, and missing information across systems.",
-  },
-  "/product-lifecycle": {
-    eyebrow: "Product lifecycle",
-    title: "Intelligence from product definition through post-market evolution.",
-    copy: "Current investigation capabilities anchor a broader lifecycle vision. Future areas are identified clearly without implying working functionality.",
-  },
-  "/why-mdarix": {
-    eyebrow: "Why MDARIX",
-    title: "Evidence before inference. Challenge before conclusion.",
-    copy: "MDARIX works above your existing systems of record to reconstruct product reality and make investigation intelligence inspectable.",
-  },
-  "/resources": {
-    eyebrow: "Resources",
-    title: "Explore product investigation intelligence.",
-    copy: "Learn how MDARIX connects product reality, evidence, temporal context, investigation, decisions, assurance, and governance.",
-  },
-  "/plans": {
-    eyebrow: "Plans",
-    title: "Start with Free Early Access.",
-    copy: "Create an account, verify your email, and enter a tenant-scoped development workspace. Future commercial packaging is not represented here.",
-  },
-  "/pricing": {
-    eyebrow: "Pricing",
-    title: "Choose the investigation foundation that fits your team.",
-    copy: "Compare illustrative early-access options for connected product context, evidence intelligence, assurance, and governed human decisions.",
-  },
-  "/capabilities": {
-    eyebrow: "Current capabilities",
-    title: "From connected lifecycle data to traceable decisions.",
-    copy: "Explore the current product reality, investigation, evidence, challenge, decision, assurance, and governance capabilities.",
-  },
-  "/roadmap": {
-    eyebrow: "Product roadmap",
-    title: "Current capabilities and the broader lifecycle direction.",
-    copy: "Future roadmap areas are informational and do not represent available workflows or committed release dates.",
-  },
-  "/integrations": {
-    eyebrow: "Integrations",
-    title: "Work above the systems you already trust.",
-    copy: "QMS, PLM, ERP, MES, supplier, document, and evidence platforms remain authoritative systems of record.",
-  },
-  "/security": {
-    eyebrow: "Security & access",
-    title: "Controlled, tenant-scoped, and traceable by design.",
-    copy: "Authentication, role and field authorization, action controls, provenance, and human authority form the current security foundation. Independent certification is not claimed.",
-  },
-  "/ai-trust": {
-    eyebrow: "AI trust",
-    title: "Grounded intelligence with visible limits.",
-    copy: "MDARIX preserves evidence references, temporal context, contradictions, unknowns, provenance, and human review. AI does not create the final regulated decision.",
-  },
-  "/request-demo": {
-    eyebrow: "Get started",
-    title: "Explore MDARIX in your lifecycle context.",
-    copy: "Create an account, verify your email, sign in, and enter the tenant-scoped application.",
-  },
-  "/company": {
-    eyebrow: "Company",
-    title: "A more defensible way to investigate product reality.",
-    copy: "MDARIX is designed for medical-device teams that need connected evidence, visible uncertainty, and accountable human decisions.",
-  },
+type NavMenu = {
+  name: string;
+  title: string;
+  href: string;
+  groups: { title: string; links: { label: string; href: string; note?: string }[] }[];
 };
 
-const publicHeroVisuals: Record<string, { src: string; alt: string; caption: string }> = {
-  "/platform/challenger": {
-    src: "/medtech-hero-challenger.png",
-    alt: "MedTech investigation workspace comparing competing explanations against evidence",
-    caption: "Competing explanations → evidence challenge → human review",
-  },
-  "/platform/ai-assurance": {
-    src: "/medtech-hero-ai-assurance.png",
-    alt: "MedTech AI assurance workspace showing validation checkpoints and reviewer controls",
-    caption: "Grounding → guardrails → assurance → human review",
-  },
-  "/platform/ai-provenance": {
-    src: "/medtech-hero-ai-provenance.png",
-    alt: "MedTech evidence chain connecting device observations, source records, and an AI insight",
-    caption: "Observation → source → provenance → inspectable insight",
-  },
-  "/platform/human-review": {
-    src: "/medtech-hero-human-review.png",
-    alt: "MedTech quality and regulatory reviewers examining evidence before approving a decision",
-    caption: "Evidence → review → approval boundary → accountable decision",
-  },
-  "/platform/audit-trail": {
-    src: "/medtech-hero-audit-trail.png",
-    alt: "MedTech investigation audit timeline with version history and signed decision markers",
-    caption: "Event history → version context → signature → traceable record",
-  },
-  "/platform/enterprise-administration": {
-    src: "/medtech-hero-enterprise-administration.png",
-    alt: "MedTech enterprise administration control room connecting tenants, identity, integrations, and operations",
-    caption: "Tenant boundaries → integrations → assurance → operations",
-  },
-};
-
-const solutionHeroVisuals: Record<string, { src: string; alt: string }> = {
-  complaints: {
-    src: "/medtech-solution-complaints.png",
-    alt: "MedTech complaint signals connected to product versions and evidence",
-  },
-  changes: {
-    src: "/medtech-solution-changes.png",
-    alt: "MedTech product change investigation connected to field evidence",
-  },
-  affected: {
-    src: "/medtech-solution-affected.png",
-    alt: "MedTech products and manufacturing lots mapped for impact review",
-  },
-  supplier: {
-    src: "/medtech-solution-supplier.png",
-    alt: "MedTech supplier, component, site, and lot relationships under review",
-  },
-  evidence: {
-    src: "/medtech-solution-evidence.png",
-    alt: "MedTech evidence intelligence view with provenance and evidence gaps",
-  },
-  challenge: {
-    src: "/medtech-solution-challenge.png",
-    alt: "MedTech competing explanations compared against authorized evidence",
-  },
-  unknowns: {
-    src: "/medtech-solution-unknowns.png",
-    alt: "MedTech investigation unknowns and missing evidence highlighted for review",
-  },
-  "quality-leaders": {
-    src: "/medtech-role-quality-leaders.png",
-    alt: "Quality leaders reviewing medical-device signals, evidence strength, risk context, and decisions",
-  },
-  investigators: {
-    src: "/medtech-role-investigators.png",
-    alt: "Medical-device investigators connecting complaints, versions, suppliers, lots, hypotheses, and unknowns",
-  },
-  regulatory: {
-    src: "/medtech-role-regulatory.png",
-    alt: "Regulatory reviewer inspecting a medical-device evidence package with provenance and approval controls",
-  },
-  product: {
-    src: "/medtech-role-product.png",
-    alt: "Medical-device product and research team comparing design revisions, components, versions, and field outcomes",
-  },
-  "supplier-quality": {
-    src: "/medtech-role-supplier-quality.png",
-    alt: "Supplier quality professional tracing a component from supplier through lot to field signal",
-  },
-  manufacturing: {
-    src: "/medtech-role-manufacturing.png",
-    alt: "Manufacturing quality team reviewing production lots, process observations, and device signals",
-  },
-  executives: {
-    src: "/medtech-role-executives.png",
-    alt: "Executive team reviewing a decision-ready medical-device risk and evidence summary",
-  },
-  "complaint-investigation": {
-    src: "/medtech-investigation-complaint.png",
-    alt: "Medical-device complaints connected to product versions, field reports, and evidence",
-  },
-  "version-investigation": {
-    src: "/medtech-investigation-version.png",
-    alt: "Medical-device hardware and software versions compared with field signals and evidence",
-  },
-  "change-investigation": {
-    src: "/medtech-investigation-change.png",
-    alt: "Medical-device design and manufacturing changes linked to post-market outcomes",
-  },
-  "supplier-investigation": {
-    src: "/medtech-investigation-supplier.png",
-    alt: "Medical-device supplier, component, lot, and field signal relationships",
-  },
-  "component-investigation": {
-    src: "/medtech-investigation-component.png",
-    alt: "Medical-device component lineage traced from specification through field evidence",
-  },
-  "lot-investigation": {
-    src: "/medtech-investigation-lot.png",
-    alt: "Medical-device manufacturing lots, distribution paths, and complaint evidence mapped for review",
-  },
-  "risk-investigation": {
-    src: "/medtech-investigation-risk.png",
-    alt: "Medical-device hazards, controls, residual risk, and evidence connected for investigation",
-  },
-  "cross-system": {
-    src: "/medtech-investigation-cross-system.png",
-    alt: "QMS, PLM, ERP, supplier, and manufacturing systems connected in a medical-device investigation",
-  },
-};
-
-const capabilityCopy: Record<string, { eyebrow: string; title: string; copy: string }> = {
-  challenger: {
-    eyebrow: "Current capability · AI Challenger",
-    title: "Challenge the explanation before it becomes a conclusion.",
-    copy: "Compare competing explanations against authorized medical-device evidence while keeping contradictions, unknowns, limitations, and human responsibility visible.",
-  },
-  "ai-assurance": {
-    eyebrow: "Current capability · AI Assurance",
-    title: "Inspect how advisory intelligence is bounded and reviewed.",
-    copy: "Make grounding, uncertainty, provider limitations, safety controls, and human review requirements visible around every AI-assisted investigation step.",
-  },
-  "ai-provenance": {
-    eyebrow: "Current capability · AI Provenance",
-    title: "Trace every insight back to its evidence context.",
-    copy: "Connect observations, source records, temporal scope, provenance, and authorized retrieval so reviewers can inspect where an AI-assisted interpretation came from.",
-  },
-  "human-review": {
-    eyebrow: "Current capability · Human Review",
-    title: "Keep accountable people at the decision boundary.",
-    copy: "Bring evidence, contradictions, gaps, remarks, version context, and approval controls together so humans remain responsible for governed decisions.",
-  },
-  "audit-trail": {
-    eyebrow: "Current capability · Audit Trail",
-    title: "Preserve the story of what changed, who acted, and why.",
-    copy: "Follow investigation events, record versions, evidence actions, approvals, and provenance in a reviewable audit story.",
-  },
-  "enterprise-administration": {
-    eyebrow: "Current capability · Enterprise Administration",
-    title: "Operate tenants, access, integrations, and configuration from one governed control plane.",
-    copy: "Give platform administrators a clear view of customer boundaries, identity, mappings, integrations, AI assurance, security, and operational health.",
-  },
-};
-
-const capabilityStatus = [
-  { label: "Implemented", text: "Current workflows covered by the MVP code and local checks." },
-  { label: "Synthetic / demo-only", text: "Seeded validation tenants, simulators, and non-customer data." },
-  { label: "Planned", text: "Future product direction, not an available workflow." },
-  { label: "Production-dependent", text: "Requires hosted infrastructure, credentials, or operational evidence." },
-];
-
-const lifecycleContent: Record<string, { eyebrow: string; title: string; copy: string }> = {
-  strategy: {
-    eyebrow: "Product lifecycle · Discover",
-    title: "Turn market and patient needs into a governed product direction.",
-    copy: "Frame the intended use, target users, clinical problem, market need, business goals, and regulatory pathway before detailed design work begins.",
-  },
-  "clinical-need": {
-    eyebrow: "Product lifecycle · Discover",
-    title: "Define the clinical need and the outcome the device must support.",
-    copy: "Connect user needs, patient populations, care settings, clinical risks, and measurable outcomes so product requirements begin with a clear clinical purpose.",
-  },
-  requirements: {
-    eyebrow: "Product lifecycle · Define",
-    title: "Translate user needs into traceable product requirements.",
-    copy: "Establish functional, safety, performance, usability, software, security, and regulatory requirements with ownership, rationale, and verification intent.",
-  },
-  design: {
-    eyebrow: "Product lifecycle · Develop",
-    title: "Manage design decisions with evidence attached to every requirement.",
-    copy: "Coordinate design outputs, interfaces, risk controls, configuration decisions, and revisions while preserving traceability from requirement to implementation.",
-  },
-  "design-controls": {
-    eyebrow: "Product lifecycle · Develop",
-    title: "Make design controls visible from planning through release.",
-    copy: "Organize design inputs, outputs, reviews, verification, validation, change control, and approval evidence into a reviewable design history.",
-  },
-  verification: {
-    eyebrow: "Product lifecycle · Prove",
-    title: "Show that the design meets its specified requirements.",
-    copy: "Bring test protocols, results, deviations, failures, corrective actions, and approval records together so verification status is inspectable and complete.",
-  },
-  clinical: {
-    eyebrow: "Product lifecycle · Prove",
-    title: "Connect clinical evidence to product decisions.",
-    copy: "Maintain the relationship between clinical evaluation, intended use, benefit-risk reasoning, usability evidence, and the product configuration under review.",
-  },
-  regulatory: {
-    eyebrow: "Product lifecycle · Release",
-    title: "Prepare a traceable regulatory evidence story.",
-    copy: "Organize submissions, commitments, standards, approvals, findings, and market-specific obligations around the exact product version and evidence scope.",
-  },
-  manufacturing: {
-    eyebrow: "Product lifecycle · Build",
-    title: "Connect released design intent to manufacturing reality.",
-    copy: "Relate manufacturing processes, suppliers, components, lots, deviations, inspections, and release records back to the approved product configuration.",
-  },
-  signal: {
-    eyebrow: "Product lifecycle · Monitor",
-    title: "Detect and investigate signals across the installed product base.",
-    copy: "Combine complaints, service data, adverse events, returns, trends, and product-version context to distinguish emerging signals from isolated observations.",
-  },
-  capa: {
-    eyebrow: "Product lifecycle · Improve",
-    title: "Move from a confirmed issue to controlled improvement.",
-    copy: "Link investigation findings to containment, root-cause analysis, corrective and preventive actions, effectiveness checks, owners, and approval evidence.",
-  },
-  recall: {
-    eyebrow: "Product lifecycle · Act",
-    title: "Coordinate field action decisions with complete product scope.",
-    copy: "Identify affected versions, lots, markets, customers, risk rationale, communications, execution status, and evidence for a controlled field action.",
-  },
-  monitoring: {
-    eyebrow: "Product lifecycle · Monitor",
-    title: "Continuously watch product performance and evidence quality.",
-    copy: "Track trends, thresholds, open unknowns, supplier performance, complaint patterns, and changes that may alter the product risk picture.",
-  },
-  retirement: {
-    eyebrow: "Product lifecycle · Evolve",
-    title: "Retire products with traceability and accountability.",
-    copy: "Preserve the final configuration, support obligations, residual risks, records, customer impact, and regulatory responsibilities through product retirement.",
-  },
-  "supplier-intelligence": {
-    eyebrow: "Product lifecycle · Build & Release",
-    title: "Understand supplier connections behind product signals.",
-    copy: "A product issue may involve a component, material, supplier, or supplier change. MDARIX helps teams connect supplier and component information with product records and emerging signals, supporting clearer investigations and impact assessments.",
-  },
-  "component-intelligence": {
-    eyebrow: "Product lifecycle · Build & Release",
-    title: "See how component relationships affect product decisions.",
-    copy: "Components connect product design, suppliers, manufacturing, risk, and field performance. MDARIX helps teams see these relationships in context, making it easier to assess whether a component-related issue may affect other products or versions.",
-  },
-  "lot-batch-intelligence": {
-    eyebrow: "Product lifecycle · Build & Release",
-    title: "Assess lot and batch context when investigating product signals.",
-    copy: "Lot and batch information can help teams assess the scope and distribution of a potential issue. MDARIX connects lot context with product, manufacturing, supplier, and post-market records to support structured investigation and impact review.",
-  },
-  "change-intelligence": {
-    eyebrow: "Product lifecycle · Build & Release",
-    title: "Understand the product impact of every change.",
-    copy: "Changes to design, components, suppliers, processes, labeling, or software can affect requirements, risks, evidence, and products in the field. MDARIX helps teams connect change proposals to those relationships so impact assessments are supported by product context.",
-  },
-};
-
-Object.assign(lifecycleContent, {
-  "post-market-surveillance": {
-    eyebrow: "Product lifecycle · Monitor, Improve & Evolve",
-    title: "Turn post-market information into connected product insight.",
-    copy: "Post-market surveillance brings together complaints, adverse events, service information, returns, trends, and other field evidence. MDARIX connects this information to products, versions, lots, risks, investigations, and decisions so teams can review emerging signals in context.",
-  },
-  "lifecycle-evidence-intelligence": {
-    eyebrow: "Product lifecycle · Monitor, Improve & Evolve",
-    title: "Make lifecycle evidence easier to find, connect, and evaluate.",
-    copy: "Evidence is most useful when reviewers can see the product question, risk, investigation, or decision it supports. MDARIX preserves source, version, date, provenance, contradictions, limitations, and missing links across the lifecycle.",
-  },
-});
-
-const anchorPages: Record<string, { eyebrow: string; title: string; copy: string }> = {
-  complaints: {
-    eyebrow: "Solution · Complaint signals",
-    title: "Find out what changed before complaints increased.",
-    copy: "Connect complaint patterns to product versions, changes, components, suppliers, lots, and evidence so investigators can separate a signal from a conclusion.",
-  },
-  changes: {
-    eyebrow: "Solution · Product changes",
-    title: "Understand the changes that shaped the signal.",
-    copy: "Compare product revisions and controlled changes with complaint timing, affected lots, configuration, and supporting evidence.",
-  },
-  affected: {
-    eyebrow: "Solution · Affected products and lots",
-    title: "Trace impact from version to lot.",
-    copy: "Follow product versions, component relationships, suppliers, and lot context to identify what is affected and what remains unknown.",
-  },
-  supplier: {
-    eyebrow: "Solution · Supplier investigation",
-    title: "Connect supplier context to product reality.",
-    copy: "Bring supplier, component, change, lot, and complaint relationships into one investigation workspace.",
-  },
-  evidence: {
-    eyebrow: "Solution · Evidence intelligence",
-    title: "Make evidence visible before inference.",
-    copy: "Review source anchors, reliability, temporal context, contradictions, and missing evidence before forming a hypothesis.",
-  },
-  challenge: {
-    eyebrow: "Solution · AI Challenger",
-    title: "Challenge the explanation before it becomes a conclusion.",
-    copy: "Expose competing hypotheses, contradictions, unknowns, and limitations so authorized humans can review the reasoning.",
-  },
-  unknowns: {
-    eyebrow: "Solution · Unknowns radar",
-    title: "See what the investigation still cannot establish.",
-    copy: "Surface incomplete traceability, missing lot references, unsupported failure chains, and other evidence gaps.",
-  },
-  "quality-leaders": {
-    eyebrow: "Role · Quality leaders",
-    title: "Give quality leaders the full investigation picture.",
-    copy: "Review product reality, evidence quality, competing explanations, assurance, and human decisions in one governed view.",
-  },
-  investigators: {
-    eyebrow: "Role · Investigators / QA",
-    title: "Move from signal to evidence with confidence.",
-    copy: "Build a traceable investigation across product, change, supplier, lot, complaint, evidence, and hypothesis context.",
-  },
-  regulatory: {
-    eyebrow: "Role · Regulatory affairs",
-    title: "Prepare traceable review context.",
-    copy: "Preserve provenance, limitations, temporal context, and human review boundaries for regulated investigation workflows.",
-  },
-  product: {
-    eyebrow: "Role · Product and R&D",
-    title: "Connect product changes to outcomes.",
-    copy: "Understand how revisions, components, configuration, and lifecycle events relate to downstream signals.",
-  },
-  "supplier-quality": {
-    eyebrow: "Role · Supplier quality",
-    title: "Follow supplier and component relationships.",
-    copy: "Investigate supplier-linked signals with affected lots, component revisions, evidence, and missing context in view.",
-  },
-  manufacturing: {
-    eyebrow: "Role · Manufacturing quality",
-    title: "Understand affected lots and changes.",
-    copy: "Connect manufacturing context to product versions, lots, complaints, evidence, and investigation decisions.",
-  },
-  executives: {
-    eyebrow: "Role · Executives",
-    title: "Review decision-ready assurance.",
-    copy: "See what is known, what is challenged, what remains unresolved, and where human authorization is required.",
-  },
-};
-
-const solutionOverrides: Record<string, { eyebrow: string; title: string; copy: string }> = {
-  complaints: {
-    eyebrow: "Solution · Complaint signals",
-    title: "Understand what is driving an increase in complaints.",
-    copy: "A rise in complaints may relate to a product version, component, supplier, lot, market, or change. MDARIX helps teams review these connections in context, explore possible patterns, and document the evidence behind their assessment.",
-  },
-  changes: {
-    eyebrow: "Solution · Product changes",
-    title: "See how product changes relate to field experience.",
-    copy: "Design, component, supplier, software, and manufacturing changes can affect products already in use. MDARIX connects change history with product context and post-market signals to help teams assess possible relationships.",
-  },
-  affected: {
-    eyebrow: "Solution · Affected products and lots",
-    title: "Map potential impact across products and lots.",
-    copy: "When an issue is identified, teams need to understand which products, versions, configurations, or lots may be involved. MDARIX connects these records to organize scope assessment and review supporting relationships.",
-  },
-  supplier: {
-    eyebrow: "Solution · Supplier investigation",
-    title: "Follow supplier relationships through to product impact.",
-    copy: "Supplier-related issues can affect multiple components, products, and lots. MDARIX connects supplier records with product and post-market context to support a complete review of potential impact.",
-  },
-  evidence: {
-    eyebrow: "Solution · Evidence intelligence",
-    title: "Bring scattered evidence into the decision context.",
-    copy: "Relevant information can be spread across quality, regulatory, product, supplier, and manufacturing systems. MDARIX connects available records to the issue under review and makes missing evidence visible.",
-  },
-  challenge: {
-    eyebrow: "Solution · AI Challenger",
-    title: "Test suspected causes against connected evidence.",
-    copy: "A plausible cause should be evaluated against available facts and alternative explanations. MDARIX organizes hypotheses, supporting or conflicting evidence, and uncertainty before a conclusion.",
-  },
-  unknowns: {
-    eyebrow: "Solution · Unknowns radar",
-    title: "Make evidence gaps visible before decisions are finalized.",
-    copy: "MDARIX identifies missing, outdated, or conflicting evidence links so reviewers understand what is known, what remains uncertain, and what still needs attention.",
-  },
-  "complaint-investigation": {
-    eyebrow: "Solution - Complaint investigation",
-    title: "Understand the signal before deciding what changed.",
-    copy: "Connect complaint patterns to product versions, field reports, affected lots, and supporting evidence so investigators can frame the right question without overstating causality.",
-  },
-  "version-investigation": {
-    eyebrow: "Solution - Version investigation",
-    title: "See which product version belongs in the investigation.",
-    copy: "Compare released versions, effective dates, configuration context, changes, and field experience to keep the review anchored to the correct device revision.",
-  },
-  "change-investigation": {
-    eyebrow: "Solution - Change investigation",
-    title: "Trace product changes to the outcomes they may affect.",
-    copy: "Relate design, component, supplier, software, and manufacturing changes to post-market signals and evidence while keeping relationships distinct from proof.",
-  },
-  "supplier-investigation": {
-    eyebrow: "Solution - Supplier investigation",
-    title: "Follow supplier context through to product impact.",
-    copy: "Connect supplier, component, site, lot, change, and field records to support a complete review of potential product impact.",
-  },
-  "component-investigation": {
-    eyebrow: "Solution - Component investigation",
-    title: "Trace a component across the device lifecycle.",
-    copy: "Bring specifications, suppliers, revisions, manufacturing context, affected products, and field evidence together for a focused component review.",
-  },
-  "lot-investigation": {
-    eyebrow: "Solution - Lot investigation",
-    title: "Map lot context before assessing scope.",
-    copy: "Connect manufacturing lots, sites, distribution paths, products, complaints, and evidence to make potential impact and remaining gaps visible.",
-  },
-  "risk-investigation": {
-    eyebrow: "Solution - Risk investigation",
-    title: "Keep risk review connected to evidence and controls.",
-    copy: "Relate hazards, risk controls, residual-risk observations, product context, and investigation evidence while preserving human review and approval boundaries.",
-  },
-  "cross-system": {
-    eyebrow: "Solution - Cross-system investigation",
-    title: "Bring the investigation together across systems of record.",
-    copy: "Use governed mappings to connect QMS, PLM, ERP, supplier, and manufacturing context while each source remains authoritative and provenance stays visible.",
-  },
-};
-
-const pricingPlans = [
+const NAV_MENUS: NavMenu[] = [
   {
-    name: "Free",
-    price: "$0",
-    cadence: "forever",
-    note: "Explore the connected investigation workspace.",
-    features: ["1 workspace", "Up to 3 users", "Product 360 and investigation basics", "Community guidance"],
-    action: "Start free",
+    name: "Platform",
+    title: "Platform & AI",
+    href: "/platform",
+    groups: platformGroups.map((group) => ({
+      title: group.title,
+      links: group.capabilities.map((capability) => ({
+        label: capability.label,
+        href: `/platform#${capability.slug}`,
+      })),
+    })),
   },
   {
-    name: "Individual",
-    price: "$49",
-    cadence: "per user / month",
-    note: "For focused quality and investigation work.",
-    features: ["1 workspace", "Up to 10 users", "Evidence and hypothesis intelligence", "Standard support"],
-    action: "Choose Individual",
+    name: "Solutions",
+    title: "Solutions",
+    href: "/solutions",
+    groups: solutionGroups.map((group) => ({
+      title: group.title,
+      links: group.items.map((item) => ({ label: item.label, href: `/solutions#${item.key}` })),
+    })),
   },
   {
-    name: "Pro",
-    price: "$149",
-    cadence: "per user / month",
-    note: "For teams connecting evidence across functions.",
-    features: ["Unlimited workspaces", "Up to 50 users", "AI assurance and decision workflows", "Priority support"],
-    action: "Choose Pro",
-    featured: true,
+    name: "Product Lifecycle",
+    title: "Product Lifecycle",
+    href: "/product-lifecycle",
+    groups: lifecycleStages.map((stage) => ({
+      title: stage.title,
+      links: stage.items.map((item) => ({
+        label: item.label,
+        href: item.href ?? `/product-lifecycle#${item.slug}`,
+        note: item.future ? "Future" : undefined,
+      })),
+    })),
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    cadence: "annual plan",
-    note: "For governed, tenant-scoped deployment at scale.",
-    features: [
-      "Advanced administration",
-      "SSO and enterprise access",
-      "Custom integrations",
-      "Dedicated success support",
+    name: "Trust",
+    title: "Trust",
+    href: "/trust",
+    groups: [
+      {
+        title: "Why MDARIX",
+        links: [
+          { label: "Not another QMS", href: "/trust#not-qms" },
+          { label: "Evidence before inference", href: "/trust#evidence" },
+          { label: "Humans decide", href: "/trust#humans-decide" },
+        ],
+      },
+      {
+        title: "Trust foundations",
+        links: [
+          { label: "AI trust & assurance", href: "/trust#ai" },
+          { label: "Security & access", href: "/trust#security" },
+          { label: "Integration approach", href: "/trust#integrations" },
+        ],
+      },
     ],
-    action: "Talk to us",
   },
 ];
 
-const postMarketResources = [
+const FOOTER: Array<{ title: string; links: [string, string][] }> = [
   {
-    type: "FDA guidance",
-    date: "2025",
-    title: "AI-enabled medical devices: lifecycle and postmarket performance considerations",
-    text: "FDA draft guidance covering lifecycle documentation, transparency, bias, and postmarket performance monitoring for AI-enabled devices.",
-    href: "https://www.fda.gov/news-events/press-announcements/fda-issues-comprehensive-draft-guidance-developers-artificial-intelligence-enabled-medical-devices",
+    title: "Platform",
+    links: [
+      ["Product 360", "/platform#product-360"],
+      ["Investigation intelligence", "/platform#investigation-intelligence"],
+      ["Decision intelligence", "/platform#decision-intelligence"],
+      ["Trust & governance", "/platform#trust-governance"],
+    ],
   },
   {
-    type: "FDA guidance",
-    date: "2022",
-    title: "Postmarket Surveillance under Section 522",
-    text: "Final guidance on active, systematic, scientifically valid collection, analysis, and interpretation of marketed-device information.",
-    href: "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/postmarket-surveillance-under-section-522-federal-food-drug-and-cosmetic-act",
+    title: "Solutions",
+    links: [
+      ["By challenge", "/solutions#challenges"],
+      ["By role", "/solutions#roles"],
+      ["By investigation", "/solutions#investigations"],
+      ["Product lifecycle", "/product-lifecycle"],
+    ],
   },
   {
-    type: "EU guidance",
-    date: "2025",
-    title: "MDCG 2025-10: Post-market surveillance guidance",
-    text: "European Commission guidance for post-market surveillance of medical devices and in vitro diagnostic medical devices.",
-    href: "https://health.ec.europa.eu/latest-updates/mdcg-2025-10-guidance-post-market-surveillance-medical-devices-and-vitro-diagnostic-medical-devices-2025-12-19_en",
+    title: "Trust",
+    links: [
+      ["Why MDARIX", "/trust#principles"],
+      ["AI trust", "/trust#ai"],
+      ["Security & access", "/trust#security"],
+      ["Integrations", "/trust#integrations"],
+    ],
   },
   {
-    type: "EU / AI guidance",
-    date: "2025",
-    title: "MDCG 2025-6 and AI Act / MDR-IVDR interplay",
-    text: "Joint guidance discussing post-market monitoring, interaction with other AI systems, and integration with existing MDR/IVDR monitoring plans.",
-    href: "https://health.ec.europa.eu/medical-devices-sector/new-regulations/guidance-mdcg-endorsed-documents-and-other-guidance_en",
-  },
-  {
-    type: "WHO publication",
-    date: "2021",
-    title: "Guidance for post-market surveillance and market surveillance of medical devices",
-    text: "A practical framework for collecting and evaluating experience from marketed devices and identifying when action may be needed.",
-    href: "https://www.who.int/publications/i/item/9789240015319",
-  },
-  {
-    type: "WHO publication",
-    date: "2023",
-    title: "Generating evidence for AI-based medical devices",
-    text: "Framework for training, validation, evaluation, and post-deployment monitoring of AI-based medical devices.",
-    href: "https://iris.who.int/bitstream/handle/10665/349093/9789240038462-eng.pdf",
-  },
-  {
-    type: "FDA resource",
-    date: "Updated",
-    title: "FDA AI-enabled medical device list",
-    text: "Reference list of AI-enabled devices authorized for marketing in the United States; useful for landscape and surveillance research.",
-    href: "https://www.fda.gov/medical-devices/artificial-intelligence-enabled-medical-devices/list-artificial-intelligence-enabled-medical-devices",
-  },
-  {
-    type: "FDA resource",
-    date: "Ongoing",
-    title: "FDA postmarket requirements and safety monitoring",
-    text: "FDA overview of reporting, device tracking, surveillance studies, recalls, and other postmarket obligations and resources.",
-    href: "https://www.fda.gov/medical-devices/device-advice-comprehensive-regulatory-assistance/postmarket-requirements-devices",
+    title: "Company",
+    links: [
+      ["About MDARIX", "/company"],
+      ["Resources", "/resources"],
+      ["Plans & pricing", "/pricing"],
+      ["Request a demo", "/company#contact"],
+    ],
   },
 ];
-
-const platformCapabilityData: Record<
-  string,
-  { kicker: string; summary: string; stats: string[]; cards: { title: string; text: string }[]; steps: string[] }
-> = {
-  "ask-mdarix": {
-    kicker: "Ask MDARIX · governed investigation intelligence",
-    summary:
-      "Ask a focused question about an authorized investigation and receive a bounded response that keeps source evidence, temporal scope, uncertainty, and human responsibility visible.",
-    stats: ["Authorized retrieval", "Cited evidence", "Uncertainty visible", "Human review"],
-    cards: [
-      {
-        title: "Start with a precise question",
-        text: "Frame the issue, product, ProductVersion, time window, and investigation scope before retrieval begins.",
-      },
-      {
-        title: "Retrieve only what you can access",
-        text: "Tenant, role, field, and record policies remain authoritative; a prompt cannot widen access or reveal hidden data.",
-      },
-      {
-        title: "Separate answer from evidence",
-        text: "Show supporting sources, contradictions, unknowns, missing evidence, and limitations alongside the interpretation.",
-      },
-      {
-        title: "Abstain when the record is weak",
-        text: "Unsupported causal claims are bounded or declined rather than presented as facts.",
-      },
-      {
-        title: "Keep people accountable",
-        text: "AI assists investigation; authorized reviewers decide what is accepted, escalated, or sent for further evidence.",
-      },
-    ],
-    steps: ["Question", "Scope", "Retrieve", "Cite", "Challenge", "Review"],
-  },
-  "product-360": {
-    kicker: "Product intelligence · MedTech product 360",
-    summary:
-      "A decision-ready view of a medical device as it exists across product versions, intended configuration, components, suppliers, manufacturing lots, complaints, investigations, risks, and evidence.",
-    stats: ["Product + versions", "Components + suppliers", "Lots + field signals", "Evidence + decisions"],
-    cards: [
-      {
-        title: "Configuration at a glance",
-        text: "See the released device configuration, active components, revision identifiers, suppliers, sites, and status in one controlled product context.",
-      },
-      {
-        title: "Version-aware impact",
-        text: "Compare ProductVersions and follow a complaint or change to the affected configuration without losing source provenance.",
-      },
-      {
-        title: "Manufacturing context",
-        text: "Relate components, supplier records, sites, lots, and release history to the product configuration under review.",
-      },
-      {
-        title: "Post-market connection",
-        text: "Bring complaints, service observations, investigations, risks, and evidence into the same product story.",
-      },
-      {
-        title: "Safe decision support",
-        text: "Show missing links, contradictions, temporal limits, and unsupported conclusions instead of hiding uncertainty.",
-      },
-      {
-        title: "Searchable product record",
-        text: "Find a device, revision, component, supplier, lot, or linked signal quickly, then narrow the view by status, date, and authorized scope.",
-      },
-      {
-        title: "Data quality you can inspect",
-        text: "Surface missing attributes, conflicting source values, stale relationships, and unresolved mapping issues before they affect a review.",
-      },
-      {
-        title: "Connected system handoff",
-        text: "Use governed APIs and versioned mappings to exchange context with PLM, QMS, ERP/MES, and supplier systems while preserving ownership of source data.",
-      },
-    ],
-    steps: [
-      "Product",
-      "Versions",
-      "Configuration",
-      "Components",
-      "Suppliers",
-      "Lots",
-      "Signals",
-      "Evidence",
-      "Decision",
-    ],
-  },
-  "reality-graph": {
-    kicker: "Product Reality Graph · connected MedTech context",
-    summary:
-      "Map how a device, its versions, components, suppliers, sites, lots, changes, complaints, and evidence relate—so investigators can inspect the product story without mistaking a relationship for proof.",
-    stats: ["Product relationships", "Configuration context", "Field signals", "Evidence provenance"],
-    cards: [
-      {
-        title: "One connected product story",
-        text: "Start with a product or signal and traverse the authorized links that explain its configuration, manufacturing context, and field experience.",
-      },
-      {
-        title: "Relationship-first investigation",
-        text: "Use the graph to locate relevant components, suppliers, lots, changes, complaints, and observations across the device lifecycle.",
-      },
-      {
-        title: "Context before causality",
-        text: "A graph path organizes evidence context; it does not automatically establish a root cause or regulatory conclusion.",
-      },
-      {
-        title: "Visible gaps and conflicts",
-        text: "Highlight missing links, inconsistent source values, temporal limits, and contradictory evidence before review.",
-      },
-      {
-        title: "Ready for governed action",
-        text: "Carry provenance, scope, uncertainty, and human accountability from exploration into the decision package.",
-      },
-    ],
-    steps: ["Product", "Version", "Component", "Supplier", "Lot", "Signal", "Evidence", "Review"],
-  },
-  "product-version": {
-    kicker: "ProductVersion intelligence · controlled MedTech release history",
-    summary:
-      "Keep every medical-device revision anchored to its product identity, approved configuration, effective dates, verification context, and field experience—so reviewers can see exactly which version was relevant to an investigation.",
-    stats: ["Revision identity", "Change control", "Verification context", "Field impact"],
-    cards: [
-      {
-        title: "A controlled revision record",
-        text: "Keep product identity separate from ProductVersion identity, status, effective dates, and release ownership.",
-      },
-      {
-        title: "Change-to-evidence trace",
-        text: "Relate software or configuration changes to requirements, verification observations, complaints, affected lots, and review evidence.",
-      },
-      {
-        title: "Release readiness context",
-        text: "Make approval state, superseded versions, known limitations, and required human review visible before a release is relied upon.",
-      },
-      {
-        title: "Temporal clarity",
-        text: "Separate current, event-as-of, and known-as-of views so historical context is not rewritten by later updates.",
-      },
-      {
-        title: "Impact without overclaiming",
-        text: "Identify potentially affected products, components, sites, and signals while keeping causal conclusions bounded by evidence.",
-      },
-    ],
-    steps: ["Product", "Revision", "Change", "Verify", "Release", "Monitor", "Impact", "Review"],
-  },
-  timeline: {
-    kicker: "Timeline Intelligence · temporal MedTech context",
-    summary:
-      "Reconstruct the sequence around a product signal and distinguish when a change became effective, when it was recorded, and when the organization could have known about it.",
-    stats: ["Effective dates", "Recorded events", "Known context", "Review points"],
-    cards: [
-      {
-        title: "See the sequence",
-        text: "Place product, version, configuration, supplier, lot, complaint, and evidence events on one readable investigation timeline.",
-      },
-      {
-        title: "Three views of time",
-        text: "Switch between current, event-as-of, and known-as-of context without mixing their meaning or rewriting history.",
-      },
-      {
-        title: "Explain the change window",
-        text: "Identify what changed before or after a signal, which records support the timing, and where the chronology is incomplete.",
-      },
-      {
-        title: "Review with provenance",
-        text: "Keep each event tied to its source, tenant scope, ProductVersion, and limitations before it informs a human decision.",
-      },
-    ],
-    steps: ["Effective", "Recorded", "Known", "Change", "Signal", "Evidence", "Review"],
-  },
-  "post-market-surveillance": {
-    kicker: "Post-market surveillance",
-    summary:
-      "Connect complaints, adverse events, service information, returns, trends, and field evidence to the products, versions, lots, risks, investigations, and decisions they inform.",
-    stats: ["Complaints", "Field signals", "Product scope", "Review actions"],
-    cards: [
-      {
-        title: "Connect field information",
-        text: "Bring post-market records together with product, version, lot, component, supplier, and manufacturing context.",
-      },
-      {
-        title: "Review emerging signals",
-        text: "Explore patterns over time while keeping source records, limitations, and review rationale visible.",
-      },
-      {
-        title: "Support governed action",
-        text: "Link surveillance findings to investigations, risk review, CAPA, field action assessment, and human decisions.",
-      },
-    ],
-    steps: ["Field data", "Product context", "Signal", "Investigation", "Assessment", "Action"],
-  },
-  "lifecycle-evidence-intelligence": {
-    kicker: "Evidence intelligence",
-    summary:
-      "Make lifecycle evidence easier to find, connect, and evaluate by preserving its source, version, date, provenance, contradictions, limitations, and missing links.",
-    stats: ["Sources", "Provenance", "Evidence gaps", "Decisions"],
-    cards: [
-      {
-        title: "Keep evidence in context",
-        text: "Link evidence to products, requirements, risks, investigations, changes, claims, assessments, and decisions.",
-      },
-      {
-        title: "Expose limitations",
-        text: "Make missing, outdated, conflicting, or weak evidence relationships visible before review conclusions are formed.",
-      },
-      {
-        title: "Preserve the decision trail",
-        text: "Show which evidence supported an assessment and retain the human review boundary around the decision.",
-      },
-    ],
-    steps: ["Source", "Context", "Evidence", "Gap", "Review", "Decision"],
-  },
-};
-
-const investigationCapability = {
-  kicker: "Investigation - governed MedTech review workspace",
-  summary:
-    "Move from a complaint or field signal to a structured, evidence-grounded investigation. MDARIX keeps product context, competing explanations, unknowns, provenance, and human review visible at every step.",
-  stats: ["Signal context", "Evidence chain", "Hypotheses visible", "Human decision"],
-  cards: [
-    {
-      title: "Frame the investigation",
-      text: "Define the question, product and ProductVersion scope, time window, owner, and review objective before analysis begins.",
-    },
-    {
-      title: "Build the evidence chain",
-      text: "Connect complaints, changes, components, suppliers, lots, observations, and source records without rewriting authoritative systems.",
-    },
-    {
-      title: "Compare explanations",
-      text: "Keep hypotheses, supporting evidence, contradictions, failure chains, and unknowns separate so a plausible story is not mistaken for proof.",
-    },
-    {
-      title: "Make gaps actionable",
-      text: "Show missing tests, unavailable sources, stale records, and unresolved relationships so reviewers know what to investigate next.",
-    },
-    {
-      title: "Prepare a governed decision",
-      text: "Assemble a versioned brief with provenance and limitations; authorized humans remain responsible for conclusions and approvals.",
-    },
-  ],
-  steps: ["Signal", "Scope", "Context", "Evidence", "Hypotheses", "Unknowns", "Review"],
-};
-const evidenceCapability = {
-  kicker: "Evidence - connected MedTech intelligence",
-  summary:
-    "Bring quality, product, supplier, manufacturing, and post-market records into one authorized evidence context. MDARIX preserves provenance, relationships, contradictions, and gaps so teams can review before they decide.",
-  stats: ["Source provenance", "Product context", "Evidence gaps", "Review traceability"],
-  cards: [
-    {
-      title: "Collect the evidence",
-      text: "Connect source records from QMS, PLM, ERP, supplier, service, and post-market systems while keeping each system authoritative.",
-    },
-    {
-      title: "Anchor every record",
-      text: "Relate observations to the right product, ProductVersion, component, supplier, lot, complaint, investigation, and time window.",
-    },
-    {
-      title: "Separate fact from inference",
-      text: "Keep observed information distinct from interpretations, hypotheses, recommendations, and human decisions.",
-    },
-    {
-      title: "Expose contradictions",
-      text: "Make conflicting values, stale records, unavailable sources, and incomplete relationships visible instead of hiding uncertainty.",
-    },
-    {
-      title: "Prepare traceable review",
-      text: "Carry citations, source identifiers, limitations, and reviewer responsibility into the investigation brief and decision package.",
-    },
-  ],
-  steps: ["Sources", "Context", "Provenance", "Evidence", "Gaps", "Review", "Decision"],
-};
-
-const capabilityStory = (slug: string, title: string) => {
-  const investigation = ["ask-mdarix", "investigation", "evidence", "hypotheses", "challenger", "unknowns"].includes(
-    slug,
-  );
-  const decision = ["failure-chain", "counterfactual", "decision-center", "investigation-brief"].includes(slug);
-  const trust = ["ai-assurance", "ai-provenance", "human-review", "audit-trail", "enterprise-administration"].includes(
-    slug,
-  );
-  const kicker = investigation
-    ? "Investigation intelligence"
-    : decision
-      ? "Decision intelligence"
-      : trust
-        ? "Trust & governance"
-        : "Product lifecycle intelligence";
-  const lens = investigation
-    ? "signal, evidence, competing explanations, and unknowns"
-    : decision
-      ? "evidence, limitations, review, and an authorized human decision"
-      : trust
-        ? "identity, provenance, assurance, and governed human authority"
-        : "product intent, development evidence, release context, and post-market learning";
-  return {
-    kicker,
-    summary: `${title} helps teams move through an inspectable E2E workflow across ${lens}. Every step keeps source context, scope, limitations, and responsibility visible.`,
-    stats: investigation
-      ? ["Signal", "Evidence", "Hypotheses", "Unknowns"]
-      : decision
-        ? ["Context", "Challenge", "Review", "Decision"]
-        : trust
-          ? ["Identity", "Provenance", "Assurance", "Audit"]
-          : ["Define", "Develop", "Release", "Improve"],
-    cards: [
-      {
-        title: "Start with context",
-        text: `Bring the relevant ${lens} into one reviewable workspace without losing the source boundary.`,
-      },
-      {
-        title: "Inspect before inference",
-        text: "Separate observed facts from interpretation, uncertainty, recommendations, and conclusions.",
-      },
-      {
-        title: "Close the loop",
-        text: "Preserve limitations, reviewer responsibility, and the traceable next action at the end of the journey.",
-      },
-    ],
-    steps: investigation
-      ? ["Question", "Scope", "Evidence", "Challenge", "Unknowns", "Review"]
-      : decision
-        ? ["Context", "Analysis", "Challenge", "Readiness", "Human", "Decision"]
-        : trust
-          ? ["Identity", "Access", "Evidence", "Assurance", "Review", "Audit"]
-          : ["Define", "Develop", "Prove", "Release", "Monitor", "Improve"],
-  };
-};
-
-function PublicFooter() {
-  const columns = [
-    {
-      title: "About MDARIX",
-      links: [
-        ["Our mission", "/why-mdarix"],
-        ["Trust & security", "/security"],
-        ["Resources", "/resources"],
-        ["Contact us", "/request-demo"],
-      ],
-    },
-    {
-      title: "Platform",
-      links: [
-        ["Product 360", "/platform/product-360"],
-        ["Investigation intelligence", "/platform/investigation"],
-        ["Evidence intelligence", "/platform/evidence"],
-        ["AI assurance", "/platform/ai-assurance"],
-      ],
-    },
-    {
-      title: "Solutions",
-      links: [
-        ["Complaint investigation", "/solutions#complaint-investigation"],
-        ["Product change investigation", "/solutions#change-investigation"],
-        ["Supplier investigation", "/solutions#supplier-investigation"],
-        ["Affected lots", "/solutions#affected"],
-      ],
-    },
-    {
-      title: "Use cases",
-      links: [
-        ["Quality leaders", "/solutions#quality-leaders"],
-        ["Investigators / QA", "/solutions#investigators"],
-        ["Regulatory affairs", "/solutions#regulatory"],
-        ["Supplier quality", "/solutions#supplier-quality"],
-      ],
-    },
-    {
-      title: "Resources",
-      links: [
-        ["Investigation playbooks", "/resources"],
-        ["Lifecycle intelligence", "/product-lifecycle"],
-        ["Roadmap", "/roadmap"],
-        ["Pricing", "/pricing"],
-      ],
-    },
-    {
-      title: "Connect",
-      links: [
-        ["Integration approach", "/integrations"],
-        ["Security & access", "/security"],
-        ["Request a demo", "/request-demo"],
-        ["Sign in", "/signin"],
-      ],
-    },
-  ];
-  return (
-    <footer className="public-footer public-footer-expanded">
-      <div className="public-footer-grid">
-        {columns.map((column) => (
-          <section key={column.title}>
-            <h3>{column.title}</h3>
-            {column.links.map(([label, href]) => (
-              <a key={label} href={href}>
-                {label}
-              </a>
-            ))}
-          </section>
-        ))}
-      </div>
-      <div className="public-footer-bottom">
-        <span>MDARIX — System of Intelligence, not System of Record.</span>
-        <span>Evidence before inference · Humans decide</span>
-      </div>
-    </footer>
-  );
-}
 
 export function PublicMegaSite({ path }: { path: string }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hash, setHash] = useState(() => window.location.hash.slice(1));
+  const [{ page, hash }, setLocation] = useState(() => resolveSitePath(path, window.location.hash.slice(1)));
+
+  // Normalize legacy URLs in the address bar, then bring the requested section into view.
+  useEffect(() => {
+    const target = `${page}${hash ? `#${hash}` : ""}`;
+    if (`${window.location.pathname}${window.location.hash}` !== target) window.history.replaceState(null, "", target);
+    document.title = page === "/" ? "MDARIX · Product investigation intelligence" : `MDARIX · ${pageTitle(page)}`;
+    if (hash) window.setTimeout(() => document.getElementById(hash)?.scrollIntoView({ block: "start" }), 60);
+    else window.scrollTo({ top: 0 });
+  }, [page, hash]);
+
+  useEffect(() => {
+    const update = () => setLocation(resolveSitePath(window.location.pathname, window.location.hash.slice(1)));
+    window.addEventListener("hashchange", update);
+    window.addEventListener("popstate", update);
+    return () => {
+      window.removeEventListener("hashchange", update);
+      window.removeEventListener("popstate", update);
+    };
+  }, []);
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -1252,148 +190,77 @@ export function PublicMegaSite({ path }: { path: string }) {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, []);
-  useEffect(() => {
-    const update = () => setHash(window.location.hash.slice(1));
-    window.addEventListener("hashchange", update);
-    return () => window.removeEventListener("hashchange", update);
-  }, [path]);
-  useEffect(() => {
-    const closeAfterMenuLink = (event: MouseEvent) => {
-      if ((event.target as HTMLElement).closest(".mega-menu a")) {
-        setOpenMenu(null);
-        setMobileOpen(false);
-      }
-    };
-    document.addEventListener("click", closeAfterMenuLink);
-    return () => document.removeEventListener("click", closeAfterMenuLink);
-  }, []);
-  const capability = path.startsWith("/platform/")
-    ? (path.split("/").pop() ?? "capability") === "reality-graph"
-      ? "Product Reality Graph"
-      : (path.split("/").pop() ?? "capability") === "timeline"
-        ? "Timeline Intelligence"
-        : (path.split("/").pop() ?? "capability") === "ask-mdarix"
-          ? "Ask MDARIX"
-          : (path.split("/").pop() ?? "capability") === "evidence"
-            ? "Evidence Intelligence"
-            : (path.split("/").pop() ?? "capability")
-                .replace(/-/g, " ")
-                .replace(/\b\w/g, (letter) => letter.toUpperCase())
-    : null;
-  const capabilitySlug = path.split("/").pop() ?? "capability";
-  const roadmapTarget =
-    path === "/roadmap" && window.location.hash
-      ? window.location.hash
-          .slice(1)
-          .replace(/-/g, " ")
-          .replace(/\b\w/g, (letter) => letter.toUpperCase())
-      : null;
-  const anchorPage = anchorPages[hash];
-  const lifecyclePage = lifecycleContent[capabilitySlug];
-  const solutionPage = solutionOverrides[hash];
-  const solutionContent = solutionPage ?? anchorPage;
-  const solutionHeroVisual = solutionHeroVisuals[hash];
-  const page = roadmapTarget
-    ? {
-        eyebrow: "Future",
-        title: roadmapTarget,
-        copy: "Planned as part of the broader MDARIX Medical Device Product Lifecycle Intelligence platform. This page is informational and does not represent available functionality.",
-      }
-    : (solutionContent ??
-      lifecyclePage ??
-      (capability
-        ? (capabilityCopy[capabilitySlug] ?? {
-            eyebrow: "Current capability",
-            title: capability,
-            copy: `${capability} contributes to the connected MDARIX product-investigation workflow across product, version, temporal, evidence, tenant, and human-governance boundaries.`,
-          })
-        : (pages[path] ?? pages["/"])));
-  const isHome = path === "/";
-  const hideCapabilityEyebrow = Object.prototype.hasOwnProperty.call(publicHeroVisuals, path);
-  const heroVisual = publicHeroVisuals[path] ?? {
-    src: isHome ? "/medtech-investigation-team.png" : "/medtech-lifecycle-board.svg",
-    alt: "MedTech lifecycle workflow connecting product design, manufacturing, post-market signals, evidence, and human decisions",
-    caption: "Product reality → signals → evidence → governed decision",
-  };
-  const questionFlow = [
-    "Complaint signal",
-    "ProductVersion",
-    "Change",
-    "Component",
-    "Supplier",
-    "Affected lots",
-    "Evidence",
-    "Hypotheses",
-    "Contradictions",
-    "Unknowns",
-    "Assurance",
-    "Human decision",
-  ];
-  const platformCapability = capability
-    ? capabilitySlug === "investigation"
-      ? investigationCapability
-      : capabilitySlug === "evidence"
-        ? evidenceCapability
-        : (platformCapabilityData[capabilitySlug] ?? capabilityStory(capabilitySlug, page.title))
-    : null;
-  const closeMenuAndNavigate = () => {
+
+  const closeMenus = () => {
     setOpenMenu(null);
     setMobileOpen(false);
-    window.setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 0);
   };
-  if (typeof document !== "undefined") {
-    document.documentElement.dataset.publicPath = path;
-    document.documentElement.dataset.publicHash = hash;
-  }
+  const activeMenu = NAV_MENUS.find((menu) => menu.name === openMenu);
+
   return (
-    <div className="public-shell" onClick={() => openMenu && setOpenMenu(null)}>
-      <header className="public-header" onClick={(event) => event.stopPropagation()}>
-        <a className="brand" href="/" aria-label="MDARIX home">
-          MDARIX<span>Product intelligence</span>
+    <div className="mdx-site" onClick={() => openMenu && setOpenMenu(null)}>
+      <a className="ms-skip" href="#main">
+        Skip to content
+      </a>
+      <header className="ms-header" onClick={(event) => event.stopPropagation()}>
+        <a className="ms-brand" href="/" aria-label="MDARIX home">
+          <span className="ms-logo" aria-hidden="true">
+            M
+          </span>
+          MDARIX<small>Product intelligence</small>
         </a>
         <button
-          className="mobile-menu-button"
+          className="ms-menu-button"
           aria-expanded={mobileOpen}
           aria-controls="public-navigation"
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
           onClick={() => setMobileOpen(!mobileOpen)}
         >
-          Menu
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <nav id="public-navigation" className={mobileOpen ? "mobile-open" : ""}>
-          {Object.keys(menus).map((name) => (
+        <nav id="public-navigation" className={mobileOpen ? "is-open" : ""} aria-label="Main">
+          {NAV_MENUS.map(({ name }) => (
             <button
               key={name}
+              type="button"
               aria-expanded={openMenu === name}
+              className={NAV_MENUS.find((menu) => menu.name === name)?.href === page ? "is-current" : ""}
               onClick={() => setOpenMenu(openMenu === name ? null : name)}
             >
-              {name}
+              {name} <ChevronDown size={14} aria-hidden="true" />
             </button>
           ))}
-          <a href="/resources" onClick={closeMenuAndNavigate}>
+          <a href="/resources" className={page === "/resources" ? "is-current" : ""} onClick={closeMenus}>
             Resources
           </a>
-          <a href="/pricing" onClick={closeMenuAndNavigate}>
+          <a href="/pricing" className={page === "/pricing" ? "is-current" : ""} onClick={closeMenus}>
             Pricing
           </a>
-        </nav>
-        <div className="public-actions">
-          <a href="/signin">Login</a>
-          <a className="primary-action" href="/request-demo">
-            Request demo
+          <a href="/company" className={page === "/company" ? "is-current" : ""} onClick={closeMenus}>
+            Company
           </a>
-        </div>
-        {openMenu && (
-          <div className="mega-menu" role="region" aria-label={`${openMenu} menu`}>
-            {menus[openMenu].map((group) => (
+          <div className="ms-nav-actions">
+            <a href="/signin">Sign in</a>
+            <a className="ms-btn ms-btn-primary" href="/company#contact" onClick={closeMenus}>
+              Request a demo
+            </a>
+          </div>
+        </nav>
+        {activeMenu && (
+          <div className="ms-mega" role="region" aria-label={`${activeMenu.title} menu`}>
+            <div className="ms-mega-intro">
+              <span className="ms-eyebrow">{activeMenu.title}</span>
+              <a className="ms-link" href={activeMenu.href} onClick={closeMenus}>
+                Overview <ArrowRight size={14} aria-hidden="true" />
+              </a>
+            </div>
+            {activeMenu.groups.map((group) => (
               <section key={group.title}>
                 <h2>{group.title}</h2>
-                {group.items.map((entry) => (
-                  <a key={entry.label} href={entry.href} onClick={closeMenuAndNavigate}>
-                    <span>
-                      <strong>{entry.label}</strong>
-                      {entry.description && <em>{entry.description}</em>}
-                    </span>
-                    {entry.future && <small className="status-future">Future</small>}
+                {group.links.map((link) => (
+                  <a key={link.label} href={link.href} onClick={closeMenus}>
+                    {link.label}
+                    {link.note && <small>{link.note}</small>}
                   </a>
                 ))}
               </section>
@@ -1401,508 +268,66 @@ export function PublicMegaSite({ path }: { path: string }) {
           </div>
         )}
       </header>
-      <main className="public-main">
-        <section className="public-hero">
-          <div className="public-hero-copy">
-            {!hideCapabilityEyebrow && <span className="eyebrow">{page.eyebrow}</span>}
-            <h1>{page.title}</h1>
-            <p>{page.copy}</p>
-            <div className="public-cta">
-              <a className="primary-action" href="/platform">
-                Explore the platform
-              </a>
-              <a className="secondary-link" href="/signup">
-                Get started →
-              </a>
-            </div>
-          </div>
-          <figure className="medtech-hero-visual">
-            <img src={heroVisual.src} alt={heroVisual.alt} />
-            <figcaption>{heroVisual.caption}</figcaption>
-          </figure>
-        </section>
-        <section className="public-question">
-          <span className="eyebrow">A product investigation question</span>
-          <h2>Why did shutdown complaints increase after Product Rev D?</h2>
-          <p>
-            MDARIX helps teams follow the question across product reality, evidence, uncertainty, assurance, and
-            controlled human decision-making.
-          </p>
-          <div className="question-flow">
-            {questionFlow.map((step, index) => (
-              <React.Fragment key={step}>
-                <article>{step}</article>
-                {index < questionFlow.length - 1 && <ChevronRight aria-hidden="true" />}
-              </React.Fragment>
-            ))}
-          </div>
-        </section>
-        <section className="public-story">
-          <div>
-            <span className="eyebrow">A different intelligence layer</span>
-            <h2>Keep your systems of record. Connect the investigation.</h2>
-          </div>
-          <div className="story-grid">
-            <article>
-              <strong>Product reality</strong>
-              <p>Relate products, versions, components, suppliers, lots, changes, complaints, risks, and evidence.</p>
-            </article>
-            <article>
-              <strong>Evidence before inference</strong>
-              <p>Separate observations, interpretations, hypotheses, contradictions, unknowns, and decisions.</p>
-            </article>
-            <article>
-              <strong>AI you can inspect</strong>
-              <p>Show grounding, temporal context, ProductVersion validation, provenance, and limitations.</p>
-            </article>
-            <article>
-              <strong>Humans decide</strong>
-              <p>AI supports investigation. Authorized humans make controlled decisions.</p>
-            </article>
-          </div>
-        </section>
-        {isHome && (
-          <section className="medtech-editorial">
-            <div>
-              <span className="eyebrow">Built for MedTech investigation teams</span>
-              <h2>Bring quality, regulatory, product, supplier, and manufacturing context into one review.</h2>
-              <p>
-                MDARIX helps cross-functional teams inspect the same product reality while preserving source ownership,
-                evidence provenance, uncertainty, and accountable human decisions.
-              </p>
-              <a className="secondary-link" href="/solutions">
-                Explore MedTech workflows →
-              </a>
-            </div>
-            <figure>
-              <img
-                src="/medtech-source-network.svg"
-                alt="Connected QMS, PLM, ERP, MES, and supplier systems feeding a governed MDARIX investigation workspace"
-              />
-              <figcaption>Connected source systems, governed mappings, and traceable investigation context.</figcaption>
-            </figure>
-          </section>
-        )}
-        {path === "/roadmap" && !roadmapTarget && (
-          <section className="public-story roadmap-grid">
-            <article>
-              <h2>Current capabilities</h2>
-              <p>
-                Product 360, Product Reality Graph, temporal context, evidence intelligence, investigation, hypotheses,
-                challenger, unknowns, failure chain, counterfactuals, decisions, assurance, and governance foundations.
-              </p>
-            </article>
-            <article>
-              <span className="status-future">Future</span>
-              <h2>Broader lifecycle intelligence</h2>
-              <p>
-                Strategy, requirements, design controls, regulatory, clinical, manufacturing operations, CAPA, recall,
-                continuous monitoring, and retirement remain roadmap areas.
-              </p>
-            </article>
-          </section>
-        )}
-        {(path === "/plans" || path === "/pricing") && (
-          <section className="pricing-section">
-            <p className="pricing-disclaimer">
-              Illustrative early-access pricing. Plans and billing are not yet enabled.
-            </p>
-            <div className="pricing-grid">
-              {pricingPlans.map((plan) => (
-                <article className={`pricing-card ${plan.featured ? "pricing-card-featured" : ""}`} key={plan.name}>
-                  {plan.featured && <span className="pricing-badge">Most popular</span>}
-                  <h2>{plan.name}</h2>
-                  <p>{plan.note}</p>
-                  <div className="pricing-price">{plan.price}</div>
-                  <small>{plan.cadence}</small>
-                  <ul>
-                    {plan.features.map((feature) => (
-                      <li key={feature}>{feature}</li>
-                    ))}
-                  </ul>
-                  <a
-                    className={plan.featured ? "primary-action" : "secondary-action"}
-                    href={plan.name === "Enterprise" ? "/request-demo" : "/signup"}
-                  >
-                    {plan.action}
-                  </a>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-        {platformCapability && (
-          <section className="capability-detail">
-            <div className="capability-intro">
-              <div>
-                <span className="eyebrow">{platformCapability.kicker}</span>
-                <h2>{page.title}</h2>
-                <p>{platformCapability.summary}</p>
-              </div>
-              <div className="capability-visual" aria-label={`${page.title} illustration`}>
-                <div className="visual-orbit orbit-one" />
-                <div className="visual-orbit orbit-two" />
-                <div className="visual-node node-one">{platformCapability.steps[0]}</div>
-                <div className="visual-node node-two">{platformCapability.steps[2]}</div>
-                <div className="visual-node node-three">{platformCapability.steps[5]}</div>
-              </div>
-            </div>
-            <div className="capability-stats">
-              {platformCapability.stats.map((stat) => (
-                <strong key={stat}>{stat}</strong>
-              ))}
-            </div>
-            <div className="capability-cards">
-              {platformCapability.cards.map((card) => (
-                <article key={card.title}>
-                  <span className="capability-index">0{platformCapability.cards.indexOf(card) + 1}</span>
-                  <h3>{card.title}</h3>
-                  <p>{card.text}</p>
-                </article>
-              ))}
-            </div>
-            <div className="capability-journey">
-              <span className="eyebrow">How the story connects</span>
-              <div>
-                {platformCapability.steps.map((step, index) => (
-                  <React.Fragment key={step}>
-                    <span>{step}</span>
-                    {index < platformCapability.steps.length - 1 && <ChevronRight aria-hidden="true" />}
-                  </React.Fragment>
-                ))}
-              </div>
-            </div>
-          </section>
-        )}
-        {capabilitySlug === "product-360" && (
-          <section className="product360-story">
-            <div className="product360-story-heading">
-              <span className="eyebrow">Product 360 in practice</span>
-              <h2>Understand the device before you decide what changed.</h2>
-              <p>
-                MDARIX brings the released product definition, manufacturing context, and post-market experience into
-                one review surface. Source systems remain authoritative; MDARIX preserves the relationships and
-                provenance needed to investigate them.
-              </p>
-            </div>
-            <div className="product360-use-grid">
-              <article>
-                <span>01</span>
-                <h3>Start with the released configuration</h3>
-                <p>
-                  Anchor the review to the right product and ProductVersion, including effective dates and known
-                  limitations.
-                </p>
-              </article>
-              <article>
-                <span>02</span>
-                <h3>Trace impact through the chain</h3>
-                <p>Follow components, suppliers, sites, and lots to understand where a change or signal may matter.</p>
-              </article>
-              <article>
-                <span>03</span>
-                <h3>Bring field experience into context</h3>
-                <p>
-                  Connect complaints, investigations, evidence, and risks without turning a relationship into an
-                  unsupported causal claim.
-                </p>
-              </article>
-              <article>
-                <span>04</span>
-                <h3>Prepare a reviewable decision</h3>
-                <p>
-                  Make contradictions, missing evidence, uncertainty, and human approval visible before action is taken.
-                </p>
-              </article>
-            </div>
-            <div className="product360-boundary">
-              <strong>MDARIX Product 360 is a context and investigation layer.</strong>
-              <span>
-                It complements QMS, PLM, ERP/MES, and supplier systems; it does not replace their authoritative records.
-              </span>
-            </div>
-          </section>
-        )}
-        {solutionContent && (
-          <section className="solution-detail">
-            <div>
-              <span className="eyebrow">End-to-end solution story</span>
-              <h2>{page.title}</h2>
-              <p>{page.copy}</p>
-            </div>
-            {solutionHeroVisual && (
-              <figure className="solution-hero-visual">
-                <img src={solutionHeroVisual.src} alt={solutionHeroVisual.alt} />
-                <figcaption>MedTech signal → context → evidence → governed review</figcaption>
-              </figure>
-            )}
-            <div className="solution-flow">
-              <article>
-                <span>01</span>
-                <h3>Frame the question</h3>
-                <p>Define the signal, scope, time window, and accountable review team.</p>
-              </article>
-              <article>
-                <span>02</span>
-                <h3>Connect the context</h3>
-                <p>Bring product, version, change, supplier, lot, complaint, and evidence context together.</p>
-              </article>
-              <article>
-                <span>03</span>
-                <h3>Inspect the uncertainty</h3>
-                <p>Separate what is observed from what is inferred, contradicted, missing, or still unknown.</p>
-              </article>
-              <article>
-                <span>04</span>
-                <h3>Move to governed action</h3>
-                <p>Preserve provenance and limitations while authorized humans review and decide.</p>
-              </article>
-            </div>
-          </section>
-        )}
-        {path === "/resources" && (
-          <section className="resource-detail">
-            <span className="eyebrow">Resource library</span>
-            <h2>Practical guidance for every investigation stage.</h2>
-            <p>
-              Use these resources to move from a product signal to a traceable, reviewable decision while keeping
-              evidence, uncertainty, and human authority visible.
-            </p>
-            <div className="resource-grid">
-              <article>
-                <strong>Investigation playbooks</strong>
-                <p>Complaint increases, product changes, supplier issues, affected lots, and missing evidence.</p>
-                <a href="/solutions#complaints" onClick={closeMenuAndNavigate}>
-                  Explore playbooks →
-                </a>
-              </article>
-              <article>
-                <strong>Trust &amp; governance guides</strong>
-                <p>AI assurance, provenance, role boundaries, audit trails, and controlled human review.</p>
-                <a href="/platform/ai-assurance" onClick={closeMenuAndNavigate}>
-                  Review trust controls →
-                </a>
-              </article>
-              <article>
-                <strong>Lifecycle perspectives</strong>
-                <p>Discover, develop, prove, release, monitor, improve, and evolve with connected context.</p>
-                <a href="/product-lifecycle" onClick={closeMenuAndNavigate}>
-                  Explore lifecycle →
-                </a>
-              </article>
-            </div>
-          </section>
-        )}
-        {isHome && (
-          <section className="medtech-home-grid">
-            <article>
-              <div>
-                <span className="eyebrow">Quality signal loop</span>
-                <h2>From field signal to controlled action.</h2>
-                <p>
-                  Follow complaints and service observations through product version, affected lots, evidence review,
-                  and an accountable human decision.
-                </p>
-              </div>
-              <img
-                src="/medtech-quality-loop.svg"
-                alt="Workflow from field signal through triage, evidence review, action, and effectiveness check"
-              />
-            </article>
-            <article>
-              <div>
-                <span className="eyebrow">Evidence chain</span>
-                <h2>Make every conclusion traceable.</h2>
-                <p>
-                  Keep source records, observations, competing hypotheses, unknowns, and approvals visible in the same
-                  investigation story.
-                </p>
-              </div>
-              <img
-                src="/medtech-evidence-chain.svg"
-                alt="Evidence chain linking source records to observations, hypotheses, and decisions"
-              />
-            </article>
-            <article>
-              <div>
-                <span className="eyebrow">Connected systems</span>
-                <h2>Work above the systems you already use.</h2>
-                <p>
-                  Connect QMS, PLM, ERP, supplier, and manufacturing context through governed mappings while each source
-                  remains authoritative.
-                </p>
-              </div>
-              <img
-                src="/medtech-source-network.svg"
-                alt="Connected medical device systems feeding a governed MDARIX investigation workspace"
-              />
-            </article>
-          </section>
-        )}
-        {path === "/resources" && (
-          <section className="resource-detail resource-latest" aria-labelledby="latest-pms-resources">
-            <span className="eyebrow">Latest reading · AI and post-market surveillance</span>
-            <h2 id="latest-pms-resources">Current regulatory and industry publications for MedTech teams.</h2>
-            <p>
-              Curated links to official regulator and public-health sources. MDARIX does not replace regulatory advice;
-              use the original source for the current text, scope, and applicability.
-            </p>
-            <div className="resource-grid resource-source-grid">
-              {postMarketResources.map((resource) => (
-                <article key={resource.href}>
-                  <div className="resource-meta">
-                    <span>{resource.type}</span>
-                    <time>{resource.date}</time>
-                  </div>
-                  <h3>{resource.title}</h3>
-                  <p>{resource.text}</p>
-                  <a href={resource.href} target="_blank" rel="noreferrer">
-                    Open official source →
-                  </a>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-        {path === "/security" && (
-          <section className="public-story trust-claims" aria-labelledby="verified-trust-title">
-            <div>
-              <span className="eyebrow">Verified trust claims</span>
-              <h2 id="verified-trust-title">What MDARIX can accurately say today.</h2>
-              <p>
-                These statements describe implemented product controls and controlled MVP validation. They are not
-                certification claims.
-              </p>
-            </div>
-            <div className="story-grid">
-              <article>
-                <strong>Implemented controls</strong>
-                <p>
-                  Tenant-scoped authorization, role and field policies, audit records, provenance, human approval
-                  controls, and advisory AI safeguards are implemented in the MVP.
-                </p>
-              </article>
-              <article>
-                <strong>Synthetic validation boundary</strong>
-                <p>
-                  Current demonstrations use synthetic tenants, local infrastructure, and validation simulators. They do
-                  not represent customer or production certification evidence.
-                </p>
-              </article>
-              <article>
-                <strong>Certification status</strong>
-                <p>
-                  MDARIX does not claim ISO 27001 certification, HIPAA compliance, GDPR compliance, or 21 CFR Part 11
-                  compliance on this site.
-                </p>
-              </article>
-              <article>
-                <strong>Evidence availability</strong>
-                <p>
-                  Validation protocols, test reports, and approved non-confidential sample dossiers may be shared during
-                  a controlled review. No confidential customer material is published.
-                </p>
-              </article>
-            </div>
-          </section>
-        )}
-        {path === "/why-mdarix" && (
-          <section className="public-story positioning-story" aria-labelledby="positioning-title">
-            <div>
-              <span className="eyebrow">MVP positioning</span>
-              <h2 id="positioning-title">An investigation intelligence layer for medical-device teams.</h2>
-              <p>
-                MDARIX is designed for quality, regulatory, product, supplier-quality, and manufacturing teams
-                investigating a product signal across systems of record.
-              </p>
-            </div>
-            <div className="story-grid">
-              <article>
-                <strong>Where MDARIX fits</strong>
-                <p>
-                  MDARIX connects product context, complaints, changes, suppliers, lots, evidence, uncertainty, and
-                  human decisions. QMS, PLM, ERP, and supplier systems remain authoritative.
-                </p>
-              </article>
-              <article>
-                <strong>What makes the MVP different</strong>
-                <p>
-                  The MVP focuses on evidence-bounded investigation: relationships are visible, competing explanations
-                  remain separate, missing evidence is explicit, and AI remains advisory.
-                </p>
-              </article>
-              <article>
-                <strong>What MDARIX is not</strong>
-                <p>
-                  It is not positioned as a replacement QMS, PLM, ERP, or a certified regulatory submission system.
-                  Competitor products may be stronger in those system-of-record domains.
-                </p>
-              </article>
-              <article>
-                <strong>Design-partner outcome</strong>
-                <p>
-                  Measure complaint-to-investigation time, evidence retrieval time, mapping/import success, cross-tenant
-                  isolation, and decision traceability during a controlled pilot.
-                </p>
-              </article>
-            </div>
-          </section>
-        )}
-        <section className="mvp-status-panel" aria-labelledby="mvp-status-title">
-          <div>
-            <span className="eyebrow">MVP scope clarity</span>
-            <h2 id="mvp-status-title">Know what is available today.</h2>
-            <p>
-              MDARIX distinguishes working demo capabilities from synthetic validation, planned direction, and
-              production-dependent gates.
-            </p>
-          </div>
-          <div className="mvp-status-grid">
-            {capabilityStatus.map((status) => (
-              <article key={status.label}>
-                <strong>{status.label}</strong>
-                <p>{status.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-        {path === "/resources" && (
-          <section className="resource-hero-editorial" aria-labelledby="resource-hero-title">
-            <div className="resource-hero-intro">
-              <span className="eyebrow">MedTech intelligence desk</span>
-              <h2 id="resource-hero-title">AI, safety signals, and post-market surveillance.</h2>
-              <p>
-                Explore how medical-device teams monitor real-world performance, investigate emerging signals, and keep
-                AI-enabled devices under human oversight across the product lifecycle.
-              </p>
-            </div>
-            <div className="resource-hero-grid">
-              <figure>
-                <img
-                  src="/medtech-resource-pms-signals.png"
-                  alt="Medical-device post-market surveillance signals reviewed by a quality team"
-                />
-                <figcaption>Post-market signals</figcaption>
-              </figure>
-              <figure>
-                <img
-                  src="/medtech-resource-ai-lifecycle.png"
-                  alt="AI-enabled medical device lifecycle monitoring and performance review"
-                />
-                <figcaption>AI lifecycle monitoring</figcaption>
-              </figure>
-              <figure>
-                <img
-                  src="/medtech-resource-regulatory-intelligence.png"
-                  alt="Regulatory intelligence and source provenance for AI medical devices"
-                />
-                <figcaption>Regulatory intelligence</figcaption>
-              </figure>
-            </div>
-          </section>
-        )}
+
+      <main id="main" className="ms-main">
+        {page === "/" && <HomePage />}
+        {page === "/platform" && <PlatformPage />}
+        {page === "/solutions" && <SolutionsPage />}
+        {page === "/product-lifecycle" && <LifecyclePage />}
+        {page === "/trust" && <TrustPage />}
+        {page === "/resources" && <ResourcesPage />}
+        {page === "/pricing" && <PricingPage />}
+        {page === "/company" && <CompanyPage />}
       </main>
-      <PublicFooter />
+
+      <footer className="ms-footer">
+        <div className="ms-footer-top">
+          <div className="ms-footer-brand">
+            <a className="ms-brand ms-brand-light" href="/">
+              <span className="ms-logo" aria-hidden="true">
+                M
+              </span>
+              MDARIX
+            </a>
+            <p>Evidence-first investigation intelligence for medical-device teams.</p>
+            <div className="ms-cta-row">
+              <a className="ms-btn ms-btn-light" href="/signup">
+                Get started
+              </a>
+              <a className="ms-btn ms-btn-ghost-light" href="/signin">
+                Sign in
+              </a>
+            </div>
+          </div>
+          {FOOTER.map((column) => (
+            <section key={column.title}>
+              <h3>{column.title}</h3>
+              {column.links.map(([label, href]) => (
+                <a key={label} href={href}>
+                  {label}
+                </a>
+              ))}
+            </section>
+          ))}
+        </div>
+        <div className="ms-footer-bottom">
+          <span>MDARIX — System of Intelligence, not System of Record.</span>
+          <span>Evidence before inference · Humans decide</span>
+        </div>
+      </footer>
     </div>
   );
+}
+
+function pageTitle(page: SitePage) {
+  return {
+    "/": "Home",
+    "/platform": "Platform",
+    "/solutions": "Solutions",
+    "/product-lifecycle": "Product lifecycle",
+    "/trust": "Trust",
+    "/resources": "Resources",
+    "/pricing": "Plans & pricing",
+    "/company": "Company",
+  }[page];
 }
