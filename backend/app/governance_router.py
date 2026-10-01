@@ -23,6 +23,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.stage2 import MfaChallenge
 from backend.app.db.models.stage3 import ContextSnapshot
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import change_diff
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
@@ -284,6 +285,7 @@ def sign(
     payload: SignatureRequest,
     request: Request,
     db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     actor = session_actor(db, ctx)
@@ -295,7 +297,7 @@ def sign(
         raise HTTPException(
             403, detail={"code": "DENIED_NOT_ENTITLED", "message": "Tenant is not entitled to controlled signatures"}
         )
-    item = db.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
+    item = data.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
     if not item:
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
@@ -386,6 +388,11 @@ def sign(
         .first()
     )
     if existing:
+        signed_status = "APPROVED" if existing.decision == "APPROVE" else "REJECTED"
+        if item.decision_status != signed_status:
+            # The signature was recorded but the decision's status update did not reach the tenant data plane.
+            item.decision_status = signed_status
+            data.commit()
         raise HTTPException(
             409, detail={"code": "DUPLICATE_SIGNATURE", "message": "This decision version is already signed"}
         )
@@ -409,7 +416,7 @@ def sign(
         created_at=NOW(),
     )
     db.add(record)
-    item.decision_status = "APPROVED" if payload.decision == "APPROVE" else "REJECTED"
+    signed_status = "APPROVED" if payload.decision == "APPROVE" else "REJECTED"
     if payload.decision == "APPROVE":
         db.add(
             ContextSnapshot(
@@ -440,7 +447,10 @@ def sign(
         request=request,
         reason=payload.remarks,
     )
+    # The signature and audit trail (control plane) are committed first; the decision lives in the tenant data plane.
     db.commit()
+    item.decision_status = signed_status
+    data.commit()
     return {
         "signature_id": record.id,
         "status": item.decision_status,
@@ -456,11 +466,12 @@ def material_change(
     decision_id: uuid.UUID,
     payload: MaterialChangeRequest,
     db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
-    item = db.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
+    item = data.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
     if not item:
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
@@ -490,6 +501,7 @@ def material_change(
     )
     audit(db, t, actor["user_id"], "RE_SIGNATURE_REQUIRED", item.id)
     db.commit()
+    data.commit()
     return {"status": "RE_REVIEW_REQUIRED", "previous_version": current, "current_version": item.updated_at}
 
 
@@ -527,12 +539,13 @@ def signature_history(
 def signature_verification(
     decision_id: uuid.UUID,
     db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Return server-side verification evidence without exposing secrets or signing material."""
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
-    item = db.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
+    item = data.query(Decision).filter(Decision.id == decision_id, Decision.tenant_id == t.id).first()
     if not item:
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}

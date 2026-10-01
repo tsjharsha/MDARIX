@@ -403,3 +403,65 @@ def test_api_signing_security_matrix():
         db.query(Decision).filter(Decision.id.in_(ids)).delete(synchronize_session=False)
         db.commit()
         db.close()
+
+
+def test_signing_and_verification_read_the_decision_from_the_tenant_data_plane():
+    """Decisions live in the tenant data plane. A decision only that session can see must still be signable."""
+    from backend.app.db.data_plane import get_data_plane_db
+
+    db = SessionLocal()
+    investigation = db.query(Investigation).first()
+    tenant = db.query(Tenant).filter(Tenant.id == investigation.tenant_id).one()
+    bootstrap(db, tenant)
+    db.commit()
+    approver_client = _client(f"approver-{uuid.uuid4().hex[:8]}@example.com", tenant.id)
+
+    # Uncommitted in its own session: invisible to the control-plane session the old code used.
+    data = SessionLocal()
+    now = datetime.now(timezone.utc)
+    decision = Decision(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        investigation_id=investigation.id,
+        decision_identifier=f"D23-DP-{uuid.uuid4().hex[:10]}",
+        decision_type="INVESTIGATION_REVIEW",
+        disposition="REQUIRES_REVIEW",
+        rationale="Data-plane signing",
+        decision_status="REQUIRES_REVIEW",
+        authorized_by_ref=f"creator-{uuid.uuid4().hex[:8]}@example.com",
+        updated_at=now,
+        decision_timestamp=now,
+        created_at=now,
+    )
+    data.add(decision)
+    data.flush()
+
+    def tenant_data_plane():
+        yield data
+
+    app.dependency_overrides[get_data_plane_db] = tenant_data_plane
+    try:
+        signed = approver_client.post(
+            f"/api/v1/governance/decisions/{decision.id}/sign",
+            json={
+                "decision": "APPROVE",
+                "remarks": "Reviewed in the data plane",
+                "password": "Correct current password 123",
+                "object_version": decision.updated_at.isoformat(),
+            },
+        )
+        assert signed.status_code == 200, signed.text
+        assert signed.json()["status"] == "APPROVED"
+        data.refresh(decision)
+        assert decision.decision_status == "APPROVED"
+        verification = approver_client.get(f"/api/v1/governance/decisions/{decision.id}/signature-verification")
+        assert verification.status_code == 200
+        assert verification.json()["signatures"][0]["valid"] is True
+    finally:
+        app.dependency_overrides.pop(get_data_plane_db, None)
+        db.query(SignedApprovalRecord).filter_by(object_id=decision.id).delete()
+        db.commit()
+        data.query(Decision).filter(Decision.id == decision.id).delete()
+        data.commit()
+        data.close()
+        db.close()
