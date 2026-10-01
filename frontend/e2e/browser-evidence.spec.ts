@@ -251,9 +251,9 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app");
     await expect(page.locator("body")).not.toBeEmpty();
-    await page.waitForTimeout(1500);
-    const interactive = page.locator("a,button,input,select,textarea");
-    expect(await interactive.count()).toBeGreaterThan(0);
+    // Wait for the workspace to finish loading (it fetches its live status first) rather than a fixed delay.
+    const interactive = page.locator(":is(a,button,input,select,textarea):visible");
+    await expect(interactive.first()).toBeVisible({ timeout: 20_000 });
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-home.png`, fullPage: true });
