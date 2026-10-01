@@ -311,36 +311,77 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     rows = rows.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
     total = rows.count()
     items = rows.offset((page - 1) * page_size).limit(page_size).all()
+    # One query per kind of detail for the whole page (previously six queries per tenant). Each lookup keeps the
+    # ordering the per-tenant query used, and the first row per tenant wins, so the output is unchanged.
+    page_ids = [row.id for row, _ in items]
+
+    def first_per_tenant(results) -> dict:
+        found: dict = {}
+        for item in results:
+            found.setdefault(item.tenant_id, item)
+        return found
+
+    assignments = first_per_tenant(
+        db.query(TenantPlanAssignment)
+        .filter(TenantPlanAssignment.tenant_id.in_(page_ids), TenantPlanAssignment.status == "ACTIVE")
+        .order_by(TenantPlanAssignment.effective_from.desc())
+        .all()
+        if page_ids
+        else []
+    )
+    plan_ids = {assignment.plan_id for assignment in assignments.values()}
+    plans = (
+        {plan.id: plan for plan in db.query(PlanDefinition).filter(PlanDefinition.id.in_(plan_ids)).all()}
+        if plan_ids
+        else {}
+    )
+    subscriptions = first_per_tenant(
+        db.query(SubscriptionLifecycle)
+        .filter(SubscriptionLifecycle.tenant_id.in_(page_ids))
+        .order_by(SubscriptionLifecycle.created_at.desc())
+        .all()
+        if page_ids
+        else []
+    )
+    admins = first_per_tenant(
+        db.query(AuthUser)
+        .filter(
+            AuthUser.tenant_id.in_(page_ids),
+            func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"]),
+        )
+        .order_by(AuthUser.created_at.asc())
+        .all()
+        if page_ids
+        else []
+    )
+    last_activities = (
+        dict(
+            db.query(AuditEvent.tenant_id, func.max(AuditEvent.created_at))
+            .filter(AuditEvent.tenant_id.in_(page_ids))
+            .group_by(AuditEvent.tenant_id)
+            .all()
+        )
+        if page_ids
+        else {}
+    )
+    seat_counts = (
+        dict(
+            db.query(TenantMembership.tenant_id, func.count(TenantMembership.id))
+            .filter(TenantMembership.tenant_id.in_(page_ids))
+            .group_by(TenantMembership.tenant_id)
+            .all()
+        )
+        if page_ids
+        else {}
+    )
     payload = []
     for row, customer in items:
-        assignment = (
-            db.query(TenantPlanAssignment)
-            .filter(TenantPlanAssignment.tenant_id == row.id, TenantPlanAssignment.status == "ACTIVE")
-            .order_by(TenantPlanAssignment.effective_from.desc())
-            .first()
-        )
-        plan_row = (
-            db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first() if assignment else None
-        )
-        subscription = (
-            db.query(SubscriptionLifecycle)
-            .filter(SubscriptionLifecycle.tenant_id == row.id)
-            .order_by(SubscriptionLifecycle.created_at.desc())
-            .first()
-        )
-        primary_admin = (
-            db.query(AuthUser)
-            .filter(
-                AuthUser.tenant_id == row.id,
-                func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"]),
-            )
-            .order_by(AuthUser.created_at.asc())
-            .first()
-        )
-        last_activity = (
-            db.query(AuditEvent).filter(AuditEvent.tenant_id == row.id).order_by(AuditEvent.created_at.desc()).first()
-        )
-        seat_usage = db.query(TenantMembership).filter(TenantMembership.tenant_id == row.id).count()
+        assignment = assignments.get(row.id)
+        plan_row = plans.get(assignment.plan_id) if assignment else None
+        subscription = subscriptions.get(row.id)
+        primary_admin = admins.get(row.id)
+        last_activity_at = last_activities.get(row.id)
+        seat_usage = seat_counts.get(row.id, 0)
         seat_cap = getattr(plan_row, "seat_cap", None) or getattr(plan_row, "max_seats", None)
         health_status = "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "ATTENTION_REQUIRED"
         if seat_status == "OVER" and not (seat_cap and seat_usage > seat_cap):
@@ -376,7 +417,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
                 "expires_at": subscription.expires_at.isoformat() if subscription and subscription.expires_at else None,
                 "primary_admin": primary_admin.display_name if primary_admin else None,
                 "primary_admin_email": primary_admin.username if primary_admin else None,
-                "last_activity": last_activity.created_at.isoformat() if last_activity else None,
+                "last_activity": last_activity_at.isoformat() if last_activity_at else None,
                 "created_by": customer.created_by if customer and getattr(customer, "created_by", None) else None,
                 "health_status": health_status,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
