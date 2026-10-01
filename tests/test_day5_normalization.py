@@ -72,7 +72,13 @@ def test_product_version_component_relationship(normalized):
 
 
 def test_manufacturing_site_identity(normalized):
-    assert scalar("SELECT count(*) FROM manufacturing_sites") == 2
+    assert (
+        scalar(
+            "SELECT count(*) FROM manufacturing_sites s JOIN tenants t ON t.id = s.tenant_id "
+            "WHERE t.tenant_key = 'ACME_CARE_SYNTHETIC' AND s.site_identifier NOT LIKE 'DEMO-%'"
+        )
+        == 2
+    )
 
 
 def test_lot_composite_identity(normalized):

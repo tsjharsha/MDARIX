@@ -186,7 +186,12 @@ STANDARD_SYSTEM_FIELDS = {"tenant_id", "source_record_uuid", "created_at", "upda
 
 def _entity(key: str, *fields):
     """Business entity with its UUID key and business ID (both system-managed)."""
-    return [(f"{key}_uuid", "UUID", True, None), (f"{key}_id", "STRING", True, None), ("tenant_id", "UUID", True, None), *fields]
+    return [
+        (f"{key}_uuid", "UUID", True, None),
+        (f"{key}_id", "STRING", True, None),
+        ("tenant_id", "UUID", True, None),
+        *fields,
+    ]
 
 
 CANONICAL_ENTITIES = {
@@ -443,10 +448,34 @@ AUTH_TYPES = [
     ("BASIC_AUTH", "Basic Authentication", {"username_ref": "string", "password_secret_ref": "string"}),
     ("MUTUAL_TLS", "Mutual TLS", {"certificate_secret_ref": "string", "private_key_secret_ref": "string"}),
 ]  # fmt: skip
-PAGINATION_TYPES = [("NONE", "None"), ("OFFSET_LIMIT", "Offset / Limit"), ("PAGE_NUMBER", "Page Number"), ("CURSOR", "Cursor"), ("NEXT_LINK", "Next Link")]
-SYNC_MODES = [("FULL", "Full"), ("INCREMENTAL", "Incremental"), ("WEBHOOK", "Webhook"), ("HYBRID", "Hybrid"), ("MANUAL", "Manual"), ("SCHEDULED", "Scheduled")]
+PAGINATION_TYPES = [
+    ("NONE", "None"),
+    ("OFFSET_LIMIT", "Offset / Limit"),
+    ("PAGE_NUMBER", "Page Number"),
+    ("CURSOR", "Cursor"),
+    ("NEXT_LINK", "Next Link"),
+]
+SYNC_MODES = [
+    ("FULL", "Full"),
+    ("INCREMENTAL", "Incremental"),
+    ("WEBHOOK", "Webhook"),
+    ("HYBRID", "Hybrid"),
+    ("MANUAL", "Manual"),
+    ("SCHEDULED", "Scheduled"),
+]
 # Connectors: previous CONNECTOR_VERSIONS catalog plus the three generic simulators.
-CONNECTOR_APPS = ["TRACKWISE", "TEAMCENTER", "SAP_ERP", "SALESFORCE_SERVICE", "VEEVA_QMS", "ORACLE_ERP", "COUPA", "PLM", "ERP", "SUPPLIER"]
+CONNECTOR_APPS = [
+    "TRACKWISE",
+    "TEAMCENTER",
+    "SAP_ERP",
+    "SALESFORCE_SERVICE",
+    "VEEVA_QMS",
+    "ORACLE_ERP",
+    "COUPA",
+    "PLM",
+    "ERP",
+    "SUPPLIER",
+]
 
 # --- Reference, security and regulatory masters ------------------------------------------------
 
@@ -706,8 +735,16 @@ def load(conn) -> dict[str, int]:
     for key, (_name, fields) in CANONICAL_ENTITIES.items():
         for field, data_type, required, reference in fields:
             system = _system_managed(fields, field)
-            policy = "PLATFORM_ONLY" if system else "RESTRICTED" if data_type == "UUID_REF" else "CUSTOMER_OVERRIDE_ALLOWED"
-            classification = "CONFIDENTIAL" if field in CONFIDENTIAL_CANONICAL else "SENSITIVE_QUALITY" if field in SENSITIVE_QUALITY_FIELDS else "INTERNAL"
+            policy = (
+                "PLATFORM_ONLY" if system else "RESTRICTED" if data_type == "UUID_REF" else "CUSTOMER_OVERRIDE_ALLOWED"
+            )
+            classification = (
+                "CONFIDENTIAL"
+                if field in CONFIDENTIAL_CANONICAL
+                else "SENSITIVE_QUALITY"
+                if field in SENSITIVE_QUALITY_FIELDS
+                else "INTERNAL"
+            )
             ids["cfield", key, field] = _insert(
                 conn, "canonical_field_definition", "canonical_field_uuid", canonical_entity_uuid=ids["entity", key],
                 field_name=field, field_label=_label(field), data_type=data_type, required=required,

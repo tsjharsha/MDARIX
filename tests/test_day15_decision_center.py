@@ -1,4 +1,6 @@
 import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
@@ -62,6 +64,54 @@ def test_advisory_cannot_finalize_decision():
     assert "decision_status" not in response.json()["advisory"]
 
 
+@contextmanager
+def _role_may_approve(tenant_id, role_name: str):
+    """Temporarily give a role approval authority (fresh databases grant it to Approver only)."""
+    from backend.app.db.models.foundation import ApprovalAuthority, Tenant
+    from backend.app.db.session import SessionLocal
+    from backend.app.governance_router import bootstrap
+
+    db = SessionLocal()
+    now = datetime.now(timezone.utc)
+    added = None
+    try:
+        bootstrap(db, db.query(Tenant).filter(Tenant.id == tenant_id).one())
+        existing = (
+            db.query(ApprovalAuthority)
+            .filter_by(
+                tenant_id=tenant_id,
+                role_name=role_name,
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                authority="AUTHORIZED",
+                status="ACTIVE",
+            )
+            .first()
+        )
+        if existing is None:
+            added = ApprovalAuthority(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                role_name=role_name,
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                authority="AUTHORIZED",
+                version="test",
+                status="ACTIVE",
+                effective_from=now,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(added)
+        db.commit()
+        yield
+    finally:
+        if added is not None:
+            db.delete(added)
+            db.commit()
+        db.close()
+
+
 def test_human_decision_requires_rationale_and_review():
     investigation, _, _ = primary_investigation()
     missing = client.post(
@@ -81,11 +131,12 @@ def test_human_decision_requires_rationale_and_review():
     assert created.status_code == 200
     decision_id = created.json()["id"]
     assert created.json()["decision_status"] == "REQUIRES_REVIEW"
-    # The author cannot approve their own decision (segregation of duties)...
-    own = client.post(
-        f"/api/v1/investigations/decisions/{decision_id}/reviews",
-        json={"disposition": "APPROVED", "reviewer_ref": "reviewer", "comments": "Human review completed."},
-    )
+    # The author cannot approve their own decision (segregation of duties), even when their role may approve.
+    with _role_may_approve(primary_investigation()[1], "Administrator"):
+        own = client.post(
+            f"/api/v1/investigations/decisions/{decision_id}/reviews",
+            json={"disposition": "APPROVED", "reviewer_ref": "reviewer", "comments": "Human review completed."},
+        )
     assert own.status_code == 403
     assert own.json()["detail"]["code"] == "SOD_DENIED"
     # ...a different user holding approval authority can.

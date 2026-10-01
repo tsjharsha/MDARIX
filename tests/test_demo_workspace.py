@@ -59,9 +59,15 @@ def test_setup_refuses_a_weak_password():
 
 
 def test_each_demo_role_signs_in_and_sees_the_story(demo):
+    db = SessionLocal()
+    try:
+        held = status(db)["records"]
+    finally:
+        db.close()
+    assert held["products"] > 0 and held["investigations"] > 0
     for role, email, _ in DEMO_TEAM:
         counts = _signin(email).get("/api/v1/analytics/command-center").json()["counts"]
-        assert counts["products"] >= 5 and counts["investigations"] >= 19, (role, counts)
+        assert (counts["products"], counts["investigations"]) == (held["products"], held["investigations"]), role
 
 
 def test_the_demo_viewer_is_read_only(demo):

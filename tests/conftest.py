@@ -172,15 +172,53 @@ LEGACY_PROTECTED = {
 }
 
 
+def _ensure_legacy_user(db, tenant):
+    """The shared Administrator test account and its membership, created on first use (fresh databases)."""
+    email = "legacy-test-auth@synthetic.invalid"
+    user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == email).first()
+    now = datetime.now(timezone.utc)
+    if user is None:
+        user = AuthUser(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            username=email,
+            display_name="Legacy Test Auth",
+            company="Test",
+            password_hash=_hash("LegacyTestPassword123!"),
+            role="Administrator",
+            status="ACTIVE",
+            email_verified=True,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(user)
+        db.flush()
+    membership = (
+        db.query(TenantMembership)
+        .filter(TenantMembership.tenant_id == tenant.id, TenantMembership.user_id == user.id)
+        .first()
+    )
+    if membership is None:
+        db.add(
+            TenantMembership(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                user_id=user.id,
+                status="ACTIVE",
+                is_default=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+    db.commit()
+    return user
+
+
 def authenticated_client(application=app):
     client = TestClient(application)
     db = SessionLocal()
     tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
-    user = (
-        db.query(AuthUser)
-        .filter(AuthUser.tenant_id == tenant.id, AuthUser.username == "legacy-test-auth@synthetic.invalid")
-        .first()
-    )
+    user = _ensure_legacy_user(db, tenant)
     token = auth_service.signin_persisted(
         "legacy-test-auth@synthetic.invalid",
         "LegacyTestPassword123!",
