@@ -45,8 +45,9 @@ from counterfactual.router import router as counterfactual_router
 from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
 from scenario_intelligence.router import router as scenario_router
+from backend.app.runtime_env import is_production_like
 
-_production_like = os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}
+_production_like = is_production_like()
 _docs_enabled = os.getenv("MDARIX_ENABLE_API_DOCS", "true" if not _production_like else "false").lower() == "true"
 app = FastAPI(
     title="MDARIX R1 API",
@@ -78,7 +79,7 @@ async def enforce_cookie_csrf(request: Request, call_next):
     if (
         request.method not in {"GET", "HEAD", "OPTIONS"}
         and request.cookies.get("mdarix_session")
-        and os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}
+        and is_production_like()
     ):
         configured = os.getenv("MDARIX_APP_URL", "").rstrip("/")
         expected = f"{urlparse(configured).scheme}://{urlparse(configured).netloc}" if configured else ""

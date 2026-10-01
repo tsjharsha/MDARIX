@@ -19,6 +19,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import AuthSession
 from backend.app.db.session import get_db
+from backend.app.runtime_env import is_development
 
 
 def set_database_tenant_context(db: Session, tenant_id: str) -> None:
@@ -103,10 +104,7 @@ def get_request_context(request: Request, db: Session = Depends(get_db)) -> Auth
         # an accidental environment mismatch from weakening authentication.
         import os
 
-        legacy_fallback = (
-            os.getenv("MDARIX_ENV", "development").lower() == "development"
-            and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
-        )
+        legacy_fallback = is_development() and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
         if not legacy_fallback:
             raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
         try:

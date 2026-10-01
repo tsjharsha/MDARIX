@@ -26,14 +26,15 @@ def test_provider_adapter_uses_server_credential_reference_and_sanitizes_respons
         captured["timeout"] = timeout
         return _Response()
 
-    monkeypatch.setenv("TEST_CONNECTOR_TOKEN", "do-not-return")
-    monkeypatch.setattr("backend.app.access.common.urlopen", fake_urlopen)
+    monkeypatch.setenv("MDARIX_CONNECTOR_SECRET_TEST", "do-not-return")
+    monkeypatch.setenv("MDARIX_CONNECTOR_ALLOWED_HOSTS", "provider.invalid")
+    monkeypatch.setattr("backend.app.access.common.safe_urlopen", fake_urlopen)
     row = SimpleNamespace(
         id="connector-1",
         configuration={
             "endpoint": "https://provider.invalid/api",
             "health_path": "health",
-            "credential_ref": "TEST_CONNECTOR_TOKEN",
+            "credential_ref": "MDARIX_CONNECTOR_SECRET_TEST",
             "timeout_seconds": 3,
         },
     )
@@ -54,7 +55,8 @@ def test_provider_adapter_reports_unconfigured_and_unreachable_without_secrets(m
     def fail(*_args, **_kwargs):
         raise TimeoutError()
 
-    monkeypatch.setattr("backend.app.access.common.urlopen", fail)
+    monkeypatch.setenv("MDARIX_CONNECTOR_ALLOWED_HOSTS", "provider.invalid")
+    monkeypatch.setattr("backend.app.access.common.safe_urlopen", fail)
     row.configuration = {"endpoint": "https://provider.invalid/api", "health_path": "health"}
     result = _provider_get(row, "health_path")
     assert result == {"status": "FAILED", "reason": "PROVIDER_UNREACHABLE"}

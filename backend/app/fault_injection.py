@@ -11,12 +11,10 @@ per-day flags (DAY27/DAY30/DAY31/DAY32/DAY34_LIVE_DEPENDENCY_FAILURE).
 """
 
 import os
+from backend.app.runtime_env import PRODUCTION, environment
 
 SIMULATE_DEPENDENCY_FAILURE_FLAG = "MDARIX_SIMULATE_DEPENDENCY_FAILURE"
 
 
 def dependency_failure_simulated() -> bool:
-    return (
-        os.environ.get(SIMULATE_DEPENDENCY_FAILURE_FLAG) == "1"
-        and os.environ.get("MDARIX_ENV", "development").lower() != "production"
-    )
+    return os.environ.get(SIMULATE_DEPENDENCY_FAILURE_FLAG) == "1" and environment() != PRODUCTION

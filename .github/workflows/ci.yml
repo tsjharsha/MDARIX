@@ -22,6 +22,8 @@ jobs:
       # CI uses the freshly provisioned PostgreSQL service, so it is safe to
       # apply the runtime-role and RLS migration during the isolated run.
       MDARIX_DB_HARDENING_APPLY: '1'
+      # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
+      MDARIX_ENV: development
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -83,6 +85,8 @@ jobs:
       POSTGRES_PORT: '5432'
       POSTGRES_DB: mdarix_r1
       MDARIX_DB_HARDENING_APPLY: '1'
+      # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
+      MDARIX_ENV: development
       DAY35_FIXTURE_APPLY: '1'
       DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:
@@ -185,6 +189,8 @@ jobs:
       POSTGRES_PORT: '5432'
       POSTGRES_DB: mdarix_r1
       MDARIX_DB_HARDENING_APPLY: '1'
+      # Disposable CI services run with development conveniences; an unset MDARIX_ENV means production.
+      MDARIX_ENV: development
       DAY35_FIXTURE_APPLY: '1'
       DAY35_FIXTURE_PASSWORD: 'Temp@1234password'
     services:

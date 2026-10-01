@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
+from backend.app.runtime_env import is_local
 
 # Free-trial workspaces have no dedicated database: their registry row names this marker, and their business data
 # lives in the control database, keyed and filtered by tenant like every other tenant-owned table there.
@@ -28,7 +29,7 @@ def _secret_url(secret_ref: str) -> str:
         # Local validation fallback: the registry still controls the database
         # name and the caller never supplies a connection string. Hosted
         # deployments must provide the referenced secret explicitly.
-        if os.getenv("MDARIX_ENV", "development").lower() not in {"development", "test"}:
+        if not is_local():
             raise RuntimeError(f"DATA_PLANE_SECRET_NOT_CONFIGURED:{secret_ref}")
         tenant_key = secret_ref.removeprefix("MDARIX_DATA_PLANE_").removesuffix("_DATABASE_URL")
         ports = {"R1_TENANT_1": 5541, "R1_TENANT_2": 5542, "R1_TENANT_3": 5543, "R1_TENANT_4": 5544}

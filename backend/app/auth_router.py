@@ -28,6 +28,7 @@ from backend.app.db.models.stage2 import (
 )
 from backend.app.db.session import get_db
 from backend.app.request_context import ensure_tenant_access
+from backend.app.runtime_env import is_development
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
@@ -67,15 +68,12 @@ def fail(exc):
 
 
 def _development_token(token: str | None) -> str | None:
-    return token if os.getenv("MDARIX_ENV", "development").lower() == "development" else None
+    return token if is_development() else None
 
 
 def _legacy_compat_enabled() -> bool:
     """Allow in-process compatibility only for explicitly enabled local tests."""
-    return (
-        os.getenv("MDARIX_ENV", "development").lower() == "development"
-        and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
-    )
+    return is_development() and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
 
 
 def _password_reuse(db, row, new_password: str) -> bool:
@@ -146,7 +144,7 @@ def mfa_enroll(request: Request, db: Session = Depends(get_db)):
     return {
         "status": "MFA_ENROLLMENT_PENDING",
         "expires_at": now + timedelta(minutes=10),
-        "development_code": code if os.getenv("MDARIX_ENV", "development").lower() == "development" else None,
+        "development_code": code if is_development() else None,
     }
 
 
@@ -232,7 +230,7 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
     return {
         "status": "MFA_CHALLENGE_ISSUED",
         "expires_at": now + timedelta(minutes=5),
-        "development_code": code if os.getenv("MDARIX_ENV", "development").lower() == "development" else None,
+        "development_code": code if is_development() else None,
     }
 
 
@@ -372,8 +370,8 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
         if hasattr(db, "commit"):
             db.commit()
         persist_session(db, token, row.id, row.tenant_id)
-        is_development = os.getenv("MDARIX_ENV", "development").lower() == "development"
-        secure_cookie = True if not is_development else os.getenv("MDARIX_COOKIE_SECURE", "false").lower() == "true"
+        development = is_development()
+        secure_cookie = True if not development else os.getenv("MDARIX_COOKIE_SECURE", "false").lower() == "true"
         response.set_cookie("mdarix_session", token, httponly=True, samesite="lax", secure=secure_cookie, max_age=3600)
         return auth_service.context(token)
     except ValueError as e:

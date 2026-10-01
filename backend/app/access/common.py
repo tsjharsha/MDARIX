@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
+from backend.app.access.outbound import address_is_public, host_is_allowlisted, is_allowed_secret_ref, safe_urlopen
 
 from fastapi import HTTPException
 from sqlalchemy import func
@@ -30,10 +30,11 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.access.schemas import CustomerProvisionRequest
 from backend.app.access.authz import _is_platform_admin
+from backend.app.runtime_env import is_development
 
 
 def _development_token(token: str | None) -> str | None:
-    return token if os.getenv("MDARIX_ENV", "development").lower() == "development" else None
+    return token if is_development() else None
 
 
 def _audit_configuration(
@@ -67,32 +68,19 @@ def _safe_provider_url(endpoint: str, path: str, *, timeout: float = 10.0) -> st
     if not 0 < timeout <= 60:
         raise ValueError("CONNECTOR_TIMEOUT_INVALID")
     host = parsed.hostname.lower().rstrip(".")
-    development = os.getenv("MDARIX_ENV", "development").lower() == "development"
-    try:
-        addresses = {ipaddress.ip_address(host)}
-    except ValueError:
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    # Explicitly allowlisted hosts (MDARIX_CONNECTOR_ALLOWED_HOSTS, e.g. local simulators) skip the address check.
+    # Everything else must resolve to public addresses only; the live socket is checked again by safe_urlopen.
+    if not host_is_allowlisted(host, parsed.port):
         try:
-            addresses = {
-                ipaddress.ip_address(item[4][0])
-                for item in socket.getaddrinfo(
-                    host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM
-                )
-            }
-        except OSError as exc:
-            # Local contract tests and simulator stubs may intentionally use
-            # non-DNS names. They are never accepted by staging/production.
-            if not development:
+            addresses = {str(ipaddress.ip_address(host))}
+        except ValueError:
+            try:
+                addresses = {item[4][0] for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)}
+            except OSError as exc:
                 raise ValueError("CONNECTOR_HOST_UNRESOLVABLE") from exc
-            addresses = set()
-    if not development and any(
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        or address.is_reserved
-        or address.is_multicast
-        for address in addresses
-    ):
-        raise ValueError("CONNECTOR_PRIVATE_DESTINATION_BLOCKED")
+        if not addresses or not all(address_is_public(address) for address in addresses):
+            raise ValueError("CONNECTOR_PRIVATE_DESTINATION_BLOCKED")
     safe_path = "/" + str(path or "health").lstrip("/")
     return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", parsed.query, ""))
 
@@ -101,7 +89,8 @@ def _connector_credential(configuration: dict, *, allow_header: bool = True) -> 
     ref = configuration.get("credential_ref")
     if ref is None:
         return None
-    if not isinstance(ref, str) or not ref.replace("_", "").isalnum() or len(ref) > 120:
+    # Only MDARIX_CONNECTOR_SECRET_* names: a connector can never read database, AI, email or session secrets.
+    if not is_allowed_secret_ref(ref):
         raise ValueError("CONNECTOR_CREDENTIAL_REF_INVALID")
     token = os.getenv(ref)
     if token and allow_header:
@@ -339,7 +328,7 @@ def _provider_get(row: ConnectorConfiguration, path_key: str):
     if token:
         headers["Authorization"] = f"Bearer {token}"
     try:
-        with urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
+        with safe_urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
             payload = response.read(1_000_001).decode("utf-8")
             if len(payload) > 1_000_000:
                 return {"status": "FAILED", "reason": "PROVIDER_RESPONSE_TOO_LARGE"}
@@ -367,7 +356,8 @@ def _safe_connector_summary(row: ConnectorConfiguration) -> dict:
         "schema_path": configuration.get("schema_path", "schema"),
         "records_path": configuration.get("records_path"),
         "credential_configured": bool(
-            configuration.get("credential_ref") and os.getenv(str(configuration.get("credential_ref")))
+            is_allowed_secret_ref(configuration.get("credential_ref"))
+            and os.getenv(str(configuration.get("credential_ref")))
         ),
         "credential_ref": configuration.get("credential_ref"),
         "mapping_version": configuration.get("mapping_version"),

@@ -7,7 +7,6 @@ so a failure never leaves a half-built workspace with a live activation link.
 
 from __future__ import annotations
 
-import os
 import re
 import secrets
 import uuid
@@ -34,6 +33,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import OnboardingRequest, SubscriptionLifecycle
 from backend.app.trial.sample_data import seed_sample_workspace
+from backend.app.runtime_env import is_development
 
 FREE_TRIAL_PLAN = "FREE_TRIAL"
 TRIAL_DAYS = 30
@@ -171,7 +171,7 @@ def _send_invitation(db: Session, user: AuthUser, organization: str, admin_id) -
         delivery = "FAILED"
     result = {"email_delivery": delivery}
     # Without working email, a development host shows the link so the admin can pass it on by hand.
-    if delivery != "SENT" and os.getenv("MDARIX_ENV", "development").lower() == "development":
+    if delivery != "SENT" and is_development():
         result["activation_path"] = f"/activate-account?token={token}"
     return result
 

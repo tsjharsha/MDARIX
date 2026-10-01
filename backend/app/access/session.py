@@ -1,6 +1,5 @@
 """Signed-in user context: /me and /session endpoints."""
 
-import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -25,6 +24,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import RoleSwitch, TenantSwitchRequest
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
+from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -232,7 +232,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "allowed_menu": allowed_menu,
         "allowed_actions": base.get("permissions", {}),
         "policy_version": base.get("role_version", "legacy"),
-        "environment": os.getenv("MDARIX_ENV", "development"),
+        "environment": environment(),
     }
 
 

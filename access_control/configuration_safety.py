@@ -1,5 +1,7 @@
 """Safety rules for persisted connector and mapping configuration."""
 
+import re
+
 SENSITIVE_KEY_PARTS = ("password", "token", "secret", "credential", "private_key", "cookie", "authorization")
 
 
@@ -10,7 +12,8 @@ def validate_safe_configuration(value: object, path: str = "configuration") -> N
             # A reference to a managed secret is configuration metadata, not a
             # secret value. The referenced value must never be persisted.
             if normalized in {"credential_ref", "secret_ref", "vault_ref"}:
-                if not isinstance(nested, str) or not nested.replace("_", "").isalnum() or len(nested) > 120:
+                # Only the connector secret namespace may be referenced (see backend/app/access/outbound.py).
+                if not isinstance(nested, str) or not re.match(r"^MDARIX_CONNECTOR_SECRET_[A-Z0-9_]{1,80}$", nested):
                     raise ValueError(f"INVALID_SECRET_REFERENCE:{path}.{key}")
                 continue
             if any(part in normalized for part in SENSITIVE_KEY_PARTS):

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
+from backend.app.access.outbound import safe_urlopen
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -51,6 +51,14 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
     try:
         configuration = safe_configuration(payload.configuration)
     except ValueError as exc:
+        if str(exc).startswith("INVALID_SECRET_REFERENCE"):
+            raise HTTPException(
+                422,
+                detail={
+                    "code": "CONNECTOR_CREDENTIAL_REF_INVALID",
+                    "message": "A credential reference must name a connector secret (MDARIX_CONNECTOR_SECRET_...)",
+                },
+            ) from exc
         raise HTTPException(
             422,
             detail={
@@ -499,7 +507,7 @@ def execute_connector(
             headers["Authorization"] = f"Bearer {token}"
             headers["X-Provider-Token"] = token
         try:
-            with urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
+            with safe_urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
                 raw = response.read(5_000_001)
                 if len(raw) > 5_000_000:
                     raise HTTPException(

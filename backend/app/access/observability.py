@@ -3,7 +3,6 @@
 import csv
 import io
 import json
-import os
 import zipfile
 from datetime import datetime, timedelta, timezone
 
@@ -30,6 +29,7 @@ from backend.app.db.models.stage2 import (
 )
 from backend.app.db.session import get_db
 from backend.app.access.authz import _admin_detail_tenant, _admin_tenant, _require_platform_admin
+from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -323,7 +323,7 @@ def tenant_dashboard(request: Request, db: Session = Depends(get_db)):
         "tenant": {
             "id": str(tenant_id),
             "name": admin.company or admin.display_name or "Authenticated tenant",
-            "environment": os.getenv("MDARIX_ENV", "development"),
+            "environment": environment(),
         },
         "metrics": {
             "users": users,

@@ -1,6 +1,5 @@
 """Authenticated, non-chat Ask MDARIX control-plane endpoint."""
 
-import os
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -37,6 +36,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
+from backend.app.runtime_env import is_production_like
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"
@@ -62,7 +62,7 @@ class AskRequest(BaseModel):
 
 
 def _authenticated_context(request: Request, db: Session | None = None) -> dict:
-    if db is not None and os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}:
+    if db is not None and is_production_like():
         ctx = get_request_context(request, db)
         return {
             "user_id": ctx.user_id,
@@ -217,11 +217,7 @@ def ask(
     db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_plane_db),
 ) -> dict:
-    context = (
-        _authenticated_context(request, db)
-        if os.getenv("MDARIX_ENV", "development").lower() in {"production", "staging"}
-        else _authenticated_context(request)
-    )
+    context = _authenticated_context(request, db) if is_production_like() else _authenticated_context(request)
     correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
     tenant = db.query(Tenant).filter(Tenant.id == context["tenant_id"]).first()
     if tenant is None or str(tenant.status).lower() not in {"active", "enabled"}:

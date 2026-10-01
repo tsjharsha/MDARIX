@@ -1,6 +1,5 @@
 """Authorization helpers for the access API: authenticated user, administrator and platform-administrator checks."""
 
-import os
 import uuid
 
 from fastapi import HTTPException, Request
@@ -10,6 +9,7 @@ from backend.app.db.models.foundation import (
     AuthUser,
 )
 from backend.app.request_context import get_request_context
+from backend.app.runtime_env import is_development
 
 
 def _require_administrator(request: Request, db: Session) -> AuthUser:
@@ -94,7 +94,7 @@ def _authenticated_user(request: Request, db: Session) -> AuthUser:
         )
     except (ValueError, TypeError):
         user = None
-    if user is None and os.getenv("MDARIX_ENV", "development").lower() == "development":
+    if user is None and is_development():
         user = (
             db.query(AuthUser)
             .filter(AuthUser.username == context.user_id.lower(), AuthUser.tenant_id == context.tenant_id)
