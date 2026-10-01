@@ -8,7 +8,9 @@ from ai.execution import record_ai_execution
 from backend.app.db.models.foundation import AIExecution
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceError, InvestigationWorkspaceService
+from backend.app.db.models.evidence_intelligence import EvidenceChunk
 from investigator.grounding import GroundingValidator
+from investigator.model_provider import ModelAnalysisUnavailable, ModelInvestigatorProvider
 from investigator.provider import (
     MODEL,
     MODEL_VERSION,
@@ -39,10 +41,12 @@ class EvidenceGroundedInvestigatorService:
         workspace_service: InvestigationWorkspaceService | None = None,
         provider: ControlledInvestigatorProvider | None = None,
         grounding_validator: GroundingValidator | None = None,
+        model_provider: ModelInvestigatorProvider | None = None,
     ) -> None:
         self.workspace_service = workspace_service or InvestigationWorkspaceService()
         self.provider = provider or ControlledInvestigatorProvider()
         self.grounding_validator = grounding_validator or GroundingValidator()
+        self.model_provider = model_provider or ModelInvestigatorProvider()
 
     def analyze(self, db: Session, request: InvestigationAnalysisRequest) -> InvestigationAnalysisResponse:
         if request.tenant_id is None:
@@ -72,22 +76,27 @@ class EvidenceGroundedInvestigatorService:
             investigator_question=request.investigator_question,
             analysis_mode=request.analysis_mode,
         )
+        analysis = self._with_model_analysis(db, request, workspace, analysis)
         analysis = self._validate_analysis(analysis)
-        from genai.grounding import advisory, build_authorized_context
+        if analysis.analysis_author == "LANGUAGE_MODEL":
+            # The model already wrote the analysis from the evidence; a second advisory call adds nothing.
+            ai_advisory = {"status": "NOT_NEEDED", "reason": "The language model wrote this analysis."}
+        else:
+            from genai.grounding import advisory, build_authorized_context
 
-        grounded = build_authorized_context(
-            db,
-            tenant_id=request.tenant_id,
-            investigation_id=request.investigation_id,
-            temporal_mode=request.temporal_mode,
-            as_of=request.as_of,
-        )
-        ai_advisory = advisory(
-            workflow="INVESTIGATION_SYNTHESIS",
-            deterministic_result=analysis.model_dump(mode="json"),
-            grounded_context=grounded,
-            question=request.investigator_question,
-        )
+            grounded = build_authorized_context(
+                db,
+                tenant_id=request.tenant_id,
+                investigation_id=request.investigation_id,
+                temporal_mode=request.temporal_mode,
+                as_of=request.as_of,
+            )
+            ai_advisory = advisory(
+                workflow="INVESTIGATION_SYNTHESIS",
+                deterministic_result=analysis.model_dump(mode="json"),
+                grounded_context=grounded,
+                question=request.investigator_question,
+            )
         analysis = analysis.model_copy(
             update={"model_provenance": {**analysis.model_provenance, "live_provider_advisory": ai_advisory}}
         )
@@ -100,9 +109,11 @@ class EvidenceGroundedInvestigatorService:
                 tenant_id=request.tenant_id,
                 investigation_id=request.investigation_id,
                 provider=PROVIDER,
-                model_name=MODEL,
-                model_version=MODEL_VERSION,
-                prompt_template_version=PROMPT_TEMPLATE_VERSION,
+                model_name=analysis.model_provenance.get("model_analysis", {}).get("model", MODEL),
+                model_version=analysis.model_provenance.get("model_analysis", {}).get("model_version", MODEL_VERSION),
+                prompt_template_version=analysis.model_provenance.get("model_analysis", {}).get(
+                    "prompt_template_version", PROMPT_TEMPLATE_VERSION
+                ),
                 orchestration_version=ORCHESTRATION_VERSION,
                 context_refs={
                     "context_snapshot_id": analysis.context_snapshot_id,
@@ -183,6 +194,60 @@ class EvidenceGroundedInvestigatorService:
                 return InvestigationAnalysisResponse(analysis=analysis, persisted=True, ai_execution_id=row.id)
         raise InvestigatorError("ANALYSIS_NOT_FOUND", "Investigation analysis not found")
 
+    def _with_model_analysis(
+        self, db: Session, request: InvestigationAnalysisRequest, workspace, rules: InvestigationAnalysis
+    ) -> InvestigationAnalysis:
+        """Let the language model write the evidence sections; keep the rule analysis if it cannot.
+
+        Product changes, timeline, graph relationships, workspace limitations and guardrail limitations always come
+        from the rules (they are facts of the record, not interpretation).
+        """
+        chunk_ids = [
+            uuid.UUID(str(chunk["chunk_id"]))
+            for evidence in workspace.evidence_context
+            for chunk in evidence.get("chunks", [])
+            if chunk.get("chunk_id")
+        ]
+        chunk_texts = {}
+        if chunk_ids:
+            rows = (
+                db.query(EvidenceChunk.id, EvidenceChunk.text_content)
+                .filter(EvidenceChunk.tenant_id == request.tenant_id, EvidenceChunk.id.in_(chunk_ids))
+                .all()
+            )
+            chunk_texts = {str(row.id): row.text_content or "" for row in rows}
+        try:
+            model = self.model_provider.analyze(workspace, chunk_texts, request.investigator_question)
+        except ModelAnalysisUnavailable as exc:
+            return rules.model_copy(
+                update={
+                    "analysis_author": "RULES",
+                    "model_provenance": {
+                        **rules.model_provenance,
+                        "analysis_author": "RULES",
+                        "fallback_reason": exc.reason,
+                        "model_attempt": exc.detail,
+                    },
+                }
+            )
+        return rules.model_copy(
+            update={
+                "analysis_author": "LANGUAGE_MODEL",
+                "summary": model.summary,
+                "observations": model.sections["observations"],
+                "possible_explanations": model.sections["possible_explanations"],
+                "contradictions": model.sections["contradictions"],
+                "missing_information": rules.missing_information + model.sections["missing_information"],
+                "questions_to_investigate": model.sections["questions_to_investigate"],
+                "model_provenance": {
+                    **rules.model_provenance,
+                    "analysis_author": "LANGUAGE_MODEL",
+                    "model_analysis": model.provenance,
+                    "checks_dropped": model.dropped,
+                },
+            }
+        )
+
     def _validate_analysis(self, analysis: InvestigationAnalysis) -> InvestigationAnalysis:
         accepted, rejected, summary = self.grounding_validator.validate_items(analysis.accepted_items())
         grouped = self._regroup(accepted)
@@ -215,6 +280,7 @@ class EvidenceGroundedInvestigatorService:
                     "evidence_source_anchor_coverage": evidence_coverage,
                     "invented_evidence_count": len(rejected),
                     "unsupported_causal_conclusions": self._unsupported_causal_conclusions(accepted),
+                    "model_statements_dropped_by_checks": len(analysis.model_provenance.get("checks_dropped", [])),
                     "validated_at": datetime.now(timezone.utc).isoformat(),
                 },
             }

@@ -116,10 +116,19 @@ class GenAIProvider:
             "hidden_chain_of_thought_persisted": False,
         }
 
-    def complete(self, prompt: str, context: dict | None = None) -> GenAIResult:
+    def complete(
+        self,
+        prompt: str,
+        context: dict | None = None,
+        *,
+        system: str | None = None,
+        json_output: bool = False,
+        max_output_tokens: int | None = None,
+    ) -> GenAIResult:
+        """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request."""
         safe_prompt = SENSITIVE.sub(lambda m: m.group(1) + ": [REDACTED]", prompt)
         safe_context = redact_context(context or {})
-        input_tokens = max(1, (len(safe_prompt) + len(json.dumps(safe_context, default=str))) // 4)
+        input_tokens = max(1, (len(safe_prompt) + len(json.dumps(safe_context, default=str)) + len(system or "")) // 4)
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
         started = time.monotonic()
@@ -141,21 +150,22 @@ class GenAIProvider:
                 int((time.monotonic() - started) * 1000),
             )
         if self.provider_name in {"groq", "ollama"}:
-            payload = json.dumps(
-                {
-                    "model": self.model,
-                    "messages": [
-                        {
-                            "role": "user",
-                            "content": safe_prompt
-                            + "\n\nAuthorized context:\n"
-                            + json.dumps(safe_context, default=str),
-                        }
-                    ],
-                    "max_tokens": self.max_output,
-                    "temperature": 0,
-                }
-            ).encode()
+            body = {
+                "model": self.model,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": safe_prompt + "\n\nAuthorized context:\n" + json.dumps(safe_context, default=str),
+                    }
+                ],
+                "max_tokens": max_output_tokens or self.max_output,
+                "temperature": 0,
+            }
+            if system:
+                body["messages"].insert(0, {"role": "system", "content": system})
+            if json_output:
+                body["response_format"] = {"type": "json_object"}
+            payload = json.dumps(body).encode()
         else:
             payload = json.dumps(
                 {"model": self.model, "prompt": safe_prompt, "context": safe_context, "max_tokens": self.max_output}
@@ -210,5 +220,13 @@ class GenAIProvider:
                     status,
                     type(exc).__name__,
                 )
-                time.sleep(min(2**attempt, 4))
+                wait = min(2**attempt, 4)
+                if status == 429 and attempt < self.retries:
+                    # Rate limited: wait as long as the provider asks, within a cap that keeps requests responsive.
+                    try:
+                        asked = float(exc.headers.get("retry-after") or 0)
+                    except (TypeError, ValueError):
+                        asked = 0.0
+                    wait = max(wait, min(asked, float(os.getenv("MDARIX_GENAI_MAX_RETRY_WAIT_SECONDS", "10"))))
+                time.sleep(wait)
         raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: {type(error).__name__}")

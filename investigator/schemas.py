@@ -74,6 +74,9 @@ class InvestigationAnalysis(BaseModel):
     context_snapshot_version: str
     ai_execution_id: uuid.UUID | None = None
     status: AnalysisStatus
+    # Who wrote the analysis: the language model (checked by MDARIX rules) or the rules alone (fallback).
+    analysis_author: Literal["LANGUAGE_MODEL", "RULES"] = "RULES"
+    summary: str | None = None
     observations: list[AnalysisItem] = Field(default_factory=list)
     relevant_changes: list[AnalysisItem] = Field(default_factory=list)
     temporal_patterns: list[AnalysisItem] = Field(default_factory=list)

@@ -455,6 +455,7 @@ def ask(
                 .filter(
                     Hypothesis.tenant_id == UUID(context["tenant_id"]),
                     Hypothesis.investigation_id == investigation_id,
+                    Hypothesis.status != "superseded",  # replaced by a newer model-written set
                 )
                 .all()
             )
@@ -464,6 +465,7 @@ def ask(
                 .filter(
                     Unknown.tenant_id == UUID(context["tenant_id"]),
                     Unknown.investigation_id == investigation_id,
+                    Unknown.status != "superseded",
                 )
                 .all()
             )

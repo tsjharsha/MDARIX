@@ -91,10 +91,14 @@ class BriefService:
         hypotheses = (
             db.query(Hypothesis)
             .filter(Hypothesis.tenant_id == tenant_id, Hypothesis.investigation_id == investigation_id)
+            .filter(Hypothesis.status != "superseded")  # replaced by a newer model-written set
             .all()
         )
         unknowns = (
-            db.query(Unknown).filter(Unknown.tenant_id == tenant_id, Unknown.investigation_id == investigation_id).all()
+            db.query(Unknown)
+            .filter(Unknown.tenant_id == tenant_id, Unknown.investigation_id == investigation_id)
+            .filter(Unknown.status != "superseded")
+            .all()
         )
         chains = (
             db.query(FailureChain)
