@@ -14,6 +14,15 @@ from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from regulatory_intelligence.service import RegulatoryDraftService
 from regulatory_intelligence.estar import generate_estar_package
+from backend.app.access.permissions import (
+    AI_RUN,
+    DATA_EXPORT,
+    RECORDS_WRITE,
+    REGULATORY_APPROVE,
+    effective_role,
+    permissions_for_role,
+    require_permission,
+)
 
 router = APIRouter(prefix="/api/v1/regulatory", tags=["Regulatory Intelligence"])
 
@@ -39,7 +48,7 @@ def _hash_content(content: dict, citations: list[dict]) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-@router.post("/draft")
+@router.post("/draft", dependencies=[Depends(require_permission(AI_RUN))])
 def generate_regulatory_draft(
     payload: RegulatoryDraftRequest,
     db: Session = Depends(get_db),
@@ -242,6 +251,24 @@ def update_regulatory_status(
                 "message": f"Cannot transition from {document.status} to {payload.status}",
             },
         )
+    # Approval needs the regulatory-approval permission and a different person from the author (segregation of
+    # duties); every other transition needs permission to change records.
+    granted = permissions_for_role(effective_role(db, ctx))
+    needed = REGULATORY_APPROVE if payload.status == "APPROVED" else RECORDS_WRITE
+    if needed not in granted:
+        raise HTTPException(
+            403,
+            detail={
+                "code": "PERMISSION_DENIED",
+                "message": "Your role does not allow this action",
+                "permission": needed,
+            },
+        )
+    if payload.status == "APPROVED" and str(document.created_by or "") == str(ctx.user_id):
+        raise HTTPException(
+            403,
+            detail={"code": "SOD_DENIED", "message": "The author of a regulatory document cannot also approve it"},
+        )
     now = datetime.now(timezone.utc)
     previous = document.status
     document.status = payload.status
@@ -267,7 +294,7 @@ def update_regulatory_status(
     return {"id": str(document.id), "status": document.status, "lock_version": document.lock_version}
 
 
-@router.get("/documents/{document_id}/estar")
+@router.get("/documents/{document_id}/estar", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def download_estar_preparation(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),

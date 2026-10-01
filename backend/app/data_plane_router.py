@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
+from backend.app.access.permissions import DATA_EXPORT, require_permission
 
 router = APIRouter(prefix="/api/v1/data-plane", tags=["Tenant Data Plane"])
 
@@ -72,7 +73,7 @@ def search(
     return {"tenant_id": ctx.tenant_id, "records": result[:limit]}
 
 
-@router.get("/export.csv")
+@router.get("/export.csv", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def export_csv(deps=Depends(_deps)):
     ctx, db = deps
     records = _rows(db, "products", ctx.tenant_id, 5000)

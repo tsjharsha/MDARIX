@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from integration.gateway import ConnectionConfig, MappingDefinition, preview
+from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/integrations", tags=["Integration Gateway"])
 
@@ -19,7 +20,7 @@ class PreviewRequest(BaseModel):
     rules: dict
 
 
-@router.post("/preview")
+@router.post("/preview", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def mapping_preview(request: PreviewRequest, ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     config = ConnectionConfig(
         ctx.tenant_id, request.connection_id, "preview", request.connector_type, request.source_system_type

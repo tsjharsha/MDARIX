@@ -32,6 +32,7 @@ from backend.app.request_context import AuthenticatedRequestContext, get_request
 from communication.email.inbound import classify_inbound_event, verify_webhook
 from communication.email.service import EmailService
 from object_storage.service import ObjectStorageService
+from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/stage3", tags=["Stage 3 Workflow"])
 NOW = lambda: datetime.now(timezone.utc)
@@ -81,7 +82,7 @@ TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
 
 
-@router.post("/interactions")
+@router.post("/interactions", dependencies=[Depends(require_permission(AI_RUN))])
 def create_interaction(
     payload: InteractionRequest,
     db: Session = Depends(get_data_plane_db),
@@ -257,7 +258,7 @@ def list_interactions(
     ]
 
 
-@router.post("/supplier-evidence-requests")
+@router.post("/supplier-evidence-requests", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def request_supplier_evidence(
     payload: SupplierEvidenceRequestPayload,
     db: Session = Depends(get_data_plane_db),
@@ -328,7 +329,9 @@ def list_supplier_evidence_requests(
     ]
 
 
-@router.post("/supplier-evidence-requests/{request_id}/attachments")
+@router.post(
+    "/supplier-evidence-requests/{request_id}/attachments", dependencies=[Depends(require_permission(RECORDS_WRITE))]
+)
 async def upload_supplier_attachment(
     request_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -537,7 +540,7 @@ def stage3_genai_health(ctx: AuthenticatedRequestContext = Depends(get_request_c
     return {"tenant_id": ctx.tenant_id, **GenAIProvider().health()}
 
 
-@router.post("/reports/{report_code}")
+@router.post("/reports/{report_code}", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def generate_report(
     report_code: str,
     output_format: str = "JSON",
@@ -708,7 +711,7 @@ def compliance_report(
     )
 
 
-@router.post("/reports/{report_code}/jobs")
+@router.post("/reports/{report_code}/jobs", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def queue_report(
     report_code: str,
     output_format: str = "PDF",
@@ -764,7 +767,7 @@ def report_job(
     return {key: value for key, value in job.items() if key not in {"context", "hidden_fields"}}
 
 
-@router.get("/reports/jobs/{job_id}/download")
+@router.get("/reports/jobs/{job_id}/download", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def download_report(
     job_id: uuid.UUID,
     db: Session = Depends(get_db),

@@ -187,16 +187,17 @@ def test_decision_author_is_the_signed_in_user_not_a_name_in_the_request(org, mo
         raise DecisionCenterError("CAPTURED", "stop after capturing the request")
 
     monkeypatch.setattr(decision_router.service, "create_decision", fake_create)
-    response = org["clients"]["viewer"].post(
-        f"/api/v1/investigations/{org['investigation']}/decisions",
-        json={
-            "selected_action": decision_router.OPTIONS[0],
-            "rationale": "Spoofing attempt",
-            "authorized_by_ref": "qa-director@elsewhere",
-        },
-    )
+    attempt = {
+        "selected_action": decision_router.OPTIONS[0],
+        "rationale": "Spoofing attempt",
+        "authorized_by_ref": "qa-director@elsewhere",
+    }
+    # A read-only Viewer may not create decisions at all.
+    refused = org["clients"]["viewer"].post(f"/api/v1/investigations/{org['investigation']}/decisions", json=attempt)
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "PERMISSION_DENIED"
+    response = org["clients"]["approver"].post(f"/api/v1/investigations/{org['investigation']}/decisions", json=attempt)
     assert response.status_code == 400
-    assert captured["author"] == org["ids"]["viewer"]
+    assert captured["author"] == org["ids"]["approver"]
 
 
 def test_a_viewer_cannot_approve_through_a_review_or_a_signature(org):

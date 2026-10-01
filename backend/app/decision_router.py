@@ -13,6 +13,7 @@ from decision_center.schemas import (
     ReviewCreateRequest,
 )
 from decision_center.service import OPTIONS, DecisionCenterError, DecisionCenterService
+from backend.app.access.permissions import AI_RUN, RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Decision Center"])
 service = DecisionCenterService()
@@ -92,7 +93,7 @@ def decision_context(
         raise error(exc) from exc
 
 
-@router.post("/{investigation_id}/decision-advisory")
+@router.post("/{investigation_id}/decision-advisory", dependencies=[Depends(require_permission(AI_RUN))])
 def decision_advisory(
     investigation_id: uuid.UUID,
     request: AdvisoryRequest,
@@ -105,7 +106,7 @@ def decision_advisory(
         raise error(exc) from exc
 
 
-@router.post("/{investigation_id}/decisions")
+@router.post("/{investigation_id}/decisions", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def create_decision(
     investigation_id: uuid.UUID,
     request: DecisionCreateRequest,

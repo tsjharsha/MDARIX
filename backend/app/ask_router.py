@@ -37,6 +37,7 @@ from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
 from backend.app.runtime_env import is_production_like
+from backend.app.access.permissions import AI_RUN, effective_role, permissions_for_role
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"
@@ -218,6 +219,17 @@ def ask(
     data_db: Session = Depends(get_data_plane_db),
 ) -> dict:
     context = _authenticated_context(request, db) if is_production_like() else _authenticated_context(request)
+    # Ask resolves its own session, so its AI permission is checked here with the server-trusted role.
+    role = effective_role(db, get_request_context(request, db)) if is_production_like() else context.get("active_role")
+    if AI_RUN not in permissions_for_role(role):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "PERMISSION_DENIED",
+                "message": "Your role does not allow this action",
+                "permission": AI_RUN,
+            },
+        )
     correlation_id = request.headers.get("X-Correlation-ID") or str(uuid4())
     tenant = db.query(Tenant).filter(Tenant.id == context["tenant_id"]).first()
     if tenant is None or str(tenant.status).lower() not in {"active", "enabled"}:

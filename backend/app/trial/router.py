@@ -33,6 +33,7 @@ from backend.app.trial.service import (
     serialize_request,
     trial_subscription,
 )
+from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1", tags=["Free trial"])
 
@@ -169,7 +170,7 @@ async def _body(request: Request) -> bytes:
     return raw
 
 
-@router.post("/trial/imports/{entity}/check")
+@router.post("/trial/imports/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 async def check_trial_import(
     entity: str,
     request: Request,
@@ -181,7 +182,7 @@ async def check_trial_import(
     return imports.check_file(data, uuid.UUID(str(ctx.tenant_id)), entity, await _body(request))
 
 
-@router.post("/trial/imports/{entity}")
+@router.post("/trial/imports/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 async def run_trial_import(
     entity: str,
     request: Request,

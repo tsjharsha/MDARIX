@@ -7,12 +7,13 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from retrieval.schemas import RetrievalRequest, RetrievalResponse
 from retrieval.service import RetrievalError, TrustedRetrievalService
+from backend.app.access.permissions import AI_RUN, RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/retrieval", tags=["Trusted Evidence Retrieval"])
 service = TrustedRetrievalService()
 
 
-@router.post("/index")
+@router.post("/index", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def index_evidence_chunks(
     reprocess: bool = Query(False),
     db: Session = Depends(get_data_plane_db),
@@ -22,7 +23,7 @@ def index_evidence_chunks(
     return service.index_evidence_chunks(db, tenant_id, reprocess=reprocess)
 
 
-@router.post("/query", response_model=RetrievalResponse)
+@router.post("/query", response_model=RetrievalResponse, dependencies=[Depends(require_permission(AI_RUN))])
 def query_retrieval(
     request: RetrievalRequest,
     db: Session = Depends(get_data_plane_db),

@@ -8,6 +8,7 @@ from backend.app.db.models.foundation import Evidence
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from evidence.services.evidence_service import EvidenceIntelligenceService
+from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/evidence", tags=["Evidence Intelligence"])
 service = EvidenceIntelligenceService()
@@ -166,7 +167,7 @@ def get_evidence_related_entities(
     }
 
 
-@router.post("/{evidence_id}/process")
+@router.post("/{evidence_id}/process", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def process_evidence_intelligence(
     evidence_id: str,
     request: Request,

@@ -9,6 +9,7 @@ from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from .schemas import ScenarioRequest, ScenarioResponse
 from .service import ScenarioError, ScenarioService
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Day 32 Scenario Intelligence"])
 service = ScenarioService()
@@ -21,7 +22,9 @@ def _context(request: Request) -> dict:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}) from exc
 
 
-@router.post("/{investigation_id}/scenarios", response_model=ScenarioResponse)
+@router.post(
+    "/{investigation_id}/scenarios", response_model=ScenarioResponse, dependencies=[Depends(require_permission(AI_RUN))]
+)
 def execute_scenario(
     investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_data_plane_db)
 ):

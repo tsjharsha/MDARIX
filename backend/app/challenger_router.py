@@ -10,6 +10,7 @@ from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from challenger.schemas import ChallengeRequest, ChallengeResponse
 from challenger.service import ChallengerError, ChallengerService
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["AI Challenger"])
 service = ChallengerService()
@@ -33,7 +34,11 @@ def _authorize_investigation(db: Session, tenant_id: uuid.UUID, investigation_id
         )
 
 
-@router.post("/{investigation_id}/challenges", response_model=ChallengeResponse)
+@router.post(
+    "/{investigation_id}/challenges",
+    response_model=ChallengeResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def create_challenges(
     investigation_id: uuid.UUID,
     request: Request,

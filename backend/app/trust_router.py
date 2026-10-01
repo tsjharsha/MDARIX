@@ -7,6 +7,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from trust_engine.schemas import AssuranceRequest, AssuranceResponse
 from trust_engine.service import TrustEngine, TrustError
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1", tags=["AI Trust Assurance"])
 service = TrustEngine()
@@ -18,7 +19,11 @@ def fail(e):
     )
 
 
-@router.post("/ai-executions/{execution_id}/assurance", response_model=AssuranceResponse)
+@router.post(
+    "/ai-executions/{execution_id}/assurance",
+    response_model=AssuranceResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def assure(
     execution_id: uuid.UUID,
     request: AssuranceRequest,

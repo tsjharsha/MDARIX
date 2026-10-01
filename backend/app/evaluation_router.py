@@ -9,6 +9,7 @@ from backend.app.db.models.foundation import EvaluationRun, ReleaseAssuranceResu
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from evaluation.harness import configuration_snapshot, run_golden_suite
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/evaluations", tags=["Golden Evaluation"])
 
@@ -19,7 +20,7 @@ class EvaluationRequest(BaseModel):
     prompt_version: str = "R1-controlled-v1"
 
 
-@router.post("/runs")
+@router.post("/runs", dependencies=[Depends(require_permission(AI_RUN))])
 def run_evaluation(
     request: EvaluationRequest,
     db: Session = Depends(get_data_plane_db),

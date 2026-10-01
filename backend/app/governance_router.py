@@ -26,6 +26,7 @@ from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import change_diff
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/governance", tags=["Enterprise Governance"])
 FEATURE = "DECISION_CENTER_SIGNATURES"
@@ -461,7 +462,7 @@ def sign(
     }
 
 
-@router.post("/decisions/{decision_id}/material-change")
+@router.post("/decisions/{decision_id}/material-change", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def material_change(
     decision_id: uuid.UUID,
     payload: MaterialChangeRequest,

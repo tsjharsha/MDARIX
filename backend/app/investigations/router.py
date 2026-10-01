@@ -21,6 +21,7 @@ from investigator.schemas import (
     InvestigationAnalysisResponse,
 )
 from investigator.service import EvidenceGroundedInvestigatorService, InvestigatorError
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Workspace"])
 service = InvestigationWorkspaceService()
@@ -68,7 +69,11 @@ def get_investigation_workspace(
         raise workspace_error(exc) from exc
 
 
-@router.post("/{investigation_id}/analysis", response_model=InvestigationAnalysisResponse)
+@router.post(
+    "/{investigation_id}/analysis",
+    response_model=InvestigationAnalysisResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def create_investigation_analysis(
     investigation_id: uuid.UUID,
     request: InvestigationAnalysisRequest,
@@ -112,7 +117,11 @@ def get_investigation_analysis(
         raise investigator_error(exc) from exc
 
 
-@router.post("/{investigation_id}/hypotheses", response_model=HypothesisSetResponse)
+@router.post(
+    "/{investigation_id}/hypotheses",
+    response_model=HypothesisSetResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def create_hypotheses(
     investigation_id: uuid.UUID,
     request: HypothesisSetRequest,

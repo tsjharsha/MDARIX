@@ -7,6 +7,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from briefs.schemas import BriefCreateRequest, BriefListResponse, BriefResponse
 from briefs.service import BriefError, BriefService
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Brief"])
 service = BriefService()
@@ -18,7 +19,9 @@ def err(exc: BriefError):
     )
 
 
-@router.post("/{investigation_id}/briefs", response_model=BriefResponse)
+@router.post(
+    "/{investigation_id}/briefs", response_model=BriefResponse, dependencies=[Depends(require_permission(AI_RUN))]
+)
 def generate_brief(
     investigation_id: uuid.UUID,
     request: BriefCreateRequest,

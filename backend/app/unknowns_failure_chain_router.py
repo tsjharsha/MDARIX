@@ -19,6 +19,7 @@ from failure_chain.schemas import (
 from unknowns.engine import ORCHESTRATION_VERSION as U_VERSION
 from unknowns.engine import PROVIDER as U_PROVIDER
 from unknowns.schemas import UnknownRequest, UnknownResponse, UnknownSet
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Unknowns and Failure Chains"])
 service = UnknownsFailureChainService()
@@ -40,7 +41,9 @@ def _authorize_investigation(db: Session, tenant_id: uuid.UUID, investigation_id
         )
 
 
-@router.post("/{investigation_id}/unknowns", response_model=UnknownResponse)
+@router.post(
+    "/{investigation_id}/unknowns", response_model=UnknownResponse, dependencies=[Depends(require_permission(AI_RUN))]
+)
 def create_unknowns(
     investigation_id: uuid.UUID,
     request: Request,
@@ -70,7 +73,11 @@ def latest_unknowns(
     return UnknownResponse(unknown_set=result, persisted=True, ai_execution_id=row)
 
 
-@router.post("/{investigation_id}/failure-chains", response_model=FailureChainResponse)
+@router.post(
+    "/{investigation_id}/failure-chains",
+    response_model=FailureChainResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def create_chains(
     investigation_id: uuid.UUID,
     request: Request,

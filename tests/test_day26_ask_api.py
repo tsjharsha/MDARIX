@@ -20,7 +20,7 @@ def test_ask_uses_server_context_and_ignores_client_authority(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Viewer"},
+        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     tenant = SimpleNamespace(id=tenant_id, status="active")
 
@@ -65,7 +65,7 @@ def test_ask_uses_server_context_and_ignores_client_authority(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["tenant_id"] == str(tenant_id)
-    assert body["active_role"] == "Viewer"
+    assert body["active_role"] == "Investigator"
     assert body["correlation_id"] == "corr-1"
 
 
@@ -77,7 +77,7 @@ def test_missing_server_entitlement_is_denied(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Viewer"},
+        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     tenant = SimpleNamespace(id=tenant_id, status="active")
 
@@ -119,7 +119,7 @@ def test_unexpected_ask_dependency_error_is_customer_safe(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Viewer"},
+        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     monkeypatch.setattr(
         "backend.app.ask_router._has_ask_entitlement",
@@ -198,3 +198,18 @@ def test_signin_uses_persisted_auth_user_after_service_restart(monkeypatch):
     )
     assert result["tenant_id"] == str(row.tenant_id)
     assert response.headers.get("set-cookie", "").startswith("mdarix_session=")
+
+
+def test_a_viewer_may_not_run_ask(monkeypatch):
+    """Ask sends tenant records to the AI provider, so read-only Viewers are refused."""
+    monkeypatch.setattr(
+        "backend.app.ask_router._authenticated_context",
+        lambda request: {"user_id": "u1", "tenant_id": str(uuid4()), "active_role": "Viewer"},
+    )
+    app.dependency_overrides[get_db] = lambda: SimpleNamespace()
+    app.dependency_overrides[get_data_plane_db] = lambda: SimpleNamespace()
+    try:
+        response = TestClient(app).post("/api/v1/ask/", json={"question": "What changed?"})
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 403 and response.json()["detail"]["code"] == "PERMISSION_DENIED"

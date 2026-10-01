@@ -7,6 +7,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from .schemas import CounterfactualRequest, CounterfactualResponse
 from .service import CounterfactualError, CounterfactualService
+from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Day 16 Counterfactual"])
 service = CounterfactualService()
@@ -22,7 +23,11 @@ def payload(item) -> CounterfactualResponse:
     )
 
 
-@router.post("/{investigation_id}/counterfactuals", response_model=CounterfactualResponse)
+@router.post(
+    "/{investigation_id}/counterfactuals",
+    response_model=CounterfactualResponse,
+    dependencies=[Depends(require_permission(AI_RUN))],
+)
 def create_counterfactual(
     investigation_id: uuid.UUID,
     request: CounterfactualRequest,
