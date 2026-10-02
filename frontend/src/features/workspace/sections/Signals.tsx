@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
-import { dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
+import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
 import { Tabs, listOf, useResource } from "../../customer-admin/shared";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable } from "./common";
@@ -52,17 +52,25 @@ function Trends() {
     const severity: Slice[] = [...bySeverity.entries()]
       .map(([label, count]) => ({ key: label, label, count, tone: "neutral" as const }))
       .sort((a, b) => b.count - a.count);
+    const timestamps = rows.map((row) => row.event_timestamp);
+    const span = chartWindowEnd(timestamps, 30);
     return {
       severity,
-      trend: dailyCounts(
-        rows.map((row) => row.event_timestamp),
-        30,
-      ),
+      trend: dailyCounts(timestamps, 30, span.end),
+      // Older data: show the 30 days up to the latest signal, and say so in the title.
+      title: span.shifted
+        ? `Signals by event date · 30 days to ${span.end.toLocaleDateString(undefined, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+            timeZone: "UTC",
+          })} (latest signal)`
+        : "Signals by event date · last 30 days",
     };
   }, [signals.data]);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Signals" title="Signals by event date · last 30 days" state={signals.state} error={signals.error}>
+      <Panel eyebrow="Signals" title={model.title} state={signals.state} error={signals.error}>
         <ColumnChart data={model.trend} unit="signals" caption="latest 100 recorded signals" />
       </Panel>
       <Panel eyebrow="Signals" title="By recorded severity" state={signals.state} error={signals.error}>

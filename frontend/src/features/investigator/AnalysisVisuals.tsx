@@ -253,8 +253,8 @@ export function HypothesisBoard({ set }: { set: HypothesisSet }) {
                 <details>
                   <summary>How to rule it out ({hypothesis.falsification_conditions.length})</summary>
                   <ul>
-                    {hypothesis.falsification_conditions.slice(0, 4).map((item) => (
-                      <li key={item}>{item}</li>
+                    {hypothesis.falsification_conditions.slice(0, 4).map((item, index) => (
+                      <li key={`${index}-${item}`}>{item}</li>
                     ))}
                   </ul>
                 </details>
@@ -409,8 +409,8 @@ export function BriefVisual({ brief }: { brief: InvestigationBrief }) {
           <section className="av-card av-tone-info">
             <h4>What we know</h4>
             <ul className="av-statements">
-              {known.map((text) => (
-                <li key={text}>{text}</li>
+              {known.map((text, index) => (
+                <li key={`${index}-${text}`}>{text}</li>
               ))}
             </ul>
           </section>

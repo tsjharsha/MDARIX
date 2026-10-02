@@ -103,6 +103,22 @@ export function planMix(customers: CustomerRow[]): Slice[] {
 const dayKey = (date: Date) => date.toISOString().slice(0, 10);
 
 /** Counts per calendar day (UTC) for the `days` days ending on `today`, oldest first; empty days are zero. */
+/** The day a daily chart should end on: today, or the latest event when nothing happened in the window
+ * (an older data set would otherwise show an empty chart). Without valid dates it is today. */
+export function chartWindowEnd(
+  timestamps: Array<string | null | undefined>,
+  days: number,
+  today = new Date(),
+): { end: Date; shifted: boolean } {
+  const times = timestamps
+    .map((value) => (value ? new Date(value).getTime() : Number.NaN))
+    .filter((value) => !Number.isNaN(value));
+  if (!times.length) return { end: today, shifted: false };
+  const latest = Math.max(...times);
+  const windowStart = today.getTime() - days * 86_400_000;
+  return latest < windowStart ? { end: new Date(latest), shifted: true } : { end: today, shifted: false };
+}
+
 export function dailyCounts(
   timestamps: Array<string | null | undefined>,
   days: number,

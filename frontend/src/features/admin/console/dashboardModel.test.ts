@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attentionItems,
+  chartWindowEnd,
   dailyCounts,
   expiryBuckets,
   healthSignals,
@@ -96,5 +97,22 @@ describe("platform admin dashboard model", () => {
     ).toEqual([2, 1, 1]);
     expect(worstTone(["good", "warning", "neutral"])).toBe("warning");
     expect(worstTone([])).toBe("good");
+  });
+});
+
+describe("chartWindowEnd", () => {
+  const today = new Date("2026-10-02T12:00:00Z");
+  it("keeps today when there are recent events", () => {
+    expect(chartWindowEnd(["2026-09-20T00:00:00Z"], 30, today)).toEqual({ end: today, shifted: false });
+  });
+  it("ends on the latest event when the data set is older than the window", () => {
+    const span = chartWindowEnd(["2026-03-01T00:00:00Z", "2026-03-14T08:00:00Z", null, "not a date"], 30, today);
+    expect(span.shifted).toBe(true);
+    expect(span.end.toISOString()).toBe("2026-03-14T08:00:00.000Z");
+    const series = dailyCounts(["2026-03-14T08:00:00Z"], 30, span.end);
+    expect(series[series.length - 1].count).toBe(1);
+  });
+  it("keeps today without valid dates", () => {
+    expect(chartWindowEnd([null, undefined], 30, today)).toEqual({ end: today, shifted: false });
   });
 });
