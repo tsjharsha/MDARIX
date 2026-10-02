@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from auth.emailer import smtp_configuration_status
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
+from backend.app.access.schemas import QueueItemsAction
 from backend.app.access.trends import daily as _daily, per_day as _per_day, run_outcome, window
 from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
 from backend.app.db.models.enterprise import ConnectorRun
@@ -32,6 +33,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
 from backend.app.db.session import get_db
+from backend.app.enterprise_audit import make_audit_event
 from backend.app.worker_status import worker_status
 
 router = APIRouter(prefix="/api/v1", tags=["Platform console"])
@@ -586,6 +588,105 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
             "reminder_delivery": "NOT_CONNECTED",
         },
     }
+
+
+# Work that gave up after its retries ---------------------------------------------------------------------------
+
+DEAD_LETTER_LIMIT = 500
+
+
+def _dead_letter_summary(row: OutboxEvent) -> dict:
+    """What was queued and why it gave up; never the payload, which can hold customer business data."""
+    return {
+        "id": str(row.id),
+        "event_name": row.event_name,
+        "aggregate_type": row.aggregate_type,
+        "attempts": row.attempts,
+        "last_error": row.last_error,
+        "occurred_at": _iso(row.occurred_at),
+        "dead_lettered_at": _iso(row.dead_lettered_at),
+    }
+
+
+@router.get("/platform-admin/console/dead-letters")
+def dead_letters(request: Request, db: Session = Depends(get_db)):
+    """Background work that gave up after its retries, newest first, with the tenant it belongs to."""
+    _require_platform_admin(request, db)
+    query = db.query(OutboxEvent).filter(OutboxEvent.dead_lettered_at.is_not(None))
+    rows = query.order_by(OutboxEvent.dead_lettered_at.desc()).limit(DEAD_LETTER_LIMIT).all()
+    names = _tenant_names(db, [row.tenant_id for row in rows])
+    return {
+        "total": query.count(),
+        "items": [_with_tenant(_dead_letter_summary(row), names, row.tenant_id) for row in rows],
+    }
+
+
+def _act_on_dead_letters(request: Request, body: QueueItemsAction, db: Session, *, discard: bool) -> dict:
+    admin = _require_platform_admin(request, db)
+    ids = set(body.ids)
+    rows = (
+        db.query(OutboxEvent)
+        .filter(OutboxEvent.id.in_(ids), OutboxEvent.dead_lettered_at.is_not(None))
+        .with_for_update()
+        .all()
+    )
+    if len(rows) != len(ids):
+        # Someone else retried or discarded part of the selection: act on all of it or on none of it.
+        raise HTTPException(
+            409,
+            detail={
+                "code": "QUEUE_ITEMS_CHANGED",
+                "message": "Some of these items are no longer waiting for a decision. Reload and try again.",
+            },
+        )
+    now = datetime.now(timezone.utc)
+    by_tenant: dict = {}
+    for row in rows:
+        by_tenant.setdefault(row.tenant_id, []).append(row)
+    action = "OUTBOX_EVENTS_DISCARDED" if discard else "OUTBOX_EVENTS_RETRIED"
+    # One audit record per tenant, written before the change, naming every item (without its payload) and the reason.
+    for tenant_id, items in by_tenant.items():
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=str(admin.id),
+                action=action,
+                entity_type="OutboxEvent",
+                details={
+                    "source": "PLATFORM_ADMIN",
+                    "count": len(items),
+                    "items": [_dead_letter_summary(row) for row in items],
+                },
+                request=request,
+                reason=body.reason,
+                created_at=now,
+            )
+        )
+    for row in rows:
+        if discard:
+            db.delete(row)
+        else:
+            # Back in the queue with a fresh set of retries; the worker picks it up on its next cycle.
+            row.dead_lettered_at = None
+            row.attempts = 0
+            row.next_attempt_at = now
+            row.last_error = None
+            row.claimed_by = None
+            row.claimed_at = None
+    db.commit()
+    return {"count": len(rows), "action": "DISCARDED" if discard else "RETRIED"}
+
+
+@router.post("/platform-admin/console/dead-letters/retry")
+def retry_dead_letters(request: Request, body: QueueItemsAction, db: Session = Depends(get_db)):
+    """Put work that gave up back in the queue (for example after the cause was fixed). Recorded with a reason."""
+    return _act_on_dead_letters(request, body, db, discard=False)
+
+
+@router.post("/platform-admin/console/dead-letters/discard")
+def discard_dead_letters(request: Request, body: QueueItemsAction, db: Session = Depends(get_db)):
+    """Remove work that gave up and is not needed (for example test leftovers). Recorded with a reason."""
+    return _act_on_dead_letters(request, body, db, discard=True)
 
 
 # Dashboard ------------------------------------------------------------------------------------------------------

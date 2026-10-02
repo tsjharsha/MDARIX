@@ -1,7 +1,15 @@
 import { useMemo, useState } from "react";
-import { Activity, Database, Inbox, Mail, ServerCog, TriangleAlert } from "lucide-react";
+import { Activity, Database, Inbox, Mail, RotateCcw, ServerCog, Trash2, TriangleAlert, X } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
-import { SearchBox, Table, formatDate, useResource } from "../../customer-admin/shared";
+import {
+  ConfirmDialog,
+  SearchBox,
+  Table,
+  formatDate,
+  send,
+  useResource,
+  type Confirmation,
+} from "../../customer-admin/shared";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, TenantCell } from "./common";
@@ -173,6 +181,146 @@ function WorkerStatus({ worker }: { worker: Ops["worker"] }) {
   );
 }
 
+type GaveUpItem = {
+  id: string;
+  event_name: string;
+  aggregate_type: string;
+  attempts: number;
+  last_error: string | null;
+  occurred_at: string | null;
+  dead_lettered_at: string | null;
+  tenant_id: string | null;
+  tenant_name?: string | null;
+  tenant_key?: string | null;
+};
+type GaveUpGroup = {
+  key: string;
+  event_name: string;
+  tenant_name?: string | null;
+  tenant_key?: string | null;
+  ids: string[];
+  count: number;
+  last_error: string | null;
+  first: string | null;
+  last: string | null;
+};
+
+/** Items of the same kind in the same tenant, so a batch (for example test leftovers) is handled in one step. */
+export function groupGaveUp(items: GaveUpItem[]): GaveUpGroup[] {
+  const groups = new Map<string, GaveUpGroup>();
+  for (const item of items) {
+    const key = `${item.event_name}|${item.tenant_id ?? ""}`;
+    const group = groups.get(key) ?? {
+      key,
+      event_name: item.event_name,
+      tenant_name: item.tenant_name,
+      tenant_key: item.tenant_key,
+      ids: [],
+      count: 0,
+      last_error: item.last_error,
+      first: item.occurred_at,
+      last: item.occurred_at,
+    };
+    group.ids.push(item.id);
+    group.count += 1;
+    if (item.occurred_at && (!group.first || item.occurred_at < group.first)) group.first = item.occurred_at;
+    if (item.occurred_at && (!group.last || item.occurred_at > group.last)) group.last = item.occurred_at;
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Work that gave up after its retries: send it again once the cause is fixed, or discard it when it is not needed.
+ * Both ask for a reason, which the server keeps in each tenant's audit trail. */
+function GaveUp({ onChanged }: { onChanged: () => void }) {
+  const list = useResource<{ total: number; items: GaveUpItem[] }>("/api/v1/platform-admin/console/dead-letters");
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [message, setMessage] = useState("");
+  const groups = useMemo(() => groupGaveUp(list.data?.items ?? []), [list.data]);
+  const act = (group: GaveUpGroup, discard: boolean) => {
+    const what = `${group.count} ${titleCase(group.event_name)} item${group.count === 1 ? "" : "s"}`;
+    const where = group.tenant_name ? ` for ${group.tenant_name}` : "";
+    setConfirm({
+      title: discard ? `Discard ${what}?` : `Retry ${what}?`,
+      body: discard
+        ? `The ${what}${where} are removed from the queue and will not be sent. Use this for work that is not needed, such as test leftovers. The audit trail keeps what was discarded and why.`
+        : `The ${what}${where} go back in the queue with a fresh set of retries; the background worker sends them within seconds. Retry once the cause of the failure is fixed.`,
+      confirmLabel: discard ? "Discard" : "Retry",
+      danger: discard,
+      reason: { label: "Reason (kept in the audit trail)", min: 10 },
+      run: (reason) =>
+        send(`/api/v1/platform-admin/console/dead-letters/${discard ? "discard" : "retry"}`, "POST", {
+          ids: group.ids,
+          reason,
+        }),
+      done: discard ? `Discarded ${what}${where}.` : `${what}${where} are back in the queue.`,
+    });
+  };
+  return (
+    <Panel eyebrow="Queue" title="Gave up after retries" state={list.state} error={list.error}>
+      {message && (
+        <div className="ac-message tone-good" role="status">
+          {message}
+          <button type="button" className="ac-link" onClick={() => setMessage("")} aria-label="Dismiss message">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      <Table
+        caption="Gave up after retries"
+        rows={groups}
+        rowKey={(row) => row.key}
+        empty={{
+          title: "Nothing gave up",
+          detail: "Background work that fails five times appears here for a decision.",
+        }}
+        columns={[
+          { key: "kind", label: "Kind", render: (row) => titleCase(row.event_name), fields: ["event_name"] },
+          {
+            key: "tenant",
+            label: "Tenant",
+            render: (row) => <TenantCell row={row} />,
+            fields: ["tenant_name", "tenant_key"],
+          },
+          { key: "count", label: "Items", numeric: true, render: (row) => row.count },
+          { key: "error", label: "Last error", render: (row) => row.last_error ?? "—", fields: ["last_error"] },
+          {
+            key: "when",
+            label: "Queued",
+            render: (row) =>
+              row.first === row.last ? formatDate(row.last) : `${formatDate(row.first)} – ${formatDate(row.last)}`,
+            fields: ["first", "last"],
+          },
+          {
+            key: "actions",
+            label: "",
+            render: (row) => (
+              <span className="ca-action-row">
+                <button type="button" className="ac-secondary" onClick={() => act(row, false)}>
+                  <RotateCcw size={14} /> Retry
+                </button>
+                <button type="button" className="ac-secondary" onClick={() => act(row, true)}>
+                  <Trash2 size={14} /> Discard
+                </button>
+              </span>
+            ),
+          },
+        ]}
+      />
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(text) => {
+          setConfirm(null);
+          setMessage(text);
+          list.reload();
+          onChanged();
+        }}
+      />
+    </Panel>
+  );
+}
+
 /** Background work waiting, retrying or given up, and recent tenant provisioning. */
 function Queues() {
   const ops = useOps();
@@ -207,6 +355,7 @@ function Queues() {
           icon={<ServerCog size={18} />}
         />
       </section>
+      <GaveUp onChanged={ops.reload} />
       <div className="ac-grid two">
         <Panel eyebrow="Queue" title="Waiting work by kind" state={ops.state} error={ops.error}>
           <Table

@@ -381,3 +381,10 @@ class EnvironmentCreateRequest(BaseModel):
     application_version: str | None = Field(default=None, max_length=80)
     schema_version: str | None = Field(default=None, max_length=80)
     configuration_version: str | None = Field(default=None, max_length=80)
+
+
+class QueueItemsAction(BaseModel):
+    """Retry or discard background work that gave up after its retries (platform administrators only)."""
+
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=10, max_length=1000)
