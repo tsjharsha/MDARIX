@@ -38,7 +38,7 @@ from backend.app.access.schemas import (
     ReleaseActionRequest,
     StatusRequest,
 )
-from backend.app.access.authz import _admin_tenant, _guard_user_administration
+from backend.app.access.authz import _admin_tenant, _guard_user_administration, is_hidden_from
 from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
 from backend.app.access.connector_mapping import MappingNotUsable, import_connector_records, released_mapping
 from backend.app.db.data_plane import get_data_plane_db
@@ -358,6 +358,11 @@ def update_control_plane_resource(
     if unknown:
         raise HTTPException(422, detail={"code": "FIELD_NOT_ALLOWED", "message": "One or more fields cannot be edited"})
     row = db.query(model).filter(model.id == resource_id, model.tenant_id == admin.tenant_id).first()
+    if row is not None and resource == "persona-assignments":
+        # A platform account's assignments are not the customer's to see or change.
+        owner = db.query(AuthUser).filter(AuthUser.id == row.user_id).first()
+        if owner is not None and is_hidden_from(admin, owner):
+            row = None
     if row is None:
         raise HTTPException(
             404, detail={"code": "RESOURCE_NOT_FOUND", "message": "Resource is not available for this tenant"}

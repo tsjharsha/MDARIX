@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
 
@@ -28,7 +29,14 @@ from backend.app.db.models.stage2 import (
     UserInvitation,
 )
 from backend.app.db.session import get_db
-from backend.app.access.authz import _admin_detail_tenant, _admin_tenant, _require_platform_admin
+from backend.app.access.authz import (
+    _admin_detail_tenant,
+    _admin_tenant,
+    _is_platform_admin,
+    _require_platform_admin,
+    platform_account_clause,
+    visible_user_filters,
+)
 from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -38,6 +46,16 @@ router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 def admin_smtp_status(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
     return smtp_configuration_status()
+
+
+PLATFORM_ACTOR_LABEL = "MDARIX platform administrator"
+
+
+def _as_uuid(value):
+    try:
+        return uuid.UUID(str(value))
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/admin/audit-history")
@@ -51,11 +69,23 @@ def audit_history(
     if entity_type:
         query = query.filter(AuditEvent.entity_type == entity_type)
     rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
+    # Actions by MDARIX staff stay visible to the customer, attributed to the platform rather than to a person.
+    platform_actors = (
+        set()
+        if _is_platform_admin(admin)
+        else {
+            str(user_id)
+            for (user_id,) in db.query(AuthUser.id).filter(
+                AuthUser.id.in_({_as_uuid(row.actor_ref) for row in rows} - {None}), platform_account_clause()
+            )
+        }
+    )
     return [
         {
             "id": str(row.id),
             "tenant_id": str(row.tenant_id),
-            "actor_ref": row.actor_ref,
+            "actor_ref": None if str(row.actor_ref) in platform_actors else row.actor_ref,
+            "actor_label": PLATFORM_ACTOR_LABEL if str(row.actor_ref) in platform_actors else None,
             "action": row.action,
             "entity_type": row.entity_type,
             "entity_id": str(row.entity_id) if row.entity_id else None,
@@ -314,8 +344,11 @@ def tenant_dashboard(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     tenant_id = admin.tenant_id
     health = admin_health_summary(request, db)
-    users = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).count()
-    active_users = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE").count()
+    visible = visible_user_filters(admin)
+    users = db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, *visible).count()
+    active_users = (
+        db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE", *visible).count()
+    )
     products = db.query(Product).filter(Product.tenant_id == tenant_id).count()
     investigations = db.query(Investigation).filter_by(tenant_id=tenant_id).count()
     connectors = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).count()

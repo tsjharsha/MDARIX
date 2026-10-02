@@ -3,6 +3,7 @@
 import uuid
 
 from fastapi import HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import (
@@ -39,6 +40,40 @@ def _is_platform_role(role: str | None) -> bool:
 
 def _is_platform_admin(user: AuthUser) -> bool:
     return _is_platform_role(user.role)
+
+
+def platform_account_clause():
+    """SQL: the AuthUser row is a platform (MDARIX staff) account, with the same normalization as _is_platform_role."""
+    normalized = func.upper(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"))
+    return normalized.in_(sorted(PLATFORM_ROLE_CODES))
+
+
+def visible_user_filters(viewer: AuthUser) -> list:
+    """Filters for AuthUser queries: platform accounts are visible to platform administrators only.
+
+    MDARIX staff accounts can sit in a customer tenant (for example the tenant platform administrators sign in to);
+    the customer's administrators and users must not see, open or change them.
+    """
+    return [] if _is_platform_admin(viewer) else [~platform_account_clause()]
+
+
+def hidden_platform_user_ids(db: Session, viewer: AuthUser, tenant_id):
+    """Ids of the tenant's platform accounts the viewer may not see (None when the viewer sees everyone)."""
+    if _is_platform_admin(viewer):
+        return None
+    return db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id, platform_account_clause())
+
+
+def is_hidden_from(viewer: AuthUser, user) -> bool:
+    """True when ``user`` is a platform account that ``viewer`` (not a platform administrator) may not see."""
+    return user.id != viewer.id and not _is_platform_admin(viewer) and _is_platform_role(user.role)
+
+
+def ensure_user_visible(viewer: AuthUser, user: AuthUser | None) -> AuthUser:
+    """404 for a user the viewer may not see, exactly as for one that does not exist (nothing to enumerate)."""
+    if user is None or is_hidden_from(viewer, user):
+        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    return user
 
 
 def _guard_user_administration(

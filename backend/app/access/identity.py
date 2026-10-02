@@ -46,6 +46,10 @@ from backend.app.access.authz import (
     _guard_user_administration,
     _is_platform_admin,
     _require_administrator,
+    ensure_user_visible,
+    hidden_platform_user_ids,
+    is_hidden_from,
+    visible_user_filters,
 )
 from backend.app.access.common import (
     _ensure_email_not_used_elsewhere,
@@ -69,12 +73,17 @@ def persona_catalog(request: Request, db: Session = Depends(get_db)):
     ]
 
 
+def _belongs_to_hidden_account(db: Session, viewer, user_id) -> bool:
+    """True when the record belongs to a platform account the viewer may not see or change."""
+    owner = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    return bool(owner and is_hidden_from(viewer, owner))
+
+
 @router.get("/admin/identity/users/{user_id}")
 def admin_user(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
-    if user is None:
-        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    ensure_user_visible(admin, user)
     return (
         context(request, db)
         if user.id == admin.id
@@ -93,8 +102,7 @@ def admin_user(user_id: uuid.UUID, request: Request, db: Session = Depends(get_d
 def create_membership(payload: MembershipRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == payload.user_id, AuthUser.tenant_id == admin.tenant_id).first()
-    if user is None:
-        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    ensure_user_visible(admin, user)
     existing = db.query(TenantMembership).filter_by(tenant_id=admin.tenant_id, user_id=user.id).first()
     if existing:
         existing.status = "ACTIVE"
@@ -130,8 +138,7 @@ def assign_persona(payload: PersonaRequest, request: Request, db: Session = Depe
             422, detail={"code": "UNKNOWN_PERSONA", "message": "Persona is not in the R1 catalog"}
         ) from exc
     user = db.query(AuthUser).filter(AuthUser.id == payload.user_id, AuthUser.tenant_id == admin.tenant_id).first()
-    if user is None:
-        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    ensure_user_visible(admin, user)
     row = (
         db.query(PersonaAssignment)
         .filter_by(tenant_id=admin.tenant_id, user_id=user.id, persona_code=persona.code)
@@ -211,6 +218,8 @@ def create_role(payload: RoleRequest, request: Request, db: Session = Depends(ge
 def assign_role(payload: RoleAssignmentRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == payload.user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    if user is not None:
+        ensure_user_visible(admin, user)
     role = (
         db.query(RoleDefinition)
         .filter(
@@ -375,7 +384,13 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
 @router.get("/admin/identity/users")
 def list_users(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    rows = db.query(AuthUser).filter(AuthUser.tenant_id == admin.tenant_id).order_by(AuthUser.username).all()
+    # MDARIX staff accounts in the tenant are listed for platform administrators only.
+    rows = (
+        db.query(AuthUser)
+        .filter(AuthUser.tenant_id == admin.tenant_id, *visible_user_filters(admin))
+        .order_by(AuthUser.username)
+        .all()
+    )
     return [
         {
             "id": str(row.id),
@@ -524,7 +539,7 @@ def admin_password_reset(payload: PasswordActionRequest, request: Request, db: S
         .filter(AuthUser.tenant_id == admin.tenant_id, AuthUser.username == payload.email.strip().lower())
         .first()
     )
-    if row is None:
+    if row is None or is_hidden_from(admin, row):
         return {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "NOT_SENT"}
     token = issue_reset(db, row.id, row.tenant_id, admin.id)
     delivery = send_password_reset_email(row.username, token)
@@ -551,12 +566,11 @@ def admin_password_reset(payload: PasswordActionRequest, request: Request, db: S
 @router.get("/admin/identity/persona-assignments")
 def list_persona_assignments(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    rows = (
-        db.query(PersonaAssignment)
-        .filter(PersonaAssignment.tenant_id == admin.tenant_id)
-        .order_by(PersonaAssignment.user_id, PersonaAssignment.persona_code)
-        .all()
-    )
+    query = db.query(PersonaAssignment).filter(PersonaAssignment.tenant_id == admin.tenant_id)
+    hidden = hidden_platform_user_ids(db, admin, admin.tenant_id)
+    if hidden is not None:
+        query = query.filter(PersonaAssignment.user_id.notin_(hidden))
+    rows = query.order_by(PersonaAssignment.user_id, PersonaAssignment.persona_code).all()
     return [
         {
             "id": str(row.id),
@@ -572,12 +586,11 @@ def list_persona_assignments(request: Request, db: Session = Depends(get_db)):
 @router.get("/admin/identity/role-assignments")
 def list_role_assignments(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    rows = (
-        db.query(RoleAssignment)
-        .filter(RoleAssignment.tenant_id == admin.tenant_id)
-        .order_by(RoleAssignment.user_id)
-        .all()
-    )
+    query = db.query(RoleAssignment).filter(RoleAssignment.tenant_id == admin.tenant_id)
+    hidden = hidden_platform_user_ids(db, admin, admin.tenant_id)
+    if hidden is not None:
+        query = query.filter(RoleAssignment.user_id.notin_(hidden))
+    rows = query.order_by(RoleAssignment.user_id).all()
     return [
         {
             "id": str(row.id),
@@ -654,7 +667,7 @@ def update_membership_status(
         .filter(TenantMembership.id == membership_id, TenantMembership.tenant_id == admin.tenant_id)
         .first()
     )
-    if row is None:
+    if row is None or _belongs_to_hidden_account(db, admin, row.user_id):
         raise HTTPException(
             404, detail={"code": "MEMBERSHIP_NOT_FOUND", "message": "Membership is not available for this tenant"}
         )
@@ -675,7 +688,7 @@ def update_persona_status(
         .filter(PersonaAssignment.id == assignment_id, PersonaAssignment.tenant_id == admin.tenant_id)
         .first()
     )
-    if row is None:
+    if row is None or _belongs_to_hidden_account(db, admin, row.user_id):
         raise HTTPException(
             404,
             detail={
@@ -700,7 +713,7 @@ def update_role_assignment_status(
         .filter(RoleAssignment.id == assignment_id, RoleAssignment.tenant_id == admin.tenant_id)
         .first()
     )
-    if row is None:
+    if row is None or _belongs_to_hidden_account(db, admin, row.user_id):
         raise HTTPException(
             404,
             detail={"code": "ROLE_ASSIGNMENT_NOT_FOUND", "message": "Role assignment is not available for this tenant"},
@@ -716,8 +729,7 @@ def update_role_assignment_status(
 def user_effective_access(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
-    if user is None:
-        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available for this tenant"})
+    ensure_user_visible(admin, user)
     assignments = (
         db.query(RoleAssignment)
         .filter(
@@ -843,7 +855,11 @@ def list_permission_sets(request: Request, db: Session = Depends(get_db)):
 @router.get("/admin/identity/memberships")
 def list_memberships(request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    rows = db.query(TenantMembership).filter(TenantMembership.tenant_id == admin.tenant_id).all()
+    query = db.query(TenantMembership).filter(TenantMembership.tenant_id == admin.tenant_id)
+    hidden = hidden_platform_user_ids(db, admin, admin.tenant_id)
+    if hidden is not None:
+        query = query.filter(TenantMembership.user_id.notin_(hidden))
+    rows = query.all()
     return [
         {
             "id": str(row.id),

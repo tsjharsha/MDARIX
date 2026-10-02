@@ -9,9 +9,10 @@ from fastapi.testclient import TestClient
 from auth.durable import persist_session
 from auth.service import _hash, auth_service
 from backend.app.db.models.customer_lifecycle import Customer
-from backend.app.db.models.foundation import AuthUser, Tenant, TenantMembership
+from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
+from tests.conftest import authenticated_client
 
 PASSWORD = "Customer admin test password 123"
 
@@ -349,3 +350,74 @@ def test_a_tenant_user_cannot_be_created_with_an_email_live_in_another_tenant(wo
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMAIL_IN_USE"
     # A retired account elsewhere does not block the email.
     assert invite(retired_email).status_code == 200
+
+
+def test_platform_accounts_in_the_tenant_are_invisible_to_the_customer_administrator(world):
+    client, ids = world
+    platform_id, member_id = ids["platform_user"], ids["member"]
+    users = {row["id"] for row in client.get("/api/v1/admin/identity/users").json()}
+    assert member_id in users and ids["admin"] in users
+    assert platform_id not in users
+    # Opening it directly behaves as if it did not exist.
+    for path in (
+        f"/api/v1/admin/identity/users/{platform_id}",
+        f"/api/v1/admin/identity/users/{platform_id}/effective-access",
+    ):
+        response = client.get(path)
+        assert response.status_code == 404 and response.json()["detail"]["code"] == "USER_NOT_FOUND"
+    for path in (
+        "/api/v1/admin/identity/memberships",
+        "/api/v1/admin/identity/persona-assignments",
+        "/api/v1/admin/identity/role-assignments",
+    ):
+        assert platform_id not in {row["user_id"] for row in client.get(path).json()}, path
+    # The dashboard counts only the customer's own people.
+    dashboard = client.get("/api/v1/admin/tenant-dashboard").json()
+    assert dashboard["metrics"]["users"] == len(users)
+
+
+def test_the_customer_administrator_cannot_act_on_a_platform_account(world):
+    client, ids = world
+    platform_id = ids["platform_user"]
+    persona = client.post(
+        "/api/v1/admin/identity/persona-assignments", json={"user_id": platform_id, "persona_code": "INVESTIGATOR"}
+    )
+    assert persona.status_code == 404
+    membership = client.post("/api/v1/admin/identity/memberships", json={"user_id": platform_id, "is_default": True})
+    assert membership.status_code == 404
+    db = SessionLocal()
+    try:
+        email = db.query(AuthUser.username).filter(AuthUser.id == uuid.UUID(platform_id)).scalar()
+    finally:
+        db.close()
+    reset = client.post("/api/v1/admin/identity/users/password-reset", json={"email": email})
+    assert reset.status_code == 200 and reset.json()["email_delivery"] == "NOT_SENT"
+
+
+def test_platform_actions_in_the_audit_trail_name_the_platform_not_the_person(world):
+    client, ids = world
+    event_id = uuid.uuid4()
+    db = SessionLocal()
+    try:
+        db.add(
+            AuditEvent(
+                id=event_id,
+                tenant_id=ids["tenant"],
+                actor_ref=ids["platform_user"],
+                action="SUPPORT_REVIEW",
+                entity_type="Tenant",
+                created_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+    rows = {row["id"]: row for row in client.get("/api/v1/admin/audit-history").json()}
+    event = rows[str(event_id)]
+    assert event["actor_ref"] is None and event["actor_label"] == "MDARIX platform administrator"
+
+
+def test_platform_administrators_still_see_platform_accounts():
+    platform = authenticated_client()
+    roles = {str(row["role"]).upper() for row in platform.get("/api/v1/admin/identity/users").json()}
+    assert "ADMINISTRATOR" in roles

@@ -29,7 +29,7 @@ from backend.app.db.models.foundation import (
     TenantPlanAssignment,
 )
 from backend.app.access.schemas import CustomerProvisionRequest
-from backend.app.access.authz import _is_platform_admin
+from backend.app.access.authz import _is_platform_admin, platform_account_clause
 from backend.app.runtime_env import is_development
 
 
@@ -154,7 +154,12 @@ def _ensure_email_not_used_elsewhere(db: Session, email: str, tenant_id: uuid.UU
 def _seat_counts(db: Session, tenant_id: uuid.UUID) -> dict:
     users = (
         db.query(AuthUser)
-        .filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(["INVITED", "ACTIVE", "PENDING_VERIFICATION"]))
+        .filter(
+            AuthUser.tenant_id == tenant_id,
+            AuthUser.status.in_(["INVITED", "ACTIVE", "PENDING_VERIFICATION"]),
+            # MDARIX staff accounts in the tenant are not the customer's licensed users.
+            ~platform_account_clause(),
+        )
         .all()
     )
     admins = [user for user in users if (user.role or "").upper() == "CUSTOMER_ADMIN"]

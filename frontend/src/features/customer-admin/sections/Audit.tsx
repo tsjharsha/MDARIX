@@ -81,7 +81,8 @@ export function AuditSection() {
           {
             key: "actor",
             label: "Actor",
-            render: (row) => <span className="ca-mono-sm">{actorName(row.actor_ref)}</span>,
+            // Actions by MDARIX staff come labelled by the server instead of naming the person.
+            render: (row) => <span className="ca-mono-sm">{row.actor_label ?? actorName(row.actor_ref)}</span>,
           },
           { key: "reason", label: "Reason", render: (row) => row.reason ?? row.details?.reason ?? "—" },
         ]}

@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from auth.service import _hash
+from backend.app.access.authz import platform_account_clause
 from backend.app.db.models.foundation import AuditEvent, AuthUser, TenantMembership
 from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.trial.service import TRIAL_USER_LIMIT, TRIAL_USER_ROLE, _send_invitation
@@ -41,7 +42,7 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
     owner_email = (request.email if request else "").strip().lower()
     users = (
         db.query(AuthUser)
-        .filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(SEATED_STATUSES))
+        .filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(SEATED_STATUSES), ~platform_account_clause())
         .order_by(AuthUser.created_at)
         .all()
     )
