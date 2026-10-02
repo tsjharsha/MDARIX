@@ -21,8 +21,16 @@ provider's state.
 | **Google Gemini API** (AI Studio key) | `gemini` | Strong free tier on Gemini Flash models; supports JSON output | On the free tier Google may use requests to improve its models, so use synthetic data only |
 | **OpenRouter** | `openrouter` | One key for many models; models ending `:free` cost nothing | Small daily request cap without credits; free models come and go |
 | **Mistral** ("Experiment" plan) | `mistral` | Free plan with rate limits; EU provider | Requests may be used for training on the free plan |
-| **GitHub Models** | `github` | Free with a GitHub token; several OpenAI and open models | Low daily limits; meant for prototyping |
-| **Ollama** (local) | `ollama` | Runs on the demo laptop: no limits, no internet, no data leaves the machine | Needs a capable machine; smaller models give weaker answers; slower |
+| **Ollama** (local) | `ollama` | Runs on the demo laptop: no limits, no internet, no data leaves the machine | Needs free memory (about 3 GB for `llama3.2`, about 1.5 GB for `llama3.2:1b`); smaller models give weaker answers; the first request loads the model, so it gets 120 s |
+
+GitHub Models (`github`) was retired by GitHub on 30 July 2026. A retired or misspelt name in
+`MDARIX_GENAI_FALLBACKS` is skipped: the API logs a warning and AI Control Center shows it as **Not used** with the
+reason.
+
+Default models (checked 3 October 2026): Gemini `gemini-flash-latest` (follows Google's current Flash model),
+OpenRouter `nvidia/nemotron-3-super-120b-a12b:free`, Mistral `mistral-small-latest`. Free OpenRouter models are often
+rate-limited upstream and come and go; pick another from https://openrouter.ai/models?max_price=0 with
+`MDARIX_GENAI_OPENROUTER_MODEL` if needed.
 
 **Recommended for demos:** Groq, then Cerebras (same model family, so answers stay alike), then Gemini, then
 Ollama as the offline safety net.

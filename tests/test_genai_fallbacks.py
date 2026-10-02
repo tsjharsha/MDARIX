@@ -122,3 +122,25 @@ def test_health_lists_the_chain_without_keys():
         ("gemini", True),
     ]
     assert "key" not in json.dumps(health).lower().replace("api_key", "")
+    assert health["skipped_fallbacks"] == {}
+
+
+def test_a_retired_or_misspelt_fallback_is_skipped_and_shown(monkeypatch):
+    monkeypatch.setenv("MDARIX_GENAI_FALLBACKS", "github, gemini, geminy")
+    monkeypatch.setenv("MDARIX_GENAI_GITHUB_API_KEY", "github-key")
+    calls = _route(monkeypatch, {"groq": "limited", "generativelanguage": "ok", "github": "ok"})
+    provider = GenAIProvider()
+    assert [item.provider_name for item in provider.fallbacks] == ["gemini"]
+    assert provider.complete("Summarize", {}).provider == "gemini"
+    assert "github" not in [host for host, _ in calls]
+    skipped = provider.health()["skipped_fallbacks"]
+    assert set(skipped) == {"github", "geminy"} and "retired" in skipped["github"]
+
+
+def test_a_local_ollama_fallback_keeps_time_to_load_its_model(monkeypatch):
+    monkeypatch.setenv("MDARIX_GENAI_FALLBACKS", "gemini, ollama")
+    monkeypatch.setenv("MDARIX_GENAI_TIMEOUT_SECONDS", "30")
+    gemini, ollama = GenAIProvider().fallbacks
+    assert gemini.timeout == 30 and ollama.timeout == 120
+    monkeypatch.setenv("MDARIX_GENAI_OLLAMA_TIMEOUT_SECONDS", "45")
+    assert GenAIProvider().fallbacks[1].timeout == 45

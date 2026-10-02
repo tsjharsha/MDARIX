@@ -16,7 +16,7 @@ type Model = {
   human_review_required?: boolean;
   hidden_chain_of_thought_persisted?: boolean;
 };
-type Fallback = { provider: string; model: string; configured: boolean; resting?: boolean };
+type Fallback = { provider: string; model: string; configured: boolean; resting?: boolean; skipped?: string };
 type Execution = {
   id: string;
   at?: string | null;
@@ -54,7 +54,19 @@ const seconds = (ms: number | null | undefined) =>
 
 /** Which model is in use, and how the AI has been used across every tenant in the last 30 days. */
 function Overview() {
-  const models = useResource<{ models: Model[]; fallbacks?: Fallback[] }>("/api/v1/platform-admin/ai/models");
+  const models = useResource<{ models: Model[]; fallbacks?: Fallback[]; skipped_fallbacks?: Record<string, string> }>(
+    "/api/v1/platform-admin/ai/models",
+  );
+  // Providers named in the setting that cannot be used are listed last, with the reason, instead of disappearing.
+  const fallbackRows: Array<Fallback & { order?: number }> = [
+    ...(models.data?.fallbacks ?? []).map((item, index) => ({ ...item, order: index + 1 })),
+    ...Object.entries(models.data?.skipped_fallbacks ?? {}).map(([provider, reason]) => ({
+      provider,
+      model: "—",
+      configured: false,
+      skipped: reason,
+    })),
+  ];
   const activity = useResource<AiActivity>("/api/v1/platform-admin/console/ai-activity");
   const model = models.data?.models?.[0];
   const data = activity.data;
@@ -156,21 +168,25 @@ function Overview() {
         </Intro>
         <Table
           caption="Fallback providers"
-          rows={(models.data?.fallbacks ?? []).map((item, index) => ({ ...item, order: index + 1 }))}
+          rows={fallbackRows}
           rowKey={(row) => row.provider}
           empty={{
             title: "No fallback configured",
             detail: "Set MDARIX_GENAI_FALLBACKS and each provider's key on the server (see the AI provider runbook).",
           }}
           columns={[
-            { key: "order", label: "Order", numeric: true, render: (row) => row.order },
+            { key: "order", label: "Order", numeric: true, render: (row) => row.order ?? "—" },
             { key: "provider", label: "Provider", render: (row) => <strong>{titleCase(row.provider)}</strong> },
             { key: "model", label: "Model", render: (row) => row.model },
             {
               key: "state",
               label: "State",
               render: (row) =>
-                !row.configured ? (
+                row.skipped ? (
+                  <span className="ar-no">
+                    <CircleSlash size={14} aria-hidden="true" /> Not used: {row.skipped}
+                  </span>
+                ) : !row.configured ? (
                   <span className="ar-no">
                     <CircleSlash size={14} aria-hidden="true" /> No key set
                   </span>

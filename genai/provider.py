@@ -22,12 +22,15 @@ OLLAMA_DEFAULT_MODEL = "llama3.2"
 OPENAI_COMPATIBLE = {
     "groq": (GROQ_BASE_URL, GROQ_DEFAULT_MODEL),
     "cerebras": ("https://api.cerebras.ai/v1/chat/completions", "gpt-oss-120b"),
-    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-2.5-flash"),
-    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "openai/gpt-oss-20b:free"),
+    # "-latest" follows Google's current Flash model, so a retired version does not break the fallback.
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-flash-latest"),
+    # Free OpenRouter models come and go; check https://openrouter.ai/models?max_price=0 when this one stops answering.
+    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "nvidia/nemotron-3-super-120b-a12b:free"),
     "mistral": ("https://api.mistral.ai/v1/chat/completions", "mistral-small-latest"),
-    "github": ("https://models.github.ai/inference/chat/completions", "openai/gpt-4.1-mini"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
 }
+# Services that no longer exist: named in MDARIX_GENAI_FALLBACKS they are skipped with a warning.
+RETIRED_PROVIDERS = {"github": "GitHub Models was retired by GitHub on 30 July 2026"}
 # A provider that refused us (rate or daily limit) is skipped until this time (monotonic seconds), so a demo does not
 # wait on it for every request; any other failure is skipped for a short time only.
 _COOLDOWN_UNTIL: dict[str, float] = {}
@@ -120,6 +123,8 @@ class GenAIProvider:
                 }
                 for item in self.fallbacks
             ],
+            # Named in MDARIX_GENAI_FALLBACKS but unusable (retired service or misspelt), with the reason.
+            "skipped_fallbacks": unusable_fallbacks(),
         }
 
     @staticmethod
@@ -308,10 +313,14 @@ def fallback_chain(primary: GenAIProvider) -> list[GenAIProvider]:
     Free tiers suit demonstrations on synthetic data only: several may use the requests to improve their models.
     """
     names = [name.strip().lower() for name in os.getenv("MDARIX_GENAI_FALLBACKS", "").split(",") if name.strip()]
+    for name, reason in unusable_fallbacks(names).items():
+        logger.warning("GenAI fallback %s is skipped: %s", name, reason)
     return [
         GenAIProvider(
             provider_name=name,
-            timeout_seconds=os.getenv(f"MDARIX_GENAI_{name.upper()}_TIMEOUT_SECONDS") or primary.timeout,
+            # A local model loads into memory on its first request, so Ollama keeps its longer default.
+            timeout_seconds=os.getenv(f"MDARIX_GENAI_{name.upper()}_TIMEOUT_SECONDS")
+            or (max(primary.timeout, 120) if name == "ollama" else primary.timeout),
             max_retries=int(os.getenv(f"MDARIX_GENAI_{name.upper()}_MAX_RETRIES", "1")),
             max_input_tokens=primary.max_input,
             max_output_tokens=primary.max_output,
@@ -320,3 +329,14 @@ def fallback_chain(primary: GenAIProvider) -> list[GenAIProvider]:
         for name in names
         if name != primary.provider_name and name in OPENAI_COMPATIBLE
     ]
+
+
+def unusable_fallbacks(names: list[str] | None = None) -> dict[str, str]:
+    """Names in MDARIX_GENAI_FALLBACKS that cannot be used, with the reason (shown in health, logged at start)."""
+    if names is None:
+        names = [name.strip().lower() for name in os.getenv("MDARIX_GENAI_FALLBACKS", "").split(",") if name.strip()]
+    return {
+        name: RETIRED_PROVIDERS.get(name, "not a supported provider name")
+        for name in names
+        if name not in OPENAI_COMPATIBLE
+    }

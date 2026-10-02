@@ -56,6 +56,8 @@ def get_platform_ai_models(request: Request, db: Session = Depends(get_db)):
         ],
         # Free providers used in order when the one before is limited or down (keys are never returned).
         "fallbacks": health.get("fallbacks", []),
+        # Named in the setting but unusable (for example a retired service), with the reason.
+        "skipped_fallbacks": health.get("skipped_fallbacks", {}),
         "scope": {"secrets_redacted": True},
     }
 
