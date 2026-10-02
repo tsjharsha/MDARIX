@@ -53,3 +53,14 @@ def test_citations_outside_the_investigation_fail():
     output, _ = _vs001_output()
     result = score(VS001, output, _Matcher(LocalModelEmbeddingProvider()), set())  # none belong to it
     assert _check(result, "CITATIONS_VALID")["status"] == "FAIL"
+
+
+def test_careful_wording_is_not_mistaken_for_certainty():
+    from evaluation.real_pipeline import asserts_certainty
+
+    assert asserts_certainty("The data proves the capacitor failed.")
+    assert asserts_certainty("All Rev D devices are affected.")
+    assert not asserts_certainty("Absence of data does not prove lack of effect, only that evidence is missing.")
+    assert not asserts_certainty("It cannot be proven from these records.")
+    assert not asserts_certainty("Its brevity limits the detail needed to prove sufficiency.")
+    assert asserts_certainty("This is proof that the lot was defective.")

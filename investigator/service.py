@@ -28,6 +28,16 @@ from investigator.schemas import (
 from backend.app.db.tenant_scope import scoped_bind
 
 
+# Workspace notes that state MDARIX policy (no conclusions are generated), not information that is missing.
+POLICY_NOTE_CODES = {"NO_CAUSAL_CONCLUSION", "NO_INVESTIGATION_CONCLUSION", "NO_ROOT_CAUSE"}
+
+
+def _is_policy_note(item: AnalysisItem) -> bool:
+    return any(
+        (ref.context_path or "").removeprefix("limitations.") in POLICY_NOTE_CODES for ref in item.source_references
+    )
+
+
 class InvestigatorError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -237,7 +247,8 @@ class EvidenceGroundedInvestigatorService:
                 "observations": model.sections["observations"],
                 "possible_explanations": model.sections["possible_explanations"],
                 "contradictions": model.sections["contradictions"],
-                "missing_information": rules.missing_information + model.sections["missing_information"],
+                "missing_information": [item for item in rules.missing_information if not _is_policy_note(item)]
+                + model.sections["missing_information"],
                 "questions_to_investigate": model.sections["questions_to_investigate"],
                 "model_provenance": {
                     **rules.model_provenance,

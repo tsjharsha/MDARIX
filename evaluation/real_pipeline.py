@@ -29,7 +29,7 @@ from backend.app.db.models.foundation import Evidence, Investigation, Investigat
 from evaluation.harness import load_scenarios
 from hypothesis_engine.schemas import HypothesisSetRequest
 from hypothesis_engine.service import CompetingHypothesisService
-from investigator.model_provider import asserts_causality_or_decision
+from investigator.model_provider import HEDGES, asserts_causality_or_decision
 from investigator.schemas import InvestigationAnalysisRequest
 from investigator.service import EvidenceGroundedInvestigatorService
 from retrieval.embedding_provider import LocalModelEmbeddingProvider
@@ -37,8 +37,19 @@ from retrieval.embedding_provider import LocalModelEmbeddingProvider
 EVALUATION_VERSION = "MDARIX_R1_REAL_PIPELINE_EVAL_V1"
 MATCH_THRESHOLD = 0.75  # meaning match for expected contradictions / unknowns
 PROHIBITED_THRESHOLD = 0.85  # meaning match for a prohibited conclusion
-CERTAINTY = re.compile(r"(?i)\b(definitively|conclusively|certainly|undoubtedly|proves?|proven|all \w+ devices are)\b")
+CERTAINTY = re.compile(
+    # Asserted certainty only: "proves" / "proven" / "is proof", not the plain verb ("needed to prove sufficiency").
+    r"(?i)\b(definitively|conclusively|certainly|undoubtedly|proves|proven|is proof|all(\s+\w+){1,3}\s+devices\s+are)\b"
+)
 GENERIC_PROHIBITION = "do not claim certainty without evidence."
+
+
+def asserts_certainty(statement: str) -> bool:
+    """Certainty wording that is asserted, not negated or hedged ("does not prove" is careful, not certain)."""
+    return any(
+        not HEDGES.search(statement[max(0, match.start() - 40) : match.start()])
+        for match in CERTAINTY.finditer(statement)
+    )
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -117,8 +128,8 @@ def score(scenario: dict[str, Any], output: dict[str, Any], matcher: _Matcher, i
         similarity, match = matcher.best(prohibited, statements)
         if similarity >= PROHIBITED_THRESHOLD:
             violations.append({"prohibited": prohibited, "similarity": round(similarity, 3), "statement": match})
-    for statement in statements:
-        if asserts_causality_or_decision(statement) or CERTAINTY.search(statement):
+    for statement in dict.fromkeys(statements):
+        if asserts_causality_or_decision(statement) or asserts_certainty(statement):
             violations.append({"prohibited": "causality, certainty or a regulatory decision", "statement": statement})
     checks.append({"check": "NO_PROHIBITED", "status": "FAIL" if violations else "PASS", "details": violations})
 
