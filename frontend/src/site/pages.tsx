@@ -22,6 +22,7 @@ import {
   type Capability,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
+import { SignalStory, SourceFlow, StandardsSection } from "./visuals";
 
 export const SITE_PAGES = [
   "/",
@@ -274,6 +275,9 @@ export function HomePage() {
         </div>
       </section>
 
+      <SourceFlow />
+      <SignalStory />
+
       <section className="ms-section ms-split">
         <Reveal className="ms-split-copy">
           <span className="ms-eyebrow">Built for MedTech investigation teams</span>
@@ -334,6 +338,8 @@ export function HomePage() {
         </div>
       </section>
 
+      <StandardsSection id="standards" />
+
       <section className="ms-section ms-trust-strip">
         <SectionHead
           eyebrow="Trust by design"
@@ -344,8 +350,8 @@ export function HomePage() {
           {[
             [
               Lock,
-              "Separate data per customer",
-              "Each organization's business data is kept in its own database and every request is scoped to it.",
+              "Isolated data per customer",
+              "Every record belongs to one organization; the database itself enforces the boundary on every query.",
             ],
             [
               ShieldCheck,
@@ -725,6 +731,8 @@ export function TrustPage() {
         </Reveal>
       </section>
 
+      <StandardsSection id="trust-standards" />
+
       <section className="ms-section" aria-labelledby="security">
         <SectionHead eyebrow={security.eyebrow} title={security.title} copy={security.copy} id="security" />
         <div className="ms-grid-3">
@@ -732,7 +740,7 @@ export function TrustPage() {
             [
               Lock,
               "Organization isolation",
-              "Each organization's data is scoped to it on every request, with business data held in a separate database per customer.",
+              "Each organization's data is scoped to it on every request and enforced by the database (row-level security); a dedicated database per customer is supported where required.",
             ],
             [
               UserCheck,
@@ -757,11 +765,13 @@ export function TrustPage() {
             );
           })}
         </div>
-        <SectionHead
-          eyebrow="Verified trust claims"
-          title="What MDARIX can accurately say today."
-          copy="These statements describe implemented product controls and controlled MVP validation. They are not certification claims."
-        />
+        <div className="ms-subsection">
+          <SectionHead
+            eyebrow="Verified trust claims"
+            title="What MDARIX can accurately say today."
+            copy="These statements describe implemented product controls and controlled MVP validation. They are not certification claims."
+          />
+        </div>
         <div className="ms-grid-2">
           {[
             [
@@ -807,7 +817,10 @@ export function TrustPage() {
             </li>
             <li>
               <Check size={16} aria-hidden="true" />
-              <span>Credentials stay in your secret manager; MDARIX stores only a reference.</span>
+              <span>
+                Source-system API keys are encrypted at rest and never shown again, or kept in your secret manager by
+                reference.
+              </span>
             </li>
           </ul>
         </Reveal>

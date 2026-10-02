@@ -268,7 +268,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
     cards: [
       {
         title: "Separate data per customer",
-        text: "Each customer organization's business data lives in its own database, and every request is scoped to the signed-in organization.",
+        text: "Every record carries its organization, the database enforces that boundary on every query (row-level security), and every request is scoped to the signed-in organization. A dedicated database per customer is supported where required.",
       },
       {
         title: "Customer self-administration",
