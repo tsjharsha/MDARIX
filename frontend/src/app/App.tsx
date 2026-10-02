@@ -69,6 +69,9 @@ const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
   "admin-manage": "Customer administrators",
   "admin-create-customer": "Onboarding",
   "platform-onboarding": "Onboarding",
+  // Former full-screen registries now open their section of the console.
+  "admin-integration-registry": "Integrations:Connector catalog",
+  "admin-api-registry": "Operations:Developer API",
 };
 
 export function PrivateApplicationGate() {
@@ -244,8 +247,6 @@ export function PrivateApplication() {
             "admin-deployments",
             "admin-import-export",
             "admin-upgrade-center",
-            "admin-integration-registry",
-            "admin-api-registry",
             "admin-schema-registry",
             "admin-transformation-library",
           ].includes(activeView) && (
@@ -275,8 +276,6 @@ export function PrivateApplication() {
                     "admin-deployments": "Deployments",
                     "admin-import-export": "Import / Export",
                     "admin-upgrade-center": "Upgrade center",
-                    "admin-integration-registry": "Integration registry",
-                    "admin-api-registry": "API & contract registry",
                     "admin-schema-registry": "Schema registry",
                     "admin-transformation-library": "Transformation library",
                   } as Record<string, string>

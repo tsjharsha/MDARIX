@@ -360,6 +360,25 @@ def expiring_subscriptions(request: Request, db: Session = Depends(get_db)):
     ]
 
 
+DEFAULT_REMINDER_THRESHOLDS = [60, 30, 7]
+
+
+def reminder_schedules(db: Session) -> dict:
+    """Tenant id -> reminder days before expiry, from each tenant's newest active policy.
+
+    A tenant without a policy is absent; the lifecycle run then uses 60, 30 and 7 days.
+    """
+    schedules: dict = {}
+    for policy in (
+        db.query(ReminderPolicy)
+        .filter(func.upper(ReminderPolicy.status) == "ACTIVE")
+        .order_by(ReminderPolicy.created_at.desc())
+        .all()
+    ):
+        schedules.setdefault(policy.tenant_id, [int(value) for value in (policy.thresholds or [])])
+    return schedules
+
+
 @router.post("/platform/subscriptions/lifecycle/run")
 def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
     admin = _require_platform_admin(request, db)
@@ -367,6 +386,7 @@ def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
     queued = 0
     transitioned = 0
     rows = db.query(SubscriptionLifecycle).all()
+    schedules = reminder_schedules(db)
     for row in rows:
         if row.expires_at <= now and row.grace_ends_at and row.grace_ends_at > now and row.status != "GRACE":
             row.status = "GRACE"
@@ -375,7 +395,8 @@ def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
             row.status = "EXPIRED"
             transitioned += 1
             db.query(Tenant).filter(Tenant.id == row.tenant_id).update({"status": "SUSPENDED"})
-        for stage, threshold in (("60_DAY", 60), ("30_DAY", 30), ("7_DAY", 7)):
+        thresholds = schedules.get(row.tenant_id) or DEFAULT_REMINDER_THRESHOLDS
+        for stage, threshold in ((f"{days}_DAY", days) for days in thresholds):
             if 0 <= (row.expires_at - now).days <= threshold:
                 existing = (
                     db.query(OutboxEvent)

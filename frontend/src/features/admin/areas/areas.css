@@ -1,0 +1,205 @@
+/* Platform administrator areas (Plans & Licensing … Operations). Builds on the console tokens (admin-console.css)
+   and the Customers & Tenants styles (customers.css). */
+.ar-area .ac-grid {
+  min-width: 0;
+}
+.ar-intro {
+  margin: 0;
+  color: var(--ac-ink-2);
+  line-height: 1.5;
+}
+.ar-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-left: 3px solid var(--ac-teal);
+  border-radius: 6px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  line-height: 1.45;
+}
+.ar-notice svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ac-teal);
+}
+.ar-picker {
+  max-width: 520px;
+}
+.ar-picker select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.cc-toolbar .ar-picker {
+  flex: 1 1 260px;
+  grid-template-columns: minmax(0, 1fr);
+}
+.ar-inline select {
+  height: 36px;
+}
+.ar-stats-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ar-stats-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.ar-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+.ar-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.ar-card header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ar-card h4,
+.ar-subhead {
+  margin: 6px 0 0;
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ar-card p {
+  margin: 0;
+}
+.ar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-chips li {
+  padding: 3px 9px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 12px;
+}
+.ar-chips-no li {
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  text-decoration: line-through;
+  text-decoration-color: var(--ac-critical);
+}
+.ar-limits {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.ar-limits div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--ac-line);
+}
+.ar-limits dt {
+  color: var(--ac-ink-2);
+}
+.ar-limits dd {
+  margin: 0;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ar-selected strong {
+  color: var(--ac-teal);
+  text-decoration: underline;
+}
+.ar-yes,
+.ar-no {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ar-yes {
+  color: var(--ac-good, #1f7a4d);
+}
+.ar-no {
+  color: var(--ac-ink-2);
+}
+.ar-insert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ar-insert .ac-secondary {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.ar-preview {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-bg, #f6f8fa);
+}
+.ar-preview p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.ar-area .cc-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+}
+.ar-method {
+  display: inline-block;
+  min-width: 52px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.ar-post,
+.ar-put,
+.ar-patch {
+  background: #fff4e5;
+}
+.ar-delete {
+  background: #fdecea;
+}
+@media (min-width: 1100px) {
+  .ac-grid.two.ar-wide-right {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+}
+@media (max-width: 900px) {
+  .ar-stats-3,
+  .ar-stats-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .ar-stats-3,
+  .ar-stats-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

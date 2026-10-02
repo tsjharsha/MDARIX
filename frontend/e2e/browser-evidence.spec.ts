@@ -118,36 +118,71 @@ test.describe("MDARIX browser evidence", () => {
         timeout: 20_000,
       });
     }
-    const domains: Record<string, string[]> = {
-      "Plans & Licensing": ["Plans", "Entitlements", "Subscriptions", "Expirations", "Reminder rules"],
-      "Identity & Access": ["Platform users", "Platform roles", "Permission sets", "MFA & SSO", "Sessions"],
-      "Data & Configuration": ["Master data", "Data mapping", "Mapping versions", "Configuration releases"],
-      Integrations: ["Connector catalog", "Customer integrations", "Webhooks", "Integration health", "Failures & logs"],
-      "AI Control Center": [
-        "AI overview",
-        "Models & versions",
-        "Agents",
-        "Prompts",
-        "Evaluations",
-        "Guardrails",
-        "AI executions",
-      ],
-      Security: ["Security overview", "Tenant isolation", "Encryption & residency", "Retention", "Access reviews"],
-      Operations: ["System health", "Jobs & queues", "Storage", "Incidents", "System settings"],
+    // Plans & Licensing … Operations: each section has its own page; checked by its main heading.
+    const areas: Record<string, Record<string, string>> = {
+      "Plans & Licensing": {
+        Plans: "Plans",
+        Subscriptions: "Subscriptions",
+        Renewals: "Licences by end date",
+        Reminders: "Reminders",
+      },
+      "Identity & Access": {
+        "Platform users": "Platform users",
+        "Roles & permissions": "Roles",
+        "Effective access": "Effective access",
+      },
+      Integrations: {
+        "Connector catalog": "Connector catalog",
+        "Runs & failures": "Integration runs",
+        Reconciliation: "Reconciliation results",
+        Credentials: "Connection credentials",
+        "API & schemas": "Records and fields",
+      },
+      "AI Control Center": {
+        Overview: "Model in use",
+        Evaluations: "How the AI performs on our test cases",
+        Executions: "AI runs",
+        "Agents & guardrails": "Agents & guardrails",
+      },
+      Security: {
+        Overview: "Tenant isolation",
+        "Audit trail": "Audit trail",
+        "Support access": "Support access",
+        Retention: "Retention",
+      },
+      Operations: {
+        "System health": "Worker",
+        "Queues & jobs": "Waiting work by kind",
+        "Email & notifications": "Email delivery",
+        "Developer API": "Developer API",
+      },
     };
-    for (const [domain, items] of Object.entries(domains)) {
+    for (const [domain, sections] of Object.entries(areas)) {
       await openAdminNavigation(page);
       await navigation.getByRole("button", { name: new RegExp(`^${domain}`) }).click();
       const tabs = page.getByRole("tablist", { name: `${domain} sections` });
-      for (const item of items) {
+      for (const [item, heading] of Object.entries(sections)) {
         await tabs.getByRole("tab", { name: item, exact: true }).click();
-        await expect(page.locator(".platform-admin-workspace")).toHaveAttribute(
-          "data-admin-view",
-          `${domain}:${item}`,
-          { timeout: 20_000 },
-        );
-        await expect(page.getByRole("heading", { name: item, exact: true, level: 2 })).toBeVisible();
+        await expect(page.locator("main.ac-main")).toHaveAttribute("data-admin-section", `${domain}:${item}`);
+        await expect(page.getByRole("heading", { name: heading, exact: true, level: 2 })).toBeVisible({
+          timeout: 20_000,
+        });
+        await expect(page.getByText("[object Object]")).toHaveCount(0);
       }
+    }
+    // Data & Configuration keeps its workspaces.
+    const dataItems = ["Master data", "Data mapping", "Mapping versions", "Configuration releases"];
+    await openAdminNavigation(page);
+    await navigation.getByRole("button", { name: /^Data & Configuration/ }).click();
+    const dataTabs = page.getByRole("tablist", { name: "Data & Configuration sections" });
+    for (const item of dataItems) {
+      await dataTabs.getByRole("tab", { name: item, exact: true }).click();
+      await expect(page.locator(".platform-admin-workspace")).toHaveAttribute(
+        "data-admin-view",
+        `Data & Configuration:${item}`,
+        { timeout: 20_000 },
+      );
+      await expect(page.getByRole("heading", { name: item, exact: true, level: 2 })).toBeVisible();
     }
   });
 
@@ -302,7 +337,7 @@ test.describe("MDARIX browser evidence", () => {
       .click();
     await page
       .getByRole("tablist", { name: "Security sections" })
-      .getByRole("tab", { name: "Security events", exact: true })
+      .getByRole("tab", { name: "Audit trail", exact: true })
       .click();
     // The platform audit trail, with export and the evidence package.
     await expect(page.getByRole("link", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });

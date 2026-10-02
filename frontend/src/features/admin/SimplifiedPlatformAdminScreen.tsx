@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
+import { AdminArea, isAreaDomain } from "./areas/AdminArea";
+import { LEGACY_SECTIONS } from "./areas/sections";
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
@@ -21,11 +23,14 @@ const CUSTOMERS_AND_TENANTS = "Customers & Tenants";
 const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
 
 function locationFor(target: OverviewTarget | string): Location {
-  const domainName = typeof target === "string" ? target : target.domain;
+  // A string is a domain, or "Domain:Section" for a deep link.
+  const [domainName, deepItem] =
+    typeof target === "string" ? (target.split(":", 2) as [string, string | undefined]) : [target.domain, target.item];
   const domain = SECTIONS.find((entry) => entry[0] === domainName);
   if (!domain) return { domain: OVERVIEW, item: OVERVIEW };
-  const requested = typeof target === "string" ? undefined : target.item;
   const items = domain[3] as readonly string[];
+  // Old section names (bookmarks, links from other screens) land on the section that replaced them.
+  const requested = deepItem && !items.includes(deepItem) ? LEGACY_SECTIONS[deepItem] : deepItem;
   return { domain: domain[0], item: requested && items.includes(requested) ? requested : items[0] };
 }
 
@@ -232,6 +237,12 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                     <CustomersAndTenants
                       section={location.item as CustomerTenantSection}
                       onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
+                    />
+                  ) : isAreaDomain(location.domain) ? (
+                    <AdminArea
+                      key={`${location.domain}:${location.item}`}
+                      domain={location.domain}
+                      section={location.item}
                     />
                   ) : (
                     <PlatformAdminScreen

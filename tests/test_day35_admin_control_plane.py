@@ -128,7 +128,8 @@ def test_platform_admin_console_overview_uses_live_sources_and_embeds_every_doma
         "/api/v1/admin/audit-history",
     ):
         assert endpoint in overview
-    # Every non-overview domain renders the real workspaces, embedded in the console shell.
+    # Plans & Licensing … Operations have their own pages; the remaining domains embed the real workspaces.
+    assert "<AdminArea" in SIMPLIFIED_ADMIN_UI and "isAreaDomain" in SIMPLIFIED_ADMIN_UI
     assert "<PlatformAdminScreen" in SIMPLIFIED_ADMIN_UI and "embedded" in SIMPLIFIED_ADMIN_UI
     assert "export const DOMAINS" in PLATFORM_ADMIN_UI
     assert "/api/v1/auth/signout" in SIMPLIFIED_ADMIN_UI

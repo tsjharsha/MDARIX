@@ -4,7 +4,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
 ROUTER = access_api_source()
-SCREEN = (ROOT / "frontend" / "src" / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
+AREAS = ROOT / "frontend" / "src" / "features" / "admin" / "areas"
+INTEGRATIONS = (AREAS / "Integrations.tsx").read_text(encoding="utf-8")
+AI = (AREAS / "AiControlCenter.tsx").read_text(encoding="utf-8")
+SECTIONS = (AREAS / "sections.ts").read_text(encoding="utf-8")
 
 
 def test_operational_admin_endpoints_are_tenant_scoped_and_secret_safe():
@@ -20,6 +23,10 @@ def test_operational_admin_endpoints_are_tenant_scoped_and_secret_safe():
 
 
 def test_operational_admin_frontend_surfaces_are_connected():
-    for label in ("Integration runs", "Reconciliation", "Credentials", "AI executions"):
-        assert label in SCREEN
-    assert "AdminOperationalRecords" in SCREEN
+    # Runs, reconciliation and credentials are Integrations sections; AI runs are an AI Control Center section.
+    for label in ("Runs & failures", "Reconciliation", "Credentials", "Executions"):
+        assert f'"{label}"' in SECTIONS
+    assert "/api/v1/platform-admin/console/integration-runs" in INTEGRATIONS
+    assert "reconciled" in INTEGRATIONS
+    assert "/api/v1/admin/integrations/credentials" in INTEGRATIONS
+    assert "/api/v1/platform-admin/console/ai-activity" in AI

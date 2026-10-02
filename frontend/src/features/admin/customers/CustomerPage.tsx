@@ -293,7 +293,7 @@ function Subscription({
   );
 }
 
-function ChangeSubscription({
+export function ChangeSubscription({
   tenants,
   currentPlans,
   onClose,

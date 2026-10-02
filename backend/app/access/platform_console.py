@@ -1,0 +1,583 @@
+"""Platform-wide views for the platform administrator's console: renewals, reminders, integration runs, AI
+activity, the audit trail, security posture and operations.
+
+Each view spans every tenant (system scope, platform administrator only) but returns operational metadata only:
+tenant, status, counts, timings, actions and actors. Customer business content is never returned (no AI inputs
+or outputs, no record payloads, no audit old/new values).
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func, or_, text
+from sqlalchemy.orm import Session
+
+from auth.emailer import smtp_configuration_status
+from backend.app.access.authz import _require_platform_admin
+from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
+from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
+from backend.app.db.models.enterprise import ConnectorRun
+from backend.app.db.models.foundation import (
+    AIExecution,
+    AuditEvent,
+    AuthUser,
+    PlanDefinition,
+    Tenant,
+)
+from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
+from backend.app.db.session import get_db
+
+router = APIRouter(prefix="/api/v1", tags=["Platform console"])
+
+# Merge variables a reminder template may use (the server refuses any other).
+TEMPLATE_VARIABLES = ["customer_name", "expiry_date", "days_remaining", "activation_link"]
+# Platform tables that deliberately carry no row-level security policy (see migration md05_rls_system_scope).
+RLS_EXCLUDED_TABLES = [
+    "auth_users",
+    "auth_sessions",
+    "onboarding_requests",
+    "provisioning_jobs",
+    "provisioning_job_steps",
+    "platform_incidents",
+    "tenant_data_planes",
+]
+
+
+def _tenant_names(db: Session, tenant_ids) -> dict:
+    """Tenant id -> {tenant_key, tenant_name, customer_name} for the given tenants, in one query."""
+    ids = {tenant_id for tenant_id in tenant_ids if tenant_id}
+    if not ids:
+        return {}
+    rows = (
+        db.query(Tenant.id, Tenant.tenant_key, Tenant.display_name, Tenant.name, Customer.display_name)
+        .outerjoin(Customer, Customer.id == Tenant.customer_id)
+        .filter(Tenant.id.in_(ids))
+        .all()
+    )
+    return {row[0]: {"tenant_key": row[1], "tenant_name": row[2] or row[3], "customer_name": row[4]} for row in rows}
+
+
+def _with_tenant(item: dict, names: dict, tenant_id) -> dict:
+    found = names.get(tenant_id, {})
+    return {
+        **item,
+        "tenant_id": str(tenant_id) if tenant_id else None,
+        "tenant_key": found.get("tenant_key"),
+        "tenant_name": found.get("tenant_name"),
+        "customer_name": found.get("customer_name"),
+    }
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _page(page: int, page_size: int) -> tuple[int, int]:
+    return max(1, page), min(100, max(1, page_size))
+
+
+# Plans & Licensing ---------------------------------------------------------------------------------------------
+
+
+@router.get("/platform-admin/console/renewals")
+def subscription_renewals(request: Request, db: Session = Depends(get_db)):
+    """Every licence with an end date, soonest first, with its tenant, plan and the reminders queued for it."""
+    _require_platform_admin(request, db)
+    now = datetime.now(timezone.utc)
+    rows = db.query(SubscriptionLifecycle).order_by(SubscriptionLifecycle.expires_at.asc()).all()
+    names = _tenant_names(db, [row.tenant_id for row in rows])
+    plans = dict(db.query(PlanDefinition.id, PlanDefinition.name).all())
+    queued = Counter(
+        str(subscription_id)
+        for (subscription_id,) in db.query(OutboxEvent.aggregate_id).filter(
+            OutboxEvent.event_name == "SUBSCRIPTION_REMINDER"
+        )
+    )
+    items = []
+    for row in rows:
+        days = (row.expires_at - now).days if row.expires_at else None
+        items.append(
+            _with_tenant(
+                {
+                    "subscription_id": str(row.id),
+                    "plan_name": plans.get(row.plan_id),
+                    "status": row.status,
+                    "starts_at": _iso(row.starts_at),
+                    "expires_at": _iso(row.expires_at),
+                    "grace_ends_at": _iso(row.grace_ends_at),
+                    "days_remaining": days,
+                    "renewal_state": row.renewal_state,
+                    "reminders_queued": queued.get(str(row.id), 0),
+                },
+                names,
+                row.tenant_id,
+            )
+        )
+    return {"items": items, "total": len(items)}
+
+
+@router.get("/platform-admin/tenants/{tenant_id}/reminder-settings")
+def tenant_reminder_settings(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """The reminder policy a tenant uses (its newest active one, or the default) and its email templates."""
+    _require_platform_admin(request, db)
+    if db.query(Tenant.id).filter(Tenant.id == tenant_id).first() is None:
+        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    policy = (
+        db.query(ReminderPolicy)
+        .filter(ReminderPolicy.tenant_id == tenant_id, func.upper(ReminderPolicy.status) == "ACTIVE")
+        .order_by(ReminderPolicy.created_at.desc())
+        .first()
+    )
+    templates = (
+        db.query(EmailTemplate)
+        .filter(EmailTemplate.tenant_id == tenant_id)
+        .order_by(EmailTemplate.stage, EmailTemplate.created_at.desc())
+        .all()
+    )
+    return {
+        "policy": {
+            "id": str(policy.id),
+            "name": policy.name,
+            "thresholds": list(policy.thresholds or []),
+            "timezone": policy.timezone,
+            "recipient_types": list(policy.recipient_types or []),
+            "version": policy.version,
+            "created_at": _iso(policy.created_at),
+        }
+        if policy
+        else None,
+        "default_thresholds": DEFAULT_REMINDER_THRESHOLDS,
+        "templates": [
+            {
+                "id": str(row.id),
+                "stage": row.stage,
+                "version": row.version,
+                "subject": row.subject,
+                "body": row.body,
+                "status": row.status,
+                "created_at": _iso(row.created_at),
+            }
+            for row in templates
+        ],
+        "template_variables": TEMPLATE_VARIABLES,
+    }
+
+
+# Integrations --------------------------------------------------------------------------------------------------
+
+
+@router.get("/platform-admin/console/integration-runs")
+def integration_runs(
+    request: Request,
+    status: str = "",
+    tenant_id: uuid.UUID | None = None,
+    q: str = "",
+    reconciled: bool = False,
+    page: int = 1,
+    page_size: int = 25,
+    db: Session = Depends(get_db),
+):
+    """Connector runs across every tenant, newest first, with a 30-day summary by outcome.
+
+    ``reconciled`` keeps only runs that were reconciled against their source (any result).
+    """
+    _require_platform_admin(request, db)
+    page, page_size = _page(page, page_size)
+    query = db.query(ConnectorRun)
+    if status.strip():
+        if status.strip().upper() == "PROBLEMS":
+            query = query.filter(
+                or_(
+                    func.upper(ConnectorRun.status).in_(["FAILED", "PARTIAL", "ERROR"]),
+                    ConnectorRun.failure_category.is_not(None),
+                    ConnectorRun.records_rejected > 0,
+                )
+            )
+        else:
+            query = query.filter(func.upper(ConnectorRun.status) == status.strip().upper())
+    if tenant_id:
+        query = query.filter(ConnectorRun.tenant_id == tenant_id)
+    if reconciled:
+        query = query.filter(ConnectorRun.reconciliation_status.is_not(None))
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        query = query.filter(
+            or_(func.lower(ConnectorRun.source_system).like(like), func.lower(ConnectorRun.connection_id).like(like))
+        )
+    total = query.count()
+    rows = query.order_by(ConnectorRun.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    names = _tenant_names(db, [row.tenant_id for row in rows])
+    since = datetime.now(timezone.utc) - timedelta(days=30)
+    summary = dict(
+        db.query(func.upper(ConnectorRun.status), func.count(ConnectorRun.id))
+        .filter(ConnectorRun.started_at >= since)
+        .group_by(func.upper(ConnectorRun.status))
+        .all()
+    )
+    reconciliation = dict(
+        db.query(func.upper(ConnectorRun.reconciliation_status), func.count(ConnectorRun.id))
+        .filter(ConnectorRun.started_at >= since, ConnectorRun.reconciliation_status.is_not(None))
+        .group_by(func.upper(ConnectorRun.reconciliation_status))
+        .all()
+    )
+    items = [
+        _with_tenant(
+            {
+                "id": str(row.id),
+                "source_system": row.source_system,
+                "connection_id": row.connection_id,
+                "run_type": row.run_type,
+                "status": row.status,
+                "records_received": row.records_received,
+                "records_accepted": row.records_accepted,
+                "records_rejected": row.records_rejected,
+                "records_quarantined": row.records_quarantined,
+                "records_duplicate": row.records_duplicate,
+                "retry_attempt": row.retry_attempt,
+                "reconciliation_status": row.reconciliation_status,
+                "schema_drift_status": row.schema_drift_status,
+                "failure_category": row.failure_category,
+                "started_at": _iso(row.started_at),
+                "completed_at": _iso(row.completed_at),
+            },
+            names,
+            row.tenant_id,
+        )
+        for row in rows
+    ]
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": max(1, (total + page_size - 1) // page_size),
+        "last_30_days": {"by_status": summary, "by_reconciliation": reconciliation},
+    }
+
+
+# AI Control Center ---------------------------------------------------------------------------------------------
+
+
+@router.get("/platform-admin/console/ai-activity")
+def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db)):
+    """AI executions across every tenant: totals, failures, latency, by tenant and model, and the latest runs.
+
+    Metadata only: what ran, where, when, how long and whether it validated. Inputs and outputs stay with the tenant.
+    """
+    _require_platform_admin(request, db)
+    days = min(365, max(1, days))
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    window = db.query(AIExecution).filter(AIExecution.execution_timestamp >= since)
+    total = window.count()
+    failed = window.filter(AIExecution.error_state.is_not(None)).count()
+    latencies = sorted(
+        value
+        for (value,) in db.query(AIExecution.latency_ms).filter(
+            AIExecution.execution_timestamp >= since, AIExecution.latency_ms.is_not(None)
+        )
+    )
+    p95 = latencies[min(len(latencies) - 1, int(len(latencies) * 0.95))] if latencies else None
+    by_tenant_rows = (
+        db.query(AIExecution.tenant_id, func.count(AIExecution.id))
+        .filter(AIExecution.execution_timestamp >= since)
+        .group_by(AIExecution.tenant_id)
+        .order_by(func.count(AIExecution.id).desc())
+        .limit(10)
+        .all()
+    )
+    by_model = [
+        {"provider": row[0], "model": row[1], "count": row[2]}
+        for row in db.query(AIExecution.provider, AIExecution.model_name, func.count(AIExecution.id))
+        .filter(AIExecution.execution_timestamp >= since)
+        .group_by(AIExecution.provider, AIExecution.model_name)
+        .order_by(func.count(AIExecution.id).desc())
+        .all()
+    ]
+    by_validation: dict = {}
+    for status, count in (
+        db.query(func.upper(AIExecution.validation_status), func.count(AIExecution.id))
+        .filter(AIExecution.execution_timestamp >= since)
+        .group_by(func.upper(AIExecution.validation_status))
+        .all()
+    ):
+        key = status or "NOT_RECORDED"
+        by_validation[key] = by_validation.get(key, 0) + count
+    latest = db.query(AIExecution).order_by(AIExecution.execution_timestamp.desc()).limit(50).all()
+    names = _tenant_names(db, [row[0] for row in by_tenant_rows] + [row.tenant_id for row in latest])
+    return {
+        "window_days": days,
+        "total": total,
+        "failed": failed,
+        "p95_latency_ms": p95,
+        "by_tenant": [_with_tenant({"count": row[1]}, names, row[0]) for row in by_tenant_rows],
+        "by_model": by_model,
+        "by_validation": by_validation,
+        "latest": [
+            _with_tenant(
+                {
+                    "id": str(row.id),
+                    "at": _iso(row.execution_timestamp),
+                    "provider": row.provider,
+                    "model": row.model_name,
+                    "model_version": row.model_version,
+                    "prompt_version": row.prompt_template_version,
+                    "validation_status": row.validation_status,
+                    "confidence": row.confidence_label,
+                    "latency_ms": row.latency_ms,
+                    "failed": row.error_state is not None,
+                },
+                names,
+                row.tenant_id,
+            )
+            for row in latest
+        ],
+    }
+
+
+# Security ------------------------------------------------------------------------------------------------------
+
+
+def _actor_names(db: Session, refs) -> dict:
+    ids = set()
+    for ref in refs:
+        try:
+            ids.add(uuid.UUID(str(ref)))
+        except (TypeError, ValueError):
+            continue
+    if not ids:
+        return {}
+    return {
+        str(row[0]): row[1] or row[2]
+        for row in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username).filter(AuthUser.id.in_(ids))
+    }
+
+
+@router.get("/platform-admin/console/audit")
+def platform_audit(
+    request: Request,
+    q: str = "",
+    tenant_id: uuid.UUID | None = None,
+    attention: bool = False,
+    page: int = 1,
+    page_size: int = 50,
+    db: Session = Depends(get_db),
+):
+    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values)."""
+    _require_platform_admin(request, db)
+    page, page_size = _page(page, page_size)
+    query = db.query(AuditEvent)
+    if tenant_id:
+        query = query.filter(AuditEvent.tenant_id == tenant_id)
+    if attention:
+        query = query.filter(
+            or_(
+                AuditEvent.action.like("%DENIED%"),
+                AuditEvent.action.like("%FAILED%"),
+                AuditEvent.action.like("%SUSPEND%"),
+                AuditEvent.action.like("%REVOKE%"),
+            )
+        )
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        query = query.filter(
+            or_(func.lower(AuditEvent.action).like(like), func.lower(AuditEvent.entity_type).like(like))
+        )
+    total = query.count()
+    rows = query.order_by(AuditEvent.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    names = _tenant_names(db, [row.tenant_id for row in rows])
+    actors = _actor_names(db, [row.actor_ref for row in rows])
+    items = []
+    for row in rows:
+        details = row.details if isinstance(row.details, dict) else {}
+        items.append(
+            _with_tenant(
+                {
+                    "id": str(row.id),
+                    "at": _iso(row.created_at),
+                    "action": row.action,
+                    "entity_type": row.entity_type,
+                    "actor": actors.get(str(row.actor_ref)) or (row.actor_ref if row.actor_ref else None),
+                    "reason": row.reason or details.get("reason"),
+                    "source": details.get("source"),
+                    "source_ip": row.source_ip,
+                },
+                names,
+                row.tenant_id,
+            )
+        )
+    return {"items": items, "total": total, "page": page, "pages": max(1, (total + page_size - 1) // page_size)}
+
+
+@router.get("/platform-admin/console/security")
+def security_posture(request: Request, db: Session = Depends(get_db)):
+    """Tenant isolation, sign-in protection, support access, data residency and retention, from live records."""
+    _require_platform_admin(request, db)
+    now = datetime.now(timezone.utc)
+    tenant_tables = db.execute(
+        text(
+            "SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = current_schema() AND c.relkind IN ('r', 'p') AND EXISTS ("
+            "SELECT 1 FROM information_schema.columns k WHERE k.table_schema = n.nspname "
+            "AND k.table_name = c.relname AND k.column_name = 'tenant_id')"
+        )
+    ).all()
+    protected = sorted(name for name, enabled in tenant_tables if enabled)
+    unprotected = sorted(name for name, enabled in tenant_tables if not enabled)
+    active_accounts = db.query(AuthUser).filter(func.upper(AuthUser.status) == "ACTIVE")
+    grants = dict(
+        db.query(func.upper(SupportAccessGrant.status), func.count(SupportAccessGrant.id))
+        .group_by(func.upper(SupportAccessGrant.status))
+        .all()
+    )
+    residency = [
+        {"region": row[0] or "UNSPECIFIED", "tenants": row[1]}
+        for row in db.query(Tenant.residency_region, func.count(Tenant.id))
+        .group_by(Tenant.residency_region)
+        .order_by(func.count(Tenant.id).desc())
+        .all()
+    ]
+    since = now - timedelta(days=30)
+    denied = (
+        db.query(AuditEvent.action, func.count(AuditEvent.id))
+        .filter(
+            AuditEvent.created_at >= since,
+            or_(AuditEvent.action.like("%DENIED%"), AuditEvent.action.like("%FAILED%")),
+        )
+        .group_by(AuditEvent.action)
+        .order_by(func.count(AuditEvent.id).desc())
+        .limit(8)
+        .all()
+    )
+    audit_total = db.query(func.count(AuditEvent.id)).scalar() or 0
+    oldest, earliest_release = db.query(func.min(AuditEvent.created_at), func.min(AuditEvent.retention_until)).one()
+    return {
+        "isolation": {
+            "tenant_tables": len(tenant_tables),
+            "protected": len(protected),
+            "unprotected": unprotected,
+            "excluded_by_design": [name for name in unprotected if name in RLS_EXCLUDED_TABLES],
+            "unexpected": [name for name in unprotected if name not in RLS_EXCLUDED_TABLES],
+        },
+        "sign_in": {
+            "active_accounts": active_accounts.count(),
+            "mfa_required": active_accounts.filter(AuthUser.mfa_required.is_(True)).count(),
+            "mfa_enrolled": active_accounts.filter(AuthUser.mfa_enrolled_at.is_not(None)).count(),
+        },
+        "support_access": grants,
+        "residency": residency,
+        "denied_or_failed_30_days": [{"action": row[0], "count": row[1]} for row in denied],
+        "retention": {
+            "audit_events": audit_total,
+            "oldest_event_at": _iso(oldest),
+            "earliest_release_at": _iso(earliest_release),
+            "policy": "Audit events are append-only and kept for at least 7 years.",
+        },
+    }
+
+
+@router.get("/platform-admin/console/support-access")
+def support_access_overview(request: Request, db: Session = Depends(get_db)):
+    """Support access grants with readable tenant and person names, newest first."""
+    _require_platform_admin(request, db)
+    rows = db.query(SupportAccessGrant).order_by(SupportAccessGrant.created_at.desc()).limit(200).all()
+    names = _tenant_names(db, [row.tenant_id for row in rows])
+    people = _actor_names(db, [row.platform_user_id for row in rows] + [row.approved_by for row in rows])
+    now = datetime.now(timezone.utc)
+    items = []
+    for row in rows:
+        status = (row.status or "").upper()
+        expired = bool(row.expires_at and row.expires_at <= now)
+        items.append(
+            _with_tenant(
+                {
+                    "id": str(row.id),
+                    "person": people.get(str(row.platform_user_id)),
+                    "platform_user_id": str(row.platform_user_id),
+                    "scope": row.scope or {},
+                    "reason": row.reason,
+                    "status": "EXPIRED" if expired and status in {"PENDING", "ACTIVE", "APPROVED"} else status,
+                    "starts_at": _iso(row.starts_at),
+                    "expires_at": _iso(row.expires_at),
+                    "approved_by": people.get(str(row.approved_by)) if row.approved_by else None,
+                    "can_approve": status == "PENDING" and not expired,
+                    "can_revoke": status in {"PENDING", "ACTIVE", "APPROVED"} and not expired,
+                },
+                names,
+                row.tenant_id,
+            )
+        )
+    return {"items": items}
+
+
+# Operations ----------------------------------------------------------------------------------------------------
+
+
+@router.get("/platform-admin/console/operations")
+def operations_overview(request: Request, db: Session = Depends(get_db)):
+    """Queues, background jobs and email delivery across the platform."""
+    _require_platform_admin(request, db)
+    database_ok = True
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:  # pragma: no cover - reported, not raised
+        database_ok = False
+    outbox = db.query(OutboxEvent)
+    pending = outbox.filter(OutboxEvent.published_at.is_(None), OutboxEvent.dead_lettered_at.is_(None))
+    by_event = [
+        {"event": row[0], "pending": row[1]}
+        for row in pending.with_entities(OutboxEvent.event_name, func.count(OutboxEvent.id))
+        .group_by(OutboxEvent.event_name)
+        .order_by(func.count(OutboxEvent.id).desc())
+        .limit(10)
+        .all()
+    ]
+    oldest_pending = pending.with_entities(func.min(OutboxEvent.occurred_at)).scalar()
+    jobs = dict(
+        db.query(func.upper(ProvisioningJob.status), func.count(ProvisioningJob.id))
+        .group_by(func.upper(ProvisioningJob.status))
+        .all()
+    )
+    recent_jobs = db.query(ProvisioningJob).order_by(ProvisioningJob.created_at.desc()).limit(10).all()
+    names = _tenant_names(db, [row.tenant_id for row in recent_jobs])
+    smtp = smtp_configuration_status()
+    return {
+        "database": "OK" if database_ok else "UNAVAILABLE",
+        "worker_heartbeat": "NOT_REPORTED",
+        "queue": {
+            "pending": pending.count(),
+            "retrying": pending.filter(OutboxEvent.attempts > 0).count(),
+            "dead_lettered": outbox.filter(OutboxEvent.dead_lettered_at.is_not(None)).count(),
+            "published": outbox.filter(OutboxEvent.published_at.is_not(None)).count(),
+            "oldest_pending_at": _iso(oldest_pending),
+            "pending_by_event": by_event,
+        },
+        "provisioning_jobs": {
+            "by_status": jobs,
+            "recent": [
+                _with_tenant(
+                    {
+                        "id": str(row.id),
+                        "job_identifier": row.job_identifier,
+                        "status": row.status,
+                        "retry_count": row.retry_count,
+                        "created_at": _iso(row.created_at),
+                        "completed_at": _iso(row.completed_at),
+                    },
+                    names,
+                    row.tenant_id,
+                )
+                for row in recent_jobs
+            ],
+        },
+        "email": {
+            "configured": bool(smtp.get("configured")),
+            "present": smtp.get("present", {}),
+            "sender_domain_verified": bool(smtp.get("sender_domain_verified")),
+            "reminders_pending": pending.filter(OutboxEvent.event_name == "SUBSCRIPTION_REMINDER").count(),
+            # Nothing consumes queued subscription reminders yet, so none are delivered.
+            "reminder_delivery": "NOT_CONNECTED",
+        },
+    }
