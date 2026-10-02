@@ -256,3 +256,30 @@ def test_reset_removes_what_the_demo_created_and_restores_the_story(demo):
     assert _golden_products() == golden_before
     # The team survives a reset and can still sign in.
     assert _signin("investigator@acmecare-demo.invalid").get("/api/v1/auth/session").status_code == 200
+
+
+def test_a_demo_case_has_its_own_graph_and_search_context(demo):
+    from backend.app.db.models.foundation import Complaint
+    from investigation_workspace.schemas import InvestigationWorkspaceRequest
+    from investigation_workspace.service import InvestigationWorkspaceService
+
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == DEMO_TENANT_KEY).one()
+        case = db.query(Investigation).filter_by(tenant_id=tenant.id, investigation_identifier="ACD-INV-101").one()
+        workspace = InvestigationWorkspaceService().workspace(
+            db,
+            InvestigationWorkspaceRequest(tenant_id=tenant.id, investigation_id=case.id, include_retrieval=True),
+        )
+        nodes = workspace.relationship_context["nodes"]
+        assert nodes, "the graph is built from the demo tenant's own records"
+        assert {node["tenant_id"] for node in nodes} == {str(tenant.id)}
+        complaint_ids = {str(row.id) for row in db.query(Complaint.id).filter(Complaint.tenant_id == tenant.id)}
+        graph_complaints = {node["canonical_entity_id"] for node in nodes if node["entity_type"] == "complaint"}
+        assert graph_complaints and graph_complaints <= complaint_ids
+        assert workspace.retrieval_context.results_count >= 1  # evidence is linked to its product and version
+        assert {item.evidence_identifier for item in workspace.retrieval_context.results} <= {
+            code for code, *_ in story.EVIDENCE["ACD-INV-101"]
+        }
+    finally:
+        db.close()

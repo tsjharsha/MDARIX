@@ -36,7 +36,8 @@ class InvestigationWorkspaceService:
         retrieval_service: TrustedRetrievalService | None = None,
     ) -> None:
         self.product_service = product_service or Product360Service()
-        self.graph_service = graph_service or RealityGraphService()
+        # Without an injected service the graph is read per request, from the request's own session (data plane).
+        self.graph_service = graph_service
         self.retrieval_service = retrieval_service or TrustedRetrievalService()
 
     def workspace(
@@ -73,7 +74,7 @@ class InvestigationWorkspaceService:
                     "PRODUCT_VERSION_NOT_FOUND", "ProductVersion is not available for this investigation product"
                 )
         product_context = self._product_context(investigation, product_version_id, request, data_plane_engine)
-        relationship_context = self._relationship_context(investigation.id)
+        relationship_context = self._relationship_context(db, request.tenant_id, investigation.id)
         evidence_context = self._evidence_context(
             db, request.tenant_id, investigation, request.temporal_mode, request.as_of
         )
@@ -148,9 +149,11 @@ class InvestigationWorkspaceService:
             "owner_ref": investigation.owner_ref,
         }
 
-    def _relationship_context(self, investigation_id: uuid.UUID) -> dict[str, Any]:
+    def _relationship_context(self, db: Session, tenant_id, investigation_id: uuid.UUID) -> dict[str, Any]:
+        # Always the investigation's own tenant: without it the graph service falls back to a default tenant.
+        service = self.graph_service or RealityGraphService(db)
         try:
-            graph = self.graph_service.get_investigation_graph(str(investigation_id), depth=2)
+            graph = service.get_investigation_graph(str(investigation_id), depth=2, tenant_id=str(tenant_id))
             return graph.model_dump(mode="json")
         except GraphError as exc:
             return {
@@ -262,7 +265,9 @@ class InvestigationWorkspaceService:
                 "chunk_id": str(chunk.id),
                 "sequence_number": chunk.sequence_number,
                 "source_anchor": chunk.source_anchor or {},
-                "excerpt": (chunk.source_anchor or {}).get("excerpt") or chunk.text_content[:240],
+                # The chunk's own text (up to 240 characters) rather than the 100-character anchor excerpt, so a
+                # statement is not cut off mid-sentence; the source anchor itself is unchanged.
+                "excerpt": (chunk.text_content or "")[:240] or (chunk.source_anchor or {}).get("excerpt"),
                 "materialized": True,
             }
             for chunk in chunks
@@ -408,12 +413,18 @@ class InvestigationWorkspaceService:
         return limitations
 
     def _select_product_version_id(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID) -> str | None:
+        """The version most of the case's complaints concern (ties: the one with the latest complaint).
+
+        A case can include a few baseline complaints from an older version; the earliest complaint would pick that
+        older version and hide the evidence about the version under investigation.
+        """
         value = db.execute(
             text(
                 "SELECT c.product_version_id FROM investigation_complaints ic "
                 "JOIN complaints c ON c.tenant_id=ic.tenant_id AND c.id=ic.complaint_id "
                 "WHERE ic.tenant_id=:tenant_id AND ic.investigation_id=:investigation_id AND c.product_version_id IS NOT NULL "
-                "ORDER BY c.event_timestamp NULLS LAST LIMIT 1"
+                "GROUP BY c.product_version_id "
+                "ORDER BY count(*) DESC, max(c.event_timestamp) DESC NULLS LAST LIMIT 1"
             ),
             {"tenant_id": tenant_id, "investigation_id": investigation_id},
         ).scalar_one_or_none()

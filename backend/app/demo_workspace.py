@@ -287,6 +287,7 @@ def reset_demo(db: Session) -> dict:
 
 def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> dict:
     """Write the curated story (backend/app/demo_story.py) into an empty demo tenant. Does not commit."""
+    from backend.app.db.models.evidence_intelligence import EvidenceEntityLink
     from backend.app.db.models.foundation import (
         Component,
         ComponentSupplier,
@@ -498,9 +499,14 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
                     created_at=now,
                 )
             )
+    product_of_case = {code: product_code for code, product_code, *_ in story.INVESTIGATIONS}
+    versions_of = {
+        spec["id"]: [versions[(spec["id"], revision)] for revision, _ in spec["versions"]] for spec in story.PRODUCTS
+    }
     evidence_count = 0
     for investigation_code, records in story.EVIDENCE.items():
         investigation = investigations[investigation_code]
+        product_code = product_of_case[investigation_code]
         for code, kind, title, days, reliability, text in records:
             evidence = add(
                 Evidence(
@@ -528,6 +534,21 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
                     created_at=now,
                 )
             )
+            # Link the record to its product and versions, as ingestion does, so case search finds it.
+            for entity_type, entity_id, reference in [("Product", products[product_code].id, product_code)] + [
+                ("ProductVersion", version.id, version.version_identifier) for version in versions_of[product_code]
+            ]:
+                add(
+                    EvidenceEntityLink(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        evidence_id=evidence.id,
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        raw_reference=reference,
+                        resolution_status="RESOLVED",
+                    )
+                )
             evidence_count += 1
     db.flush()
     return {
