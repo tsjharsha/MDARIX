@@ -19,7 +19,8 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.app.db.models.foundation import Complaint, LotBatch, Product, ProductVersion
+from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
+from backend.app.trial import business_imports
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import TRIAL_FILE_LIMIT_BYTES, TRIAL_ROW_LIMIT
 
@@ -61,13 +62,36 @@ TEMPLATES: dict[str, dict] = {
     "lots": {
         "title": "Lots and batches",
         "required": ["lot_id", "product_id", "version"],
-        "optional": ["manufacture_date"],
-        "example": [["L24-0815", "PUMP-200", "Rev D", "2026-07-20"], ["L24-0902", "PUMP-200", "Rev D", "2026-08-11"]],
+        "optional": ["manufacture_date", "site_id"],
+        "example": [
+            ["L24-0815", "PUMP-200", "Rev D", "2026-07-20", ""],
+            ["L24-0902", "PUMP-200", "Rev D", "2026-08-11", ""],
+        ],
     },
     "complaints": {
         "title": "Complaints",
         "required": ["complaint_id", "product_id", "description"],
-        "optional": ["version", "lot_id", "event_date", "received_date", "status"],
+        "optional": [
+            "version",
+            "lot_id",
+            "event_date",
+            "received_date",
+            "status",
+            # Regulatory details from the quality system (none identifies a person).
+            "awareness_date",
+            "severity",
+            "country",
+            "reporter_type",
+            "complaint_type",
+            "problem_code",
+            "serial_number",
+            "udi",
+            "device_returned",
+            "patient_involved",
+            "serious_injury",
+            "death",
+            "malfunction",
+        ],
         "example": [
             [
                 "CMP-10021",
@@ -78,10 +102,28 @@ TEMPLATES: dict[str, dict] = {
                 "2026-08-28",
                 "2026-08-30",
                 "open",
+                "2026-08-30",
+                "major",
+                "IE",
+                "Healthcare professional",
+                "Device malfunction",
+                "ALM-OCC-FALSE",
+                "SN-200D-004471",
+                "",
+                "Y",
+                "Y",
+                "N",
+                "N",
+                "Y",
             ]
         ],
     },
+    **business_imports.TEMPLATES,
 }
+# Yes/no columns, and columns that hold longer text than the 255-character default.
+FLAG_COLUMNS = {"device_returned", "patient_involved", "serious_injury", "death", "malfunction"}
+FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no": False, "false": False, "0": False}
+LONG_TEXT = {"description": 4000, "text": 4000, "question": 4000, "content": 20000}
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,119}$")
 _PERSONAL_DATA = [
@@ -186,6 +228,7 @@ def _parse(entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIA
 def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) -> None:
     spec = TEMPLATES[entity]
     key = spec["required"][0]
+    identity_columns = spec.get("identity")
     seen: dict[tuple, int] = {}
     for line, row in rows:
         for column in spec["required"]:
@@ -197,13 +240,19 @@ def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) ->
             if column.endswith("_id") or column == "version":
                 if not _ID.match(value):
                     report.add(line, column, "Use up to 120 letters, numbers, spaces or . _ / # : - characters.")
+            elif column.endswith("_ids"):
+                if any(not _ID.match(part) for part in business_imports.split_ids(value)):
+                    report.add(line, column, "List identifiers separated by ; (letters, numbers, . _ / # : -).")
+            elif column in FLAG_COLUMNS:
+                if value.lower() not in FLAG_VALUES:
+                    report.add(line, column, "Use Y or N.")
             elif column.endswith("_date"):
                 try:
                     date.fromisoformat(value)
                 except ValueError:
                     report.add(line, column, f"'{value}' is not a date in YYYY-MM-DD format.")
             else:
-                limit = 4000 if column == "description" else 255
+                limit = LONG_TEXT.get(column, 255)
                 if len(value) > limit:
                     report.add(line, column, f"Keep this under {limit} characters.")
                 found = _personal_data(value)
@@ -213,7 +262,10 @@ def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) ->
                     report.add(line, column, "Text cannot start with =, +, @ or a formula; spreadsheets would run it.")
         if entity == "complaints" and row.get("status") and row["status"].lower() not in COMPLAINT_STATUSES:
             report.add(line, "status", "Status must be open, closed or under investigation.")
-        identity = (row.get(key), row.get("version")) if entity == "products" else (row.get(key),)
+        if identity_columns:
+            identity = tuple(row.get(column) for column in identity_columns)
+        else:
+            identity = (row.get(key), row.get("version")) if entity == "products" else (row.get(key),)
         if identity in seen:
             report.add(line, key, f"Duplicate of row {seen[identity]}.")
         else:
@@ -252,6 +304,13 @@ class _Lookup:
             )
         return self.versions[key]
 
+    def site(self, identifier: str) -> ManufacturingSite | None:
+        return (
+            self.db.query(ManufacturingSite)
+            .filter(ManufacturingSite.tenant_id == self.tenant_id, ManufacturingSite.site_identifier == identifier)
+            .first()
+        )
+
     def lot(self, identifier: str) -> LotBatch | None:
         if identifier not in self.lots:
             self.lots[identifier] = (
@@ -264,6 +323,8 @@ class _Lookup:
 
 def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> int:
     """Validate references and count the rows that would be new records."""
+    if entity in business_imports.TEMPLATES:
+        return business_imports.check(entity, rows, lookup, report)
     new = 0
     new_products: set[str] = set()
     for line, row in rows:
@@ -285,6 +346,8 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> in
             if version is None:
                 report.add(line, "version", f"Version '{row['version']}' of '{row['product_id']}' is not loaded yet.")
         if entity == "lots":
+            if row.get("site_id") and lookup.site(row["site_id"]) is None:
+                report.add(line, "site_id", f"Site '{row['site_id']}' is not in your workspace. Load it first.")
             existing = lookup.lot(row["lot_id"])
             if existing is None:
                 new += 1
@@ -331,11 +394,14 @@ def rows_from_records(entity: str, records: list[dict], report: _Report) -> list
 
 def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
     total = 0
-    for model in (Product, ProductVersion, LotBatch, Complaint):
-        total += (
-            db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, model.source_system == source).scalar()
-            or 0
-        )
+    from retrieval.record_evidence import RECORD_EVIDENCE_TYPE
+
+    for model in (Product, ProductVersion, LotBatch, Complaint, *business_imports.MODELS):
+        query = db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, model.source_system == source)
+        if model is business_imports.Evidence:
+            # The searchable copy of each imported record is not a row the customer loaded.
+            query = query.filter(model.evidence_type != RECORD_EVIDENCE_TYPE)
+        total += query.scalar() or 0
     return int(total)
 
 
@@ -415,6 +481,11 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     lookup = _Lookup(db, tenant_id)
     now = datetime.now(timezone.utc)
     created = updated = 0
+    if entity in business_imports.TEMPLATES:
+        created, updated = business_imports.write(
+            entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
+        )
+        return {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
     for _, row in rows:
         if entity == "products":
             product = lookup.product(row["product_id"])
@@ -467,6 +538,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         version = lookup.version(product, row["version"]) if row.get("version") else None
         if entity == "lots":
             built = _date(row["manufacture_date"]) if row.get("manufacture_date") else None
+            site = lookup.site(row["site_id"]) if row.get("site_id") else None
             lot = lookup.lot(row["lot_id"])
             if lot is None:
                 lot = LotBatch(
@@ -474,6 +546,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     tenant_id=tenant_id,
                     lot_identifier=row["lot_id"],
                     product_version_id=version.id if version else None,
+                    manufacturing_site_id=site.id if site else None,
                     status="active",
                     source_identifier=row["lot_id"],
                     **_stamp(now, built, source),
@@ -483,6 +556,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 created += 1
             else:
                 lot.product_version_id = version.id if version else lot.product_version_id
+                lot.manufacturing_site_id = site.id if site else lot.manufacturing_site_id
                 if built:
                     lot.effective_timestamp = built
                 lot.updated_at = now
@@ -505,18 +579,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             "complaint_timestamp": received or event,
             "description": row["description"],
             "status": (row.get("status") or "open").lower(),
+            **_complaint_details(row),
         }
         if complaint is None:
-            db.add(
-                Complaint(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    complaint_identifier=row["complaint_id"],
-                    source_identifier=row["complaint_id"],
-                    **values,
-                    **_stamp(now, received or event, source),
-                )
+            complaint = Complaint(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                complaint_identifier=row["complaint_id"],
+                source_identifier=row["complaint_id"],
+                **values,
+                **_stamp(now, received or event, source),
             )
+            db.add(complaint)
             created += 1
         else:
             for name, value in values.items():
@@ -524,7 +598,60 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             complaint.updated_at = now
             updated += 1
         db.flush()
+        _index_complaint(db, tenant_id, complaint, row, product, version, lot, source)
     return {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+
+
+def _complaint_details(row: dict) -> dict:
+    """The optional regulatory columns of a complaint row; a column the batch leaves out keeps its stored value."""
+    details: dict = {}
+    for column in ("severity", "country", "reporter_type", "complaint_type", "problem_code", "serial_number", "udi"):
+        if column in row:
+            details[column] = row[column] or None
+    for column in FLAG_COLUMNS:
+        if column in row:
+            details[column] = FLAG_VALUES.get(row[column].lower()) if row[column] else None
+    if "awareness_date" in row:
+        details["awareness_timestamp"] = _date(row["awareness_date"]) if row["awareness_date"] else None
+    return details
+
+
+def _index_complaint(db: Session, tenant_id, complaint: Complaint, row: dict, product, version, lot, source: str):
+    """Make the complaint searchable by Ask MDARIX and the investigator (retrieval/record_evidence.py)."""
+    from retrieval.record_evidence import summary, upsert_record_evidence
+
+    facts = {
+        "Product": row["product_id"],
+        "Version": row.get("version"),
+        "Lot": row.get("lot_id"),
+        "Event date": complaint.event_timestamp,
+        "Received": complaint.complaint_timestamp,
+        "Status": complaint.status,
+        "Severity": complaint.severity,
+        "Country": complaint.country,
+        "Complaint type": complaint.complaint_type,
+        "Problem code": complaint.problem_code,
+        "Device returned": complaint.device_returned,
+        "Patient involved": complaint.patient_involved,
+        "Serious injury": complaint.serious_injury,
+        "Death": complaint.death,
+        "Malfunction": complaint.malfunction,
+    }
+    upsert_record_evidence(
+        db,
+        tenant_id,
+        kind="COMPLAINT",
+        identifier=complaint.complaint_identifier,
+        title=f"Complaint {complaint.complaint_identifier}",
+        content=summary(f"Complaint {complaint.complaint_identifier}", facts, f"Description: {complaint.description}"),
+        links=[
+            ("Complaint", complaint.id),
+            ("Product", product.id if product else None),
+            ("ProductVersion", version.id if version else complaint.product_version_id),
+            ("LotBatch", lot.id if lot else None),
+        ],
+        source=source,
+    )
 
 
 def insights(db: Session, tenant_id) -> dict:

@@ -1,276 +1,276 @@
 application,application_name,file,record_type,column,required,data_type,description,mdarix_field,imported_by_mdarix_today
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_id,Yes,text,TrackWise internal record ID,complaints.source_identifier,Not yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_number,Yes,text,Complaint number people use,complaints.complaint_id,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,product_code,Yes,text,Product (same number as in PLM),complaints.product_id,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,product_revision,No,text,Product version/revision,complaints.version,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,event_date,No,date YYYY-MM-DD,When the event happened,complaints.event_date,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,received_date,No,date YYYY-MM-DD,When the company received it,complaints.received_date,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,awareness_date,No,date YYYY-MM-DD,Regulatory awareness date (reporting clock starts),-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_id,Yes,text,TrackWise internal record ID,-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_number,Yes,text,Complaint number people use,Complaint.complaint_id,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,product_code,Yes,text,Product (same number as in PLM),Complaint.product_id,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,product_revision,No,text,Product version/revision,Complaint.version,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,event_date,No,date YYYY-MM-DD,When the event happened,Complaint.event_date,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,received_date,No,date YYYY-MM-DD,When the company received it,Complaint.received_date,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,awareness_date,No,date YYYY-MM-DD,Regulatory awareness date (reporting clock starts),Complaint.awareness_date,Yes
 TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,opened_date,No,date YYYY-MM-DD,When the record was opened,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,country,No,ISO country code,Country where the event happened,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,reporter_type,No,text,"Healthcare professional, User facility, Patient or caregiver, Distributor",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_type,No,text,"Device malfunction, Device performance, Labeling, Packaging",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,problem_code,No,text,Company or IMDRF problem code,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,problem_description,Yes,text,"What happened, without personal data",complaints.description,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,severity,No,text,"Minor, Major, Critical",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,lot_number,No,text,Lot/batch (same number as in ERP),complaints.lot_id,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,serial_number,No,text,Device serial number,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,udi,No,text,Unique device identifier,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,device_returned,No,Y/N,Device returned for evaluation,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,patient_involved,No,Y/N,A patient was involved,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,serious_injury,No,Y/N,Serious injury reported,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,death,No,Y/N,Death reported,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,malfunction,No,Y/N,Device malfunction,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,status,No,text,"Open, Under investigation, Closed",complaints.status,Yes
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,investigation_number,No,text,Linked investigation,investigation_complaints,Not yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,created_at,No,date-time ISO 8601 UTC,Record created in TrackWise,complaints.source_timestamp,Not yet
-TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,updated_at,No,date-time ISO 8601 UTC,Last change in TrackWise,complaints.recorded_timestamp,Not yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,investigation_number,Yes,text,Investigation number,investigations.investigation_identifier,Not yet
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,country,No,ISO country code,Country where the event happened,Complaint.country,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,reporter_type,No,text,"Healthcare professional, User facility, Patient or caregiver, Distributor",Complaint.reporter_type,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,complaint_type,No,text,"Device malfunction, Device performance, Labeling, Packaging",Complaint.complaint_type,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,problem_code,No,text,Company or IMDRF problem code,Complaint.problem_code,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,problem_description,Yes,text,"What happened, without personal data",Complaint.description,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,severity,No,text,"Minor, Major, Critical",Complaint.severity,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,lot_number,No,text,Lot/batch (same number as in ERP),Complaint.lot_id,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,serial_number,No,text,Device serial number,Complaint.serial_number,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,udi,No,text,Unique device identifier,Complaint.udi,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,device_returned,No,Y/N,Device returned for evaluation,Complaint.device_returned,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,patient_involved,No,Y/N,A patient was involved,Complaint.patient_involved,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,serious_injury,No,Y/N,Serious injury reported,Complaint.serious_injury,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,death,No,Y/N,Death reported,Complaint.death,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,malfunction,No,Y/N,Device malfunction,Complaint.malfunction,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,status,No,text,"Open, Under investigation, Closed",Complaint.status,Yes
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,investigation_number,No,text,Linked investigation,-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,created_at,No,date-time ISO 8601 UTC,Record created in TrackWise,-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),complaints.csv,Complaint,updated_at,No,date-time ISO 8601 UTC,Last change in TrackWise,-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,investigation_number,Yes,text,Investigation number,Investigation.investigation_id,Yes
 TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,title,Yes,text,Short title,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,investigation_question,Yes,text,The question the investigation answers,investigations.investigation_question,Not yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,product_code,Yes,text,Product investigated,investigations.product_id,Not yet
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,investigation_question,Yes,text,The question the investigation answers,Investigation.question,Yes
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,product_code,Yes,text,Product investigated,Investigation.product_id,Yes
 TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,product_revision,No,text,Revision in scope,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,related_complaints,No,list separated by ;,Complaint numbers in scope,investigation_complaints,Not yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,opened_date,No,date YYYY-MM-DD,Opened,investigations.opened_at,Not yet
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,related_complaints,No,list separated by ;,Complaint numbers in scope,Investigation.complaint_ids,Yes
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,opened_date,No,date YYYY-MM-DD,Opened,Investigation.opened_date,Yes
 TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,due_date,No,date YYYY-MM-DD,Due,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,owner,No,user ID (no names or emails),Owner's user ID in TrackWise,investigations.owner_ref,Not yet
-TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,status,Yes,text,"Open, In progress, Closed",investigations.status,Not yet
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,owner,No,user ID (no names or emails),Owner's user ID in TrackWise,Investigation.owner,Yes
+TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,status,Yes,text,"Open, In progress, Closed",Investigation.status,Yes
 TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,root_cause_category,No,text,"Design, Manufacturing, Supplier, Use error, Not confirmed",-,No MDARIX field yet
 TRACKWISE,TrackWise Digital (quality management),investigations.csv,Investigation,conclusion,No,text,Conclusion when closed,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,capa_number,Yes,text,CAPA number,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,title,Yes,text,Short title,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,source_type,No,text,"Investigation, Complaint, Audit, Nonconformance",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,source_reference,No,text,Number of the source record,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,product_code,No,text,Product,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,action_type,No,text,"Corrective, Preventive",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,opened_date,No,date YYYY-MM-DD,Opened,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,due_date,No,date YYYY-MM-DD,Due,-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,status,Yes,text,"Open, Implementation, Effectiveness check, Closed",-,No MDARIX field yet
-TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,effectiveness_check_date,No,date YYYY-MM-DD,When effectiveness is checked,-,No MDARIX field yet
-SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,case_number,Yes,text,Case number,-,No MDARIX field yet
-SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,subject,Yes,text,Short subject,-,No MDARIX field yet
-SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,description,Yes,text,"What the customer reported, without personal data",-,No MDARIX field yet
-SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,product_code,No,text,Product,-,No MDARIX field yet
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,capa_number,Yes,text,CAPA number,Capa.capa_id,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,title,Yes,text,Short title,Capa.title,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,source_type,No,text,"Investigation, Complaint, Audit, Nonconformance",Capa.source_type,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,source_reference,No,text,Number of the source record,Capa.source_reference,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,product_code,No,text,Product,Capa.product_id,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,action_type,No,text,"Corrective, Preventive",Capa.action_type,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,opened_date,No,date YYYY-MM-DD,Opened,Capa.opened_date,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,due_date,No,date YYYY-MM-DD,Due,Capa.due_date,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,status,Yes,text,"Open, Implementation, Effectiveness check, Closed",Capa.status,Yes
+TRACKWISE,TrackWise Digital (quality management),capas.csv,CAPA,effectiveness_check_date,No,date YYYY-MM-DD,When effectiveness is checked,Capa.effectiveness_check_date,Yes
+SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,case_number,Yes,text,Case number,Evidence.evidence_id,Yes
+SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,subject,Yes,text,Short subject,Evidence.title,Yes
+SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,description,Yes,text,"What the customer reported, without personal data",Evidence.content,Yes
+SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,product_code,No,text,Product,Evidence.product_id,Yes
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,serial_number,No,text,Device serial number,-,No MDARIX field yet
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,lot_number,No,text,Lot/batch,-,No MDARIX field yet
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,case_origin,No,text,"Phone, Web, Field service, Email",-,No MDARIX field yet
-SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,opened_datetime,No,date-time ISO 8601 UTC,When the case was opened,-,No MDARIX field yet
+SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,opened_datetime,No,date-time ISO 8601 UTC,When the case was opened,Evidence.effective_date,Yes
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,status,No,text,"New, Working, Escalated, Closed",-,No MDARIX field yet
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,escalated_to_complaint,No,Y/N,Became a complaint in the quality system,-,No MDARIX field yet
 SALESFORCE_SERVICE,Salesforce Service (complaint intake),cases.csv,Service case,complaint_number,No,text,Complaint number in the quality system,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,event_number,Yes,text,Quality event number,complaints.complaint_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,event_number,Yes,text,Quality event number,Complaint.complaint_id,Yes
 VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,event_type,Yes,text,"Complaint, Deviation, Nonconformance (only Complaint becomes an MDARIX complaint)",-,No MDARIX field yet
 VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,title,Yes,text,Short title,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,description,Yes,text,"What happened, without personal data",complaints.description,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,product_code,Yes,text,Product (same number as in PLM),complaints.product_id,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,product_version,No,text,Product version,complaints.version,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,lot_number,No,text,Lot (same number as in ERP),complaints.lot_id,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,event_date,No,date YYYY-MM-DD,When it happened,complaints.event_date,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,opened_date,No,date YYYY-MM-DD,When it was opened,complaints.received_date,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,severity,No,text,"Minor, Major, Critical",-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,status,No,text,"Open, In review, Closed",complaints.status,Yes
-VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,investigation_number,No,text,Linked investigation,investigation_complaints,Not yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,capa_number,Yes,text,CAPA number,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,title,Yes,text,Short title,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,source_event,No,text,Quality event number,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,product_code,No,text,Product,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,action_type,No,text,"Corrective, Preventive",-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,opened_date,No,date YYYY-MM-DD,Opened,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,due_date,No,date YYYY-MM-DD,Due,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,status,Yes,text,"Open, Implementation, Effectiveness check, Closed",-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,document_number,Yes,text,Document number,evidence.evidence_identifier,Not yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,title,Yes,text,Document title,evidence.title,Not yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,document_type,Yes,text,"Design verification report, Test report, Risk management file, IFU, SOP",evidence.evidence_type,Not yet
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,description,Yes,text,"What happened, without personal data",Complaint.description,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,product_code,Yes,text,Product (same number as in PLM),Complaint.product_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,product_version,No,text,Product version,Complaint.version,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,lot_number,No,text,Lot (same number as in ERP),Complaint.lot_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,event_date,No,date YYYY-MM-DD,When it happened,Complaint.event_date,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,opened_date,No,date YYYY-MM-DD,When it was opened,Complaint.received_date,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,severity,No,text,"Minor, Major, Critical",Complaint.severity,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,status,No,text,"Open, In review, Closed",Complaint.status,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),quality_events.csv,Quality event,investigation_number,No,text,Linked investigation,-,No MDARIX field yet
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,capa_number,Yes,text,CAPA number,Capa.capa_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,title,Yes,text,Short title,Capa.title,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,source_event,No,text,Quality event number,Capa.source_reference,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,product_code,No,text,Product,Capa.product_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,action_type,No,text,"Corrective, Preventive",Capa.action_type,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,opened_date,No,date YYYY-MM-DD,Opened,Capa.opened_date,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,due_date,No,date YYYY-MM-DD,Due,Capa.due_date,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),capas.csv,CAPA,status,Yes,text,"Open, Implementation, Effectiveness check, Closed",Capa.status,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,document_number,Yes,text,Document number,Evidence.evidence_id,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,title,Yes,text,Document title,Evidence.title,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,document_type,Yes,text,"Design verification report, Test report, Risk management file, IFU, SOP",Evidence.evidence_type,Yes
 VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,version,No,text,Document version,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,lifecycle_state,No,text,"Effective, Draft, Superseded",evidence.reliability_status,Not yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,effective_date,No,date YYYY-MM-DD,Effective from,evidence.effective_timestamp,Not yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,product_code,No,text,Product it applies to,-,No MDARIX field yet
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,lifecycle_state,No,text,"Effective, Draft, Superseded",Evidence.review_status,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,effective_date,No,date YYYY-MM-DD,Effective from,Evidence.effective_date,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,product_code,No,text,Product it applies to,Evidence.product_id,Yes
 VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,owner_department,No,text,Owning department,-,No MDARIX field yet
-VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,file_name,No,text,File name of the document,evidence.document_ref,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",item_number,Yes,text,Item number (products and components),products.product_id,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",name,Yes,text,Item name,products.product_name,Yes
+VEEVA_QMS,Veeva Vault QMS (quality management),documents.csv,Controlled document,file_name,No,text,File name of the document,Evidence.document_ref,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",item_number,Yes,text,Item number (products and components),Component.component_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",name,Yes,text,Item name,Component.component_name,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",item_type,Yes,text,"Product, Assembly, Component, Software (only Product imports today)",-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",description,No,text,Description,products.description,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",product_family,No,text,Product family,products.product_family,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",lifecycle,No,text,"In work, Released, Obsolete",products.lifecycle_status,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",description,No,text,Description,Component.description,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",product_family,No,text,Product family,Product.product_family,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",lifecycle,No,text,"In work, Released, Obsolete",Component.status,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),items.csv,"Item (product, assembly, component, software)",owner_group,No,text,Owning engineering group,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),version_id,Yes,text,Teamcenter revision record ID,product_versions.source_identifier,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),product_id,Yes,text,Item number,products.product_id,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),item_name,Yes,text,"Item name, repeated on every revision",products.product_name,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),revision,Yes,text,Revision,products.version,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),version_name,No,text,Revision name,product_versions.description,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),effective_date,No,date YYYY-MM-DD,Effective from,product_versions.effective_timestamp,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),release_date,No,date YYYY-MM-DD,Released,products.version_release_date,Yes
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),status,No,text,"In work, Released, Superseded",product_versions.lifecycle_status,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),version_id,Yes,text,Teamcenter revision record ID,-,No MDARIX field yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),product_id,Yes,text,Item number,Product.product_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),item_name,Yes,text,"Item name, repeated on every revision",Product.product_name,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),revision,Yes,text,Revision,Product.version,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),version_name,No,text,Revision name,-,No MDARIX field yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),effective_date,No,date YYYY-MM-DD,Effective from,-,No MDARIX field yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),release_date,No,date YYYY-MM-DD,Released,Product.version_release_date,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),status,No,text,"In work, Released, Superseded",-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),software_version,No,text,Firmware/software version in this revision,-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),configuration_id,No,text,Configuration or variant,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),change_order_id,No,text,Change that created this revision,changes.change_identifier,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),recorded_at,No,date-time ISO 8601 UTC,When Teamcenter recorded it,product_versions.recorded_timestamp,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),change_order_id,No,text,Change that created this revision,-,No MDARIX field yet
+TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),recorded_at,No,date-time ISO 8601 UTC,When Teamcenter recorded it,-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),item_revisions.csv,Item revision (product version),known_at,No,date-time ISO 8601 UTC,When the company knew it,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,parent_item_number,Yes,text,Parent item,product_components.product_version_id,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,parent_revision,Yes,text,Parent revision,product_components.product_version_id,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,child_item_number,Yes,text,Child item,product_components.component_id,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,child_revision,No,text,Child revision,components.revision,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,parent_item_number,Yes,text,Parent item,BomLine.product_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,parent_revision,Yes,text,Parent revision,BomLine.version,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,child_item_number,Yes,text,Child item,BomLine.component_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,child_revision,No,text,Child revision,-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,quantity,No,number,Quantity per parent,-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,unit,No,text,"EA, M, G",-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,find_number,No,text,Position on the drawing,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,effective_from,No,date YYYY-MM-DD,Effective from,product_components.effective_timestamp,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,effective_from,No,date YYYY-MM-DD,Effective from,BomLine.effective_date,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),bom_lines.csv,Bill of materials line,effective_to,No,date YYYY-MM-DD,Effective until (empty = still effective),-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,change_number,Yes,text,Change number,changes.change_identifier,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,change_number,Yes,text,Change number,Change.change_id,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,title,Yes,text,Short title,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,change_type,Yes,text,"ECN, ECO, Deviation",changes.change_type,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,description,Yes,text,What changed and why,changes.description,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,affected_items,No,list separated by ;,Items changed,-,No MDARIX field yet
+TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,change_type,Yes,text,"ECN, ECO, Deviation",Change.change_type,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,description,Yes,text,What changed and why,Change.description,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,affected_items,No,list separated by ;,Items changed,Change.affected_ids,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,status,No,text,"In review, Approved, Implemented",-,No MDARIX field yet
 TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,release_date,No,date YYYY-MM-DD,Released,-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,effective_date,No,date YYYY-MM-DD,Effective from,changes.event_timestamp,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,requirement_id,Yes,text,Requirement ID,requirements.requirement_identifier,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,product_code,Yes,text,Product,requirements.product_id,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,revision,No,text,Product revision,requirements.product_version_id,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,requirement_type,No,text,"User need, System, Software, Safety",requirements.requirement_type,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,text,Yes,text,Requirement text,requirements.text,Not yet
+TEAMCENTER,Siemens Teamcenter (PLM),change_notices.csv,Engineering change,effective_date,No,date YYYY-MM-DD,Effective from,Change.effective_date,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,requirement_id,Yes,text,Requirement ID,Requirement.requirement_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,product_code,Yes,text,Product,Requirement.product_id,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,revision,No,text,Product revision,Requirement.version,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,requirement_type,No,text,"User need, System, Software, Safety",Requirement.requirement_type,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,text,Yes,text,Requirement text,Requirement.text,Yes
 TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,verification_method,No,text,"Test, Inspection, Analysis",-,No MDARIX field yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,status,No,text,"Draft, Approved, Obsolete",requirements.status,Not yet
-TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,trace_to_risk,No,text,Risk ID it controls,-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),parts.csv,Part,number,Yes,text,Part number,products.product_id,Yes
-WINDCHILL,PTC Windchill (PLM),parts.csv,Part,name,Yes,text,Part name,products.product_name,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,status,No,text,"Draft, Approved, Obsolete",Requirement.status,Yes
+TEAMCENTER,Siemens Teamcenter (PLM),requirements.csv,Requirement,trace_to_risk,No,text,Risk ID it controls,Requirement.risk_id,Yes
+WINDCHILL,PTC Windchill (PLM),parts.csv,Part,number,Yes,text,Part number,Component.component_id,Yes
+WINDCHILL,PTC Windchill (PLM),parts.csv,Part,name,Yes,text,Part name,Component.component_name,Yes
 WINDCHILL,PTC Windchill (PLM),parts.csv,Part,part_type,Yes,text,"End item, Component, Software (only End item imports today)",-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),parts.csv,Part,state,No,text,"In work, Released, Obsolete",products.lifecycle_status,Not yet
-WINDCHILL,PTC Windchill (PLM),parts.csv,Part,product_line,No,text,Product line,products.product_family,Yes
-WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,number,Yes,text,Part number,products.product_id,Yes
-WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,name,Yes,text,Part name,products.product_name,Yes
-WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,version,Yes,text,"Version (A, B, ...)",products.version,Yes
+WINDCHILL,PTC Windchill (PLM),parts.csv,Part,state,No,text,"In work, Released, Obsolete",Component.status,Yes
+WINDCHILL,PTC Windchill (PLM),parts.csv,Part,product_line,No,text,Product line,Product.product_family,Yes
+WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,number,Yes,text,Part number,Product.product_id,Yes
+WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,name,Yes,text,Part name,Product.product_name,Yes
+WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,version,Yes,text,"Version (A, B, ...)",Product.version,Yes
 WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,iteration,No,number,Iteration within the version,-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,state,No,text,"In work, Released, Superseded",product_versions.lifecycle_status,Not yet
-WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,released_date,No,date YYYY-MM-DD,Released,products.version_release_date,Yes
-WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,parent_number,Yes,text,Parent part,product_components.product_version_id,Not yet
-WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,parent_version,Yes,text,Parent version,product_components.product_version_id,Not yet
-WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,child_number,Yes,text,Child part,product_components.component_id,Not yet
+WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,state,No,text,"In work, Released, Superseded",-,No MDARIX field yet
+WINDCHILL,PTC Windchill (PLM),part_versions.csv,Part version,released_date,No,date YYYY-MM-DD,Released,Product.version_release_date,Yes
+WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,parent_number,Yes,text,Parent part,BomLine.product_id,Yes
+WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,parent_version,Yes,text,Parent version,BomLine.version,Yes
+WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,child_number,Yes,text,Child part,BomLine.component_id,Yes
 WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,quantity,No,number,Quantity,-,No MDARIX field yet
 WINDCHILL,PTC Windchill (PLM),bom.csv,Bill of materials line,unit,No,text,"EA, M, G",-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,number,Yes,text,Change notice number,changes.change_identifier,Not yet
+WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,number,Yes,text,Change notice number,Change.change_id,Yes
 WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,name,Yes,text,Title,-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,description,Yes,text,What changed,changes.description,Not yet
-WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,affected_parts,No,list separated by ;,Parts changed,-,No MDARIX field yet
+WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,description,Yes,text,What changed,Change.description,Yes
+WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,affected_parts,No,list separated by ;,Parts changed,Change.affected_ids,Yes
 WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,state,No,text,"Open, Resolved",-,No MDARIX field yet
-WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,resolution_date,No,date YYYY-MM-DD,Resolved,changes.event_timestamp,Not yet
-SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MATNR,Yes,text,Material number (same as the PLM item number),products.product_id,Yes
-SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MAKTX,Yes,text,Material description,products.product_name,Yes
+WINDCHILL,PTC Windchill (PLM),change_notices.csv,Change notice,resolution_date,No,date YYYY-MM-DD,Resolved,Change.effective_date,Yes
+SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MATNR,Yes,text,Material number (same as the PLM item number),Component.component_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MAKTX,Yes,text,Material description,Component.component_name,Yes
 SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MTART,Yes,text,"Material type: FERT finished product, HALB semi-finished, ROH raw/purchased",-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MATKL,No,text,Material group,-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),MEINS,No,text,Base unit of measure,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),REVLV,No,text,Revision level,products.version,Yes
+SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),REVLV,No,text,Revision level,Component.revision,Yes
 SAP_ERP,SAP S/4HANA (ERP),materials.csv,Material (MARA/MAKT),LVORM,No,X or empty,Flagged for deletion,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),WERKS,Yes,text,Plant code,manufacturing_sites.site_identifier,Not yet
-SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),NAME1,Yes,text,Plant name,manufacturing_sites.name,Not yet
-SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),LAND1,No,ISO country code,Country,manufacturing_sites.location,Not yet
-SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),ORT01,No,text,City,manufacturing_sites.location,Not yet
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),CHARG,Yes,text,Batch number,lots.lot_id,Yes
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),MATNR,Yes,text,Material,lots.product_id,Yes
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),WERKS,Yes,text,Plant where it was made,lot_batches.manufacturing_site_id,Not yet
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),REVLV,Yes,text,Revision level built,lots.version,Yes
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),HSDAT,No,date YYYY-MM-DD,Date of manufacture,lots.manufacture_date,Yes
+SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),WERKS,Yes,text,Plant code,Site.site_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),NAME1,Yes,text,Plant name,Site.site_name,Yes
+SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),LAND1,No,ISO country code,Country,-,No MDARIX field yet
+SAP_ERP,SAP S/4HANA (ERP),plants.csv,Plant (T001W),ORT01,No,text,City,Site.location,Yes
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),CHARG,Yes,text,Batch number,Lot.lot_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),MATNR,Yes,text,Material,Lot.product_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),WERKS,Yes,text,Plant where it was made,Lot.site_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),REVLV,Yes,text,Revision level built,Lot.version,Yes
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),HSDAT,No,date YYYY-MM-DD,Date of manufacture,Lot.manufacture_date,Yes
 SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),VFDAT,No,date YYYY-MM-DD,Shelf-life expiry date,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),ZUSTD,No,X or empty,Batch in restricted use (quarantine),lot_batches.status,Not yet
+SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),ZUSTD,No,X or empty,Batch in restricted use (quarantine),-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),LIFNR,No,text,"Vendor, for purchased batches",-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),batches.csv,Batch (MCH1/MCHA),LICHA,No,text,Vendor's own batch number,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),CHARG_PARENT,Yes,text,Product batch,lot_components.lot_batch_id,Not yet
+SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),CHARG_PARENT,Yes,text,Product batch,LotGenealogy.lot_id,Yes
 SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),MATNR_PARENT,Yes,text,Product material,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),CHARG_COMPONENT,Yes,text,Component batch used,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),MATNR_COMPONENT,Yes,text,Component material,lot_components.component_id,Not yet
+SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),CHARG_COMPONENT,Yes,text,Component batch used,LotGenealogy.component_lot_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),MATNR_COMPONENT,Yes,text,Component material,LotGenealogy.component_id,Yes
 SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),MENGE,No,number,Quantity consumed,-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),batch_where_used.csv,Batch genealogy (which component batches went into which product batch),MEINS,No,text,Unit,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),LIFNR,Yes,text,Vendor number,suppliers.supplier_identifier,Not yet
-SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),NAME1,Yes,text,Vendor name,suppliers.name,Not yet
+SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),LIFNR,Yes,text,Vendor number,Supplier.supplier_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),NAME1,Yes,text,Vendor name,Supplier.supplier_name,Yes
 SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),LAND1,No,ISO country code,Country,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),SPERR,No,X or empty,Blocked for purchasing,suppliers.status,Not yet
+SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),SPERR,No,X or empty,Blocked for purchasing,-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),vendors.csv,Vendor (LFA1),KTOKK,No,text,Vendor account group,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,MATNR,Yes,text,Material,component_suppliers.component_id,Not yet
+SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,MATNR,Yes,text,Material,ComponentSupplier.component_id,Yes
 SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,WERKS,Yes,text,Plant,-,No MDARIX field yet
-SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,LIFNR,Yes,text,Vendor,component_suppliers.supplier_id,Not yet
-SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,VDATU,No,date YYYY-MM-DD,Valid from,component_suppliers.effective_timestamp,Not yet
+SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,LIFNR,Yes,text,Vendor,ComponentSupplier.supplier_id,Yes
+SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,VDATU,No,date YYYY-MM-DD,Valid from,ComponentSupplier.effective_date,Yes
 SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,BDATU,No,date YYYY-MM-DD,Valid to,-,No MDARIX field yet
 SAP_ERP,SAP S/4HANA (ERP),source_list.csv,Source list (EORD): which vendor supplies which material,FLIFN,No,X or empty,Fixed vendor,-,No MDARIX field yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,ITEM_NUMBER,Yes,text,Item number,products.product_id,Yes
-ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,DESCRIPTION,Yes,text,Description,products.product_name,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,ITEM_NUMBER,Yes,text,Item number,Component.component_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,DESCRIPTION,Yes,text,Description,Component.component_name,Yes
 ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,ITEM_TYPE,Yes,text,"FG finished good, PURCHASED, SUBASSEMBLY",-,No MDARIX field yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,REVISION,No,text,Current revision,products.version,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,REVISION,No,text,Current revision,Component.revision,Yes
 ORACLE_ERP,Oracle Fusion Cloud (ERP),items.csv,Item,INVENTORY_ITEM_STATUS_CODE,No,text,"Active, Inactive",-,No MDARIX field yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),ORGANIZATION_CODE,Yes,text,Organization code,manufacturing_sites.site_identifier,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),ORGANIZATION_NAME,Yes,text,Name,manufacturing_sites.name,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),LOCATION_CODE,No,text,Location,manufacturing_sites.location,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,LOT_NUMBER,Yes,text,Lot number,lots.lot_id,Yes
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ITEM_NUMBER,Yes,text,Item,lots.product_id,Yes
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,REVISION,Yes,text,Revision built,lots.version,Yes
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ORGANIZATION_CODE,No,text,Where it was made,lot_batches.manufacturing_site_id,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ORIGINATION_DATE,No,date YYYY-MM-DD,Made on,lots.manufacture_date,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),ORGANIZATION_CODE,Yes,text,Organization code,Site.site_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),ORGANIZATION_NAME,Yes,text,Name,Site.site_name,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),organizations.csv,Inventory organization (site),LOCATION_CODE,No,text,Location,Site.location,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,LOT_NUMBER,Yes,text,Lot number,Lot.lot_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ITEM_NUMBER,Yes,text,Item,Lot.product_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,REVISION,Yes,text,Revision built,Lot.version,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ORGANIZATION_CODE,No,text,Where it was made,Lot.site_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,ORIGINATION_DATE,No,date YYYY-MM-DD,Made on,Lot.manufacture_date,Yes
 ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,EXPIRATION_DATE,No,date YYYY-MM-DD,Expires,-,No MDARIX field yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,STATUS_CODE,No,text,"Active, Hold",lot_batches.status,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,SUPPLIER_NUMBER,Yes,text,Supplier number,suppliers.supplier_identifier,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,VENDOR_NAME,Yes,text,Name,suppliers.name,Not yet
+ORACLE_ERP,Oracle Fusion Cloud (ERP),lots.csv,Lot,STATUS_CODE,No,text,"Active, Hold",-,No MDARIX field yet
+ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,SUPPLIER_NUMBER,Yes,text,Supplier number,Supplier.supplier_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,VENDOR_NAME,Yes,text,Name,Supplier.supplier_name,Yes
 ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,COUNTRY,No,ISO country code,Country,-,No MDARIX field yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,ENABLED_FLAG,No,Y/N,Enabled,suppliers.status,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,ITEM_NUMBER,Yes,text,Item,component_suppliers.component_id,Not yet
-ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,SUPPLIER_NUMBER,Yes,text,Supplier,component_suppliers.supplier_id,Not yet
+ORACLE_ERP,Oracle Fusion Cloud (ERP),suppliers.csv,Supplier,ENABLED_FLAG,No,Y/N,Enabled,-,No MDARIX field yet
+ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,ITEM_NUMBER,Yes,text,Item,ComponentSupplier.component_id,Yes
+ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,SUPPLIER_NUMBER,Yes,text,Supplier,ComponentSupplier.supplier_id,Yes
 ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,ORGANIZATION_CODE,No,text,Organization,-,No MDARIX field yet
 ORACLE_ERP,Oracle Fusion Cloud (ERP),approved_supplier_list.csv,Approved supplier list,ASL_STATUS,No,text,"Approved, Debarred",-,No MDARIX field yet
 MES,Manufacturing execution system,production_orders.csv,Production order,order_number,Yes,text,Production order,-,No MDARIX field yet
-MES,Manufacturing execution system,production_orders.csv,Production order,material_number,Yes,text,Product built,lots.product_id,Yes
-MES,Manufacturing execution system,production_orders.csv,Production order,revision,Yes,text,Revision built,lots.version,Yes
-MES,Manufacturing execution system,production_orders.csv,Production order,lot_number,Yes,text,Lot produced,lots.lot_id,Yes
-MES,Manufacturing execution system,production_orders.csv,Production order,site_code,Yes,text,Site,lot_batches.manufacturing_site_id,Not yet
+MES,Manufacturing execution system,production_orders.csv,Production order,material_number,Yes,text,Product built,Lot.product_id,Yes
+MES,Manufacturing execution system,production_orders.csv,Production order,revision,Yes,text,Revision built,Lot.version,Yes
+MES,Manufacturing execution system,production_orders.csv,Production order,lot_number,Yes,text,Lot produced,Lot.lot_id,Yes
+MES,Manufacturing execution system,production_orders.csv,Production order,site_code,Yes,text,Site,Lot.site_id,Yes
 MES,Manufacturing execution system,production_orders.csv,Production order,start_date,No,date YYYY-MM-DD,Started,-,No MDARIX field yet
-MES,Manufacturing execution system,production_orders.csv,Production order,end_date,No,date YYYY-MM-DD,Finished,lots.manufacture_date,Yes
+MES,Manufacturing execution system,production_orders.csv,Production order,end_date,No,date YYYY-MM-DD,Finished,Lot.manufacture_date,Yes
 MES,Manufacturing execution system,production_orders.csv,Production order,quantity_built,No,number,Units built,-,No MDARIX field yet
 MES,Manufacturing execution system,production_orders.csv,Production order,status,No,text,"Released, In progress, Completed",-,No MDARIX field yet
-MES,Manufacturing execution system,genealogy.csv,Lot genealogy,lot_number,Yes,text,Product lot,lot_components.lot_batch_id,Not yet
+MES,Manufacturing execution system,genealogy.csv,Lot genealogy,lot_number,Yes,text,Product lot,LotGenealogy.lot_id,Yes
 MES,Manufacturing execution system,genealogy.csv,Lot genealogy,material_number,Yes,text,Product,-,No MDARIX field yet
-MES,Manufacturing execution system,genealogy.csv,Lot genealogy,component_material,Yes,text,Component,lot_components.component_id,Not yet
-MES,Manufacturing execution system,genealogy.csv,Lot genealogy,component_lot,Yes,text,Component lot used,-,No MDARIX field yet
+MES,Manufacturing execution system,genealogy.csv,Lot genealogy,component_material,Yes,text,Component,LotGenealogy.component_id,Yes
+MES,Manufacturing execution system,genealogy.csv,Lot genealogy,component_lot,Yes,text,Component lot used,LotGenealogy.component_lot_id,Yes
 MES,Manufacturing execution system,genealogy.csv,Lot genealogy,quantity_consumed,No,number,Quantity,-,No MDARIX field yet
 MES,Manufacturing execution system,genealogy.csv,Lot genealogy,consumed_date,No,date YYYY-MM-DD,When it was used,-,No MDARIX field yet
-LIMS,Laboratory information management system,test_results.csv,Test result,result_id,Yes,text,Result ID,evidence.evidence_identifier,Not yet
+LIMS,Laboratory information management system,test_results.csv,Test result,result_id,Yes,text,Result ID,Evidence.evidence_id,Yes
 LIMS,Laboratory information management system,test_results.csv,Test result,sample_id,Yes,text,Sample ID,-,No MDARIX field yet
 LIMS,Laboratory information management system,test_results.csv,Test result,lot_number,No,text,Lot tested,-,No MDARIX field yet
 LIMS,Laboratory information management system,test_results.csv,Test result,material_number,No,text,Material tested,-,No MDARIX field yet
-LIMS,Laboratory information management system,test_results.csv,Test result,test_method,Yes,text,Test method,evidence.title,Not yet
+LIMS,Laboratory information management system,test_results.csv,Test result,test_method,Yes,text,Test method,Evidence.title,Yes
 LIMS,Laboratory information management system,test_results.csv,Test result,parameter,Yes,text,What was measured,-,No MDARIX field yet
-LIMS,Laboratory information management system,test_results.csv,Test result,result_value,Yes,number,Measured value,evidence.content,Not yet
+LIMS,Laboratory information management system,test_results.csv,Test result,result_value,Yes,number,Measured value,-,No MDARIX field yet
 LIMS,Laboratory information management system,test_results.csv,Test result,unit,No,text,Unit,-,No MDARIX field yet
 LIMS,Laboratory information management system,test_results.csv,Test result,lower_limit,No,number,Lower specification limit,-,No MDARIX field yet
 LIMS,Laboratory information management system,test_results.csv,Test result,upper_limit,No,number,Upper specification limit,-,No MDARIX field yet
-LIMS,Laboratory information management system,test_results.csv,Test result,result,Yes,text,"Pass, Fail",-,No MDARIX field yet
-LIMS,Laboratory information management system,test_results.csv,Test result,tested_date,No,date YYYY-MM-DD,Tested on,evidence.effective_timestamp,Not yet
-LIMS,Laboratory information management system,test_results.csv,Test result,review_status,No,text,"Pending review, Approved",evidence.reliability_status,Not yet
-RISK,Risk management file (ISO 14971),risks.csv,Risk,risk_id,Yes,text,Risk ID,risks.risk_identifier,Not yet
-RISK,Risk management file (ISO 14971),risks.csv,Risk,product_code,Yes,text,Product,risks.product_id,Not yet
-RISK,Risk management file (ISO 14971),risks.csv,Risk,revision,No,text,Product revision,risks.product_version_id,Not yet
+LIMS,Laboratory information management system,test_results.csv,Test result,result,Yes,text,"Pass, Fail",Evidence.content,Yes
+LIMS,Laboratory information management system,test_results.csv,Test result,tested_date,No,date YYYY-MM-DD,Tested on,Evidence.effective_date,Yes
+LIMS,Laboratory information management system,test_results.csv,Test result,review_status,No,text,"Pending review, Approved",Evidence.review_status,Yes
+RISK,Risk management file (ISO 14971),risks.csv,Risk,risk_id,Yes,text,Risk ID,Risk.risk_id,Yes
+RISK,Risk management file (ISO 14971),risks.csv,Risk,product_code,Yes,text,Product,Risk.product_id,Yes
+RISK,Risk management file (ISO 14971),risks.csv,Risk,revision,No,text,Product revision,Risk.version,Yes
 RISK,Risk management file (ISO 14971),risks.csv,Risk,hazard,Yes,text,Hazard,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),risks.csv,Risk,hazardous_situation,No,text,Hazardous situation,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),risks.csv,Risk,harm,Yes,text,Harm,risks.description,Not yet
+RISK,Risk management file (ISO 14971),risks.csv,Risk,harm,Yes,text,Harm,Risk.description,Yes
 RISK,Risk management file (ISO 14971),risks.csv,Risk,severity,No,number 1-5,Severity,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),risks.csv,Risk,probability,No,number 1-5,Probability,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),risks.csv,Risk,risk_level,No,text,"Acceptable, ALARP, Unacceptable",-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),risks.csv,Risk,status,No,text,"Open, Controlled, Closed",risks.status,Not yet
-RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),fmea_id,Yes,text,Failure mode ID,failure_modes.failure_mode_identifier,Not yet
+RISK,Risk management file (ISO 14971),risks.csv,Risk,status,No,text,"Open, Controlled, Closed",Risk.status,Yes
+RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),fmea_id,Yes,text,Failure mode ID,FailureMode.failure_mode_id,Yes
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),product_code,Yes,text,Product,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),item_or_function,No,text,Item or function,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),failure_mode,Yes,text,Failure mode,failure_modes.name,Not yet
-RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),effect,No,text,Effect,failure_modes.description,Not yet
+RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),failure_mode,Yes,text,Failure mode,FailureMode.failure_mode_name,Yes
+RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),effect,No,text,Effect,FailureMode.description,Yes
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),cause,No,text,Cause,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),severity,No,number 1-10,Severity,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),occurrence,No,number 1-10,Occurrence,-,No MDARIX field yet
 RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),detection,No,number 1-10,Detection,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),linked_risk_id,No,text,Risk it leads to,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,control_id,Yes,text,Control ID,controls.control_identifier,Not yet
-RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,risk_id,Yes,text,Risk it controls,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,control_type,No,text,"Inherent safety by design, Protective measure, Information for safety",controls.control_type,Not yet
-RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,description,Yes,text,What the control does,controls.description,Not yet
+RISK,Risk management file (ISO 14971),failure_modes.csv,FMEA line (failure mode),linked_risk_id,No,text,Risk it leads to,FailureMode.risk_id,Yes
+RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,control_id,Yes,text,Control ID,Control.control_id,Yes
+RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,risk_id,Yes,text,Risk it controls,Control.risk_id,Yes
+RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,control_type,No,text,"Inherent safety by design, Protective measure, Information for safety",Control.control_type,Yes
+RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,description,Yes,text,What the control does,Control.description,Yes
 RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,verification_reference,No,text,Test or document that proves it,-,No MDARIX field yet
-RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,status,No,text,"Planned, Implemented, Verified",controls.status,Not yet
-COUPA,Coupa (supplier management),suppliers.csv,Supplier,supplier_number,Yes,text,Supplier number (same as in ERP),suppliers.supplier_identifier,Not yet
-COUPA,Coupa (supplier management),suppliers.csv,Supplier,name,Yes,text,Supplier name,suppliers.name,Not yet
-COUPA,Coupa (supplier management),suppliers.csv,Supplier,status,No,text,"Active, On hold, Inactive",suppliers.status,Not yet
+RISK,Risk management file (ISO 14971),risk_controls.csv,Risk control,status,No,text,"Planned, Implemented, Verified",Control.status,Yes
+COUPA,Coupa (supplier management),suppliers.csv,Supplier,supplier_number,Yes,text,Supplier number (same as in ERP),Supplier.supplier_id,Yes
+COUPA,Coupa (supplier management),suppliers.csv,Supplier,name,Yes,text,Supplier name,Supplier.supplier_name,Yes
+COUPA,Coupa (supplier management),suppliers.csv,Supplier,status,No,text,"Active, On hold, Inactive",Supplier.status,Yes
 COUPA,Coupa (supplier management),suppliers.csv,Supplier,country,No,ISO country code,Country,-,No MDARIX field yet
 COUPA,Coupa (supplier management),suppliers.csv,Supplier,commodity,No,text,What they supply,-,No MDARIX field yet
 COUPA,Coupa (supplier management),suppliers.csv,Supplier,preferred,No,Y/N,Preferred supplier,-,No MDARIX field yet
@@ -281,10 +281,10 @@ COUPA,Coupa (supplier management),supplier_risks.csv,Supplier risk assessment,ra
 COUPA,Coupa (supplier management),supplier_risks.csv,Supplier risk assessment,assessed_date,No,date YYYY-MM-DD,Assessed on,-,No MDARIX field yet
 COUPA,Coupa (supplier management),supplier_risks.csv,Supplier risk assessment,status,No,text,"Open, Mitigated, Closed",-,No MDARIX field yet
 COUPA,Coupa (supplier management),supplier_risks.csv,Supplier risk assessment,notes,No,text,"Short note, no personal data",-,No MDARIX field yet
-COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,certificate_number,Yes,text,Certificate number,evidence.evidence_identifier,Not yet
+COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,certificate_number,Yes,text,Certificate number,Evidence.evidence_id,Yes
 COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,supplier_number,Yes,text,Supplier,-,No MDARIX field yet
-COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,certificate_type,Yes,text,"ISO 13485, ISO 9001, RoHS declaration",evidence.title,Not yet
+COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,certificate_type,Yes,text,"ISO 13485, ISO 9001, RoHS declaration",Evidence.title,Yes
 COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,issuer,No,text,Issuing body,-,No MDARIX field yet
-COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,issue_date,No,date YYYY-MM-DD,Issued,-,No MDARIX field yet
+COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,issue_date,No,date YYYY-MM-DD,Issued,Evidence.effective_date,Yes
 COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,expiry_date,No,date YYYY-MM-DD,Expires,-,No MDARIX field yet
-COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,status,No,text,"Valid, Expired, Withdrawn",evidence.reliability_status,Not yet
+COUPA,Coupa (supplier management),supplier_certificates.csv,Supplier certificate,status,No,text,"Valid, Expired, Withdrawn",Evidence.review_status,Yes

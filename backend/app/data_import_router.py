@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,9 @@ from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports
 from backend.app.trial.service import trial_subscription
+
+from backend.app.db.data_plane import open_tenant_data_session
+from retrieval.record_evidence import embed_tenant_evidence
 
 router = APIRouter(prefix="/api/v1/data/import", tags=["Data import"])
 
@@ -86,6 +89,7 @@ async def check_import(
 async def run_import(
     entity: str,
     request: Request,
+    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -116,4 +120,7 @@ async def run_import(
         )
     )
     db.commit()
+    if result.get("rows"):
+        # Semantic search over the imported records, after the response (their text is already searchable).
+        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
     return result

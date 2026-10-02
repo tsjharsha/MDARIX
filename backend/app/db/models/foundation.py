@@ -250,6 +250,20 @@ class Complaint(TenantOwned, Base):
     complaint_timestamp = tz()
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="open")
+    # Regulatory details as the quality system records them (none identifies a person).
+    severity: Mapped[str | None] = mapped_column(String(40))
+    country: Mapped[str | None] = mapped_column(String(80))
+    reporter_type: Mapped[str | None] = mapped_column(String(80))
+    complaint_type: Mapped[str | None] = mapped_column(String(80))
+    problem_code: Mapped[str | None] = mapped_column(String(120))
+    serial_number: Mapped[str | None] = mapped_column(String(120))
+    udi: Mapped[str | None] = mapped_column(String(120))
+    awareness_timestamp = tz()
+    device_returned: Mapped[bool | None] = mapped_column(Boolean)
+    patient_involved: Mapped[bool | None] = mapped_column(Boolean)
+    serious_injury: Mapped[bool | None] = mapped_column(Boolean)
+    death: Mapped[bool | None] = mapped_column(Boolean)
+    malfunction: Mapped[bool | None] = mapped_column(Boolean)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         ForeignKeyConstraint(
@@ -274,6 +288,29 @@ class Investigation(TenantOwned, Base):
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         UniqueConstraint("tenant_id", "investigation_identifier", name="uq_investigations_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_investigations_tenant_id_id"),
+    )
+
+
+class Capa(TenantOwned, Base):
+    """A corrective or preventive action from the customer's quality system."""
+
+    __tablename__ = "capas"
+    capa_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    action_type: Mapped[str | None] = mapped_column(String(40))
+    source_type: Mapped[str | None] = mapped_column(String(80))
+    source_reference: Mapped[str | None] = mapped_column(String(120))
+    product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="open")
+    opened_at = tz()
+    due_at = tz()
+    effectiveness_check_at = tz()
+    __table_args__ = (
+        ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
+        ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
+        UniqueConstraint("tenant_id", "capa_identifier", name="uq_capas_tenant_identifier"),
+        UniqueConstraint("tenant_id", "id", name="uq_capas_tenant_id_id"),
     )
 
 
@@ -917,6 +954,8 @@ class LotComponent(Base):
     tenant_id = tenant_fk()
     lot_batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     component_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    # The component's own lot that went into this lot (genealogy), when the source records it.
+    component_lot_identifier: Mapped[str | None] = mapped_column(String(120))
     evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at = tz(False)
     __table_args__ = (
@@ -1070,6 +1109,10 @@ class ConnectorConfiguration(Base):
     configuration: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     version: Mapped[str] = mapped_column(String(40), nullable=False, server_default="v1")
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="DRAFT")
+    # The customer system's API key, encrypted (AES-GCM); never returned. Takes precedence over credential_ref.
+    credential_encrypted: Mapped[str | None] = mapped_column(Text)
+    credential_hint: Mapped[str | None] = mapped_column(String(8))
+    credential_set_at = tz()
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (UniqueConstraint("tenant_id", "code", "version", name="uq_connector_configuration"),)

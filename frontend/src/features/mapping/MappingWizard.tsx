@@ -8,11 +8,13 @@ import {
   defaultTransform,
   type FieldRule,
   type MappingCheck,
+  withFilter,
 } from "./mappingModel";
 import "./mapping.css";
 
 type Target = { entity: string; label: string; required: string[]; optional: string[] };
 type Targets = { targets: Target[]; transforms: Array<{ code: string; label: string }> };
+type StandardMapping = { code: string; target_entity: string; mapping_rules: Record<string, any> };
 
 /**
  * A new connector mapping in three steps: what to connect, which customer field fills which MDARIX field, then a
@@ -34,6 +36,9 @@ export function MappingWizard({
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ code: "", source_system: "", source_object: "", target_entity: "" });
   const [rules, setRules] = useState<FieldRule[]>([]);
+  const [filter, setFilter] = useState({ field: "", values: "" });
+  const [defaults, setDefaults] = useState<Record<string, string>>({});
+  const [standardUsed, setStandardUsed] = useState("");
   const [check, setCheck] = useState<MappingCheck | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -43,6 +48,27 @@ export function MappingWizard({
   const sourceFields = useResource<any[]>(
     form.source_object ? `/api/v1/admin/mapping/objects/${encodeURIComponent(form.source_object)}/fields` : null,
   );
+  const recordCode = form.source_object.split(":")[1]?.toLowerCase() ?? "";
+  const standard = useResource<{ mappings: StandardMapping[] }>(
+    form.source_system && recordCode
+      ? `/api/v1/admin/configuration/standard-mappings?application=${encodeURIComponent(form.source_system)}&record=${encodeURIComponent(recordCode)}`
+      : null,
+  );
+  const applyStandard = (mapping: StandardMapping) => {
+    const { _filter, _defaults, ...fieldRules } = mapping.mapping_rules;
+    setForm({ ...form, code: form.code || mapping.code, target_entity: mapping.target_entity });
+    setRules(
+      Object.entries(fieldRules).map(([source, rule]: [string, any]) => ({
+        source,
+        column: String(rule.target_field).split(".")[1] ?? "",
+        transform: rule.transform ?? "identity",
+      })),
+    );
+    setFilter(_filter ? { field: _filter.field, values: (_filter.in ?? []).join(", ") } : { field: "", values: "" });
+    setDefaults(_defaults ?? {});
+    setStandardUsed(mapping.code);
+    setStep(2);
+  };
   const target = targets.data?.targets.find((item) => item.entity === form.target_entity);
   const columns = target ? [...target.required, ...target.optional] : [];
   const sources = listOf(sourceFields.data).map((field) => ({
@@ -56,7 +82,13 @@ export function MappingWizard({
   const ready1 = form.code.trim().length >= 3 && form.source_object && form.target_entity;
   const update = (index: number, change: Partial<FieldRule>) =>
     setRules(rules.map((rule, at) => (at === index ? { ...rule, ...change } : rule)));
-  const payload = () => ({ target_entity: form.target_entity, mapping_rules: buildRules(form.target_entity, rules) });
+  const payload = () => ({
+    target_entity: form.target_entity,
+    mapping_rules: {
+      ...withFilter(buildRules(form.target_entity, rules), filter.field, filter.values),
+      ...(Object.keys(defaults).length ? { _defaults: defaults } : {}),
+    },
+  });
   const runCheck = async () => {
     setBusy(true);
     setError("");
@@ -136,6 +168,8 @@ export function MappingWizard({
                   onChange={(event) => {
                     setForm({ ...form, source_object: event.target.value });
                     setRules([]);
+                    setDefaults({});
+                    setStandardUsed("");
                   }}
                 >
                   <option value="">Choose a record</option>
@@ -164,6 +198,27 @@ export function MappingWizard({
                 ))}
               </select>
             </label>
+            {(standard.data?.mappings ?? []).length > 0 && (
+              <section className="mw-standard" aria-label="Standard mapping">
+                <strong>MDARIX standard mapping available</strong>
+                <p className="ac-muted">
+                  Fills every field from this system's standard layout (the CSV templates). You can change anything
+                  before saving; it is still approved and released like any mapping.
+                </p>
+                <div className="mw-actions">
+                  {(standard.data?.mappings ?? []).map((mapping) => (
+                    <button
+                      key={mapping.code}
+                      type="button"
+                      className="ac-secondary"
+                      onClick={() => applyStandard(mapping)}
+                    >
+                      Use the standard mapping for {mapping.target_entity}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
             {apps.state === "error" && (
               <p className="ca-inline-error" role="alert">
                 The list of systems could not be loaded: {apps.error}
@@ -174,6 +229,16 @@ export function MappingWizard({
         {step === 2 && (
           <>
             <p>Choose which customer field fills each MDARIX field, and how the value is carried over.</p>
+            {standardUsed && (
+              <p className="ac-muted">
+                Started from the standard mapping {standardUsed}
+                {Object.keys(defaults).length > 0 &&
+                  `; fixed values: ${Object.entries(defaults)
+                    .map(([column, value]) => `${columnLabel(column)} = ${value}`)
+                    .join(", ")}`}
+                .
+              </p>
+            )}
             <div className="mw-actions">
               <button
                 type="button"
@@ -249,6 +314,38 @@ export function MappingWizard({
                 Each customer field can fill one MDARIX field; remove the repeated one.
               </p>
             )}
+            <fieldset className="mw-filter">
+              <legend>Only some records (optional)</legend>
+              <p className="ac-muted">
+                For a list that mixes kinds of records, for example items that are products and components, import only
+                the records whose field holds one of these values.
+              </p>
+              <div className="mw-two">
+                <label className="ca-field">
+                  Customer field
+                  <select
+                    value={filter.field}
+                    onChange={(event) => setFilter({ ...filter, field: event.target.value })}
+                  >
+                    <option value="">Import every record</option>
+                    {sources.map((field) => (
+                      <option key={field.name} value={field.name}>
+                        {field.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ca-field">
+                  Values to keep (comma-separated)
+                  <input
+                    value={filter.values}
+                    disabled={!filter.field}
+                    placeholder="e.g. Product"
+                    onChange={(event) => setFilter({ ...filter, values: event.target.value })}
+                  />
+                </label>
+              </div>
+            </fieldset>
           </>
         )}
         {step === 3 && check && <MappingCheckResult result={check} />}

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.models.foundation import Investigation, Product, ProductVersion
 from backend.app.db.models.stage2 import MDARIXCaseContext
 from backend.app.db.session import get_db
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1/workspace/context", tags=["Workspace Context"])
@@ -114,9 +115,13 @@ def get_context(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext 
 
 @router.put("")
 def put_context(
-    data: ContextUpdate, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+    data: ContextUpdate,
+    db: Session = Depends(get_db),
+    business: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    _validate(db, ctx, data)
+    # The product, version and case live in the tenant's data plane; the saved context in the control plane.
+    _validate(business, ctx, data)
     row = _row(db, ctx)
     if data.product_id != row.product_id:
         row.product_version_id = row.signal_id = row.investigation_id = None

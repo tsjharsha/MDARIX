@@ -27,6 +27,11 @@ type Issue = { persona: string; where: string; kind: string; detail: string };
 const issues: Issue[] = [];
 const visited: Array<{ persona: string; where: string }> = [];
 
+// Saved after every screen, so a slow or failed run still reports everything it reached.
+function save() {
+  if (REPORT_FILE) writeFileSync(REPORT_FILE, JSON.stringify({ issues, visited }, null, 1));
+}
+
 function totp(secret: string, offsetSteps = 0): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
   let bits = "";
@@ -118,6 +123,7 @@ async function sweep(page: Page, persona: string, where: string) {
     if (page.url() !== startUrl) await page.goto(startUrl).catch(() => undefined);
   }
   visited.push({ persona, where: `${where} (${pressed} buttons)` });
+  save();
 }
 
 async function crawl(page: Page, persona: any) {
@@ -140,6 +146,7 @@ async function crawl(page: Page, persona: any) {
     const tablists = page.locator('main [role="tablist"]');
     const tabs = tablists.first().locator('[role="tab"]');
     const tabCount = (await tablists.count()) ? await tabs.count() : 0;
+    visited.push({ persona: persona.name, where: name });
     if (!tabCount) {
       await panelErrors(page, persona.name, name);
       await sweep(page, persona.name, name);
@@ -170,10 +177,12 @@ async function crawl(page: Page, persona: any) {
 
 test.describe("deep crawl of every screen", () => {
   test.skip(!config, "Set E2E_DEEP_PERSONAS to run the deep crawl.");
+  // A control that never becomes ready is skipped after a few seconds instead of stalling the whole crawl.
+  test.use({ actionTimeout: 5_000, navigationTimeout: 20_000 });
 
   for (const persona of config?.personas ?? []) {
     test(`${persona.name}: every screen, tab and safe button`, async ({ page }) => {
-      test.setTimeout(30 * 60_000);
+      test.setTimeout(20 * 60_000);
       let where = "sign-in";
       watch(page, persona.name, () => where);
       await signIn(page, persona);
@@ -222,8 +231,5 @@ test.describe("deep crawl of every screen", () => {
     await expect(page.getByRole("tab", { name: "Workspace", selected: true })).toBeVisible();
   });
 
-  test.afterEach(() => {
-    // Written after every test, so a later failure never loses what was already found.
-    if (REPORT_FILE) writeFileSync(REPORT_FILE, JSON.stringify({ issues, visited }, null, 1));
-  });
+  test.afterEach(() => save());
 });

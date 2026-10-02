@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { KeyRound, Plus } from "lucide-react";
 import { ColumnChart, Panel, ToneBadge } from "../../admin/console/charts";
 import { dailyCounts, runOutcomes, titleCase, type Tone } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
@@ -102,6 +102,100 @@ function LinkMapping({
     </div>
   );
 }
+/** Store the API key the customer's system issued for this connection; it is encrypted and never shown again. */
+function ApiKeyDialog({
+  connection,
+  onClose,
+  onSaved,
+}: {
+  connection: any;
+  onClose: () => void;
+  onSaved: (message: string) => void;
+}) {
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const path = `/api/v1/admin/configuration/connectors/${connection.id}/api-key`;
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const result = await send<any>(path, "PUT", { api_key: key.trim() });
+      onSaved(`API key ending ${result.api_key_ends_with} saved for ${connection.code}.`);
+    } catch (reason) {
+      setError(errorText(reason, "The key was not saved."));
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await send(path, "DELETE");
+      onSaved(`API key removed from ${connection.code}.`);
+    } catch (reason) {
+      setError(errorText(reason, "The key was not removed."));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+      <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ca-api-key" onSubmit={save}>
+        <p className="ac-eyebrow">{connection.code}</p>
+        <h2 id="ca-api-key">API key for this connection</h2>
+        <p>
+          Paste the key your source system issued for this organization. MDARIX encrypts it and uses it only to read
+          records; it is never shown again.
+          {connection.has_api_key && ` The current key ends in ${connection.api_key_ends_with}.`}
+        </p>
+        <label className="ca-field">
+          API key
+          <input
+            type="password"
+            autoComplete="off"
+            required
+            minLength={8}
+            value={key}
+            onChange={(event) => setKey(event.target.value)}
+          />
+        </label>
+        {error && (
+          <p className="ca-inline-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="ac-modal-actions">
+          {connection.has_api_key && (
+            <button type="button" className="ac-secondary" onClick={() => void remove()} disabled={busy}>
+              Remove key
+            </button>
+          )}
+          <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className="ac-primary" disabled={busy || key.trim().length < 8}>
+            {busy ? "Saving…" : "Save key"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** What a sync did, in words: records read, and what the mapping imported, skipped or refused. */
+export const syncSummary = (result: any): string => {
+  const read = `${result?.records_read ?? 0} records read`;
+  const imported = result?.canonical_import;
+  if (!imported) return read;
+  if (String(imported.status).toUpperCase() !== "IMPORTED") {
+    const issue = imported.report?.issues?.[0]?.message ?? imported.reason;
+    return `${read}; nothing imported${issue ? `: ${issue}` : ""}`;
+  }
+  const parts = [`${imported.created ?? 0} new`, `${imported.updated ?? 0} updated`];
+  if (imported.skipped) parts.push(`${imported.skipped} left out by the mapping's filter`);
+  return `${read}; imported ${parts.join(", ")}`;
+};
+
 type Tab = (typeof TABS)[number];
 
 const resultTone = (status: unknown): Tone => {
@@ -120,7 +214,8 @@ export function IntegrationsSection({ tab }: { tab?: string }) {
   return (
     <>
       <p className="ca-lede">
-        Secrets are never stored here. A connection points to a credential reference held in your secret manager.
+        Each connection reads one record type from a source system with that system's API key. Keys are encrypted and
+        never shown again; a connection can instead name a credential reference held in your secret manager.
       </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Integration sections" />
       {active === "Connections" && <Connections />}
@@ -141,6 +236,7 @@ function Connections() {
   const mappings = useResource<any[]>("/api/v1/admin/configuration/mappings");
   const [form, setForm] = useState({ ...EMPTY_CONNECTION });
   const [linking, setLinking] = useState<any | null>(null);
+  const [keying, setKeying] = useState<any | null>(null);
   const credentialFor = (id: string) => listOf(credentials.data).find((row) => row.id === id);
 
   const run = async (row: any, action: "provider-health" | "discover-schema", label: string) => {
@@ -219,12 +315,20 @@ function Connections() {
             {
               key: "credential",
               label: "Credential",
-              render: (row) =>
-                credentialFor(row.id)?.credential_configured ? (
-                  <ToneBadge tone="good" label="Reference set" />
-                ) : (
-                  <ToneBadge tone="warning" label="No reference" />
-                ),
+              render: (row) => (
+                <span className="ca-person">
+                  {row.has_api_key ? (
+                    <ToneBadge tone="good" label={`API key ••••${row.api_key_ends_with ?? ""}`} />
+                  ) : credentialFor(row.id)?.credential_configured ? (
+                    <ToneBadge tone="good" label="Reference set" />
+                  ) : (
+                    <ToneBadge tone="warning" label="No key" />
+                  )}
+                  <button type="button" className="ac-link" onClick={() => setKeying(row)}>
+                    <KeyRound size={14} aria-hidden="true" /> {row.has_api_key ? "Replace key" : "Set API key"}
+                  </button>
+                </span>
+              ),
             },
             {
               key: "mapping",
@@ -281,11 +385,12 @@ function Connections() {
                                 connector: row.code,
                                 action: "Sync",
                                 status: result.status,
-                                reason: `${result.records_read ?? 0} records read`,
+                                reason: syncSummary(result),
                                 at: new Date(),
                               },
                               ...items.slice(0, 9),
                             ]);
+                            connectors.reload();
                           },
                         })
                       }
@@ -321,7 +426,7 @@ function Connections() {
                     <strong>
                       {check.connector} · {check.action}
                     </strong>
-                    {check.reason && <small>{titleCase(String(check.reason))}</small>}
+                    {check.reason && <small>{String(check.reason)}</small>}
                   </span>
                   <small className="ac-muted">{check.at.toLocaleTimeString()}</small>
                 </li>
@@ -337,6 +442,17 @@ function Connections() {
           onClose={() => setLinking(null)}
           onLinked={(message) => {
             setLinking(null);
+            notify(message);
+            connectors.reload();
+          }}
+        />
+      )}
+      {keying && (
+        <ApiKeyDialog
+          connection={keying}
+          onClose={() => setKeying(null)}
+          onSaved={(message) => {
+            setKeying(null);
             notify(message);
             connectors.reload();
           }}
@@ -388,7 +504,7 @@ function Connections() {
             <label className="ca-field">
               Record to read
               <input
-                placeholder="e.g. Complaint"
+                placeholder="e.g. complaints"
                 value={form.source_object}
                 onChange={(event) => setForm({ ...form, source_object: event.target.value })}
               />
@@ -409,8 +525,9 @@ function Connections() {
             </label>
           </div>
           <p className="ac-muted">
-            Never paste a password or token here. Enter only the reference name; the server rejects secret values. Only
-            a released mapping imports records; until then Sync now reads and stages them.
+            Add the API key after creating the connection (Set API key), or enter a credential reference name here;
+            never paste a key into these fields. Only a released mapping imports records; until then Sync now reads and
+            stages them.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary">

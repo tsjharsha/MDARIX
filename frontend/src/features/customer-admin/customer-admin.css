@@ -214,7 +214,13 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  color: var(--ca-danger);
+  /* The workspace uses these forms too, outside the customer console that defines --ca-danger. */
+  color: var(--ca-danger, #b42318);
+}
+.ca-inline-ok {
+  margin: 0;
+  color: var(--ac-good, #0b7a3b);
+  font-weight: 600;
 }
 .ca-note-box {
   margin: 0;

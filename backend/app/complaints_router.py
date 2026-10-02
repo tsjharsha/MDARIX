@@ -98,6 +98,19 @@ def list_complaints(
                 "received_date": complaint.complaint_timestamp.isoformat() if complaint.complaint_timestamp else None,
                 "source_system": complaint.source_system,
                 "investigations": int(linked.get(complaint.id, 0)),
+                # Regulatory details recorded by the quality system (offered in the list's column chooser).
+                "severity": complaint.severity,
+                "country": complaint.country,
+                "complaint_type": complaint.complaint_type,
+                "problem_code": complaint.problem_code,
+                "serial_number": complaint.serial_number,
+                "udi": complaint.udi,
+                "awareness_date": complaint.awareness_timestamp.isoformat() if complaint.awareness_timestamp else None,
+                "device_returned": complaint.device_returned,
+                "patient_involved": complaint.patient_involved,
+                "serious_injury": complaint.serious_injury,
+                "death": complaint.death,
+                "malfunction": complaint.malfunction,
             }
             for complaint, product_identifier, product_name, version in rows
         ],

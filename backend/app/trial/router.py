@@ -9,14 +9,15 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _require_platform_admin
-from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.data_plane import get_data_plane_db, open_tenant_data_session
+from retrieval.record_evidence import embed_tenant_evidence
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Complaint, LotBatch, Product
 from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
@@ -186,6 +187,7 @@ async def check_trial_import(
 async def run_trial_import(
     entity: str,
     request: Request,
+    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
@@ -217,6 +219,9 @@ async def run_trial_import(
         raise HTTPException(
             500, detail={"code": "TRIAL_IMPORT_FAILED", "message": "The import failed; nothing was saved"}
         ) from exc
+    if result.get("rows"):
+        # Semantic search over the imported records, after the response (their text is already searchable).
+        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
     return {**result, "insights": imports.insights(data, tenant_id)}
 
 

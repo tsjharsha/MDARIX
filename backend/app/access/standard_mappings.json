@@ -1,0 +1,1125 @@
+[
+ {
+  "application": "COUPA",
+  "record": "suppliers",
+  "code": "COUPA_SUPPLIERS",
+  "target_entity": "Supplier",
+  "mapping_rules": {
+   "supplier_number": {
+    "target_field": "Supplier.supplier_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Supplier.supplier_name",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Supplier.status",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "suppliers",
+  "code": "ORACLE_ERP_SUPPLIERS",
+  "target_entity": "Supplier",
+  "mapping_rules": {
+   "SUPPLIER_NUMBER": {
+    "target_field": "Supplier.supplier_id",
+    "transform": "trim"
+   },
+   "VENDOR_NAME": {
+    "target_field": "Supplier.supplier_name",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "vendors",
+  "code": "SAP_ERP_VENDORS",
+  "target_entity": "Supplier",
+  "mapping_rules": {
+   "LIFNR": {
+    "target_field": "Supplier.supplier_id",
+    "transform": "trim"
+   },
+   "NAME1": {
+    "target_field": "Supplier.supplier_name",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "organizations",
+  "code": "ORACLE_ERP_ORGANIZATIONS",
+  "target_entity": "Site",
+  "mapping_rules": {
+   "ORGANIZATION_CODE": {
+    "target_field": "Site.site_id",
+    "transform": "trim"
+   },
+   "ORGANIZATION_NAME": {
+    "target_field": "Site.site_name",
+    "transform": "trim"
+   },
+   "LOCATION_CODE": {
+    "target_field": "Site.location",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "plants",
+  "code": "SAP_ERP_PLANTS",
+  "target_entity": "Site",
+  "mapping_rules": {
+   "WERKS": {
+    "target_field": "Site.site_id",
+    "transform": "trim"
+   },
+   "NAME1": {
+    "target_field": "Site.site_name",
+    "transform": "trim"
+   },
+   "ORT01": {
+    "target_field": "Site.location",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "items",
+  "code": "ORACLE_ERP_ITEMS_PRODUCT",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "ITEM_NUMBER": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "DESCRIPTION": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "REVISION": {
+    "target_field": "Product.version",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "ITEM_TYPE",
+    "in": [
+     "FG"
+    ]
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "materials",
+  "code": "SAP_ERP_MATERIALS_PRODUCT",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "MATNR": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "MAKTX": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "REVLV": {
+    "target_field": "Product.version",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "MTART",
+    "in": [
+     "FERT"
+    ]
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "items",
+  "code": "TEAMCENTER_ITEMS_PRODUCT",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "item_number": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "product_family": {
+    "target_field": "Product.product_family",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "item_type",
+    "in": [
+     "Product"
+    ]
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "item_revisions",
+  "code": "TEAMCENTER_ITEM_REVISIONS",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "product_id": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "item_name": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "revision": {
+    "target_field": "Product.version",
+    "transform": "trim"
+   },
+   "release_date": {
+    "target_field": "Product.version_release_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "WINDCHILL",
+  "record": "parts",
+  "code": "WINDCHILL_PARTS_PRODUCT",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "number": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "product_line": {
+    "target_field": "Product.product_family",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "part_type",
+    "in": [
+     "End item"
+    ]
+   }
+  }
+ },
+ {
+  "application": "WINDCHILL",
+  "record": "part_versions",
+  "code": "WINDCHILL_PART_VERSIONS",
+  "target_entity": "Product",
+  "mapping_rules": {
+   "number": {
+    "target_field": "Product.product_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Product.product_name",
+    "transform": "trim"
+   },
+   "version": {
+    "target_field": "Product.version",
+    "transform": "trim"
+   },
+   "released_date": {
+    "target_field": "Product.version_release_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "items",
+  "code": "ORACLE_ERP_ITEMS_COMPONENT",
+  "target_entity": "Component",
+  "mapping_rules": {
+   "ITEM_NUMBER": {
+    "target_field": "Component.component_id",
+    "transform": "trim"
+   },
+   "DESCRIPTION": {
+    "target_field": "Component.component_name",
+    "transform": "trim"
+   },
+   "REVISION": {
+    "target_field": "Component.revision",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "ITEM_TYPE",
+    "in": [
+     "PURCHASED",
+     "SUBASSEMBLY"
+    ]
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "materials",
+  "code": "SAP_ERP_MATERIALS_COMPONENT",
+  "target_entity": "Component",
+  "mapping_rules": {
+   "MATNR": {
+    "target_field": "Component.component_id",
+    "transform": "trim"
+   },
+   "MAKTX": {
+    "target_field": "Component.component_name",
+    "transform": "trim"
+   },
+   "REVLV": {
+    "target_field": "Component.revision",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "MTART",
+    "in": [
+     "ROH",
+     "HALB"
+    ]
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "items",
+  "code": "TEAMCENTER_ITEMS_COMPONENT",
+  "target_entity": "Component",
+  "mapping_rules": {
+   "item_number": {
+    "target_field": "Component.component_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Component.component_name",
+    "transform": "trim"
+   },
+   "description": {
+    "target_field": "Component.description",
+    "transform": "trim"
+   },
+   "lifecycle": {
+    "target_field": "Component.status",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "item_type",
+    "in": [
+     "Component",
+     "Assembly",
+     "Software"
+    ]
+   }
+  }
+ },
+ {
+  "application": "WINDCHILL",
+  "record": "parts",
+  "code": "WINDCHILL_PARTS_COMPONENT",
+  "target_entity": "Component",
+  "mapping_rules": {
+   "number": {
+    "target_field": "Component.component_id",
+    "transform": "trim"
+   },
+   "name": {
+    "target_field": "Component.component_name",
+    "transform": "trim"
+   },
+   "state": {
+    "target_field": "Component.status",
+    "transform": "trim"
+   },
+   "_filter": {
+    "field": "part_type",
+    "in": [
+     "Component",
+     "Software"
+    ]
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "bom_lines",
+  "code": "TEAMCENTER_BOM_LINES",
+  "target_entity": "BomLine",
+  "mapping_rules": {
+   "parent_item_number": {
+    "target_field": "BomLine.product_id",
+    "transform": "trim"
+   },
+   "parent_revision": {
+    "target_field": "BomLine.version",
+    "transform": "trim"
+   },
+   "child_item_number": {
+    "target_field": "BomLine.component_id",
+    "transform": "trim"
+   },
+   "effective_from": {
+    "target_field": "BomLine.effective_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "WINDCHILL",
+  "record": "bom",
+  "code": "WINDCHILL_BOM",
+  "target_entity": "BomLine",
+  "mapping_rules": {
+   "parent_number": {
+    "target_field": "BomLine.product_id",
+    "transform": "trim"
+   },
+   "parent_version": {
+    "target_field": "BomLine.version",
+    "transform": "trim"
+   },
+   "child_number": {
+    "target_field": "BomLine.component_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "approved_supplier_list",
+  "code": "ORACLE_ERP_APPROVED_SUPPLIER_LIST",
+  "target_entity": "ComponentSupplier",
+  "mapping_rules": {
+   "ITEM_NUMBER": {
+    "target_field": "ComponentSupplier.component_id",
+    "transform": "trim"
+   },
+   "SUPPLIER_NUMBER": {
+    "target_field": "ComponentSupplier.supplier_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "source_list",
+  "code": "SAP_ERP_SOURCE_LIST",
+  "target_entity": "ComponentSupplier",
+  "mapping_rules": {
+   "MATNR": {
+    "target_field": "ComponentSupplier.component_id",
+    "transform": "trim"
+   },
+   "LIFNR": {
+    "target_field": "ComponentSupplier.supplier_id",
+    "transform": "trim"
+   },
+   "VDATU": {
+    "target_field": "ComponentSupplier.effective_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "MES",
+  "record": "production_orders",
+  "code": "MES_PRODUCTION_ORDERS",
+  "target_entity": "Lot",
+  "mapping_rules": {
+   "lot_number": {
+    "target_field": "Lot.lot_id",
+    "transform": "trim"
+   },
+   "material_number": {
+    "target_field": "Lot.product_id",
+    "transform": "trim"
+   },
+   "revision": {
+    "target_field": "Lot.version",
+    "transform": "trim"
+   },
+   "end_date": {
+    "target_field": "Lot.manufacture_date",
+    "transform": "date"
+   },
+   "site_code": {
+    "target_field": "Lot.site_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "ORACLE_ERP",
+  "record": "lots",
+  "code": "ORACLE_ERP_LOTS",
+  "target_entity": "Lot",
+  "mapping_rules": {
+   "LOT_NUMBER": {
+    "target_field": "Lot.lot_id",
+    "transform": "trim"
+   },
+   "ITEM_NUMBER": {
+    "target_field": "Lot.product_id",
+    "transform": "trim"
+   },
+   "REVISION": {
+    "target_field": "Lot.version",
+    "transform": "trim"
+   },
+   "ORIGINATION_DATE": {
+    "target_field": "Lot.manufacture_date",
+    "transform": "date"
+   },
+   "ORGANIZATION_CODE": {
+    "target_field": "Lot.site_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "batches",
+  "code": "SAP_ERP_BATCHES",
+  "target_entity": "Lot",
+  "mapping_rules": {
+   "CHARG": {
+    "target_field": "Lot.lot_id",
+    "transform": "trim"
+   },
+   "MATNR": {
+    "target_field": "Lot.product_id",
+    "transform": "trim"
+   },
+   "REVLV": {
+    "target_field": "Lot.version",
+    "transform": "trim"
+   },
+   "HSDAT": {
+    "target_field": "Lot.manufacture_date",
+    "transform": "date"
+   },
+   "WERKS": {
+    "target_field": "Lot.site_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "MES",
+  "record": "genealogy",
+  "code": "MES_GENEALOGY",
+  "target_entity": "LotGenealogy",
+  "mapping_rules": {
+   "lot_number": {
+    "target_field": "LotGenealogy.lot_id",
+    "transform": "trim"
+   },
+   "component_material": {
+    "target_field": "LotGenealogy.component_id",
+    "transform": "trim"
+   },
+   "component_lot": {
+    "target_field": "LotGenealogy.component_lot_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "SAP_ERP",
+  "record": "batch_where_used",
+  "code": "SAP_ERP_BATCH_WHERE_USED",
+  "target_entity": "LotGenealogy",
+  "mapping_rules": {
+   "CHARG_PARENT": {
+    "target_field": "LotGenealogy.lot_id",
+    "transform": "trim"
+   },
+   "MATNR_COMPONENT": {
+    "target_field": "LotGenealogy.component_id",
+    "transform": "trim"
+   },
+   "CHARG_COMPONENT": {
+    "target_field": "LotGenealogy.component_lot_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "RISK",
+  "record": "risks",
+  "code": "RISK_RISKS",
+  "target_entity": "Risk",
+  "mapping_rules": {
+   "risk_id": {
+    "target_field": "Risk.risk_id",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Risk.product_id",
+    "transform": "trim"
+   },
+   "revision": {
+    "target_field": "Risk.version",
+    "transform": "trim"
+   },
+   "harm": {
+    "target_field": "Risk.description",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Risk.status",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "RISK",
+  "record": "failure_modes",
+  "code": "RISK_FAILURE_MODES",
+  "target_entity": "FailureMode",
+  "mapping_rules": {
+   "fmea_id": {
+    "target_field": "FailureMode.failure_mode_id",
+    "transform": "trim"
+   },
+   "failure_mode": {
+    "target_field": "FailureMode.failure_mode_name",
+    "transform": "trim"
+   },
+   "effect": {
+    "target_field": "FailureMode.description",
+    "transform": "trim"
+   },
+   "linked_risk_id": {
+    "target_field": "FailureMode.risk_id",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "RISK",
+  "record": "risk_controls",
+  "code": "RISK_RISK_CONTROLS",
+  "target_entity": "Control",
+  "mapping_rules": {
+   "control_id": {
+    "target_field": "Control.control_id",
+    "transform": "trim"
+   },
+   "risk_id": {
+    "target_field": "Control.risk_id",
+    "transform": "trim"
+   },
+   "control_type": {
+    "target_field": "Control.control_type",
+    "transform": "trim"
+   },
+   "description": {
+    "target_field": "Control.description",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Control.status",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "requirements",
+  "code": "TEAMCENTER_REQUIREMENTS",
+  "target_entity": "Requirement",
+  "mapping_rules": {
+   "product_code": {
+    "target_field": "Requirement.product_id",
+    "transform": "trim"
+   },
+   "revision": {
+    "target_field": "Requirement.version",
+    "transform": "trim"
+   },
+   "trace_to_risk": {
+    "target_field": "Requirement.risk_id",
+    "transform": "trim"
+   },
+   "requirement_id": {
+    "target_field": "Requirement.requirement_id",
+    "transform": "trim"
+   },
+   "requirement_type": {
+    "target_field": "Requirement.requirement_type",
+    "transform": "trim"
+   },
+   "text": {
+    "target_field": "Requirement.text",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Requirement.status",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "TRACKWISE",
+  "record": "complaints",
+  "code": "TRACKWISE_COMPLAINTS",
+  "target_entity": "Complaint",
+  "mapping_rules": {
+   "complaint_number": {
+    "target_field": "Complaint.complaint_id",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Complaint.product_id",
+    "transform": "trim"
+   },
+   "product_revision": {
+    "target_field": "Complaint.version",
+    "transform": "trim"
+   },
+   "problem_description": {
+    "target_field": "Complaint.description",
+    "transform": "trim"
+   },
+   "lot_number": {
+    "target_field": "Complaint.lot_id",
+    "transform": "trim"
+   },
+   "event_date": {
+    "target_field": "Complaint.event_date",
+    "transform": "date"
+   },
+   "received_date": {
+    "target_field": "Complaint.received_date",
+    "transform": "date"
+   },
+   "awareness_date": {
+    "target_field": "Complaint.awareness_date",
+    "transform": "date"
+   },
+   "status": {
+    "target_field": "Complaint.status",
+    "transform": "lower"
+   },
+   "severity": {
+    "target_field": "Complaint.severity",
+    "transform": "trim"
+   },
+   "country": {
+    "target_field": "Complaint.country",
+    "transform": "trim"
+   },
+   "reporter_type": {
+    "target_field": "Complaint.reporter_type",
+    "transform": "trim"
+   },
+   "complaint_type": {
+    "target_field": "Complaint.complaint_type",
+    "transform": "trim"
+   },
+   "problem_code": {
+    "target_field": "Complaint.problem_code",
+    "transform": "trim"
+   },
+   "serial_number": {
+    "target_field": "Complaint.serial_number",
+    "transform": "trim"
+   },
+   "udi": {
+    "target_field": "Complaint.udi",
+    "transform": "trim"
+   },
+   "device_returned": {
+    "target_field": "Complaint.device_returned",
+    "transform": "trim"
+   },
+   "patient_involved": {
+    "target_field": "Complaint.patient_involved",
+    "transform": "trim"
+   },
+   "serious_injury": {
+    "target_field": "Complaint.serious_injury",
+    "transform": "trim"
+   },
+   "death": {
+    "target_field": "Complaint.death",
+    "transform": "trim"
+   },
+   "malfunction": {
+    "target_field": "Complaint.malfunction",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "VEEVA_QMS",
+  "record": "quality_events",
+  "code": "VEEVA_QMS_QUALITY_EVENTS",
+  "target_entity": "Complaint",
+  "mapping_rules": {
+   "event_number": {
+    "target_field": "Complaint.complaint_id",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Complaint.product_id",
+    "transform": "trim"
+   },
+   "product_version": {
+    "target_field": "Complaint.version",
+    "transform": "trim"
+   },
+   "lot_number": {
+    "target_field": "Complaint.lot_id",
+    "transform": "trim"
+   },
+   "opened_date": {
+    "target_field": "Complaint.received_date",
+    "transform": "date"
+   },
+   "description": {
+    "target_field": "Complaint.description",
+    "transform": "trim"
+   },
+   "event_date": {
+    "target_field": "Complaint.event_date",
+    "transform": "date"
+   },
+   "severity": {
+    "target_field": "Complaint.severity",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Complaint.status",
+    "transform": "lower"
+   },
+   "_filter": {
+    "field": "event_type",
+    "in": [
+     "Complaint"
+    ]
+   }
+  }
+ },
+ {
+  "application": "TRACKWISE",
+  "record": "investigations",
+  "code": "TRACKWISE_INVESTIGATIONS",
+  "target_entity": "Investigation",
+  "mapping_rules": {
+   "investigation_number": {
+    "target_field": "Investigation.investigation_id",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Investigation.product_id",
+    "transform": "trim"
+   },
+   "investigation_question": {
+    "target_field": "Investigation.question",
+    "transform": "trim"
+   },
+   "related_complaints": {
+    "target_field": "Investigation.complaint_ids",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Investigation.status",
+    "transform": "trim"
+   },
+   "opened_date": {
+    "target_field": "Investigation.opened_date",
+    "transform": "date"
+   },
+   "owner": {
+    "target_field": "Investigation.owner",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "TRACKWISE",
+  "record": "capas",
+  "code": "TRACKWISE_CAPAS",
+  "target_entity": "Capa",
+  "mapping_rules": {
+   "capa_number": {
+    "target_field": "Capa.capa_id",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Capa.product_id",
+    "transform": "trim"
+   },
+   "title": {
+    "target_field": "Capa.title",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Capa.status",
+    "transform": "trim"
+   },
+   "action_type": {
+    "target_field": "Capa.action_type",
+    "transform": "trim"
+   },
+   "source_type": {
+    "target_field": "Capa.source_type",
+    "transform": "trim"
+   },
+   "source_reference": {
+    "target_field": "Capa.source_reference",
+    "transform": "trim"
+   },
+   "opened_date": {
+    "target_field": "Capa.opened_date",
+    "transform": "date"
+   },
+   "due_date": {
+    "target_field": "Capa.due_date",
+    "transform": "date"
+   },
+   "effectiveness_check_date": {
+    "target_field": "Capa.effectiveness_check_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "VEEVA_QMS",
+  "record": "capas",
+  "code": "VEEVA_QMS_CAPAS",
+  "target_entity": "Capa",
+  "mapping_rules": {
+   "capa_number": {
+    "target_field": "Capa.capa_id",
+    "transform": "trim"
+   },
+   "source_event": {
+    "target_field": "Capa.source_reference",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Capa.product_id",
+    "transform": "trim"
+   },
+   "title": {
+    "target_field": "Capa.title",
+    "transform": "trim"
+   },
+   "action_type": {
+    "target_field": "Capa.action_type",
+    "transform": "trim"
+   },
+   "opened_date": {
+    "target_field": "Capa.opened_date",
+    "transform": "date"
+   },
+   "due_date": {
+    "target_field": "Capa.due_date",
+    "transform": "date"
+   },
+   "status": {
+    "target_field": "Capa.status",
+    "transform": "trim"
+   }
+  }
+ },
+ {
+  "application": "TEAMCENTER",
+  "record": "change_notices",
+  "code": "TEAMCENTER_CHANGE_NOTICES",
+  "target_entity": "Change",
+  "mapping_rules": {
+   "change_number": {
+    "target_field": "Change.change_id",
+    "transform": "trim"
+   },
+   "affected_items": {
+    "target_field": "Change.affected_ids",
+    "transform": "trim"
+   },
+   "change_type": {
+    "target_field": "Change.change_type",
+    "transform": "trim"
+   },
+   "description": {
+    "target_field": "Change.description",
+    "transform": "trim"
+   },
+   "effective_date": {
+    "target_field": "Change.effective_date",
+    "transform": "date"
+   }
+  }
+ },
+ {
+  "application": "WINDCHILL",
+  "record": "change_notices",
+  "code": "WINDCHILL_CHANGE_NOTICES",
+  "target_entity": "Change",
+  "mapping_rules": {
+   "number": {
+    "target_field": "Change.change_id",
+    "transform": "trim"
+   },
+   "description": {
+    "target_field": "Change.description",
+    "transform": "trim"
+   },
+   "affected_parts": {
+    "target_field": "Change.affected_ids",
+    "transform": "trim"
+   },
+   "resolution_date": {
+    "target_field": "Change.effective_date",
+    "transform": "date"
+   },
+   "_defaults": {
+    "change_type": "Change notice"
+   }
+  }
+ },
+ {
+  "application": "COUPA",
+  "record": "supplier_certificates",
+  "code": "COUPA_SUPPLIER_CERTIFICATES",
+  "target_entity": "Evidence",
+  "mapping_rules": {
+   "certificate_number": {
+    "target_field": "Evidence.evidence_id",
+    "transform": "trim"
+   },
+   "certificate_type": {
+    "target_field": "Evidence.title",
+    "transform": "trim"
+   },
+   "status": {
+    "target_field": "Evidence.review_status",
+    "transform": "trim"
+   },
+   "issue_date": {
+    "target_field": "Evidence.effective_date",
+    "transform": "date"
+   },
+   "_defaults": {
+    "evidence_type": "Supplier certificate"
+   }
+  }
+ },
+ {
+  "application": "LIMS",
+  "record": "test_results",
+  "code": "LIMS_TEST_RESULTS",
+  "target_entity": "Evidence",
+  "mapping_rules": {
+   "result_id": {
+    "target_field": "Evidence.evidence_id",
+    "transform": "trim"
+   },
+   "test_method": {
+    "target_field": "Evidence.title",
+    "transform": "trim"
+   },
+   "result": {
+    "target_field": "Evidence.content",
+    "transform": "trim"
+   },
+   "tested_date": {
+    "target_field": "Evidence.effective_date",
+    "transform": "date"
+   },
+   "review_status": {
+    "target_field": "Evidence.review_status",
+    "transform": "trim"
+   },
+   "_defaults": {
+    "evidence_type": "Test result"
+   }
+  }
+ },
+ {
+  "application": "SALESFORCE_SERVICE",
+  "record": "cases",
+  "code": "SALESFORCE_SERVICE_CASES",
+  "target_entity": "Evidence",
+  "mapping_rules": {
+   "case_number": {
+    "target_field": "Evidence.evidence_id",
+    "transform": "trim"
+   },
+   "subject": {
+    "target_field": "Evidence.title",
+    "transform": "trim"
+   },
+   "description": {
+    "target_field": "Evidence.content",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Evidence.product_id",
+    "transform": "trim"
+   },
+   "opened_datetime": {
+    "target_field": "Evidence.effective_date",
+    "transform": "date"
+   },
+   "_defaults": {
+    "evidence_type": "Service case"
+   }
+  }
+ },
+ {
+  "application": "VEEVA_QMS",
+  "record": "documents",
+  "code": "VEEVA_QMS_DOCUMENTS",
+  "target_entity": "Evidence",
+  "mapping_rules": {
+   "document_number": {
+    "target_field": "Evidence.evidence_id",
+    "transform": "trim"
+   },
+   "document_type": {
+    "target_field": "Evidence.evidence_type",
+    "transform": "trim"
+   },
+   "lifecycle_state": {
+    "target_field": "Evidence.review_status",
+    "transform": "trim"
+   },
+   "product_code": {
+    "target_field": "Evidence.product_id",
+    "transform": "trim"
+   },
+   "file_name": {
+    "target_field": "Evidence.document_ref",
+    "transform": "trim"
+   },
+   "title": {
+    "target_field": "Evidence.title",
+    "transform": "trim"
+   },
+   "effective_date": {
+    "target_field": "Evidence.effective_date",
+    "transform": "date"
+   }
+  }
+ }
+]

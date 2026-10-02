@@ -568,3 +568,8 @@
   color: var(--ac-muted);
   font-size: 13px;
 }
+
+.uw-flag-critical {
+  color: var(--ca-danger, #b42318);
+  font-weight: 600;
+}

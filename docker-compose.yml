@@ -134,22 +134,22 @@ services:
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d supplier"], interval: 5s, timeout: 5s, retries: 10}
   trackwise-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: TRACKWISE, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@trackwise-simulator-db:5432/trackwise}
+    environment: {SIMULATOR_PROVIDER: TRACKWISE, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@trackwise-simulator-db:5432/trackwise, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {trackwise-simulator-db: {condition: service_healthy}}
     ports: ["8101:8099"]
   plm-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: PLM, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@plm-simulator-db:5432/plm}
+    environment: {SIMULATOR_PROVIDER: PLM, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@plm-simulator-db:5432/plm, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {plm-simulator-db: {condition: service_healthy}}
     ports: ["8102:8099"]
   erp-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@erp-simulator-db:5432/erp}
+    environment: {SIMULATOR_PROVIDER: ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@erp-simulator-db:5432/erp, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {erp-simulator-db: {condition: service_healthy}}
     ports: ["8103:8099"]
   supplier-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: SUPPLIER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@supplier-simulator-db:5432/supplier}
+    environment: {SIMULATOR_PROVIDER: SUPPLIER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@supplier-simulator-db:5432/supplier, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {supplier-simulator-db: {condition: service_healthy}}
     ports: ["8104:8099"]
   veeva-qms-simulator-db:
@@ -174,24 +174,61 @@ services:
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d coupa"], interval: 5s, timeout: 5s, retries: 10}
   veeva-qms-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: VEEVA_QMS, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@veeva-qms-simulator-db:5432/veeva_qms}
+    environment: {SIMULATOR_PROVIDER: VEEVA_QMS, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@veeva-qms-simulator-db:5432/veeva_qms, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {veeva-qms-simulator-db: {condition: service_healthy}}
     ports: ["8105:8099"]
   teamcenter-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: TEAMCENTER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@teamcenter-simulator-db:5432/teamcenter}
+    environment: {SIMULATOR_PROVIDER: TEAMCENTER, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@teamcenter-simulator-db:5432/teamcenter, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {teamcenter-simulator-db: {condition: service_healthy}}
     ports: ["8106:8099"]
   oracle-erp-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: ORACLE_ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@oracle-erp-simulator-db:5432/oracle_erp}
+    environment: {SIMULATOR_PROVIDER: ORACLE_ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@oracle-erp-simulator-db:5432/oracle_erp, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {oracle-erp-simulator-db: {condition: service_healthy}}
     ports: ["8107:8099"]
   coupa-simulator:
     build: {context: ., dockerfile: source_simulator/Dockerfile}
-    environment: {SIMULATOR_PROVIDER: COUPA, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@coupa-simulator-db:5432/coupa}
+    environment: {SIMULATOR_PROVIDER: COUPA, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@coupa-simulator-db:5432/coupa, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
     depends_on: {coupa-simulator-db: {condition: service_healthy}}
     ports: ["8108:8099"]
+
+  # One Postgres server for the six newer simulated customer systems; each creates its own databases on it.
+  source-systems-db:
+    image: postgres:16
+    environment: {POSTGRES_DB: postgres, POSTGRES_USER: provider, POSTGRES_PASSWORD: provider}
+    volumes: [source_systems_data:/var/lib/postgresql/data]
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U provider -d postgres"], interval: 5s, timeout: 5s, retries: 10}
+  sap-erp-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: SAP_ERP, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/sap_erp, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8109:8099"]
+  windchill-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: WINDCHILL, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/windchill, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8110:8099"]
+  mes-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: MES, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/mes, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8111:8099"]
+  lims-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: LIMS, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/lims, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8112:8099"]
+  risk-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: RISK, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/risk, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8113:8099"]
+  salesforce-service-simulator:
+    build: {context: ., dockerfile: source_simulator/Dockerfile}
+    environment: {SIMULATOR_PROVIDER: SALESFORCE_SERVICE, SIMULATOR_DATABASE_URL: postgresql+pg8000://provider:provider@source-systems-db:5432/salesforce_service, SIMULATOR_ADMIN_TOKEN: "${MDARIX_SIMULATOR_ADMIN_TOKEN:-}"}
+    depends_on: {source-systems-db: {condition: service_healthy}}
+    ports: ["8114:8099"]
 
 volumes:
   mdarix_postgres_data:
@@ -209,3 +246,4 @@ volumes:
   tenant_b_data:
   tenant_c_data:
   tenant_d_data:
+  source_systems_data:

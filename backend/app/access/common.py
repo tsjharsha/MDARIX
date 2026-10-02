@@ -85,7 +85,15 @@ def _safe_provider_url(endpoint: str, path: str, *, timeout: float = 10.0) -> st
     return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", parsed.query, ""))
 
 
-def _connector_credential(configuration: dict, *, allow_header: bool = True) -> str | None:
+def _connector_credential(configuration: dict, stored=None, *, allow_header: bool = True) -> str | None:
+    """The API key for the customer's system: the connector's own encrypted key, else its credential_ref secret."""
+    if stored is not None and getattr(stored, "credential_encrypted", None):
+        from access_control.connector_secrets import open_sealed
+
+        try:
+            return open_sealed(stored.credential_encrypted, stored.tenant_id, stored.id)
+        except Exception as exc:  # wrong encryption key or a value copied from another connector
+            raise ValueError("CONNECTOR_CREDENTIAL_UNREADABLE") from exc
     ref = configuration.get("credential_ref")
     if ref is None:
         return None
@@ -336,12 +344,14 @@ def _provider_get(row: ConnectorConfiguration, path_key: str):
     timeout = float(configuration.get("timeout_seconds", 5))
     try:
         url = _safe_provider_url(endpoint, configuration.get(path_key, "health"), timeout=timeout)
-        token = _connector_credential(configuration)
+        token = _connector_credential(configuration, row)
     except ValueError as exc:
         return {"status": "INVALID_CONFIGURATION", "reason": str(exc), "connector_id": str(row.id)}
     headers = {"Accept": "application/json"}
     if token:
+        # Customer systems differ: some read a bearer token, the simulated ones read X-Provider-Token.
         headers["Authorization"] = f"Bearer {token}"
+        headers["X-Provider-Token"] = token
     try:
         with safe_urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
             payload = response.read(1_000_001).decode("utf-8")

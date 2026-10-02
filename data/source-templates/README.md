@@ -42,18 +42,28 @@ Replace the example rows with your own data and keep the header row exactly as i
 - **No personal data.** MDARIX refuses rows containing email addresses, phone numbers, personal names, patient identifiers or dates of birth. For people, use user IDs such as `QE-INV-014`.
 - Don't start a value with `=`, `+` or `@`; MDARIX refuses spreadsheet formulas.
 
-## What MDARIX imports today
+## How the data reaches MDARIX
 
-| Imported today | Records |
-|---|---|
-| **Yes** | Complaints (TrackWise `complaints.csv`, Veeva `quality_events.csv` rows of type Complaint), products and versions (Teamcenter, Windchill, SAP `FERT` materials, Oracle `FG` items), and finished-product lots (SAP `batches.csv`, Oracle `lots.csv`, MES `production_orders.csv`). Only the columns marked **Yes** in the dictionary are read. |
-| **Not yet** | Components and BOMs, suppliers and approved supplier lists, sites, lot genealogy, engineering changes, requirements, risks, FMEA, risk controls, investigations, controlled documents and test results. The dictionary already shows which MDARIX field each column will fill. |
-| **No MDARIX field yet** | CAPAs, supplier risk assessments, service cases, and complaint details such as severity, country, serial number, UDI, problem code and patient involvement. |
+Load the files into the simulated systems and connect MDARIX to them: see
+`docs/runbooks/CUSTOMER_SOURCE_SYSTEMS.md`. Every record type here has an **MDARIX standard mapping**
+(`backend/app/access/standard_mappings.json`). Mapping Studio offers it as **Use the standard mapping**.
 
-Three things to know about the import as it stands:
+- Files that mix kinds of records have one standard mapping per kind. Each keeps only its own rows with a filter:
+  - Teamcenter `items.csv` (`item_type`)
+  - SAP `materials.csv` (`MTART`: `FERT` products, `ROH`/`HALB` components)
+  - Oracle `items.csv` (`ITEM_TYPE`)
+  - Windchill `parts.csv` (`part_type`)
+  - Veeva `quality_events.csv`: only `Complaint` events become complaints.
+- A few records get a fixed value for a field their system does not carry. For example, LIMS results are evidence
+  of type "Test result".
+- Columns marked "No MDARIX field yet" in the dictionary are kept in the source system but not imported. These are
+  supplier risk assessments, and details such as quantities, units and expiry dates.
+
+Three things to know about the import:
 - Each products file needs the product name on every row, so the revision files repeat it.
-- A batch of records with one bad row imports nothing. So `batches.csv` holds finished-product batches only; component batches such as sensor lot `KS-5521` appear in the genealogy files.
-- The import cannot yet keep only some rows of a file. A product sync from Teamcenter `items.csv`, SAP `materials.csv` or Oracle `items.csv` would also bring in the component rows (sensor, battery, display) as products. Until a row filter or component import exists, load components into those files only when you also want to test that behaviour.
+- A batch with one bad row imports nothing. `batches.csv` therefore holds finished-product batches only; component
+  batches such as sensor lot `KS-5521` appear in the genealogy files.
+- Records that refer to others need those loaded first. The runbook gives the order.
 
 ## Applications
 
@@ -61,14 +71,13 @@ Three things to know about the import as it stands:
 |---|---|---|---|
 | `TRACKWISE` | TrackWise Digital | 8101 | complaints, investigations, capas |
 | `VEEVA_QMS` | Veeva Vault QMS | 8105 | quality_events, capas, documents |
-| `SALESFORCE_SERVICE` | Salesforce Service | not yet | cases |
+| `SALESFORCE_SERVICE` | Salesforce Service | 8114 | cases |
 | `TEAMCENTER` | Siemens Teamcenter | 8106 | items, item_revisions, bom_lines, change_notices, requirements |
-| `WINDCHILL` | PTC Windchill | not yet | parts, part_versions, bom, change_notices |
-| `SAP_ERP` | SAP S/4HANA | not yet | materials, plants, batches, batch_where_used, vendors, source_list |
+| `WINDCHILL` | PTC Windchill | 8110 | parts, part_versions, bom, change_notices |
+| `SAP_ERP` | SAP S/4HANA | 8109 | materials, plants, batches, batch_where_used, vendors, source_list |
 | `ORACLE_ERP` | Oracle Fusion Cloud | 8107 | items, organizations, lots, suppliers, approved_supplier_list |
-| `MES` | Manufacturing execution | not yet | production_orders, genealogy |
-| `LIMS` | Laboratory system | not yet | test_results |
-| `RISK` | Risk management file | not yet | risks, failure_modes, risk_controls |
+| `MES` | Manufacturing execution | 8111 | production_orders, genealogy |
+| `LIMS` | Laboratory system | 8112 | test_results |
+| `RISK` | Risk management file | 8113 | risks, failure_modes, risk_controls |
 | `COUPA` | Coupa | 8108 | suppliers, supplier_risks, supplier_certificates |
 
-"Not yet" means there is no simulator for that application yet.

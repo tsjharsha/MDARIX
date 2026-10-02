@@ -24,6 +24,7 @@ PASSWORD = "Trial password 2026!"
 # whole test database, so trial workspaces created here must not leave business data behind.
 _TRIAL_BUSINESS_TABLES = (
     "retrieval_queries",  # Ask logs its evidence search against the investigation
+    "evidence_entity_links",  # imported records are linked to their evidence for AI search
     "evidence_chunk_embeddings",
     "evidence_chunks",
     "investigation_evidence",

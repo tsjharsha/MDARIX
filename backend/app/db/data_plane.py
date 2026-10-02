@@ -9,6 +9,7 @@ password.
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from functools import lru_cache
 from fastapi import Depends
 
@@ -37,14 +38,18 @@ def _secret_url(secret_ref: str) -> str:
         port = ports.get(tenant_key)
         if port is None:
             raise RuntimeError(f"DATA_PLANE_SECRET_NOT_CONFIGURED:{secret_ref}")
-        password = os.getenv("MDARIX_DATA_PLANE_PASSWORD", "change-this-local-secret")
+        # The least-privilege role created by scripts/upgrade_data_planes.py when configured, else the plane's owner.
+        user = os.getenv("MDARIX_DATA_PLANE_RUNTIME_USER", "").strip()
+        password = os.getenv("MDARIX_DATA_PLANE_RUNTIME_PASSWORD", "") if user else ""
+        if not (user and password):
+            user, password = "mdarix_data", os.getenv("MDARIX_DATA_PLANE_PASSWORD", "change-this-local-secret")
         database = {
             "R1_TENANT_1": "mdarix_tenant_a",
             "R1_TENANT_2": "mdarix_tenant_b",
             "R1_TENANT_3": "mdarix_tenant_c",
             "R1_TENANT_4": "mdarix_tenant_d",
         }[tenant_key]
-        value = f"postgresql+pg8000://mdarix_data:{password}@127.0.0.1:{port}/{database}"
+        value = f"postgresql+pg8000://{user}:{password}@127.0.0.1:{port}/{database}"
     return value
 
 
@@ -115,3 +120,34 @@ def data_plane_session(database_ref: str, secret_ref: str):
         yield db
     finally:
         db.close()
+
+
+@contextmanager
+def open_tenant_data_session(tenant_id):
+    """A session on one tenant's business data for work outside a request, such as a background step after an
+    import. Resolved from the registry exactly like get_data_plane_db; a tenant without a dedicated plane uses the
+    control database bound to that tenant (row-level security)."""
+    from backend.app.db.models.customer_lifecycle import TenantDataPlane
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_system, bind_tenant
+
+    control = SessionLocal()
+    try:
+        bind_system(control, "background job: resolve the tenant's data plane")
+        row = (
+            control.query(TenantDataPlane)
+            .filter(TenantDataPlane.tenant_id == tenant_id, TenantDataPlane.status == "ACTIVE")
+            .first()
+        )
+        if row is None or row.connection_secret_ref == SHARED_CONTROL_DATA_PLANE:
+            control.commit()
+            bind_tenant(control, tenant_id)
+            yield control
+            return
+        db = session_factory(row.database_ref, row.connection_secret_ref)()
+        try:
+            yield db
+        finally:
+            db.close()
+    finally:
+        control.close()

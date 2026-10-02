@@ -1,3 +1,5 @@
+import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,7 +14,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -53,12 +55,42 @@ class FeedbackRequest(BaseModel):
     comment: str | None = Field(default=None, max_length=4000)
 
 
+_EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,63}$")
+_LINK = re.compile(r"(?i)(https?://|www\.|\]\(|<a\s)")
+
+
 class SupplierEvidenceRequestPayload(BaseModel):
-    recipient: str = Field(min_length=3, max_length=254)
-    title: str = Field(min_length=1, max_length=240)
+    """A request to one of the tenant's suppliers. The email carries only this plain text: no links, so it cannot be
+    used to send people somewhere else."""
+
+    recipient: str = Field(min_length=6, max_length=254)
+    title: str = Field(min_length=3, max_length=240)
     requested_items: list[str] = Field(min_length=1, max_length=50)
+    supplier_id: uuid.UUID
     investigation_id: uuid.UUID | None = None
-    supplier_id: uuid.UUID | None = None
+
+    @field_validator("recipient")
+    @classmethod
+    def _address(cls, value: str) -> str:
+        value = value.strip()
+        if not _EMAIL.match(value):
+            raise ValueError("Enter one email address, for example quality@supplier.com")
+        return value.lower()
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str) -> str:
+        if _LINK.search(value):
+            raise ValueError("Leave links out; the supplier answers through MDARIX")
+        return value.strip()
+
+    @field_validator("requested_items")
+    @classmethod
+    def _items(cls, items: list[str]) -> list[str]:
+        cleaned = [item.strip() for item in items if item.strip()]
+        if not cleaned or any(len(item) > 240 or _LINK.search(item) for item in cleaned):
+            raise ValueError("List what you need in plain words, up to 240 characters each, without links")
+        return cleaned
 
 
 # Ask MDARIX wraps the user's question with the same guardrails as the other advisory workflows, and asks for a
@@ -319,13 +351,46 @@ def list_interactions(
     ]
 
 
+def _limit_supplier_requests(db: Session, ctx: AuthenticatedRequestContext, now) -> None:
+    """Emails leave MDARIX: at most MDARIX_SUPPLIER_REQUESTS_PER_DAY per tenant and _PER_HOUR per person."""
+    from datetime import timedelta
+
+    per_day = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_DAY", "50"))
+    per_hour = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_HOUR", "10"))
+    recent = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+    if recent.filter(SupplierEvidenceRequest.created_at >= now - timedelta(days=1)).count() >= per_day:
+        raise HTTPException(
+            429, detail={"code": "SUPPLIER_REQUEST_LIMIT", "message": f"Your organization can send {per_day} a day"}
+        )
+    mine = recent.filter(
+        SupplierEvidenceRequest.requested_by == str(ctx.user_id),
+        SupplierEvidenceRequest.created_at >= now - timedelta(hours=1),
+    )
+    if mine.count() >= per_hour:
+        raise HTTPException(
+            429, detail={"code": "SUPPLIER_REQUEST_LIMIT", "message": f"You can send {per_hour} an hour; try later"}
+        )
+
+
 @router.post("/supplier-evidence-requests", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def request_supplier_evidence(
     payload: SupplierEvidenceRequestPayload,
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    from backend.app.db.models.foundation import Investigation, Supplier
+
     now = NOW()
+    # The supplier and any case must be this tenant's own (404 otherwise, the same as for an unknown id).
+    for model, value, code in (
+        (Supplier, payload.supplier_id, "SUPPLIER_NOT_FOUND"),
+        (Investigation, payload.investigation_id, "INVESTIGATION_NOT_FOUND"),
+    ):
+        if value is not None and (
+            db.query(model.id).filter(model.id == value, model.tenant_id == ctx.tenant_id).first() is None
+        ):
+            raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
+    _limit_supplier_requests(db, ctx, now)
     row = SupplierEvidenceRequest(
         id=uuid.uuid4(),
         tenant_id=ctx.tenant_id,
@@ -350,7 +415,7 @@ def request_supplier_evidence(
         )
         row.status = "SENT"
     except Exception:
-        row.status = "DELIVERY_PENDING"
+        row.status = "PENDING_DELIVERY"
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -385,6 +450,9 @@ def list_supplier_evidence_requests(
             "title": r.title,
             "status": r.status,
             "requested_items": r.requested_items,
+            "supplier_id": str(r.supplier_id) if r.supplier_id else None,
+            "investigation_id": str(r.investigation_id) if r.investigation_id else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in rows
     ]

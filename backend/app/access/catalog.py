@@ -1,6 +1,7 @@
 """Tenant catalog: products, product versions, master mappings, mapping versions and overrides."""
 
 import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,7 +14,9 @@ from backend.app.db.models.foundation import (
     TenantMappingOverride,
     TenantMappingVersion,
 )
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
+from backend.app.request_context import get_request_context
 from backend.app.access.schemas import (
     AdminUpdateRequest,
     LifecycleRequest,
@@ -30,161 +33,191 @@ from backend.app.access.common import _audit_configuration
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
 
+@contextmanager
+def _tenant_business(request: Request, db: Session):
+    """The signed-in tenant's business data (its data plane, or the control database for a shared plane)."""
+    sessions = get_data_plane_db(get_request_context(request, db), db)
+    business = next(sessions)
+    try:
+        yield business
+    finally:
+        sessions.close()
+
+
+def _commit(business: Session, db: Session) -> None:
+    if business is not db:
+        business.commit()
+    db.commit()
+
+
 @router.post("/admin/catalog/products")
 def create_product(payload: ProductRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    now = datetime.now(timezone.utc)
-    if (
-        db.query(Product)
-        .filter(Product.tenant_id == admin.tenant_id, Product.product_identifier == payload.product_identifier)
-        .first()
-    ):
-        raise HTTPException(
-            409, detail={"code": "PRODUCT_EXISTS", "message": "Product identifier already exists for this tenant"}
+    with _tenant_business(request, db) as business:
+        now = datetime.now(timezone.utc)
+        if (
+            business.query(Product)
+            .filter(Product.tenant_id == admin.tenant_id, Product.product_identifier == payload.product_identifier)
+            .first()
+        ):
+            raise HTTPException(
+                409, detail={"code": "PRODUCT_EXISTS", "message": "Product identifier already exists for this tenant"}
+            )
+        row = Product(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            product_identifier=payload.product_identifier,
+            name=payload.name,
+            description=payload.description,
+            product_family=payload.product_family,
+            manufacturer_context=payload.manufacturer_context,
+            lifecycle_status="active",
+            created_at=now,
+            updated_at=now,
         )
-    row = Product(
-        id=uuid.uuid4(),
-        tenant_id=admin.tenant_id,
-        product_identifier=payload.product_identifier,
-        name=payload.name,
-        description=payload.description,
-        product_family=payload.product_family,
-        manufacturer_context=payload.manufacturer_context,
-        lifecycle_status="active",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    _audit_configuration(db, admin, "PRODUCT_CREATED", "Product", row.id, "v1")
-    db.commit()
-    return {
-        "id": str(row.id),
-        "product_identifier": row.product_identifier,
-        "name": row.name,
-        "tenant_id": str(row.tenant_id),
-    }
+        business.add(row)
+        _audit_configuration(db, admin, "PRODUCT_CREATED", "Product", row.id, "v1")
+        _commit(business, db)
+        return {
+            "id": str(row.id),
+            "product_identifier": row.product_identifier,
+            "name": row.name,
+            "tenant_id": str(row.tenant_id),
+        }
 
 
 @router.get("/admin/catalog/products")
 def list_products(request: Request, db: Session = Depends(get_db)):
     """Return the authenticated tenant's master product catalog and version counts."""
     admin = _admin_tenant(request, db)
-    rows = db.query(Product).filter(Product.tenant_id == admin.tenant_id).order_by(Product.name.asc()).all()
-    return [
-        {
-            "id": str(row.id),
-            "tenant_id": str(row.tenant_id),
-            "product_identifier": row.product_identifier,
-            "name": row.name,
-            "description": row.description,
-            "product_family": row.product_family,
-            "manufacturer_context": row.manufacturer_context,
-            "lifecycle_status": row.lifecycle_status,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-            "version_count": db.query(ProductVersion)
-            .filter(
-                ProductVersion.tenant_id == admin.tenant_id,
-                ProductVersion.product_id == row.id,
-            )
-            .count(),
-        }
-        for row in rows
-    ]
+    with _tenant_business(request, db) as business:
+        rows = business.query(Product).filter(Product.tenant_id == admin.tenant_id).order_by(Product.name.asc()).all()
+        return [
+            {
+                "id": str(row.id),
+                "tenant_id": str(row.tenant_id),
+                "product_identifier": row.product_identifier,
+                "name": row.name,
+                "description": row.description,
+                "product_family": row.product_family,
+                "manufacturer_context": row.manufacturer_context,
+                "lifecycle_status": row.lifecycle_status,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                "version_count": business.query(ProductVersion)
+                .filter(
+                    ProductVersion.tenant_id == admin.tenant_id,
+                    ProductVersion.product_id == row.id,
+                )
+                .count(),
+            }
+            for row in rows
+        ]
 
 
 @router.get("/admin/catalog/product-versions")
 def list_product_versions(request: Request, product_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
     """Return version history, optionally scoped to one tenant-owned product."""
     admin = _admin_tenant(request, db)
-    query = db.query(ProductVersion).filter(ProductVersion.tenant_id == admin.tenant_id)
-    if product_id is not None:
-        query = query.filter(ProductVersion.product_id == product_id)
-    rows = query.order_by(ProductVersion.version_identifier.asc()).all()
-    return [
-        {
-            "id": str(row.id),
-            "tenant_id": str(row.tenant_id),
-            "product_id": str(row.product_id),
-            "version_identifier": row.version_identifier,
-            "description": row.description,
-            "lifecycle_status": row.lifecycle_status,
-            "release_timestamp": row.release_timestamp.isoformat() if row.release_timestamp else None,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-        }
-        for row in rows
-    ]
+    with _tenant_business(request, db) as business:
+        query = business.query(ProductVersion).filter(ProductVersion.tenant_id == admin.tenant_id)
+        if product_id is not None:
+            query = query.filter(ProductVersion.product_id == product_id)
+        rows = query.order_by(ProductVersion.version_identifier.asc()).all()
+        return [
+            {
+                "id": str(row.id),
+                "tenant_id": str(row.tenant_id),
+                "product_id": str(row.product_id),
+                "version_identifier": row.version_identifier,
+                "description": row.description,
+                "lifecycle_status": row.lifecycle_status,
+                "release_timestamp": row.release_timestamp.isoformat() if row.release_timestamp else None,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+            for row in rows
+        ]
 
 
 @router.post("/admin/catalog/product-versions")
 def create_product_version(payload: ProductVersionRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    now = datetime.now(timezone.utc)
-    product = db.query(Product).filter(Product.id == payload.product_id, Product.tenant_id == admin.tenant_id).first()
-    if product is None:
-        raise HTTPException(
-            404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+    with _tenant_business(request, db) as business:
+        now = datetime.now(timezone.utc)
+        product = (
+            business.query(Product)
+            .filter(Product.id == payload.product_id, Product.tenant_id == admin.tenant_id)
+            .first()
         )
-    if (
-        db.query(ProductVersion)
-        .filter(
-            ProductVersion.tenant_id == admin.tenant_id,
-            ProductVersion.product_id == product.id,
-            ProductVersion.version_identifier == payload.version_identifier,
+        if product is None:
+            raise HTTPException(
+                404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+            )
+        if (
+            business.query(ProductVersion)
+            .filter(
+                ProductVersion.tenant_id == admin.tenant_id,
+                ProductVersion.product_id == product.id,
+                ProductVersion.version_identifier == payload.version_identifier,
+            )
+            .first()
+        ):
+            raise HTTPException(
+                409, detail={"code": "PRODUCT_VERSION_EXISTS", "message": "ProductVersion already exists"}
+            )
+        release_timestamp = (
+            datetime.fromisoformat(payload.release_timestamp.replace("Z", "+00:00"))
+            if payload.release_timestamp
+            else None
         )
-        .first()
-    ):
-        raise HTTPException(409, detail={"code": "PRODUCT_VERSION_EXISTS", "message": "ProductVersion already exists"})
-    release_timestamp = (
-        datetime.fromisoformat(payload.release_timestamp.replace("Z", "+00:00")) if payload.release_timestamp else None
-    )
-    row = ProductVersion(
-        id=uuid.uuid4(),
-        tenant_id=admin.tenant_id,
-        product_id=product.id,
-        version_identifier=payload.version_identifier,
-        description=payload.description,
-        lifecycle_status="active",
-        release_timestamp=release_timestamp,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    _audit_configuration(db, admin, "PRODUCT_VERSION_CREATED", "ProductVersion", row.id, "v1")
-    db.commit()
-    return {
-        "id": str(row.id),
-        "product_id": str(row.product_id),
-        "version_identifier": row.version_identifier,
-        "tenant_id": str(row.tenant_id),
-    }
+        row = ProductVersion(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            product_id=product.id,
+            version_identifier=payload.version_identifier,
+            description=payload.description,
+            lifecycle_status="active",
+            release_timestamp=release_timestamp,
+            created_at=now,
+            updated_at=now,
+        )
+        business.add(row)
+        _audit_configuration(db, admin, "PRODUCT_VERSION_CREATED", "ProductVersion", row.id, "v1")
+        _commit(business, db)
+        return {
+            "id": str(row.id),
+            "product_id": str(row.product_id),
+            "version_identifier": row.version_identifier,
+            "tenant_id": str(row.tenant_id),
+        }
 
 
 @router.patch("/admin/catalog/products/{product_id}")
 def update_product(product_id: uuid.UUID, payload: AdminUpdateRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
-    allowed = {
-        "product_identifier",
-        "name",
-        "description",
-        "product_family",
-        "manufacturer_context",
-        "lifecycle_status",
-    }
-    if set(payload.values) - allowed:
-        raise HTTPException(422, detail={"code": "FIELD_NOT_ALLOWED", "message": "Product field cannot be edited"})
-    row = db.query(Product).filter(Product.id == product_id, Product.tenant_id == admin.tenant_id).first()
-    if row is None:
-        raise HTTPException(
-            404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
-        )
-    for field, value in payload.values.items():
-        setattr(row, field, value)
-    row.updated_at = datetime.now(timezone.utc)
-    _audit_configuration(db, admin, "PRODUCT_UPDATED", "Product", row.id, "v1")
-    db.commit()
-    return {"id": str(row.id), "status": row.lifecycle_status}
+    with _tenant_business(request, db) as business:
+        allowed = {
+            "product_identifier",
+            "name",
+            "description",
+            "product_family",
+            "manufacturer_context",
+            "lifecycle_status",
+        }
+        if set(payload.values) - allowed:
+            raise HTTPException(422, detail={"code": "FIELD_NOT_ALLOWED", "message": "Product field cannot be edited"})
+        row = business.query(Product).filter(Product.id == product_id, Product.tenant_id == admin.tenant_id).first()
+        if row is None:
+            raise HTTPException(
+                404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+            )
+        for field, value in payload.values.items():
+            setattr(row, field, value)
+        row.updated_at = datetime.now(timezone.utc)
+        _audit_configuration(db, admin, "PRODUCT_UPDATED", "Product", row.id, "v1")
+        _commit(business, db)
+        return {"id": str(row.id), "status": row.lifecycle_status}
 
 
 @router.patch("/admin/catalog/product-versions/{version_id}")
@@ -192,31 +225,35 @@ def update_product_version(
     version_id: uuid.UUID, payload: AdminUpdateRequest, request: Request, db: Session = Depends(get_db)
 ):
     admin = _admin_tenant(request, db)
-    allowed = {"version_identifier", "description", "lifecycle_status", "release_timestamp"}
-    if set(payload.values) - allowed:
-        raise HTTPException(
-            422, detail={"code": "FIELD_NOT_ALLOWED", "message": "ProductVersion field cannot be edited"}
+    with _tenant_business(request, db) as business:
+        allowed = {"version_identifier", "description", "lifecycle_status", "release_timestamp"}
+        if set(payload.values) - allowed:
+            raise HTTPException(
+                422, detail={"code": "FIELD_NOT_ALLOWED", "message": "ProductVersion field cannot be edited"}
+            )
+        row = (
+            business.query(ProductVersion)
+            .filter(ProductVersion.id == version_id, ProductVersion.tenant_id == admin.tenant_id)
+            .first()
         )
-    row = (
-        db.query(ProductVersion)
-        .filter(ProductVersion.id == version_id, ProductVersion.tenant_id == admin.tenant_id)
-        .first()
-    )
-    if row is None:
-        raise HTTPException(
-            404,
-            detail={"code": "PRODUCT_VERSION_NOT_FOUND", "message": "ProductVersion is not available for this tenant"},
-        )
-    if payload.values.get("release_timestamp"):
-        payload.values["release_timestamp"] = datetime.fromisoformat(
-            str(payload.values["release_timestamp"]).replace("Z", "+00:00")
-        )
-    for field, value in payload.values.items():
-        setattr(row, field, value)
-    row.updated_at = datetime.now(timezone.utc)
-    _audit_configuration(db, admin, "PRODUCT_VERSION_UPDATED", "ProductVersion", row.id, "v1")
-    db.commit()
-    return {"id": str(row.id), "status": row.lifecycle_status}
+        if row is None:
+            raise HTTPException(
+                404,
+                detail={
+                    "code": "PRODUCT_VERSION_NOT_FOUND",
+                    "message": "ProductVersion is not available for this tenant",
+                },
+            )
+        if payload.values.get("release_timestamp"):
+            payload.values["release_timestamp"] = datetime.fromisoformat(
+                str(payload.values["release_timestamp"]).replace("Z", "+00:00")
+            )
+        for field, value in payload.values.items():
+            setattr(row, field, value)
+        row.updated_at = datetime.now(timezone.utc)
+        _audit_configuration(db, admin, "PRODUCT_VERSION_UPDATED", "ProductVersion", row.id, "v1")
+        _commit(business, db)
+        return {"id": str(row.id), "status": row.lifecycle_status}
 
 
 @router.patch("/admin/catalog/products/{product_id}/lifecycle")

@@ -61,12 +61,12 @@ def test_a_mapping_is_checked_before_it_is_saved(admin):
     wrong = check_mapping(
         "Complaint",
         {
-            "a": {"target_field": "Complaint.severity", "transform": "trim"},
+            "a": {"target_field": "Complaint.colour", "transform": "trim"},
             "b": {"target_field": "Complaint.complaint_id", "transform": "ENUM_MAP"},
             "c": {"target_field": "Complaint.complaint_id", "transform": "trim"},
         },
     )
-    assert any("severity" in problem for problem in wrong["problems"])
+    assert any("colour" in problem for problem in wrong["problems"])
     assert any("ENUM_MAP" in problem for problem in wrong["problems"])
     assert any("more than one" in problem for problem in wrong["problems"])
     # The canonical data-model code (what the first wizard saved) is not an importable record.

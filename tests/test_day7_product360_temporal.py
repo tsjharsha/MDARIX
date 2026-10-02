@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
@@ -76,8 +77,10 @@ def test_product_investigation_access_preserves_association_outside_historical_s
     response = client.get(f"/api/v1/products/{product_id}/investigations")
     assert response.status_code == 200
     payload = response.json()
-    assert [item["investigation_identifier"] for item in payload] == [f"INV-{number:03d}" for number in range(1, 8)]
-    assert len({item["id"] for item in payload}) == 7
+    # The seeded cases, in order; cases people open on the demo product through the workspace may follow them.
+    seeded = [item for item in payload if re.fullmatch(r"INV-\d{3}", item["investigation_identifier"])]
+    assert [item["investigation_identifier"] for item in seeded] == [f"INV-{number:03d}" for number in range(1, 8)]
+    assert len({item["id"] for item in payload}) == len(payload)
 
     historical = service.product360(
         product_id, version_id="D", as_of=datetime(2026, 2, 15, tzinfo=timezone.utc), mode="event"

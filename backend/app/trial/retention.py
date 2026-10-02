@@ -58,6 +58,7 @@ TRIAL_DATA_TABLES = (
     "report_jobs",
     "scenarios",
     "supplier_evidence_requests",
+    "capas",
     "evidence",
     "investigations",
     "risks",

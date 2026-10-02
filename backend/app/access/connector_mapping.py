@@ -1,4 +1,5 @@
-"""Turn connector records into the tenant's products, lots and complaints through a released mapping.
+"""Turn connector records into the tenant's business records (products, lots, complaints, components, suppliers,
+investigations, ...) through a released mapping.
 
 A connector names a mapping (configuration "mapping_code"). Only a RELEASED mapping of the same tenant is used
 (released through the governed workflow: request approval, approval by a second administrator, release). Its rules
@@ -6,11 +7,21 @@ use the integration gateway format: {source_field: {"target_field": "<Entity>.<c
 "transform": "trim|lower|upper|string|date|boolean|identity"}}, where <column> is a column of the import template
 (see backend/app/trial/imports.py TEMPLATES). Mapped records go through the same checked import as CSV uploads, so a
 batch with any problem writes nothing.
+
+A mapping can keep only some source records: its "_filter" setting {"field": "<source field>", "in": [values]} imports
+the records whose field holds one of the values (compared without case) and counts the others as skipped. For example
+a Teamcenter item list holds products and components; a products mapping keeps item_type "Product".
+
+Its "_defaults" setting {column: value} fills an MDARIX field the source does not carry with a fixed value, for
+example evidence_type "Test result" for a laboratory system's results. A mapped value always wins over a default.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
+from functools import lru_cache
+from pathlib import Path
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -19,9 +30,33 @@ from backend.app.db.models.foundation import MappingConfiguration
 from backend.app.trial import imports
 from integration.gateway import transform
 
-# Canonical mapping targets and the import template that receives them.
-TARGET_TEMPLATES = {"Product": "products", "ProductVersion": "products", "Lot": "lots", "LotBatch": "lots"}
-TARGET_TEMPLATES["Complaint"] = "complaints"
+# The records a mapping can fill, with the import template that receives them (shown in Mapping Studio).
+IMPORTABLE_TARGETS = {
+    "Complaint": "complaints",
+    "Product": "products",
+    "Lot": "lots",
+    "Component": "components",
+    "Supplier": "suppliers",
+    "Site": "sites",
+    "BomLine": "bom",
+    "ComponentSupplier": "component_suppliers",
+    "LotGenealogy": "lot_genealogy",
+    "Change": "changes",
+    "Requirement": "requirements",
+    "Risk": "risks",
+    "FailureMode": "failure_modes",
+    "Control": "controls",
+    "Investigation": "investigations",
+    "Evidence": "evidence",
+    "Capa": "capas",
+}
+# Also accepted as targets: the canonical names some mappings already use for the same templates.
+TARGET_TEMPLATES = {
+    **IMPORTABLE_TARGETS,
+    "ProductVersion": "products",
+    "LotBatch": "lots",
+    "ManufacturingSite": "sites",
+}
 # Only a mapping that a second administrator approved and that was then released can write records.
 USABLE_STATUSES = {"RELEASED"}
 
@@ -56,12 +91,39 @@ class RecordsNotConvertible(ValueError):
         self.issues = issues
 
 
+def record_filter(mapping_rules) -> dict | None:
+    """The mapping's row filter {"field": ..., "in": [...]}, or None when it keeps every record."""
+    settings = mapping_rules.get("_filter") if isinstance(mapping_rules, dict) else None
+    if not isinstance(settings, dict) or not settings.get("field") or not isinstance(settings.get("in"), list):
+        return None
+    return {"field": str(settings["field"]), "in": [str(value) for value in settings["in"]]}
+
+
+def record_defaults(mapping_rules) -> dict[str, str]:
+    """The mapping's fixed values {column: value} for fields the source does not carry."""
+    settings = mapping_rules.get("_defaults") if isinstance(mapping_rules, dict) else None
+    if not isinstance(settings, dict):
+        return {}
+    return {str(column): str(value) for column, value in settings.items() if str(value).strip()}
+
+
+def keep_record(selection: dict | None, record: dict) -> bool:
+    if selection is None:
+        return True
+    value = str(record.get(selection["field"]) or "").strip().lower()
+    return value in {item.strip().lower() for item in selection["in"]}
+
+
 def map_records(mapping: MappingConfiguration, records: list[dict]) -> tuple[str, list[dict]]:
     entity = TARGET_TEMPLATES[mapping.target_entity]
     rules = {key: rule for key, rule in (mapping.mapping_rules or {}).items() if not key.startswith("_")}
+    selection = record_filter(mapping.mapping_rules)
+    defaults = record_defaults(mapping.mapping_rules)
     mapped = []
     issues: list[dict] = []
     for index, record in enumerate(records, start=1):
+        if not keep_record(selection, record):
+            continue
         row: dict = {}
         for source_field, rule in rules.items():
             if not isinstance(rule, dict) or "." not in str(rule.get("target_field", "")):
@@ -69,7 +131,9 @@ def map_records(mapping: MappingConfiguration, records: list[dict]) -> tuple[str
             column = str(rule["target_field"]).split(".", 1)[1]
             conversion = rule.get("transform") or "identity"
             try:
-                value = transform(record.get(source_field), conversion)
+                raw = record.get(source_field)
+                # An empty cell is no value (CSV exports send ""), never a value to convert.
+                value = None if isinstance(raw, str) and not raw.strip() else transform(raw, conversion)
             except (TypeError, ValueError):
                 if len(issues) < 50:
                     issues.append(
@@ -84,6 +148,8 @@ def map_records(mapping: MappingConfiguration, records: list[dict]) -> tuple[str
                 value = str(value)[:10]  # templates take YYYY-MM-DD
             if value is not None:
                 row[column] = value
+        for column, value in defaults.items():
+            row.setdefault(column, value)
         mapped.append(row)
     if issues:
         raise RecordsNotConvertible(issues)
@@ -104,6 +170,18 @@ def import_connector_records(
             "mapping": mapping.code,
             "report": report,
         }
+    skipped = len(records) - len(mapped)
+    if records and not mapped:
+        # Every record was left out by the mapping's filter: nothing to import, and nothing wrong.
+        return {
+            "status": "IMPORTED",
+            "mapping": mapping.code,
+            "entity": entity,
+            "created": 0,
+            "updated": 0,
+            "rows": 0,
+            "skipped": skipped,
+        }
     policy = imports.ImportPolicy(source=f"CONNECTOR:{connector_code}"[:120])
     report = imports.check_records(data, tenant_id, entity, mapped, policy)
     if not report["ready"]:
@@ -112,7 +190,7 @@ def import_connector_records(
         result = imports.import_records(data, tenant_id, entity, mapped, policy)
     except HTTPException as exc:  # a race between check and write; nothing was written for this batch
         return {"status": "BLOCKED", "entity": entity, "mapping": mapping.code, "report": exc.detail}
-    return {"status": "IMPORTED", "mapping": mapping.code, **result}
+    return {"status": "IMPORTED", "mapping": mapping.code, **result, "skipped": skipped}
 
 
 # Conversions the import applies to a value on its way in (integration.gateway.transform), in words.
@@ -125,8 +203,25 @@ TRANSFORMS = {
     "date": "As a date",
     "boolean": "As yes / no",
 }
-# The records a mapping can fill today, with the template that receives them.
-IMPORTABLE_TARGETS = {"Complaint": "complaints", "Product": "products", "Lot": "lots"}
+
+
+_STANDARD_FILE = Path(__file__).with_name("standard_mappings.json")
+
+
+@lru_cache(maxsize=1)
+def _standard() -> tuple[dict, ...]:
+    return tuple(json.loads(_STANDARD_FILE.read_text(encoding="utf-8")))
+
+
+def standard_mappings(application: str | None = None, record: str | None = None) -> list[dict]:
+    """The standard mappings (generated with the CSV templates by scripts/generate_source_templates.py), in the order
+    their records should be loaded, optionally for one system and one record type."""
+    return [
+        dict(item)
+        for item in _standard()
+        if (not application or item["application"] == application.upper())
+        and (not record or item["record"] == record.lower())
+    ]
 
 
 def mapping_targets() -> dict:
@@ -161,7 +256,9 @@ def check_mapping(target_entity: str, mapping_rules) -> dict:
     template = TARGET_TEMPLATES.get(target_entity)
     rules = field_rules(mapping_rules)
     if template is None:
-        problems.append(f"MDARIX cannot import '{target_entity}' records yet; choose Complaint, Product or Lot.")
+        problems.append(
+            f"MDARIX cannot import '{target_entity}' records yet; choose one of: {', '.join(IMPORTABLE_TARGETS)}."
+        )
         return {"status": "NEEDS_CHANGES", "problems": problems, "missing_required": [], "rule_count": len(rules)}
     spec = imports.TEMPLATES[template]
     columns = set(spec["required"]) | set(spec["optional"])
@@ -179,9 +276,13 @@ def check_mapping(target_entity: str, mapping_rules) -> dict:
         filled.append(column)
     for column in sorted({column for column in filled if filled.count(column) > 1}):
         problems.append(f"'{column}' is filled by more than one customer field.")
+    defaults = record_defaults(mapping_rules)
+    for column in defaults:
+        if column not in columns:
+            problems.append(f"'{column}' is not a field of {spec['title'].lower()}.")
     if not rules:
         problems.append("The mapping has no field rules.")
-    missing = [column for column in spec["required"] if column not in filled]
+    missing = [column for column in spec["required"] if column not in filled and column not in defaults]
     return {
         "status": "READY" if not problems and not missing else "NEEDS_CHANGES",
         "problems": problems,

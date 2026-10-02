@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { autoMatch, buildRules, columnLabel, defaultTransform, suggestSource } from "./mappingModel";
+import { autoMatch, buildRules, columnLabel, defaultTransform, suggestSource, withFilter } from "./mappingModel";
 
 // The TrackWise Digital complaint fields from master data (a subset).
 const TRACKWISE = [
@@ -54,5 +54,17 @@ describe("matching TrackWise fields", () => {
     ]);
     // Running it again adds nothing.
     expect(autoMatch(rules, ["complaint_id", "product_id", "description"], TRACKWISE)).toHaveLength(3);
+  });
+});
+
+describe("withFilter", () => {
+  it("adds the row filter only when a field and at least one value are given", () => {
+    const rules = { item_number: { target_field: "Product.product_id", transform: "trim" } };
+    expect(withFilter(rules, "item_type", " Product , Assembly ,")).toEqual({
+      ...rules,
+      _filter: { field: "item_type", in: ["Product", "Assembly"] },
+    });
+    expect(withFilter(rules, "item_type", "  ")).toBe(rules);
+    expect(withFilter(rules, "", "Product")).toBe(rules);
   });
 });

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 from backend.app.access.connector_mapping import import_connector_records
 from tests.test_business_permissions import _client_with_role
+from tests.test_supplier_evidence_requests import own_supplier
 
 
 def test_a_duplicate_connector_or_mapping_code_is_refused_clearly():
@@ -55,7 +56,12 @@ def test_uploads_keep_only_a_safe_name_and_must_be_what_they_claim():
     user = _client_with_role("INVESTIGATOR")
     made = user.post(
         "/api/v1/stage3/supplier-evidence-requests",
-        json={"recipient": "supplier@example.invalid", "title": "CoC", "requested_items": ["CoC"]},
+        json={
+            "recipient": "supplier@example.invalid",
+            "title": "CoC",
+            "requested_items": ["CoC"],
+            "supplier_id": own_supplier(user),
+        },
     )
     assert made.status_code == 200, made.text
     path = f"/api/v1/stage3/supplier-evidence-requests/{made.json()['id']}/attachments"

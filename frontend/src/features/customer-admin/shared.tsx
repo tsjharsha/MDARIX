@@ -46,7 +46,7 @@ export function useResource<T>(path: string | null): Resource<T> {
 export const listOf = (value: any): any[] =>
   Array.isArray(value) ? value : (value?.items ?? value?.results ?? value?.records ?? []);
 
-export async function send<T = any>(path: string, method: "POST" | "PUT" | "PATCH", body?: unknown) {
+export async function send<T = any>(path: string, method: "POST" | "PUT" | "PATCH" | "DELETE", body?: unknown) {
   return requestJson<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 

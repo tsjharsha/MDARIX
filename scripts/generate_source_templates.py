@@ -5,48 +5,422 @@ pump (Teamcenter, SAP, TrackWise, MES, LIMS, risk file) and the AquaFlow 300 pum
 same product, lot and supplier numbers appear in every system, so MDARIX can link a complaint to its lot, the lot to
 its components and the components to their suppliers.
 
-The data dictionary (_data_dictionary.csv) says, for every column, which MDARIX field it maps to and whether MDARIX
-imports it today. Run:  python scripts/generate_source_templates.py   (writes data/source-templates/)
+The data dictionary (_data_dictionary.csv) says, for every column, which MDARIX field the standard mapping fills.
+The standard mappings themselves go to backend/app/access/standard_mappings.json, served to Mapping Studio. Run:  python scripts/generate_source_templates.py   (writes data/source-templates/)
 """
 
 from __future__ import annotations
 
 import csv
 import io
+import json
 from pathlib import Path
 
 OUT = Path(__file__).resolve().parents[1] / "data" / "source-templates"
 
-# The columns MDARIX imports today (backend/app/trial/imports.py TEMPLATES): <template>.<column>.
-IMPORTED_TODAY = {
-    "complaints.complaint_id",
-    "complaints.product_id",
-    "complaints.description",
-    "complaints.version",
-    "complaints.lot_id",
-    "complaints.event_date",
-    "complaints.received_date",
-    "complaints.status",
-    "products.product_id",
-    "products.product_name",
-    "products.version",
-    "products.product_family",
-    "products.version_release_date",
-    "lots.lot_id",
-    "lots.product_id",
-    "lots.version",
-    "lots.manufacture_date",
+
+def col(name: str, required: bool, data_type: str, description: str) -> dict:
+    return {"name": name, "required": required, "type": data_type, "description": description}
+
+
+# The MDARIX standard mapping of each template: which MDARIX record it fills (a mapping target in
+# backend/app/access/connector_mapping.py), source column -> MDARIX field, and optionally the records to keep
+# ("filter": column, values) and fixed values for fields the source does not carry ("defaults"). A file that mixes
+# kinds of records (items that are products or components) has one mapping per kind.
+def std(target: str, fields: dict[str, str], keep: tuple[str, list[str]] | None = None, defaults=None) -> dict:
+    return {"target": target, "fields": fields, "filter": keep, "defaults": defaults or {}}
+
+
+SAME = lambda *names: {name: name for name in names}  # noqa: E731
+
+STANDARD = {
+    ("TRACKWISE", "complaints.csv"): [
+        std(
+            "Complaint",
+            {
+                "complaint_number": "complaint_id",
+                "product_code": "product_id",
+                "product_revision": "version",
+                "problem_description": "description",
+                "lot_number": "lot_id",
+                **SAME("event_date", "received_date", "awareness_date", "status", "severity", "country"),
+                **SAME("reporter_type", "complaint_type", "problem_code", "serial_number", "udi"),
+                **SAME("device_returned", "patient_involved", "serious_injury", "death", "malfunction"),
+            },
+        )
+    ],
+    ("TRACKWISE", "investigations.csv"): [
+        std(
+            "Investigation",
+            {
+                "investigation_number": "investigation_id",
+                "product_code": "product_id",
+                "investigation_question": "question",
+                "related_complaints": "complaint_ids",
+                **SAME("status", "opened_date", "owner"),
+            },
+        )
+    ],
+    ("TRACKWISE", "capas.csv"): [
+        std(
+            "Capa",
+            {
+                "capa_number": "capa_id",
+                "product_code": "product_id",
+                **SAME("title", "status", "action_type", "source_type", "source_reference"),
+                **SAME("opened_date", "due_date", "effectiveness_check_date"),
+            },
+        )
+    ],
+    ("SALESFORCE_SERVICE", "cases.csv"): [
+        std(
+            "Evidence",
+            {
+                "case_number": "evidence_id",
+                "subject": "title",
+                "description": "content",
+                "product_code": "product_id",
+                "opened_datetime": "effective_date",
+            },
+            defaults={"evidence_type": "Service case"},
+        )
+    ],
+    ("VEEVA_QMS", "quality_events.csv"): [
+        std(
+            "Complaint",
+            {
+                "event_number": "complaint_id",
+                "product_code": "product_id",
+                "product_version": "version",
+                "lot_number": "lot_id",
+                "opened_date": "received_date",
+                **SAME("description", "event_date", "severity", "status"),
+            },
+            keep=("event_type", ["Complaint"]),
+        )
+    ],
+    ("VEEVA_QMS", "capas.csv"): [
+        std(
+            "Capa",
+            {
+                "capa_number": "capa_id",
+                "source_event": "source_reference",
+                "product_code": "product_id",
+                **SAME("title", "action_type", "opened_date", "due_date", "status"),
+            },
+        )
+    ],
+    ("VEEVA_QMS", "documents.csv"): [
+        std(
+            "Evidence",
+            {
+                "document_number": "evidence_id",
+                "document_type": "evidence_type",
+                "lifecycle_state": "review_status",
+                "product_code": "product_id",
+                "file_name": "document_ref",
+                **SAME("title", "effective_date"),
+            },
+        )
+    ],
+    ("TEAMCENTER", "items.csv"): [
+        std(
+            "Product",
+            {"item_number": "product_id", "name": "product_name", "product_family": "product_family"},
+            keep=("item_type", ["Product"]),
+        ),
+        std(
+            "Component",
+            {
+                "item_number": "component_id",
+                "name": "component_name",
+                "description": "description",
+                "lifecycle": "status",
+            },
+            keep=("item_type", ["Component", "Assembly", "Software"]),
+        ),
+    ],
+    ("TEAMCENTER", "item_revisions.csv"): [
+        std(
+            "Product",
+            {
+                "product_id": "product_id",
+                "item_name": "product_name",
+                "revision": "version",
+                "release_date": "version_release_date",
+            },
+        )
+    ],
+    ("TEAMCENTER", "bom_lines.csv"): [
+        std(
+            "BomLine",
+            {
+                "parent_item_number": "product_id",
+                "parent_revision": "version",
+                "child_item_number": "component_id",
+                "effective_from": "effective_date",
+            },
+        )
+    ],
+    ("TEAMCENTER", "change_notices.csv"): [
+        std(
+            "Change",
+            {
+                "change_number": "change_id",
+                "affected_items": "affected_ids",
+                **SAME("change_type", "description", "effective_date"),
+            },
+        )
+    ],
+    ("TEAMCENTER", "requirements.csv"): [
+        std(
+            "Requirement",
+            {
+                "product_code": "product_id",
+                "revision": "version",
+                "trace_to_risk": "risk_id",
+                **SAME("requirement_id", "requirement_type", "text", "status"),
+            },
+        )
+    ],
+    ("WINDCHILL", "parts.csv"): [
+        std(
+            "Product",
+            {"number": "product_id", "name": "product_name", "product_line": "product_family"},
+            keep=("part_type", ["End item"]),
+        ),
+        std(
+            "Component",
+            {"number": "component_id", "name": "component_name", "state": "status"},
+            keep=("part_type", ["Component", "Software"]),
+        ),
+    ],
+    ("WINDCHILL", "part_versions.csv"): [
+        std(
+            "Product",
+            {
+                "number": "product_id",
+                "name": "product_name",
+                "version": "version",
+                "released_date": "version_release_date",
+            },
+        )
+    ],
+    ("WINDCHILL", "bom.csv"): [
+        std("BomLine", {"parent_number": "product_id", "parent_version": "version", "child_number": "component_id"})
+    ],
+    ("WINDCHILL", "change_notices.csv"): [
+        std(
+            "Change",
+            {
+                "number": "change_id",
+                "description": "description",
+                "affected_parts": "affected_ids",
+                "resolution_date": "effective_date",
+            },
+            defaults={"change_type": "Change notice"},
+        )
+    ],
+    ("SAP_ERP", "materials.csv"): [
+        std(
+            "Product",
+            {"MATNR": "product_id", "MAKTX": "product_name", "REVLV": "version"},
+            keep=("MTART", ["FERT"]),
+        ),
+        std(
+            "Component",
+            {"MATNR": "component_id", "MAKTX": "component_name", "REVLV": "revision"},
+            keep=("MTART", ["ROH", "HALB"]),
+        ),
+    ],
+    ("SAP_ERP", "plants.csv"): [std("Site", {"WERKS": "site_id", "NAME1": "site_name", "ORT01": "location"})],
+    ("SAP_ERP", "batches.csv"): [
+        std(
+            "Lot",
+            {
+                "CHARG": "lot_id",
+                "MATNR": "product_id",
+                "REVLV": "version",
+                "HSDAT": "manufacture_date",
+                "WERKS": "site_id",
+            },
+        )
+    ],
+    ("SAP_ERP", "batch_where_used.csv"): [
+        std(
+            "LotGenealogy",
+            {"CHARG_PARENT": "lot_id", "MATNR_COMPONENT": "component_id", "CHARG_COMPONENT": "component_lot_id"},
+        )
+    ],
+    ("SAP_ERP", "vendors.csv"): [std("Supplier", {"LIFNR": "supplier_id", "NAME1": "supplier_name"})],
+    ("SAP_ERP", "source_list.csv"): [
+        std("ComponentSupplier", {"MATNR": "component_id", "LIFNR": "supplier_id", "VDATU": "effective_date"})
+    ],
+    ("ORACLE_ERP", "items.csv"): [
+        std(
+            "Product",
+            {"ITEM_NUMBER": "product_id", "DESCRIPTION": "product_name", "REVISION": "version"},
+            keep=("ITEM_TYPE", ["FG"]),
+        ),
+        std(
+            "Component",
+            {"ITEM_NUMBER": "component_id", "DESCRIPTION": "component_name", "REVISION": "revision"},
+            keep=("ITEM_TYPE", ["PURCHASED", "SUBASSEMBLY"]),
+        ),
+    ],
+    ("ORACLE_ERP", "organizations.csv"): [
+        std("Site", {"ORGANIZATION_CODE": "site_id", "ORGANIZATION_NAME": "site_name", "LOCATION_CODE": "location"})
+    ],
+    ("ORACLE_ERP", "lots.csv"): [
+        std(
+            "Lot",
+            {
+                "LOT_NUMBER": "lot_id",
+                "ITEM_NUMBER": "product_id",
+                "REVISION": "version",
+                "ORIGINATION_DATE": "manufacture_date",
+                "ORGANIZATION_CODE": "site_id",
+            },
+        )
+    ],
+    ("ORACLE_ERP", "suppliers.csv"): [
+        std("Supplier", {"SUPPLIER_NUMBER": "supplier_id", "VENDOR_NAME": "supplier_name"})
+    ],
+    ("ORACLE_ERP", "approved_supplier_list.csv"): [
+        std("ComponentSupplier", {"ITEM_NUMBER": "component_id", "SUPPLIER_NUMBER": "supplier_id"})
+    ],
+    ("MES", "production_orders.csv"): [
+        std(
+            "Lot",
+            {
+                "lot_number": "lot_id",
+                "material_number": "product_id",
+                "revision": "version",
+                "end_date": "manufacture_date",
+                "site_code": "site_id",
+            },
+        )
+    ],
+    ("MES", "genealogy.csv"): [
+        std(
+            "LotGenealogy",
+            {"lot_number": "lot_id", "component_material": "component_id", "component_lot": "component_lot_id"},
+        )
+    ],
+    ("LIMS", "test_results.csv"): [
+        std(
+            "Evidence",
+            {
+                "result_id": "evidence_id",
+                "test_method": "title",
+                "result": "content",
+                "tested_date": "effective_date",
+                "review_status": "review_status",
+            },
+            defaults={"evidence_type": "Test result"},
+        )
+    ],
+    ("RISK", "risks.csv"): [
+        std(
+            "Risk",
+            {
+                "risk_id": "risk_id",
+                "product_code": "product_id",
+                "revision": "version",
+                "harm": "description",
+                "status": "status",
+            },
+        )
+    ],
+    ("RISK", "failure_modes.csv"): [
+        std(
+            "FailureMode",
+            {
+                "fmea_id": "failure_mode_id",
+                "failure_mode": "failure_mode_name",
+                "effect": "description",
+                "linked_risk_id": "risk_id",
+            },
+        )
+    ],
+    ("RISK", "risk_controls.csv"): [
+        std("Control", SAME("control_id", "risk_id", "control_type", "description", "status"))
+    ],
+    ("COUPA", "suppliers.csv"): [
+        std("Supplier", {"supplier_number": "supplier_id", "name": "supplier_name", "status": "status"})
+    ],
+    ("COUPA", "supplier_certificates.csv"): [
+        std(
+            "Evidence",
+            {
+                "certificate_number": "evidence_id",
+                "certificate_type": "title",
+                "status": "review_status",
+                "issue_date": "effective_date",
+            },
+            defaults={"evidence_type": "Supplier certificate"},
+        )
+    ],
 }
+# The order in which to load records, so that every record finds the ones it refers to.
+LOAD_ORDER = [
+    "Supplier",
+    "Site",
+    "Product",
+    "Component",
+    "BomLine",
+    "ComponentSupplier",
+    "Lot",
+    "LotGenealogy",
+    "Risk",
+    "FailureMode",
+    "Control",
+    "Requirement",
+    "Complaint",
+    "Investigation",
+    "Capa",
+    "Change",
+    "Evidence",
+]
+MAPPINGS_FILE = Path(__file__).resolve().parents[1] / "backend" / "app" / "access" / "standard_mappings.json"
 
 
-def col(name: str, required: bool, data_type: str, description: str, target: str = "") -> dict:
-    return {"name": name, "required": required, "type": data_type, "description": description, "target": target}
+def transform_for(target: str, column: str) -> str:
+    if column.endswith("_date"):
+        return "date"
+    if column == "status" and target == "Complaint":
+        return "lower"
+    return "trim"
 
 
-def status_of(target: str) -> str:
-    if not target:
-        return "No MDARIX field yet"
-    return "Yes" if target in IMPORTED_TODAY else "Not yet"
+def standard_mappings() -> list[dict]:
+    """Every standard mapping in the format MDARIX stores (mapping_rules), in load order."""
+    out = []
+    for (application, file), specs in STANDARD.items():
+        for spec in specs:
+            rules: dict = {
+                source: {
+                    "target_field": f"{spec['target']}.{column}",
+                    "transform": transform_for(spec["target"], column),
+                }
+                for source, column in spec["fields"].items()
+            }
+            if spec["filter"]:
+                rules["_filter"] = {"field": spec["filter"][0], "in": spec["filter"][1]}
+            if spec["defaults"]:
+                rules["_defaults"] = spec["defaults"]
+            record = file.removesuffix(".csv")
+            suffix = f"_{spec['target'].upper()}" if len(specs) > 1 else ""
+            out.append(
+                {
+                    "application": application,
+                    "record": record,
+                    "code": f"{application}_{record.upper()}{suffix}"[:100],
+                    "target_entity": spec["target"],
+                    "mapping_rules": rules,
+                }
+            )
+    return sorted(out, key=lambda item: (LOAD_ORDER.index(item["target_entity"]), item["code"]))
 
 
 APPLICATIONS: list[dict] = [
@@ -59,17 +433,16 @@ APPLICATIONS: list[dict] = [
                 "file": "complaints.csv",
                 "record": "Complaint",
                 "columns": [
-                    col("complaint_id", True, "text", "TrackWise internal record ID", "complaints.source_identifier"),
-                    col("complaint_number", True, "text", "Complaint number people use", "complaints.complaint_id"),
-                    col("product_code", True, "text", "Product (same number as in PLM)", "complaints.product_id"),
-                    col("product_revision", False, "text", "Product version/revision", "complaints.version"),
-                    col("event_date", False, "date YYYY-MM-DD", "When the event happened", "complaints.event_date"),
+                    col("complaint_id", True, "text", "TrackWise internal record ID"),
+                    col("complaint_number", True, "text", "Complaint number people use"),
+                    col("product_code", True, "text", "Product (same number as in PLM)"),
+                    col("product_revision", False, "text", "Product version/revision"),
+                    col("event_date", False, "date YYYY-MM-DD", "When the event happened"),
                     col(
                         "received_date",
                         False,
                         "date YYYY-MM-DD",
                         "When the company received it",
-                        "complaints.received_date",
                     ),
                     col(
                         "awareness_date", False, "date YYYY-MM-DD", "Regulatory awareness date (reporting clock starts)"
@@ -89,10 +462,9 @@ APPLICATIONS: list[dict] = [
                         True,
                         "text",
                         "What happened, without personal data",
-                        "complaints.description",
                     ),
                     col("severity", False, "text", "Minor, Major, Critical"),
-                    col("lot_number", False, "text", "Lot/batch (same number as in ERP)", "complaints.lot_id"),
+                    col("lot_number", False, "text", "Lot/batch (same number as in ERP)"),
                     col("serial_number", False, "text", "Device serial number"),
                     col("udi", False, "text", "Unique device identifier"),
                     col("device_returned", False, "Y/N", "Device returned for evaluation"),
@@ -100,21 +472,19 @@ APPLICATIONS: list[dict] = [
                     col("serious_injury", False, "Y/N", "Serious injury reported"),
                     col("death", False, "Y/N", "Death reported"),
                     col("malfunction", False, "Y/N", "Device malfunction"),
-                    col("status", False, "text", "Open, Under investigation, Closed", "complaints.status"),
-                    col("investigation_number", False, "text", "Linked investigation", "investigation_complaints"),
+                    col("status", False, "text", "Open, Under investigation, Closed"),
+                    col("investigation_number", False, "text", "Linked investigation"),
                     col(
                         "created_at",
                         False,
                         "date-time ISO 8601 UTC",
                         "Record created in TrackWise",
-                        "complaints.source_timestamp",
                     ),
                     col(
                         "updated_at",
                         False,
                         "date-time ISO 8601 UTC",
                         "Last change in TrackWise",
-                        "complaints.recorded_timestamp",
                     ),
                 ],
                 "rows": [
@@ -241,7 +611,6 @@ APPLICATIONS: list[dict] = [
                         True,
                         "text",
                         "Investigation number",
-                        "investigations.investigation_identifier",
                     ),
                     col("title", True, "text", "Short title"),
                     col(
@@ -249,27 +618,24 @@ APPLICATIONS: list[dict] = [
                         True,
                         "text",
                         "The question the investigation answers",
-                        "investigations.investigation_question",
                     ),
-                    col("product_code", True, "text", "Product investigated", "investigations.product_id"),
+                    col("product_code", True, "text", "Product investigated"),
                     col("product_revision", False, "text", "Revision in scope"),
                     col(
                         "related_complaints",
                         False,
                         "list separated by ;",
                         "Complaint numbers in scope",
-                        "investigation_complaints",
                     ),
-                    col("opened_date", False, "date YYYY-MM-DD", "Opened", "investigations.opened_at"),
+                    col("opened_date", False, "date YYYY-MM-DD", "Opened"),
                     col("due_date", False, "date YYYY-MM-DD", "Due"),
                     col(
                         "owner",
                         False,
                         "user ID (no names or emails)",
                         "Owner's user ID in TrackWise",
-                        "investigations.owner_ref",
                     ),
-                    col("status", True, "text", "Open, In progress, Closed", "investigations.status"),
+                    col("status", True, "text", "Open, In progress, Closed"),
                     col(
                         "root_cause_category",
                         False,
@@ -356,7 +722,7 @@ APPLICATIONS: list[dict] = [
     {
         "code": "SALESFORCE_SERVICE",
         "name": "Salesforce Service (complaint intake)",
-        "simulator": "",
+        "simulator": "8114",
         "note": "Use only if Salesforce is where complaints are first logged; the complaint itself still comes from the quality system.",
         "files": [
             {
@@ -415,7 +781,7 @@ APPLICATIONS: list[dict] = [
                 "file": "quality_events.csv",
                 "record": "Quality event",
                 "columns": [
-                    col("event_number", True, "text", "Quality event number", "complaints.complaint_id"),
+                    col("event_number", True, "text", "Quality event number"),
                     col(
                         "event_type",
                         True,
@@ -423,15 +789,15 @@ APPLICATIONS: list[dict] = [
                         "Complaint, Deviation, Nonconformance (only Complaint becomes an MDARIX complaint)",
                     ),
                     col("title", True, "text", "Short title"),
-                    col("description", True, "text", "What happened, without personal data", "complaints.description"),
-                    col("product_code", True, "text", "Product (same number as in PLM)", "complaints.product_id"),
-                    col("product_version", False, "text", "Product version", "complaints.version"),
-                    col("lot_number", False, "text", "Lot (same number as in ERP)", "complaints.lot_id"),
-                    col("event_date", False, "date YYYY-MM-DD", "When it happened", "complaints.event_date"),
-                    col("opened_date", False, "date YYYY-MM-DD", "When it was opened", "complaints.received_date"),
+                    col("description", True, "text", "What happened, without personal data"),
+                    col("product_code", True, "text", "Product (same number as in PLM)"),
+                    col("product_version", False, "text", "Product version"),
+                    col("lot_number", False, "text", "Lot (same number as in ERP)"),
+                    col("event_date", False, "date YYYY-MM-DD", "When it happened"),
+                    col("opened_date", False, "date YYYY-MM-DD", "When it was opened"),
                     col("severity", False, "text", "Minor, Major, Critical"),
-                    col("status", False, "text", "Open, In review, Closed", "complaints.status"),
-                    col("investigation_number", False, "text", "Linked investigation", "investigation_complaints"),
+                    col("status", False, "text", "Open, In review, Closed"),
+                    col("investigation_number", False, "text", "Linked investigation"),
                 ],
                 "rows": [
                     [
@@ -508,23 +874,20 @@ APPLICATIONS: list[dict] = [
                 "file": "documents.csv",
                 "record": "Controlled document",
                 "columns": [
-                    col("document_number", True, "text", "Document number", "evidence.evidence_identifier"),
-                    col("title", True, "text", "Document title", "evidence.title"),
+                    col("document_number", True, "text", "Document number"),
+                    col("title", True, "text", "Document title"),
                     col(
                         "document_type",
                         True,
                         "text",
                         "Design verification report, Test report, Risk management file, IFU, SOP",
-                        "evidence.evidence_type",
                     ),
                     col("version", False, "text", "Document version"),
-                    col(
-                        "lifecycle_state", False, "text", "Effective, Draft, Superseded", "evidence.reliability_status"
-                    ),
-                    col("effective_date", False, "date YYYY-MM-DD", "Effective from", "evidence.effective_timestamp"),
+                    col("lifecycle_state", False, "text", "Effective, Draft, Superseded"),
+                    col("effective_date", False, "date YYYY-MM-DD", "Effective from"),
                     col("product_code", False, "text", "Product it applies to"),
                     col("owner_department", False, "text", "Owning department"),
-                    col("file_name", False, "text", "File name of the document", "evidence.document_ref"),
+                    col("file_name", False, "text", "File name of the document"),
                 ],
                 "rows": [
                     [
@@ -573,14 +936,14 @@ APPLICATIONS: list[dict] = [
                 "file": "items.csv",
                 "record": "Item (product, assembly, component, software)",
                 "columns": [
-                    col("item_number", True, "text", "Item number (products and components)", "products.product_id"),
-                    col("name", True, "text", "Item name", "products.product_name"),
+                    col("item_number", True, "text", "Item number (products and components)"),
+                    col("name", True, "text", "Item name"),
                     col(
                         "item_type", True, "text", "Product, Assembly, Component, Software (only Product imports today)"
                     ),
-                    col("description", False, "text", "Description", "products.description"),
-                    col("product_family", False, "text", "Product family", "products.product_family"),
-                    col("lifecycle", False, "text", "In work, Released, Obsolete", "products.lifecycle_status"),
+                    col("description", False, "text", "Description"),
+                    col("product_family", False, "text", "Product family"),
+                    col("lifecycle", False, "text", "In work, Released, Obsolete"),
                     col("owner_group", False, "text", "Owning engineering group"),
                 ],
                 "rows": [
@@ -640,21 +1003,19 @@ APPLICATIONS: list[dict] = [
                         True,
                         "text",
                         "Teamcenter revision record ID",
-                        "product_versions.source_identifier",
                     ),
-                    col("product_id", True, "text", "Item number", "products.product_id"),
-                    col("item_name", True, "text", "Item name, repeated on every revision", "products.product_name"),
-                    col("revision", True, "text", "Revision", "products.version"),
-                    col("version_name", False, "text", "Revision name", "product_versions.description"),
+                    col("product_id", True, "text", "Item number"),
+                    col("item_name", True, "text", "Item name, repeated on every revision"),
+                    col("revision", True, "text", "Revision"),
+                    col("version_name", False, "text", "Revision name"),
                     col(
                         "effective_date",
                         False,
                         "date YYYY-MM-DD",
                         "Effective from",
-                        "product_versions.effective_timestamp",
                     ),
-                    col("release_date", False, "date YYYY-MM-DD", "Released", "products.version_release_date"),
-                    col("status", False, "text", "In work, Released, Superseded", "product_versions.lifecycle_status"),
+                    col("release_date", False, "date YYYY-MM-DD", "Released"),
+                    col("status", False, "text", "In work, Released, Superseded"),
                     col("software_version", False, "text", "Firmware/software version in this revision"),
                     col("configuration_id", False, "text", "Configuration or variant"),
                     col(
@@ -662,14 +1023,12 @@ APPLICATIONS: list[dict] = [
                         False,
                         "text",
                         "Change that created this revision",
-                        "changes.change_identifier",
                     ),
                     col(
                         "recorded_at",
                         False,
                         "date-time ISO 8601 UTC",
                         "When Teamcenter recorded it",
-                        "product_versions.recorded_timestamp",
                     ),
                     col("known_at", False, "date-time ISO 8601 UTC", "When the company knew it"),
                 ],
@@ -710,10 +1069,10 @@ APPLICATIONS: list[dict] = [
                 "file": "bom_lines.csv",
                 "record": "Bill of materials line",
                 "columns": [
-                    col("parent_item_number", True, "text", "Parent item", "product_components.product_version_id"),
-                    col("parent_revision", True, "text", "Parent revision", "product_components.product_version_id"),
-                    col("child_item_number", True, "text", "Child item", "product_components.component_id"),
-                    col("child_revision", False, "text", "Child revision", "components.revision"),
+                    col("parent_item_number", True, "text", "Parent item"),
+                    col("parent_revision", True, "text", "Parent revision"),
+                    col("child_item_number", True, "text", "Child item"),
+                    col("child_revision", False, "text", "Child revision"),
                     col("quantity", False, "number", "Quantity per parent"),
                     col("unit", False, "text", "EA, M, G"),
                     col("find_number", False, "text", "Position on the drawing"),
@@ -722,7 +1081,6 @@ APPLICATIONS: list[dict] = [
                         False,
                         "date YYYY-MM-DD",
                         "Effective from",
-                        "product_components.effective_timestamp",
                     ),
                     col("effective_to", False, "date YYYY-MM-DD", "Effective until (empty = still effective)"),
                 ],
@@ -738,14 +1096,14 @@ APPLICATIONS: list[dict] = [
                 "file": "change_notices.csv",
                 "record": "Engineering change",
                 "columns": [
-                    col("change_number", True, "text", "Change number", "changes.change_identifier"),
+                    col("change_number", True, "text", "Change number"),
                     col("title", True, "text", "Short title"),
-                    col("change_type", True, "text", "ECN, ECO, Deviation", "changes.change_type"),
-                    col("description", True, "text", "What changed and why", "changes.description"),
+                    col("change_type", True, "text", "ECN, ECO, Deviation"),
+                    col("description", True, "text", "What changed and why"),
                     col("affected_items", False, "list separated by ;", "Items changed"),
                     col("status", False, "text", "In review, Approved, Implemented"),
                     col("release_date", False, "date YYYY-MM-DD", "Released"),
-                    col("effective_date", False, "date YYYY-MM-DD", "Effective from", "changes.event_timestamp"),
+                    col("effective_date", False, "date YYYY-MM-DD", "Effective from"),
                 ],
                 "rows": [
                     [
@@ -774,19 +1132,18 @@ APPLICATIONS: list[dict] = [
                 "file": "requirements.csv",
                 "record": "Requirement",
                 "columns": [
-                    col("requirement_id", True, "text", "Requirement ID", "requirements.requirement_identifier"),
-                    col("product_code", True, "text", "Product", "requirements.product_id"),
-                    col("revision", False, "text", "Product revision", "requirements.product_version_id"),
+                    col("requirement_id", True, "text", "Requirement ID"),
+                    col("product_code", True, "text", "Product"),
+                    col("revision", False, "text", "Product revision"),
                     col(
                         "requirement_type",
                         False,
                         "text",
                         "User need, System, Software, Safety",
-                        "requirements.requirement_type",
                     ),
-                    col("text", True, "text", "Requirement text", "requirements.text"),
+                    col("text", True, "text", "Requirement text"),
                     col("verification_method", False, "text", "Test, Inspection, Analysis"),
-                    col("status", False, "text", "Draft, Approved, Obsolete", "requirements.status"),
+                    col("status", False, "text", "Draft, Approved, Obsolete"),
                     col("trace_to_risk", False, "text", "Risk ID it controls"),
                 ],
                 "rows": [
@@ -817,17 +1174,17 @@ APPLICATIONS: list[dict] = [
     {
         "code": "WINDCHILL",
         "name": "PTC Windchill (PLM)",
-        "simulator": "",
+        "simulator": "8110",
         "files": [
             {
                 "file": "parts.csv",
                 "record": "Part",
                 "columns": [
-                    col("number", True, "text", "Part number", "products.product_id"),
-                    col("name", True, "text", "Part name", "products.product_name"),
+                    col("number", True, "text", "Part number"),
+                    col("name", True, "text", "Part name"),
                     col("part_type", True, "text", "End item, Component, Software (only End item imports today)"),
-                    col("state", False, "text", "In work, Released, Obsolete", "products.lifecycle_status"),
-                    col("product_line", False, "text", "Product line", "products.product_family"),
+                    col("state", False, "text", "In work, Released, Obsolete"),
+                    col("product_line", False, "text", "Product line"),
                 ],
                 "rows": [
                     ["PUMP-300", "AquaFlow 300 Ambulatory Pump", "End item", "Released", "Ambulatory infusion"],
@@ -839,12 +1196,12 @@ APPLICATIONS: list[dict] = [
                 "file": "part_versions.csv",
                 "record": "Part version",
                 "columns": [
-                    col("number", True, "text", "Part number", "products.product_id"),
-                    col("name", True, "text", "Part name", "products.product_name"),
-                    col("version", True, "text", "Version (A, B, ...)", "products.version"),
+                    col("number", True, "text", "Part number"),
+                    col("name", True, "text", "Part name"),
+                    col("version", True, "text", "Version (A, B, ...)"),
                     col("iteration", False, "number", "Iteration within the version"),
-                    col("state", False, "text", "In work, Released, Superseded", "product_versions.lifecycle_status"),
-                    col("released_date", False, "date YYYY-MM-DD", "Released", "products.version_release_date"),
+                    col("state", False, "text", "In work, Released, Superseded"),
+                    col("released_date", False, "date YYYY-MM-DD", "Released"),
                 ],
                 "rows": [["PUMP-300", "AquaFlow 300 Ambulatory Pump", "Rev A", "3", "Released", "2026-02-10"]],
             },
@@ -852,9 +1209,9 @@ APPLICATIONS: list[dict] = [
                 "file": "bom.csv",
                 "record": "Bill of materials line",
                 "columns": [
-                    col("parent_number", True, "text", "Parent part", "product_components.product_version_id"),
-                    col("parent_version", True, "text", "Parent version", "product_components.product_version_id"),
-                    col("child_number", True, "text", "Child part", "product_components.component_id"),
+                    col("parent_number", True, "text", "Parent part"),
+                    col("parent_version", True, "text", "Parent version"),
+                    col("child_number", True, "text", "Child part"),
                     col("quantity", False, "number", "Quantity"),
                     col("unit", False, "text", "EA, M, G"),
                 ],
@@ -864,12 +1221,12 @@ APPLICATIONS: list[dict] = [
                 "file": "change_notices.csv",
                 "record": "Change notice",
                 "columns": [
-                    col("number", True, "text", "Change notice number", "changes.change_identifier"),
+                    col("number", True, "text", "Change notice number"),
                     col("name", True, "text", "Title"),
-                    col("description", True, "text", "What changed", "changes.description"),
+                    col("description", True, "text", "What changed"),
                     col("affected_parts", False, "list separated by ;", "Parts changed"),
                     col("state", False, "text", "Open, Resolved"),
-                    col("resolution_date", False, "date YYYY-MM-DD", "Resolved", "changes.event_timestamp"),
+                    col("resolution_date", False, "date YYYY-MM-DD", "Resolved"),
                 ],
                 "rows": [
                     [
@@ -887,15 +1244,15 @@ APPLICATIONS: list[dict] = [
     {
         "code": "SAP_ERP",
         "name": "SAP S/4HANA (ERP)",
-        "simulator": "",
+        "simulator": "8109",
         "note": "Headers are SAP technical field names (MATNR = material, CHARG = batch, WERKS = plant, LIFNR = vendor).",
         "files": [
             {
                 "file": "materials.csv",
                 "record": "Material (MARA/MAKT)",
                 "columns": [
-                    col("MATNR", True, "text", "Material number (same as the PLM item number)", "products.product_id"),
-                    col("MAKTX", True, "text", "Material description", "products.product_name"),
+                    col("MATNR", True, "text", "Material number (same as the PLM item number)"),
+                    col("MAKTX", True, "text", "Material description"),
                     col(
                         "MTART",
                         True,
@@ -904,7 +1261,7 @@ APPLICATIONS: list[dict] = [
                     ),
                     col("MATKL", False, "text", "Material group"),
                     col("MEINS", False, "text", "Base unit of measure"),
-                    col("REVLV", False, "text", "Revision level", "products.version"),
+                    col("REVLV", False, "text", "Revision level"),
                     col("LVORM", False, "X or empty", "Flagged for deletion"),
                 ],
                 "rows": [
@@ -917,10 +1274,10 @@ APPLICATIONS: list[dict] = [
                 "file": "plants.csv",
                 "record": "Plant (T001W)",
                 "columns": [
-                    col("WERKS", True, "text", "Plant code", "manufacturing_sites.site_identifier"),
-                    col("NAME1", True, "text", "Plant name", "manufacturing_sites.name"),
-                    col("LAND1", False, "ISO country code", "Country", "manufacturing_sites.location"),
-                    col("ORT01", False, "text", "City", "manufacturing_sites.location"),
+                    col("WERKS", True, "text", "Plant code"),
+                    col("NAME1", True, "text", "Plant name"),
+                    col("LAND1", False, "ISO country code", "Country"),
+                    col("ORT01", False, "text", "City"),
                 ],
                 "rows": [
                     ["1100", "Galway final assembly", "IE", "Galway"],
@@ -931,13 +1288,13 @@ APPLICATIONS: list[dict] = [
                 "file": "batches.csv",
                 "record": "Batch (MCH1/MCHA)",
                 "columns": [
-                    col("CHARG", True, "text", "Batch number", "lots.lot_id"),
-                    col("MATNR", True, "text", "Material", "lots.product_id"),
-                    col("WERKS", True, "text", "Plant where it was made", "lot_batches.manufacturing_site_id"),
-                    col("REVLV", True, "text", "Revision level built", "lots.version"),
-                    col("HSDAT", False, "date YYYY-MM-DD", "Date of manufacture", "lots.manufacture_date"),
+                    col("CHARG", True, "text", "Batch number"),
+                    col("MATNR", True, "text", "Material"),
+                    col("WERKS", True, "text", "Plant where it was made"),
+                    col("REVLV", True, "text", "Revision level built"),
+                    col("HSDAT", False, "date YYYY-MM-DD", "Date of manufacture"),
                     col("VFDAT", False, "date YYYY-MM-DD", "Shelf-life expiry date"),
-                    col("ZUSTD", False, "X or empty", "Batch in restricted use (quarantine)", "lot_batches.status"),
+                    col("ZUSTD", False, "X or empty", "Batch in restricted use (quarantine)"),
                     col("LIFNR", False, "text", "Vendor, for purchased batches"),
                     col("LICHA", False, "text", "Vendor's own batch number"),
                 ],
@@ -951,10 +1308,10 @@ APPLICATIONS: list[dict] = [
                 "file": "batch_where_used.csv",
                 "record": "Batch genealogy (which component batches went into which product batch)",
                 "columns": [
-                    col("CHARG_PARENT", True, "text", "Product batch", "lot_components.lot_batch_id"),
+                    col("CHARG_PARENT", True, "text", "Product batch"),
                     col("MATNR_PARENT", True, "text", "Product material"),
                     col("CHARG_COMPONENT", True, "text", "Component batch used"),
-                    col("MATNR_COMPONENT", True, "text", "Component material", "lot_components.component_id"),
+                    col("MATNR_COMPONENT", True, "text", "Component material"),
                     col("MENGE", False, "number", "Quantity consumed"),
                     col("MEINS", False, "text", "Unit"),
                 ],
@@ -968,10 +1325,10 @@ APPLICATIONS: list[dict] = [
                 "file": "vendors.csv",
                 "record": "Vendor (LFA1)",
                 "columns": [
-                    col("LIFNR", True, "text", "Vendor number", "suppliers.supplier_identifier"),
-                    col("NAME1", True, "text", "Vendor name", "suppliers.name"),
+                    col("LIFNR", True, "text", "Vendor number"),
+                    col("NAME1", True, "text", "Vendor name"),
                     col("LAND1", False, "ISO country code", "Country"),
-                    col("SPERR", False, "X or empty", "Blocked for purchasing", "suppliers.status"),
+                    col("SPERR", False, "X or empty", "Blocked for purchasing"),
                     col("KTOKK", False, "text", "Vendor account group"),
                 ],
                 "rows": [
@@ -984,10 +1341,10 @@ APPLICATIONS: list[dict] = [
                 "file": "source_list.csv",
                 "record": "Source list (EORD): which vendor supplies which material",
                 "columns": [
-                    col("MATNR", True, "text", "Material", "component_suppliers.component_id"),
+                    col("MATNR", True, "text", "Material"),
                     col("WERKS", True, "text", "Plant"),
-                    col("LIFNR", True, "text", "Vendor", "component_suppliers.supplier_id"),
-                    col("VDATU", False, "date YYYY-MM-DD", "Valid from", "component_suppliers.effective_timestamp"),
+                    col("LIFNR", True, "text", "Vendor"),
+                    col("VDATU", False, "date YYYY-MM-DD", "Valid from"),
                     col("BDATU", False, "date YYYY-MM-DD", "Valid to"),
                     col("FLIFN", False, "X or empty", "Fixed vendor"),
                 ],
@@ -1007,10 +1364,10 @@ APPLICATIONS: list[dict] = [
                 "file": "items.csv",
                 "record": "Item",
                 "columns": [
-                    col("ITEM_NUMBER", True, "text", "Item number", "products.product_id"),
-                    col("DESCRIPTION", True, "text", "Description", "products.product_name"),
+                    col("ITEM_NUMBER", True, "text", "Item number"),
+                    col("DESCRIPTION", True, "text", "Description"),
                     col("ITEM_TYPE", True, "text", "FG finished good, PURCHASED, SUBASSEMBLY"),
-                    col("REVISION", False, "text", "Current revision", "products.version"),
+                    col("REVISION", False, "text", "Current revision"),
                     col("INVENTORY_ITEM_STATUS_CODE", False, "text", "Active, Inactive"),
                 ],
                 "rows": [
@@ -1022,9 +1379,9 @@ APPLICATIONS: list[dict] = [
                 "file": "organizations.csv",
                 "record": "Inventory organization (site)",
                 "columns": [
-                    col("ORGANIZATION_CODE", True, "text", "Organization code", "manufacturing_sites.site_identifier"),
-                    col("ORGANIZATION_NAME", True, "text", "Name", "manufacturing_sites.name"),
-                    col("LOCATION_CODE", False, "text", "Location", "manufacturing_sites.location"),
+                    col("ORGANIZATION_CODE", True, "text", "Organization code"),
+                    col("ORGANIZATION_NAME", True, "text", "Name"),
+                    col("LOCATION_CODE", False, "text", "Location"),
                 ],
                 "rows": [["M1", "Monterrey assembly", "MX-MTY"]],
             },
@@ -1032,13 +1389,13 @@ APPLICATIONS: list[dict] = [
                 "file": "lots.csv",
                 "record": "Lot",
                 "columns": [
-                    col("LOT_NUMBER", True, "text", "Lot number", "lots.lot_id"),
-                    col("ITEM_NUMBER", True, "text", "Item", "lots.product_id"),
-                    col("REVISION", True, "text", "Revision built", "lots.version"),
-                    col("ORGANIZATION_CODE", False, "text", "Where it was made", "lot_batches.manufacturing_site_id"),
-                    col("ORIGINATION_DATE", False, "date YYYY-MM-DD", "Made on", "lots.manufacture_date"),
+                    col("LOT_NUMBER", True, "text", "Lot number"),
+                    col("ITEM_NUMBER", True, "text", "Item"),
+                    col("REVISION", True, "text", "Revision built"),
+                    col("ORGANIZATION_CODE", False, "text", "Where it was made"),
+                    col("ORIGINATION_DATE", False, "date YYYY-MM-DD", "Made on"),
                     col("EXPIRATION_DATE", False, "date YYYY-MM-DD", "Expires"),
-                    col("STATUS_CODE", False, "text", "Active, Hold", "lot_batches.status"),
+                    col("STATUS_CODE", False, "text", "Active, Hold"),
                 ],
                 "rows": [
                     ["OL-3001", "PUMP-300", "Rev A", "M1", "2026-06-20", "2031-06-20", "Active"],
@@ -1049,10 +1406,10 @@ APPLICATIONS: list[dict] = [
                 "file": "suppliers.csv",
                 "record": "Supplier",
                 "columns": [
-                    col("SUPPLIER_NUMBER", True, "text", "Supplier number", "suppliers.supplier_identifier"),
-                    col("VENDOR_NAME", True, "text", "Name", "suppliers.name"),
+                    col("SUPPLIER_NUMBER", True, "text", "Supplier number"),
+                    col("VENDOR_NAME", True, "text", "Name"),
                     col("COUNTRY", False, "ISO country code", "Country"),
-                    col("ENABLED_FLAG", False, "Y/N", "Enabled", "suppliers.status"),
+                    col("ENABLED_FLAG", False, "Y/N", "Enabled"),
                 ],
                 "rows": [["SUP-2001", "Lumora Displays", "TW", "Y"], ["SUP-2002", "Castell Plastics", "MX", "Y"]],
             },
@@ -1060,8 +1417,8 @@ APPLICATIONS: list[dict] = [
                 "file": "approved_supplier_list.csv",
                 "record": "Approved supplier list",
                 "columns": [
-                    col("ITEM_NUMBER", True, "text", "Item", "component_suppliers.component_id"),
-                    col("SUPPLIER_NUMBER", True, "text", "Supplier", "component_suppliers.supplier_id"),
+                    col("ITEM_NUMBER", True, "text", "Item"),
+                    col("SUPPLIER_NUMBER", True, "text", "Supplier"),
                     col("ORGANIZATION_CODE", False, "text", "Organization"),
                     col("ASL_STATUS", False, "text", "Approved, Debarred"),
                 ],
@@ -1072,19 +1429,19 @@ APPLICATIONS: list[dict] = [
     {
         "code": "MES",
         "name": "Manufacturing execution system",
-        "simulator": "",
+        "simulator": "8111",
         "files": [
             {
                 "file": "production_orders.csv",
                 "record": "Production order",
                 "columns": [
                     col("order_number", True, "text", "Production order"),
-                    col("material_number", True, "text", "Product built", "lots.product_id"),
-                    col("revision", True, "text", "Revision built", "lots.version"),
-                    col("lot_number", True, "text", "Lot produced", "lots.lot_id"),
-                    col("site_code", True, "text", "Site", "lot_batches.manufacturing_site_id"),
+                    col("material_number", True, "text", "Product built"),
+                    col("revision", True, "text", "Revision built"),
+                    col("lot_number", True, "text", "Lot produced"),
+                    col("site_code", True, "text", "Site"),
                     col("start_date", False, "date YYYY-MM-DD", "Started"),
-                    col("end_date", False, "date YYYY-MM-DD", "Finished", "lots.manufacture_date"),
+                    col("end_date", False, "date YYYY-MM-DD", "Finished"),
                     col("quantity_built", False, "number", "Units built"),
                     col("status", False, "text", "Released, In progress, Completed"),
                 ],
@@ -1117,9 +1474,9 @@ APPLICATIONS: list[dict] = [
                 "file": "genealogy.csv",
                 "record": "Lot genealogy",
                 "columns": [
-                    col("lot_number", True, "text", "Product lot", "lot_components.lot_batch_id"),
+                    col("lot_number", True, "text", "Product lot"),
                     col("material_number", True, "text", "Product"),
-                    col("component_material", True, "text", "Component", "lot_components.component_id"),
+                    col("component_material", True, "text", "Component"),
                     col("component_lot", True, "text", "Component lot used"),
                     col("quantity_consumed", False, "number", "Quantity"),
                     col("consumed_date", False, "date YYYY-MM-DD", "When it was used"),
@@ -1134,25 +1491,25 @@ APPLICATIONS: list[dict] = [
     {
         "code": "LIMS",
         "name": "Laboratory information management system",
-        "simulator": "",
+        "simulator": "8112",
         "files": [
             {
                 "file": "test_results.csv",
                 "record": "Test result",
                 "columns": [
-                    col("result_id", True, "text", "Result ID", "evidence.evidence_identifier"),
+                    col("result_id", True, "text", "Result ID"),
                     col("sample_id", True, "text", "Sample ID"),
                     col("lot_number", False, "text", "Lot tested"),
                     col("material_number", False, "text", "Material tested"),
-                    col("test_method", True, "text", "Test method", "evidence.title"),
+                    col("test_method", True, "text", "Test method"),
                     col("parameter", True, "text", "What was measured"),
-                    col("result_value", True, "number", "Measured value", "evidence.content"),
+                    col("result_value", True, "number", "Measured value"),
                     col("unit", False, "text", "Unit"),
                     col("lower_limit", False, "number", "Lower specification limit"),
                     col("upper_limit", False, "number", "Upper specification limit"),
                     col("result", True, "text", "Pass, Fail"),
-                    col("tested_date", False, "date YYYY-MM-DD", "Tested on", "evidence.effective_timestamp"),
-                    col("review_status", False, "text", "Pending review, Approved", "evidence.reliability_status"),
+                    col("tested_date", False, "date YYYY-MM-DD", "Tested on"),
+                    col("review_status", False, "text", "Pending review, Approved"),
                 ],
                 "rows": [
                     [
@@ -1192,22 +1549,22 @@ APPLICATIONS: list[dict] = [
     {
         "code": "RISK",
         "name": "Risk management file (ISO 14971)",
-        "simulator": "",
+        "simulator": "8113",
         "files": [
             {
                 "file": "risks.csv",
                 "record": "Risk",
                 "columns": [
-                    col("risk_id", True, "text", "Risk ID", "risks.risk_identifier"),
-                    col("product_code", True, "text", "Product", "risks.product_id"),
-                    col("revision", False, "text", "Product revision", "risks.product_version_id"),
+                    col("risk_id", True, "text", "Risk ID"),
+                    col("product_code", True, "text", "Product"),
+                    col("revision", False, "text", "Product revision"),
                     col("hazard", True, "text", "Hazard"),
                     col("hazardous_situation", False, "text", "Hazardous situation"),
-                    col("harm", True, "text", "Harm", "risks.description"),
+                    col("harm", True, "text", "Harm"),
                     col("severity", False, "number 1-5", "Severity"),
                     col("probability", False, "number 1-5", "Probability"),
                     col("risk_level", False, "text", "Acceptable, ALARP, Unacceptable"),
-                    col("status", False, "text", "Open, Controlled, Closed", "risks.status"),
+                    col("status", False, "text", "Open, Controlled, Closed"),
                 ],
                 "rows": [
                     [
@@ -1240,11 +1597,11 @@ APPLICATIONS: list[dict] = [
                 "file": "failure_modes.csv",
                 "record": "FMEA line (failure mode)",
                 "columns": [
-                    col("fmea_id", True, "text", "Failure mode ID", "failure_modes.failure_mode_identifier"),
+                    col("fmea_id", True, "text", "Failure mode ID"),
                     col("product_code", True, "text", "Product"),
                     col("item_or_function", False, "text", "Item or function"),
-                    col("failure_mode", True, "text", "Failure mode", "failure_modes.name"),
-                    col("effect", False, "text", "Effect", "failure_modes.description"),
+                    col("failure_mode", True, "text", "Failure mode"),
+                    col("effect", False, "text", "Effect"),
                     col("cause", False, "text", "Cause"),
                     col("severity", False, "number 1-10", "Severity"),
                     col("occurrence", False, "number 1-10", "Occurrence"),
@@ -1282,18 +1639,17 @@ APPLICATIONS: list[dict] = [
                 "file": "risk_controls.csv",
                 "record": "Risk control",
                 "columns": [
-                    col("control_id", True, "text", "Control ID", "controls.control_identifier"),
+                    col("control_id", True, "text", "Control ID"),
                     col("risk_id", True, "text", "Risk it controls"),
                     col(
                         "control_type",
                         False,
                         "text",
                         "Inherent safety by design, Protective measure, Information for safety",
-                        "controls.control_type",
                     ),
-                    col("description", True, "text", "What the control does", "controls.description"),
+                    col("description", True, "text", "What the control does"),
                     col("verification_reference", False, "text", "Test or document that proves it"),
-                    col("status", False, "text", "Planned, Implemented, Verified", "controls.status"),
+                    col("status", False, "text", "Planned, Implemented, Verified"),
                 ],
                 "rows": [
                     [
@@ -1330,10 +1686,9 @@ APPLICATIONS: list[dict] = [
                         True,
                         "text",
                         "Supplier number (same as in ERP)",
-                        "suppliers.supplier_identifier",
                     ),
-                    col("name", True, "text", "Supplier name", "suppliers.name"),
-                    col("status", False, "text", "Active, On hold, Inactive", "suppliers.status"),
+                    col("name", True, "text", "Supplier name"),
+                    col("status", False, "text", "Active, On hold, Inactive"),
                     col("country", False, "ISO country code", "Country"),
                     col("commodity", False, "text", "What they supply"),
                     col("preferred", False, "Y/N", "Preferred supplier"),
@@ -1381,13 +1736,13 @@ APPLICATIONS: list[dict] = [
                 "file": "supplier_certificates.csv",
                 "record": "Supplier certificate",
                 "columns": [
-                    col("certificate_number", True, "text", "Certificate number", "evidence.evidence_identifier"),
+                    col("certificate_number", True, "text", "Certificate number"),
                     col("supplier_number", True, "text", "Supplier"),
-                    col("certificate_type", True, "text", "ISO 13485, ISO 9001, RoHS declaration", "evidence.title"),
+                    col("certificate_type", True, "text", "ISO 13485, ISO 9001, RoHS declaration"),
                     col("issuer", False, "text", "Issuing body"),
                     col("issue_date", False, "date YYYY-MM-DD", "Issued"),
                     col("expiry_date", False, "date YYYY-MM-DD", "Expires"),
-                    col("status", False, "text", "Valid, Expired, Withdrawn", "evidence.reliability_status"),
+                    col("status", False, "text", "Valid, Expired, Withdrawn"),
                 ],
                 "rows": [
                     [
@@ -1415,6 +1770,19 @@ APPLICATIONS: list[dict] = [
 ]
 
 
+# Records whose key is not the first column (the simulators use the key to update a record instead of adding it).
+KEYS = {
+    ("TEAMCENTER", "bom_lines.csv"): ["parent_item_number", "parent_revision", "child_item_number"],
+    ("WINDCHILL", "part_versions.csv"): ["number", "version"],
+    ("WINDCHILL", "bom.csv"): ["parent_number", "parent_version", "child_number"],
+    ("SAP_ERP", "batch_where_used.csv"): ["CHARG_PARENT", "CHARG_COMPONENT"],
+    ("SAP_ERP", "source_list.csv"): ["MATNR", "WERKS", "LIFNR"],
+    ("ORACLE_ERP", "approved_supplier_list.csv"): ["ITEM_NUMBER", "SUPPLIER_NUMBER"],
+    ("MES", "genealogy.csv"): ["lot_number", "component_material", "component_lot"],
+}
+CATALOG = Path(__file__).resolve().parents[1] / "source_simulator" / "source_catalog.json"
+
+
 def write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
@@ -1434,6 +1802,11 @@ def main() -> None:
             for row in spec["rows"]:
                 assert len(row) == len(header), (app["code"], spec["file"], row[0])
             write_csv(folder / spec["file"], header, spec["rows"])
+            mapped = {
+                source: f"{item['target']}.{column}"
+                for item in STANDARD.get((app["code"], spec["file"]), [])
+                for source, column in item["fields"].items()
+            }
             for c in spec["columns"]:
                 dictionary.append(
                     [
@@ -1445,8 +1818,8 @@ def main() -> None:
                         "Yes" if c["required"] else "No",
                         c["type"],
                         c["description"],
-                        c["target"] or "-",
-                        status_of(c["target"]),
+                        mapped.get(c["name"], "-"),
+                        "Yes" if c["name"] in mapped else "No MDARIX field yet",
                     ]
                 )
     write_csv(
@@ -1465,6 +1838,37 @@ def main() -> None:
         ],
         dictionary,
     )
+    # The simulators read this catalog: which records each application holds, their columns and key.
+    catalog = {
+        app["code"]: {
+            "name": app["name"],
+            "port": int(app["simulator"]),
+            "records": {
+                spec["file"].removesuffix(".csv"): {
+                    "label": spec["record"],
+                    "key": KEYS.get((app["code"], spec["file"]), [spec["columns"][0]["name"]]),
+                    "columns": [c["name"] for c in spec["columns"]],
+                    "required": [c["name"] for c in spec["columns"] if c["required"]],
+                }
+                for spec in app["files"]
+            },
+        }
+        for app in APPLICATIONS
+    }
+    for code, app in catalog.items():
+        for name, record in app["records"].items():
+            assert set(record["key"]) <= set(record["columns"]), (code, name)
+    CATALOG.write_text(json.dumps(catalog, indent=1) + "\n", encoding="utf-8", newline="\n")
+    known = {
+        (app["code"], spec["file"]): {c["name"] for c in spec["columns"]}
+        for app in APPLICATIONS
+        for spec in app["files"]
+    }
+    for key, specs in STANDARD.items():
+        for spec in specs:
+            unknown = set(spec["fields"]) - known[key]
+            assert not unknown, (key, unknown)
+    MAPPINGS_FILE.write_text(json.dumps(standard_mappings(), indent=1) + "\n", encoding="utf-8", newline="\n")
     files = sum(len(app["files"]) for app in APPLICATIONS)
     print(
         f"Wrote {files} templates for {len(APPLICATIONS)} applications and {len(dictionary)} dictionary rows to {OUT}"

@@ -67,3 +67,15 @@ export const autoMatch = (rules: FieldRule[], required: string[], sources: Array
   }
   return [...rules, ...added];
 };
+
+/**
+ * Keep only the source records whose field holds one of the listed values (compared without case), for example a
+ * Teamcenter item list's "item_type" = Product. Saved as the mapping's "_filter" setting; empty values keep all.
+ */
+export const withFilter = (rules: Record<string, unknown>, field: string, values: string) => {
+  const accepted = values
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return field && accepted.length ? { ...rules, _filter: { field, in: accepted } } : rules;
+};

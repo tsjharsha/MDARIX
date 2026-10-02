@@ -1,0 +1,845 @@
+{
+ "TRACKWISE": {
+  "name": "TrackWise Digital (quality management)",
+  "port": 8101,
+  "records": {
+   "complaints": {
+    "label": "Complaint",
+    "key": [
+     "complaint_id"
+    ],
+    "columns": [
+     "complaint_id",
+     "complaint_number",
+     "product_code",
+     "product_revision",
+     "event_date",
+     "received_date",
+     "awareness_date",
+     "opened_date",
+     "country",
+     "reporter_type",
+     "complaint_type",
+     "problem_code",
+     "problem_description",
+     "severity",
+     "lot_number",
+     "serial_number",
+     "udi",
+     "device_returned",
+     "patient_involved",
+     "serious_injury",
+     "death",
+     "malfunction",
+     "status",
+     "investigation_number",
+     "created_at",
+     "updated_at"
+    ],
+    "required": [
+     "complaint_id",
+     "complaint_number",
+     "product_code",
+     "problem_description"
+    ]
+   },
+   "investigations": {
+    "label": "Investigation",
+    "key": [
+     "investigation_number"
+    ],
+    "columns": [
+     "investigation_number",
+     "title",
+     "investigation_question",
+     "product_code",
+     "product_revision",
+     "related_complaints",
+     "opened_date",
+     "due_date",
+     "owner",
+     "status",
+     "root_cause_category",
+     "conclusion"
+    ],
+    "required": [
+     "investigation_number",
+     "title",
+     "investigation_question",
+     "product_code",
+     "status"
+    ]
+   },
+   "capas": {
+    "label": "CAPA",
+    "key": [
+     "capa_number"
+    ],
+    "columns": [
+     "capa_number",
+     "title",
+     "source_type",
+     "source_reference",
+     "product_code",
+     "action_type",
+     "opened_date",
+     "due_date",
+     "status",
+     "effectiveness_check_date"
+    ],
+    "required": [
+     "capa_number",
+     "title",
+     "status"
+    ]
+   }
+  }
+ },
+ "SALESFORCE_SERVICE": {
+  "name": "Salesforce Service (complaint intake)",
+  "port": 8114,
+  "records": {
+   "cases": {
+    "label": "Service case",
+    "key": [
+     "case_number"
+    ],
+    "columns": [
+     "case_number",
+     "subject",
+     "description",
+     "product_code",
+     "serial_number",
+     "lot_number",
+     "case_origin",
+     "opened_datetime",
+     "status",
+     "escalated_to_complaint",
+     "complaint_number"
+    ],
+    "required": [
+     "case_number",
+     "subject",
+     "description"
+    ]
+   }
+  }
+ },
+ "VEEVA_QMS": {
+  "name": "Veeva Vault QMS (quality management)",
+  "port": 8105,
+  "records": {
+   "quality_events": {
+    "label": "Quality event",
+    "key": [
+     "event_number"
+    ],
+    "columns": [
+     "event_number",
+     "event_type",
+     "title",
+     "description",
+     "product_code",
+     "product_version",
+     "lot_number",
+     "event_date",
+     "opened_date",
+     "severity",
+     "status",
+     "investigation_number"
+    ],
+    "required": [
+     "event_number",
+     "event_type",
+     "title",
+     "description",
+     "product_code"
+    ]
+   },
+   "capas": {
+    "label": "CAPA",
+    "key": [
+     "capa_number"
+    ],
+    "columns": [
+     "capa_number",
+     "title",
+     "source_event",
+     "product_code",
+     "action_type",
+     "opened_date",
+     "due_date",
+     "status"
+    ],
+    "required": [
+     "capa_number",
+     "title",
+     "status"
+    ]
+   },
+   "documents": {
+    "label": "Controlled document",
+    "key": [
+     "document_number"
+    ],
+    "columns": [
+     "document_number",
+     "title",
+     "document_type",
+     "version",
+     "lifecycle_state",
+     "effective_date",
+     "product_code",
+     "owner_department",
+     "file_name"
+    ],
+    "required": [
+     "document_number",
+     "title",
+     "document_type"
+    ]
+   }
+  }
+ },
+ "TEAMCENTER": {
+  "name": "Siemens Teamcenter (PLM)",
+  "port": 8106,
+  "records": {
+   "items": {
+    "label": "Item (product, assembly, component, software)",
+    "key": [
+     "item_number"
+    ],
+    "columns": [
+     "item_number",
+     "name",
+     "item_type",
+     "description",
+     "product_family",
+     "lifecycle",
+     "owner_group"
+    ],
+    "required": [
+     "item_number",
+     "name",
+     "item_type"
+    ]
+   },
+   "item_revisions": {
+    "label": "Item revision (product version)",
+    "key": [
+     "version_id"
+    ],
+    "columns": [
+     "version_id",
+     "product_id",
+     "item_name",
+     "revision",
+     "version_name",
+     "effective_date",
+     "release_date",
+     "status",
+     "software_version",
+     "configuration_id",
+     "change_order_id",
+     "recorded_at",
+     "known_at"
+    ],
+    "required": [
+     "version_id",
+     "product_id",
+     "item_name",
+     "revision"
+    ]
+   },
+   "bom_lines": {
+    "label": "Bill of materials line",
+    "key": [
+     "parent_item_number",
+     "parent_revision",
+     "child_item_number"
+    ],
+    "columns": [
+     "parent_item_number",
+     "parent_revision",
+     "child_item_number",
+     "child_revision",
+     "quantity",
+     "unit",
+     "find_number",
+     "effective_from",
+     "effective_to"
+    ],
+    "required": [
+     "parent_item_number",
+     "parent_revision",
+     "child_item_number"
+    ]
+   },
+   "change_notices": {
+    "label": "Engineering change",
+    "key": [
+     "change_number"
+    ],
+    "columns": [
+     "change_number",
+     "title",
+     "change_type",
+     "description",
+     "affected_items",
+     "status",
+     "release_date",
+     "effective_date"
+    ],
+    "required": [
+     "change_number",
+     "title",
+     "change_type",
+     "description"
+    ]
+   },
+   "requirements": {
+    "label": "Requirement",
+    "key": [
+     "requirement_id"
+    ],
+    "columns": [
+     "requirement_id",
+     "product_code",
+     "revision",
+     "requirement_type",
+     "text",
+     "verification_method",
+     "status",
+     "trace_to_risk"
+    ],
+    "required": [
+     "requirement_id",
+     "product_code",
+     "text"
+    ]
+   }
+  }
+ },
+ "WINDCHILL": {
+  "name": "PTC Windchill (PLM)",
+  "port": 8110,
+  "records": {
+   "parts": {
+    "label": "Part",
+    "key": [
+     "number"
+    ],
+    "columns": [
+     "number",
+     "name",
+     "part_type",
+     "state",
+     "product_line"
+    ],
+    "required": [
+     "number",
+     "name",
+     "part_type"
+    ]
+   },
+   "part_versions": {
+    "label": "Part version",
+    "key": [
+     "number",
+     "version"
+    ],
+    "columns": [
+     "number",
+     "name",
+     "version",
+     "iteration",
+     "state",
+     "released_date"
+    ],
+    "required": [
+     "number",
+     "name",
+     "version"
+    ]
+   },
+   "bom": {
+    "label": "Bill of materials line",
+    "key": [
+     "parent_number",
+     "parent_version",
+     "child_number"
+    ],
+    "columns": [
+     "parent_number",
+     "parent_version",
+     "child_number",
+     "quantity",
+     "unit"
+    ],
+    "required": [
+     "parent_number",
+     "parent_version",
+     "child_number"
+    ]
+   },
+   "change_notices": {
+    "label": "Change notice",
+    "key": [
+     "number"
+    ],
+    "columns": [
+     "number",
+     "name",
+     "description",
+     "affected_parts",
+     "state",
+     "resolution_date"
+    ],
+    "required": [
+     "number",
+     "name",
+     "description"
+    ]
+   }
+  }
+ },
+ "SAP_ERP": {
+  "name": "SAP S/4HANA (ERP)",
+  "port": 8109,
+  "records": {
+   "materials": {
+    "label": "Material (MARA/MAKT)",
+    "key": [
+     "MATNR"
+    ],
+    "columns": [
+     "MATNR",
+     "MAKTX",
+     "MTART",
+     "MATKL",
+     "MEINS",
+     "REVLV",
+     "LVORM"
+    ],
+    "required": [
+     "MATNR",
+     "MAKTX",
+     "MTART"
+    ]
+   },
+   "plants": {
+    "label": "Plant (T001W)",
+    "key": [
+     "WERKS"
+    ],
+    "columns": [
+     "WERKS",
+     "NAME1",
+     "LAND1",
+     "ORT01"
+    ],
+    "required": [
+     "WERKS",
+     "NAME1"
+    ]
+   },
+   "batches": {
+    "label": "Batch (MCH1/MCHA)",
+    "key": [
+     "CHARG"
+    ],
+    "columns": [
+     "CHARG",
+     "MATNR",
+     "WERKS",
+     "REVLV",
+     "HSDAT",
+     "VFDAT",
+     "ZUSTD",
+     "LIFNR",
+     "LICHA"
+    ],
+    "required": [
+     "CHARG",
+     "MATNR",
+     "WERKS",
+     "REVLV"
+    ]
+   },
+   "batch_where_used": {
+    "label": "Batch genealogy (which component batches went into which product batch)",
+    "key": [
+     "CHARG_PARENT",
+     "CHARG_COMPONENT"
+    ],
+    "columns": [
+     "CHARG_PARENT",
+     "MATNR_PARENT",
+     "CHARG_COMPONENT",
+     "MATNR_COMPONENT",
+     "MENGE",
+     "MEINS"
+    ],
+    "required": [
+     "CHARG_PARENT",
+     "MATNR_PARENT",
+     "CHARG_COMPONENT",
+     "MATNR_COMPONENT"
+    ]
+   },
+   "vendors": {
+    "label": "Vendor (LFA1)",
+    "key": [
+     "LIFNR"
+    ],
+    "columns": [
+     "LIFNR",
+     "NAME1",
+     "LAND1",
+     "SPERR",
+     "KTOKK"
+    ],
+    "required": [
+     "LIFNR",
+     "NAME1"
+    ]
+   },
+   "source_list": {
+    "label": "Source list (EORD): which vendor supplies which material",
+    "key": [
+     "MATNR",
+     "WERKS",
+     "LIFNR"
+    ],
+    "columns": [
+     "MATNR",
+     "WERKS",
+     "LIFNR",
+     "VDATU",
+     "BDATU",
+     "FLIFN"
+    ],
+    "required": [
+     "MATNR",
+     "WERKS",
+     "LIFNR"
+    ]
+   }
+  }
+ },
+ "ORACLE_ERP": {
+  "name": "Oracle Fusion Cloud (ERP)",
+  "port": 8107,
+  "records": {
+   "items": {
+    "label": "Item",
+    "key": [
+     "ITEM_NUMBER"
+    ],
+    "columns": [
+     "ITEM_NUMBER",
+     "DESCRIPTION",
+     "ITEM_TYPE",
+     "REVISION",
+     "INVENTORY_ITEM_STATUS_CODE"
+    ],
+    "required": [
+     "ITEM_NUMBER",
+     "DESCRIPTION",
+     "ITEM_TYPE"
+    ]
+   },
+   "organizations": {
+    "label": "Inventory organization (site)",
+    "key": [
+     "ORGANIZATION_CODE"
+    ],
+    "columns": [
+     "ORGANIZATION_CODE",
+     "ORGANIZATION_NAME",
+     "LOCATION_CODE"
+    ],
+    "required": [
+     "ORGANIZATION_CODE",
+     "ORGANIZATION_NAME"
+    ]
+   },
+   "lots": {
+    "label": "Lot",
+    "key": [
+     "LOT_NUMBER"
+    ],
+    "columns": [
+     "LOT_NUMBER",
+     "ITEM_NUMBER",
+     "REVISION",
+     "ORGANIZATION_CODE",
+     "ORIGINATION_DATE",
+     "EXPIRATION_DATE",
+     "STATUS_CODE"
+    ],
+    "required": [
+     "LOT_NUMBER",
+     "ITEM_NUMBER",
+     "REVISION"
+    ]
+   },
+   "suppliers": {
+    "label": "Supplier",
+    "key": [
+     "SUPPLIER_NUMBER"
+    ],
+    "columns": [
+     "SUPPLIER_NUMBER",
+     "VENDOR_NAME",
+     "COUNTRY",
+     "ENABLED_FLAG"
+    ],
+    "required": [
+     "SUPPLIER_NUMBER",
+     "VENDOR_NAME"
+    ]
+   },
+   "approved_supplier_list": {
+    "label": "Approved supplier list",
+    "key": [
+     "ITEM_NUMBER",
+     "SUPPLIER_NUMBER"
+    ],
+    "columns": [
+     "ITEM_NUMBER",
+     "SUPPLIER_NUMBER",
+     "ORGANIZATION_CODE",
+     "ASL_STATUS"
+    ],
+    "required": [
+     "ITEM_NUMBER",
+     "SUPPLIER_NUMBER"
+    ]
+   }
+  }
+ },
+ "MES": {
+  "name": "Manufacturing execution system",
+  "port": 8111,
+  "records": {
+   "production_orders": {
+    "label": "Production order",
+    "key": [
+     "order_number"
+    ],
+    "columns": [
+     "order_number",
+     "material_number",
+     "revision",
+     "lot_number",
+     "site_code",
+     "start_date",
+     "end_date",
+     "quantity_built",
+     "status"
+    ],
+    "required": [
+     "order_number",
+     "material_number",
+     "revision",
+     "lot_number",
+     "site_code"
+    ]
+   },
+   "genealogy": {
+    "label": "Lot genealogy",
+    "key": [
+     "lot_number",
+     "component_material",
+     "component_lot"
+    ],
+    "columns": [
+     "lot_number",
+     "material_number",
+     "component_material",
+     "component_lot",
+     "quantity_consumed",
+     "consumed_date"
+    ],
+    "required": [
+     "lot_number",
+     "material_number",
+     "component_material",
+     "component_lot"
+    ]
+   }
+  }
+ },
+ "LIMS": {
+  "name": "Laboratory information management system",
+  "port": 8112,
+  "records": {
+   "test_results": {
+    "label": "Test result",
+    "key": [
+     "result_id"
+    ],
+    "columns": [
+     "result_id",
+     "sample_id",
+     "lot_number",
+     "material_number",
+     "test_method",
+     "parameter",
+     "result_value",
+     "unit",
+     "lower_limit",
+     "upper_limit",
+     "result",
+     "tested_date",
+     "review_status"
+    ],
+    "required": [
+     "result_id",
+     "sample_id",
+     "test_method",
+     "parameter",
+     "result_value",
+     "result"
+    ]
+   }
+  }
+ },
+ "RISK": {
+  "name": "Risk management file (ISO 14971)",
+  "port": 8113,
+  "records": {
+   "risks": {
+    "label": "Risk",
+    "key": [
+     "risk_id"
+    ],
+    "columns": [
+     "risk_id",
+     "product_code",
+     "revision",
+     "hazard",
+     "hazardous_situation",
+     "harm",
+     "severity",
+     "probability",
+     "risk_level",
+     "status"
+    ],
+    "required": [
+     "risk_id",
+     "product_code",
+     "hazard",
+     "harm"
+    ]
+   },
+   "failure_modes": {
+    "label": "FMEA line (failure mode)",
+    "key": [
+     "fmea_id"
+    ],
+    "columns": [
+     "fmea_id",
+     "product_code",
+     "item_or_function",
+     "failure_mode",
+     "effect",
+     "cause",
+     "severity",
+     "occurrence",
+     "detection",
+     "linked_risk_id"
+    ],
+    "required": [
+     "fmea_id",
+     "product_code",
+     "failure_mode"
+    ]
+   },
+   "risk_controls": {
+    "label": "Risk control",
+    "key": [
+     "control_id"
+    ],
+    "columns": [
+     "control_id",
+     "risk_id",
+     "control_type",
+     "description",
+     "verification_reference",
+     "status"
+    ],
+    "required": [
+     "control_id",
+     "risk_id",
+     "description"
+    ]
+   }
+  }
+ },
+ "COUPA": {
+  "name": "Coupa (supplier management)",
+  "port": 8108,
+  "records": {
+   "suppliers": {
+    "label": "Supplier",
+    "key": [
+     "supplier_number"
+    ],
+    "columns": [
+     "supplier_number",
+     "name",
+     "status",
+     "country",
+     "commodity",
+     "preferred"
+    ],
+    "required": [
+     "supplier_number",
+     "name"
+    ]
+   },
+   "supplier_risks": {
+    "label": "Supplier risk assessment",
+    "key": [
+     "risk_number"
+    ],
+    "columns": [
+     "risk_number",
+     "supplier_number",
+     "risk_type",
+     "rating",
+     "assessed_date",
+     "status",
+     "notes"
+    ],
+    "required": [
+     "risk_number",
+     "supplier_number"
+    ]
+   },
+   "supplier_certificates": {
+    "label": "Supplier certificate",
+    "key": [
+     "certificate_number"
+    ],
+    "columns": [
+     "certificate_number",
+     "supplier_number",
+     "certificate_type",
+     "issuer",
+     "issue_date",
+     "expiry_date",
+     "status"
+    ],
+    "required": [
+     "certificate_number",
+     "supplier_number",
+     "certificate_type"
+    ]
+   }
+  }
+ }
+}

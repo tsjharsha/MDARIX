@@ -106,3 +106,25 @@
     display: none;
   }
 }
+
+.mw-filter {
+  border: 1px solid var(--ac-line, #d8e1e3);
+  border-radius: 8px;
+  padding: 10px 14px 4px;
+  margin: 14px 0 0;
+}
+
+.mw-filter legend {
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.mw-standard {
+  border: 1px solid var(--ac-accent, #0b7470);
+  background: var(--ac-accent-soft, #e6f3f1);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 12px;
+  display: grid;
+  gap: 4px;
+}

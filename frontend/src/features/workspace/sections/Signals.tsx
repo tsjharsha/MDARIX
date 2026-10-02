@@ -159,6 +159,20 @@ function ComplaintList() {
             fields: ["received_date"],
             render: (row) => formatDate(row.received_date ?? row.event_date),
           },
+          {
+            key: "severity",
+            label: "Severity",
+            fields: ["severity", "patient_involved", "serious_injury", "death"],
+            render: (row) => (
+              <span className="ca-person">
+                <span>{row.severity ?? "—"}</span>
+                {(row.death || row.serious_injury) && (
+                  <small className="uw-flag-critical">Serious injury or death</small>
+                )}
+                {!row.death && !row.serious_injury && row.patient_involved && <small>Patient involved</small>}
+              </span>
+            ),
+          },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
           {
             key: "cases",

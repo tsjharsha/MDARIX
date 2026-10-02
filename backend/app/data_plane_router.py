@@ -50,6 +50,18 @@ def evidence(limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)):
     return {"tenant_id": ctx.tenant_id, "records": _rows(db, "evidence", ctx.tenant_id, limit)}
 
 
+@router.get("/suppliers")
+def suppliers(limit: int = Query(200, ge=1, le=500), deps=Depends(_deps)):
+    ctx, db = deps
+    return {"tenant_id": ctx.tenant_id, "records": _rows(db, "suppliers", ctx.tenant_id, limit)}
+
+
+@router.get("/capas")
+def capas(limit: int = Query(200, ge=1, le=500), deps=Depends(_deps)):
+    ctx, db = deps
+    return {"tenant_id": ctx.tenant_id, "records": _rows(db, "capas", ctx.tenant_id, limit)}
+
+
 @router.get("/search")
 def search(
     q: str = Query(..., min_length=1, max_length=120), limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)

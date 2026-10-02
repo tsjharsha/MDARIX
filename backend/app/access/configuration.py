@@ -7,7 +7,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from backend.app.access.outbound import safe_urlopen
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -56,6 +57,7 @@ from backend.app.access.connector_mapping import (
     import_connector_records,
     mapping_targets,
     released_mapping,
+    standard_mappings,
 )
 from backend.app.db.models.enterprise import ConnectorRun
 from backend.app.db.data_plane import get_data_plane_db
@@ -185,6 +187,16 @@ def list_mapping_targets(request: Request, db: Session = Depends(get_db)):
     """The MDARIX records a connector mapping can fill (with their fields) and the conversions it may apply."""
     _admin_tenant(request, db)
     return mapping_targets()
+
+
+@router.get("/admin/configuration/standard-mappings")
+def list_standard_mappings(
+    request: Request, application: str | None = None, record: str | None = None, db: Session = Depends(get_db)
+):
+    """MDARIX's standard mapping for each record of each supported customer system (the CSV templates' layout).
+    A mapping started from one is still a draft: it is checked, approved by a second administrator and released."""
+    _admin_tenant(request, db)
+    return {"mappings": standard_mappings(application, record)}
 
 
 @router.post("/admin/configuration/mappings/check")
@@ -337,9 +349,79 @@ def list_connectors(request: Request, db: Session = Depends(get_db)):
             "version": row.version,
             "status": row.status,
             "configuration": row.configuration,
+            # Whether the connector holds its own API key; the key itself is never returned.
+            "has_api_key": bool(row.credential_encrypted),
+            "api_key_ends_with": row.credential_hint,
+            "api_key_set_at": row.credential_set_at.isoformat() if row.credential_set_at else None,
         }
         for row in rows
     ]
+
+
+class ConnectorApiKeyRequest(BaseModel):
+    api_key: str = Field(min_length=8, max_length=512)
+
+
+def _tenant_connector(db: Session, tenant_id, configuration_id: uuid.UUID) -> ConnectorConfiguration:
+    row = (
+        db.query(ConnectorConfiguration)
+        .filter(ConnectorConfiguration.id == configuration_id, ConnectorConfiguration.tenant_id == tenant_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(404, detail={"code": "CONNECTOR_NOT_FOUND", "message": "Connector not found"})
+    return row
+
+
+@router.put("/admin/configuration/connectors/{configuration_id}/api-key")
+def set_connector_api_key(
+    configuration_id: uuid.UUID, payload: ConnectorApiKeyRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Store the customer system's API key for this connector, encrypted. It is never shown again."""
+    from access_control.connector_secrets import ConnectorSecretsUnavailable, seal
+
+    admin = _admin_tenant(request, db)
+    row = _tenant_connector(db, admin.tenant_id, configuration_id)
+    try:
+        sealed = seal(payload.api_key.strip(), row.tenant_id, row.id)
+    except ValueError as exc:
+        raise HTTPException(
+            422, detail={"code": "CONNECTOR_API_KEY_INVALID", "message": "Use the key exactly as the system issued it"}
+        ) from exc
+    except ConnectorSecretsUnavailable as exc:
+        raise HTTPException(
+            503, detail={"code": "CONNECTOR_KEYS_UNAVAILABLE", "message": "Connector keys cannot be stored here yet"}
+        ) from exc
+    replaced = bool(row.credential_encrypted)
+    now = datetime.now(timezone.utc)
+    row.credential_encrypted, row.credential_hint, row.credential_set_at = sealed, payload.api_key.strip()[-4:], now
+    row.updated_at = now
+    _audit_configuration(
+        db,
+        admin,
+        "CONNECTOR_API_KEY_REPLACED" if replaced else "CONNECTOR_API_KEY_SET",
+        "ConnectorConfiguration",
+        row.id,
+        row.version,
+        request=request,
+    )
+    db.commit()
+    return {"connector_id": str(row.id), "has_api_key": True, "api_key_ends_with": row.credential_hint}
+
+
+@router.delete("/admin/configuration/connectors/{configuration_id}/api-key")
+def remove_connector_api_key(configuration_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    admin = _admin_tenant(request, db)
+    row = _tenant_connector(db, admin.tenant_id, configuration_id)
+    if not row.credential_encrypted:
+        raise HTTPException(404, detail={"code": "NO_API_KEY", "message": "This connector has no stored key"})
+    row.credential_encrypted = row.credential_hint = row.credential_set_at = None
+    row.updated_at = datetime.now(timezone.utc)
+    _audit_configuration(
+        db, admin, "CONNECTOR_API_KEY_REMOVED", "ConnectorConfiguration", row.id, row.version, request=request
+    )
+    db.commit()
+    return {"connector_id": str(row.id), "has_api_key": False}
 
 
 @router.get("/admin/configuration/mappings")
@@ -687,6 +769,7 @@ def execute_connector(
     configuration_id: uuid.UUID,
     payload: ConnectorRunRequest,
     request: Request,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     admin = _admin_tenant(request, db)
@@ -718,7 +801,7 @@ def execute_connector(
                 configuration.get("records_path", f"records/{source_object}"),
                 timeout=timeout,
             )
-            token = _connector_credential(configuration)
+            token = _connector_credential(configuration, row)
         except ValueError as exc:
             raise HTTPException(
                 422, detail={"code": str(exc), "message": "Connector endpoint configuration is not safe or valid"}
@@ -800,6 +883,12 @@ def execute_connector(
     db.add(run)
     _audit_configuration(db, admin, "CONNECTOR_EXECUTED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
+    if canonical_import and canonical_import.get("status") == "IMPORTED" and canonical_import.get("rows"):
+        # Semantic search over the imported records (their text is already searchable by product and record).
+        from backend.app.db.data_plane import open_tenant_data_session
+        from retrieval.record_evidence import embed_tenant_evidence
+
+        background.add_task(embed_tenant_evidence, open_tenant_data_session, admin.tenant_id)
     return {
         "status": "COMPLETE",
         "run_id": str(run.id),
