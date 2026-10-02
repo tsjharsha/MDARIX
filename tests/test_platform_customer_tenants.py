@@ -167,8 +167,10 @@ def test_a_refused_tenant_leaves_nothing_behind(platform, customer):
     assert duplicate_code.status_code == 409 and duplicate_code.json()["detail"]["code"] == "TENANT_EXISTS"
     taken = _add_tenant(platform, customer["customer_id"]).json()["administrator"]["email"]
     before = tenant_count()
-    duplicate_email = _add_tenant(platform, customer["customer_id"], admin_email=taken)
-    assert duplicate_email.status_code == 409 and duplicate_email.json()["detail"]["code"] == "ACCOUNT_EXISTS"
+    # The same person may administer a second tenant: a separate account there; sign-in asks which tenant.
+    second_tenant = _add_tenant(platform, customer["customer_id"], admin_email=taken)
+    assert second_tenant.status_code == 200, second_tenant.text
+    before = tenant_count()
     same_name = _add_tenant(platform, customer["customer_id"], tenant_name=customer["name"].upper())
     assert same_name.status_code == 409 and same_name.json()["detail"]["code"] == "TENANT_NAME_EXISTS"
     no_plan = _add_tenant(platform, customer["customer_id"], plan_id=str(uuid.uuid4()))

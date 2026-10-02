@@ -1108,7 +1108,7 @@ class TenantMappingVersion(Base):
     tenant_id = tenant_fk()
     master_mapping_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     version: Mapped[str] = mapped_column(String(40), nullable=False)
-    rules: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    rules: Mapped[dict | list] = mapped_column(JSONB, nullable=False, server_default="{}")
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="DRAFT")
     effective_from = tz()
     effective_to = tz()

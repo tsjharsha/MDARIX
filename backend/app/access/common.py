@@ -131,26 +131,10 @@ def _active_plan_limits(db: Session, tenant_id: uuid.UUID) -> dict:
 
 
 def _ensure_email_not_used_elsewhere(db: Session, email: str, tenant_id: uuid.UUID | None) -> None:
-    """One person, one live account: refuse an email that already has a live account in another tenant.
-
-    Sign-in finds the account by email, so a second live account in another tenant (possibly with another role)
-    would make it ambiguous which one the person signs in to. Retired (INACTIVE/OFFBOARDED) accounts don't count.
-    """
-    query = db.query(AuthUser.id).filter(
-        func.lower(AuthUser.username) == email.strip().lower(),
-        func.upper(AuthUser.status).notin_(["INACTIVE", "OFFBOARDED"]),
-    )
-    if tenant_id is not None:
-        query = query.filter(AuthUser.tenant_id != tenant_id)
-    if query.first() is not None:
-        raise HTTPException(
-            409,
-            detail={
-                "code": "EMAIL_IN_USE",
-                "message": "This email already belongs to an account in another organization. "
-                "Use a different work email.",
-            },
-        )
+    """A person may hold an account in several organizations (one account per organization, each with its own
+    password, role and data); sign-in asks which organization when the email and password match more than one.
+    Nothing to refuse here: duplicates inside one organization are refused where the account is created."""
+    return None
 
 
 def _seat_counts(db: Session, tenant_id: uuid.UUID) -> dict:

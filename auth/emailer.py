@@ -96,13 +96,15 @@ def send_activation_email(recipient: str, token: str, organization: str, valid_f
     )
 
 
-def send_password_reset_email(recipient: str, token: str) -> str:
+def send_password_reset_email(recipient: str, token: str, organization: str | None = None) -> str:
+    # A person with accounts in several organizations gets one link per organization, each naming it.
+    where = f" for {organization}" if organization else ""
     return _send_link_email(
         recipient,
         token,
-        subject="Reset your MDARIX password",
+        subject=f"Reset your MDARIX password{where}",
         path="/reset-password",
-        intro="Reset your MDARIX password by opening this link:",
+        intro=f"Reset your MDARIX password{where} by opening this link:",
     )
 
 

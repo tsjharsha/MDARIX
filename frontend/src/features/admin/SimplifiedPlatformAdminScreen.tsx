@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
@@ -121,6 +122,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
             <strong>{securityContext?.display_name ?? "Administrator"}</strong>
             <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
           </span>
+          <SwitchOrganization />
           <button type="button" className="ac-secondary" onClick={signOut} aria-label="Sign out of MDARIX">
             <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
           </button>

@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 
 from backend.app.db.session import engine
 from tests.conftest import authenticated_client
@@ -13,11 +14,19 @@ SOURCES = ("CSV_IMPORT", "CONNECTOR:%")
 
 
 def _cleanup():
+    # Row by row: an imported record that an investigation still uses (for example one opened by an end-to-end run)
+    # is left in place instead of failing the whole cleanup.
     with engine.begin() as connection:
         for table in ("complaints", "lot_batches", "product_versions", "products"):
-            connection.execute(
-                text(f"DELETE FROM {table} WHERE source_system = 'CSV_IMPORT' OR source_system LIKE 'CONNECTOR:%'")
-            )
+            ids = connection.execute(
+                text(f"SELECT id FROM {table} WHERE source_system = 'CSV_IMPORT' OR source_system LIKE 'CONNECTOR:%'")
+            ).scalars()
+            for row_id in list(ids):
+                try:
+                    with connection.begin_nested():
+                        connection.execute(text(f"DELETE FROM {table} WHERE id = :id"), {"id": row_id})
+                except (IntegrityError, ProgrammingError):  # pg8000 reports a foreign-key refusal as either
+                    pass
 
 
 @pytest.fixture(autouse=True, scope="module")

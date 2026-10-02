@@ -98,3 +98,35 @@ def test_the_connector_limit_is_enforced_per_customer():
         json={"code": "ONE_TOO_MANY", "connector_type": "TEST", "configuration": {}},
     )
     assert second.status_code == 409 and second.json()["detail"]["code"] == "CONNECTOR_LIMIT_REACHED"
+
+
+def test_a_customers_limits_can_be_changed_later_but_not_below_what_it_uses():
+    platform = authenticated_client()
+    tenant = _customer(platform, users=5, connectors=1)
+    admin = _customer_admin(platform, tenant["id"])
+    assert (
+        admin.post(
+            "/api/v1/admin/configuration/connectors",
+            json={"code": "ONE", "connector_type": "TEST", "configuration": {}},
+        ).status_code
+        == 200
+    )
+    path = f"/api/v1/platform-admin/customers/{tenant['id']}/limits"
+    reason = "Customer upgraded their contract"
+    raised = platform.put(path, json={"connector_limit": 3, "licensed_users_limit": 12, "reason": reason})
+    assert raised.status_code == 200, raised.text
+    assert raised.json()["limits"]["connector_limit"] == 3 and raised.json()["limits"]["licensed_users_limit"] == 12
+    assert (
+        admin.post(
+            "/api/v1/admin/configuration/connectors",
+            json={"code": "TWO", "connector_type": "TEST", "configuration": {}},
+        ).status_code
+        == 200
+    )
+    too_low = platform.put(path, json={"connector_limit": 1, "reason": reason})
+    assert too_low.status_code == 409 and too_low.json()["detail"]["code"] == "LIMIT_BELOW_USAGE"
+    assert platform.put(path, json={"reason": reason}).status_code == 422
+    assert platform.put(path, json={"connector_limit": 3, "reason": "short"}).status_code == 422
+    assert admin.put(path, json={"connector_limit": 50, "reason": reason}).status_code == 403
+    usage = platform.get(f"/api/v1/platform-admin/customers/{tenant['id']}/usage").json()
+    assert usage["usage"]["connectors"] == 2 and usage["limits"]["connector_limit"] == 3

@@ -9,12 +9,10 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import (
     AuditEvent,
-    AuthUser,
     ConnectorConfiguration,
     FeatureEntitlement,
     PlanDefinition,
     Tenant,
-    TenantMembership,
     TenantPlanAssignment,
 )
 from backend.app.db.models.stage2 import (
@@ -31,6 +29,7 @@ from backend.app.access.schemas import (
     SubscriptionRequest,
 )
 from backend.app.access.authz import _require_platform_admin
+from backend.app.access.schemas import TenantLimitsRequest
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -170,18 +169,100 @@ def get_platform_subscription_detail(subscription_id: uuid.UUID, request: Reques
     }
 
 
+def _usage_counts(db: Session, tenant_id: uuid.UUID) -> tuple[int, int, int]:
+    """Seats, customer administrators and connectors counted exactly as the limits are enforced."""
+    from backend.app.access.common import _seat_counts
+    from backend.app.access.configuration import RETIRED_CONNECTOR_STATUSES
+
+    seats = _seat_counts(db, tenant_id)
+    connectors = (
+        db.query(ConnectorConfiguration.id)
+        .filter(
+            ConnectorConfiguration.tenant_id == tenant_id,
+            ~func.upper(ConnectorConfiguration.status).in_(RETIRED_CONNECTOR_STATUSES),
+        )
+        .count()
+    )
+    return seats["allocated_users"], seats["allocated_customer_admins"], connectors
+
+
+@router.put("/platform-admin/customers/{tenant_id}/limits")
+def set_tenant_limits(
+    tenant_id: uuid.UUID, payload: TenantLimitsRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Change one customer tenant's limits (its plan's other customers are not affected). A limit cannot go below
+    what the tenant already uses; the change and its reason are in the tenant's audit trail."""
+    admin = _require_platform_admin(request, db)
+    if db.query(Tenant).filter(Tenant.id == tenant_id).first() is None:
+        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
+    assignment = (
+        db.query(TenantPlanAssignment)
+        .filter(TenantPlanAssignment.tenant_id == tenant_id, TenantPlanAssignment.status == "ACTIVE")
+        .with_for_update()
+        .first()
+    )
+    if assignment is None:
+        raise HTTPException(
+            409, detail={"code": "NO_ACTIVE_PLAN", "message": "Assign a plan to this tenant before setting its limits"}
+        )
+    requested = {
+        key: value
+        for key, value in {
+            "licensed_users_limit": payload.licensed_users_limit,
+            "customer_admin_limit": payload.customer_admin_limit,
+            "connector_limit": payload.connector_limit,
+        }.items()
+        if value is not None
+    }
+    if not requested:
+        raise HTTPException(422, detail={"code": "NOTHING_TO_CHANGE", "message": "Give at least one limit"})
+    users, admins, connectors = _usage_counts(db, tenant_id)
+    in_use = {"licensed_users_limit": users, "customer_admin_limit": admins, "connector_limit": connectors}
+    too_low = {
+        key: {"requested": value, "in_use": in_use[key]} for key, value in requested.items() if value < in_use[key]
+    }
+    if too_low:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "LIMIT_BELOW_USAGE",
+                "message": "A limit cannot be lower than what the tenant already uses",
+                "limits": too_low,
+            },
+        )
+    from backend.app.access.common import _active_plan_limits
+
+    before = _active_plan_limits(db, tenant_id)
+    assignment.limits = {**(assignment.limits or {}), **requested}
+    now = datetime.now(timezone.utc)
+    assignment.updated_at = now
+    from backend.app.enterprise_audit import make_audit_event
+
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(admin.id),
+            action="TENANT_LIMITS_CHANGED",
+            entity_type="TenantPlanAssignment",
+            entity_id=assignment.id,
+            details={"source": "PLATFORM_ADMIN"},
+            request=request,
+            reason=payload.reason,
+            old_values={key: before.get(key) for key in requested},
+            new_values=requested,
+            created_at=now,
+        )
+    )
+    db.commit()
+    return {"tenant_id": str(tenant_id), "limits": _active_plan_limits(db, tenant_id), "usage": in_use}
+
+
 @router.get("/platform-admin/customers/{tenant_id}/usage")
 def get_platform_usage(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
     if db.query(Tenant).filter(Tenant.id == tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
-    users = db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant_id).count()
-    admins = (
-        db.query(AuthUser)
-        .filter(AuthUser.tenant_id == tenant_id, func.upper(AuthUser.role) == "CUSTOMER_ADMIN")
-        .count()
-    )
-    connectors = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).count()
+    users, admins, connectors = _usage_counts(db, tenant_id)
     assignment = (
         db.query(TenantPlanAssignment)
         .filter(TenantPlanAssignment.tenant_id == tenant_id, TenantPlanAssignment.status == "ACTIVE")

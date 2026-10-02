@@ -83,7 +83,9 @@ function AuthFrame({ mode, children }: { mode: string; children: ReactNode }) {
 
 export function AuthPage({ mode }: { mode: string }) {
   const [message, setMessage] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(new URLSearchParams(window.location.search).get("email") ?? "");
+  // The email and password open accounts in several organizations: the person picks one.
+  const [organizations, setOrganizations] = useState<Array<{ tenant_id: string; tenant_name: string }>>([]);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
@@ -144,12 +146,23 @@ export function AuthPage({ mode }: { mode: string }) {
             : isTokenPassword
               ? { token, password }
               : { email };
-    const response = await fetch(`/api/v1/auth/${endpoint}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await response.json();
+    let response: Response;
+    try {
+      response = await fetch(`/api/v1/auth/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
+      return;
+    }
+    const data = await response.json().catch(() => null);
+    if (data === null) {
+      // No readable answer (for example the server is restarting): say so instead of failing silently.
+      setMessage("MDARIX is not responding right now. Please try again in a moment.");
+      return;
+    }
     if (response.ok) {
       if (mode === "signup") {
         // Sign-up records a request; the account itself is created when the workspace is set up.
@@ -166,6 +179,9 @@ export function AuthPage({ mode }: { mode: string }) {
         setMessage("Account activated. You can now sign in with your email and new password.");
       } else if (mode === "reset-password") {
         setMessage("Password reset complete. You can now sign in with your new password.");
+      } else if (mode === "signin" && data.status === "TENANT_SELECTION_REQUIRED") {
+        setOrganizations(data.organizations ?? []);
+        setMessage("Your account is in more than one organization. Choose the one to open.");
       } else if (mode === "signin") {
         if (data.mfa_enrollment_required) {
           window.location.href = "/mfa?setup=1";
@@ -189,6 +205,46 @@ export function AuthPage({ mode }: { mode: string }) {
       );
     }
   };
+  const openOrganization = async (tenantId: string) => {
+    const response = await fetch("/api/v1/auth/signin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, tenant_id: tenantId }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(data.detail?.message ?? "Sign-in could not be completed.");
+      return;
+    }
+    window.location.href = data.mfa_enrollment_required ? "/mfa?setup=1" : data.mfa_required ? "/mfa" : "/app";
+  };
+  if (mode === "signin" && organizations.length)
+    return (
+      <AuthFrame mode="signin">
+        <div className="auth-card">
+          <span className="eyebrow">Welcome back</span>
+          <h1>Choose an organization</h1>
+          <p className="auth-lead">
+            {email} has an account in each of these organizations. Each has its own data and role.
+          </p>
+          <ul className="auth-organizations">
+            {organizations.map((item) => (
+              <li key={item.tenant_id}>
+                <button type="button" className="secondary-link" onClick={() => void openOrganization(item.tenant_id)}>
+                  {item.tenant_name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {message && <p role="status">{message}</p>}
+          <p className="auth-links">
+            <button type="button" className="ac-link" onClick={() => setOrganizations([])}>
+              Use a different account
+            </button>
+          </p>
+        </div>
+      </AuthFrame>
+    );
   if (isMfa && recoveryCodes.length)
     return (
       <AuthFrame mode="security">

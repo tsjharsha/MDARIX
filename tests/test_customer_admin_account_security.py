@@ -319,16 +319,23 @@ def test_sign_in_uses_the_account_the_password_belongs_to():
     assert wrong.status_code in {400, 401}
 
 
-def test_with_the_same_password_the_account_set_most_recently_wins():
-    # The person just accepted the Customer Administrator invitation and chose a password they also use elsewhere.
+def test_with_the_same_password_in_two_organizations_the_person_chooses():
+    # The person just accepted the Customer Administrator invitation and chose a password they also use elsewhere:
+    # MDARIX no longer guesses which organization they meant, it asks.
     email, admin_tenant, _ = _two_active_accounts(
         "Shared password 12345", "Shared password 12345", admin_password_newer=True
     )
-    response = TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": "Shared password 12345"})
-    assert response.status_code == 200 and response.json()["tenant_id"] == admin_tenant
+    client = TestClient(app)
+    chooser = client.post("/api/v1/auth/signin", json={"email": email, "password": "Shared password 12345"})
+    assert chooser.status_code == 200 and chooser.json()["status"] == "TENANT_SELECTION_REQUIRED"
+    assert admin_tenant in {item["tenant_id"] for item in chooser.json()["organizations"]}
+    chosen = client.post(
+        "/api/v1/auth/signin", json={"email": email, "password": "Shared password 12345", "tenant_id": admin_tenant}
+    )
+    assert chosen.status_code == 200 and chosen.json()["tenant_id"] == admin_tenant
 
 
-def test_a_tenant_user_cannot_be_created_with_an_email_live_in_another_tenant(world):
+def test_an_email_live_in_another_tenant_gets_its_own_account_here(world):
     client, _ = world
     db = SessionLocal()
     try:
@@ -346,9 +353,14 @@ def test_a_tenant_user_cannot_be_created_with_an_email_live_in_another_tenant(wo
             json={"email": email, "display_name": "Second account", "company": "Synthetic", "role": "Viewer"},
         )
 
-    refused = invite(live_email)
-    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMAIL_IN_USE"
-    # A retired account elsewhere does not block the email.
+    # The same person may also work in this organization: a separate account here (own password, role, data);
+    # sign-in asks which organization.
+    second = invite(live_email)
+    assert second.status_code == 200, second.text
+    # A second account for the same email in the same organization is still refused.
+    again = invite(live_email)
+    assert again.status_code == 409
+    # A retired account elsewhere does not block the email either.
     assert invite(retired_email).status_code == 200
 
 

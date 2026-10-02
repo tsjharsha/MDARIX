@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
-import { Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, Tabs, formatDate, listOf, useResource } from "../../customer-admin/shared";
+import { useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { Embedded, NeedsProduct, RecordTable } from "./common";
+import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
 
-const TABS = ["Product complaints", "All signals", "Trends"] as const;
+const TABS = ["Product complaints", "Complaint list", "All signals", "Trends"] as const;
 type Tab = (typeof TABS)[number];
 
 export function SignalsSection({ tab }: { tab?: string }) {
@@ -35,6 +36,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
           <Stage2Experience mode="signals" />
         </Embedded>
       )}
+      {active === "Complaint list" && <ComplaintList />}
       {active === "Trends" && <Trends />}
     </>
   );
@@ -82,5 +84,104 @@ function Trends() {
         <p className="ac-note">Severity is shown only when the source system recorded it.</p>
       </Panel>
     </div>
+  );
+}
+
+/** Every complaint in the organization, across products: search, filter by product and status, page through. */
+function ComplaintList() {
+  const { work } = useWorkspace();
+  const [query, setQuery] = useState("");
+  const [product, setProduct] = useState("");
+  const [status, setStatus] = useState("");
+  const [page, setPage] = useState(1);
+  const params = new URLSearchParams({ page: String(page), page_size: "50" });
+  if (query.trim()) params.set("q", query.trim());
+  if (product) params.set("product_id", product);
+  if (status) params.set("status", status);
+  const list = useResource<any>(`/api/v1/complaints?${params}`);
+  const pages = list.data?.pages ?? 1;
+  const reset = (apply: () => void) => {
+    apply();
+    setPage(1);
+  };
+  return (
+    <Panel
+      eyebrow="Signals"
+      title={`Complaints in your organization${list.data ? ` · ${list.data.total}` : ""}`}
+      state={list.state}
+      error={list.error}
+    >
+      <div className="cc-toolbar">
+        <SearchBox
+          value={query}
+          onChange={(value) => reset(() => setQuery(value))}
+          label="Search complaint ID or text"
+        />
+        <select aria-label="Product" value={product} onChange={(event) => reset(() => setProduct(event.target.value))}>
+          <option value="">All products</option>
+          {work.products.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <select aria-label="Status" value={status} onChange={(event) => reset(() => setStatus(event.target.value))}>
+          <option value="">All statuses</option>
+          {listOf(list.data?.statuses).map((value: string) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Table
+        caption="Complaint list"
+        rows={listOf(list.data?.items)}
+        rowKey={(row) => String(row.id)}
+        empty={{ title: "No complaints found", detail: "Complaints arrive through connectors and imports." }}
+        columns={[
+          {
+            key: "id",
+            label: "Complaint",
+            fields: ["complaint_identifier"],
+            render: (row) => <strong>{row.complaint_identifier}</strong>,
+          },
+          {
+            key: "product",
+            label: "Product",
+            fields: ["product_name", "product_identifier", "version"],
+            render: (row) => `${row.product_name}${row.version ? ` · ${row.version}` : ""}`,
+          },
+          { key: "description", label: "Description", render: (row) => row.description ?? "—" },
+          {
+            key: "received",
+            label: "Received",
+            fields: ["received_date"],
+            render: (row) => formatDate(row.received_date ?? row.event_date),
+          },
+          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+          {
+            key: "cases",
+            label: "Investigations",
+            numeric: true,
+            fields: ["investigations"],
+            render: (row) => row.investigations,
+          },
+        ]}
+      />
+      {pages > 1 && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+            Previous
+          </button>
+          <span className="ac-muted">
+            Page {page} of {pages}
+          </span>
+          <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
+            Next
+          </button>
+        </div>
+      )}
+    </Panel>
   );
 }

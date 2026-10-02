@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
-import { Table, Tabs, errorText, listOf, send, useResource } from "../../customer-admin/shared";
+import { Drawer, Table, Tabs, errorText, listOf, send, useResource } from "../../customer-admin/shared";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { useCan, useWorkspace } from "../workspaceContext";
@@ -17,6 +17,7 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
   const { work, open } = useWorkspace();
   const canOpen = useCan("records.write");
   const [starting, setStarting] = useState(false);
+  const [managing, setManaging] = useState<any | null>(null);
   const all = useResource<any>("/api/v1/analytics/investigations");
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
   const openCase = (id: string) => {
@@ -62,6 +63,19 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
               { key: "id", label: "Investigation", render: (row) => <strong>{row.investigation_identifier}</strong> },
               { key: "question", label: "Question", render: (row) => row.investigation_question ?? "—" },
               { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+              ...(canOpen
+                ? [
+                    {
+                      key: "manage",
+                      label: "",
+                      render: (row: any) => (
+                        <button type="button" className="ac-link" onClick={() => setManaging(row)}>
+                          Manage
+                        </button>
+                      ),
+                    },
+                  ]
+                : []),
               {
                 key: "open",
                 label: "",
@@ -79,6 +93,17 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
             ]}
           />
         </Panel>
+      )}
+      {managing && (
+        <ManageInvestigation
+          row={managing}
+          onClose={() => setManaging(null)}
+          onSaved={() => {
+            setManaging(null);
+            all.reload();
+            work.refreshInvestigations();
+          }}
+        />
       )}
       {active === "Workspace" &&
         (work.investigationId ? (
@@ -207,5 +232,122 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
         </form>
       )}
     </Panel>
+  );
+}
+
+/** Edit a case's question, assign it, close or reopen it. Every change carries a reason for the audit trail. */
+function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () => void; onSaved: () => void }) {
+  const { notify } = useWorkspace();
+  const people = useResource<Array<{ id: string; display_name: string }>>("/api/v1/investigation-assignees");
+  const closed = String(row.status ?? "").toLowerCase() === "closed";
+  const [question, setQuestion] = useState(String(row.investigation_question ?? ""));
+  const [assignee, setAssignee] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const save = async (change: Record<string, unknown>, done: string) => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send(`/api/v1/investigations/${row.id}`, "PATCH", { ...change, reason: reason.trim() });
+      notify(done);
+      onSaved();
+    } catch (failure) {
+      setError(errorText(failure, "The change was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const reasonReady = reason.trim().length >= 10;
+  return (
+    <Drawer title={`Manage ${row.investigation_identifier}`} onClose={onClose}>
+      <label className="ca-field">
+        Reason for the change (kept in the audit trail)
+        <textarea rows={2} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} />
+      </label>
+      {closed ? (
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className="ac-primary"
+            disabled={!reasonReady || busy}
+            onClick={() => void save({ status: "open" }, `${row.investigation_identifier} reopened.`)}
+          >
+            Reopen investigation
+          </button>
+        </div>
+      ) : (
+        <>
+          <label className="ca-field">
+            Question
+            <textarea
+              rows={3}
+              minLength={10}
+              maxLength={2000}
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+            />
+          </label>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={
+                !reasonReady || busy || question.trim().length < 10 || question.trim() === row.investigation_question
+              }
+              onClick={() => void save({ investigation_question: question.trim() }, "Question updated.")}
+            >
+              Save question
+            </button>
+          </div>
+          <label className="ca-field">
+            Assign to
+            <select value={assignee} onChange={(event) => setAssignee(event.target.value)}>
+              <option value="">Choose a colleague</option>
+              {listOf(people.data).map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.display_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={!reasonReady || busy || !assignee}
+              onClick={() => void save({ assignee_id: assignee }, `${row.investigation_identifier} assigned.`)}
+            >
+              Assign
+            </button>
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={!reasonReady || busy}
+              onClick={() => void save({ unassign: true }, `${row.investigation_identifier} has no owner now.`)}
+            >
+              Remove owner
+            </button>
+          </div>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-primary"
+              disabled={!reasonReady || busy}
+              onClick={() => void save({ status: "closed" }, `${row.investigation_identifier} closed.`)}
+            >
+              Close investigation
+            </button>
+          </div>
+          <p className="ac-muted">A case with a decision still awaiting its human review cannot be closed.</p>
+        </>
+      )}
+      {error && (
+        <p className="ac-message tone-critical" role="alert">
+          {error}
+        </p>
+      )}
+    </Drawer>
   );
 }

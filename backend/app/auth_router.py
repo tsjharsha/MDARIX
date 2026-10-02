@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -43,6 +44,8 @@ class Signup(BaseModel):
 class Signin(BaseModel):
     email: str
     password: str
+    # Which organization to sign in to, when the email and password match accounts in several.
+    tenant_id: uuid.UUID | None = None
 
 
 class Verify(BaseModel):
@@ -342,6 +345,34 @@ def _account_for_email(db: Session, email: str, password: str | None = None):
     return rows[0] if rows else None
 
 
+def _accounts_for_password(db: Session, email: str, password: str) -> list:
+    """Every active account with this email whose password matches (one per organization)."""
+    matches = []
+    for row in db.query(AuthUser).filter(AuthUser.username == email, func.upper(AuthUser.status) == "ACTIVE").all():
+        try:
+            if row.password_hash and _verify(password, row.password_hash):
+                matches.append(row)
+        except ValueError:
+            continue
+    return matches
+
+
+def _organizations(db: Session, accounts: list) -> list[dict]:
+    """The organizations a person may choose between: names only, and only those that are open to them."""
+    from backend.app.db.models.foundation import Tenant
+
+    choices = []
+    for account in accounts:
+        try:
+            ensure_tenant_access(db, account)
+        except HTTPException:
+            continue
+        tenant = db.query(Tenant).filter(Tenant.id == account.tenant_id).first()
+        if tenant is not None:
+            choices.append({"tenant_id": str(tenant.id), "tenant_name": tenant.display_name or tenant.name})
+    return sorted(choices, key=lambda item: item["tenant_name"].lower())
+
+
 @router.post("/signin")
 def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
     try:
@@ -363,7 +394,21 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
                     "message": "Too many failed sign-in attempts. Try again later.",
                 },
             )
-        row = _account_for_email(db, identifier, data.password)
+        bind_system(db, "sign-in: find this person's accounts across organizations")
+        matches = _accounts_for_password(db, identifier, data.password)
+        chosen_tenant = getattr(data, "tenant_id", None)
+        if chosen_tenant is not None:
+            row = next((item for item in matches if item.tenant_id == chosen_tenant), None)
+        elif len(matches) > 1:
+            choices = _organizations(db, matches)
+            if len(choices) > 1:
+                # The password is right for several organizations: the person chooses; no session exists yet.
+                return {"status": "TENANT_SELECTION_REQUIRED", "organizations": choices}
+            row = next(
+                (item for item in matches if choices and str(item.tenant_id) == choices[0]["tenant_id"]), matches[0]
+            )
+        else:
+            row = matches[0] if matches else _account_for_email(db, identifier, data.password)
         if not row:
             raise ValueError("INVALID_CREDENTIALS")
         bind_tenant(db, row.tenant_id)
@@ -484,7 +529,24 @@ def session(request: Request, db: Session = Depends(get_db)):
         # VERIFY: a code is still due; ENROLL: MFA must be set up first; None: fully signed in.
         "mfa_state": row.mfa_state,
         "mfa_enrolled": mfa.is_enrolled(user),
+        "other_organizations": _other_organization_count(db, user),
     }
+
+
+def _other_organization_count(db: Session, user) -> int:
+    """How many other organizations this email has an active account in (for "Switch organization")."""
+    bind_system(db, "session: count this person's other organizations")
+    count = (
+        db.query(AuthUser.id)
+        .filter(
+            AuthUser.username == user.username,
+            AuthUser.tenant_id != user.tenant_id,
+            func.upper(AuthUser.status) == "ACTIVE",
+        )
+        .count()
+    )
+    bind_tenant(db, user.tenant_id)
+    return count
 
 
 # Account states an administrator imposed. A password reset or activation link must never lift them.
@@ -504,10 +566,17 @@ def _activate_invited_memberships(db: Session, row) -> None:
     ).update({"status": "ACTIVE", "updated_at": datetime.now(timezone.utc)})
 
 
-def _send_reset_quietly(email: str, token: str) -> None:
+def _organization_name(db: Session, tenant_id) -> str | None:
+    from backend.app.db.models.foundation import Tenant
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    return (tenant.display_name or tenant.name) if tenant else None
+
+
+def _send_reset_quietly(email: str, token: str, organization: str | None = None) -> None:
     """Runs after the response: a delivery problem is logged, never shown to whoever asked."""
     try:
-        send_password_reset_email(email, token)
+        send_password_reset_email(email, token, organization=organization)
     except Exception as exc:  # the answer is already the same for every request
         logging.getLogger(__name__).warning("Password reset email failed: %s", type(exc).__name__)
 
@@ -517,17 +586,22 @@ def forgot(data: ResetRequest, background: BackgroundTasks, db: Session = Depend
     """The same answer, in the same time, for every email: known, unknown or blocked. The email itself is sent
     after the response, so neither the body nor its timing reveals whether an account exists."""
     accepted = {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "ACCEPTED"}
-    row = _account_for_email(db, data.email.strip().lower())
-    if not row or _admin_blocked(row):
+    email = data.email.strip().lower()
+    bind_system(db, "password reset: find this email's accounts across organizations")
+    accounts = [row for row in db.query(AuthUser).filter(AuthUser.username == email) if not _admin_blocked(row)]
+    if not accounts:
         return accepted
-    bind_tenant(db, row.tenant_id)
-    token = issue_reset(db, row.id, row.tenant_id)
     from auth.emailer import smtp_configuration_status
 
+    # One link per organization (each account has its own password); each email names its organization.
+    tokens = []
+    for row in accounts:
+        token = issue_reset(db, row.id, row.tenant_id)
+        tokens.append(token)
+        background.add_task(_send_reset_quietly, row.username, token, _organization_name(db, row.tenant_id))
     if is_development() and not smtp_configuration_status().get("configured"):
-        # Local development without email: the link is shown so the flow can be completed.
-        return {**accepted, "development_token": _development_token(token)}
-    background.add_task(_send_reset_quietly, row.username, token)
+        background.tasks.clear()  # local development without email: the link is shown instead
+        return {**accepted, "development_token": _development_token(tokens[0])}
     return accepted
 
 

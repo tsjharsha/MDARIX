@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { SwitchOrganization } from "../shared/SwitchOrganization";
 import {
   Bell,
   Building2,
@@ -106,6 +107,7 @@ export function CustomerAdminControlPlane({
               <strong>{securityContext?.display_name ?? "Customer Administrator"}</strong>
               <small>Customer Administrator</small>
             </span>
+            <SwitchOrganization />
             <button
               type="button"
               className="ac-secondary"

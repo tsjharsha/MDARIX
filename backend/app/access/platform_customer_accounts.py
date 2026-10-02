@@ -21,7 +21,6 @@ from backend.app.access.platform_customer_admins import (
     ROLE,
     _row,
     create_customer_admin,
-    ensure_email_is_free,
 )
 from backend.app.access.schemas import TenantAddRequest
 from backend.app.customer_lifecycle import build_tenant_for_customer, shared_data_plane
@@ -182,8 +181,7 @@ def add_tenant_to_customer(
             409, detail={"code": "TENANT_NAME_EXISTS", "message": "This customer already has a tenant with this name"}
         )
     email = payload.admin_email.strip().lower()
-    # Checked before anything is created, so a taken email refuses the whole request cleanly.
-    ensure_email_is_free(db, email)
+    # A new tenant has no accounts yet; the same person may already administer another tenant (a separate account).
     plan = (
         db.query(PlanDefinition)
         .filter(PlanDefinition.id == payload.plan_id, func.upper(PlanDefinition.status) == "ACTIVE")

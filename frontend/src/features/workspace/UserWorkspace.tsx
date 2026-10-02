@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SwitchOrganization } from "../shared/SwitchOrganization";
 import {
   Bot,
   Briefcase,
@@ -158,6 +159,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
               <strong>{session?.display_name ?? "User"}</strong>
               <small>{session?.active_role ?? "No active role"}</small>
             </span>
+            <SwitchOrganization />
             <button
               type="button"
               className="ac-secondary"

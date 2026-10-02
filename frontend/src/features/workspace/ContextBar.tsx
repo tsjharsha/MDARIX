@@ -17,7 +17,12 @@ export function ContextBar() {
         Product data is unavailable: {work.error}
       </p>
     );
-  if (!work.products.length) return null;
+  if (!work.products.length)
+    return work.state === "loading" ? (
+      <p className="ac-muted" role="status">
+        Loading your products…
+      </p>
+    ) : null;
   return (
     <section className="uw-context" aria-label="Working context">
       <label>

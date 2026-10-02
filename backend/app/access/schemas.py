@@ -2,7 +2,7 @@
 
 import uuid
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class RoleSwitch(BaseModel):
@@ -268,9 +268,17 @@ class MasterMappingRequest(BaseModel):
 
 class MappingVersionRequest(BaseModel):
     master_mapping_id: uuid.UUID
-    version: str
-    rules: dict = {}
+    version: str = Field(min_length=1, max_length=40)
+    # Mapping Studio sends one entry per field rule (a list); older clients sent a dictionary.
+    rules: list[dict] | dict = Field(default_factory=list)
     effective_from: str | None = None
+
+    @field_validator("rules")
+    @classmethod
+    def _bounded(cls, value):
+        if len(value) > 500:
+            raise ValueError("at most 500 field rules")
+        return value
 
 
 class MappingOverrideRequest(BaseModel):
@@ -387,4 +395,13 @@ class QueueItemsAction(BaseModel):
     """Retry or discard background work that gave up after its retries (platform administrators only)."""
 
     ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+class TenantLimitsRequest(BaseModel):
+    """A customer tenant's own limits; omitted ones stay as they are."""
+
+    licensed_users_limit: int | None = Field(default=None, ge=1, le=100000)
+    customer_admin_limit: int | None = Field(default=None, ge=1, le=1000)
+    connector_limit: int | None = Field(default=None, ge=0, le=1000)
     reason: str = Field(min_length=10, max_length=1000)

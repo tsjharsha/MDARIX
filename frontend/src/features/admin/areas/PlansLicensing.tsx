@@ -1,7 +1,16 @@
 import { useMemo, useState } from "react";
 import { AlarmClock, CalendarClock, CalendarX2, CheckCircle2, Mail } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
-import { SearchBox, Table, errorText, formatDate, send, useResource, type Resource } from "../../customer-admin/shared";
+import {
+  Drawer,
+  SearchBox,
+  Table,
+  errorText,
+  formatDate,
+  send,
+  useResource,
+  type Resource,
+} from "../../customer-admin/shared";
 import { ChangeSubscription } from "../customers/CustomerPage";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
@@ -114,6 +123,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [changing, setChanging] = useState<TenantRow | null>(null);
+  const [limiting, setLimiting] = useState<TenantRow | null>(null);
   const params = new URLSearchParams({ page: String(page), page_size: "25", sort: "name" });
   if (query.trim()) params.set("q", query.trim());
   const tenants = useResource<{ items: TenantRow[]; total: number; pages: number }>(
@@ -170,9 +180,14 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
             key: "change",
             label: "",
             render: (row) => (
-              <button type="button" className="ac-link" onClick={() => setChanging(row)}>
-                Change
-              </button>
+              <span className="ca-action-row">
+                <button type="button" className="ac-link" onClick={() => setChanging(row)}>
+                  Change
+                </button>
+                <button type="button" className="ac-link" onClick={() => setLimiting(row)}>
+                  Limits
+                </button>
+              </span>
             ),
           },
         ]}
@@ -184,6 +199,17 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
         noun="tenant"
         onPage={setPage}
       />
+      {limiting && (
+        <TenantLimits
+          tenant={limiting}
+          onClose={() => setLimiting(null)}
+          onSaved={() => {
+            setLimiting(null);
+            onMessage(`${limiting.name ?? "Tenant"}: limits updated.`);
+            tenants.reload();
+          }}
+        />
+      )}
       {changing && (
         <ChangeSubscription
           tenants={[{ id: changing.id, tenant_key: changing.tenant_key, display_name: changing.name }]}
@@ -197,6 +223,80 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
         />
       )}
     </Panel>
+  );
+}
+
+const TENANT_LIMITS = [
+  { key: "licensed_users_limit", usage: "licensed_users", label: "Licensed users" },
+  { key: "customer_admin_limit", usage: "customer_admins", label: "Customer administrators" },
+  { key: "connector_limit", usage: "connectors", label: "Connections" },
+] as const;
+
+/** One tenant's own limits (its plan's other customers are not affected); never below what it already uses. */
+function TenantLimits({ tenant, onClose, onSaved }: { tenant: TenantRow; onClose: () => void; onSaved: () => void }) {
+  const usage = useResource<{ usage: Record<string, number>; limits: Record<string, unknown> }>(
+    `/api/v1/platform-admin/customers/${tenant.id}/usage`,
+  );
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const current = (key: string) => {
+    const value = usage.data?.limits?.[key];
+    return typeof value === "number" ? String(value) : "";
+  };
+  const changed = Object.fromEntries(
+    TENANT_LIMITS.filter(({ key }) => (values[key] ?? current(key)) !== current(key) && values[key] !== "").map(
+      ({ key }) => [key, Number(values[key])],
+    ),
+  );
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await send(`/api/v1/platform-admin/customers/${tenant.id}/limits`, "PUT", { ...changed, reason: reason.trim() });
+      onSaved();
+    } catch (failure) {
+      setError(errorText(failure, "The limits were not changed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Drawer title={`Limits for ${tenant.name ?? tenant.tenant_key}`} onClose={onClose}>
+      <Intro>These limits belong to this tenant only. A limit cannot go below what the tenant already uses.</Intro>
+      {usage.state === "ready" &&
+        TENANT_LIMITS.map(({ key, usage: used, label }) => (
+          <label className="ca-field" key={key}>
+            {label} · {usage.data?.usage?.[used] ?? 0} in use
+            <input
+              type="number"
+              min={key === "connector_limit" ? 0 : 1}
+              value={values[key] ?? current(key)}
+              onChange={(event) => setValues({ ...values, [key]: event.target.value })}
+            />
+          </label>
+        ))}
+      <label className="ca-field">
+        Reason (kept in the tenant&apos;s audit trail)
+        <textarea rows={2} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} />
+      </label>
+      {error && (
+        <p className="ac-message tone-critical" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="ca-action-row">
+        <button
+          type="button"
+          className="ac-primary"
+          disabled={busy || reason.trim().length < 10 || !Object.keys(changed).length}
+          onClick={() => void save()}
+        >
+          Save limits
+        </button>
+      </div>
+    </Drawer>
   );
 }
 

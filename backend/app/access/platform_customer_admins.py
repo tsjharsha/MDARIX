@@ -174,19 +174,16 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
     }
 
 
-def ensure_email_is_free(db: Session, email: str) -> None:
-    """One account per email: sign-in finds the account by email, so a second one would make it ambiguous.
-
-    Until a person can hold memberships in several tenants, administering a second tenant needs another email.
-    """
-    if db.query(AuthUser.id).filter(func.lower(AuthUser.username) == email).first() is not None:
+def ensure_email_is_free(db: Session, email: str, tenant_id=None) -> None:
+    """One account per email in each organization. The same person may administer several organizations (a
+    separate account in each); sign-in asks which one."""
+    query = db.query(AuthUser.id).filter(func.lower(AuthUser.username) == email)
+    if tenant_id is not None:
+        query = query.filter(AuthUser.tenant_id == tenant_id)
+    if query.first() is not None:
         raise HTTPException(
             409,
-            detail={
-                "code": "ACCOUNT_EXISTS",
-                "message": "An account with this email already exists. Each account belongs to one tenant, "
-                "so use a different email to administer another tenant.",
-            },
+            detail={"code": "ACCOUNT_EXISTS", "message": "An account with this email already exists in this tenant."},
         )
 
 
@@ -206,7 +203,7 @@ def create_customer_admin(
     Returns the account, the invitation token and the email delivery result. On a delivery failure the
     transaction is rolled back, so nothing is left half-created.
     """
-    ensure_email_is_free(db, email)
+    ensure_email_is_free(db, email, tenant.id)
     _enforce_invite_limits(db, tenant.id, ROLE)
     company = (customer.display_name if customer else None) or tenant.name
     tenant_id = tenant.id

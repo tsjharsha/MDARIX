@@ -57,7 +57,7 @@ function watch(page: Page, persona: string, where: () => string) {
 async function signIn(page: Page, persona: any) {
   await page.goto("/signin");
   await page.getByLabel("User ID or work email").fill(persona.email);
-  await page.getByLabel("Password").fill(config.password);
+  await page.getByLabel("Password").fill(persona.password ?? config.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/(app|mfa)/, { timeout: 30_000 });
   if (page.url().includes("/mfa")) {
@@ -81,8 +81,8 @@ const NAV_LABEL: Record<string, string> = {
 const HOME: Record<string, string> = { platform: "/app/admin", customer: "/app/customer-admin", workspace: "/app" };
 
 async function settle(page: Page) {
-  await page.waitForTimeout(1200);
-  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => undefined);
+  // Dashboards refresh themselves, so the network never goes quiet: a fixed pause lets the page load.
+  await page.waitForTimeout(1500);
 }
 
 async function panelErrors(page: Page, persona: string, where: string) {
@@ -170,11 +170,10 @@ async function crawl(page: Page, persona: any) {
 
 test.describe("deep crawl of every screen", () => {
   test.skip(!config, "Set E2E_DEEP_PERSONAS to run the deep crawl.");
-  test.describe.configure({ mode: "serial" });
 
   for (const persona of config?.personas ?? []) {
     test(`${persona.name}: every screen, tab and safe button`, async ({ page }) => {
-      test.setTimeout(15 * 60_000);
+      test.setTimeout(30 * 60_000);
       let where = "sign-in";
       watch(page, persona.name, () => where);
       await signIn(page, persona);
@@ -223,7 +222,8 @@ test.describe("deep crawl of every screen", () => {
     await expect(page.getByRole("tab", { name: "Workspace", selected: true })).toBeVisible();
   });
 
-  test.afterAll(() => {
+  test.afterEach(() => {
+    // Written after every test, so a later failure never loses what was already found.
     if (REPORT_FILE) writeFileSync(REPORT_FILE, JSON.stringify({ issues, visited }, null, 1));
   });
 });

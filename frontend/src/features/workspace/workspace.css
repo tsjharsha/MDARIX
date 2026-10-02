@@ -376,3 +376,195 @@
 .uw-trial-message:has(.uw-team-link) {
   flex-wrap: wrap;
 }
+
+/*
+ * Older screens shown inside the workspace (investigation workspace, story, signals, evidence library, decisions,
+ * regulatory copilot, risk): their own class names, given the console's look so every page feels like one product.
+ * Scoped to .uw-embedded, so the screens are unchanged anywhere else.
+ */
+.uw-embedded .panel {
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  box-shadow: none;
+}
+.uw-embedded .section-title {
+  margin: 0 0 10px;
+  color: var(--ac-ink);
+  font-size: 16px;
+  font-weight: 700;
+}
+.uw-embedded .eyebrow {
+  color: var(--ac-teal);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.uw-embedded .product-header,
+.uw-embedded .governance-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-embedded .product-header h1,
+.uw-embedded .governance-hero h1 {
+  margin: 4px 0;
+  font-size: 22px;
+}
+.uw-embedded .version-pill,
+.uw-embedded .platform-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  padding: 6px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-embedded label {
+  display: grid;
+  gap: 4px;
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-embedded input,
+.uw-embedded select,
+.uw-embedded textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font: inherit;
+  font-weight: 400;
+}
+.uw-embedded .primary-action {
+  padding: 8px 16px;
+  border: 1px solid var(--ac-teal);
+  border-radius: 6px;
+  background: var(--ac-teal);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-embedded .primary-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.uw-embedded .secondary-link,
+.uw-embedded .text-button {
+  padding: 8px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-embedded .advisory-box,
+.uw-embedded .human-review-box {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #f3d38a;
+  border-radius: var(--ac-radius);
+  background: #fff8e8;
+}
+.uw-embedded .human-review-box {
+  border-color: var(--ac-line);
+  background: var(--ac-page);
+}
+.uw-embedded .toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+/* Regulatory copilot */
+.uw-embedded .regulatory-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+.uw-embedded .regulatory-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.uw-embedded .regulatory-split > .panel {
+  margin: 0;
+}
+.uw-embedded .regulatory-document-list,
+.uw-embedded .evidence-list {
+  display: grid;
+  max-height: 560px;
+  overflow-y: auto;
+  border: 1px solid var(--ac-grid);
+  border-radius: var(--ac-radius);
+}
+.uw-embedded .regulatory-document-list > button,
+.uw-embedded .evidence-list > button,
+.uw-embedded .evidence-list > article,
+.uw-embedded .evidence-list > div,
+.uw-embedded .regulatory-version {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--ac-grid);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  text-align: left;
+}
+.uw-embedded .regulatory-document-list > button:hover,
+.uw-embedded .evidence-list > button:hover {
+  background: var(--ac-teal-wash);
+  cursor: pointer;
+}
+.uw-embedded .regulatory-document-list span,
+.uw-embedded .evidence-list small,
+.uw-embedded .evidence-list span {
+  color: var(--ac-muted);
+  font-size: 13px;
+}
+.uw-embedded .journey-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+.uw-embedded .journey-strip button {
+  padding: 6px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-embedded .limitations {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ac-muted);
+  font-size: 13px;
+}
