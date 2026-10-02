@@ -20,6 +20,7 @@ import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
 import { ConfirmDialog, type Confirmation } from "./shared";
 import { Dashboard } from "./sections/Dashboard";
+import { SectionSummary } from "./sections/summaries";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { UsersSection } from "./sections/Users";
 import { AccessSection } from "./sections/Access";
@@ -161,6 +162,7 @@ export function CustomerAdminControlPlane({
             {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
             <ColumnScopeProvider key={location.key} scope={`customer-admin:${section}`}>
               <div className="ca-section">
+                <SectionSummary section={section} />
                 {section === "Dashboard" && <Dashboard />}
                 {section === "Users" && <UsersSection tab={tab} />}
                 {section === "Roles & Access" && <AccessSection tab={tab} />}

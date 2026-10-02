@@ -198,9 +198,6 @@ export function Dashboard() {
           detail="Denied or unauthorized access"
           tone={security.state === "ready" ? (security.data?.metrics?.security_events ? "serious" : "good") : undefined}
           icon={<ShieldCheck size={18} />}
-          series={model.events.map((point) => point.secondary ?? 0)}
-          seriesLabel={`Refused actions per day, last ${days} days`}
-          goodWhenUp={false}
           onOpen={() => open("Security", "Security events")}
         />
       </section>

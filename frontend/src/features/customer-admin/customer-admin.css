@@ -397,3 +397,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The visual summary above each page (sections/summaries.tsx): key figures and charts, then the page itself. */
+.ca-summary {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ac-line);
+}
