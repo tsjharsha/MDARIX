@@ -216,10 +216,10 @@ function AddAdministrator({
   onClose: () => void;
   onAdded: (message: string) => void;
 }) {
-  // Inside a customer's page its tenants are known; on the all-customers tab, every tenant can be chosen.
-  const all = useResource<{ items: any[] }>(tenants ? null : "/api/v1/platform-admin/tenants?page_size=100&sort=name");
-  const options: TenantSummary[] =
-    tenants ?? (all.data?.items ?? []).map((row) => ({ ...row, display_name: row.name }));
+  // Inside a customer's page its tenants are known; on the all-customers tab, every active tenant can be chosen.
+  const all = useResource<{ items: TenantSummary[] }>(tenants ? null : "/api/v1/platform-admin/customer-admin-tenants");
+  const options: TenantSummary[] = tenants ?? all.data?.items ?? [];
+  const loadingOptions = !tenants && all.state === "loading";
   const [form, setForm] = useState({ tenant_id: "", email: "", display_name: "", reason: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -250,10 +250,21 @@ function AddAdministrator({
         <p className="ac-eyebrow">Customer administrators</p>
         <h2 id="cc-add-admin">Add administrator</h2>
         <p>They receive an email to set their password and can then manage their organization's users.</p>
+        {!tenants && all.state === "error" && (
+          <p className="ca-inline-error" role="alert">
+            The customer list could not be loaded: {all.error ?? "please try again"}.
+          </p>
+        )}
         {options.length > 1 || !tenants ? (
           <label className="ca-field">
-            Customer tenant
-            <select required value={tenantId} onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}>
+            Customer
+            <select
+              required
+              value={tenantId}
+              disabled={loadingOptions}
+              onChange={(event) => setForm({ ...form, tenant_id: event.target.value })}
+            >
+              {loadingOptions && <option value="">Loading customers…</option>}
               {options.map((tenant) => (
                 <option key={tenant.id} value={tenant.id}>
                   {tenant.display_name ?? tenant.tenant_key} {tenant.tenant_key ? `(${tenant.tenant_key})` : ""}

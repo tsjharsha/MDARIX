@@ -1,5 +1,6 @@
 """Platform administration of customers: administrators, subscription, standing and environments."""
 
+import time
 import uuid
 
 import pytest
@@ -209,3 +210,13 @@ def test_the_customer_page_has_only_working_sections(platform, customer):
     assert platform.patch(
         f"/api/v1/platform-admin/customer-records/{customer['customer_id']}", json={"display_name": "Renamed"}
     ).status_code in {404, 405}
+
+
+def test_the_add_administrator_picker_lists_active_tenants_quickly(platform, customer):
+    started = time.monotonic()
+    options = platform.get("/api/v1/platform-admin/customer-admin-tenants")
+    assert options.status_code == 200 and time.monotonic() - started < 2
+    items = options.json()["items"]
+    assert customer["id"] in {item["id"] for item in items}
+    assert all(set(item) == {"id", "tenant_key", "display_name"} for item in items)
+    assert _client_with_role("CUSTOMER_ADMIN").get("/api/v1/platform-admin/customer-admin-tenants").status_code == 403

@@ -144,6 +144,20 @@ def list_customer_admins(
     return {"items": items, "total": len(items)}
 
 
+@router.get("/platform-admin/customer-admin-tenants")
+def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db)):
+    """The tenants an administrator can be added to (active ones), for a picker: one light query."""
+    _require_platform_admin(request, db)
+    rows = (
+        db.query(Tenant.id, Tenant.tenant_key, Tenant.display_name, Customer.display_name)
+        .outerjoin(Customer, Customer.id == Tenant.customer_id)
+        .filter(func.upper(Tenant.status).in_(["ACTIVE", "PROVISIONED"]))
+        .order_by(func.lower(func.coalesce(Customer.display_name, Tenant.display_name)), Tenant.tenant_key)
+        .all()
+    )
+    return {"items": [{"id": str(row[0]), "tenant_key": row[1], "display_name": row[3] or row[2]} for row in rows]}
+
+
 @router.post("/platform-admin/tenants/{tenant_id}/customer-admins")
 def add_customer_admin(
     tenant_id: uuid.UUID, payload: CustomerAdminCreateRequest, request: Request, db: Session = Depends(get_db)
