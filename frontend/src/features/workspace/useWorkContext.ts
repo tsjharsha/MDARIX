@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../app/api";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
 import type { WorkContext } from "./workspaceContext";
+import { defaultTimeContext, preferredInvestigationId } from "./workspaceModel";
 
 /**
  * The product / version / investigation / time context every workspace section shares.
@@ -11,8 +12,8 @@ export function useWorkContext(): WorkContext {
   const [products, setProducts] = useState<Product[]>([]);
   const [productId, setProductId] = useState("");
   const [version, setVersion] = useState("");
-  const [asOf, setAsOf] = useState("2026-02-15");
-  const [mode, setMode] = useState<TemporalMode>("event");
+  const [asOf, setAsOf] = useState(() => defaultTimeContext().asOf);
+  const [mode, setMode] = useState<TemporalMode>(() => defaultTimeContext().mode);
   const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
   const [investigationId, setInvestigationId] = useState("");
   const [view, setView] = useState<Product360 | null>(null);
@@ -67,9 +68,7 @@ export function useWorkContext(): WorkContext {
       .then((items) => {
         if (!current) return;
         setInvestigations(items);
-        setInvestigationId((selected) =>
-          items.some((item) => item.id === selected) ? selected : String(items[0]?.id ?? ""),
-        );
+        setInvestigationId((selected) => preferredInvestigationId(items, selected));
       })
       .catch(() => current && setInvestigations([]));
     return () => {

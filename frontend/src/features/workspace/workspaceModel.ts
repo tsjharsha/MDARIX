@@ -9,6 +9,18 @@ const code = (value: unknown) =>
 
 const CLOSED = ["CLOSED", "RESOLVED", "COMPLETED", "CANCELLED", "ARCHIVED"];
 
+/** The workspace opens on the current state of the records, with today's date ready for point-in-time views. */
+export function defaultTimeContext(today = new Date()): { asOf: string; mode: "current" } {
+  return { asOf: today.toISOString().slice(0, 10), mode: "current" };
+}
+
+/** Keep the current selection when it is still listed; otherwise the first open case, else the first case. */
+export function preferredInvestigationId(items: Array<{ id?: unknown; status?: unknown }>, selected: string): string {
+  if (items.some((item) => String(item.id) === selected)) return selected;
+  const open = items.find((item) => isOpenInvestigation(item.status));
+  return String((open ?? items[0])?.id ?? "");
+}
+
 export function isOpenInvestigation(status: unknown) {
   return !CLOSED.includes(code(status));
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultTimeContext,
+  preferredInvestigationId,
   countBy,
   investigationStatusSlices,
   isHighSeverity,
@@ -52,5 +54,28 @@ describe("user workspace model", () => {
     expect(sectionAllowed("My Account", undefined)).toBe(true);
     expect(sectionAllowed("Products", ["products"])).toBe(true);
     expect(sectionAllowed("Decisions", ["products"])).toBe(false);
+  });
+});
+
+describe("defaultTimeContext", () => {
+  it("opens on the current state with today's date, not a fixed historical date", () => {
+    expect(defaultTimeContext(new Date("2026-10-02T09:30:00Z"))).toEqual({ asOf: "2026-10-02", mode: "current" });
+  });
+});
+
+describe("preferredInvestigationId", () => {
+  const cases = [
+    { id: "closed-1", status: "closed" },
+    { id: "open-1", status: "open" },
+  ];
+  it("opens the first open case", () => {
+    expect(preferredInvestigationId(cases, "")).toBe("open-1");
+  });
+  it("keeps a selection that is still listed, even a closed one", () => {
+    expect(preferredInvestigationId(cases, "closed-1")).toBe("closed-1");
+  });
+  it("falls back to the first case, or nothing", () => {
+    expect(preferredInvestigationId([{ id: "c", status: "closed" }], "gone")).toBe("c");
+    expect(preferredInvestigationId([], "")).toBe("");
   });
 });

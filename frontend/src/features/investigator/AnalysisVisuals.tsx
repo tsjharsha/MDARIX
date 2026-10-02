@@ -19,7 +19,7 @@ type Item = { item_id?: string; statement: string; source_references?: unknown[]
 const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Complete",
   COMPLETED_WITH_LIMITATIONS: "Complete, with limits noted",
-  ABSTAINED_INSUFFICIENT_EVIDENCE: "No conclusion: evidence is not enough",
+  ABSTAINED_INSUFFICIENT_EVIDENCE: "Open: no cause concluded",
   FAILED_VALIDATION: "Needs review: a check failed",
   MIXED_EVIDENCE: "Evidence points both ways",
   UNDER_INVESTIGATION: "Under investigation",
