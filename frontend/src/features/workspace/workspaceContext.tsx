@@ -4,7 +4,7 @@ import type { InvestigationSummary, Product, Product360, TemporalMode } from "..
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
   "Getting started",
-  "Overview",
+  "Dashboard",
   "My Work",
   "Products",
   "Signals",
@@ -21,7 +21,7 @@ export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 /** Server menu keys (session context `allowed_menu`) that grant each section. My Account is always available. */
 export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Getting started": ["home"],
-  Overview: ["home"],
+  Dashboard: ["home"],
   "My Work": ["home", "investigations"],
   Products: ["products"],
   Signals: ["products"],

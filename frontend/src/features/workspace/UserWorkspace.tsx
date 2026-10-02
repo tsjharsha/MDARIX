@@ -30,7 +30,8 @@ import {
 } from "./workspaceContext";
 import { useWorkContext } from "./useWorkContext";
 import { ContextBar } from "./ContextBar";
-import { OverviewSection } from "./sections/Overview";
+import { DashboardSection } from "./sections/Dashboard";
+import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { MyWorkSection } from "./sections/MyWork";
 import { ProductsSection } from "./sections/Products";
 import { SignalsSection } from "./sections/Signals";
@@ -45,7 +46,7 @@ import { requestJson } from "../../app/apiClient";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
   "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
-  Overview: { icon: LayoutDashboard, description: "Status dashboard", context: false },
+  Dashboard: { icon: LayoutDashboard, description: "Live quality status", context: false },
   "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
   Products: { icon: Package, description: "Product 360 and versions", context: true },
   Signals: { icon: Radio, description: "Complaints and trends", context: true },
@@ -59,12 +60,12 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
 
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
 export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
-  home: ["Overview"],
+  home: ["Dashboard"],
   "my-work": ["My Work"],
   products: ["Products"],
   signals: ["Signals"],
   story: ["Investigations", "Story"],
-  persona: ["Overview"],
+  persona: ["Dashboard"],
   ask: ["Intelligence", "Ask MDARIX"],
   investigations: ["Investigations"],
   evidence: ["Evidence"],
@@ -78,7 +79,7 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
 
 export function UserWorkspace({ session, initialView }: { session: SessionContext | null; initialView?: string }) {
   const work = useWorkContext();
-  const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Overview"]);
+  const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"]);
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
     tab: start[1],
@@ -211,19 +212,22 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
                 </button>
               </div>
             )}
-            <div key={location.key} className="ca-section">
-              {section === "Getting started" && <GettingStartedSection />}
-              {section === "Overview" && <OverviewSection />}
-              {section === "My Work" && <MyWorkSection tab={tab} />}
-              {section === "Products" && <ProductsSection tab={tab} />}
-              {section === "Signals" && <SignalsSection tab={tab} />}
-              {section === "Investigations" && <InvestigationsSection tab={tab} />}
-              {section === "Evidence" && <EvidenceSection tab={tab} />}
-              {section === "Decisions" && <DecisionsSection tab={tab} />}
-              {section === "Intelligence" && <IntelligenceSection tab={tab} />}
-              {section === "Trust & Audit" && <TrustSection tab={tab} />}
-              {section === "My Account" && <AccountSection tab={tab} />}
-            </div>
+            {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
+            <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
+              <div className="ca-section">
+                {section === "Getting started" && <GettingStartedSection />}
+                {section === "Dashboard" && <DashboardSection />}
+                {section === "My Work" && <MyWorkSection tab={tab} />}
+                {section === "Products" && <ProductsSection tab={tab} />}
+                {section === "Signals" && <SignalsSection tab={tab} />}
+                {section === "Investigations" && <InvestigationsSection tab={tab} />}
+                {section === "Evidence" && <EvidenceSection tab={tab} />}
+                {section === "Decisions" && <DecisionsSection tab={tab} />}
+                {section === "Intelligence" && <IntelligenceSection tab={tab} />}
+                {section === "Trust & Audit" && <TrustSection tab={tab} />}
+                {section === "My Account" && <AccountSection tab={tab} />}
+              </div>
+            </ColumnScopeProvider>
           </main>
         </div>
       </div>

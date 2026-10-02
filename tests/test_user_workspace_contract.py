@@ -29,9 +29,9 @@ def test_workspace_signs_out_when_idle_and_offers_sign_out():
     assert "signOut()" in SHELL
 
 
-def test_overview_is_a_live_dashboard_and_every_section_exists():
+def test_the_dashboard_is_live_and_every_section_exists():
     for section in (
-        "Overview",
+        "Dashboard",
         "My Work",
         "Products",
         "Signals",

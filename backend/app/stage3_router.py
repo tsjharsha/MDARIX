@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.access.trends import daily, window
 from backend.app.db.models.foundation import AIExecution
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -79,6 +80,64 @@ def command_center(
         ],
         "limitations": ["Analytics are bounded to the authenticated tenant and available canonical tables."],
     }
+
+
+# Daily series for the workspace dashboard: (table, date expression, key expression or None). Fixed SQL only; the
+# tenant and the window start are always parameters. Missing optional tables yield an empty series.
+_DAILY = {
+    "signals": ("complaints", "COALESCE(complaint_timestamp, event_timestamp)", None),
+    "investigations_opened": ("investigations", "COALESCE(opened_at, created_at)", None),
+    "investigations_closed": ("investigations", "closed_at", None),
+    "evidence": ("evidence", "created_at", None),
+    "decisions": ("decisions", "COALESCE(decision_timestamp, created_at)", None),
+    "ai_runs": ("ai_executions", "execution_timestamp", "(error_state IS NULL)"),
+}
+_BREAKDOWNS = {
+    "signals_by_status": ("complaints", "status"),
+    "investigations_by_status": ("investigations", "status"),
+    "evidence_by_reliability": ("evidence", "reliability_status"),
+    "evidence_by_type": ("evidence", "evidence_type"),
+    "decisions_by_status": ("decisions", "decision_status"),
+}
+
+
+@router.get("/analytics/trends")
+def workspace_trends(
+    days: int = 30,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The tenant's quality work day by day (signals, investigations opened and closed, evidence, decisions, AI
+    runs) and how it breaks down by status. Counts only, never record content."""
+    days, today, since = window(days)
+    params = {"tenant_id": ctx.tenant_id, "since": since}
+    series = {}
+    for name, (table, column, key) in _DAILY.items():
+        group = f", {key} AS k" if key else ""
+        rows = _rows(
+            db,
+            f"SELECT date({column}) AS day{group}, COUNT(*) AS n FROM {table} "
+            f"WHERE tenant_id = :tenant_id AND {column} >= :since GROUP BY 1{', 2' if key else ''}",
+            params,
+        )
+        if key:
+            points = [(row["day"], "completed" if row["k"] else "failed", row["n"]) for row in rows]
+        else:
+            points = [(row["day"], "count", row["n"]) for row in rows]
+        series[name] = daily(points, days, today)
+    breakdowns = {
+        name: [
+            {"label": row["label"] or "UNKNOWN", "count": int(row["n"])}
+            for row in _rows(
+                db,
+                f"SELECT {column} AS label, COUNT(*) AS n FROM {table} WHERE tenant_id = :tenant_id "
+                f"GROUP BY 1 ORDER BY 2 DESC",
+                {"tenant_id": ctx.tenant_id},
+            )
+        ]
+        for name, (table, column) in _BREAKDOWNS.items()
+    }
+    return {"tenant_id": ctx.tenant_id, "days": days, **series, **breakdowns, "scope": "TENANT"}
 
 
 @router.get("/analytics/signals")

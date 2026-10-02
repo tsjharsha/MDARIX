@@ -111,7 +111,8 @@ export function KpiTile({
   series?: number[];
   seriesLabel?: string;
   onOpen?: () => void;
-  goodWhenUp?: boolean;
+  /** Whether a rise is good news; null when the direction is neither (the change is shown in grey). */
+  goodWhenUp?: boolean | null;
 }) {
   const change = series ? halfOverHalf(series) : null;
   const half = series ? Math.floor(series.length / 2) : 0;
@@ -119,7 +120,8 @@ export function KpiTile({
     !!series && half > 0 && series.slice(series.length - 2 * half, series.length - half).every((value) => !value);
   const showChange = change !== null || (previousWasZero && !!series?.slice(-half).some(Boolean));
   const direction = change === null || change === 0 ? "flat" : change > 0 ? "up" : "down";
-  const changeTone = direction === "flat" ? "flat" : (direction === "up") === goodWhenUp ? "better" : "worse";
+  const changeTone =
+    direction === "flat" || goodWhenUp === null ? "flat" : (direction === "up") === goodWhenUp ? "better" : "worse";
   const body = (
     <>
       <span className="ac-kpi-head">
@@ -129,7 +131,7 @@ export function KpiTile({
         <span className="ac-kpi-label">{label}</span>
         {showChange && (
           <span
-            className={`ac-kpi-change ${change === null ? (goodWhenUp ? "better" : "worse") : changeTone}`}
+            className={`ac-kpi-change ${change === null && goodWhenUp !== null ? (goodWhenUp ? "better" : "worse") : changeTone}`}
             title="Last half of the period against the half before"
           >
             {direction === "up" || change === null ? (

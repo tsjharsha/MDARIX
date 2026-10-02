@@ -20,7 +20,7 @@ MAIN = frontend_app_source()
 STYLES = (ROOT / "frontend" / "src" / "styles.css").read_text(encoding="utf-8")
 WORKSPACE = ROOT / "frontend" / "src" / "features" / "workspace"
 WORKSPACE_CONTEXT = (WORKSPACE / "workspaceContext.tsx").read_text(encoding="utf-8")
-WORKSPACE_OVERVIEW = (WORKSPACE / "sections" / "Overview.tsx").read_text(encoding="utf-8")
+WORKSPACE_OVERVIEW = (WORKSPACE / "sections" / "Dashboard.tsx").read_text(encoding="utf-8")
 
 
 def test_public_navigation_exposes_required_categories_and_actions():
@@ -66,7 +66,7 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
-    # Signed-in business users land on the user workspace; its Overview is a live status dashboard.
+    # Signed-in business users land on the user workspace; it opens on a live Dashboard.
     assert compact("if (!isPlatformAdmin && !isCustomerAdmin) return (<><UserWorkspace") in compact(MAIN)
     # The workflow story is the navigation itself, in order: product -> signal -> case -> evidence -> decision -> trust.
     order = ["Products", "Signals", "Investigations", "Evidence", "Decisions", "Trust & Audit"]

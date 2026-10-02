@@ -89,12 +89,12 @@ export function GettingStartedSection() {
   }[] = [
     {
       id: "overview",
-      title: "Look at the Overview dashboard",
+      title: "Look at the Dashboard",
       detail: "Signals, investigations and evidence from the sample data, in one view.",
       icon: LayoutDashboard,
       done: visited.includes("overview"),
-      action: () => go("overview", "Overview"),
-      label: "Open Overview",
+      action: () => go("overview", "Dashboard"),
+      label: "Open Dashboard",
     },
     {
       id: "investigation",
