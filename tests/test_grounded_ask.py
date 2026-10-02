@@ -11,6 +11,7 @@ from genai.ask import check_answer, compact_context, normalize_answer
 from genai.provider import GenAIProvider, GenAIResult
 from retrieval.embedding_provider import DeterministicEmbeddingProvider
 from retrieval.indexing import index_tenant_evidence
+from tests.chunk_cleanup import restore_chunks
 from tests.conftest import authenticated_client
 from tests.test_day11_ai_investigator import context
 
@@ -20,7 +21,9 @@ def searchable_golden_evidence():
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").one()
-        index_tenant_evidence(db, tenant.id, provider=DeterministicEmbeddingProvider())
+        with restore_chunks(db, tenant.id):
+            index_tenant_evidence(db, tenant.id, provider=DeterministicEmbeddingProvider())
+            yield
     finally:
         db.close()
 

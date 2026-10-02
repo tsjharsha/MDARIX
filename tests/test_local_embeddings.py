@@ -19,6 +19,7 @@ from retrieval.embedding_provider import (
     active_embedding_provider,
 )
 from retrieval.indexing import index_tenant_evidence
+from tests.chunk_cleanup import restore_chunks
 from retrieval.schemas import RetrievalRequest
 from retrieval.service import TrustedRetrievalService
 
@@ -51,10 +52,11 @@ def golden():
     tenant = None
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == GOLDEN).one()
-        index_tenant_evidence(db, tenant.id, provider=DeterministicEmbeddingProvider())
-        first = index_tenant_evidence(db, tenant.id, provider=LocalModelEmbeddingProvider())
-        again = index_tenant_evidence(db, tenant.id, provider=LocalModelEmbeddingProvider())
-        yield {"db": db, "tenant": tenant, "first": first, "again": again}
+        with restore_chunks(db, tenant.id):
+            index_tenant_evidence(db, tenant.id, provider=DeterministicEmbeddingProvider())
+            first = index_tenant_evidence(db, tenant.id, provider=LocalModelEmbeddingProvider())
+            again = index_tenant_evidence(db, tenant.id, provider=LocalModelEmbeddingProvider())
+            yield {"db": db, "tenant": tenant, "first": first, "again": again}
     finally:
         # Leave no language-model vectors behind: other suites read this tenant's embedding rows.
         db.rollback()
