@@ -1,0 +1,3 @@
+result_id,sample_id,lot_number,material_number,test_method,parameter,result_value,unit,lower_limit,upper_limit,result,tested_date,review_status
+TR-88120,SMP-5521-07,KS-5521,PS-110,TM-PS-004 sensor drift at 37 C,Pressure reading offset,7.8,kPa,-5,5,Fail,2026-09-08,Approved
+TR-88121,SMP-5490-03,KS-5490,PS-110,TM-PS-004 sensor drift at 37 C,Pressure reading offset,1.9,kPa,-5,5,Pass,2026-09-08,Approved

@@ -1,0 +1,6 @@
+parent_item_number,parent_revision,child_item_number,child_revision,quantity,unit,find_number,effective_from,effective_to
+PUMP-200,Rev D,PS-110,B,1,EA,10,2026-07-01,
+PUMP-200,Rev D,MB-220,F,1,EA,20,2026-07-01,
+PUMP-200,Rev D,FW-AF200,4.2.0,1,EA,30,2026-07-01,
+PUMP-200,Rev D,BAT-18,C,1,EA,40,2026-07-01,
+PUMP-200,Rev C,PS-110,A,1,EA,10,2026-03-15,2026-06-30

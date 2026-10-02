@@ -1,0 +1,2 @@
+capa_number,title,source_event,product_code,action_type,opened_date,due_date,status
+VCAPA-0077,Add torque record check to shift handover,QE-2026-0322,PUMP-300,Corrective,2026-09-12,2026-10-31,Implementation

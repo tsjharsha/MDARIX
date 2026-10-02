@@ -1,0 +1,3 @@
+certificate_number,supplier_number,certificate_type,issuer,issue_date,expiry_date,status
+CERT-13485-KS-22,SUP-1001,ISO 13485,Notified certification body,2024-04-01,2027-03-31,Valid
+CERT-13485-HC-19,SUP-1004,ISO 13485,Notified certification body,2023-02-01,2026-01-31,Expired

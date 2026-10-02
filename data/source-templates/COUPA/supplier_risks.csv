@@ -1,0 +1,3 @@
+risk_number,supplier_number,risk_type,rating,assessed_date,status,notes
+SRA-0301,SUP-1001,Quality,Medium,2026-09-10,Open,Two complaints linked to sensor lot KS-5521.
+SRA-0288,SUP-1004,Quality,High,2026-08-25,Mitigated,Low-capacity cell lot quarantined.

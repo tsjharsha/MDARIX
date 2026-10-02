@@ -1,0 +1,3 @@
+case_number,subject,description,product_code,serial_number,lot_number,case_origin,opened_datetime,status,escalated_to_complaint,complaint_number
+00012871,Pump alarms with clear line,Customer reports occlusion alarm with no blockage; pump being returned.,PUMP-200,SN-200D-004471,L24-0815,Phone,2026-08-29T16:20:00Z,Escalated,Y,CMP-10021
+00012904,Question about battery indicator,Customer asked how to read the battery indicator; no malfunction reported.,PUMP-200,SN-200C-003001,,Web,2026-09-06T09:05:00Z,Closed,N,

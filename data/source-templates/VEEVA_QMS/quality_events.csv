@@ -1,0 +1,4 @@
+event_number,event_type,title,description,product_code,product_version,lot_number,event_date,opened_date,severity,status,investigation_number
+QE-2026-0311,Complaint,Display froze during infusion,The display froze during an ambulatory infusion; the pump kept delivering at the set rate.,PUMP-300,Rev A,OL-3001,2026-09-01,2026-09-02,Major,Open,
+QE-2026-0318,Complaint,Clip on carry case broke,The belt clip on the carry case broke after two weeks of use.,PUMP-300,Rev A,OL-3002,2026-09-08,2026-09-09,Minor,Closed,
+QE-2026-0322,Deviation,Torque check skipped on one shift,The screw torque check was not recorded for one shift on lot OL-3002.,PUMP-300,Rev A,OL-3002,2026-09-10,2026-09-10,Minor,In review,

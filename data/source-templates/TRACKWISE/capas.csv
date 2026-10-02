@@ -1,0 +1,3 @@
+capa_number,title,source_type,source_reference,product_code,action_type,opened_date,due_date,status,effectiveness_check_date
+CAPA-0450,Restore occlusion threshold margin on Rev D,Investigation,INV-3001,PUMP-200,Corrective,2026-09-15,2026-12-15,Open,
+CAPA-0431,Incoming capacity test for battery cells,Investigation,INV-2987,PUMP-200,Preventive,2026-09-05,2026-11-05,Effectiveness check,2026-12-01

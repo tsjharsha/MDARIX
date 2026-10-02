@@ -1,0 +1,3 @@
+fmea_id,product_code,item_or_function,failure_mode,effect,cause,severity,occurrence,detection,linked_risk_id
+FM-031,PUMP-200,PS-110 pressure sensor,Sensor reading drifts high at body temperature,False occlusion alarm,Sensor offset outside specification,7,3,4,RSK-0012
+FM-044,PUMP-200,BAT-18 battery,Cell capacity below specification,Shortened runtime,Low-capacity cell lot,6,2,5,RSK-0019

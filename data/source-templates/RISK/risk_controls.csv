@@ -1,0 +1,3 @@
+control_id,risk_id,control_type,description,verification_reference,status
+CTL-019,RSK-0012,Protective measure,Occlusion threshold verified at 60 and 103 kPa in production test,DOC-VV-0104,Verified
+CTL-024,RSK-0019,Information for safety,Low-battery warning 30 minutes before shutdown,REQ-AF200-061,Verified

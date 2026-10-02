@@ -1,0 +1,3 @@
+change_number,title,change_type,description,affected_items,status,release_date,effective_date
+ECN-4471,Occlusion filter threshold for Rev D,ECN,Firmware 4.2.0 lowers the occlusion filter threshold from 12 kPa to 9 kPa and uses pressure sensor revision B.,FW-AF200;PS-110;PUMP-200,Implemented,2026-06-25,2026-07-01
+ECN-4402,Battery pack revision C,ECN,Battery pack moves to revision C cells from a second supplier.,BAT-18;PUMP-200,Implemented,2026-03-10,2026-03-15

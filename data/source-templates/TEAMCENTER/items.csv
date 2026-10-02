@@ -1,0 +1,6 @@
+item_number,name,item_type,description,product_family,lifecycle,owner_group
+PUMP-200,AquaFlow 200 Infusion Pump,Product,Large-volume infusion pump,Infusion therapy,Released,Infusion R&D
+PS-110,Downstream pressure sensor assembly,Component,Measures line pressure for occlusion detection,,Released,Sensors
+MB-220,Main control board,Assembly,Controller board with alarm logic,,Released,Electronics
+FW-AF200,AquaFlow 200 firmware,Software,Pump control and alarm firmware,,Released,Software
+BAT-18,Rechargeable battery pack,Component,"Li-ion pack, 8 hours labelled runtime",,Released,Electronics

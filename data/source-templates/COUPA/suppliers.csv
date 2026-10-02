@@ -1,0 +1,4 @@
+supplier_number,name,status,country,commodity,preferred
+SUP-1001,Kestrel Sensors Ltd,Active,GB,Pressure sensors,Y
+SUP-1002,Norvale Electronics,Active,MY,Circuit boards,Y
+SUP-1004,Halden Cells AS,On hold,NO,Battery cells,N
