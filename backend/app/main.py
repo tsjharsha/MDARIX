@@ -39,6 +39,7 @@ from backend.app.stage3_workflow_router import router as stage3_workflow_router
 from backend.app.trust_router import router as trust_router
 from backend.app.trial.router import router as trial_router
 from backend.app.data_import_router import router as data_import_router
+from backend.app.investigation_open_router import router as investigation_open_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -75,22 +76,39 @@ app = FastAPI(
 )
 
 
+def _origin(url: str) -> str:
+    parsed = urlparse(url or "")
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/") if parsed.scheme and parsed.netloc else ""
+
+
+def _trusted_origins() -> set[str]:
+    configured = {_origin(os.getenv("MDARIX_APP_URL", ""))}
+    configured |= {_origin(item.strip()) for item in os.getenv("MDARIX_ALLOWED_ORIGINS", "").split(",")}
+    return {origin for origin in configured if origin}
+
+
 @app.middleware("http")
 async def enforce_cookie_csrf(request: Request, call_next):
-    """Reject cross-origin state changes authenticated only by a browser cookie."""
-    if (
-        request.method not in {"GET", "HEAD", "OPTIONS"}
-        and request.cookies.get("mdarix_session")
-        and is_production_like()
-    ):
-        configured = os.getenv("MDARIX_APP_URL", "").rstrip("/")
-        expected = f"{urlparse(configured).scheme}://{urlparse(configured).netloc}" if configured else ""
-        supplied = request.headers.get("origin")
-        if not supplied:
-            referer = request.headers.get("referer", "")
-            parsed = urlparse(referer)
-            supplied = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
-        if not expected or supplied.rstrip("/") != expected:
+    """Reject cross-origin state changes authenticated only by a browser cookie.
+
+    Production-like: the browser origin (Origin, else Referer) must be the app's own (MDARIX_APP_URL or
+    MDARIX_ALLOWED_ORIGINS). Local development: a browser origin that is not the app, not this server and not a
+    loopback address is refused as well; requests without one (scripts, tests) pass.
+    """
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.cookies.get("mdarix_session"):
+        supplied = _origin(request.headers.get("origin", "")) or _origin(request.headers.get("referer", ""))
+        trusted = _trusted_origins()
+        if is_production_like():
+            allowed = bool(trusted) and supplied in trusted
+        else:
+            host = urlparse(supplied).hostname or ""
+            allowed = (
+                not supplied
+                or supplied in trusted
+                or supplied == _origin(str(request.base_url))
+                or host in {"127.0.0.1", "localhost", "::1"}
+            )
+        if not allowed:
             return JSONResponse(
                 status_code=403,
                 content={"detail": {"code": "CSRF_ORIGIN_DENIED", "message": "A trusted browser origin is required"}},
@@ -153,6 +171,10 @@ async def security_headers(request: Request, call_next):
         "Content-Security-Policy",
         "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
     )
+    forwarded_https = request.headers.get("x-forwarded-proto", "").lower() == "https"
+    if is_production_like() or request.url.scheme == "https" or forwarded_https:
+        # Browsers keep to HTTPS for this site for a year once they have seen it over HTTPS.
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
     return response
 
 
@@ -190,6 +212,7 @@ app.include_router(stage3_workflow_router)
 app.include_router(mapping_catalog_router)
 app.include_router(trial_router)
 app.include_router(data_import_router)
+app.include_router(investigation_open_router)
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

@@ -40,11 +40,11 @@ NOW = lambda: datetime.now(timezone.utc)
 
 class InteractionRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=12000)
-    page_context: str = "ASK_MDARIX"
+    page_context: str = Field(default="ASK_MDARIX", min_length=1, max_length=120)
     product_id: uuid.UUID | None = None
     product_version_id: uuid.UUID | None = None
     investigation_id: uuid.UUID | None = None
-    temporal_mode: str = "CURRENT"
+    temporal_mode: str = Field(default="CURRENT", pattern="^(?i:current|event|known)$")
     temporal_cutoff: datetime | None = None
 
 
@@ -84,12 +84,29 @@ TENANT_ATTACHMENT_QUOTA_BYTES = 100 * 1024 * 1024
 ALLOWED_ATTACHMENT_TYPES = {"application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"}
 
 
+def _ensure_own_records(db: Session, tenant_id, payload: InteractionRequest) -> None:
+    """The case, product and version a question refers to must belong to the signed-in tenant (404 otherwise, the
+    same answer as for an id that does not exist)."""
+    from backend.app.db.models.foundation import Investigation, Product, ProductVersion
+
+    for model, value, code in (
+        (Investigation, payload.investigation_id, "INVESTIGATION_NOT_FOUND"),
+        (Product, payload.product_id, "PRODUCT_NOT_FOUND"),
+        (ProductVersion, payload.product_version_id, "PRODUCT_VERSION_NOT_FOUND"),
+    ):
+        if value is not None and (
+            db.query(model.id).filter(model.id == value, model.tenant_id == tenant_id).first() is None
+        ):
+            raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
+
+
 @router.post("/interactions", dependencies=[Depends(require_permission(AI_RUN))])
 def create_interaction(
     payload: InteractionRequest,
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    _ensure_own_records(db, ctx.tenant_id, payload)
     now = NOW()
     session = AIInteractionSession(
         id=uuid.uuid4(),
@@ -373,6 +390,35 @@ def list_supplier_evidence_requests(
     ]
 
 
+def safe_filename(name: str | None) -> str:
+    """The file's own name only (no folders, control characters or leading dots), at most 120 characters."""
+    import re
+
+    base = re.split(r"[\\/]", str(name or ""))[-1]
+    base = re.sub(r"[^A-Za-z0-9 ._()\-]", "_", base).strip(" .")
+    return base[:120] or "attachment"
+
+
+# The first bytes each permitted type must start with; text types must be valid UTF-8 text.
+_SIGNATURES = {
+    "application/pdf": (b"%PDF-",),
+    "image/png": (b"\x89PNG\r\n\x1a\n",),
+    "image/jpeg": (b"\xff\xd8\xff",),
+}
+
+
+def _content_matches_type(content: bytes, content_type: str) -> bool:
+    if content_type in _SIGNATURES:
+        return content.startswith(_SIGNATURES[content_type])
+    if content_type.startswith("text/"):
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+        return b"\x00" not in content
+    return False
+
+
 @router.post(
     "/supplier-evidence-requests/{request_id}/attachments", dependencies=[Depends(require_permission(RECORDS_WRITE))]
 )
@@ -416,14 +462,21 @@ async def upload_supplier_attachment(
         raise HTTPException(
             422, detail={"code": "MALWARE_SCAN_REJECTED", "message": "Attachment failed the malware safety scan"}
         )
-    metadata = ObjectStorageService().put(ctx.tenant_id, f"{request_id}-{file.filename or 'attachment'}", content)
+    if not _content_matches_type(content, content_type):
+        raise HTTPException(
+            415,
+            detail={"code": "ATTACHMENT_CONTENT_MISMATCH", "message": "The file content does not match its type"},
+        )
+    filename = safe_filename(file.filename)
+    # The stored key never contains the uploaded name, so a name cannot steer where the file is written.
+    metadata = ObjectStorageService().put(ctx.tenant_id, f"{request_id}-{uuid.uuid4().hex}", content)
     now = NOW()
     attachment = EvidenceAttachment(
         id=uuid.uuid4(),
         tenant_id=ctx.tenant_id,
         request_id=row.id,
         uploaded_by=ctx.user_id,
-        filename=file.filename or "attachment",
+        filename=filename,
         content_type=content_type,
         object_key=metadata["object_key"],
         size=metadata["size"],
@@ -502,7 +555,7 @@ def download_supplier_attachment(
         raise HTTPException(
             404, detail={"code": "ATTACHMENT_NOT_FOUND", "message": "Attachment is not available"}
         ) from exc
-    safe_name = attachment.filename.replace('"', "")
+    safe_name = safe_filename(attachment.filename)
     return Response(
         content=content,
         media_type=attachment.content_type,

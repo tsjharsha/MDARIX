@@ -61,13 +61,16 @@ export function DecisionCenterView({
       })
       .then(setAdvisory)
       .catch((err) => setMessage(err.message));
+  const [recording, setRecording] = useState(false);
   const recordDecision = () => {
+    if (recording) return; // one click, one decision
     if (!rationale.trim()) {
       setRationaleError("Enter a human rationale before recording this decision.");
       setMessage("Human rationale is required before recording a decision.");
       rationaleRef.current?.focus();
       return;
     }
+    setRecording(true);
     fetch(`/api/v1/investigations/${investigationId}/decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -87,7 +90,8 @@ export function DecisionCenterView({
         setDecision(payload);
         setMessage("Decision recorded as REQUIRES_REVIEW. Complete Human Review below.");
       })
-      .catch((err) => setMessage(err.message));
+      .catch((err) => setMessage(err.message))
+      .finally(() => setRecording(false));
   };
   const submitReview = () =>
     fetch(`/api/v1/investigations/decisions/${decision.id}/reviews`, {
@@ -208,7 +212,7 @@ export function DecisionCenterView({
                 </button>
               )}
               {canWrite ? (
-                <button className="primary-action" onClick={recordDecision}>
+                <button className="primary-action" onClick={recordDecision} disabled={recording}>
                   Record Human Decision
                 </button>
               ) : (
@@ -298,10 +302,12 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
   const [choice, setChoice] = useState("APPROVE");
   const [remarks, setRemarks] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
   const [message, setMessage] = useState("");
   const [signed, setSigned] = useState<any>(null);
   const close = () => {
     setPassword("");
+    setMfaCode("");
     setRemarks("");
     setMessage("");
     setOpen(false);
@@ -323,7 +329,13 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
     fetch(`/api/v1/governance/decisions/${decision.id}/sign`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision: choice, remarks, password, object_version: decision.updated_at }),
+      body: JSON.stringify({
+        decision: choice,
+        remarks,
+        password,
+        object_version: decision.updated_at,
+        ...(mfaCode ? { mfa_code: mfaCode } : {}),
+      }),
     })
       .then(async (r) => ({
         ok: r.ok,
@@ -337,6 +349,7 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
       }))
       .then(({ ok, data }) => {
         setPassword("");
+        setMfaCode("");
         if (!ok) {
           const code = data.detail?.code;
           const messages: Record<string, string> = {
@@ -348,6 +361,11 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
               "This decision changed while you were reviewing it. Reload the current version and review again.",
             DUPLICATE_SIGNATURE: "This decision version has already been signed.",
             SOD_DENIED: "The decision creator cannot sign their own decision. Use a different authorized approver.",
+            MFA_REQUIRED: "Enter the current 6-digit code from your authenticator app.",
+            MFA_ENROLLMENT_REQUIRED:
+              "Signing needs multi-factor authentication. Set up your authenticator app under My Account first.",
+            SIGNATURE_TEMPORARILY_LOCKED:
+              "Too many failed attempts. Signing is locked for 15 minutes for your account.",
           };
           setMessage(
             messages[code] ?? data.detail?.message ?? `Signature could not be recorded${code ? ` (${code})` : ""}.`,
@@ -408,6 +426,15 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Current password"
             autoComplete="current-password"
+          />
+          <input
+            aria-label="Authenticator code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={mfaCode}
+            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
+            placeholder="6-digit authenticator code"
           />
           <div className="toolbar">
             <button className="secondary-link" onClick={close}>

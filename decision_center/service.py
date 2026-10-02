@@ -10,6 +10,9 @@ from investigation_workspace.service import InvestigationWorkspaceService, Inves
 from decision_center.schemas import AdvisoryRequest, DecisionContextRequest, DecisionCreateRequest, ReviewCreateRequest
 from backend.app.db.tenant_scope import scoped_bind
 
+# Statuses a governed signature gives a decision; a signed decision is closed to further review.
+SIGNED_STATUSES = frozenset({"APPROVED", "REJECTED"})
+
 OPTIONS = [
     "CONTINUE_INVESTIGATION",
     "REQUEST_ADDITIONAL_EVIDENCE",
@@ -240,7 +243,9 @@ class DecisionCenterService:
         self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, request: DecisionCreateRequest
     ) -> Decision:
         context = self.context(db, tenant_id, investigation_id, request)
-        identifier = f"DEC-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{str(investigation_id)[:8]}"
+        # A random part keeps two decisions on the same case in the same second distinct.
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+        identifier = f"DEC-{stamp}-{str(investigation_id)[:8]}-{uuid.uuid4().hex[:6].upper()}"
         row = Decision(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
@@ -289,6 +294,9 @@ class DecisionCenterService:
         decision = db.query(Decision).filter(Decision.tenant_id == tenant_id, Decision.id == decision_id).first()
         if not decision:
             raise DecisionCenterError("DECISION_NOT_FOUND", "Decision is not available for this tenant")
+        if str(decision.decision_status or "").upper() in SIGNED_STATUSES:
+            # A signed decision is a closed record: reopening it needs a new decision, never a review.
+            raise DecisionCenterError("DECISION_LOCKED", "This decision is signed and can no longer be reviewed")
         review = HumanReview(
             id=uuid.uuid4(),
             tenant_id=tenant_id,

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase, type Tone } from "../../admin/console/dashboardModel";
-import { useConsole } from "../context";
+import { ASSIGNABLE_ROLES, useConsole } from "../context";
 import { Table, Tabs, errorText, listOf, send, useResource, type Confirmation } from "../shared";
 
 const TABS = ["Roles", "Permission sets", "Approval rules"] as const;
@@ -348,14 +348,37 @@ function PermissionSets() {
   );
 }
 
+/** What a rule governs. The server matches these exact codes, so they are chosen, never typed. */
+const GOVERNED = [
+  {
+    object_type: "Decision",
+    decision_type: "INVESTIGATION_REVIEW",
+    label: "Investigation decisions: review and signature",
+  },
+];
+
 function ApprovalRules() {
   const { notify } = useConsole();
   const policies = useResource<any>("/api/v1/admin/governance/policies");
-  const [authority, setAuthority] = useState({ role_name: "", object_type: "", decision_type: "" });
+  const tenantRoles = useResource<any[]>("/api/v1/admin/identity/roles");
+  // Business roles first, then the organization's own active roles; administrators manage, they do not approve.
+  const roleChoices = [
+    ...ASSIGNABLE_ROLES.filter((role) => role.value !== "CUSTOMER_ADMIN"),
+    ...listOf(tenantRoles.data)
+      .filter((role) => String(role.status).toUpperCase() === "ACTIVE")
+      .map((role) => ({ value: String(role.name), label: String(role.name) })),
+  ].filter(
+    (role, index, all) => all.findIndex((other) => other.value.toUpperCase() === role.value.toUpperCase()) === index,
+  );
+  const [authority, setAuthority] = useState({
+    role_name: "APPROVER",
+    object_type: GOVERNED[0].object_type,
+    decision_type: GOVERNED[0].decision_type,
+  });
   const [sod, setSod] = useState({
     name: "",
-    object_type: "",
-    decision_type: "",
+    object_type: GOVERNED[0].object_type,
+    decision_type: GOVERNED[0].decision_type,
     creator_cannot_approve: true,
     last_material_editor_cannot_approve: true,
   });
@@ -442,21 +465,45 @@ function ApprovalRules() {
               void submit(
                 "/api/v1/admin/governance/approval-authorities",
                 authority,
-                "Approval authority added as a draft.",
-                () => setAuthority({ role_name: "", object_type: "", decision_type: "" }),
+                "Approval authority added as a draft. Activate it in the list above to put it into effect.",
+                () => setAuthority({ ...authority, role_name: "APPROVER" }),
               );
             }}
           >
-            {(["role_name", "object_type", "decision_type"] as const).map((field) => (
-              <label className="ca-field" key={field}>
-                {titleCase(field)}
-                <input
-                  required
-                  value={authority[field]}
-                  onChange={(event) => setAuthority({ ...authority, [field]: event.target.value })}
-                />
-              </label>
-            ))}
+            <p className="ac-muted">
+              Approvers and Leaders may approve and sign decisions by default. New rules start as drafts: activate them
+              in the list above.
+            </p>
+            <label className="ca-field">
+              Role
+              <select
+                required
+                value={authority.role_name}
+                onChange={(event) => setAuthority({ ...authority, role_name: event.target.value })}
+              >
+                {roleChoices.map((role) => (
+                  <option key={role.value} value={role.value}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              May approve
+              <select
+                value={`${authority.object_type}|${authority.decision_type}`}
+                onChange={(event) => {
+                  const [object_type, decision_type] = event.target.value.split("|");
+                  setAuthority({ ...authority, object_type, decision_type });
+                }}
+              >
+                {GOVERNED.map((item) => (
+                  <option key={item.decision_type} value={`${item.object_type}|${item.decision_type}`}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <div className="ca-action-row">
               <button type="submit" className="ac-secondary">
                 Add authority
@@ -469,21 +516,39 @@ function ApprovalRules() {
             className="ca-form"
             onSubmit={(event) => {
               event.preventDefault();
-              void submit("/api/v1/admin/governance/sod-policies", sod, "Segregation rule added as a draft.", () =>
-                setSod({ ...sod, name: "", object_type: "", decision_type: "" }),
+              void submit(
+                "/api/v1/admin/governance/sod-policies",
+                sod,
+                "Segregation rule added as a draft. Activate it in the list above to put it into effect.",
+                () => setSod({ ...sod, name: "" }),
               );
             }}
           >
-            {(["name", "object_type", "decision_type"] as const).map((field) => (
-              <label className="ca-field" key={field}>
-                {titleCase(field)}
-                <input
-                  required
-                  value={sod[field]}
-                  onChange={(event) => setSod({ ...sod, [field]: event.target.value })}
-                />
-              </label>
-            ))}
+            <label className="ca-field">
+              Name
+              <input
+                required
+                maxLength={120}
+                value={sod.name}
+                onChange={(event) => setSod({ ...sod, name: event.target.value })}
+              />
+            </label>
+            <label className="ca-field">
+              Applies to
+              <select
+                value={`${sod.object_type}|${sod.decision_type}`}
+                onChange={(event) => {
+                  const [object_type, decision_type] = event.target.value.split("|");
+                  setSod({ ...sod, object_type, decision_type });
+                }}
+              >
+                {GOVERNED.map((item) => (
+                  <option key={item.decision_type} value={`${item.object_type}|${item.decision_type}`}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="ca-check">
               <input
                 type="checkbox"

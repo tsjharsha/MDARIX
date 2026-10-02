@@ -160,7 +160,14 @@ const STATUS_FILTERS = ["", "DRAFT", "READY_FOR_APPROVAL", "APPROVED", "RELEASED
 
 /** Every source-to-MDARIX mapping: open one to see its fields, check it, or start a new one. */
 function Mappings({ onMessage }: { onMessage: Notify }) {
-  const mappings = useResource<Mapping[]>("/api/v1/admin/configuration/mappings");
+  // Whose mappings: the platform's own tenant (""), or a customer tenant the MDARIX team prepares drafts for.
+  const [tenantSearch, setTenantSearch] = useState("");
+  const [tenant, setTenant] = useState<{ id: string; name: string } | null>(null);
+  const tenants = useResource<{ items: any[] }>(
+    `/api/v1/platform-admin/tenants?${new URLSearchParams(tenantSearch.trim() ? { q: tenantSearch.trim() } : {})}`,
+  );
+  const base = tenant ? `/api/v1/platform-admin/tenants/${tenant.id}/mappings` : "/api/v1/admin/configuration/mappings";
+  const mappings = useResource<Mapping[]>(base);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState<Mapping | null>(null);
@@ -185,6 +192,35 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
         mappings start as drafts and go live through Releases.
       </Intro>
       <div className="cc-toolbar">
+        <SearchBox value={tenantSearch} onChange={setTenantSearch} label="Find a customer tenant" />
+        <select
+          aria-label="Whose mappings"
+          value={tenant?.id ?? ""}
+          onChange={(event) => {
+            const row = listOf(tenants.data?.items).find(
+              (item) => String(item.id ?? item.tenant_id) === event.target.value,
+            );
+            setTenant(
+              row ? { id: String(row.id ?? row.tenant_id), name: String(row.display_name ?? row.tenant_key) } : null,
+            );
+          }}
+        >
+          <option value="">MDARIX platform tenant (yours)</option>
+          {listOf(tenants.data?.items).map((row) => (
+            <option key={String(row.id ?? row.tenant_id)} value={String(row.id ?? row.tenant_id)}>
+              {String(row.display_name ?? row.tenant_key)}
+              {row.customer_name ? ` · ${row.customer_name}` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+      {tenant && (
+        <p className="ac-note">
+          Preparing drafts for {tenant.name}. Their own Customer Administrators request approval, approve (a second
+          administrator) and release them, so the customer decides what imports into their data.
+        </p>
+      )}
+      <div className="cc-toolbar">
         <SearchBox value={query} onChange={setQuery} label="Search mapping, system or record" />
         <select aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
           {STATUS_FILTERS.map((value) => (
@@ -204,12 +240,18 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
             key: "mapping",
             fields: ["code", "version"],
             label: "Mapping",
-            render: (row) => (
-              <button type="button" className="ac-link cc-stack" onClick={() => setOpen(row)}>
-                <strong>{row.code}</strong>
-                <small>Version {row.version}</small>
-              </button>
-            ),
+            render: (row) =>
+              tenant ? (
+                <span className="cc-stack">
+                  <strong>{row.code}</strong>
+                  <small>Version {row.version}</small>
+                </span>
+              ) : (
+                <button type="button" className="ac-link cc-stack" onClick={() => setOpen(row)}>
+                  <strong>{row.code}</strong>
+                  <small>Version {row.version}</small>
+                </button>
+              ),
           },
           {
             key: "route",
@@ -235,10 +277,15 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
       {open && <MappingDetail mapping={open} onClose={() => setOpen(null)} />}
       {creating && (
         <MappingWizard
+          savePath={base}
           onClose={() => setCreating(false)}
           onSaved={(code) => {
             setCreating(false);
-            onMessage(`Mapping ${code} saved as a draft. Request approval for it under Releases.`);
+            onMessage(
+              tenant
+                ? `Mapping ${code} saved as a draft for ${tenant.name}. Their administrators release it.`
+                : `Mapping ${code} saved as a draft. Request approval for it under Releases.`,
+            );
             mappings.reload();
           }}
         />

@@ -21,14 +21,11 @@ from auth.service import auth_service
 from backend.app.db.models.ask import InvestigationSessionRecord
 from backend.app.db.models.foundation import (
     Evidence,
-    FeatureEntitlement,
     Hypothesis,
     HypothesisEvidence,
     Investigation,
-    PlanDefinition,
     ProductVersion,
     Tenant,
-    TenantPlanAssignment,
     Unknown,
 )
 from backend.app.db.session import get_db
@@ -80,22 +77,10 @@ def _authenticated_context(request: Request, db: Session | None = None) -> dict:
 
 
 def _has_ask_entitlement(db: Session, tenant_id: str) -> bool:
-    """Evaluate the existing server-side plan/feature tables on every call."""
-    row = (
-        db.query(TenantPlanAssignment)
-        .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
-        .join(FeatureEntitlement, FeatureEntitlement.plan_id == PlanDefinition.id)
-        .filter(
-            TenantPlanAssignment.tenant_id == tenant_id,
-            TenantPlanAssignment.status == "ACTIVE",
-            PlanDefinition.status == "ACTIVE",
-            FeatureEntitlement.feature_code == ASK_FEATURE,
-            FeatureEntitlement.enabled.is_(True),
-            FeatureEntitlement.status == "ACTIVE",
-        )
-        .first()
-    )
-    return row is not None
+    """Evaluate the server-side plan tables on every call; Ask is part of every active plan unless switched off."""
+    from backend.app.access.plan_features import plan_includes
+
+    return plan_includes(db, tenant_id, ASK_FEATURE)
 
 
 def _record_audit(

@@ -1882,6 +1882,31 @@ th {
   color: var(--mdx-muted);
   font-size: 14px;
 }
+/* MFA: the authenticator setup key (grouped in fours for typing) and the one-time recovery codes. */
+.mfa-setup {
+  display: grid;
+  gap: 8px;
+}
+.mfa-secret {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--mdx-border);
+  border-radius: var(--mdx-radius);
+  background: #f6f9fb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+  user-select: all;
+}
+.mfa-recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+  padding-left: 22px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
 .auth-links a {
   color: var(--mdx-teal);
 }

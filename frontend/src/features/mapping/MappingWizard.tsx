@@ -19,7 +19,16 @@ type Targets = { targets: Target[]; transforms: Array<{ code: string; label: str
  * check and save as a draft. It saves exactly the format the connector import uses, so a released mapping imports.
  * Used by Customer Administrators (their own systems) and by platform administrators.
  */
-export function MappingWizard({ onClose, onSaved }: { onClose: () => void; onSaved: (code: string) => void }) {
+export function MappingWizard({
+  onClose,
+  onSaved,
+  savePath = "/api/v1/admin/configuration/mappings",
+}: {
+  onClose: () => void;
+  onSaved: (code: string) => void;
+  /** Where the draft is saved: the signed-in administrator's tenant by default, or a customer tenant for staff. */
+  savePath?: string;
+}) {
   const apps = useResource<any[]>("/api/v1/admin/mapping/applications");
   const targets = useResource<Targets>("/api/v1/admin/configuration/mapping-targets");
   const [step, setStep] = useState(1);
@@ -68,7 +77,7 @@ export function MappingWizard({ onClose, onSaved }: { onClose: () => void; onSav
       .toUpperCase()
       .replace(/[^A-Z0-9]+/g, "_");
     try {
-      await send("/api/v1/admin/configuration/mappings", "POST", {
+      await send(savePath, "POST", {
         code,
         source_system: form.source_system,
         version: "v1",

@@ -1,7 +1,7 @@
 """Reusable authenticated, tenant-scoped request context."""
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from fastapi import Depends, HTTPException, Request
@@ -68,6 +68,12 @@ def ensure_tenant_access(db: Session, user) -> None:
         raise HTTPException(
             403, detail={"code": "MEMBERSHIP_SUSPENDED", "message": "Your access to this organization is suspended"}
         )
+
+
+def _idle_limit() -> timedelta:
+    import os
+
+    return timedelta(minutes=max(1, int(os.getenv("MDARIX_SESSION_IDLE_MINUTES", "30"))))
 
 
 @dataclass(frozen=True)
@@ -198,7 +204,20 @@ def get_request_context(request: Request, db: Session = Depends(get_db)) -> Auth
             {},
             request.headers.get("X-Correlation-ID") or str(uuid4()),
         )
-    durable.last_seen_at = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    last_seen = getattr(durable, "last_seen_at", None)
+    if last_seen is not None and now - last_seen > _idle_limit():
+        # Idle too long: the session ends on the server, not only in the browser.
+        durable.revoked_at = now
+        if hasattr(db, "commit"):
+            db.commit()
+        raise HTTPException(401, detail={"code": "SESSION_IDLE_TIMEOUT", "message": "Signed out after inactivity"})
+    mfa_state = getattr(durable, "mfa_state", None)
+    if mfa_state:
+        # Password checked, second factor not yet: only the MFA steps (under /api/v1/auth) are open.
+        code = "MFA_ENROLLMENT_REQUIRED" if mfa_state == "ENROLL" else "MFA_REQUIRED"
+        raise HTTPException(403, detail={"code": code, "message": "Complete multi-factor authentication first"})
+    durable.last_seen_at = now
     set_database_tenant_context(db, str(durable.tenant_id))
     if hasattr(db, "commit"):
         db.commit()

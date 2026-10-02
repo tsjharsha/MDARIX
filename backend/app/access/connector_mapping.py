@@ -48,22 +48,45 @@ def released_mapping(db: Session, tenant_id, code: str) -> MappingConfiguration:
     return mapping
 
 
+class RecordsNotConvertible(ValueError):
+    """Source values a rule could not convert (for example a date that is not a date). Nothing is imported."""
+
+    def __init__(self, issues: list[dict]):
+        super().__init__(f"{len(issues)} value(s) could not be converted")
+        self.issues = issues
+
+
 def map_records(mapping: MappingConfiguration, records: list[dict]) -> tuple[str, list[dict]]:
     entity = TARGET_TEMPLATES[mapping.target_entity]
     rules = {key: rule for key, rule in (mapping.mapping_rules or {}).items() if not key.startswith("_")}
     mapped = []
-    for record in records:
+    issues: list[dict] = []
+    for index, record in enumerate(records, start=1):
         row: dict = {}
         for source_field, rule in rules.items():
             if not isinstance(rule, dict) or "." not in str(rule.get("target_field", "")):
                 raise MappingNotUsable(f"Rule for '{source_field}' has no '<Entity>.<column>' target")
             column = str(rule["target_field"]).split(".", 1)[1]
-            value = transform(record.get(source_field), rule.get("transform") or "identity")
+            conversion = rule.get("transform") or "identity"
+            try:
+                value = transform(record.get(source_field), conversion)
+            except (TypeError, ValueError):
+                if len(issues) < 50:
+                    issues.append(
+                        {
+                            "row": index,
+                            "column": source_field,
+                            "message": f"'{str(record.get(source_field))[:60]}' cannot be converted {TRANSFORMS.get(conversion, conversion).lower()}",
+                        }
+                    )
+                continue
             if value is not None and column.endswith("_date"):
                 value = str(value)[:10]  # templates take YYYY-MM-DD
             if value is not None:
                 row[column] = value
         mapped.append(row)
+    if issues:
+        raise RecordsNotConvertible(issues)
     return entity, mapped
 
 
@@ -71,7 +94,16 @@ def import_connector_records(
     data: Session, tenant_id: uuid.UUID, connector_code: str, mapping: MappingConfiguration, records: list[dict]
 ) -> dict:
     """Map, check and import one batch. Returns a summary; never writes a partial batch. Does not commit."""
-    entity, mapped = map_records(mapping, records)
+    try:
+        entity, mapped = map_records(mapping, records)
+    except RecordsNotConvertible as exc:
+        report = {"ready": False, "rows": len(records), "error_count": len(exc.issues), "issues": exc.issues}
+        return {
+            "status": "BLOCKED",
+            "entity": TARGET_TEMPLATES[mapping.target_entity],
+            "mapping": mapping.code,
+            "report": report,
+        }
     policy = imports.ImportPolicy(source=f"CONNECTOR:{connector_code}"[:120])
     report = imports.check_records(data, tenant_id, entity, mapped, policy)
     if not report["ready"]:

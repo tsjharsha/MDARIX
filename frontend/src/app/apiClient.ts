@@ -31,6 +31,13 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
         const detail = payload?.detail;
+        // The server ended the session for inactivity, or the second factor is still due: go where that is handled.
+        if (response.status === 401 && detail?.code === "SESSION_IDLE_TIMEOUT")
+          window.location.replace(`/signin?expired=1&returnTo=${encodeURIComponent(window.location.pathname)}`);
+        if (response.status === 403 && detail?.code === "MFA_REQUIRED" && !path.includes("/governance/"))
+          window.location.replace("/mfa");
+        if (response.status === 403 && detail?.code === "MFA_ENROLLMENT_REQUIRED" && !path.includes("/governance/"))
+          window.location.replace("/mfa?setup=1");
         throw new ApiError(
           detail?.message ?? `${response.status} ${response.statusText}`,
           response.status,

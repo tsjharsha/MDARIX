@@ -187,14 +187,10 @@ def get_platform_usage(tenant_id: uuid.UUID, request: Request, db: Session = Dep
         .filter(TenantPlanAssignment.tenant_id == tenant_id, TenantPlanAssignment.status == "ACTIVE")
         .first()
     )
-    limits = {}
-    if assignment:
-        for feature in (
-            db.query(FeatureEntitlement)
-            .filter(FeatureEntitlement.plan_id == assignment.plan_id, FeatureEntitlement.status == "ACTIVE")
-            .all()
-        ):
-            limits.update(feature.limits or {})
+    from backend.app.access.common import _active_plan_limits
+
+    # The plan's limits with this tenant's own limits taking precedence (the same rule enforcement uses).
+    limits = _active_plan_limits(db, tenant_id) if assignment else {}
     usage = {"licensed_users": users, "customer_admins": admins, "connectors": connectors}
     alerts = []
     for key, code in (

@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
-import { Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { Table, Tabs, errorText, listOf, send, useResource } from "../../customer-admin/shared";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { useWorkspace } from "../workspaceContext";
+import { useCan, useWorkspace } from "../workspaceContext";
 import { Embedded, StatusBadge } from "./common";
 
 const TABS = ["All investigations", "Workspace", "Story"] as const;
@@ -14,6 +15,8 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
     (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "All investigations",
   );
   const { work, open } = useWorkspace();
+  const canOpen = useCan("records.write");
+  const [starting, setStarting] = useState(false);
   const all = useResource<any>("/api/v1/analytics/investigations");
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
   const openCase = (id: string) => {
@@ -28,6 +31,23 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
         MDARIX organizes evidence and possible explanations. It never concludes a root cause for you.
       </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections" />
+      {active === "All investigations" && canOpen && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary" onClick={() => setStarting((value) => !value)}>
+            <FilePlus2 size={16} /> {starting ? "Close" : "Open an investigation"}
+          </button>
+        </div>
+      )}
+      {active === "All investigations" && starting && (
+        <OpenInvestigation
+          onOpened={(id) => {
+            setStarting(false);
+            all.reload();
+            work.refreshInvestigations(id);
+            setActive("Workspace");
+          }}
+        />
+      )}
       {active === "All investigations" && (
         <Panel eyebrow="Investigations" title="Investigations in your organization" state={all.state} error={all.error}>
           <Table
@@ -97,5 +117,95 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
         </p>
       )}
     </>
+  );
+}
+
+/** Open a case for one of the organization's products: the question it must answer and the complaints behind it. */
+function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
+  const { work, notify } = useWorkspace();
+  const [question, setQuestion] = useState("");
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const complaints = (work.view?.complaints ?? []) as Array<Record<string, string | null>>;
+  const product = work.products.find((item) => item.id === work.productId);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const made = await send<{ id: string; investigation_identifier: string }>("/api/v1/investigations", "POST", {
+        product_id: work.productId,
+        investigation_question: question.trim(),
+        complaint_ids: chosen,
+      });
+      notify(`Investigation ${made.investigation_identifier} opened and assigned to you.`);
+      onOpened(made.id);
+    } catch (reason) {
+      setError(errorText(reason, "The investigation could not be opened."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel
+      eyebrow="New investigation"
+      title={product ? `Open an investigation for ${product.name}` : "Open an investigation"}
+    >
+      {!work.productId ? (
+        <Empty title="Choose a product first" detail="Pick the product in the context bar above." />
+      ) : (
+        <form className="ca-form" onSubmit={submit}>
+          <label className="ca-field">
+            The question this investigation must answer
+            <textarea
+              required
+              minLength={10}
+              maxLength={2000}
+              rows={3}
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="For example: Why did occlusion alarms rise after release B?"
+            />
+          </label>
+          <fieldset className="ca-fieldset">
+            <legend>Complaints that prompted it (optional)</legend>
+            {complaints.length ? (
+              complaints.slice(0, 50).map((row) => {
+                const id = String(row.id ?? "");
+                return (
+                  <label className="ca-check" key={id || String(row.complaint_identifier)}>
+                    <input
+                      type="checkbox"
+                      disabled={!id}
+                      checked={chosen.includes(id)}
+                      onChange={(event) =>
+                        setChosen((value) =>
+                          event.target.checked ? [...value, id] : value.filter((item) => item !== id),
+                        )
+                      }
+                    />
+                    {row.complaint_identifier ?? id} · {row.description ?? "No description"}
+                  </label>
+                );
+              })
+            ) : (
+              <p className="ac-muted">No complaints recorded for the selected version.</p>
+            )}
+          </fieldset>
+          {error && (
+            <p className="ac-message tone-critical" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy || question.trim().length < 10}>
+              {busy ? "Opening…" : "Open investigation"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Panel>
   );
 }

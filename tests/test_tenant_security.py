@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 from auth.durable import issue_reset
 from backend.app.db.models.foundation import (
+    PlanDefinition,
+    TenantPlanAssignment,
     AuthUser,
     Decision,
     Investigation,
@@ -65,6 +67,20 @@ def org():
             updated_at=now,
         )
         db.add(investigation)
+        # A real customer tenant is on a plan; controlled signatures come with every active plan.
+        plan = db.query(PlanDefinition).filter(PlanDefinition.status == "ACTIVE").order_by(PlanDefinition.code).first()
+        db.add(
+            TenantPlanAssignment(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                plan_id=plan.id,
+                status="ACTIVE",
+                effective_from=now,
+                reason="Tenant security tests",
+                created_at=now,
+                updated_at=now,
+            )
+        )
         db.commit()
         world = {
             "tenant": tenant.id,
@@ -162,7 +178,7 @@ def test_a_suspended_user_cannot_reactivate_themselves_with_a_password_reset(org
     anonymous = TestClient(app)
     forgot = anonymous.post("/api/v1/auth/forgot-password", json={"email": email})
     assert forgot.status_code == 200
-    assert forgot.json()["email_delivery"] == "NOT_SENT"
+    assert forgot.json()["email_delivery"] == "ACCEPTED"  # the same answer as for any other email
     assert not forgot.json().get("development_token")
     reset = anonymous.post("/api/v1/auth/reset-password", json={"token": token, "password": "A brand new password 456"})
     assert reset.status_code >= 400
@@ -210,7 +226,8 @@ def test_a_viewer_cannot_approve_through_a_review_or_a_signature(org):
         json={"disposition": "APPROVED", "reviewer_ref": "Chief Quality Officer"},
     )
     assert review.status_code == 403
-    assert review.json()["detail"]["code"] == "APPROVAL_AUTHORITY_DENIED"
+    # A Viewer may not review at all (no permission to change records), let alone approve.
+    assert review.json()["detail"]["code"] == "PERMISSION_DENIED"
     db = SessionLocal()
     try:
         decision = db.query(Decision).filter(Decision.id == decision_id).one()
@@ -240,14 +257,16 @@ def test_nobody_approves_their_own_decision_but_another_approver_can(org):
     assert other.json()["reviewer_ref"] == org["ids"]["second_approver"]
 
 
-def test_requesting_more_evidence_does_not_need_approval_authority(org):
+def test_requesting_more_evidence_needs_permission_to_change_records_but_not_approval(org):
     decision_id = _decision(org, created_by=org["ids"]["approver"])
-    response = org["clients"]["viewer"].post(
-        f"/api/v1/investigations/decisions/{decision_id}/reviews",
-        json={"disposition": "REQUIRES_ADDITIONAL_EVIDENCE", "comments": "Need the lot records"},
-    )
+    body = {"disposition": "REQUIRES_ADDITIONAL_EVIDENCE", "comments": "Need the lot records"}
+    path = f"/api/v1/investigations/decisions/{decision_id}/reviews"
+    # A read-only Viewer cannot send a decision back.
+    refused = org["clients"]["viewer"].post(path, json=body)
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "PERMISSION_DENIED"
+    response = org["clients"]["second_approver"].post(path, json=body)
     assert response.status_code == 200, response.text
-    assert response.json()["reviewer_ref"] == org["ids"]["viewer"]
+    assert response.json()["reviewer_ref"] == org["ids"]["second_approver"]
 
 
 # --- Audit export and entitlements ---------------------------------------------------------------------------

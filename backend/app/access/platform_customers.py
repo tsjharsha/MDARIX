@@ -84,10 +84,18 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
             effective_from=now,
             effective_to=None,
             reason=payload.notes or "Platform Admin customer provisioning",
+            # The limits set for this customer belong to its tenant, not to the plan other customers share.
+            limits={
+                "licensed_users_limit": payload.licensed_users_limit,
+                "customer_admin_limit": payload.customer_admin_limit,
+                "connector_limit": payload.connector_limit,
+            },
             created_at=now,
             updated_at=now,
         )
     )
+    # A plan that has no limits yet starts with this customer's as its defaults; an existing plan's limits are
+    # shared by its other customers and are never changed here.
     for feature_code, limits in {
         "ADMIN_CONTROL_PLANE": {
             "licensed_users_limit": payload.licensed_users_limit,
@@ -114,10 +122,6 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
                     updated_at=now,
                 )
             )
-        else:
-            existing.enabled = True
-            existing.limits = limits
-            existing.updated_at = now
     db.add(
         AuditEvent(
             id=uuid.uuid4(),

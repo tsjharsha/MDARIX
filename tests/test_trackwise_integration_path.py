@@ -176,7 +176,24 @@ def test_a_mapping_the_import_cannot_read_is_reported_not_a_server_error(admin):
             "mapping_rules": {"complaint_id": {"target_field": "complaint_id", "transform": "trim"}},
         },
     ).json()
-    _release(admin, created.get("mapping_id") or created["id"])
+    mapping_id = created.get("mapping_id") or created["id"]
+    # The release gate now refuses a mapping that cannot import...
+    gate = admin.post(
+        f"/api/v1/admin/configuration/mappings/{mapping_id}/release-action",
+        json={"action": "REQUEST_APPROVAL", "reason": "Release an old-format mapping"},
+    )
+    assert gate.status_code == 409 and gate.json()["detail"]["code"] == "RELEASE_GATE_BLOCKED"
+    # ...but one released before the gate checked mappings must still be reported at sync, not crash it.
+    from backend.app.db.models.foundation import MappingConfiguration
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_system
+
+    with SessionLocal() as db:
+        bind_system(db, "test: a mapping released before the release gate")
+        db.query(MappingConfiguration).filter(MappingConfiguration.id == uuid.UUID(mapping_id)).update(
+            {MappingConfiguration.status: "RELEASED"}
+        )
+        db.commit()
     connector = admin.post(
         "/api/v1/admin/configuration/connectors",
         json={

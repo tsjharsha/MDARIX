@@ -41,6 +41,8 @@ class AuthSession(Base):
     revoked_at = _ts()
     created_at = _ts(False)
     last_seen_at = _ts(False)
+    # None once fully signed in; VERIFY when an authenticator code is still due; ENROLL when MFA must be set up first.
+    mfa_state: Mapped[str | None] = mapped_column(String(16))
     __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_auth_sessions_tenant_id"),)
 
 

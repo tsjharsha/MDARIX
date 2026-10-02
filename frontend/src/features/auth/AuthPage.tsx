@@ -93,20 +93,33 @@ export function AuthPage({ mode }: { mode: string }) {
   const isMfa = mode === "mfa";
   const [mfaCode, setMfaCode] = useState("");
   const [mfaSecret, setMfaSecret] = useState("");
+  const [mfaUri, setMfaUri] = useState("");
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [mfaEnrollment] = useState(new URLSearchParams(window.location.search).get("setup") === "1");
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isMfa) {
-      const response = await fetch("/api/v1/auth/mfa/verify", {
+      // Setting up: confirm the new authenticator with its first code. Signing in: the current code, or a
+      // one-time recovery code when the phone is not at hand.
+      const response = await fetch(mfaEnrollment ? "/api/v1/auth/mfa/verify-enrollment" : "/api/v1/auth/mfa/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: mfaCode }),
+        body: JSON.stringify({ code: mfaCode.trim() }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        setMessage("MFA verified. Loading MDARIX...");
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && mfaEnrollment && Array.isArray(data.recovery_codes)) {
+        setRecoveryCodes(data.recovery_codes);
+        setMessage("Authenticator set up. Save your recovery codes before you continue.");
+      } else if (response.ok) {
+        setMessage("Verified. Loading MDARIX...");
         window.location.href = "/app";
-      } else setMessage(data.detail?.message ?? "MFA verification could not be completed.");
+      } else
+        setMessage(
+          data.detail?.code === "MFA_TEMPORARILY_LOCKED"
+            ? "Too many wrong codes. Wait 15 minutes, then try again."
+            : (data.detail?.message ?? "The code could not be verified."),
+        );
       return;
     }
     const endpoint =
@@ -154,7 +167,9 @@ export function AuthPage({ mode }: { mode: string }) {
       } else if (mode === "reset-password") {
         setMessage("Password reset complete. You can now sign in with your new password.");
       } else if (mode === "signin") {
-        if (data.mfa_required) {
+        if (data.mfa_enrollment_required) {
+          window.location.href = "/mfa?setup=1";
+        } else if (data.mfa_required) {
           window.location.href = "/mfa";
         } else {
           setMessage("Signed in. Loading MDARIX...");
@@ -162,9 +177,7 @@ export function AuthPage({ mode }: { mode: string }) {
         }
       } else
         setMessage(
-          data.email_delivery === "SENT"
-            ? "If the account exists, reset instructions were emailed."
-            : `If the account exists, reset instructions are available.${data.development_token ? ` Development token: ${data.development_token}` : ""}`,
+          `If an account exists for this email, we have sent reset instructions.${data.development_token ? ` Development token: ${data.development_token}` : ""}`,
         );
     } else {
       setMessage(
@@ -176,16 +189,41 @@ export function AuthPage({ mode }: { mode: string }) {
       );
     }
   };
+  if (isMfa && recoveryCodes.length)
+    return (
+      <AuthFrame mode="security">
+        <div className="auth-card">
+          <span className="eyebrow">Account security</span>
+          <h1>Save your recovery codes</h1>
+          <p>
+            Each code signs you in once if your phone is lost or not at hand. They are shown only now: print them or
+            keep them in a password manager.
+          </p>
+          <ol className="mfa-recovery-codes" aria-label="Recovery codes">
+            {recoveryCodes.map((code) => (
+              <li key={code}>
+                <code>{code}</code>
+              </li>
+            ))}
+          </ol>
+          <button className="primary-action" type="button" onClick={() => (window.location.href = "/app")}>
+            I have saved these codes, continue
+          </button>
+        </div>
+      </AuthFrame>
+    );
   if (isMfa)
     return (
       <AuthFrame mode="security">
         <form className="auth-card" onSubmit={submit}>
           <span className="eyebrow">Account security</span>
-          <h1>{mfaEnrollment ? "Enroll an authenticator" : "Verify your identity"}</h1>
+          <h1>{mfaEnrollment ? "Set up your authenticator app" : "Verify your identity"}</h1>
           <p>
             {mfaEnrollment
-              ? "Generate an enrollment secret, add it to your authenticator app, then verify the first code."
-              : "Enter the six-digit code from your authenticator app to continue."}
+              ? "Add MDARIX to an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
+              : useRecovery
+                ? "Enter one of your recovery codes. Each code works once."
+                : "Enter the 6-digit code from your authenticator app to continue."}
           </p>
           {mfaEnrollment && (
             <>
@@ -194,41 +232,64 @@ export function AuthPage({ mode }: { mode: string }) {
                 type="button"
                 onClick={async () => {
                   const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" });
-                  const data = await response.json();
+                  const data = await response.json().catch(() => ({}));
                   setMfaSecret(data.secret ?? "");
+                  setMfaUri(data.otpauth_uri ?? "");
                   setMessage(
                     response.ok
-                      ? "Secret generated. Add it to your authenticator app."
-                      : (data.detail?.message ?? "MFA enrollment is unavailable."),
+                      ? `Add the key below to your authenticator app.${data.development_code ? ` Development code: ${data.development_code}` : ""}`
+                      : (data.detail?.message ?? "MFA setup is unavailable."),
                   );
                 }}
               >
-                Generate enrollment secret
+                {mfaSecret ? "Generate a new key" : "Generate my setup key"}
               </button>
               {mfaSecret && (
-                <p className="mfa-secret" aria-label="MFA enrollment secret">
-                  {mfaSecret}
-                </p>
+                <div className="mfa-setup">
+                  <p className="mfa-secret" aria-label="Authenticator setup key">
+                    {mfaSecret.replace(/(.{4})/g, "$1 ").trim()}
+                  </p>
+                  <a className="secondary-link" href={mfaUri}>
+                    Open in an authenticator app on this device
+                  </a>
+                </div>
               )}
             </>
           )}
           <input
-            aria-label="Six digit authentication code"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
+            aria-label={useRecovery ? "Recovery code" : "Six digit authentication code"}
+            inputMode={useRecovery ? "text" : "numeric"}
+            autoComplete="one-time-code"
             minLength={6}
-            maxLength={6}
+            maxLength={useRecovery ? 17 : 6}
             required
             value={mfaCode}
-            onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ""))}
-            placeholder="000000"
+            onChange={(e) =>
+              setMfaCode(useRecovery ? e.target.value.replace(/[^0-9a-fA-F-]/g, "") : e.target.value.replace(/\D/g, ""))
+            }
+            placeholder={useRecovery ? "xxxxxxxx-xxxxxxxx" : "000000"}
           />
           <button className="primary-action" type="submit">
-            {mfaEnrollment ? "Verify and enable MFA" : "Verify MFA code"}
+            {mfaEnrollment ? "Verify and turn on MFA" : "Verify"}
           </button>
           {message && <p role="status">{message}</p>}
           <p className="auth-links">
-            <a href="/mfa?setup=1">Set up MFA</a> · <a href="/signin">Return to sign in</a>
+            {!mfaEnrollment && (
+              <>
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() => {
+                    setUseRecovery((value) => !value);
+                    setMfaCode("");
+                  }}
+                >
+                  {useRecovery ? "Use my authenticator app" : "Use a recovery code"}
+                </button>{" "}
+                ·{" "}
+              </>
+            )}
+            <a href="/signin">Return to sign in</a>
           </p>
         </form>
       </AuthFrame>

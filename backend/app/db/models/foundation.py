@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -630,6 +631,12 @@ class AuthUser(Base):
     email_verified: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     mfa_required: Mapped[bool] = mapped_column(nullable=False, server_default="false")
     mfa_enrolled_at = tz(True)
+    # Authenticator-app MFA (auth/totp.py): the secret is encrypted; the last used time step stops code replay;
+    # recovery codes are stored as hashes only.
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text)
+    mfa_pending_secret_encrypted: Mapped[str | None] = mapped_column(Text)
+    mfa_last_step: Mapped[int | None] = mapped_column(BigInteger)
+    mfa_recovery_hashes: Mapped[list | None] = mapped_column(JSONB)
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)
@@ -776,6 +783,9 @@ class TenantPlanAssignment(Base):
     effective_from = tz(False)
     effective_to = tz()
     reason: Mapped[str | None] = mapped_column(Text)
+    # This tenant's own limits (licensed_users_limit, customer_admin_limit, connector_limit); they take precedence
+    # over the plan's, which are shared by every tenant on the plan.
+    limits: Mapped[dict | None] = mapped_column(JSONB)
     created_at = tz(False)
     updated_at = tz(False)
 

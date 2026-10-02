@@ -1,7 +1,6 @@
 import hashlib
 import logging
 import os
-import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response
@@ -22,7 +21,6 @@ from backend.app.db.models.foundation import AuthUser, TenantMembership
 from backend.app.db.models.stage2 import (
     AuthSession,
     LoginThrottle,
-    MfaChallenge,
     OnboardingRequest,
     PasswordHistory,
 )
@@ -62,6 +60,11 @@ class Reset(BaseModel):
 
 class MfaCode(BaseModel):
     code: str = Field(min_length=6, max_length=6)
+
+
+class MfaVerify(BaseModel):
+    # A 6-digit authenticator code, or a one-time recovery code (xxxxxxxx-xxxxxxxx).
+    code: str = Field(min_length=6, max_length=32)
 
 
 def fail(exc):
@@ -111,92 +114,10 @@ def _mfa_hash(code: str) -> str:
     return hashlib.sha256(code.encode("ascii")).hexdigest()
 
 
-@router.post("/mfa/enroll")
-def mfa_enroll(request: Request, db: Session = Depends(get_db)):
-    """Begin a durable MFA enrollment; the one-time code is never persisted."""
+def _mfa_session(request: Request, db: Session):
+    """The signed-in session and its user, for the MFA steps (which a session that still owes MFA may use)."""
     token = request.cookies.get("mdarix_session", "")
     row = (
-        db.query(AuthSession)
-        .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
-        .first()
-    )
-    if not row:
-        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
-    user = db.query(AuthUser).filter(AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id).first()
-    if not user:
-        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
-    bind_tenant(db, user.tenant_id)
-    code = f"{secrets.randbelow(1000000):06d}"
-    now = datetime.now(timezone.utc)
-    db.query(MfaChallenge).filter(
-        MfaChallenge.user_id == user.id, MfaChallenge.tenant_id == user.tenant_id, MfaChallenge.used_at.is_(None)
-    ).update({"used_at": now})
-    db.add(
-        MfaChallenge(
-            id=__import__("uuid").uuid4(),
-            user_id=user.id,
-            tenant_id=user.tenant_id,
-            code_hash=_mfa_hash(code),
-            purpose="ENROLLMENT",
-            expires_at=now + timedelta(minutes=10),
-            created_at=now,
-        )
-    )
-    db.commit()
-    return {
-        "status": "MFA_ENROLLMENT_PENDING",
-        "expires_at": now + timedelta(minutes=10),
-        "development_code": code if is_development() else None,
-    }
-
-
-@router.post("/mfa/verify")
-@router.post("/mfa/verify-enrollment")
-def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("mdarix_session", "")
-    current = (
-        db.query(AuthSession)
-        .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
-        .first()
-    )
-    if current is not None:
-        bind_tenant(db, current.tenant_id)
-    challenge = (
-        db.query(MfaChallenge)
-        .join(AuthSession, AuthSession.user_id == MfaChallenge.user_id)
-        .filter(
-            AuthSession.session_hash == hash_token(token),
-            MfaChallenge.purpose == "ENROLLMENT",
-            MfaChallenge.used_at.is_(None),
-            MfaChallenge.expires_at > datetime.now(timezone.utc),
-        )
-        .order_by(MfaChallenge.created_at.desc())
-        .first()
-    )
-    if not challenge or challenge.attempts >= 5:
-        raise HTTPException(
-            400, detail={"code": "MFA_CHALLENGE_INVALID", "message": "MFA challenge is invalid or expired"}
-        )
-    challenge.attempts += 1
-    if not secrets.compare_digest(challenge.code_hash, _mfa_hash(data.code)):
-        db.commit()
-        raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
-    now = datetime.now(timezone.utc)
-    challenge.used_at = now
-    user = (
-        db.query(AuthUser).filter(AuthUser.id == challenge.user_id, AuthUser.tenant_id == challenge.tenant_id).first()
-    )
-    user.mfa_required = True
-    user.mfa_enrolled_at = now
-    db.commit()
-    return {"status": "MFA_ENROLLED", "user_id": str(user.id), "enrolled_at": now}
-
-
-@router.post("/mfa/challenge")
-def mfa_challenge(request: Request, db: Session = Depends(get_db)):
-    """Issue a durable, single-use challenge for a governed signature."""
-    token = request.cookies.get("mdarix_session", "")
-    session = (
         db.query(AuthSession)
         .filter(
             AuthSession.session_hash == hash_token(token),
@@ -204,44 +125,119 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
             AuthSession.expires_at > datetime.now(timezone.utc),
         )
         .first()
+        if token
+        else None
     )
-    if not session:
+    if not row:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
-    bind_tenant(db, session.tenant_id)
+    bind_tenant(db, row.tenant_id)
     user = (
         db.query(AuthUser)
-        .filter(AuthUser.id == session.user_id, AuthUser.tenant_id == session.tenant_id, AuthUser.status == "ACTIVE")
+        .filter(AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id, AuthUser.status == "ACTIVE")
         .first()
     )
-    if not user or not user.mfa_required or not user.mfa_enrolled_at:
+    if not user:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    return row, user
+
+
+@router.post("/mfa/enroll")
+def mfa_enroll(request: Request, db: Session = Depends(get_db)):
+    """Start setting up an authenticator app: returns the secret (and its otpauth link for a QR code).
+
+    Replacing an existing authenticator needs a fully verified session, so a stolen password alone cannot do it.
+    """
+    from backend.app import mfa
+
+    session_row, user = _mfa_session(request, db)
+    if mfa.is_enrolled(user) and session_row.mfa_state:
+        raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your current code first"})
+    started = mfa.start_enrollment(user)
+    db.commit()
+    return started
+
+
+@router.post("/mfa/verify-enrollment")
+def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends(get_db)):
+    """Confirm the new authenticator with its first code; returns one-time recovery codes (shown once)."""
+    from backend.app import mfa
+
+    session_row, user = _mfa_session(request, db)
+    mfa.ensure_not_locked(db, user)
+    now = datetime.now(timezone.utc)
+    if not user.mfa_pending_secret_encrypted:
+        raise HTTPException(
+            400, detail={"code": "MFA_CHALLENGE_INVALID", "message": "Start MFA setup before verifying a code"}
+        )
+    codes = mfa.finish_enrollment(user, data.code, now)
+    if codes is None:
+        mfa.record_failure(db, user)
+        db.commit()
+        raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
+    mfa.record_success(db, user)
+    session_row.mfa_state = None
+    db.commit()
+    return {"status": "MFA_ENROLLED", "user_id": str(user.id), "enrolled_at": now, "recovery_codes": codes}
+
+
+@router.post("/mfa/verify")
+def mfa_verify(data: MfaVerify, request: Request, db: Session = Depends(get_db)):
+    """Complete sign-in with an authenticator code (or a one-time recovery code). Also confirms a new authenticator
+    when one is being set up, for clients that use this endpoint for both."""
+    from backend.app import mfa
+
+    session_row, user = _mfa_session(request, db)
+    if user.mfa_pending_secret_encrypted and (not mfa.is_enrolled(user) or not session_row.mfa_state):
+        if len(data.code) != 6:
+            raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
+        return mfa_verify_enrollment(MfaCode(code=data.code), request, db)
+    mfa.ensure_not_locked(db, user)
+    if not mfa.is_enrolled(user):
+        raise HTTPException(400, detail={"code": "MFA_NOT_ENROLLED", "message": "Set up an authenticator app first"})
+    if not mfa.check_code(user, data.code, allow_recovery=True):
+        mfa.record_failure(db, user)
+        db.commit()
+        raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
+    mfa.record_success(db, user)
+    session_row.mfa_state = None
+    db.commit()
+    return {"status": "MFA_VERIFIED", "recovery_codes_left": len(user.mfa_recovery_hashes or [])}
+
+
+@router.post("/mfa/recovery-codes")
+def mfa_recovery_codes(request: Request, db: Session = Depends(get_db)):
+    """Replace the recovery codes (fully verified session only); the old ones stop working."""
+    from backend.app import mfa
+    from security.mfa_recovery import hash_recovery_codes, issue_recovery_codes
+
+    session_row, user = _mfa_session(request, db)
+    if session_row.mfa_state or not mfa.is_enrolled(user):
+        raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your code first"})
+    codes = issue_recovery_codes(8)
+    user.mfa_recovery_hashes = hash_recovery_codes(codes)
+    db.commit()
+    return {"status": "RECOVERY_CODES_ISSUED", "recovery_codes": codes}
+
+
+@router.post("/mfa/challenge")
+def mfa_challenge(request: Request, db: Session = Depends(get_db)):
+    """Signatures take the current code from the authenticator app; nothing is sent. Kept for clients that ask
+    first: it confirms the account is enrolled (and, in local development, shows the current code)."""
+    from auth import totp
+    from backend.app import mfa
+
+    _session_row, user = _mfa_session(request, db)
+    if not mfa.is_enrolled(user):
         raise HTTPException(
             403, detail={"code": "MFA_NOT_ENROLLED", "message": "Enroll MFA before requesting a signature challenge"}
         )
-    code = f"{secrets.randbelow(1000000):06d}"
-    now = datetime.now(timezone.utc)
-    db.query(MfaChallenge).filter(
-        MfaChallenge.user_id == user.id,
-        MfaChallenge.tenant_id == user.tenant_id,
-        MfaChallenge.purpose == "SIGNATURE",
-        MfaChallenge.used_at.is_(None),
-    ).update({"used_at": now})
-    db.add(
-        MfaChallenge(
-            id=__import__("uuid").uuid4(),
-            user_id=user.id,
-            tenant_id=user.tenant_id,
-            code_hash=_mfa_hash(code),
-            purpose="SIGNATURE",
-            expires_at=now + timedelta(minutes=5),
-            created_at=now,
-        )
-    )
-    db.commit()
-    return {
-        "status": "MFA_CHALLENGE_ISSUED",
-        "expires_at": now + timedelta(minutes=5),
-        "development_code": code if is_development() else None,
-    }
+    development_code = None
+    if is_development():
+        try:
+            development_code = totp.current_code(totp.decrypt_secret(user.mfa_secret_encrypted, str(user.id)))
+        except totp.MfaUnavailable:
+            development_code = None
+    return {"status": "USE_AUTHENTICATOR_CODE", "development_code": development_code}
 
 
 def _alert_trial_request(organization: str, display_name: str, email: str) -> None:
@@ -395,11 +391,20 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
             throttle.updated_at = now
         if hasattr(db, "commit"):
             db.commit()
-        persist_session(db, token, row.id, row.tenant_id)
+        from backend.app import mfa
+
+        # The new session owes MFA when the account is enrolled (VERIFY) or policy requires setting it up (ENROLL);
+        # until then it can only use the MFA steps.
+        mfa_state = mfa.session_state_for(row)
+        persist_session(db, token, row.id, row.tenant_id, mfa_state=mfa_state)
         development = is_development()
         secure_cookie = True if not development else os.getenv("MDARIX_COOKIE_SECURE", "false").lower() == "true"
         response.set_cookie("mdarix_session", token, httponly=True, samesite="lax", secure=secure_cookie, max_age=3600)
-        return auth_service.context(token)
+        return {
+            **auth_service.context(token),
+            "mfa_required": mfa_state == "VERIFY",
+            "mfa_enrollment_required": mfa_state == "ENROLL",
+        }
     except ValueError as e:
         identifier = data.email.strip().lower()
         now = datetime.now(timezone.utc)
@@ -460,7 +465,15 @@ def session(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     bind_tenant(db, user.tenant_id)
     ensure_tenant_access(db, user)
-    row.last_seen_at = datetime.now(timezone.utc)
+    from backend.app import mfa
+    from backend.app.request_context import _idle_limit
+
+    now = datetime.now(timezone.utc)
+    if row.last_seen_at and now - row.last_seen_at > _idle_limit():
+        row.revoked_at = now
+        db.commit()
+        raise HTTPException(401, detail={"code": "SESSION_IDLE_TIMEOUT", "message": "Signed out after inactivity"})
+    row.last_seen_at = now
     db.commit()
     return {
         "user_id": str(user.id),
@@ -468,6 +481,9 @@ def session(request: Request, db: Session = Depends(get_db)):
         "email": user.username,
         "tenant_id": str(user.tenant_id),
         "active_role": user.role,
+        # VERIFY: a code is still due; ENROLL: MFA must be set up first; None: fully signed in.
+        "mfa_state": row.mfa_state,
+        "mfa_enrolled": mfa.is_enrolled(user),
     }
 
 
@@ -488,20 +504,31 @@ def _activate_invited_memberships(db: Session, row) -> None:
     ).update({"status": "ACTIVE", "updated_at": datetime.now(timezone.utc)})
 
 
+def _send_reset_quietly(email: str, token: str) -> None:
+    """Runs after the response: a delivery problem is logged, never shown to whoever asked."""
+    try:
+        send_password_reset_email(email, token)
+    except Exception as exc:  # the answer is already the same for every request
+        logging.getLogger(__name__).warning("Password reset email failed: %s", type(exc).__name__)
+
+
 @router.post("/forgot-password")
-def forgot(data: ResetRequest, db: Session = Depends(get_db)):
+def forgot(data: ResetRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """The same answer, in the same time, for every email: known, unknown or blocked. The email itself is sent
+    after the response, so neither the body nor its timing reveals whether an account exists."""
+    accepted = {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "ACCEPTED"}
     row = _account_for_email(db, data.email.strip().lower())
-    # Same answer for unknown and blocked accounts, so the response reveals nothing.
     if not row or _admin_blocked(row):
-        return {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "NOT_SENT"}
+        return accepted
     bind_tenant(db, row.tenant_id)
     token = issue_reset(db, row.id, row.tenant_id)
-    delivery = send_password_reset_email(row.username, token)
-    return {
-        "status": "RESET_REQUEST_ACCEPTED",
-        "email_delivery": delivery,
-        "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
-    }
+    from auth.emailer import smtp_configuration_status
+
+    if is_development() and not smtp_configuration_status().get("configured"):
+        # Local development without email: the link is shown so the flow can be completed.
+        return {**accepted, "development_token": _development_token(token)}
+    background.add_task(_send_reset_quietly, row.username, token)
+    return accepted
 
 
 @router.post("/reset-password")

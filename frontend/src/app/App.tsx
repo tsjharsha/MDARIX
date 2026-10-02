@@ -100,8 +100,13 @@ const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
 export function PrivateApplicationGate() {
   const [state, setState] = useState<"CHECKING" | "AUTHORIZED" | "DENIED">("CHECKING");
   useEffect(() => {
-    requestJson("/api/v1/auth/session", { retries: 0, timeoutMs: 10000 })
-      .then(() => setState("AUTHORIZED"))
+    requestJson<{ mfa_state?: string | null }>("/api/v1/auth/session", { retries: 0, timeoutMs: 10000 })
+      .then((session) => {
+        // Password checked but the second factor is still due (or must be set up first).
+        if (session.mfa_state === "VERIFY") window.location.replace("/mfa");
+        else if (session.mfa_state === "ENROLL") window.location.replace("/mfa?setup=1");
+        else setState("AUTHORIZED");
+      })
       .catch(() => setState("DENIED"));
   }, []);
   useEffect(() => {

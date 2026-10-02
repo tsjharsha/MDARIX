@@ -16,6 +16,8 @@ export function useWorkContext(): WorkContext {
   const [mode, setMode] = useState<TemporalMode>(() => defaultTimeContext().mode);
   const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
   const [investigationId, setInvestigationId] = useState("");
+  const [investigationsVersion, setInvestigationsVersion] = useState(0);
+  const [pendingSelection, setPendingSelection] = useState("");
   const [view, setView] = useState<Product360 | null>(null);
   const [state, setState] = useState<WorkContext["state"]>("loading");
   const [error, setError] = useState("");
@@ -68,13 +70,20 @@ export function useWorkContext(): WorkContext {
       .then((items) => {
         if (!current) return;
         setInvestigations(items);
-        setInvestigationId((selected) => preferredInvestigationId(items, selected));
+        setInvestigationId((selected) =>
+          preferredInvestigationId(
+            items,
+            pendingSelection && items.some((item) => String(item.id) === pendingSelection)
+              ? pendingSelection
+              : selected,
+          ),
+        );
       })
       .catch(() => current && setInvestigations([]));
     return () => {
       current = false;
     };
-  }, [productId]);
+  }, [productId, investigationsVersion, pendingSelection]);
 
   return {
     products,
@@ -89,6 +98,10 @@ export function useWorkContext(): WorkContext {
     investigations,
     investigationId,
     setInvestigationId,
+    refreshInvestigations: (select?: string) => {
+      if (select) setPendingSelection(select);
+      setInvestigationsVersion((value) => value + 1);
+    },
     view,
     state,
     error,

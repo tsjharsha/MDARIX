@@ -17,7 +17,7 @@ def hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
-def persist_session(db: Session, raw: str, user_id, tenant_id, ttl: int = 3600):
+def persist_session(db: Session, raw: str, user_id, tenant_id, ttl: int = 3600, mfa_state: str | None = None):
     if not hasattr(db, "add"):
         return
     now = datetime.now(timezone.utc)
@@ -29,6 +29,7 @@ def persist_session(db: Session, raw: str, user_id, tenant_id, ttl: int = 3600):
             expires_at=now + timedelta(seconds=ttl),
             created_at=now,
             last_seen_at=now,
+            mfa_state=mfa_state,
         )
     )
     db.commit()

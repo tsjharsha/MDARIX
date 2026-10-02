@@ -93,6 +93,20 @@ def generate_regulatory_draft(
                 "message": "Document identifier already belongs to another document type",
             },
         )
+    elif document.status != "DRAFT":
+        # An approved or archived document is a controlled record: new content goes into a new document. A
+        # document in review returns to draft first (a recorded status change) before its text can change.
+        raise HTTPException(
+            409,
+            detail={
+                "code": "REGULATORY_DOCUMENT_LOCKED",
+                "message": (
+                    "This document is in review; return it to draft before changing its text"
+                    if document.status == "IN_REVIEW"
+                    else f"This document is {document.status.lower()}; start a new document for new content"
+                ),
+            },
+        )
     next_version = document.current_version + 1
     document.current_version = next_version
     document.status = "DRAFT"
@@ -264,11 +278,20 @@ def update_regulatory_status(
                 "permission": needed,
             },
         )
-    if payload.status == "APPROVED" and str(document.created_by or "") == str(ctx.user_id):
-        raise HTTPException(
-            403,
-            detail={"code": "SOD_DENIED", "message": "The author of a regulatory document cannot also approve it"},
-        )
+    if payload.status == "APPROVED":
+        # Anyone who wrote the document or any version of its text is an author and cannot approve it.
+        authors = {str(document.created_by or "")} | {
+            str(created_by)
+            for (created_by,) in db.query(RegulatoryDocumentVersion.created_by).filter(
+                RegulatoryDocumentVersion.document_id == document.id,
+                RegulatoryDocumentVersion.tenant_id == ctx.tenant_id,
+            )
+        }
+        if str(ctx.user_id) in authors:
+            raise HTTPException(
+                403,
+                detail={"code": "SOD_DENIED", "message": "An author of a regulatory document cannot also approve it"},
+            )
     now = datetime.now(timezone.utc)
     previous = document.status
     document.status = payload.status

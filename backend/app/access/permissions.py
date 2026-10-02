@@ -40,8 +40,12 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
 }
 
 
-def _normalize(role: str | None) -> str:
+def normalize_role(role: str | None) -> str:
+    """'Approver', 'APPROVER' and 'approver ' are the same role everywhere roles are compared."""
     return "_".join(str(role or "").strip().upper().replace("-", " ").split())
+
+
+_normalize = normalize_role  # original name, kept for existing imports
 
 
 def permissions_for_role(role: str | None) -> frozenset[str]:

@@ -8,6 +8,7 @@ from urllib.request import Request as UrlRequest
 from backend.app.access.outbound import safe_urlopen
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from access_control.configuration_safety import safe_configuration
@@ -23,6 +24,7 @@ from backend.app.db.models.foundation import (
     PersonaAssignment,
     RoleDefinition,
     SegregationOfDutiesPolicy,
+    Tenant,
 )
 from backend.app.db.models.stage2 import (
     OutboxEvent,
@@ -39,9 +41,15 @@ from backend.app.access.schemas import (
     ReleaseActionRequest,
     StatusRequest,
 )
-from backend.app.access.authz import _admin_tenant, _guard_user_administration, is_hidden_from
+from backend.app.access.authz import (
+    _admin_tenant,
+    _guard_user_administration,
+    _require_platform_admin,
+    is_hidden_from,
+)
 from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
 from backend.app.access.connector_mapping import (
+    IMPORTABLE_TARGETS,
     MappingNotUsable,
     check_mapping,
     field_rules,
@@ -58,6 +66,65 @@ router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
 # Mapping states reachable only through the release workflow (request approval -> approve -> release).
 GOVERNED_MAPPING_STATUSES = frozenset({"READY_FOR_APPROVAL", "APPROVED", "ACTIVE", "RELEASED"})
+
+
+def _code_taken(db: Session, model, tenant_id, code: str, version: str, kind: str) -> None:
+    """A clear refusal when this tenant already has the code at this version (instead of a database error)."""
+    exists = (
+        db.query(model.id).filter(model.tenant_id == tenant_id, model.code == code, model.version == version).first()
+    )
+    if exists is not None:
+        raise HTTPException(
+            409,
+            detail={
+                "code": f"{kind.upper()}_CODE_EXISTS",
+                "message": f"A {kind} with code {code} (version {version}) already exists. Choose another code.",
+            },
+        )
+
+
+# Connectors that no longer count against the plan's connector limit.
+RETIRED_CONNECTOR_STATUSES = ("RETIRED", "ARCHIVED", "DELETED")
+
+
+def _enforce_connector_limit(db: Session, tenant_id) -> None:
+    from backend.app.access.common import _active_plan_limits
+
+    limit = _active_plan_limits(db, tenant_id).get("connector_limit")
+    if not isinstance(limit, int):
+        return
+    used = (
+        db.query(ConnectorConfiguration.id)
+        .filter(
+            ConnectorConfiguration.tenant_id == tenant_id,
+            ~func.upper(ConnectorConfiguration.status).in_(RETIRED_CONNECTOR_STATUSES),
+        )
+        .count()
+    )
+    if used >= limit:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "CONNECTOR_LIMIT_REACHED",
+                "message": f"Your plan allows {limit} connectors and all are in use. Retire one or ask MDARIX for more.",
+                "allowed": limit,
+                "allocated": used,
+            },
+        )
+
+
+def _commit_unique(db: Session, kind: str, code: str) -> None:
+    """Commit, turning a race with another request that took the same code into the same clear refusal."""
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            409,
+            detail={"code": f"{kind.upper()}_CODE_EXISTS", "message": f"A {kind} with code {code} already exists."},
+        ) from exc
 
 
 @router.post("/admin/configuration/connectors")
@@ -82,6 +149,8 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
                 "message": "Secrets must be stored in a managed secret provider, not configuration",
             },
         ) from exc
+    _code_taken(db, ConnectorConfiguration, admin.tenant_id, payload.code, payload.version, "connector")
+    _enforce_connector_limit(db, admin.tenant_id)
     row = ConnectorConfiguration(
         id=uuid.uuid4(),
         tenant_id=admin.tenant_id,
@@ -95,7 +164,7 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
     )
     db.add(row)
     _audit_configuration(db, admin, "CONNECTOR_CONFIGURATION_CREATED", "ConnectorConfiguration", row.id, row.version)
-    db.commit()
+    _commit_unique(db, "connector", payload.code)
     return {
         "connector_id": str(row.id),
         "tenant_id": str(admin.tenant_id),
@@ -142,10 +211,8 @@ def check_saved_mapping(configuration_id: uuid.UUID, request: Request, db: Sessi
     return {"mapping_id": str(row.id), "code": row.code, **check_mapping(row.target_entity, row.mapping_rules)}
 
 
-@router.post("/admin/configuration/mappings")
-def create_mapping(payload: MappingRequest, request: Request, db: Session = Depends(get_db)):
-    admin = _admin_tenant(request, db)
-    now = datetime.now(timezone.utc)
+def _new_mapping(db: Session, tenant_id, payload: MappingRequest, now: datetime) -> MappingConfiguration:
+    """A draft mapping for the tenant (its code must be free); the caller audits and commits."""
     rules = dict(payload.mapping_rules)
     rules["_configuration"] = {
         "source_database": payload.source_database,
@@ -154,9 +221,10 @@ def create_mapping(payload: MappingRequest, request: Request, db: Session = Depe
         "target_schema": payload.target_schema,
         "target_table": payload.target_table or payload.target_entity,
     }
+    _code_taken(db, MappingConfiguration, tenant_id, payload.code, payload.version, "mapping")
     row = MappingConfiguration(
         id=uuid.uuid4(),
-        tenant_id=admin.tenant_id,
+        tenant_id=tenant_id,
         code=payload.code,
         source_system=payload.source_system,
         target_entity=payload.target_entity,
@@ -167,11 +235,85 @@ def create_mapping(payload: MappingRequest, request: Request, db: Session = Depe
         updated_at=now,
     )
     db.add(row)
+    return row
+
+
+def _mapping_summary(row: MappingConfiguration) -> dict:
+    return {
+        "id": str(row.id),
+        "code": row.code,
+        "source_system": row.source_system,
+        "target_entity": row.target_entity,
+        "version": row.version,
+        "status": row.status,
+        "mapping_rules": row.mapping_rules,
+    }
+
+
+@router.post("/admin/configuration/mappings")
+def create_mapping(payload: MappingRequest, request: Request, db: Session = Depends(get_db)):
+    admin = _admin_tenant(request, db)
+    row = _new_mapping(db, admin.tenant_id, payload, datetime.now(timezone.utc))
     _audit_configuration(db, admin, "MAPPING_CONFIGURATION_CREATED", "MappingConfiguration", row.id, row.version)
-    db.commit()
+    _commit_unique(db, "mapping", payload.code)
     return {
         "mapping_id": str(row.id),
         "tenant_id": str(admin.tenant_id),
+        "code": row.code,
+        "version": row.version,
+        "status": row.status,
+    }
+
+
+def _customer_tenant(db: Session, tenant_id: uuid.UUID) -> Tenant:
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is None:
+        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant not found"})
+    return tenant
+
+
+@router.get("/platform-admin/tenants/{tenant_id}/mappings")
+def platform_list_tenant_mappings(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """A customer tenant's mapping sheets, for the MDARIX team that helps set them up."""
+    _require_platform_admin(request, db)
+    _customer_tenant(db, tenant_id)
+    rows = (
+        db.query(MappingConfiguration)
+        .filter(MappingConfiguration.tenant_id == tenant_id)
+        .order_by(MappingConfiguration.code, MappingConfiguration.version)
+        .all()
+    )
+    return [_mapping_summary(row) for row in rows]
+
+
+@router.post("/platform-admin/tenants/{tenant_id}/mappings")
+def platform_create_tenant_mapping(
+    tenant_id: uuid.UUID, payload: MappingRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Prepare a draft mapping sheet for a customer tenant. Releasing it stays with the customer's own
+    administrators (request, approve by a second administrator, release), so the customer decides what imports."""
+    admin = _require_platform_admin(request, db)
+    tenant = _customer_tenant(db, tenant_id)
+    now = datetime.now(timezone.utc)
+    row = _new_mapping(db, tenant.id, payload, now)
+    from backend.app.enterprise_audit import make_audit_event
+
+    db.add(
+        make_audit_event(
+            tenant_id=tenant.id,
+            actor_ref=str(admin.id),
+            action="MAPPING_CONFIGURATION_CREATED",
+            entity_type="MappingConfiguration",
+            entity_id=row.id,
+            details={"version": row.version, "source": "PLATFORM_ADMIN", "code": row.code},
+            request=request,
+            created_at=now,
+        )
+    )
+    _commit_unique(db, "mapping", payload.code)
+    return {
+        "mapping_id": str(row.id),
+        "tenant_id": str(tenant.id),
         "code": row.code,
         "version": row.version,
         "status": row.status,
@@ -209,18 +351,7 @@ def list_mappings(request: Request, db: Session = Depends(get_db)):
         .order_by(MappingConfiguration.code, MappingConfiguration.version)
         .all()
     )
-    return [
-        {
-            "id": str(row.id),
-            "code": row.code,
-            "source_system": row.source_system,
-            "target_entity": row.target_entity,
-            "version": row.version,
-            "status": row.status,
-            "mapping_rules": row.mapping_rules,
-        }
-        for row in rows
-    ]
+    return [_mapping_summary(row) for row in rows]
 
 
 @router.get("/admin/configuration/data-mappings")
@@ -862,6 +993,20 @@ def mapping_release_action(
                 "message": "A release must contain validated mapping rules before approval or promotion.",
             },
         )
+    if payload.action in {"REQUEST_APPROVAL", "APPROVE", "PROMOTE"} and row.target_entity in IMPORTABLE_TARGETS:
+        # A mapping that imports data is released only when it can import as written: every target is a field of
+        # its record, every conversion is known, and every required field is filled.
+        verdict = check_mapping(row.target_entity, rules)
+        if verdict.get("status") != "READY":
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "RELEASE_GATE_BLOCKED",
+                    "message": "This mapping cannot import as written. Fix it before approval or release.",
+                    "problems": verdict.get("problems", []),
+                    "missing_required": verdict.get("missing_required", []),
+                },
+            )
     previous = current
     row.status = target
     row.updated_at = datetime.now(timezone.utc)

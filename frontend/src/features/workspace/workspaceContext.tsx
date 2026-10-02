@@ -64,6 +64,8 @@ export type WorkContext = {
   investigations: InvestigationSummary[];
   investigationId: string;
   setInvestigationId: (id: string) => void;
+  /** Reload the selected product's investigations (after one is opened); `select` makes that one current. */
+  refreshInvestigations: (select?: string) => void;
   view: Product360 | null;
   state: "loading" | "ready" | "empty" | "error";
   error: string;

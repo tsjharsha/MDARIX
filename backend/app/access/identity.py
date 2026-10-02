@@ -45,6 +45,7 @@ from backend.app.access.authz import (
     _admin_tenant,
     _guard_user_administration,
     _is_platform_admin,
+    _is_platform_role,
     _require_administrator,
     ensure_user_visible,
     hidden_platform_user_ids,
@@ -405,6 +406,34 @@ def list_users(request: Request, db: Session = Depends(get_db)):
     ]
 
 
+# Roles every tenant has. A tenant may also define its own (Roles & Access); anything else is refused, so a typo
+# cannot create an account whose role means nothing.
+STANDARD_ROLES = frozenset({"VIEWER", "INVESTIGATOR", "REVIEWER", "APPROVER", "LEADER", "CUSTOMER_ADMIN"})
+
+
+def _ensure_known_role(db: Session, tenant_id, role: str) -> None:
+    from backend.app.access.permissions import normalize_role
+
+    wanted = normalize_role(role)
+    if wanted in STANDARD_ROLES or _is_platform_role(role):
+        return  # platform roles are already limited to platform administrators by the guard
+    custom = {
+        normalize_role(name)
+        for (name,) in db.query(RoleDefinition.name).filter(
+            RoleDefinition.tenant_id == tenant_id, func.upper(RoleDefinition.status) == "ACTIVE"
+        )
+    }
+    if wanted not in custom:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "ROLE_NOT_RECOGNIZED",
+                "message": "Choose one of the organization's roles (Viewer, Investigator, Reviewer, Approver, Leader, "
+                "Customer Administrator, or an active custom role)",
+            },
+        )
+
+
 @router.post("/admin/identity/users")
 def create_user(payload: UserCreateRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
@@ -415,6 +444,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         )
     role = payload.role.strip().upper()
     _guard_user_administration(admin, new_role=role)
+    _ensure_known_role(db, target_tenant_id, role)
     if role == "PLATFORM_ADMIN" and not _is_platform_admin(admin):
         raise HTTPException(
             403,

@@ -156,7 +156,12 @@ def _draft_mapping(admin) -> str:
             "code": f"GOV-{uuid.uuid4().hex[:6]}",
             "source_system": "TRACKWISE",
             "target_entity": "Complaint",
-            "mapping_rules": {"complaint_number": {"target_field": "Complaint.complaint_id", "transform": "trim"}},
+            # Complete enough to import (the release gate checks it); the tests here are about the approval flow.
+            "mapping_rules": {
+                "complaint_number": {"target_field": "Complaint.complaint_id", "transform": "trim"},
+                "device_code": {"target_field": "Complaint.product_id", "transform": "trim"},
+                "narrative": {"target_field": "Complaint.description", "transform": "trim"},
+            },
         },
     ).json()
     return created.get("mapping_id") or created["id"]

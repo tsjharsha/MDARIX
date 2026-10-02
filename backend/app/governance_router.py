@@ -1,6 +1,5 @@
 import hashlib
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 
@@ -20,7 +19,6 @@ from backend.app.db.models.foundation import (
     Tenant,
     TenantPlanAssignment,
 )
-from backend.app.db.models.stage2 import MfaChallenge
 from backend.app.db.models.stage3 import ContextSnapshot
 from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
@@ -70,6 +68,8 @@ def audit(
 
 # The demo bootstrap grants decision approval to this role only. Read-only roles never receive it by default.
 DEFAULT_APPROVER_ROLE = "Approver"
+# Roles that may approve and sign investigation decisions in every tenant unless the tenant changes its rules.
+DEFAULT_APPROVAL_ROLES = ("APPROVER", "LEADER")
 
 
 def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tuple[str, str] | None:
@@ -78,17 +78,24 @@ def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tu
     Shared by signing and by review approval so both enforce the same rules:
     an ACTIVE approval authority for the user's role, and segregation of duties (no self-approval).
     """
-    authority = (
-        db.query(ApprovalAuthority)
-        .filter_by(
-            tenant_id=tenant_id,
-            role_name=role_name,
-            object_type="Decision",
-            decision_type="INVESTIGATION_REVIEW",
-            authority="AUTHORIZED",
-            status="ACTIVE",
-        )
-        .first()
+    from backend.app.access.permissions import normalize_role
+
+    # Role names are compared the way permissions are ('Approver' == 'APPROVER'), so a rule written in any case
+    # matches the role stored on the account.
+    wanted = normalize_role(role_name)
+    authority = next(
+        (
+            row
+            for row in db.query(ApprovalAuthority).filter_by(
+                tenant_id=tenant_id,
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                authority="AUTHORIZED",
+                status="ACTIVE",
+            )
+            if wanted and normalize_role(row.role_name) == wanted
+        ),
+        None,
     )
     if not authority:
         return "APPROVAL_AUTHORITY_DENIED", "Active role lacks approval authority"
@@ -100,6 +107,66 @@ def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tu
     if sod and sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
         return "SOD_DENIED", "Approval by another authorized user is required"
     return None
+
+
+def ensure_governance_defaults(db, tenant) -> None:
+    """Every tenant's starting rules for decisions: Approvers and Leaders may approve and sign, and nobody may
+    approve their own decision. Only what is missing is added, so a tenant's own changes are kept."""
+    now = NOW()
+    from backend.app.access.permissions import normalize_role
+
+    existing = {
+        normalize_role(row.role_name)
+        for row in db.query(ApprovalAuthority).filter_by(
+            tenant_id=tenant.id, object_type="Decision", decision_type="INVESTIGATION_REVIEW"
+        )
+    }
+    changed = False
+    for role in DEFAULT_APPROVAL_ROLES:
+        if role not in existing:
+            db.add(
+                ApprovalAuthority(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant.id,
+                    role_name=role,
+                    object_type="Decision",
+                    decision_type="INVESTIGATION_REVIEW",
+                    scope={},
+                    authority="AUTHORIZED",
+                    version="v1",
+                    status="ACTIVE",
+                    effective_from=now,
+                    effective_to=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            changed = True
+    if (
+        not db.query(SegregationOfDutiesPolicy)
+        .filter_by(tenant_id=tenant.id, object_type="Decision", decision_type="INVESTIGATION_REVIEW")
+        .first()
+    ):
+        db.add(
+            SegregationOfDutiesPolicy(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                name="Decision creator separation",
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                creator_cannot_approve=True,
+                last_material_editor_cannot_approve=True,
+                version="v1",
+                status="ACTIVE",
+                effective_from=now,
+                effective_to=None,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        changed = True
+    if changed:
+        db.commit()
 
 
 def bootstrap(db, tenant):
@@ -218,28 +285,28 @@ def tenant(db, actor):
     item = db.query(Tenant).filter(Tenant.id == tenant_id, Tenant.status.in_(("active", "ACTIVE"))).first()
     if not item:
         raise HTTPException(403, detail={"code": "TENANT_INACTIVE", "message": "Active tenant required"})
-    bootstrap(db, item)
+    # Default decision rules only. The synthetic demo plan (bootstrap) is assigned by the demo and fixture scripts,
+    # never as a side effect of a real tenant's request.
+    ensure_governance_defaults(db, item)
     return item
 
 
 def entitled(db, t):
-    now = NOW()
-    row = (
-        db.query(TenantPlanAssignment)
-        .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
-        .join(FeatureEntitlement, FeatureEntitlement.plan_id == PlanDefinition.id)
-        .filter(
-            TenantPlanAssignment.tenant_id == t.id,
-            TenantPlanAssignment.status == "ACTIVE",
-            PlanDefinition.status == "ACTIVE",
-            FeatureEntitlement.feature_code == FEATURE,
-            FeatureEntitlement.enabled == True,
-            FeatureEntitlement.status == "ACTIVE",
-            TenantPlanAssignment.effective_from <= now,
+    """Controlled signatures are part of every active plan unless the plan switches them off."""
+    from backend.app.access.plan_features import plan_includes
+
+    return plan_includes(db, t.id, FEATURE)
+
+
+def _signer(db, ctx: AuthenticatedRequestContext):
+    try:
+        return (
+            db.query(AuthUser)
+            .filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id)
+            .first()
         )
-        .first()
-    )
-    return bool(row)
+    except (ValueError, TypeError):
+        return None
 
 
 def session_actor(db, ctx: AuthenticatedRequestContext):
@@ -259,10 +326,12 @@ def session_actor(db, ctx: AuthenticatedRequestContext):
             "display_name": ctx.user_id,
             "session_id": ctx.session_id,
         }
+    from backend.app.access.permissions import role_of_user
+
     return {
         "tenant_id": ctx.tenant_id,
         "user_id": ctx.user_id,
-        "active_role": user.role or "Viewer",
+        "active_role": role_of_user(db, user) or "Viewer",
         "display_name": user.display_name or ctx.user_id,
         "session_id": ctx.session_id,
     }
@@ -316,6 +385,13 @@ def sign(
         raise HTTPException(403, detail={"code": code, "message": message})
     if not payload.remarks.strip():
         raise HTTPException(400, detail={"code": "REMARKS_REQUIRED", "message": "Remarks are required"})
+    from backend.app import mfa
+
+    signer = _signer(db, ctx)
+    if signer is not None:
+        # Wrong passwords and wrong codes at signing count together; 5 lock signing for 15 minutes. Sign-in has its
+        # own lock, so signing cannot be used to guess passwords around it.
+        mfa.ensure_not_locked(db, signer, scope="sign")
     try:
         user = (
             db.query(AuthUser)
@@ -333,42 +409,33 @@ def sign(
             password_ok = False
     if not password_ok:
         audit(db, t, actor["user_id"], "SIGNATURE_REAUTHENTICATION_FAILED", decision_id)
+        if signer is not None:
+            mfa.record_failure(db, signer, scope="sign")
         db.commit()
         raise HTTPException(
             403, detail={"code": "INVALID_REAUTHENTICATION", "message": "Current password was not verified"}
         )
-    user = db.query(AuthUser).filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id).first()
-    if os.getenv("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false").lower() in {"1", "true", "yes"}:
-        challenge = (
-            db.query(MfaChallenge)
-            .filter(
-                MfaChallenge.user_id == user.id if user else False,
-                MfaChallenge.tenant_id == t.id,
-                MfaChallenge.purpose == "SIGNATURE",
-                MfaChallenge.used_at.is_(None),
-                MfaChallenge.expires_at > NOW(),
-            )
-            .order_by(MfaChallenge.created_at.desc())
-            .first()
-            if user
-            else None
-        )
-        valid_mfa = (
-            challenge is not None
-            and payload.mfa_code
-            and hashlib.sha256(payload.mfa_code.encode("ascii")).hexdigest() == challenge.code_hash
-        )
-        if user is None or not user.mfa_required or not user.mfa_enrolled_at or not valid_mfa:
+    if mfa.signatures_require_mfa():
+        if signer is None or not mfa.is_enrolled(signer):
             audit(db, t, actor["user_id"], "MFA_REQUIRED_FOR_SIGNATURE", decision_id)
             db.commit()
             raise HTTPException(
                 403,
                 detail={
-                    "code": "MFA_REQUIRED",
-                    "message": "MFA enrollment and verification are required for governed signatures",
+                    "code": "MFA_ENROLLMENT_REQUIRED",
+                    "message": "Set up an authenticator app (My Account > Security) before signing decisions",
                 },
             )
-        challenge.used_at = NOW()
+        if not payload.mfa_code or not mfa.check_code(signer, payload.mfa_code, allow_recovery=False):
+            audit(db, t, actor["user_id"], "SIGNATURE_MFA_FAILED", decision_id)
+            mfa.record_failure(db, signer, scope="sign")
+            db.commit()
+            raise HTTPException(
+                403,
+                detail={"code": "MFA_REQUIRED", "message": "Enter the current code from your authenticator app"},
+            )
+    if signer is not None:
+        mfa.record_success(db, signer, scope="sign")
     material = {
         "decision_id": str(item.id),
         "version": version,

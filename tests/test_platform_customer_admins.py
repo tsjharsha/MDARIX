@@ -73,9 +73,9 @@ def test_platform_admin_adds_and_lists_customer_administrators(platform, custome
         "items"
     ]
     assert [item["email"] for item in listed] == [added["email"]]
-    assert {item["status"] for item in platform.get("/api/v1/platform-admin/customer-admins").json()["items"]} >= {
-        "INVITED"
-    }
+    # The new administrator is listed as invited (checked on its own tenant: the full list is paged, and how
+    # many other administrators fill its first page depends on the data already in the database).
+    assert listed[0]["status"] == "INVITED"
     # Retired accounts are hidden unless asked for by status.
     db = SessionLocal()
     try:

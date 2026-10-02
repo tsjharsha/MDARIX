@@ -106,6 +106,7 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
                 status="ACTIVE",
                 effective_from=now,
                 reason="Platform provisioning",
+                limits={"licensed_users_limit": payload.licensed_users_limit},
                 created_at=now,
                 updated_at=now,
             )

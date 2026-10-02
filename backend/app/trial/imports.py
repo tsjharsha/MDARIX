@@ -110,6 +110,12 @@ def template_csv(entity: str) -> str:
     return out.getvalue()
 
 
+def _spreadsheet_formula(value: str) -> bool:
+    """Text a spreadsheet would run as a formula when the data is exported and opened (CSV injection)."""
+    first = value[:1]
+    return first in {"=", "+", "@", "\t", "\r"} or (first == "-" and "(" in value[:40])
+
+
 def _personal_data(value: str) -> str | None:
     for pattern, label in _PERSONAL_DATA:
         if pattern.search(value):
@@ -203,6 +209,8 @@ def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) ->
                 found = _personal_data(value)
                 if found:
                     report.add(line, column, f"This looks like it contains {found}. Remove personal data and retry.")
+                if _spreadsheet_formula(value):
+                    report.add(line, column, "Text cannot start with =, +, @ or a formula; spreadsheets would run it.")
         if entity == "complaints" and row.get("status") and row["status"].lower() not in COMPLAINT_STATUSES:
             report.add(line, "status", "Status must be open, closed or under investigation.")
         identity = (row.get(key), row.get("version")) if entity == "products" else (row.get(key),)

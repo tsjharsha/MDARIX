@@ -109,7 +109,7 @@ def _active_plan_limits(db: Session, tenant_id: uuid.UUID) -> dict:
         )
         .first()
     )
-    limits = dict(getattr(row, "limits", None) or {})
+    limits: dict = {}
     entitlements = (
         db.query(FeatureEntitlement)
         .join(PlanDefinition, PlanDefinition.id == FeatureEntitlement.plan_id)
@@ -125,6 +125,8 @@ def _active_plan_limits(db: Session, tenant_id: uuid.UUID) -> dict:
     for entitlement in entitlements:
         if entitlement.limits:
             limits.update(entitlement.limits)
+    # The tenant's own limits come last, so they take precedence over the shared plan's.
+    limits.update(getattr(row, "limits", None) or {})
     return limits
 
 

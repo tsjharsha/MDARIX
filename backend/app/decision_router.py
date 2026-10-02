@@ -20,7 +20,7 @@ service = DecisionCenterService()
 
 
 def error(exc: DecisionCenterError) -> HTTPException:
-    status = 404 if exc.code.endswith("NOT_FOUND") else 400
+    status = 404 if exc.code.endswith("NOT_FOUND") else 409 if exc.code == "DECISION_LOCKED" else 400
     return HTTPException(status_code=status, detail={"code": exc.code, "message": exc.message})
 
 
@@ -40,7 +40,7 @@ def get_decision(
     return _decision_payload(item)
 
 
-@router.post("/decisions/{decision_id}/reviews")
+@router.post("/decisions/{decision_id}/reviews", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def review_decision(
     decision_id: uuid.UUID,
     request: ReviewCreateRequest,

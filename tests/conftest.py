@@ -17,6 +17,9 @@ os.environ.setdefault("POSTGRES_DB", "mdarix_r1_test")
 os.environ.setdefault("MDARIX_ENV", "development")
 # Existing retrieval tests pin the word-hash embedding; tests of the local language model choose it explicitly.
 os.environ.setdefault("MDARIX_EMBEDDING_PROVIDER", "deterministic")
+# Signatures need an authenticator code by default; the MFA tests (test_mfa_mvp) switch it on themselves, so the
+# many governance tests can exercise authority and separation of duties without enrolling every test user.
+os.environ.setdefault("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
 # Tests must not call paid or external services with the developer's .env
 # credentials (Groq, Resend). The deterministic provider path is exercised
 # instead; individual tests that need provider behaviour set their own env.
@@ -76,6 +79,7 @@ DB_MODULES = {
     "test_mapping_studio_stage4",
     "test_master_data",
     "test_mfa_mvp",
+    "test_decision_governance_hardening",
     "test_free_trial",
     "test_demo_workspace",
     "test_public_signup_onboarding",
