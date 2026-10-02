@@ -12,6 +12,7 @@ import {
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
+import { CustomerAdmins } from "./CustomerAdmins";
 import { lifecycleAction, titleCase } from "./model";
 import { StatusBadge } from "./StatusBadge";
 
@@ -36,7 +37,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             setQuery(value);
             setPage(1);
           }}
-          label="Search tenant name or key"
+          label="Search tenant name"
         />
         <select
           aria-label="Tenant status"
@@ -68,6 +69,16 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
               </button>
             ),
           },
+          {
+            key: "customer",
+            label: "Customer",
+            render: (row) => (
+              <span className="cc-stack">
+                <strong>{row.customer_name ?? "—"}</strong>
+                <small>{row.customer_identifier}</small>
+              </span>
+            ),
+          },
           { key: "region", label: "Data region", render: (row) => row.residency_region ?? row.region ?? "—" },
           { key: "plan", label: "Plan", render: (row) => row.plan_name ?? row.plan_code ?? "—" },
           { key: "environments", label: "Environments", numeric: true, render: (row) => row.environment_count ?? 0 },
@@ -90,16 +101,18 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
   );
 }
 
-const SECTIONS = ["Overview", "Environments", "Domain & identity", "Activity"] as const;
+const SECTIONS = ["Overview", "Administrators", "Environments", "Domain & identity", "Activity"] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function TenantPage({
   tenantId,
   onBack,
+  onOpenCustomer,
   onMessage,
 }: {
   tenantId: string;
   onBack: () => void;
+  onOpenCustomer?: (customerId: string) => void;
   onMessage: (text: string, tone?: "good" | "critical") => void;
 }) {
   const record = useResource<{ tenant: any; environments: any[]; identity_providers: any[] }>(
@@ -141,6 +154,19 @@ export function TenantPage({
           <div>
             <p className="ac-eyebrow">Tenant · {tenant?.tenant_key ?? "…"}</p>
             <h2>{name}</h2>
+            {tenant?.customer_name && (
+              <p className="ac-muted">
+                Belongs to{" "}
+                {onOpenCustomer && tenant.customer_id ? (
+                  <button type="button" className="ac-link" onClick={() => onOpenCustomer(tenant.customer_id)}>
+                    {tenant.customer_name}
+                  </button>
+                ) : (
+                  <strong>{tenant.customer_name}</strong>
+                )}{" "}
+                ({tenant.customer_identifier})
+              </p>
+            )}
           </div>
           <span className="cc-actions">
             <StatusBadge status={tenant?.status} />
@@ -168,6 +194,13 @@ export function TenantPage({
       )}
       <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Tenant sections" />
       {tenant && section === "Overview" && <TenantOverview tenant={tenant} />}
+      {tenant && section === "Administrators" && (
+        <CustomerAdmins
+          tenantId={tenantId}
+          tenants={[{ id: tenantId, tenant_key: tenant.tenant_key, display_name: tenant.display_name }]}
+          onMessage={onMessage}
+        />
+      )}
       {tenant && section === "Environments" && (
         <Environments
           tenantId={tenantId}

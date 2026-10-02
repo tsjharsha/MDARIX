@@ -24,6 +24,7 @@ from backend.app.customer_lifecycle import (
     allowed_lifecycle_transition,
 )
 from backend.app.db.models.customer_lifecycle import (
+    Customer,
     IdentityProviderConfiguration,
     SupportAccessGrant,
     TenantAccessTransition,
@@ -575,10 +576,13 @@ def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Sessi
     identity = (
         db.query(IdentityProviderConfiguration).filter(IdentityProviderConfiguration.tenant_id == tenant.id).all()
     )
+    customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     return {
         "tenant": {
             "id": str(tenant.id),
             "customer_id": str(tenant.customer_id),
+            "customer_name": (customer.display_name or customer.legal_name) if customer else None,
+            "customer_identifier": customer.customer_identifier if customer else None,
             "tenant_identifier": tenant.tenant_identifier,
             "tenant_key": tenant.tenant_key,
             "display_name": tenant.display_name,
@@ -699,8 +703,14 @@ def list_platform_tenants(
     rows = rows.order_by(sort_column.desc() if order.lower() == "desc" else sort_column.asc())
     total = rows.count()
     items = rows.offset((page - 1) * page_size).limit(page_size).all()
+    # The customer that owns each tenant on this page, in one query.
+    owners = {
+        customer.id: customer
+        for customer in db.query(Customer).filter(Customer.id.in_({row.customer_id for row in items})).all()
+    }
     payload = []
     for row in items:
+        owner = owners.get(row.customer_id)
         assignment = (
             db.query(TenantPlanAssignment)
             .filter(TenantPlanAssignment.tenant_id == row.id, TenantPlanAssignment.status == "ACTIVE")
@@ -738,6 +748,8 @@ def list_platform_tenants(
                 "tenant_key": row.tenant_key,
                 "name": row.name,
                 "customer_id": str(row.customer_id) if row.customer_id else None,
+                "customer_name": (owner.display_name or owner.legal_name) if owner else None,
+                "customer_identifier": owner.customer_identifier if owner else None,
                 "status": row.status,
                 "region": row.primary_region,
                 "residency_region": row.residency_region,

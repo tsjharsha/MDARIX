@@ -2,6 +2,10 @@
 
 Tenant creation is deliberately centralized so a tenant can never be created
 without its immutable customer identity and lifecycle metadata.
+
+A Customer is the legal and commercial parent; a Tenant is the operational and
+data-isolation boundary. One customer owns one or more tenants, and a tenant
+belongs to exactly one customer for its whole life.
 """
 
 from __future__ import annotations
@@ -37,57 +41,40 @@ def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:100]
 
 
-def build_customer_tenant(
-    *,
-    db,
-    tenant_key: str,
-    name: str,
-    status: str,
-    now: datetime,
-    region: str = "UNSPECIFIED",
-    residency_region: str = "UNSPECIFIED",
-    customer_type: str = "CUSTOMER",
-    country: str = "UNSPECIFIED",
-) -> tuple[Customer, Tenant]:
-    customer_id = uuid.uuid4()
-    tenant_id = uuid.uuid4()
-    # Tenant identifiers are platform-issued, sequential, and never derived
-    # from customer input. The transaction advisory lock prevents concurrent
-    # provisioning requests from selecting the same next number.
+def _lock_identifiers(db) -> None:
+    # Customer and tenant identifiers are platform-issued, sequential, and never
+    # derived from customer input. The transaction advisory lock prevents
+    # concurrent provisioning requests from selecting the same next number.
     db.execute(text("SELECT pg_advisory_xact_lock(73192841)"))
-    issued_customers = [
-        str(value)
-        for (value,) in db.query(Customer.customer_identifier)
-        .filter(Customer.customer_identifier.op("~")("^CUS[0-9]+$"))
-        .all()
-    ]
-    next_customer_number = max((int(value[3:]) for value in issued_customers), default=0) + 1
-    generated_customer_identifier = f"CUS{next_customer_number:04d}"
+
+
+def _next_tenant_identifier(db) -> str:
     issued_tenants = [
         str(value)
         for (value,) in db.query(Tenant.tenant_identifier).filter(Tenant.tenant_identifier.op("~")("^TEN[0-9]+$")).all()
     ]
     next_tenant_number = max((int(value[3:]) for value in issued_tenants), default=0) + 1
-    generated_tenant_identifier = f"TEN{next_tenant_number:04d}"
+    return f"TEN{next_tenant_number:04d}"
+
+
+def _tenant(
+    *,
+    customer_id: uuid.UUID,
+    tenant_identifier: str,
+    tenant_key: str,
+    name: str,
+    lifecycle_status: str,
+    now: datetime,
+    region: str,
+    residency_region: str,
+) -> Tenant:
+    tenant_id = uuid.uuid4()
     normalized_key = tenant_key.strip().upper()
-    lifecycle_status = status.strip().upper()
-    customer = Customer(
-        id=customer_id,
-        customer_identifier=generated_customer_identifier,
-        legal_name=name.strip(),
-        display_name=name.strip(),
-        customer_type=customer_type,
-        country=country,
-        lifecycle_status=lifecycle_status,
-        lock_version=1,
-        created_at=now,
-        updated_at=now,
-    )
-    tenant = Tenant(
+    return Tenant(
         id=tenant_id,
         customer_id=customer_id,
         tenant_key=normalized_key,
-        tenant_identifier=generated_tenant_identifier,
+        tenant_identifier=tenant_identifier,
         name=name.strip(),
         display_name=name.strip(),
         tenant_slug=f"{_slug(normalized_key)}-{tenant_id.hex[:8]}",
@@ -102,5 +89,78 @@ def build_customer_tenant(
         lock_version=1,
         created_at=now,
         updated_at=now,
+    )
+
+
+def build_tenant_for_customer(
+    *,
+    db,
+    customer: Customer,
+    tenant_key: str,
+    name: str,
+    status: str,
+    now: datetime,
+    region: str = "UNSPECIFIED",
+    residency_region: str = "UNSPECIFIED",
+) -> Tenant:
+    """A further tenant (another region, business unit or environment) for an existing customer."""
+    _lock_identifiers(db)
+    return _tenant(
+        customer_id=customer.id,
+        tenant_identifier=_next_tenant_identifier(db),
+        tenant_key=tenant_key,
+        name=name,
+        lifecycle_status=status.strip().upper(),
+        now=now,
+        region=region,
+        residency_region=residency_region,
+    )
+
+
+def build_customer_tenant(
+    *,
+    db,
+    tenant_key: str,
+    name: str,
+    status: str,
+    now: datetime,
+    region: str = "UNSPECIFIED",
+    residency_region: str = "UNSPECIFIED",
+    customer_type: str = "CUSTOMER",
+    country: str = "UNSPECIFIED",
+) -> tuple[Customer, Tenant]:
+    customer_id = uuid.uuid4()
+    _lock_identifiers(db)
+    issued_customers = [
+        str(value)
+        for (value,) in db.query(Customer.customer_identifier)
+        .filter(Customer.customer_identifier.op("~")("^CUS[0-9]+$"))
+        .all()
+    ]
+    next_customer_number = max((int(value[3:]) for value in issued_customers), default=0) + 1
+    generated_customer_identifier = f"CUS{next_customer_number:04d}"
+    generated_tenant_identifier = _next_tenant_identifier(db)
+    lifecycle_status = status.strip().upper()
+    customer = Customer(
+        id=customer_id,
+        customer_identifier=generated_customer_identifier,
+        legal_name=name.strip(),
+        display_name=name.strip(),
+        customer_type=customer_type,
+        country=country,
+        lifecycle_status=lifecycle_status,
+        lock_version=1,
+        created_at=now,
+        updated_at=now,
+    )
+    tenant = _tenant(
+        customer_id=customer_id,
+        tenant_identifier=generated_tenant_identifier,
+        tenant_key=tenant_key,
+        name=name,
+        lifecycle_status=lifecycle_status,
+        now=now,
+        region=region,
+        residency_region=residency_region,
     )
     return customer, tenant

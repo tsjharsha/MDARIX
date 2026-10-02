@@ -69,6 +69,10 @@
   color: var(--ac-muted);
   font-size: 12px;
 }
+.cc-tenant-list {
+  display: grid;
+  gap: 6px;
+}
 .cc-pager {
   display: flex;
   flex-wrap: wrap;
@@ -114,6 +118,24 @@
 }
 .cc-form .ca-field {
   width: 100%;
+}
+/* Dialogs: fields stay inside the dialog. A grid track otherwise grows to its widest content, and a select is as
+   wide as its longest option (a long "Customer · Tenant (CODE)"), which pushed every field past the right edge. */
+.cc-area .ac-modal {
+  grid-template-columns: minmax(0, 1fr);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.cc-area .ac-modal .ca-field {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.cc-area .ac-modal .ca-field input,
+.cc-area .ac-modal .ca-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
 }
 .cc-wizard {
   display: grid;

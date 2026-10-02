@@ -337,6 +337,19 @@ class CustomerAdminStatusRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=1000)
 
 
+class TenantAddRequest(BaseModel):
+    """A platform administrator adds a tenant to an existing customer, with its first Customer Administrator."""
+
+    tenant_name: str = Field(min_length=2, max_length=255)
+    tenant_code: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    environment_type: str = Field(pattern="^(PRODUCTION|SANDBOX|VALIDATION|UAT|DEMO)$")
+    data_region: str = Field(min_length=2, max_length=80)
+    plan_id: uuid.UUID
+    admin_email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    admin_display_name: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=5, max_length=1000)
+
+
 class CustomerLifecycleRequest(BaseModel):
     """Suspend or reactivate a whole customer (every tenant it owns). Re-authentication is required."""
 

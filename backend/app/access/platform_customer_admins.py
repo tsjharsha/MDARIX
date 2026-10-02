@@ -1,9 +1,12 @@
 """Platform administration of Customer Administrators across every customer.
 
-A platform administrator can list every Customer Administrator, add one to a customer tenant (activation email),
-resend an activation, send a password-reset email, and suspend or reactivate one. A customer is never left
+A Customer Administrator belongs to one tenant, not to the customer as a whole: a customer with three tenants
+has administrators for each, and an administrator manages only the users of their own tenant.
+
+A platform administrator can list every Customer Administrator, add one to a tenant (activation email),
+resend an activation, send a password-reset email, and suspend or reactivate one. A tenant is never left
 without an active Customer Administrator: suspending the last one is refused (add or replace one first, or
-suspend the whole customer instead). Every change is audited in the customer's tenant with the reason given.
+suspend the tenant instead). Every change is audited in the administrator's tenant with the reason given.
 """
 
 from __future__ import annotations
@@ -57,6 +60,7 @@ def _row(user: AuthUser, tenant: Tenant | None, customer: Customer | None, activ
         "email_verified": bool(user.email_verified),
         "tenant_id": str(user.tenant_id),
         "tenant_key": tenant.tenant_key if tenant else None,
+        "tenant_name": (tenant.display_name or tenant.name) if tenant else None,
         "tenant_status": (tenant.status or "").upper() if tenant else None,
         "customer_id": str(customer.id) if customer else None,
         "customer_name": (customer.display_name or customer.legal_name) if customer else None,
@@ -121,6 +125,7 @@ def list_customer_admins(
                 func.lower(AuthUser.username).like(like),
                 func.lower(AuthUser.display_name).like(like),
                 func.lower(Tenant.tenant_key).like(like),
+                func.lower(Tenant.display_name).like(like),
                 func.lower(Customer.display_name).like(like),
             )
         )
@@ -133,7 +138,7 @@ def list_customer_admins(
         query = query.filter(Tenant.customer_id == customer_id)
     if tenant_id:
         query = query.filter(AuthUser.tenant_id == tenant_id)
-    rows = query.order_by(Customer.display_name, AuthUser.username).limit(500).all()
+    rows = query.order_by(Customer.display_name, Tenant.tenant_key, AuthUser.username).limit(500).all()
     active = dict(
         db.query(AuthUser.tenant_id, func.count(AuthUser.id))
         .filter(_is_customer_admin(), func.upper(AuthUser.status) == "ACTIVE")
@@ -155,34 +160,61 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
         .order_by(func.lower(func.coalesce(Customer.display_name, Tenant.display_name)), Tenant.tenant_key)
         .all()
     )
-    return {"items": [{"id": str(row[0]), "tenant_key": row[1], "display_name": row[3] or row[2]} for row in rows]}
+    return {
+        "items": [
+            {
+                "id": str(row[0]),
+                "tenant_key": row[1],
+                "display_name": row[3] or row[2],
+                "tenant_name": row[2],
+                "customer_name": row[3],
+            }
+            for row in rows
+        ]
+    }
 
 
-@router.post("/platform-admin/tenants/{tenant_id}/customer-admins")
-def add_customer_admin(
-    tenant_id: uuid.UUID, payload: CustomerAdminCreateRequest, request: Request, db: Session = Depends(get_db)
-):
-    platform_admin = _require_platform_admin(request, db)
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-    if tenant is None or (tenant.status or "").upper() not in {"ACTIVE", "PROVISIONED"}:
+def ensure_email_is_free(db: Session, email: str) -> None:
+    """One account per email: sign-in finds the account by email, so a second one would make it ambiguous.
+
+    Until a person can hold memberships in several tenants, administering a second tenant needs another email.
+    """
+    if db.query(AuthUser.id).filter(func.lower(AuthUser.username) == email).first() is not None:
         raise HTTPException(
-            404, detail={"code": "TENANT_NOT_ACTIVE", "message": "Administrators can be added only to an active tenant"}
+            409,
+            detail={
+                "code": "ACCOUNT_EXISTS",
+                "message": "An account with this email already exists. Each account belongs to one tenant, "
+                "so use a different email to administer another tenant.",
+            },
         )
-    email = payload.email.strip().lower()
-    existing = db.query(AuthUser).filter(func.lower(AuthUser.username) == email).first()
-    if existing is not None:
-        raise HTTPException(
-            409, detail={"code": "ACCOUNT_EXISTS", "message": "An account with this email already exists"}
-        )
-    _enforce_invite_limits(db, tenant_id, ROLE)
-    customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
+
+
+def create_customer_admin(
+    db: Session,
+    *,
+    tenant: Tenant,
+    customer: Customer | None,
+    email: str,
+    display_name: str,
+    reason: str,
+    platform_admin: AuthUser,
+    now: datetime,
+) -> tuple[AuthUser, str, str]:
+    """Create an invited Customer Administrator of one tenant and email the activation link (not committed).
+
+    Returns the account, the invitation token and the email delivery result. On a delivery failure the
+    transaction is rolled back, so nothing is left half-created.
+    """
+    ensure_email_is_free(db, email)
+    _enforce_invite_limits(db, tenant.id, ROLE)
     company = (customer.display_name if customer else None) or tenant.name
-    now = datetime.now(timezone.utc)
+    tenant_id = tenant.id
     user = AuthUser(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         username=email,
-        display_name=payload.display_name.strip(),
+        display_name=display_name.strip(),
         company=company,
         password_hash=_hash(secrets.token_urlsafe(48)),
         role=ROLE,
@@ -216,8 +248,33 @@ def add_customer_admin(
         platform_admin,
         "CUSTOMER_ADMIN_ADDED",
         user.id,
-        {"reason": payload.reason, "email_delivery": delivery},
+        {"reason": reason, "email_delivery": delivery},
         now,
+    )
+    return user, token, delivery
+
+
+@router.post("/platform-admin/tenants/{tenant_id}/customer-admins")
+def add_customer_admin(
+    tenant_id: uuid.UUID, payload: CustomerAdminCreateRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Add a Customer Administrator to one tenant; they are invited by email to set their password."""
+    platform_admin = _require_platform_admin(request, db)
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is None or (tenant.status or "").upper() not in {"ACTIVE", "PROVISIONED"}:
+        raise HTTPException(
+            404, detail={"code": "TENANT_NOT_ACTIVE", "message": "Administrators can be added only to an active tenant"}
+        )
+    customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
+    user, token, delivery = create_customer_admin(
+        db,
+        tenant=tenant,
+        customer=customer,
+        email=payload.email.strip().lower(),
+        display_name=payload.display_name,
+        reason=payload.reason,
+        platform_admin=platform_admin,
+        now=datetime.now(timezone.utc),
     )
     db.commit()
     return {
@@ -325,8 +382,8 @@ def change_customer_admin_status(
             409,
             detail={
                 "code": "LAST_ACTIVE_CUSTOMER_ADMIN",
-                "message": "This is the customer's only active administrator. Add or replace an administrator first, "
-                "or suspend the whole customer.",
+                "message": "This is the tenant's only active administrator. Add or replace an administrator first, "
+                "or suspend the tenant.",
             },
         )
     now = datetime.now(timezone.utc)

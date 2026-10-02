@@ -1,30 +1,33 @@
 import { useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { Panel } from "../console/charts";
-import { SearchBox, Table, formatDate, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, useResource } from "../../customer-admin/shared";
 import { CustomerImportDialog } from "./CustomerImportDialog";
-import type { CustomerRow } from "./model";
+import type { CustomerAccount } from "./model";
 import { StatusBadge } from "./StatusBadge";
 
-/** Every customer, one row per customer tenant. Opening a row shows the customer's page. */
-export function CustomerDirectory({ onOpen }: { onOpen: (row: CustomerRow) => void }) {
+/**
+ * Every customer once, with the tenants it owns. A customer is the legal and commercial parent; each tenant is a
+ * separate workspace and data boundary with its own plan and administrators. Opening a row shows the customer.
+ */
+export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => void }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [plan, setPlan] = useState("");
   const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
-  const params = new URLSearchParams({ page: String(page), sort: "name", order: "asc" });
+  const params = new URLSearchParams({ page: String(page) });
   if (query.trim()) params.set("q", query.trim());
   if (status) params.set("status", status);
   if (plan.trim()) params.set("plan", plan.trim());
-  const customers = useResource<{ items: CustomerRow[]; total: number; pages: number }>(
-    `/api/v1/platform-admin/customers?${params}`,
+  const customers = useResource<{ items: CustomerAccount[]; total: number; pages: number }>(
+    `/api/v1/platform-admin/customer-accounts?${params}`,
   );
   const plans = useResource<any[]>("/api/v1/platform-admin/plans");
-  const exportParams = new URLSearchParams(params);
-  exportParams.set("format", "csv");
-  exportParams.set("page", "1");
-  exportParams.set("page_size", "100");
+  // The export keeps its established shape: one row per tenant, with the owning customer on each row.
+  const exportParams = new URLSearchParams({ format: "csv", page: "1", page_size: "100", sort: "name" });
+  if (query.trim()) exportParams.set("q", query.trim());
+  if (plan.trim()) exportParams.set("plan", plan.trim());
   const reset = (apply: () => void) => {
     apply();
     setPage(1);
@@ -39,7 +42,11 @@ export function CustomerDirectory({ onOpen }: { onOpen: (row: CustomerRow) => vo
       error={customers.error}
       action={
         <span className="cc-actions">
-          <a className="ac-secondary" href={`/api/v1/platform-admin/customers?${exportParams}`}>
+          <a
+            className="ac-secondary"
+            href={`/api/v1/platform-admin/customers?${exportParams}`}
+            title="One row per tenant, with its customer"
+          >
             <Download size={16} aria-hidden="true" /> Export CSV
           </a>
           <button type="button" className="ac-secondary" onClick={() => setImporting(true)}>
@@ -80,31 +87,38 @@ export function CustomerDirectory({ onOpen }: { onOpen: (row: CustomerRow) => vo
             key: "customer",
             label: "Customer",
             render: (row) => (
-              <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row)}>
-                <strong>{row.name ?? "Unnamed customer"}</strong>
-                <small>{row.customer_identifier ?? row.tenant_key}</small>
+              <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
+                <strong>{row.name || "Unnamed customer"}</strong>
+                <small>{row.customer_identifier}</small>
               </button>
             ),
           },
-          { key: "admin", label: "Primary administrator", render: (row) => row.primary_admin ?? "—" },
-          { key: "plan", label: "Plan", render: (row) => row.plan_name ?? row.plan_code ?? "—" },
           {
-            key: "renewal",
-            label: "Licence ends",
-            render: (row) => (row.expires_at ? formatDate(row.expires_at) : "—"),
+            key: "tenants",
+            label: "Tenants",
+            render: (row) =>
+              row.tenants.length ? (
+                <span className="cc-tenant-list">
+                  {row.tenants.map((tenant) => (
+                    <span key={tenant.id} className="cc-stack">
+                      <strong>{tenant.display_name ?? tenant.tenant_key}</strong>
+                      <small>
+                        {[tenant.tenant_key, tenant.plan_name, tenant.data_region].filter(Boolean).join(" · ")}
+                      </small>
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span className="ac-muted">No tenant yet</span>
+              ),
           },
-          {
-            key: "seats",
-            label: "Seats used",
-            numeric: true,
-            render: (row) => `${row.seat_usage ?? 0}${row.seat_cap ? ` / ${row.seat_cap}` : ""}`,
-          },
+          { key: "admins", label: "Active administrators", numeric: true, render: (row) => row.active_admins },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           {
             key: "open",
             label: "",
             render: (row) => (
-              <button type="button" className="ac-link" onClick={() => onOpen(row)}>
+              <button type="button" className="ac-link" onClick={() => onOpen(row.id)}>
                 Open
               </button>
             ),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, CreditCard, PauseCircle, PlayCircle } from "lucide-react";
+import { ArrowLeft, CreditCard, PauseCircle, PlayCircle, Plus } from "lucide-react";
 import { Panel } from "../console/charts";
 import {
   ConfirmDialog,
@@ -11,6 +11,7 @@ import {
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
+import { AddTenant } from "./AddTenant";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { isoDate, lifecycleAction, titleCase, type Plan, type TenantSummary } from "./model";
 import { StatusBadge } from "./StatusBadge";
@@ -24,8 +25,10 @@ type Record = {
 };
 
 /**
- * One customer: its details (maintained by the customer, shown read-only), administrators, subscription,
- * usage and activity. The platform administrator changes only standing, administrators and subscription.
+ * One customer (the legal and commercial parent) and the tenants it owns: its details (maintained by the
+ * customer, shown read-only), tenants, administrators, subscription, usage and activity. The platform
+ * administrator changes only standing, tenants, administrators and subscription. Administrators, plans and
+ * usage belong to a tenant, so each is shown with its tenant.
  */
 export function CustomerPage({
   customerId,
@@ -41,6 +44,7 @@ export function CustomerPage({
   const record = useResource<Record>(`/api/v1/platform-admin/customer-records/${customerId}`);
   const [section, setSection] = useState<Section>("Overview");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [addingTenant, setAddingTenant] = useState(false);
   const customer = record.data?.customer;
   const tenants = record.data?.tenants ?? [];
   const name = customer?.display_name ?? customer?.legal_name ?? "Customer";
@@ -108,7 +112,12 @@ export function CustomerPage({
       )}
       <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Customer sections" />
       {customer && section === "Overview" && (
-        <Overview customer={customer} tenants={tenants} onOpenTenant={onOpenTenant} />
+        <Overview
+          customer={customer}
+          tenants={tenants}
+          onOpenTenant={onOpenTenant}
+          onAddTenant={next === "SUSPENDED" ? () => setAddingTenant(true) : undefined}
+        />
       )}
       {customer && section === "Administrators" && (
         <CustomerAdmins customerId={customerId} tenants={tenants} onMessage={onMessage} />
@@ -127,6 +136,18 @@ export function CustomerPage({
           record.reload();
         }}
       />
+      {addingTenant && (
+        <AddTenant
+          customerId={customerId}
+          customerName={name}
+          onClose={() => setAddingTenant(false)}
+          onAdded={(message) => {
+            setAddingTenant(false);
+            onMessage(message);
+            record.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -147,10 +168,13 @@ function Overview({
   customer,
   tenants,
   onOpenTenant,
+  onAddTenant,
 }: {
   customer: Record["customer"];
   tenants: Record["tenants"];
   onOpenTenant: (tenantId: string) => void;
+  // Offered only while the customer is active.
+  onAddTenant?: () => void;
 }) {
   return (
     <div className="ac-grid two">
@@ -168,7 +192,20 @@ function Overview({
           </div>
         </dl>
       </Panel>
-      <Panel eyebrow="Workspaces" title="Tenants">
+      <Panel
+        eyebrow="Workspaces and data boundaries"
+        title="Tenants"
+        action={
+          onAddTenant && (
+            <button type="button" className="ac-primary" onClick={onAddTenant}>
+              <Plus size={16} aria-hidden="true" /> Add tenant
+            </button>
+          )
+        }
+      >
+        <p className="ac-muted">
+          Each tenant has its own plan, users and administrators; nothing is shared between tenants.
+        </p>
         <Table
           caption="Tenants of this customer"
           rows={tenants}

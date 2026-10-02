@@ -50,16 +50,11 @@ export function CustomersAndTenants({
         <TenantPage
           tenantId={open.id}
           onBack={() => setOpen(open.from ? { kind: "customer", id: open.from } : null)}
+          onOpenCustomer={(id) => setOpen({ kind: "customer", id })}
           onMessage={notify}
         />
       ) : section === "Customers" ? (
-        <CustomerDirectory
-          onOpen={(row) =>
-            row.customer_id
-              ? setOpen({ kind: "customer", id: row.customer_id })
-              : setOpen({ kind: "tenant", id: row.id })
-          }
-        />
+        <CustomerDirectory onOpen={(id) => setOpen({ kind: "customer", id })} />
       ) : section === "Customer administrators" ? (
         <CustomerAdmins onMessage={notify} />
       ) : section === "Tenants" ? (
@@ -80,7 +75,8 @@ function Onboarding({ onCreated }: { onCreated: () => void }) {
           <p className="ac-eyebrow">Onboarding</p>
           <h2>New customers and trial requests</h2>
           <p className="ac-muted">
-            A new customer gets its tenant, plan and first Customer Administrator, who is invited by email.
+            A new customer gets its first tenant, with a plan and the tenant&apos;s first Customer Administrator, who is
+            invited by email. Further tenants are added from the customer&apos;s page.
           </p>
         </div>
         {!creating && (

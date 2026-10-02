@@ -3,23 +3,6 @@
 export const SECTIONS = ["Customers", "Customer administrators", "Tenants", "Onboarding"] as const;
 export type Section = (typeof SECTIONS)[number];
 
-export type CustomerRow = {
-  id: string; // tenant id (one row per customer tenant)
-  customer_id: string | null;
-  customer_identifier?: string | null;
-  name?: string | null;
-  tenant_key?: string | null;
-  primary_admin?: string | null;
-  primary_admin_email?: string | null;
-  plan_code?: string | null;
-  plan_name?: string | null;
-  expires_at?: string | null;
-  seat_usage?: number | null;
-  seat_cap?: number | null;
-  status?: string | null;
-  data_region?: string | null;
-};
-
 export type CustomerAdmin = {
   id: string;
   email: string;
@@ -27,6 +10,7 @@ export type CustomerAdmin = {
   status: string;
   tenant_id: string;
   tenant_key: string | null;
+  tenant_name?: string | null;
   customer_id: string | null;
   customer_name: string | null;
   can_suspend: boolean;
@@ -43,6 +27,40 @@ export type TenantSummary = {
   tenant_key?: string | null;
   display_name?: string | null;
   status?: string | null;
+  // Set on the all-customers picker, where tenants of different customers are listed together.
+  tenant_name?: string | null;
+  customer_name?: string | null;
+};
+
+/** One customer (the legal and commercial parent) with the tenants it owns. */
+export type CustomerAccount = {
+  id: string;
+  customer_identifier: string;
+  name: string;
+  legal_name?: string | null;
+  country?: string | null;
+  status?: string | null;
+  tenant_count: number;
+  active_admins: number;
+  tenants: Array<{
+    id: string;
+    tenant_key: string;
+    display_name?: string | null;
+    status?: string | null;
+    data_region?: string | null;
+    plan_name?: string | null;
+    active_admins: number;
+  }>;
+};
+
+/** The environment a tenant can start with; each tenant has at most one of each type. */
+export const ENVIRONMENT_TYPES = ["PRODUCTION", "VALIDATION", "SANDBOX", "UAT", "DEMO"] as const;
+
+/** How a tenant is named in a list mixing several customers: "Customer · Tenant (KEY)". */
+export const tenantOptionLabel = (tenant: TenantSummary) => {
+  const tenantName = tenant.tenant_name ?? tenant.display_name ?? tenant.tenant_key ?? "Tenant";
+  const owner = tenant.customer_name && tenant.customer_name !== tenantName ? `${tenant.customer_name} · ` : "";
+  return `${owner}${tenantName}${tenant.tenant_key ? ` (${tenant.tenant_key})` : ""}`;
 };
 
 /** Status labels the platform administrator reads at a glance (the raw code stays in the title). */
