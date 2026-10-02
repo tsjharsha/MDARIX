@@ -140,6 +140,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
         columns={[
           {
             key: "tenant",
+            fields: ["name", "tenant_key"],
             label: "Tenant",
             render: (row) => (
               <span className="cc-stack">
@@ -148,16 +149,22 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
               </span>
             ),
           },
-          { key: "plan", label: "Plan", render: (row) => row.plan_name ?? row.plan_code ?? "Not assigned" },
+          {
+            key: "plan",
+            fields: ["plan_name", "plan_code"],
+            label: "Plan",
+            render: (row) => row.plan_name ?? row.plan_code ?? "Not assigned",
+          },
           {
             key: "period",
+            fields: ["license_start", "expires_at"],
             label: "Licence period",
             render: (row) =>
               row.expires_at
                 ? `${row.license_start ? new Date(row.license_start).toLocaleDateString() : "—"} – ${new Date(row.expires_at).toLocaleDateString()}`
                 : "No end date",
           },
-          { key: "seats", label: "Users", numeric: true, render: (row) => row.seat_usage ?? 0 },
+          { key: "seats", fields: ["seat_usage"], label: "Users", numeric: true, render: (row) => row.seat_usage ?? 0 },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           {
             key: "change",
@@ -284,10 +291,16 @@ function Renewals() {
             detail: rows.length ? "Choose another period." : "Licences with an end date appear here.",
           }}
           columns={[
-            { key: "tenant", label: "Tenant", render: (row) => <TenantCell row={row} /> },
-            { key: "plan", label: "Plan", render: (row) => row.plan_name ?? "—" },
+            {
+              key: "tenant",
+              fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+              label: "Tenant",
+              render: (row) => <TenantCell row={row} />,
+            },
+            { key: "plan", fields: ["plan_name"], label: "Plan", render: (row) => row.plan_name ?? "—" },
             {
               key: "ends",
+              fields: ["expires_at", "days_remaining"],
               label: "Ends",
               render: (row) => (
                 <span className="cc-stack">
@@ -303,7 +316,13 @@ function Renewals() {
               ),
             },
             { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
-            { key: "reminders", label: "Reminders queued", numeric: true, render: (row) => row.reminders_queued },
+            {
+              key: "reminders",
+              fields: ["reminders_queued"],
+              label: "Reminders queued",
+              numeric: true,
+              render: (row) => row.reminders_queued,
+            },
           ]}
         />
       </Panel>

@@ -7,6 +7,7 @@ import { CustomerDirectory } from "./CustomerDirectory";
 import { CustomerPage } from "./CustomerPage";
 import type { Section } from "./model";
 import { TenantDirectory, TenantPage } from "./TenantPages";
+import { ColumnScopeProvider } from "../../tables/ColumnChooser";
 import "../../customer-admin/customer-admin.css";
 import "./customers.css";
 
@@ -30,39 +31,42 @@ export function CustomersAndTenants({
   const notify = (text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone });
 
   return (
-    <div className="cc-area">
-      {message && (
-        <div className={`ac-message tone-${message.tone}`} role="status">
-          {message.text}
-          <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      {open?.kind === "customer" ? (
-        <CustomerPage
-          customerId={open.id}
-          onBack={() => setOpen(null)}
-          onOpenTenant={(id) => setOpen({ kind: "tenant", id, from: open.id })}
-          onMessage={notify}
-        />
-      ) : open?.kind === "tenant" ? (
-        <TenantPage
-          tenantId={open.id}
-          onBack={() => setOpen(open.from ? { kind: "customer", id: open.from } : null)}
-          onOpenCustomer={(id) => setOpen({ kind: "customer", id })}
-          onMessage={notify}
-        />
-      ) : section === "Customers" ? (
-        <CustomerDirectory onOpen={(id) => setOpen({ kind: "customer", id })} />
-      ) : section === "Customer administrators" ? (
-        <CustomerAdmins onMessage={notify} />
-      ) : section === "Tenants" ? (
-        <TenantDirectory onOpen={(id) => setOpen({ kind: "tenant", id })} />
-      ) : (
-        <Onboarding onCreated={() => onSection("Customers")} />
-      )}
-    </div>
+    // Every list here lets the administrator choose the fields it shows.
+    <ColumnScopeProvider scope="admin:Customers & Tenants">
+      <div className="cc-area">
+        {message && (
+          <div className={`ac-message tone-${message.tone}`} role="status">
+            {message.text}
+            <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {open?.kind === "customer" ? (
+          <CustomerPage
+            customerId={open.id}
+            onBack={() => setOpen(null)}
+            onOpenTenant={(id) => setOpen({ kind: "tenant", id, from: open.id })}
+            onMessage={notify}
+          />
+        ) : open?.kind === "tenant" ? (
+          <TenantPage
+            tenantId={open.id}
+            onBack={() => setOpen(open.from ? { kind: "customer", id: open.from } : null)}
+            onOpenCustomer={(id) => setOpen({ kind: "customer", id })}
+            onMessage={notify}
+          />
+        ) : section === "Customers" ? (
+          <CustomerDirectory onOpen={(id) => setOpen({ kind: "customer", id })} />
+        ) : section === "Customer administrators" ? (
+          <CustomerAdmins onMessage={notify} />
+        ) : section === "Tenants" ? (
+          <TenantDirectory onOpen={(id) => setOpen({ kind: "tenant", id })} />
+        ) : (
+          <Onboarding onCreated={() => onSection("Customers")} />
+        )}
+      </div>
+    </ColumnScopeProvider>
   );
 }
 

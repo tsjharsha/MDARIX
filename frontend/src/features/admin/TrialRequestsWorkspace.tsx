@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
+import { Table } from "../customer-admin/shared";
 
 type TrialRequest = {
   id: string;
@@ -179,86 +180,86 @@ export function TrialRequestsWorkspace() {
           {filter === "PENDING_REVIEW" ? "No requests are waiting for review." : "Nothing here yet."}
         </p>
       ) : (
-        <div className="trial-queue-table-wrap">
-          <table className="trial-queue-table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Requester</th>
-                <th>Requested</th>
-                <th>{filter === "APPROVED" ? "Workspace" : filter === "DECLINED" ? "Reason" : "Status"}</th>
-                <th aria-label="Actions" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <strong>{row.organization}</strong>
-                  </td>
-                  <td>
-                    {row.display_name}
-                    <small>{row.email}</small>
-                  </td>
-                  <td>{formatDate(row.created_at)}</td>
-                  <td>
-                    {row.status === "APPROVED" ? (
-                      <>
-                        {row.tenant_key}
-                        {row.data_deleted ? (
-                          <small>Trial data deleted</small>
-                        ) : (
-                          <small>
-                            Trial ends {formatDate(row.trial_expires_at)} · data kept until{" "}
-                            {formatDate(row.data_delete_after)}
-                          </small>
-                        )}
-                      </>
-                    ) : row.status === "DECLINED" ? (
-                      (row.decision_reason ?? "—")
+        <Table
+          caption="Trial requests"
+          rows={rows}
+          rowKey={(row) => row.id}
+          empty={{ title: "Nothing here yet", detail: "Requests appear here as companies ask for a trial." }}
+          columns={[
+            { key: "organization", label: "Company", render: (row) => <strong>{row.organization}</strong> },
+            {
+              key: "requester",
+              label: "Requester",
+              render: (row) => (
+                <span className="cc-stack">
+                  {row.display_name}
+                  <small>{row.email}</small>
+                </span>
+              ),
+            },
+            { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
+            {
+              key: "outcome",
+              label: filter === "APPROVED" ? "Workspace" : filter === "DECLINED" ? "Reason" : "Status",
+              render: (row) =>
+                row.status === "APPROVED" ? (
+                  <span className="cc-stack">
+                    {row.tenant_key}
+                    {row.data_deleted ? (
+                      <small>Trial data deleted</small>
                     ) : (
-                      <span className="trial-queue-pill">Pending review</span>
+                      <small>
+                        Trial ends {formatDate(row.trial_expires_at)} · data kept until{" "}
+                        {formatDate(row.data_delete_after)}
+                      </small>
                     )}
-                  </td>
-                  <td>
-                    <div className="trial-queue-actions">
-                      {row.status === "PENDING_REVIEW" && (
-                        <>
-                          <button
-                            className="platform-admin-primary"
-                            disabled={busy !== null}
-                            onClick={() => setConfirming(row)}
-                          >
-                            <Check size={14} /> Approve
-                          </button>
-                          <button
-                            className="platform-admin-secondary"
-                            disabled={busy !== null}
-                            onClick={() => setDeclining(row)}
-                          >
-                            <X size={14} /> Decline
-                          </button>
-                        </>
-                      )}
-                      {row.status === "APPROVED" && row.owner_status === "INVITED" && !row.data_deleted && (
-                        <button
-                          className="platform-admin-secondary"
-                          disabled={busy !== null}
-                          onClick={() => act(row, "resend-invitation")}
-                        >
-                          <MailCheck size={14} /> Resend invitation
-                        </button>
-                      )}
-                      {row.status === "APPROVED" && row.owner_status === "ACTIVE" && !row.data_deleted && (
-                        <span className="trial-queue-pill is-active">Owner active</span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </span>
+                ) : row.status === "DECLINED" ? (
+                  (row.decision_reason ?? "—")
+                ) : (
+                  <span className="trial-queue-pill">Pending review</span>
+                ),
+            },
+            {
+              key: "actions",
+              label: "",
+              render: (row) => (
+                <div className="trial-queue-actions">
+                  {row.status === "PENDING_REVIEW" && (
+                    <>
+                      <button
+                        className="platform-admin-primary"
+                        disabled={busy !== null}
+                        onClick={() => setConfirming(row)}
+                      >
+                        <Check size={14} /> Approve
+                      </button>
+                      <button
+                        className="platform-admin-secondary"
+                        disabled={busy !== null}
+                        onClick={() => setDeclining(row)}
+                      >
+                        <X size={14} /> Decline
+                      </button>
+                    </>
+                  )}
+                  {row.status === "APPROVED" && row.owner_status === "INVITED" && !row.data_deleted && (
+                    <button
+                      className="platform-admin-secondary"
+                      disabled={busy !== null}
+                      onClick={() => act(row, "resend-invitation")}
+                    >
+                      <MailCheck size={14} /> Resend invitation
+                    </button>
+                  )}
+                  {row.status === "APPROVED" && row.owner_status === "ACTIVE" && !row.data_deleted && (
+                    <span className="trial-queue-pill is-active">Owner active</span>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
       )}
 
       {confirming && (

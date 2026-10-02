@@ -226,11 +226,17 @@ function AuditTrail() {
         rowKey={(row) => row.id}
         empty={{ title: "No events", detail: "No event matches these filters." }}
         columns={[
-          { key: "when", label: "When", render: (row) => formatDate(row.at) },
-          { key: "tenant", label: "Tenant", render: (row) => <TenantCell row={row} /> },
-          { key: "who", label: "Who", render: (row) => row.actor ?? "System" },
+          { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
+          {
+            key: "tenant",
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            label: "Tenant",
+            render: (row) => <TenantCell row={row} />,
+          },
+          { key: "who", fields: ["actor"], label: "Who", render: (row) => row.actor ?? "System" },
           {
             key: "what",
+            fields: ["action", "entity_type"],
             label: "What",
             render: (row) => (
               <span className="cc-stack">
@@ -239,7 +245,7 @@ function AuditTrail() {
               </span>
             ),
           },
-          { key: "why", label: "Reason", render: (row) => row.reason ?? "—" },
+          { key: "why", fields: ["reason"], label: "Reason", render: (row) => row.reason ?? "—" },
         ]}
       />
       <Pager page={page} pages={audit.data?.pages ?? 1} total={audit.data?.total ?? 0} noun="event" onPage={setPage} />
@@ -293,11 +299,17 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
         rowKey={(row) => row.id}
         empty={{ title: "No support access", detail: "Requests and their approvals appear here." }}
         columns={[
-          { key: "tenant", label: "Tenant", render: (row) => <TenantCell row={row} /> },
-          { key: "person", label: "For", render: (row) => row.person ?? "—" },
+          {
+            key: "tenant",
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            label: "Tenant",
+            render: (row) => <TenantCell row={row} />,
+          },
+          { key: "person", fields: ["person", "platform_user_id"], label: "For", render: (row) => row.person ?? "—" },
           { key: "why", label: "Reason", render: (row) => row.reason },
           {
             key: "window",
+            fields: ["starts_at", "expires_at"],
             label: "Window",
             render: (row) => (
               <span className="cc-stack">

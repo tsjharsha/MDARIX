@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Search, X } from "lucide-react";
 import { ApiError, requestJson } from "../../app/apiClient";
 import { Empty, Panel, type PanelState } from "../admin/console/charts";
+import { ColumnChooser, ColumnScope } from "../tables/ColumnChooser";
+import {
+  availableFieldKeys,
+  fieldLabel,
+  formatFieldValue,
+  loadSelection,
+  resolveSelection,
+  saveSelection,
+} from "../tables/columnModel";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
@@ -78,21 +87,85 @@ export function ResourcePanel<T>({
   );
 }
 
-export type Column<T> = { key: string; label: string; render: (row: T) => ReactNode; numeric?: boolean };
+export type Column<T> = {
+  key: string;
+  label: string;
+  render: (row: T) => ReactNode;
+  numeric?: boolean;
+  // The data fields this column already shows (so the field chooser does not offer them again).
+  fields?: string[];
+};
 
-export function Table<T>({
-  rows,
-  columns,
-  empty,
-  rowKey,
-  caption,
-}: {
+type TableProps<T> = {
   rows: T[];
   columns: Column<T>[];
   empty: { title: string; detail: string };
   rowKey: (row: T, index: number) => string;
   caption: string;
-}) {
+};
+
+/**
+ * A list. Inside a ColumnScope (the platform administrator's areas) it also offers "Columns": every field the rows
+ * carry can be shown, hidden and put in order, and the choice is remembered per list in this browser.
+ */
+export function Table<T>(props: TableProps<T>) {
+  const scope = useContext(ColumnScope);
+  return scope ? <ChoosableTable {...props} scope={scope} /> : <PlainTable {...props} />;
+}
+
+function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: TableProps<T> & { scope: string }) {
+  const id = `${scope}:${caption}`;
+  // Columns without a heading (row actions such as Open or Change) always stay, at the end.
+  const pinned = columns.filter((column) => !column.label.trim());
+  const named = columns.filter((column) => column.label.trim());
+  const defaults = named.map((column) => column.key);
+  const extraKeys = useMemo(
+    () =>
+      availableFieldKeys(
+        rows as unknown[],
+        columns.flatMap((column) => [column.key, ...(column.fields ?? [])]),
+      ),
+    [rows, columns],
+  );
+  const [saved, setSaved] = useState<string[] | null>(() => loadSelection(id));
+  if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  const options = [
+    ...named.map((column) => ({ key: column.key, label: column.label })),
+    ...extraKeys.map((key) => ({ key, label: fieldLabel(key) })),
+  ];
+  const selection = resolveSelection(
+    defaults,
+    options.map((option) => option.key),
+    saved,
+  );
+  const extraColumn = (key: string): Column<T> => {
+    const sample = (rows as unknown as Array<Record<string, unknown>>).find((row) => row?.[key] != null)?.[key];
+    return {
+      key,
+      label: fieldLabel(key),
+      numeric: typeof sample === "number",
+      render: (row) => formatFieldValue((row as unknown as Record<string, unknown>)[key]),
+    };
+  };
+  const shown = [...selection.map((key) => named.find((column) => column.key === key) ?? extraColumn(key)), ...pinned];
+  return (
+    <>
+      <ColumnChooser
+        caption={caption}
+        options={options}
+        selection={selection}
+        defaults={defaults}
+        onChange={(next) => {
+          setSaved(next);
+          saveSelection(id, next);
+        }}
+      />
+      <PlainTable rows={rows} columns={shown} empty={empty} rowKey={rowKey} caption={caption} />
+    </>
+  );
+}
+
+function PlainTable<T>({ rows, columns, empty, rowKey, caption }: TableProps<T>) {
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
   return (
     <div className="ac-table-wrap">

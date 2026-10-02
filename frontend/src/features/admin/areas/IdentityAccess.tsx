@@ -78,6 +78,7 @@ function PlatformUsers() {
         columns={[
           {
             key: "user",
+            fields: ["display_name", "email"],
             label: "User",
             render: (row) => (
               <span className="cc-stack">

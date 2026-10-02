@@ -85,6 +85,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
         columns={[
           {
             key: "customer",
+            fields: ["name", "customer_identifier", "legal_name"],
             label: "Customer",
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
@@ -95,6 +96,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
           },
           {
             key: "tenants",
+            fields: ["tenant_count"],
             label: "Tenants",
             render: (row) =>
               row.tenants.length ? (
@@ -112,7 +114,13 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
                 <span className="ac-muted">No tenant yet</span>
               ),
           },
-          { key: "admins", label: "Active administrators", numeric: true, render: (row) => row.active_admins },
+          {
+            key: "admins",
+            fields: ["active_admins"],
+            label: "Active administrators",
+            numeric: true,
+            render: (row) => row.active_admins,
+          },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           {
             key: "open",

@@ -184,6 +184,7 @@ export function CustomerAdmins({
         columns={[
           {
             key: "name",
+            fields: ["display_name", "email"],
             label: "Administrator",
             render: (row) => (
               <span className="cc-stack">
@@ -197,6 +198,7 @@ export function CustomerAdmins({
             : [
                 {
                   key: "customer",
+                  fields: ["customer_name", "customer_id"],
                   label: "Customer",
                   render: (row: CustomerAdmin) => <strong>{row.customer_name ?? "—"}</strong>,
                 },
@@ -206,6 +208,7 @@ export function CustomerAdmins({
             : [
                 {
                   key: "tenant",
+                  fields: ["tenant_name", "tenant_key", "tenant_id"],
                   label: "Tenant",
                   render: (row: CustomerAdmin) => (
                     <span className="cc-stack">

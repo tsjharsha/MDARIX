@@ -148,10 +148,16 @@ const slices = (counts: Record<string, number> = {}): Slice[] =>
     .map(([key, count]) => ({ key, label: titleCase(key), count, tone: toneOf(key) }));
 
 const RUN_COLUMNS = [
-  { key: "when", label: "Started", render: (row: Run) => formatDate(row.started_at) },
-  { key: "tenant", label: "Tenant", render: (row: Run) => <TenantCell row={row} /> },
+  { key: "when", fields: ["started_at"], label: "Started", render: (row: Run) => formatDate(row.started_at) },
+  {
+    key: "tenant",
+    fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+    label: "Tenant",
+    render: (row: Run) => <TenantCell row={row} />,
+  },
   {
     key: "source",
+    fields: ["source_system", "connection_id"],
     label: "Source",
     render: (row: Run) => (
       <span className="cc-stack">
@@ -162,6 +168,7 @@ const RUN_COLUMNS = [
   },
   {
     key: "records",
+    fields: ["records_received", "records_accepted", "records_rejected"],
     label: "Records in / kept / rejected",
     numeric: true,
     render: (row: Run) => `${row.records_received} / ${row.records_accepted} / ${row.records_rejected}`,

@@ -61,6 +61,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
         columns={[
           {
             key: "tenant",
+            fields: ["name", "tenant_key", "tenant_identifier"],
             label: "Tenant",
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
@@ -71,6 +72,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
           },
           {
             key: "customer",
+            fields: ["customer_name", "customer_identifier", "customer_id"],
             label: "Customer",
             render: (row) => (
               <span className="cc-stack">
@@ -79,9 +81,25 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
               </span>
             ),
           },
-          { key: "region", label: "Data region", render: (row) => row.residency_region ?? row.region ?? "—" },
-          { key: "plan", label: "Plan", render: (row) => row.plan_name ?? row.plan_code ?? "—" },
-          { key: "environments", label: "Environments", numeric: true, render: (row) => row.environment_count ?? 0 },
+          {
+            key: "region",
+            fields: ["residency_region", "region"],
+            label: "Data region",
+            render: (row) => row.residency_region ?? row.region ?? "—",
+          },
+          {
+            key: "plan",
+            fields: ["plan_name", "plan_code"],
+            label: "Plan",
+            render: (row) => row.plan_name ?? row.plan_code ?? "—",
+          },
+          {
+            key: "environments",
+            fields: ["environment_count"],
+            label: "Environments",
+            numeric: true,
+            render: (row) => row.environment_count ?? 0,
+          },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />

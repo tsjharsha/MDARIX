@@ -183,10 +183,16 @@ function Executions() {
         rowKey={(row) => row.id}
         empty={{ title: failedOnly ? "No failed runs" : "No AI runs yet", detail: "Runs appear as people use AI." }}
         columns={[
-          { key: "when", label: "When", render: (row) => formatDate(row.at) },
-          { key: "tenant", label: "Tenant", render: (row) => <TenantCell row={row} /> },
+          { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
+          {
+            key: "tenant",
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            label: "Tenant",
+            render: (row) => <TenantCell row={row} />,
+          },
           {
             key: "model",
+            fields: ["model", "provider"],
             label: "Model",
             render: (row) => (
               <span className="cc-stack">
@@ -197,13 +203,21 @@ function Executions() {
           },
           {
             key: "check",
+            fields: ["validation_status"],
             label: "Answer check",
             render: (row) => (row.validation_status ? <StatusBadge status={row.validation_status} /> : "—"),
           },
           { key: "confidence", label: "Confidence", render: (row) => titleCase(row.confidence ?? "—") },
-          { key: "time", label: "Time", numeric: true, render: (row) => seconds(row.latency_ms) },
+          {
+            key: "time",
+            fields: ["latency_ms"],
+            label: "Time",
+            numeric: true,
+            render: (row) => seconds(row.latency_ms),
+          },
           {
             key: "result",
+            fields: ["failed"],
             label: "Result",
             render: (row) =>
               row.failed ? (

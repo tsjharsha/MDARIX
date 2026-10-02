@@ -202,6 +202,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
         columns={[
           {
             key: "mapping",
+            fields: ["code", "version"],
             label: "Mapping",
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => setOpen(row)}>
@@ -212,6 +213,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
           },
           {
             key: "route",
+            fields: ["source_system", "target_entity"],
             label: "From → to",
             render: (row) => (
               <span className="ar-route">
@@ -220,7 +222,13 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
               </span>
             ),
           },
-          { key: "fields", label: "Fields", numeric: true, render: (row) => mappingRuleCount(row.mapping_rules) },
+          {
+            key: "fields",
+            fields: ["mapping_rules"],
+            label: "Fields",
+            numeric: true,
+            render: (row) => mappingRuleCount(row.mapping_rules),
+          },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />

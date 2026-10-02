@@ -8,6 +8,7 @@ import { Operations } from "./Operations";
 import { PlansLicensing } from "./PlansLicensing";
 import { SecurityArea } from "./SecurityArea";
 import { AREA_SECTIONS } from "./sections";
+import { ColumnScopeProvider } from "../../tables/ColumnChooser";
 import "../../customer-admin/customer-admin.css";
 import "../customers/customers.css";
 import "./areas.css";
@@ -35,16 +36,19 @@ export function AdminArea({ domain, section }: { domain: string; section: string
       <Operations section={section} />
     );
   return (
-    <div className="cc-area ar-area">
-      {message && (
-        <div className={`ac-message tone-${message.tone}`} role="status">
-          {message.text}
-          <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
-            <X size={14} />
-          </button>
-        </div>
-      )}
-      {body}
-    </div>
+    // Every list in the area lets the administrator choose the fields it shows.
+    <ColumnScopeProvider scope={`admin:${domain}`}>
+      <div className="cc-area ar-area">
+        {message && (
+          <div className={`ac-message tone-${message.tone}`} role="status">
+            {message.text}
+            <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {body}
+      </div>
+    </ColumnScopeProvider>
   );
 }
