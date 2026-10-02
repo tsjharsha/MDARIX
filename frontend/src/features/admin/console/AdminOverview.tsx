@@ -31,9 +31,8 @@ import {
   type Slice,
   type Tone,
 } from "./dashboardModel";
-import { KpiTile, TrendChart, type TrendPoint } from "./trendCharts";
+import { KpiTile, TrendChart, toPoints, type DailyRow, type TrendPoint } from "./trendCharts";
 
-type DailyRow = { date: string } & Record<string, number | string>;
 type DashboardTrends = {
   days: number;
   ai_runs: DailyRow[];
@@ -44,29 +43,6 @@ type DashboardTrends = {
   tenants_by_region: Array<{ label: string; count: number }>;
   licences_ending: Array<{ month: string; count: number }>;
 };
-
-const dayLabel = (date: string) =>
-  new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-
-/**
- * Daily rows as chart points. With `totalOfAll`, the primary value is the day's total over `primary`, `secondary`
- * and `alsoCounted` (e.g. runs = completed + warnings + failed) and the secondary value is the `secondary` part.
- */
-const toPoints = (
-  rows: DailyRow[] | undefined,
-  primary: string,
-  secondary?: string,
-  totalOfAll = false,
-  alsoCounted: string[] = [],
-): TrendPoint[] =>
-  (rows ?? []).map((row) => {
-    const value = (key: string) => Number(row[key] ?? 0);
-    const second = secondary ? value(secondary) : undefined;
-    const first = totalOfAll
-      ? value(primary) + (second ?? 0) + alsoCounted.reduce((sum, key) => sum + value(key), 0)
-      : value(primary);
-    return { date: String(row.date), label: dayLabel(String(row.date)), primary: first, secondary: second };
-  });
 
 const slices = (
   rows: Array<{ label: string; count: number }> | undefined,

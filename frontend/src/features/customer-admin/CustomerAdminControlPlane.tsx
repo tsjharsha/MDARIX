@@ -19,7 +19,8 @@ import "../admin/console/admin-console.css";
 import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
 import { ConfirmDialog, type Confirmation } from "./shared";
-import { Overview } from "./sections/Overview";
+import { Dashboard } from "./sections/Dashboard";
+import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { UsersSection } from "./sections/Users";
 import { AccessSection } from "./sections/Access";
 import { IntegrationsSection } from "./sections/Integrations";
@@ -31,7 +32,7 @@ import { AuditSection } from "./sections/Audit";
 import { OrganizationSection } from "./sections/Organization";
 
 const NAV: Record<Section, { icon: typeof Users; description: string }> = {
-  Overview: { icon: LayoutDashboard, description: "Status dashboard" },
+  Dashboard: { icon: LayoutDashboard, description: "Live organization status" },
   Users: { icon: Users, description: "People, invitations, access" },
   "Roles & Access": { icon: KeyRound, description: "Roles, permission sets, approvals" },
   Integrations: { icon: Plug, description: "Connections and syncs" },
@@ -52,7 +53,7 @@ export function CustomerAdminControlPlane({
   onNavigate?: (view: any) => void;
 }) {
   const [location, setLocation] = useState<{ section: Section; tab?: string; key: number }>({
-    section: "Overview",
+    section: "Dashboard",
     key: 0,
   });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -71,7 +72,8 @@ export function CustomerAdminControlPlane({
   // The workspace side navigation (App.tsx) can still request a section by name.
   useEffect(() => {
     const handler = (event: Event) => {
-      const requested = String((event as CustomEvent).detail);
+      // "Overview" is the former name of the Dashboard.
+      const requested = String((event as CustomEvent).detail).replace(/^Overview$/, "Dashboard");
       if ((SECTIONS as readonly string[]).includes(requested)) open(requested as Section);
     };
     window.addEventListener("customer-admin-section", handler);
@@ -144,7 +146,7 @@ export function CustomerAdminControlPlane({
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">Customer administration</p>
-                <h1>{section === "Overview" ? "Overview" : section}</h1>
+                <h1>{section}</h1>
                 <p>{NAV[section].description}</p>
               </div>
             </div>
@@ -156,18 +158,21 @@ export function CustomerAdminControlPlane({
                 </button>
               </div>
             )}
-            <div key={location.key} className="ca-section">
-              {section === "Overview" && <Overview />}
-              {section === "Users" && <UsersSection tab={tab} />}
-              {section === "Roles & Access" && <AccessSection tab={tab} />}
-              {section === "Integrations" && <IntegrationsSection tab={tab} />}
-              {section === "Data Mapping" && <DataMappingSection tab={tab} />}
-              {section === "Plan & Subscription" && <SubscriptionSection />}
-              {section === "Security" && <SecuritySection tab={tab} />}
-              {section === "Notifications" && <NotificationsSection />}
-              {section === "Audit" && <AuditSection />}
-              {section === "Organization" && <OrganizationSection />}
-            </div>
+            {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
+            <ColumnScopeProvider key={location.key} scope={`customer-admin:${section}`}>
+              <div className="ca-section">
+                {section === "Dashboard" && <Dashboard />}
+                {section === "Users" && <UsersSection tab={tab} />}
+                {section === "Roles & Access" && <AccessSection tab={tab} />}
+                {section === "Integrations" && <IntegrationsSection tab={tab} />}
+                {section === "Data Mapping" && <DataMappingSection tab={tab} />}
+                {section === "Plan & Subscription" && <SubscriptionSection />}
+                {section === "Security" && <SecuritySection tab={tab} />}
+                {section === "Notifications" && <NotificationsSection />}
+                {section === "Audit" && <AuditSection />}
+                {section === "Organization" && <OrganizationSection />}
+              </div>
+            </ColumnScopeProvider>
           </main>
         </div>
 

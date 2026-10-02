@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from auth.emailer import smtp_configuration_status
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
+from backend.app.access.trends import daily as _daily, per_day as _per_day, run_outcome, window
 from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
 from backend.app.db.models.enterprise import ConnectorRun
 from backend.app.db.models.foundation import (
@@ -590,45 +591,21 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
 # Dashboard ------------------------------------------------------------------------------------------------------
 
 
-def _daily(rows, days: int, end) -> list[dict]:
-    """[{date, ...counts}] for each of the last `days` days, zero-filled. `rows` are (date, key, count)."""
-    start = end - timedelta(days=days - 1)
-    series = {(start + timedelta(days=offset)).isoformat(): {} for offset in range(days)}
-    for day, key, count in rows:
-        bucket = series.get(day.isoformat() if hasattr(day, "isoformat") else str(day)[:10])
-        if bucket is not None:
-            bucket[key] = bucket.get(key, 0) + int(count)
-    return [{"date": date, **counts} for date, counts in series.items()]
-
-
 @router.get("/platform-admin/console/dashboard")
 def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get_db)):
     """Platform-wide daily activity for the dashboard (AI runs, integration runs, audit events, new tenants) and
     the shape of the customer base (tenants by plan and data region, licences ending by month)."""
     _require_platform_admin(request, db)
-    days = min(90, max(7, days))
-    today = datetime.now(timezone.utc).date()
-    since = datetime.combine(today - timedelta(days=days - 1), datetime.min.time(), tzinfo=timezone.utc)
+    days, today, since = window(days)
 
     def per_day(column, *conditions, key=None) -> list[tuple]:
-        """(day, key, count) rows since the window start; key defaults to "count"."""
-        day = func.date(column)
-        if key is None:
-            rows = db.query(day, func.count()).filter(column >= since, *conditions).group_by(day).all()
-            return [(row[0], "count", row[1]) for row in rows]
-        return db.query(day, key, func.count()).filter(column >= since, *conditions).group_by(day, key).all()
+        return _per_day(db, since, column, *conditions, key=key)
 
     # Group on plain column expressions (no bound values, which Postgres would not match in GROUP BY), then label.
     ai_rows = [
         (day, "completed" if ok else "failed", count)
         for day, ok, count in per_day(AIExecution.execution_timestamp, key=AIExecution.error_state.is_(None))
     ]
-
-    def run_outcome(status) -> str:
-        value = str(status or "").upper()
-        if value in {"FAILED", "ERROR", "PARTIAL"}:
-            return "failed"
-        return "warnings" if "WARNING" in value else "completed"
 
     run_rows = [
         (day, run_outcome(status), count)

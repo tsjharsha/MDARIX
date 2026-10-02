@@ -105,7 +105,7 @@ type TableProps<T> = {
 };
 
 /**
- * A list. Inside a ColumnScope (the platform administrator's areas) it also offers "Columns": every field the rows
+ * A list. Inside a ColumnScope (every page of both administrator consoles) it also offers "Columns": every field the rows
  * carry can be shown, hidden and put in order, and the choice is remembered per list in this browser.
  */
 export function Table<T>(props: TableProps<T>) {

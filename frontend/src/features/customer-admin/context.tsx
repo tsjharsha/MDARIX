@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type { Confirmation } from "./shared";
 
 export const SECTIONS = [
-  "Overview",
+  "Dashboard",
   "Users",
   "Roles & Access",
   "Integrations",

@@ -5,6 +5,31 @@ import type { Tone } from "./dashboardModel";
 import { AnimatedNumber } from "./motion";
 
 export type TrendPoint = { date: string; label: string; primary: number; secondary?: number };
+/** One day of a dashboard series from the server: {date, ...counts}. */
+export type DailyRow = { date: string } & Record<string, number | string>;
+
+const dayLabel = (date: string) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/**
+ * Daily rows as chart points. With `totalOfAll`, the primary value is the day's total over `primary`, `secondary`
+ * and `alsoCounted` (e.g. runs = completed + warnings + failed) and the secondary value is the `secondary` part.
+ */
+export const toPoints = (
+  rows: DailyRow[] | undefined,
+  primary: string,
+  secondary?: string,
+  totalOfAll = false,
+  alsoCounted: string[] = [],
+): TrendPoint[] =>
+  (rows ?? []).map((row) => {
+    const value = (key: string) => Number(row[key] ?? 0);
+    const second = secondary ? value(secondary) : undefined;
+    const first = totalOfAll
+      ? value(primary) + (second ?? 0) + alsoCounted.reduce((sum, key) => sum + value(key), 0)
+      : value(primary);
+    return { date: String(row.date), label: dayLabel(String(row.date)), primary: first, secondary: second };
+  });
 
 const niceTop = (value: number) => {
   if (value <= 4) return Math.max(1, value <= 2 ? 2 : 4);

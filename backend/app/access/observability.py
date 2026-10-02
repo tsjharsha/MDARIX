@@ -8,6 +8,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth.emailer import (
@@ -25,6 +26,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.enterprise import ConnectorRun, ReconciliationRecord
 from backend.app.db.models.stage2 import (
+    AuthSession,
     OutboxEvent,
     UserInvitation,
 )
@@ -37,6 +39,7 @@ from backend.app.access.authz import (
     platform_account_clause,
     visible_user_filters,
 )
+from backend.app.access.trends import daily, per_day, run_outcome, window
 from backend.app.runtime_env import environment
 from backend.app.worker_status import worker_status
 
@@ -368,6 +371,60 @@ def tenant_dashboard(request: Request, db: Session = Depends(get_db)):
             **health["metrics"],
         },
         "health": {"status": health["status"], "alerts": health["alerts"], "recent_audit": health["recent_audit"]},
+        "scope": {"tenant_scoped": True, "server_derived": True},
+    }
+
+
+@router.get("/admin/dashboard-trends")
+def tenant_dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get_db)):
+    """The signed-in administrator's own tenant, day by day: sign-ins, new users, integration runs, AI runs and
+    audit events, plus investigations by status. The tenant comes from the session only; counts, never content."""
+    admin = _admin_tenant(request, db)
+    tenant_id = admin.tenant_id
+    days, today, since = window(days)
+    visible = visible_user_filters(admin)
+
+    sign_in_day = func.date(AuthSession.created_at)
+    sign_ins = (
+        db.query(sign_in_day, func.count())
+        .join(AuthUser, AuthUser.id == AuthSession.user_id)
+        .filter(AuthSession.tenant_id == tenant_id, AuthSession.created_at >= since, *visible)
+        .group_by(sign_in_day)
+        .all()
+    )
+    new_users = per_day(db, since, AuthUser.created_at, AuthUser.tenant_id == tenant_id, *visible)
+    runs = per_day(
+        db, since, ConnectorRun.started_at, ConnectorRun.tenant_id == tenant_id, key=func.upper(ConnectorRun.status)
+    )
+    ai = per_day(
+        db,
+        since,
+        AIExecution.execution_timestamp,
+        AIExecution.tenant_id == tenant_id,
+        key=AIExecution.error_state.is_(None),
+    )
+    in_tenant = AuditEvent.tenant_id == tenant_id
+    refused = or_(AuditEvent.action.like("%DENIED%"), AuditEvent.action.like("%FAILED%"))
+    audit = [(day, "events", count) for day, _, count in per_day(db, since, AuditEvent.created_at, in_tenant)] + [
+        (day, "refused", count) for day, _, count in per_day(db, since, AuditEvent.created_at, in_tenant, refused)
+    ]
+    investigations = (
+        db.query(func.upper(Investigation.status), func.count(Investigation.id))
+        .filter(Investigation.tenant_id == tenant_id)
+        .group_by(func.upper(Investigation.status))
+        .order_by(func.count(Investigation.id).desc())
+        .all()
+    )
+    return {
+        "days": days,
+        "sign_ins": daily([(day, "sign_ins", count) for day, count in sign_ins], days, today),
+        "new_users": daily([(day, "users", count) for day, _, count in new_users], days, today),
+        "integration_runs": daily([(day, run_outcome(status), count) for day, status, count in runs], days, today),
+        "ai_runs": daily([(day, "completed" if ok else "failed", count) for day, ok, count in ai], days, today),
+        "audit_events": daily(audit, days, today),
+        "investigations_by_status": [
+            {"label": status or "UNKNOWN", "count": count} for status, count in investigations
+        ],
         "scope": {"tenant_scoped": True, "server_derived": True},
     }
 
