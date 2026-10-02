@@ -19,21 +19,6 @@ export const changePolicyLabel = (policy: string | null | undefined) => {
   }
 };
 
-const normalize = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-
-/** The data-model code ("PRODUCT_VERSION") of a mapping's target, written either as a code or a name. */
-export const entityCodeFor = (
-  target: string | null | undefined,
-  entities: Array<{ entity_id: string; entity_name: string }>,
-) => {
-  const wanted = normalize(String(target ?? ""));
-  if (!wanted) return "";
-  const found = entities.find(
-    (entity) => normalize(entity.entity_id) === wanted || normalize(entity.entity_name) === wanted,
-  );
-  return found?.entity_id ?? "";
-};
-
 /** How many field rules a stored mapping has (a list under "rules", "fields", or one key per field). */
 export const mappingRuleCount = (rules: unknown) => {
   if (!rules || typeof rules !== "object") return 0;
@@ -99,34 +84,5 @@ export const nextReleaseAction = (status: unknown): NextAction | null => {
       };
     default:
       return null;
-  }
-};
-
-/** A validation finding from the server, as a sentence. */
-export const validationMessage = (item: { code?: string; target?: string; transform?: string }) => {
-  const field = item.target ? `“${item.target}”` : "a field";
-  switch (item.code) {
-    case "DUPLICATE_TARGET":
-      return `${field} is filled more than once.`;
-    case "UNKNOWN_TARGET":
-      return `${field} is not a field of this MDARIX record.`;
-    case "PROTECTED_FIELD":
-      return `${field} is set by MDARIX and cannot be filled from customer data.`;
-    case "INVALID_TRANSFORM":
-      return `“${item.transform}” is not an approved transformation.`;
-    case "REFERENCE_REQUIRES_LOOKUP":
-      return `${field} links to another record, so it needs a Lookup.`;
-    case "INVALID_REFERENCE":
-      return `${field} is not a link, so Lookup cannot be used.`;
-    case "CIRCULAR_REFERENCE":
-      return `${field} links the record to itself.`;
-    case "TYPE_INCOMPATIBLE":
-      return `${field} has a different type than its customer field; choose a conversion.`;
-    case "INVALID_OVERRIDE_POLICY":
-      return `${field} uses an unknown change policy.`;
-    default:
-      return `${field}: ${String(item.code ?? "problem")
-        .toLowerCase()
-        .replace(/_/g, " ")}.`;
   }
 };

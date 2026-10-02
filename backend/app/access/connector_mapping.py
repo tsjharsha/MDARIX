@@ -81,3 +81,78 @@ def import_connector_records(
     except HTTPException as exc:  # a race between check and write; nothing was written for this batch
         return {"status": "BLOCKED", "entity": entity, "mapping": mapping.code, "report": exc.detail}
     return {"status": "IMPORTED", "mapping": mapping.code, **result}
+
+
+# Conversions the import applies to a value on its way in (integration.gateway.transform), in words.
+TRANSFORMS = {
+    "identity": "As is",
+    "trim": "Remove spaces at the ends",
+    "upper": "UPPER CASE",
+    "lower": "lower case",
+    "string": "As text",
+    "date": "As a date",
+    "boolean": "As yes / no",
+}
+# The records a mapping can fill today, with the template that receives them.
+IMPORTABLE_TARGETS = {"Complaint": "complaints", "Product": "products", "Lot": "lots"}
+
+
+def mapping_targets() -> dict:
+    """What a connector mapping can fill: each importable record with its columns, and the conversions."""
+    return {
+        "targets": [
+            {
+                "entity": entity,
+                "label": imports.TEMPLATES[template]["title"],
+                "required": list(imports.TEMPLATES[template]["required"]),
+                "optional": list(imports.TEMPLATES[template]["optional"]),
+            }
+            for entity, template in IMPORTABLE_TARGETS.items()
+        ],
+        "transforms": [{"code": code, "label": label} for code, label in TRANSFORMS.items()],
+    }
+
+
+def field_rules(mapping_rules) -> dict:
+    """The field rules of a stored mapping (settings such as "_configuration" are not rules)."""
+    if not isinstance(mapping_rules, dict):
+        return {}
+    return {key: rule for key, rule in mapping_rules.items() if not str(key).startswith("_")}
+
+
+def check_mapping(target_entity: str, mapping_rules) -> dict:
+    """Whether a mapping can import records: a known record, known columns and conversions, required columns filled.
+
+    Returns the problems in plain words, so the same answer is shown before saving, on demand and at release.
+    """
+    problems: list[str] = []
+    template = TARGET_TEMPLATES.get(target_entity)
+    rules = field_rules(mapping_rules)
+    if template is None:
+        problems.append(f"MDARIX cannot import '{target_entity}' records yet; choose Complaint, Product or Lot.")
+        return {"status": "NEEDS_CHANGES", "problems": problems, "missing_required": [], "rule_count": len(rules)}
+    spec = imports.TEMPLATES[template]
+    columns = set(spec["required"]) | set(spec["optional"])
+    filled: list[str] = []
+    for source, rule in rules.items():
+        target = str(rule.get("target_field", "")) if isinstance(rule, dict) else ""
+        if "." not in target:
+            problems.append(f"'{source}' has no MDARIX field.")
+            continue
+        column = target.split(".", 1)[1]
+        if column not in columns:
+            problems.append(f"'{column}' is not a field of {spec['title'].lower()}.")
+        if (rule.get("transform") or "identity") not in TRANSFORMS:
+            problems.append(f"'{rule.get('transform')}' is not a conversion MDARIX applies.")
+        filled.append(column)
+    for column in sorted({column for column in filled if filled.count(column) > 1}):
+        problems.append(f"'{column}' is filled by more than one customer field.")
+    if not rules:
+        problems.append("The mapping has no field rules.")
+    missing = [column for column in spec["required"] if column not in filled]
+    return {
+        "status": "READY" if not problems and not missing else "NEEDS_CHANGES",
+        "problems": problems,
+        "missing_required": missing,
+        "rule_count": len(rules),
+    }

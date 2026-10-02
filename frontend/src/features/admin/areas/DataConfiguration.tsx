@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Pencil, Plus, ShieldAlert } from "lucide-react";
+import { ArrowRight, Pencil, Plus } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
 import {
   ConfirmDialog,
@@ -16,16 +16,11 @@ import {
 } from "../../customer-admin/shared";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
+import { MappingCheckResult, MappingWizard } from "../../mapping/MappingWizard";
+import type { MappingCheck } from "../../mapping/mappingModel";
+import { requestJson } from "../../../app/apiClient";
 import { Intro, TenantPicker } from "./common";
-import {
-  RELEASE_STEPS,
-  changePolicyLabel,
-  entityCodeFor,
-  mappingRuleCount,
-  nextReleaseAction,
-  releaseStageOf,
-  validationMessage,
-} from "./dataModel";
+import { RELEASE_STEPS, changePolicyLabel, mappingRuleCount, nextReleaseAction, releaseStageOf } from "./dataModel";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -231,7 +226,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
       />
       {open && <MappingDetail mapping={open} onClose={() => setOpen(null)} />}
       {creating && (
-        <NewMapping
+        <MappingWizard
           onClose={() => setCreating(false)}
           onSaved={(code) => {
             setCreating(false);
@@ -260,28 +255,17 @@ function MappingDetail({ mapping, onClose }: { mapping: Mapping; onClose: () => 
   const versions = useResource<any[]>(
     `/api/v1/admin/configuration/mappings/${encodeURIComponent(mapping.code)}/versions`,
   );
-  const entities = useEntities();
-  const [check, setCheck] = useState<any | null>(null);
+  const [check, setCheck] = useState<MappingCheck | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState("");
   const rows = (listOf(fields.data) as FieldRow[]).filter(
     (row) => row.mapping_id === mapping.id && row.target_field !== "Not configured",
   );
-  const entityId = entityCodeFor(mapping.target_entity, listOf(entities.data) as Entity[]);
   const runCheck = async () => {
     setChecking(true);
     setCheckError("");
     try {
-      setCheck(
-        await send("/api/v1/admin/mapping/validate", "POST", {
-          entity_id: entityId,
-          rules: rows.map((row) => ({
-            source: row.source_field,
-            target: row.target_field,
-            transform: String(row.transform ?? "DIRECT_COPY").toUpperCase(),
-          })),
-        }),
-      );
+      setCheck(await requestJson<MappingCheck>(`/api/v1/admin/configuration/mappings/${mapping.id}/check`));
     } catch (reason) {
       setCheckError(errorText(reason, "The mapping could not be checked."));
     } finally {
@@ -329,17 +313,16 @@ function MappingDetail({ mapping, onClose }: { mapping: Mapping; onClose: () => 
           ]}
         />
         <div className="ar-check">
-          <button type="button" className="ac-secondary" onClick={runCheck} disabled={checking || !entityId}>
+          <button type="button" className="ac-secondary" onClick={runCheck} disabled={checking}>
             {checking ? "Checking…" : "Check mapping"}
           </button>
-          {!entityId && <small className="ac-muted">This mapping&apos;s MDARIX record is not in the data model.</small>}
         </div>
         {checkError && (
           <p className="ca-inline-error" role="alert">
             {checkError}
           </p>
         )}
-        {check && <CheckResult result={check} />}
+        {check && <MappingCheckResult result={check} />}
         <h3 className="ar-subhead">Versions</h3>
         <Table
           caption="Versions"
@@ -354,291 +337,6 @@ function MappingDetail({ mapping, onClose }: { mapping: Mapping; onClose: () => 
         />
       </div>
     </Drawer>
-  );
-}
-
-function CheckResult({ result }: { result: any }) {
-  const errors = listOf(result.errors);
-  const missing = listOf(result.missing_required);
-  const passed = result.status === "PASS";
-  return (
-    <section className={`ar-result ${passed ? "pass" : "blocked"}`} aria-live="polite">
-      <strong>
-        {passed ? <CheckCircle2 size={16} aria-hidden="true" /> : <ShieldAlert size={16} aria-hidden="true" />}{" "}
-        {passed ? "Ready to release" : "Needs changes before release"}
-      </strong>
-      <span className="ac-muted">{result.checked_rules} field rules checked.</span>
-      {errors.length > 0 && (
-        <ul>
-          {errors.map((item, index) => (
-            <li key={index}>{validationMessage(item)}</li>
-          ))}
-        </ul>
-      )}
-      {missing.length > 0 && <p>Required MDARIX fields not filled: {missing.join(", ")}.</p>}
-    </section>
-  );
-}
-
-type Rule = { source: string; target: string; transform: string };
-
-/** A new mapping in three steps: what to connect, which fields, then a check before it is saved as a draft. */
-function NewMapping({ onClose, onSaved }: { onClose: () => void; onSaved: (code: string) => void }) {
-  const apps = useResource<any[]>("/api/v1/admin/mapping/applications");
-  const entities = useEntities();
-  const transforms = useResource<any[]>("/api/v1/admin/mapping/transforms");
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState({ code: "", source_system: "", source_object: "", target_entity: "" });
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [check, setCheck] = useState<any | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const objects = useResource<any[]>(
-    form.source_system ? `/api/v1/admin/mapping/applications/${encodeURIComponent(form.source_system)}/objects` : null,
-  );
-  const sourceFields = useResource<any[]>(
-    form.source_object ? `/api/v1/admin/mapping/objects/${encodeURIComponent(form.source_object)}/fields` : null,
-  );
-  const targetFields = useFields(form.target_entity);
-  const mappable = (listOf(targetFields.data) as CanonicalField[]).filter((field) => field.mapping_allowed);
-  const sources = listOf(sourceFields.data);
-  const transformCodes = listOf(transforms.data).map((item) => String(item.code));
-  const objectRow = listOf(objects.data).find((row) => row.source_object_id === form.source_object);
-  const ready1 = form.code.trim().length >= 3 && form.source_object && form.target_entity;
-  const update = (index: number, change: Partial<Rule>) =>
-    setRules(rules.map((rule, at) => (at === index ? { ...rule, ...change } : rule)));
-  const addRequired = () => {
-    const present = new Set(rules.map((rule) => rule.target));
-    const additions = mappable
-      .filter((field) => field.required && !present.has(field.field_name))
-      .map((field) => {
-        const same = sources.find(
-          (source) => String(source.field_name).toLowerCase() === field.field_name.toLowerCase(),
-        );
-        return {
-          source: same?.field_name ?? "",
-          target: field.field_name,
-          transform: field.data_type === "UUID_REF" ? "LOOKUP" : "DIRECT_COPY",
-        };
-      });
-    setRules([...rules, ...additions]);
-  };
-  const runCheck = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      setCheck(await send("/api/v1/admin/mapping/validate", "POST", { entity_id: form.target_entity, rules }));
-      setStep(3);
-    } catch (reason) {
-      setError(errorText(reason, "The mapping could not be checked."));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const save = async () => {
-    setBusy(true);
-    setError("");
-    const code = form.code.trim().toUpperCase().replace(/\s+/g, "_");
-    try {
-      await send("/api/v1/admin/configuration/mappings", "POST", {
-        code,
-        source_system: form.source_system,
-        target_entity: form.target_entity,
-        version: "v1",
-        source_table: objectRow?.object_name ?? null,
-        target_table: form.target_entity,
-        mapping_rules: {
-          rules: rules.map((rule) => ({
-            kind: "field",
-            source_field: rule.source,
-            target_field: rule.target,
-            transform: rule.transform,
-          })),
-        },
-      });
-      onSaved(code);
-    } catch (reason) {
-      setError(errorText(reason, "The mapping was not saved."));
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
-      <div className="ac-modal ar-wide-modal" role="dialog" aria-modal="true" aria-labelledby="ar-new-mapping">
-        <p className="ac-eyebrow">Step {step} of 3</p>
-        <h2 id="ar-new-mapping">New mapping</h2>
-        <ol className="ar-steps" aria-label="Steps">
-          {["What to connect", "Fields", "Check and save"].map((label, index) => (
-            <li key={label} className={step === index + 1 ? "current" : step > index + 1 ? "done" : ""}>
-              {label}
-            </li>
-          ))}
-        </ol>
-        {step === 1 && (
-          <>
-            <label className="ca-field">
-              Name
-              <input
-                value={form.code}
-                onChange={(event) => setForm({ ...form, code: event.target.value })}
-                placeholder="e.g. TRACKWISE_COMPLAINTS"
-              />
-            </label>
-            <div className="cc-two-fields">
-              <label className="ca-field">
-                Customer system
-                <select
-                  value={form.source_system}
-                  onChange={(event) => setForm({ ...form, source_system: event.target.value, source_object: "" })}
-                >
-                  <option value="">Choose a system</option>
-                  {listOf(apps.data).map((app) => (
-                    <option key={app.application_id} value={app.application_id}>
-                      {app.display_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="ca-field">
-                Record in that system
-                <select
-                  value={form.source_object}
-                  disabled={!form.source_system}
-                  onChange={(event) => setForm({ ...form, source_object: event.target.value })}
-                >
-                  <option value="">Choose a record</option>
-                  {listOf(objects.data).map((row) => (
-                    <option key={row.source_object_id} value={row.source_object_id}>
-                      {row.object_name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="ca-field">
-              MDARIX record it fills
-              <select
-                value={form.target_entity}
-                onChange={(event) => {
-                  setForm({ ...form, target_entity: event.target.value });
-                  setRules([]);
-                }}
-              >
-                <option value="">Choose a record</option>
-                {(listOf(entities.data) as Entity[]).map((entity) => (
-                  <option key={entity.entity_id} value={entity.entity_id}>
-                    {entity.entity_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        )}
-        {step === 2 && (
-          <>
-            <p>Choose which customer field fills each MDARIX field, and how the value is carried over.</p>
-            <div className="ar-rule-actions">
-              <button type="button" className="ac-secondary" onClick={addRequired}>
-                Add the required fields
-              </button>
-              <button
-                type="button"
-                className="ac-secondary"
-                onClick={() => setRules([...rules, { source: "", target: "", transform: "DIRECT_COPY" }])}
-              >
-                <Plus size={14} aria-hidden="true" /> Add a field
-              </button>
-            </div>
-            <div className="ar-rules" role="table" aria-label="Field rules">
-              {rules.map((rule, index) => (
-                <div key={index} className="ar-rule" role="row">
-                  <select
-                    aria-label="Customer field"
-                    value={rule.source}
-                    onChange={(event) => update(index, { source: event.target.value })}
-                  >
-                    <option value="">Customer field…</option>
-                    {sources.map((field) => (
-                      <option key={field.field_name} value={field.field_name}>
-                        {field.field_label ?? field.field_name}
-                      </option>
-                    ))}
-                  </select>
-                  <ArrowRight size={14} aria-hidden="true" />
-                  <select
-                    aria-label="MDARIX field"
-                    value={rule.target}
-                    onChange={(event) => update(index, { target: event.target.value })}
-                  >
-                    <option value="">MDARIX field…</option>
-                    {mappable.map((field) => (
-                      <option key={field.field_name} value={field.field_name}>
-                        {field.field_label ?? field.field_name}
-                        {field.required ? " (required)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    aria-label="How"
-                    value={rule.transform}
-                    onChange={(event) => update(index, { transform: event.target.value })}
-                  >
-                    {(transformCodes.length ? transformCodes : ["DIRECT_COPY"]).map((code) => (
-                      <option key={code} value={code}>
-                        {titleCase(code)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="ac-link cc-danger-link"
-                    onClick={() => setRules(rules.filter((_, at) => at !== index))}
-                    aria-label="Remove this field"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-              {!rules.length && <p className="ac-muted">No fields yet. Start with “Add the required fields”.</p>}
-            </div>
-          </>
-        )}
-        {step === 3 && check && <CheckResult result={check} />}
-        {step === 3 && check && check.status !== "PASS" && (
-          <p className="ac-muted">You can still save it as a draft and finish it later; it cannot be released yet.</p>
-        )}
-        {error && (
-          <p className="ca-inline-error" role="alert">
-            {error}
-          </p>
-        )}
-        <div className="ac-modal-actions">
-          <button type="button" className="ac-secondary" onClick={step === 1 ? onClose : () => setStep(step - 1)}>
-            {step === 1 ? "Cancel" : "Back"}
-          </button>
-          {step === 1 && (
-            <button type="button" className="ac-primary" disabled={!ready1} onClick={() => setStep(2)}>
-              Next: fields
-            </button>
-          )}
-          {step === 2 && (
-            <button
-              type="button"
-              className="ac-primary"
-              disabled={busy || !rules.length || rules.some((rule) => !rule.source || !rule.target)}
-              onClick={runCheck}
-            >
-              {busy ? "Checking…" : "Next: check"}
-            </button>
-          )}
-          {step === 3 && (
-            <button type="button" className="ac-primary" disabled={busy} onClick={save}>
-              {busy ? "Saving…" : "Save as draft"}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }
 

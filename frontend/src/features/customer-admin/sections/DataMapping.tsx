@@ -3,8 +3,10 @@ import { Plus } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
-import { Drawer, SearchBox, Table, Tabs, errorText, formatDate, listOf, matches, send, useResource } from "../shared";
+import { Drawer, SearchBox, Table, Tabs, formatDate, listOf, matches, send, useResource } from "../shared";
 import { LifecycleBadge } from "./Access";
+import { MappingCheckResult, MappingWizard } from "../../mapping/MappingWizard";
+import type { MappingCheck } from "../../mapping/mappingModel";
 
 const TABS = ["Mappings", "Field mappings"] as const;
 type Tab = (typeof TABS)[number];
@@ -38,26 +40,20 @@ function Mappings() {
   const { notify } = useConsole();
   const mappings = useResource<any[]>("/api/v1/admin/configuration/mappings");
   const [selected, setSelected] = useState<any | null>(null);
-  const [form, setForm] = useState({ code: "", source_system: "", target_entity: "", source_table: "" });
-  const create = async (event: React.FormEvent) => {
-    event.preventDefault();
-    try {
-      await send("/api/v1/admin/configuration/mappings", "POST", {
-        code: form.code.trim().toUpperCase(),
-        source_system: form.source_system.trim().toUpperCase(),
-        target_entity: form.target_entity.trim(),
-        source_table: form.source_table.trim() || undefined,
-      });
-      notify(`Mapping ${form.code} created as a draft.`);
-      setForm({ code: "", source_system: "", target_entity: "", source_table: "" });
-      mappings.reload();
-    } catch (reason) {
-      notify(errorText(reason, "Mapping could not be created."), "critical");
-    }
-  };
+  const [creating, setCreating] = useState(false);
   return (
     <>
-      <Panel eyebrow="Data mapping" title="Mappings" state={mappings.state} error={mappings.error}>
+      <Panel
+        eyebrow="Data mapping"
+        title="Mappings"
+        state={mappings.state}
+        error={mappings.error}
+        action={
+          <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
+            <Plus size={16} aria-hidden="true" /> New mapping
+          </button>
+        }
+      >
         <Table
           caption="Mappings"
           rows={listOf(mappings.data)}
@@ -90,55 +86,16 @@ function Mappings() {
           ]}
         />
       </Panel>
-      <Panel eyebrow="New" title="Create a mapping">
-        <form className="ca-form" onSubmit={create}>
-          <div className="ca-form-grid">
-            <label className="ca-field">
-              Code
-              <input
-                required
-                pattern="[A-Za-z0-9_]+"
-                title="Letters, numbers and underscores"
-                value={form.code}
-                onChange={(event) => setForm({ ...form, code: event.target.value })}
-              />
-            </label>
-            <label className="ca-field">
-              Source system
-              <input
-                required
-                placeholder="e.g. TRACKWISE"
-                value={form.source_system}
-                onChange={(event) => setForm({ ...form, source_system: event.target.value })}
-              />
-            </label>
-            <label className="ca-field">
-              MDARIX object
-              <input
-                required
-                placeholder="e.g. complaint"
-                value={form.target_entity}
-                onChange={(event) => setForm({ ...form, target_entity: event.target.value })}
-              />
-            </label>
-            <label className="ca-field">
-              Source table (optional)
-              <input
-                value={form.source_table}
-                onChange={(event) => setForm({ ...form, source_table: event.target.value })}
-              />
-            </label>
-          </div>
-          <p className="ac-muted">
-            A mapping needs field rules before it can be released; your MDARIX onboarding team can add them with you.
-          </p>
-          <div className="ca-action-row">
-            <button type="submit" className="ac-primary">
-              <Plus size={16} /> Create mapping
-            </button>
-          </div>
-        </form>
-      </Panel>
+      {creating && (
+        <MappingWizard
+          onClose={() => setCreating(false)}
+          onSaved={(code) => {
+            setCreating(false);
+            notify(`Mapping ${code} saved as a draft. Open it to request approval.`);
+            mappings.reload();
+          }}
+        />
+      )}
       {selected && (
         <ReleaseDrawer
           mapping={selected}
@@ -156,10 +113,12 @@ function Mappings() {
 function ReleaseDrawer({ mapping, onClose, onChanged }: { mapping: any; onClose: () => void; onChanged: () => void }) {
   const { confirm } = useConsole();
   const release = useResource<any>(`/api/v1/admin/configuration/mappings/${mapping.id}/release`);
+  const check = useResource<MappingCheck>(`/api/v1/admin/configuration/mappings/${mapping.id}/check`);
   const status = String(release.data?.status ?? mapping.status ?? "").toUpperCase();
   const available = RELEASE_ACTIONS.filter((option) => (option.from as readonly string[]).includes(status));
   return (
     <Drawer title={`${mapping.code} · ${mapping.version}`} onClose={onClose}>
+      {check.data && <MappingCheckResult result={check.data} />}
       <dl className="ca-facts">
         <div>
           <dt>Status</dt>

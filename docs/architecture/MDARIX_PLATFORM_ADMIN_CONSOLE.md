@@ -51,9 +51,11 @@ Audit trail.
 - **Data model:** the MDARIX records, their fields, who may change each field (MDARIX only, customer with approval,
   customer), and the records a field links to. It replaces Canonical data model and the "Canonical Object 360" and
   "Schema 360" placeholders.
-- **Mappings:** the mapping list and each mapping's field rules, a "Check mapping" against the data model, and its
-  versions. A 3-step **New mapping** wizard (what to connect, fields, check and save) adds the required fields in one
-  click and checks the mapping before saving it as a draft. This tab replaces Data mapping, Mapping versions,
+- **Mappings:** the mapping list and each mapping's field rules, a "Check mapping" (can it import records as
+  written?), and its versions. The 3-step **New mapping** wizard (what to connect, fields, check and save) is shared
+  with the Customer Administrator's Data Mapping screen. It saves the format the connector import reads, fills the
+  required fields by matching names, and checks the mapping before saving it as a draft. See
+  [CUSTOMER_SYSTEM_INTEGRATION.md](../runbooks/CUSTOMER_SYSTEM_INTEGRATION.md). This tab replaces Data mapping, Mapping versions,
   Validation & data quality, Configuration 360 / Mapping 360 and Configuration sets.
 - **Releases:** the pipeline Draft → Waiting for approval → Approved → Released → Rolled back. Each mapping shows
   its one next step, every step asks for a reason, and approval must come from a different administrator (the

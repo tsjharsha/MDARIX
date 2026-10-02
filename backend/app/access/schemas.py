@@ -88,6 +88,11 @@ class MappingRequest(BaseModel):
     target_table: str | None = None
 
 
+class MappingCheckRequest(BaseModel):
+    target_entity: str = Field(min_length=1, max_length=120)
+    mapping_rules: dict = {}
+
+
 class UserCreateRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
     display_name: str = Field(min_length=1, max_length=120)

@@ -1,0 +1,108 @@
+/* The shared connector mapping wizard (MappingWizard.tsx), used in both administrator consoles. */
+.mw-modal {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(780px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.mw-modal .ca-field {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.mw-modal .ca-field input,
+.mw-modal .ca-field select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.mw-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.mw-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mw-steps li {
+  padding: 4px 10px;
+  border: 1px solid var(--ac-line, #d9e0e6);
+  border-radius: 999px;
+  color: var(--ac-muted, #5d6b78);
+  font-size: 12px;
+}
+.mw-steps li.current {
+  border-color: var(--ac-teal, #0f766e);
+  background: var(--ac-teal-wash, #e8f5f3);
+  color: var(--ac-ink, #10202f);
+  font-weight: 700;
+}
+.mw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mw-rules {
+  display: grid;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.mw-rule {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 0.9fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.mw-rule select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--ac-line, #d9e0e6);
+  border-radius: 6px;
+  background: var(--ac-surface, #fff);
+  color: var(--ac-ink, #10202f);
+  text-overflow: ellipsis;
+}
+.mw-remove {
+  color: var(--ac-critical, #b42318) !important;
+}
+.mw-result {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line, #d9e0e6);
+  border-left-width: 3px;
+  border-radius: 6px;
+}
+.mw-result strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mw-result.ready {
+  border-left-color: var(--ac-good, #1f7a4d);
+}
+.mw-result.blocked {
+  border-left-color: var(--ac-critical, #b42318);
+}
+.mw-result ul,
+.mw-result p {
+  margin: 0;
+}
+@media (max-width: 720px) {
+  .mw-two,
+  .mw-rule {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mw-rule > svg {
+    display: none;
+  }
+}

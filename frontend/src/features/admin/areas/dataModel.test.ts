@@ -1,17 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  RELEASE_STEPS,
-  changePolicyLabel,
-  entityCodeFor,
-  mappingRuleCount,
-  nextReleaseAction,
-  validationMessage,
-} from "./dataModel";
-
-const ENTITIES = [
-  { entity_id: "PRODUCT_VERSION", entity_name: "Product Version" },
-  { entity_id: "COMPLAINT", entity_name: "Complaint" },
-];
+import { RELEASE_STEPS, changePolicyLabel, mappingRuleCount, nextReleaseAction } from "./dataModel";
 
 describe("data model labels", () => {
   it("names who may change a field", () => {
@@ -19,14 +7,6 @@ describe("data model labels", () => {
     expect(changePolicyLabel("RESTRICTED")).toBe("Customer, with approval");
     expect(changePolicyLabel("CUSTOMER_OVERRIDE_ALLOWED")).toBe("Customer");
     expect(changePolicyLabel(null)).toBe("—");
-  });
-
-  it("finds the data-model record for a mapping target written as a code or a name", () => {
-    // "ProductVersion" used to be sent as PRODUCTVERSION and was not found.
-    expect(entityCodeFor("ProductVersion", ENTITIES)).toBe("PRODUCT_VERSION");
-    expect(entityCodeFor("Product Version", ENTITIES)).toBe("PRODUCT_VERSION");
-    expect(entityCodeFor("Complaint", ENTITIES)).toBe("COMPLAINT");
-    expect(entityCodeFor("Unknown", ENTITIES)).toBe("");
   });
 
   it("counts field rules in every stored shape", () => {
@@ -54,10 +34,5 @@ describe("releases", () => {
     for (const status of ["DRAFT", "READY_FOR_APPROVAL", "APPROVED", "RELEASED", "SUPERSEDED"]) {
       expect(statuses).toContain(status);
     }
-  });
-
-  it("explains validation findings in words", () => {
-    expect(validationMessage({ code: "PROTECTED_FIELD", target: "tenant_id" })).toMatch(/set by MDARIX/);
-    expect(validationMessage({ code: "INVALID_TRANSFORM", transform: "TRIM" })).toMatch(/not an approved/);
   });
 });

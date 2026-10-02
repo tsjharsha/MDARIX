@@ -33,6 +33,18 @@ LIFECYCLE_TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 
+# A new tenant's provisioning status follows its lifecycle status, within the values the database allows
+# (DRAFT, QUEUED, RUNNING, FAILED, PROVISIONED, ACTIVE). Onboarding creates tenants as PROVISIONING, which used to
+# be copied as is and refused by the database.
+PROVISIONING_STATUS_FOR = {
+    "DRAFT": "DRAFT",
+    "PENDING_APPROVAL": "QUEUED",
+    "PROVISIONING": "RUNNING",
+    "PROVISIONED": "PROVISIONED",
+    "ACTIVE": "PROVISIONED",
+}
+
+
 def allowed_lifecycle_transition(current: str, target: str) -> bool:
     return target.upper() in LIFECYCLE_TRANSITIONS.get(current.upper(), frozenset())
 
@@ -83,7 +95,7 @@ def _tenant(
         primary_region=region,
         residency_region=residency_region,
         cross_border_processing_allowed=False,
-        provisioning_status="PROVISIONED" if lifecycle_status == "ACTIVE" else lifecycle_status,
+        provisioning_status=PROVISIONING_STATUS_FOR.get(lifecycle_status, "PROVISIONED"),
         status=lifecycle_status,
         activated_at=now if lifecycle_status == "ACTIVE" else None,
         lock_version=1,
@@ -114,6 +126,29 @@ def build_tenant_for_customer(
         now=now,
         region=region,
         residency_region=residency_region,
+    )
+
+
+def shared_data_plane(tenant: Tenant, now: datetime):
+    """Register a new tenant's business data in the shared database (rows keyed by tenant, row-level security).
+
+    Every tenant needs a data plane before its products, complaints or connector imports can be stored; without one
+    those requests fail closed. A dedicated database is set up later by replacing this registry row.
+    """
+    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE
+    from backend.app.db.models.customer_lifecycle import TenantDataPlane
+
+    return TenantDataPlane(
+        id=uuid.uuid4(),
+        tenant_id=tenant.id,
+        database_ref=f"shared-control:{tenant.tenant_key}",
+        connection_secret_ref=SHARED_CONTROL_DATA_PLANE,
+        region=tenant.primary_region or "UNSPECIFIED",
+        residency_region=tenant.residency_region or "UNSPECIFIED",
+        schema_version="control-plane",
+        status="ACTIVE",
+        created_at=now,
+        updated_at=now,
     )
 
 

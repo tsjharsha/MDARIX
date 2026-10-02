@@ -15,6 +15,7 @@ from auth.emailer import (
 from auth.service import _hash
 from backend.app.customer_lifecycle import (
     build_customer_tenant,
+    shared_data_plane,
 )
 from backend.app.db.models.customer_lifecycle import (
     Customer,
@@ -77,6 +78,7 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
         db.add(customer)
         db.add(tenant)
         db.flush()
+        db.add(shared_data_plane(tenant, now))
         plan = (
             db.query(PlanDefinition)
             .filter(PlanDefinition.code == payload.plan_code, PlanDefinition.status == "ACTIVE")
@@ -108,18 +110,26 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
                 updated_at=now,
             )
         )
-        db.add(
-            FeatureEntitlement(
-                id=uuid.uuid4(),
-                plan_id=plan.id,
-                feature_code="ADMIN_CONTROL_PLANE",
-                enabled=True,
-                limits={"licensed_users_limit": payload.licensed_users_limit},
-                status="ACTIVE",
-                created_at=now,
-                updated_at=now,
+        # The plan's limits are shared by every tenant on it: set them only for a plan that has none yet, never
+        # overwrite them (a second customer on the plan used to fail on the duplicate row).
+        if (
+            db.query(FeatureEntitlement.id)
+            .filter(FeatureEntitlement.plan_id == plan.id, FeatureEntitlement.feature_code == "ADMIN_CONTROL_PLANE")
+            .first()
+            is None
+        ):
+            db.add(
+                FeatureEntitlement(
+                    id=uuid.uuid4(),
+                    plan_id=plan.id,
+                    feature_code="ADMIN_CONTROL_PLANE",
+                    enabled=True,
+                    limits={"licensed_users_limit": payload.licensed_users_limit},
+                    status="ACTIVE",
+                    created_at=now,
+                    updated_at=now,
+                )
             )
-        )
     user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == email).first()
     if user is None:
         user = AuthUser(

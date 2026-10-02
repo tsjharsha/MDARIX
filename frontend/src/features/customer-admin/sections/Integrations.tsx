@@ -7,6 +7,101 @@ import { Table, Tabs, errorText, formatDate, listOf, send, useResource } from ".
 import { LifecycleActions, LifecycleBadge } from "./Access";
 
 const TABS = ["Connections", "Sync activity", "Reconciliation"] as const;
+
+const EMPTY_CONNECTION = {
+  code: "",
+  connector_type: "",
+  endpoint: "",
+  credential_ref: "",
+  source_object: "",
+  mapping_code: "",
+};
+
+/** One option per mapping code (its newest version), marked when it is released and so able to import. */
+const mappingOptions = (rows: unknown) => {
+  const byCode = new Map<string, any>();
+  for (const row of listOf(rows)) {
+    const seen = byCode.get(row.code);
+    if (!seen || String(row.status).toUpperCase() === "RELEASED") byCode.set(row.code, row);
+  }
+  return [...byCode.values()]
+    .sort((a, b) => String(a.code).localeCompare(String(b.code)))
+    .map((row) => ({
+      code: String(row.code),
+      label: `${row.code} (${String(row.status).toUpperCase() === "RELEASED" ? "released" : titleCase(row.status ?? "draft").toLowerCase()})`,
+    }));
+};
+
+/** Choose which mapping a connection uses; the rest of its configuration is kept as it is. */
+function LinkMapping({
+  connection,
+  mappings,
+  onClose,
+  onLinked,
+}: {
+  connection: any;
+  mappings: unknown;
+  onClose: () => void;
+  onLinked: (message: string) => void;
+}) {
+  const [code, setCode] = useState<string>(connection.configuration?.mapping_code ?? "");
+  const [record, setRecord] = useState<string>(connection.configuration?.source_object ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const configuration = { ...(connection.configuration ?? {}) };
+    if (code) configuration.mapping_code = code;
+    else delete configuration.mapping_code;
+    if (record.trim()) configuration.source_object = record.trim();
+    try {
+      await send(`/api/v1/admin/control-plane/connectors/${connection.id}`, "PATCH", { values: { configuration } });
+      onLinked(code ? `${connection.code} now uses mapping ${code}.` : `${connection.code} no longer uses a mapping.`);
+    } catch (reason) {
+      setError(errorText(reason, "The connection was not changed."));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+      <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ca-link-mapping" onSubmit={submit}>
+        <p className="ac-eyebrow">{connection.code}</p>
+        <h2 id="ca-link-mapping">Mapping for this connection</h2>
+        <p>On Sync now, the records read are turned into MDARIX records with this mapping, once it is released.</p>
+        <label className="ca-field">
+          Mapping
+          <select value={code} onChange={(event) => setCode(event.target.value)}>
+            <option value="">None (records are only staged)</option>
+            {mappingOptions(mappings).map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="ca-field">
+          Record to read
+          <input value={record} onChange={(event) => setRecord(event.target.value)} placeholder="e.g. Complaint" />
+        </label>
+        {error && (
+          <p className="ca-inline-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="ac-modal-actions">
+          <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button type="submit" className="ac-primary" disabled={busy}>
+            {busy ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 type Tab = (typeof TABS)[number];
 
 const resultTone = (status: unknown): Tone => {
@@ -43,7 +138,9 @@ function Connections() {
   const credentials = useResource<any[]>("/api/v1/admin/integrations/credentials");
   const [checks, setChecks] = useState<Check[]>([]);
   const [busy, setBusy] = useState("");
-  const [form, setForm] = useState({ code: "", connector_type: "", endpoint: "", credential_ref: "" });
+  const mappings = useResource<any[]>("/api/v1/admin/configuration/mappings");
+  const [form, setForm] = useState({ ...EMPTY_CONNECTION });
+  const [linking, setLinking] = useState<any | null>(null);
   const credentialFor = (id: string) => listOf(credentials.data).find((row) => row.id === id);
 
   const run = async (row: any, action: "provider-health" | "discover-schema", label: string) => {
@@ -75,6 +172,9 @@ function Connections() {
     const configuration: Record<string, string> = {};
     if (form.endpoint.trim()) configuration.endpoint = form.endpoint.trim();
     if (form.credential_ref.trim()) configuration.credential_ref = form.credential_ref.trim();
+    // The mapping turns the connector's records into MDARIX records on "Sync now"; the record names what to read.
+    if (form.mapping_code) configuration.mapping_code = form.mapping_code;
+    if (form.source_object.trim()) configuration.source_object = form.source_object.trim();
     try {
       await send("/api/v1/admin/configuration/connectors", "POST", {
         code: form.code.trim().toUpperCase(),
@@ -82,7 +182,7 @@ function Connections() {
         configuration,
       });
       notify(`Connection ${form.code} created as a draft. Run a health check, then activate it.`);
-      setForm({ code: "", connector_type: "", endpoint: "", credential_ref: "" });
+      setForm({ ...EMPTY_CONNECTION });
       connectors.reload();
       credentials.reload();
     } catch (reason) {
@@ -125,6 +225,18 @@ function Connections() {
                 ) : (
                   <ToneBadge tone="warning" label="No reference" />
                 ),
+            },
+            {
+              key: "mapping",
+              label: "Mapping",
+              render: (row) => (
+                <span className="ca-person">
+                  <strong>{row.configuration?.mapping_code ?? <span className="ac-muted">None</span>}</strong>
+                  <button type="button" className="ac-link" onClick={() => setLinking(row)}>
+                    {row.configuration?.mapping_code ? "Change" : "Choose mapping"}
+                  </button>
+                </span>
+              ),
             },
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
             {
@@ -218,6 +330,18 @@ function Connections() {
           </div>
         )}
       </Panel>
+      {linking && (
+        <LinkMapping
+          connection={linking}
+          mappings={mappings.data}
+          onClose={() => setLinking(null)}
+          onLinked={(message) => {
+            setLinking(null);
+            notify(message);
+            connectors.reload();
+          }}
+        />
+      )}
       <Panel eyebrow="New" title="Add a connection">
         <form className="ca-form" onSubmit={create}>
           <div className="ca-form-grid">
@@ -252,16 +376,41 @@ function Connections() {
             <label className="ca-field">
               Credential reference
               <input
-                pattern="[A-Za-z0-9_]{1,120}"
-                title="The name of the secret in your secret manager, not the secret itself"
-                placeholder="e.g. TRACKWISE_PROD_READER"
+                pattern="MDARIX_CONNECTOR_SECRET_[A-Z0-9_]{1,80}"
+                title="The name of the server secret (MDARIX_CONNECTOR_SECRET_…), never the secret itself"
+                placeholder="e.g. MDARIX_CONNECTOR_SECRET_TRACKWISE"
                 value={form.credential_ref}
                 onChange={(event) => setForm({ ...form, credential_ref: event.target.value })}
               />
             </label>
           </div>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Record to read
+              <input
+                placeholder="e.g. Complaint"
+                value={form.source_object}
+                onChange={(event) => setForm({ ...form, source_object: event.target.value })}
+              />
+            </label>
+            <label className="ca-field">
+              Mapping (turns records into MDARIX records)
+              <select
+                value={form.mapping_code}
+                onChange={(event) => setForm({ ...form, mapping_code: event.target.value })}
+              >
+                <option value="">None yet (records are only staged)</option>
+                {mappingOptions(mappings.data).map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p className="ac-muted">
-            Never paste a password or token here. Enter only the reference name; the server rejects secret values.
+            Never paste a password or token here. Enter only the reference name; the server rejects secret values. Only
+            a released mapping imports records; until then Sync now reads and stages them.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary">

@@ -34,13 +34,22 @@ from backend.app.access.schemas import (
     ConnectorRequest,
     ConnectorRunRequest,
     MappingPreviewRequest,
+    MappingCheckRequest,
     MappingRequest,
     ReleaseActionRequest,
     StatusRequest,
 )
 from backend.app.access.authz import _admin_tenant, _guard_user_administration, is_hidden_from
 from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
-from backend.app.access.connector_mapping import MappingNotUsable, import_connector_records, released_mapping
+from backend.app.access.connector_mapping import (
+    MappingNotUsable,
+    check_mapping,
+    field_rules,
+    import_connector_records,
+    mapping_targets,
+    released_mapping,
+)
+from backend.app.db.models.enterprise import ConnectorRun
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import get_request_context
 
@@ -94,6 +103,43 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
         "version": row.version,
         "status": row.status,
     }
+
+
+def _rule_count(rules) -> int:
+    if isinstance(rules, dict) and isinstance(rules.get("rules"), list):
+        return len(rules["rules"])
+    return len(field_rules(rules))
+
+
+@router.get("/admin/configuration/mapping-targets")
+def list_mapping_targets(request: Request, db: Session = Depends(get_db)):
+    """The MDARIX records a connector mapping can fill (with their fields) and the conversions it may apply."""
+    _admin_tenant(request, db)
+    return mapping_targets()
+
+
+@router.post("/admin/configuration/mappings/check")
+def check_new_mapping(payload: MappingCheckRequest, request: Request, db: Session = Depends(get_db)):
+    """Check a mapping before it is saved: can it import records as written?"""
+    _admin_tenant(request, db)
+    return check_mapping(payload.target_entity, payload.mapping_rules)
+
+
+@router.get("/admin/configuration/mappings/{configuration_id}/check")
+def check_saved_mapping(configuration_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """Check a saved mapping of this tenant: can it import records as written?"""
+    admin = _admin_tenant(request, db)
+    row = (
+        db.query(MappingConfiguration)
+        .filter(MappingConfiguration.id == configuration_id, MappingConfiguration.tenant_id == admin.tenant_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(
+            404,
+            detail={"code": "MAPPING_NOT_FOUND", "message": "Mapping configuration is not available for this tenant"},
+        )
+    return {"mapping_id": str(row.id), "code": row.code, **check_mapping(row.target_entity, row.mapping_rules)}
 
 
 @router.post("/admin/configuration/mappings")
@@ -474,6 +520,37 @@ def provider_schema(configuration_id: uuid.UUID, request: Request, db: Session =
     return {"connector_id": str(row.id), "code": row.code, **result}
 
 
+def _record_sync(tenant_id, connector: ConnectorConfiguration, source_system: str, read: int, outcome) -> ConnectorRun:
+    """One run per sync, for Sync activity and Reconciliation: what was read, kept and refused, and whether the
+    imported rows match what was read. Operational metadata only; the records stay in the tenant's data plane."""
+    now = datetime.now(timezone.utc)
+    status, accepted, rejected, reconciliation, failure = "COMPLETED", read, 0, None, None
+    if outcome:
+        if outcome.get("status") == "IMPORTED":
+            accepted = int(outcome.get("rows") or 0)
+            reconciliation = "MATCH" if accepted == read else "MISMATCH"
+        else:
+            status, accepted, rejected = "FAILED", 0, read
+            reconciliation = "MISMATCH"
+            failure = "MAPPING_NOT_USABLE" if outcome.get("reason") else "IMPORT_BLOCKED"
+    return ConnectorRun(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        connection_id=connector.code,
+        source_system=(connector.configuration or {}).get("source_object") or source_system or connector.connector_type,
+        run_type="MANUAL",
+        status=status,
+        records_received=read,
+        records_accepted=accepted,
+        records_rejected=rejected,
+        reconciliation_status=reconciliation,
+        failure_category=failure,
+        started_at=now,
+        completed_at=now,
+        created_at=now,
+    )
+
+
 @router.post("/admin/configuration/connectors/{configuration_id}/execute")
 def execute_connector(
     configuration_id: uuid.UUID,
@@ -569,6 +646,9 @@ def execute_connector(
             data = next(sessions)
             try:
                 canonical_import = import_connector_records(data, admin.tenant_id, row.code, mapping, result)
+            except MappingNotUsable as exc:
+                canonical_import = {"status": "BLOCKED", "reason": str(exc)}
+            try:
                 if canonical_import.get("status") == "IMPORTED":
                     data.commit()
                 else:
@@ -585,10 +665,13 @@ def execute_connector(
                 occurred_at=datetime.now(timezone.utc),
             )
         )
+    run = _record_sync(admin.tenant_id, row, payload.source_system, len(result), canonical_import)
+    db.add(run)
     _audit_configuration(db, admin, "CONNECTOR_EXECUTED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
     return {
         "status": "COMPLETE",
+        "run_id": str(run.id),
         "tenant_id": str(admin.tenant_id),
         "connector_id": str(row.id),
         "records_read": len(result),
@@ -697,7 +780,7 @@ def mapping_release_detail(configuration_id: uuid.UUID, request: Request, db: Se
         },
         "validation": {
             "status": "PASS" if rules else "REVIEW_REQUIRED",
-            "rule_count": len(rules.get("rules", rules)) if isinstance(rules, dict) else 0,
+            "rule_count": _rule_count(rules),
         },
         "audit": [
             {"action": item.action, "actor": item.actor_ref, "created_at": item.created_at, "details": item.details}
@@ -734,7 +817,8 @@ def mapping_release_action(
             },
         )
     rules = row.mapping_rules or {}
-    has_rules = bool(rules.get("rules", rules)) if isinstance(rules, dict) else bool(rules)
+    # Settings such as "_configuration" are not rules: a mapping without field rules cannot be released.
+    has_rules = _rule_count(rules) > 0
     transitions = {
         "REQUEST_APPROVAL": ("READY_FOR_APPROVAL", {"DRAFT", "VALIDATION", "READY_FOR_APPROVAL"}),
         "APPROVE": ("APPROVED", {"READY_FOR_APPROVAL"}),

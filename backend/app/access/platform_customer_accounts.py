@@ -24,7 +24,7 @@ from backend.app.access.platform_customer_admins import (
     ensure_email_is_free,
 )
 from backend.app.access.schemas import TenantAddRequest
-from backend.app.customer_lifecycle import build_tenant_for_customer
+from backend.app.customer_lifecycle import build_tenant_for_customer, shared_data_plane
 from backend.app.db.models.customer_lifecycle import Customer, TenantEnvironment
 from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantPlanAssignment
 from backend.app.db.session import get_db
@@ -206,6 +206,7 @@ def add_tenant_to_customer(
     tenant.provisioning_status = "ACTIVE"
     db.add(tenant)
     db.flush()
+    db.add(shared_data_plane(tenant, now))
     # The plan belongs to this tenant only; the plan's shared limits are not changed.
     db.add(
         TenantPlanAssignment(

@@ -83,13 +83,29 @@ def _guard(db, ctx):
     _platform_admin(db, ctx)
 
 
+def _catalog_reader(db: Session, ctx: AuthenticatedRequestContext):
+    """Platform administrators, and Customer Administrators reading the source-system catalog to map their data.
+
+    The catalog (systems, their records and fields) is product metadata, not tenant data; every write and every
+    check stays platform-only.
+    """
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.id == ctx.user_id, AuthUser.tenant_id == ctx.tenant_id, AuthUser.status == "ACTIVE")
+        .first()
+    )
+    if user is not None and str(user.role or "").upper() == "CUSTOMER_ADMIN":
+        return
+    _platform_admin(db, ctx)
+
+
 def _not_found(code: str, message: str) -> HTTPException:
     return HTTPException(404, detail={"code": code, "message": message})
 
 
 @router.get("/applications")
 def applications(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
-    _guard(db, ctx)
+    _catalog_reader(db, ctx)
     return catalog.applications(db)
 
 
@@ -97,7 +113,7 @@ def applications(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext
 def application_objects(
     application_id: str, db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
 ):
-    _guard(db, ctx)
+    _catalog_reader(db, ctx)
     objects = catalog.application_objects(db, application_id)
     if objects is None:
         raise _not_found("APPLICATION_NOT_FOUND", "External application is not available")
@@ -110,7 +126,7 @@ def source_fields(
     db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    _guard(db, ctx)
+    _catalog_reader(db, ctx)
     fields = catalog.source_fields(db, source_object_id)
     if fields is None:
         raise _not_found("SOURCE_OBJECT_NOT_FOUND", "Source object is not available for this application")

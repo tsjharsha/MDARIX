@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from backend.app.customer_lifecycle import (
     allowed_lifecycle_transition,
     build_customer_tenant,
+    shared_data_plane,
 )
 from backend.app.db.models.customer_lifecycle import (
     Customer,
@@ -53,6 +54,7 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
     db.add(customer)
     db.add(tenant)
     db.flush()
+    db.add(shared_data_plane(tenant, now))
     plan = (
         db.query(PlanDefinition)
         .filter(PlanDefinition.code == payload.plan_code, PlanDefinition.status == "ACTIVE")
