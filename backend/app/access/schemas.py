@@ -236,6 +236,16 @@ class PlatformProductRequest(BaseModel):
     manufacturer_context: str | None = None
 
 
+class PlatformProductUpdateRequest(BaseModel):
+    """A platform administrator edits a tenant's product; the product identifier never changes."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=2000)
+    product_family: str | None = Field(default=None, max_length=255)
+    manufacturer_context: str | None = Field(default=None, max_length=255)
+    lifecycle_status: str | None = Field(default=None, pattern="^(active|retired|archived)$")
+
+
 class PlatformProductVersionRequest(BaseModel):
     tenant_id: uuid.UUID
     product_id: uuid.UUID

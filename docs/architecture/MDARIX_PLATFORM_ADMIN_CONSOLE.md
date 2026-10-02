@@ -1,8 +1,8 @@
 # Platform Administrator Console
 
-Status: implemented for Plans & Licensing, Identity & Access, Integrations, AI Control Center, Security and
-Operations. Customers & Tenants is described in [MDARIX_CUSTOMER_TENANT_MODEL.md](MDARIX_CUSTOMER_TENANT_MODEL.md).
-Data & Configuration is unchanged.
+Status: implemented for Plans & Licensing, Data & Configuration, Identity & Access, Integrations, AI Control Center,
+Security and Operations. Customers & Tenants is described in
+[MDARIX_CUSTOMER_TENANT_MODEL.md](MDARIX_CUSTOMER_TENANT_MODEL.md).
 
 ## Principles
 
@@ -16,11 +16,12 @@ Data & Configuration is unchanged.
 - The screens state what is not connected. For example, renewal reminders are queued, but sending them by email
   is not connected yet, and the page says so.
 
-## Structure: 55 tabs became 24
+## Structure: 80 tabs became 29
 
 | Area | Tabs | Data |
 |---|---|---|
 | Plans & Licensing | Plans · Subscriptions · Renewals · Reminders | `/platform-admin/plans`, `/platform-admin/customers`, `/platform-admin/console/renewals`, `/platform-admin/tenants/{id}/reminder-settings` |
+| Data & Configuration | Data model · Mappings · Releases · Rules & reference data · Customer configuration | `/admin/mapping/canonical/*`, `/admin/configuration/mappings` (+ `/data-mappings`, `/versions`, `/release`, `/release-action`), `/admin/mapping/validate`, `/admin/mapping/transforms`, `/validation-rules`, `/override-policies`, `/platform-admin/reference-data`, `/platform/product-configuration/{tenant}` |
 | Identity & Access | Platform users · Roles & permissions · Effective access | `/admin/identity/users`, `/roles`, `/roles/{id}/permission-sets`, `/permission-sets`, `/users/{id}/effective-access` |
 | Integrations | Connector catalog · Runs & failures · Reconciliation · Credentials · API & schemas | `/admin/mapping/*`, `/platform-admin/console/integration-runs`, `/admin/integrations/credentials` |
 | AI Control Center | Overview · Evaluations · Executions · Agents & guardrails | `/platform-admin/ai/models`, `/platform-admin/console/ai-activity`, `/evaluations/golden/latest`, `/ai/agents/catalog` |
@@ -45,6 +46,38 @@ Audit trail.
 - **Support access:** Approve and Revoke work again. Each asks for a reason and refuses self-approval, as the
   server already did.
 
+### Data & Configuration (25 tabs became 5)
+
+- **Data model:** the MDARIX records, their fields, who may change each field (MDARIX only, customer with approval,
+  customer), and the records a field links to. It replaces Canonical data model and the "Canonical Object 360" and
+  "Schema 360" placeholders.
+- **Mappings:** the mapping list and each mapping's field rules, a "Check mapping" against the data model, and its
+  versions. A 3-step **New mapping** wizard (what to connect, fields, check and save) adds the required fields in one
+  click and checks the mapping before saving it as a draft. This tab replaces Data mapping, Mapping versions,
+  Validation & data quality, Configuration 360 / Mapping 360 and Configuration sets.
+- **Releases:** the pipeline Draft → Waiting for approval → Approved → Released → Rolled back. Each mapping shows
+  its one next step, every step asks for a reason, and approval must come from a different administrator (the
+  server enforces this). A history panel shows who did what. It replaces Configuration releases, Configuration
+  Release 360, Dependencies & impact, Change requests and Deployments.
+- **Rules & reference data (read-only):**
+  - transformations, validation and data-quality rules, and lookup rules;
+  - value sets with their values;
+  - countries, units, time zones and jurisdictions;
+  - customer change policies.
+
+  The new `GET /api/v1/platform-admin/reference-data` and `/reference-data/value-sets/{code}` read the seeded
+  `md_master` tables.
+- **Customer configuration:** choose a tenant to see and edit its products (new
+  `PATCH /api/v1/platform/product-configuration/{tenant}/products/{product}`, audited; the identifier never
+  changes), add versions, and see its connections and mapping versions. It replaces Master data, Customer
+  baselines/overrides, Customer Configuration 360 and Upgrade center.
+
+Fixed along the way:
+- A mapping saved by the wizard listed as one field reading "[object Object]".
+- Checking "ProductVersion" returned 404; a record is now found by its code or its name.
+- Editing a product always failed.
+- Release statuses offered buttons the server refused.
+
 ## Not shown yet (no backend)
 
 These tabs come back when their backend exists:
@@ -61,4 +94,6 @@ These tabs come back when their backend exists:
 | Platform incidents | Endpoints for `PlatformIncident` |
 | Storage, API monitoring | Metrics collection |
 | Platform releases, Feature rollouts, System settings, MCP | No backend at all |
+| Configuration change requests, deployments, import/export, upgrade campaigns | No backend; releases cover approval and roll-back |
+| Configuration health (drift) | Scheduled schema-drift checks over connected systems |
 | Renewal reminder delivery | A worker that sends queued `SUBSCRIPTION_REMINDER` events with the tenant's template |

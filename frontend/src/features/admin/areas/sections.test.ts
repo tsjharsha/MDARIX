@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AREA_SECTIONS, LEGACY_SECTIONS, parseThresholds, previewTemplate, templateVariables } from "./sections";
 
 describe("platform administrator areas", () => {
-  it("keeps each area short: 24 sections instead of 55", () => {
+  it("keeps each area short: 29 sections instead of 80", () => {
     const counts = Object.values(AREA_SECTIONS).map((sections) => sections.length);
-    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(24);
+    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(29);
     expect(Math.max(...counts)).toBeLessThanOrEqual(5);
   });
 

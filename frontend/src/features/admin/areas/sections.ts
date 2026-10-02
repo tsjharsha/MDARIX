@@ -1,6 +1,13 @@
 // The sections of the platform administrator's areas. Each section shows its own real data; capabilities without
 // a backend yet are not shown (see docs/architecture/MDARIX_PLATFORM_ADMIN_CONSOLE.md).
 
+export const DATA_SECTIONS = [
+  "Data model",
+  "Mappings",
+  "Releases",
+  "Rules & reference data",
+  "Customer configuration",
+] as const;
 export const PLANS_SECTIONS = ["Plans", "Subscriptions", "Renewals", "Reminders"] as const;
 export const IDENTITY_SECTIONS = ["Platform users", "Roles & permissions", "Effective access"] as const;
 export const INTEGRATION_SECTIONS = [
@@ -22,6 +29,7 @@ export const OPERATIONS_SECTIONS = [
 /** Area name -> its sections, for the areas this folder renders. */
 export const AREA_SECTIONS: Record<string, readonly string[]> = {
   "Plans & Licensing": PLANS_SECTIONS,
+  "Data & Configuration": DATA_SECTIONS,
   "Identity & Access": IDENTITY_SECTIONS,
   Integrations: INTEGRATION_SECTIONS,
   "AI Control Center": AI_SECTIONS,
@@ -31,6 +39,32 @@ export const AREA_SECTIONS: Record<string, readonly string[]> = {
 
 /** Where an old bookmark or link lands in the new structure. */
 export const LEGACY_SECTIONS: Record<string, string> = {
+  // Data & Configuration
+  "Configuration 360": "Mappings",
+  "Mapping 360": "Mappings",
+  "Configuration Release 360": "Releases",
+  "Customer Configuration 360": "Customer configuration",
+  "Canonical Object 360": "Data model",
+  "Schema 360": "Data model",
+  "Canonical data model": "Data model",
+  "Transformation library": "Rules & reference data",
+  "Reference data": "Rules & reference data",
+  "Validation rules": "Rules & reference data",
+  "Configuration sets": "Mappings",
+  "Customer baselines": "Customer configuration",
+  "Customer overrides": "Customer configuration",
+  "Customer baselines & overrides": "Customer configuration",
+  "Change requests": "Releases",
+  "Dependencies & impact": "Releases",
+  Deployments: "Releases",
+  "Import / Export": "Mappings",
+  "Configuration health": "Mappings",
+  "Upgrade center": "Customer configuration",
+  "Master data": "Customer configuration",
+  "Data mapping": "Mappings",
+  "Validation & data quality": "Mappings",
+  "Mapping versions": "Mappings",
+  "Configuration releases": "Releases",
   Entitlements: "Plans",
   Expirations: "Renewals",
   "Reminder rules": "Reminders",

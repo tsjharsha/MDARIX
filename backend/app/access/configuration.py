@@ -193,7 +193,8 @@ def list_data_mapping_fields(request: Request, db: Session = Depends(get_db)):
     for row in rows:
         rules = row.mapping_rules or {}
         configuration = rules.get("_configuration", {}) if isinstance(rules, dict) else {}
-        configured_fields = rules.get("fields", rules) if isinstance(rules, dict) else {}
+        # Field rules live under "fields" (older mappings) or as a list under "rules" (the mapping wizard).
+        configured_fields = rules.get("fields", rules.get("rules", rules)) if isinstance(rules, dict) else {}
         if isinstance(configured_fields, list):
             field_entries = [(str(index), item) for index, item in enumerate(configured_fields)]
         elif isinstance(configured_fields, dict):

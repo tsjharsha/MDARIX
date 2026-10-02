@@ -15,7 +15,11 @@ from backend.app.db.models.foundation import (
     TenantMappingVersion,
 )
 from backend.app.db.session import get_db
-from backend.app.access.schemas import PlatformProductRequest, PlatformProductVersionRequest
+from backend.app.access.schemas import (
+    PlatformProductRequest,
+    PlatformProductUpdateRequest,
+    PlatformProductVersionRequest,
+)
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.common import _audit_configuration, _safe_connector_summary
 
@@ -169,6 +173,8 @@ def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: S
                 "name": item.name,
                 "status": item.lifecycle_status,
                 "family": item.product_family,
+                "description": item.description,
+                "manufacturer": item.manufacturer_context,
             }
             for item in products
         ],
@@ -229,6 +235,41 @@ def platform_create_product(payload: PlatformProductRequest, request: Request, d
     return {
         "id": str(row.id),
         "tenant_id": str(payload.tenant_id),
+        "product_identifier": row.product_identifier,
+        "name": row.name,
+        "status": row.lifecycle_status,
+    }
+
+
+@router.patch("/platform/product-configuration/{tenant_id}/products/{product_id}")
+def platform_update_product(
+    tenant_id: uuid.UUID,
+    product_id: uuid.UUID,
+    payload: PlatformProductUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Edit a tenant's product: name, description, family, manufacturer or lifecycle (identifier is fixed)."""
+    admin = _require_platform_admin(request, db)
+    row = db.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
+    if row is None:
+        raise HTTPException(
+            404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+        )
+    changes = payload.model_dump(exclude_unset=True)
+    if not changes:
+        raise HTTPException(422, detail={"code": "NOTHING_TO_CHANGE", "message": "No change was given"})
+    before = {field: getattr(row, field) for field in changes}
+    for field, value in changes.items():
+        setattr(row, field, value)
+    row.updated_at = datetime.now(timezone.utc)
+    _audit_configuration(
+        db, admin, "PLATFORM_PRODUCT_UPDATED", "Product", row.id, "v1", request=request, before=before, after=changes
+    )
+    db.commit()
+    return {
+        "id": str(row.id),
+        "tenant_id": str(tenant_id),
         "product_identifier": row.product_identifier,
         "name": row.name,
         "status": row.lifecycle_status,

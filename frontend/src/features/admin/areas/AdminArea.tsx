@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { AiControlCenter } from "./AiControlCenter";
+import { DataConfiguration } from "./DataConfiguration";
 import { IdentityAccess } from "./IdentityAccess";
 import { Integrations } from "./Integrations";
 import { Operations } from "./Operations";
@@ -20,6 +21,8 @@ export function AdminArea({ domain, section }: { domain: string; section: string
   const body =
     domain === "Plans & Licensing" ? (
       <PlansLicensing section={section} onMessage={notify} />
+    ) : domain === "Data & Configuration" ? (
+      <DataConfiguration section={section} onMessage={notify} />
     ) : domain === "Identity & Access" ? (
       <IdentityAccess section={section} />
     ) : domain === "Integrations" ? (

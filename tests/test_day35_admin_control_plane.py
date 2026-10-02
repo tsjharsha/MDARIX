@@ -99,19 +99,13 @@ def test_admin_route_renders_the_simplified_platform_admin_shell():
 
 
 def test_platform_admin_data_mapping_exposes_external_to_internal_fields():
+    # Data & Configuration -> Mappings: each mapping opens with its customer-to-MDARIX field rules.
+    data_ui = (FRONTEND / "features" / "admin" / "areas" / "DataConfiguration.tsx").read_text(encoding="utf-8")
     endpoint = "/api/v1/admin/configuration/data-mappings"
-    assert endpoint in PLATFORM_ADMIN_UI
+    assert endpoint in data_ui
     assert '@router.get("/admin/configuration/data-mappings")' in ROUTER
-    for label in (
-        "External database",
-        "External table",
-        "External field",
-        "MDARIX table",
-        "MDARIX field",
-        "Transform",
-        "Required",
-    ):
-        assert label in PLATFORM_ADMIN_UI
+    for label in ("Customer field", "MDARIX field", "How", "source_table", "target_table", "Required"):
+        assert label in data_ui
     for field in ("source_database", "source_schema", "source_table", "target_schema", "target_table"):
         assert field in ROUTER
 

@@ -10,7 +10,6 @@ import { api } from "./api";
 import { PlatformProductConfiguration } from "../features/stage2/PlatformProductConfiguration";
 import { ConsentBanner } from "../features/shared/ConsentBanner";
 import { CustomerAdminControlPlane } from "../features/customer-admin/CustomerAdminControlPlane";
-import { PlatformAdminScreen } from "../features/admin/PlatformAdminScreen";
 import { RegulatoryCopilot } from "../features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "../features/risk/RiskTraceabilityWorkspace";
 import { SignatureVerificationWorkspace } from "../features/signature/SignatureVerificationWorkspace";
@@ -72,6 +71,30 @@ const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
   // Former full-screen registries now open their section of the console.
   "admin-integration-registry": "Integrations:Connector catalog",
   "admin-api-registry": "Operations:Developer API",
+  "platform-tenant-health": "Tenants",
+  // Former Data & Configuration screens open their section of the console.
+  "admin-config-360": "Data & Configuration:Mappings",
+  "admin-master-data": "Data & Configuration:Customer configuration",
+  "admin-canonical-model": "Data & Configuration:Data model",
+  "admin-data-mapping": "Data & Configuration:Mappings",
+  "admin-transformations": "Data & Configuration:Rules & reference data",
+  "admin-validation": "Data & Configuration:Mappings",
+  "admin-baselines": "Data & Configuration:Customer configuration",
+  "admin-mapping-versions": "Data & Configuration:Mappings",
+  "admin-config-releases": "Data & Configuration:Releases",
+  "admin-config-health": "Data & Configuration:Mappings",
+  "admin-config-dependencies": "Data & Configuration:Releases",
+  "admin-reference-data": "Data & Configuration:Rules & reference data",
+  "admin-validation-rules": "Data & Configuration:Rules & reference data",
+  "admin-configuration-sets": "Data & Configuration:Mappings",
+  "admin-customer-baselines": "Data & Configuration:Customer configuration",
+  "admin-customer-overrides": "Data & Configuration:Customer configuration",
+  "admin-change-requests": "Data & Configuration:Releases",
+  "admin-deployments": "Data & Configuration:Releases",
+  "admin-import-export": "Data & Configuration:Mappings",
+  "admin-upgrade-center": "Data & Configuration:Customer configuration",
+  "admin-schema-registry": "Data & Configuration:Data model",
+  "admin-transformation-library": "Data & Configuration:Rules & reference data",
 };
 
 export function PrivateApplicationGate() {
@@ -224,65 +247,6 @@ export function PrivateApplication() {
             initialSection={CUSTOMER_CONSOLE_VIEWS[activeView] ?? "Overview"}
           />
         )}
-        {isPlatformAdmin &&
-          [
-            "platform-tenant-health",
-            "admin-config-360",
-            "admin-master-data",
-            "admin-canonical-model",
-            "admin-data-mapping",
-            "admin-transformations",
-            "admin-validation",
-            "admin-baselines",
-            "admin-mapping-versions",
-            "admin-config-releases",
-            "admin-config-health",
-            "admin-config-dependencies",
-            "admin-reference-data",
-            "admin-validation-rules",
-            "admin-configuration-sets",
-            "admin-customer-baselines",
-            "admin-customer-overrides",
-            "admin-change-requests",
-            "admin-deployments",
-            "admin-import-export",
-            "admin-upgrade-center",
-            "admin-schema-registry",
-            "admin-transformation-library",
-          ].includes(activeView) && (
-            <PlatformAdminScreen
-              securityContext={securityContext}
-              onNavigate={changeView}
-              initialItem={
-                (
-                  {
-                    "admin-config-360": "Configuration 360",
-                    "admin-master-data": "Master data",
-                    "admin-canonical-model": "Canonical data model",
-                    "admin-data-mapping": "Data mapping",
-                    "admin-transformations": "Transformation library",
-                    "admin-validation": "Validation & data quality",
-                    "admin-baselines": "Customer baselines & overrides",
-                    "admin-mapping-versions": "Mapping versions",
-                    "admin-config-releases": "Configuration releases",
-                    "admin-config-health": "Configuration health",
-                    "admin-config-dependencies": "Dependencies & impact",
-                    "admin-reference-data": "Reference data",
-                    "admin-validation-rules": "Validation rules",
-                    "admin-configuration-sets": "Configuration sets",
-                    "admin-customer-baselines": "Customer baselines",
-                    "admin-customer-overrides": "Customer overrides",
-                    "admin-change-requests": "Change requests",
-                    "admin-deployments": "Deployments",
-                    "admin-import-export": "Import / Export",
-                    "admin-upgrade-center": "Upgrade center",
-                    "admin-schema-registry": "Schema registry",
-                    "admin-transformation-library": "Transformation library",
-                  } as Record<string, string>
-                )[activeView]
-              }
-            />
-          )}
         {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
         {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
         {activeView === "admin-subscriptions" && <SubscriptionAdministration />}

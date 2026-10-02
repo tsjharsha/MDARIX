@@ -150,6 +150,13 @@ test.describe("MDARIX browser evidence", () => {
         "Support access": "Support access",
         Retention: "Retention",
       },
+      "Data & Configuration": {
+        "Data model": "Data model",
+        Mappings: "Mappings",
+        Releases: "Releases",
+        "Rules & reference data": "Rules & reference data",
+        "Customer configuration": "Customer configuration",
+      },
       Operations: {
         "System health": "Worker",
         "Queues & jobs": "Waiting work by kind",
@@ -169,20 +176,6 @@ test.describe("MDARIX browser evidence", () => {
         });
         await expect(page.getByText("[object Object]")).toHaveCount(0);
       }
-    }
-    // Data & Configuration keeps its workspaces.
-    const dataItems = ["Master data", "Data mapping", "Mapping versions", "Configuration releases"];
-    await openAdminNavigation(page);
-    await navigation.getByRole("button", { name: /^Data & Configuration/ }).click();
-    const dataTabs = page.getByRole("tablist", { name: "Data & Configuration sections" });
-    for (const item of dataItems) {
-      await dataTabs.getByRole("tab", { name: item, exact: true }).click();
-      await expect(page.locator(".platform-admin-workspace")).toHaveAttribute(
-        "data-admin-view",
-        `Data & Configuration:${item}`,
-        { timeout: 20_000 },
-      );
-      await expect(page.getByRole("heading", { name: item, exact: true, level: 2 })).toBeVisible();
     }
   });
 
