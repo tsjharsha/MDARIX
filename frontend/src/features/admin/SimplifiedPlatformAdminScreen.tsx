@@ -17,7 +17,8 @@ type Props = {
 
 type Location = { domain: string; item: string };
 
-const OVERVIEW = "Overview";
+// The landing page (formerly "Overview"); any unknown or old target opens it.
+const OVERVIEW = "Dashboard";
 const CUSTOMERS_AND_TENANTS = "Customers & Tenants";
 // "Platform Overview" is replaced by the dashboard below; every other domain keeps its real workspaces.
 const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
@@ -137,8 +138,8 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
           >
             <LayoutDashboard size={18} aria-hidden="true" />
             <span>
-              <strong>Overview</strong>
-              <small>Status dashboard</small>
+              <strong>Dashboard</strong>
+              <small>Live platform status</small>
             </span>
           </button>
           {SECTIONS.map(([label, description, Icon, items]) => (
@@ -175,7 +176,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
               <div className="ac-page-head">
                 <div>
                   <p className="ac-eyebrow">Administrator control plane</p>
-                  <h1>Platform overview</h1>
+                  <h1>Dashboard</h1>
                   <p>Live status across customers, subscriptions, integrations, security and operations.</p>
                 </div>
                 <div className="ac-page-actions">

@@ -18,34 +18,61 @@ import {
   Workflow,
 } from "lucide-react";
 import { ApiError, requestJson } from "../../../app/apiClient";
-import {
-  BarList,
-  ColumnChart,
-  Empty,
-  Panel,
-  RingMeter,
-  StatTile,
-  ToneBadge,
-  ToneIcon,
-  type PanelState,
-} from "./charts";
+import { BarList, ColumnChart, Empty, Panel, RingMeter, ToneBadge, ToneIcon, type PanelState } from "./charts";
 import {
   attentionItems,
-  dailyCounts,
-  expiryBuckets,
   healthSignals,
   isActiveTenant,
-  planMix,
-  runOutcomes,
   tenantStatusSlices,
   titleCase,
   worstTone,
-  type AuditRow,
   type CustomerRow,
   type ExpiringSubscription,
-  type IntegrationRun,
+  type Slice,
   type Tone,
 } from "./dashboardModel";
+import { KpiTile, TrendChart, type TrendPoint } from "./trendCharts";
+
+type DailyRow = { date: string } & Record<string, number | string>;
+type DashboardTrends = {
+  days: number;
+  ai_runs: DailyRow[];
+  integration_runs: DailyRow[];
+  audit_events: DailyRow[];
+  new_tenants: DailyRow[];
+  tenants_by_plan: Array<{ label: string; count: number }>;
+  tenants_by_region: Array<{ label: string; count: number }>;
+  licences_ending: Array<{ month: string; count: number }>;
+};
+
+const dayLabel = (date: string) =>
+  new Date(`${date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/**
+ * Daily rows as chart points. With `totalOfAll`, the primary value is the day's total over `primary`, `secondary`
+ * and `alsoCounted` (e.g. runs = completed + warnings + failed) and the secondary value is the `secondary` part.
+ */
+const toPoints = (
+  rows: DailyRow[] | undefined,
+  primary: string,
+  secondary?: string,
+  totalOfAll = false,
+  alsoCounted: string[] = [],
+): TrendPoint[] =>
+  (rows ?? []).map((row) => {
+    const value = (key: string) => Number(row[key] ?? 0);
+    const second = secondary ? value(secondary) : undefined;
+    const first = totalOfAll
+      ? value(primary) + (second ?? 0) + alsoCounted.reduce((sum, key) => sum + value(key), 0)
+      : value(primary);
+    return { date: String(row.date), label: dayLabel(String(row.date)), primary: first, secondary: second };
+  });
+
+const slices = (
+  rows: Array<{ label: string; count: number }> | undefined,
+  rename = (label: string) => label,
+): Slice[] =>
+  (rows ?? []).map((row) => ({ key: row.label, label: rename(row.label), count: row.count, tone: "neutral" }));
 
 const SOURCES = {
   customers: "/api/v1/platform-admin/customers?page_size=100",
@@ -56,17 +83,16 @@ const SOURCES = {
   ai: "/api/v1/admin/ai-summary",
   retention: "/api/v1/admin/retention-status",
   smtp: "/api/v1/admin/smtp-status",
-  runs: "/api/v1/admin/integrations/runs",
-  audit: "/api/v1/admin/audit-history",
+  // Platform-wide: daily activity and the shape of the customer base, and the latest audit events of every tenant.
+  dashboard: "/api/v1/platform-admin/console/dashboard",
+  audit: "/api/v1/platform-admin/console/audit?page_size=8",
   users: "/api/v1/admin/identity/users",
-  connectors: "/api/v1/admin/configuration/connectors",
 } as const;
 
 type SourceKey = keyof typeof SOURCES;
 type Source = { state: PanelState; data: any; error?: string };
 type Sources = Record<SourceKey, Source>;
 
-const TREND_DAYS = 14;
 const initial = Object.fromEntries(
   Object.keys(SOURCES).map((key) => [key, { state: "loading", data: null }]),
 ) as Sources;
@@ -150,10 +176,9 @@ export function AdminOverview({
   const customers: CustomerRow[] = asList(sources.customers.data);
   const customerTotal: number = sources.customers.data?.total ?? customers.length;
   const expiring: ExpiringSubscription[] = asList(sources.expiring.data);
-  const runs: IntegrationRun[] = asList(sources.runs.data);
-  const audit: AuditRow[] = asList(sources.audit.data);
+  const audit: any[] = asList(sources.audit.data);
   const users: any[] = asList(sources.users.data);
-  const connectors: any[] = asList(sources.connectors.data);
+  const trends: DashboardTrends | null = sources.dashboard.data;
 
   const model = useMemo(() => {
     const signals = healthSignals({
@@ -165,23 +190,35 @@ export function AdminOverview({
       smtp: sources.smtp.data,
     });
     const attention = attentionItems(customers, expiring, sources.health.data?.alerts ?? []);
+    const ai = toPoints(trends?.ai_runs, "completed", "failed", true);
+    const runs = toPoints(trends?.integration_runs, "completed", "failed", true, ["warnings"]);
+    const events = toPoints(trends?.audit_events, "events", "refused");
+    const tenants = toPoints(trends?.new_tenants, "tenants");
+    const sum = (points: TrendPoint[], key: "primary" | "secondary") =>
+      points.reduce((total, point) => total + (point[key] ?? 0), 0);
     return {
       signals,
       attention,
       statuses: tenantStatusSlices(customers),
-      expiry: expiryBuckets(expiring),
-      plans: planMix(customers),
-      outcomes: runOutcomes(runs),
-      auditTrend: dailyCounts(
-        audit.map((row) => row.created_at),
-        TREND_DAYS,
-      ),
-      runTrend: dailyCounts(
-        runs.map((run) => run.started_at),
-        TREND_DAYS,
-      ),
       active: customers.filter(isActiveTenant).length,
       seats: customers.reduce((sum, customer) => sum + (customer.seat_usage ?? 0), 0),
+      ai,
+      runs,
+      events,
+      tenants,
+      aiTotal: sum(ai, "primary"),
+      aiFailed: sum(ai, "secondary"),
+      runTotal: sum(runs, "primary"),
+      runFailed: sum(runs, "secondary"),
+      eventTotal: sum(events, "primary"),
+      refused: sum(events, "secondary"),
+      plans: slices(trends?.tenants_by_plan),
+      regions: slices(trends?.tenants_by_region, (label) => (label === "UNSPECIFIED" ? "Not specified" : label)),
+      renewals: (trends?.licences_ending ?? []).map((row) => ({
+        date: row.month,
+        label: new Date(`${row.month}T00:00:00`).toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+        count: row.count,
+      })),
     };
   }, [sources]);
 
@@ -205,9 +242,11 @@ export function AdminOverview({
     (sum: number, alert: any) => sum + (Number(alert.count) || 0),
     0,
   );
+  const trendsReady = sources.dashboard.state === "ready";
+  const days = trends?.days ?? 30;
 
   return (
-    <div className={`ac-overview ${refreshing && !loading ? "is-refreshing" : ""}`}>
+    <div className={`ac-overview ac-dashboard ${refreshing && !loading ? "is-refreshing" : ""}`}>
       <section className={`ac-hero tone-${overallTone}`} aria-live="polite">
         <div className="ac-hero-status">
           <span className="ac-hero-icon">
@@ -228,9 +267,14 @@ export function AdminOverview({
         <div className="ac-hero-meters">
           <RingMeter value={model.active} total={customers.length} label="Tenants active" />
           <RingMeter
-            value={model.outcomes.succeeded}
-            total={model.outcomes.succeeded + model.outcomes.failed}
-            label="Finished runs succeeded"
+            value={model.runTotal - model.runFailed}
+            total={model.runTotal}
+            label={`Integration runs succeeded · ${days} days`}
+          />
+          <RingMeter
+            value={model.aiTotal - model.aiFailed}
+            total={model.aiTotal}
+            label={`AI runs completed · ${days} days`}
           />
         </div>
         <div className="ac-hero-actions">
@@ -243,81 +287,147 @@ export function AdminOverview({
         </div>
       </section>
 
-      <section className="ac-stats" aria-label="Key figures">
-        <StatTile
+      <section className="ac-kpis" aria-label="Key figures">
+        <KpiTile
           label="Customers"
           value={sources.customers.state === "ready" ? customerTotal : null}
           detail={`${model.active} active tenants`}
           icon={<Building2 size={18} />}
+          series={model.tenants.map((point) => point.primary)}
+          seriesLabel={`New tenants per day, last ${days} days`}
           onOpen={() => onOpen({ domain: "Customers & Tenants", item: "Customers" })}
         />
-        <StatTile
+        <KpiTile
           label="Seats in use"
           value={sources.customers.state === "ready" ? model.seats : null}
           detail="Tenant memberships"
           icon={<Users size={18} />}
-          onOpen={() => onOpen({ domain: "Plans & Licensing", item: "Entitlements" })}
+          onOpen={() => onOpen({ domain: "Plans & Licensing", item: "Subscriptions" })}
         />
-        <StatTile
+        <KpiTile
           label="Platform users"
           value={sources.users.state === "ready" ? users.length : null}
           detail={`${users.filter((user) => String(user.status).toUpperCase() === "ACTIVE").length} active`}
           icon={<KeyRound size={18} />}
           onOpen={() => onOpen({ domain: "Identity & Access", item: "Platform users" })}
         />
-        <StatTile
-          label="Expiring ≤ 30 days"
+        <KpiTile
+          label="Renewals ≤ 30 days"
           value={sources.expiring.state === "ready" ? expiringSoon : null}
-          detail={expiringSoon ? "Renewals to action" : "No renewals due"}
+          detail={expiringSoon ? "Licences to renew" : "No renewals due"}
           tone={sources.expiring.state === "ready" ? (expiringSoon ? "warning" : "good") : undefined}
           icon={<FileClock size={18} />}
-          onOpen={() => onOpen({ domain: "Plans & Licensing", item: "Expirations" })}
+          onOpen={() => onOpen({ domain: "Plans & Licensing", item: "Renewals" })}
         />
-        <StatTile
+        <KpiTile
+          label="AI runs"
+          value={trendsReady ? model.aiTotal : null}
+          detail={`${model.aiFailed} failed · last ${days} days`}
+          tone={trendsReady ? (model.aiFailed ? "warning" : "good") : undefined}
+          icon={<Sparkles size={18} />}
+          series={model.ai.map((point) => point.primary)}
+          seriesLabel={`AI runs per day, last ${days} days`}
+          onOpen={() => onOpen({ domain: "AI Control Center", item: "Executions" })}
+        />
+        <KpiTile
+          label="Integration runs"
+          value={trendsReady ? model.runTotal : null}
+          detail={`${model.runFailed} failed · last ${days} days`}
+          tone={trendsReady ? (model.runFailed ? "critical" : "good") : undefined}
+          icon={<Plug size={18} />}
+          series={model.runs.map((point) => point.primary)}
+          seriesLabel={`Integration runs per day, last ${days} days`}
+          onOpen={() => onOpen({ domain: "Integrations", item: "Runs & failures" })}
+        />
+        <KpiTile
+          label="Audit events"
+          value={trendsReady ? model.eventTotal : null}
+          detail={`${model.refused} refused or failed`}
+          tone={trendsReady ? (model.refused ? "warning" : "good") : undefined}
+          icon={<ShieldCheck size={18} />}
+          series={model.events.map((point) => point.primary)}
+          seriesLabel={`Audit events per day, last ${days} days`}
+          onOpen={() => onOpen({ domain: "Security", item: "Audit trail" })}
+        />
+        <KpiTile
           label="Open alerts"
           value={sources.health.state === "ready" ? openAlerts : null}
           detail={openAlerts ? "Raised by health checks" : "No open alerts"}
           tone={sources.health.state === "ready" ? (openAlerts ? "critical" : "good") : undefined}
           icon={<Bell size={18} />}
-          onOpen={() => onOpen({ domain: "Operations", item: "Incidents" })}
-        />
-        <StatTile
-          label="Integration success"
-          value={model.outcomes.successRate === null ? null : `${model.outcomes.successRate}%`}
-          detail={
-            sources.runs.state !== "ready"
-              ? "Runs unavailable"
-              : model.outcomes.total
-                ? `${model.outcomes.failed} failed of ${model.outcomes.total} runs`
-                : "No runs recorded yet"
-          }
-          tone={model.outcomes.total ? (model.outcomes.failed ? "critical" : "good") : undefined}
-          icon={<Plug size={18} />}
-          onOpen={() => onOpen({ domain: "Integrations", item: "Integration runs" })}
+          onOpen={() => onOpen({ domain: "Operations", item: "System health" })}
         />
       </section>
 
-      <div className="ac-grid two">
+      <section className="ac-grid three" aria-label={`Activity, last ${days} days`}>
         <Panel
-          eyebrow="Customers & tenants"
-          title="Tenant lifecycle"
-          state={sources.customers.state}
-          error={sources.customers.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenants" })} />}
+          eyebrow={`Last ${days} days · all tenants`}
+          title="AI runs"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "AI Control Center", item: "Executions" })} />}
         >
-          {customers.length ? (
-            <>
-              <BarList items={model.statuses} />
-              {customerTotal > customers.length && (
-                <p className="ac-note">
-                  Showing the first {customers.length} of {customerTotal} tenants.
-                </p>
-              )}
-            </>
+          <TrendChart data={model.ai} primaryLabel="runs" secondaryLabel="failed" unit="AI runs" />
+        </Panel>
+        <Panel
+          eyebrow={`Last ${days} days · all tenants`}
+          title="Integration runs"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Integrations", item: "Runs & failures" })} />}
+        >
+          <TrendChart data={model.runs} primaryLabel="runs" secondaryLabel="failed" unit="integration runs" />
+        </Panel>
+        <Panel
+          eyebrow={`Last ${days} days · all tenants`}
+          title="Audit events"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Audit trail" })} />}
+        >
+          <TrendChart data={model.events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
+        </Panel>
+      </section>
+
+      <section className="ac-grid three" aria-label="Customer base">
+        <Panel
+          eyebrow="Customer base"
+          title="Tenants by plan"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Subscriptions" })} />}
+        >
+          {model.plans.length ? (
+            <BarList items={model.plans} colour="series" />
           ) : (
-            <Empty title="No tenants yet" detail="Create a customer to provision the first tenant." />
+            <Empty title="No plans assigned" detail="Tenants and their plans appear here." />
           )}
         </Panel>
+        <Panel
+          eyebrow="Customer base"
+          title="Tenants by data region"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Overview" })} />}
+        >
+          {model.regions.length ? (
+            <BarList items={model.regions} colour="series" />
+          ) : (
+            <Empty title="No tenants yet" detail="Data regions appear once tenants exist." />
+          )}
+        </Panel>
+        <Panel
+          eyebrow="Next 12 months"
+          title="Licences ending"
+          state={sources.dashboard.state}
+          error={sources.dashboard.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Renewals" })} />}
+        >
+          <ColumnChart data={model.renewals} unit="licences" caption="by month of end date" />
+        </Panel>
+      </section>
+
+      <div className="ac-grid two">
         <Panel eyebrow="Operations" title="Health checks">
           <ul className="ac-signals">
             {model.signals.map((signal) => {
@@ -340,130 +450,77 @@ export function AdminOverview({
             })}
           </ul>
         </Panel>
+        <div className="ac-grid">
+          <Panel
+            eyebrow="Requires attention"
+            title="What needs action"
+            state={loading ? "loading" : "ready"}
+            action={
+              needsAction ? <ToneBadge tone={overallTone} label={`${needsAction} open`} /> : <ToneBadge tone="good" />
+            }
+          >
+            {needsAction ? (
+              <ul className="ac-attention">
+                {model.attention.slice(0, 6).map((item) => (
+                  <li key={item.key}>
+                    <ToneIcon tone={item.tone} size={18} />
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>{item.detail}</small>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty title="Nothing needs action" detail="Healthy systems stay quiet. Exceptions will appear here." />
+            )}
+          </Panel>
+          <Panel
+            eyebrow="Customers & tenants"
+            title="Tenant lifecycle"
+            state={sources.customers.state}
+            error={sources.customers.error}
+            action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenants" })} />}
+          >
+            {customers.length ? (
+              <BarList items={model.statuses} />
+            ) : (
+              <Empty title="No tenants yet" detail="Create a customer to provision the first tenant." />
+            )}
+          </Panel>
+        </div>
       </div>
 
-      <div className="ac-grid two">
-        <Panel
-          eyebrow="Audit"
-          title={`Audit activity · last ${TREND_DAYS} days`}
-          state={sources.audit.state}
-          error={sources.audit.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Security events" })} />}
-        >
-          <ColumnChart data={model.auditTrend} unit="events" caption="from the latest 200 audit events" />
-        </Panel>
-        <Panel
-          eyebrow="Plans & licensing"
-          title="Subscription expiry"
-          state={sources.expiring.state}
-          error={sources.expiring.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Expirations" })} />}
-        >
-          {expiring.length ? (
-            <BarList items={model.expiry} />
-          ) : (
-            <Empty title="No subscriptions tracked" detail="Subscription lifecycles appear once plans are assigned." />
-          )}
-        </Panel>
-      </div>
-
-      <div className="ac-grid two">
-        <Panel
-          eyebrow="Integrations"
-          title={`Integration runs · last ${TREND_DAYS} days`}
-          state={sources.runs.state}
-          error={sources.runs.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Integrations", item: "Integration runs" })} />}
-        >
-          <ColumnChart data={model.runTrend} unit="runs" caption="by start date" />
-          <div className="ac-inline-stats">
-            <span>
-              <ToneIcon tone="good" size={14} /> {model.outcomes.succeeded} succeeded
-            </span>
-            <span>
-              <ToneIcon tone={model.outcomes.failed ? "critical" : "good"} size={14} /> {model.outcomes.failed} failed
-            </span>
-            <span>
-              <ToneIcon tone="neutral" size={14} /> {model.outcomes.inProgress} other / in progress
-            </span>
-            <span>
-              <Plug size={14} aria-hidden="true" /> {connectors.length} connectors configured
-            </span>
-          </div>
-        </Panel>
-        <Panel
-          eyebrow="Plans & licensing"
-          title="Plan mix"
-          state={sources.customers.state}
-          error={sources.customers.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Plans" })} />}
-        >
-          {customers.length ? (
-            <BarList items={model.plans} colour="series" />
-          ) : (
-            <Empty title="No plan assignments" detail="Tenants and their plans appear here." />
-          )}
-        </Panel>
-      </div>
-
-      <div className="ac-grid two">
-        <Panel
-          eyebrow="Requires attention"
-          title="What needs action"
-          state={loading ? "loading" : "ready"}
-          action={
-            needsAction ? <ToneBadge tone={overallTone} label={`${needsAction} open`} /> : <ToneBadge tone="good" />
-          }
-        >
-          {needsAction ? (
-            <ul className="ac-attention">
-              {model.attention.slice(0, 8).map((item) => (
-                <li key={item.key}>
-                  <ToneIcon tone={item.tone} size={18} />
-                  <span>
-                    <strong>{item.title}</strong>
-                    <small>{item.detail}</small>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty title="Nothing needs action" detail="Healthy systems stay quiet. Exceptions will appear here." />
-          )}
-        </Panel>
-        <Panel
-          eyebrow="Audit"
-          title="Recent activity"
-          state={sources.audit.state}
-          error={sources.audit.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Security events" })} />}
-        >
-          {audit.length ? (
-            <div className="ac-table-wrap">
-              <table className="ac-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Action</th>
-                    <th scope="col">Object</th>
-                    <th scope="col">When</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {audit.slice(0, 7).map((row, index) => (
-                    <tr key={`${row.created_at}-${index}`}>
-                      <td>{titleCase(row.action ?? "Event")}</td>
-                      <td>{row.entity_type ? titleCase(row.entity_type) : "—"}</td>
-                      <td className="num">{row.created_at ? new Date(row.created_at).toLocaleString() : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <Empty title="No audit events yet" detail="Administrative actions are recorded here." />
-          )}
-        </Panel>
-      </div>
+      <Panel
+        eyebrow="All tenants"
+        title="Recent activity"
+        state={sources.audit.state}
+        error={sources.audit.error}
+        action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Audit trail" })} />}
+      >
+        {audit.length ? (
+          <ol className="ac-timeline">
+            {audit.slice(0, 8).map((row) => (
+              <li key={row.id}>
+                <span className="ac-timeline-dot" aria-hidden="true" />
+                <span className="ac-timeline-text">
+                  <strong>{titleCase(row.action ?? "Event")}</strong>
+                  <small>
+                    {[row.tenant_name, row.actor, row.entity_type ? titleCase(row.entity_type) : null]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </small>
+                </span>
+                <time className="ac-muted" dateTime={row.at}>
+                  {row.at ? new Date(row.at).toLocaleString() : "—"}
+                </time>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <Empty title="No audit events yet" detail="Administrative actions are recorded here." />
+        )}
+      </Panel>
 
       <Panel eyebrow="Governance · declared by the security service" title="Security controls" className="ac-posture">
         <ul className="ac-posture-list">

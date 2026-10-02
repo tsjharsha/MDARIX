@@ -241,7 +241,36 @@ def test_support_access_and_operations_are_readable(platform, customer):
         "/api/v1/platform-admin/console/security",
         "/api/v1/platform-admin/console/support-access",
         "/api/v1/platform-admin/console/operations",
+        "/api/v1/platform-admin/console/dashboard",
     ],
 )
 def test_only_a_platform_administrator_sees_platform_wide_views(path):
     assert _client_with_role("CUSTOMER_ADMIN").get(path).status_code == 403
+
+
+def test_the_dashboard_shows_daily_activity_and_the_customer_base(platform, customer):
+    now = datetime.now(timezone.utc)
+    _add(
+        AIExecution(
+            id=uuid.uuid4(),
+            tenant_id=uuid.UUID(customer["id"]),
+            provider="groq",
+            model_name="m",
+            execution_timestamp=now,
+            error_state="TIMEOUT",
+        )
+    )
+    dashboard = platform.get("/api/v1/platform-admin/console/dashboard", params={"days": 14}).json()
+    assert dashboard["days"] == 14
+    for series in ("ai_runs", "integration_runs", "audit_events", "new_tenants"):
+        dates = [row["date"] for row in dashboard[series]]
+        # One row per day, oldest first, ending today, with every day present.
+        assert len(dates) == 14 and dates == sorted(dates) and dates[-1] == now.date().isoformat()
+    today = dashboard["ai_runs"][-1]
+    assert today.get("failed", 0) >= 1
+    assert dashboard["new_tenants"][-1].get("tenants", 0) >= 1
+    assert any(row["count"] >= 1 for row in dashboard["tenants_by_plan"])
+    assert sum(row["count"] for row in dashboard["tenants_by_region"]) >= 1
+    assert len(dashboard["licences_ending"]) == 12
+    # The window is bounded.
+    assert platform.get("/api/v1/platform-admin/console/dashboard", params={"days": 999}).json()["days"] == 90

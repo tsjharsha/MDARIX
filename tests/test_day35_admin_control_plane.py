@@ -118,8 +118,9 @@ def test_platform_admin_console_overview_uses_live_sources_and_embeds_every_doma
         "/api/v1/admin/health-summary",
         "/api/v1/admin/operations-summary",
         "/api/v1/admin/security-summary",
-        "/api/v1/admin/integrations/runs",
-        "/api/v1/admin/audit-history",
+        # Platform-wide activity (AI, integration runs, audit) and the latest audit events of every tenant.
+        "/api/v1/platform-admin/console/dashboard",
+        "/api/v1/platform-admin/console/audit",
     ):
         assert endpoint in overview
     # Plans & Licensing … Operations have their own pages; the remaining domains embed the real workspaces.

@@ -118,7 +118,9 @@ def test_the_customer_directory_shows_each_customer_once_with_its_tenants(platfo
     ).json()
     assert [item["id"] for item in by_tenant["items"]] == [customer["customer_id"]]
     # The tenant directory names the owning customer.
-    tenants = platform.get("/api/v1/platform-admin/tenants", params={"q": "Europe Production"}).json()["items"]
+    tenants = platform.get(
+        "/api/v1/platform-admin/tenants", params={"q": second.json()["tenant"]["display_name"]}
+    ).json()["items"]
     owned = [item for item in tenants if item["id"] == second.json()["tenant"]["id"]]
     assert owned and owned[0]["customer_identifier"] == customer["customer_identifier"]
     detail = platform.get(f"/api/v1/platform-admin/tenants/{second.json()['tenant']['id']}").json()["tenant"]

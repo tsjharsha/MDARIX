@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, or_, text
@@ -27,6 +27,7 @@ from backend.app.db.models.foundation import (
     AuthUser,
     PlanDefinition,
     Tenant,
+    TenantPlanAssignment,
 )
 from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
 from backend.app.db.session import get_db
@@ -580,4 +581,102 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
             # Nothing consumes queued subscription reminders yet, so none are delivered.
             "reminder_delivery": "NOT_CONNECTED",
         },
+    }
+
+
+# Dashboard ------------------------------------------------------------------------------------------------------
+
+
+def _daily(rows, days: int, end) -> list[dict]:
+    """[{date, ...counts}] for each of the last `days` days, zero-filled. `rows` are (date, key, count)."""
+    start = end - timedelta(days=days - 1)
+    series = {(start + timedelta(days=offset)).isoformat(): {} for offset in range(days)}
+    for day, key, count in rows:
+        bucket = series.get(day.isoformat() if hasattr(day, "isoformat") else str(day)[:10])
+        if bucket is not None:
+            bucket[key] = bucket.get(key, 0) + int(count)
+    return [{"date": date, **counts} for date, counts in series.items()]
+
+
+@router.get("/platform-admin/console/dashboard")
+def dashboard_trends(request: Request, days: int = 30, db: Session = Depends(get_db)):
+    """Platform-wide daily activity for the dashboard (AI runs, integration runs, audit events, new tenants) and
+    the shape of the customer base (tenants by plan and data region, licences ending by month)."""
+    _require_platform_admin(request, db)
+    days = min(90, max(7, days))
+    today = datetime.now(timezone.utc).date()
+    since = datetime.combine(today - timedelta(days=days - 1), datetime.min.time(), tzinfo=timezone.utc)
+
+    def per_day(column, *conditions, key=None) -> list[tuple]:
+        """(day, key, count) rows since the window start; key defaults to "count"."""
+        day = func.date(column)
+        if key is None:
+            rows = db.query(day, func.count()).filter(column >= since, *conditions).group_by(day).all()
+            return [(row[0], "count", row[1]) for row in rows]
+        return db.query(day, key, func.count()).filter(column >= since, *conditions).group_by(day, key).all()
+
+    # Group on plain column expressions (no bound values, which Postgres would not match in GROUP BY), then label.
+    ai_rows = [
+        (day, "completed" if ok else "failed", count)
+        for day, ok, count in per_day(AIExecution.execution_timestamp, key=AIExecution.error_state.is_(None))
+    ]
+
+    def run_outcome(status) -> str:
+        value = str(status or "").upper()
+        if value in {"FAILED", "ERROR", "PARTIAL"}:
+            return "failed"
+        return "warnings" if "WARNING" in value else "completed"
+
+    run_rows = [
+        (day, run_outcome(status), count)
+        for day, status, count in per_day(ConnectorRun.started_at, key=func.upper(ConnectorRun.status))
+    ]
+    refused = or_(AuditEvent.action.like("%DENIED%"), AuditEvent.action.like("%FAILED%"))
+    audit_total = per_day(AuditEvent.created_at)
+    audit_refused = per_day(AuditEvent.created_at, refused)
+    audit_rows = [(day, "events", count) for day, _, count in audit_total] + [
+        (day, "refused", count) for day, _, count in audit_refused
+    ]
+    tenant_rows = [(day, "tenants", count) for day, _, count in per_day(Tenant.created_at)]
+
+    plans: Counter = Counter()
+    latest: dict = {}
+    for tenant_id, name, effective in (
+        db.query(TenantPlanAssignment.tenant_id, PlanDefinition.name, TenantPlanAssignment.effective_from)
+        .join(PlanDefinition, PlanDefinition.id == TenantPlanAssignment.plan_id)
+        .filter(TenantPlanAssignment.status == "ACTIVE")
+    ):
+        if tenant_id not in latest or (effective and latest[tenant_id][1] and effective > latest[tenant_id][1]):
+            latest[tenant_id] = (name, effective)
+    tenant_count = db.query(func.count(Tenant.id)).scalar() or 0
+    for name, _ in latest.values():
+        plans[name] += 1
+    if tenant_count > len(latest):
+        plans["No plan"] += tenant_count - len(latest)
+    regions = [
+        {"label": row[0] or "Not specified", "count": row[1]}
+        for row in db.query(Tenant.residency_region, func.count(Tenant.id))
+        .group_by(Tenant.residency_region)
+        .order_by(func.count(Tenant.id).desc())
+        .all()
+    ]
+    months = []
+    first = today.replace(day=1)
+    for offset in range(12):
+        year, month = divmod(first.month - 1 + offset, 12)
+        months.append(date(first.year + year, month + 1, 1))
+    ending = Counter(
+        row.expires_at.date().replace(day=1)
+        for row in db.query(SubscriptionLifecycle.expires_at).filter(SubscriptionLifecycle.expires_at.is_not(None))
+        if row.expires_at and months[0] <= row.expires_at.date().replace(day=1) <= months[-1]
+    )
+    return {
+        "days": days,
+        "ai_runs": _daily(ai_rows, days, today),
+        "integration_runs": _daily(run_rows, days, today),
+        "audit_events": _daily(audit_rows, days, today),
+        "new_tenants": _daily(tenant_rows, days, today),
+        "tenants_by_plan": [{"label": label, "count": count} for label, count in plans.most_common()],
+        "tenants_by_region": regions,
+        "licences_ending": [{"month": month.isoformat(), "count": ending.get(month, 0)} for month in months],
     }
