@@ -1,0 +1,133 @@
+/* Customers & Tenants (platform administrator). Builds on the console tokens in ../console/admin-console.css. */
+.cc-area {
+  /* The destructive-action colour of the customer-admin dialogs this area reuses. */
+  --ca-danger: #b42318;
+}
+.cc-area,
+.cc-page {
+  display: grid;
+  gap: 16px;
+}
+.cc-page-head {
+  display: grid;
+  gap: 8px;
+}
+.cc-page-head > .ac-link {
+  justify-self: start;
+}
+.cc-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cc-title h2 {
+  margin: 2px 0 0;
+  color: var(--ac-ink);
+  font-size: 22px;
+}
+.cc-title p {
+  margin: 0;
+}
+.cc-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.cc-actions .ac-link,
+.cc-actions a,
+.cc-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.cc-danger-link {
+  color: var(--ac-critical) !important;
+}
+.cc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.cc-toolbar select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.cc-stack {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+}
+.cc-stack small {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.cc-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--ac-muted);
+  font-size: 13px;
+}
+.cc-pager > span:first-child {
+  margin-right: auto;
+}
+.cc-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.cc-details div {
+  display: grid;
+  gap: 2px;
+}
+.cc-details dt {
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.cc-details dd {
+  margin: 0;
+  color: var(--ac-ink);
+  overflow-wrap: anywhere;
+}
+.cc-two-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.cc-form {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+.cc-form .ca-field {
+  width: 100%;
+}
+.cc-wizard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.cc-wizard > .ac-link {
+  justify-self: end;
+}
+@media (max-width: 720px) {
+  .cc-two-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

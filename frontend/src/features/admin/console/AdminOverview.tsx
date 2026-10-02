@@ -249,7 +249,7 @@ export function AdminOverview({
           value={sources.customers.state === "ready" ? customerTotal : null}
           detail={`${model.active} active tenants`}
           icon={<Building2 size={18} />}
-          onOpen={() => onOpen({ domain: "Customers & Tenants", item: "Customer Directory" })}
+          onOpen={() => onOpen({ domain: "Customers & Tenants", item: "Customers" })}
         />
         <StatTile
           label="Seats in use"
@@ -303,7 +303,7 @@ export function AdminOverview({
           title="Tenant lifecycle"
           state={sources.customers.state}
           error={sources.customers.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenant Management" })} />}
+          action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenants" })} />}
         >
           {customers.length ? (
             <>
@@ -436,7 +436,7 @@ export function AdminOverview({
           title="Recent activity"
           state={sources.audit.state}
           error={sources.audit.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenant Audit" })} />}
+          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Security events" })} />}
         >
           {audit.length ? (
             <div className="ac-table-wrap">

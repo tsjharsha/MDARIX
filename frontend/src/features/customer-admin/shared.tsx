@@ -150,7 +150,9 @@ export type Confirmation = {
   danger?: boolean;
   /** Ask for a written reason, stored with the audit event (the server enforces the same minimum). */
   reason?: { label: string; min: number };
-  run: (reason: string) => Promise<unknown>;
+  /** Ask the signed-in administrator to re-enter their password (the server verifies it). */
+  password?: boolean;
+  run: (reason: string, password: string) => Promise<unknown>;
   done: string;
 };
 
@@ -167,17 +169,19 @@ export function ConfirmDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
+  const [password, setPassword] = useState("");
   useEffect(() => {
     setBusy(false);
     setError("");
     setReason("");
+    setPassword("");
   }, [request]);
   if (!request) return null;
   const confirm = async () => {
     setBusy(true);
     setError("");
     try {
-      await request.run(reason.trim());
+      await request.run(reason.trim(), password);
       onDone(request.done);
     } catch (reason) {
       setError(errorText(reason, "The change was not applied."));
@@ -202,6 +206,17 @@ export function ConfirmDialog({
             />
           </label>
         )}
+        {request.password && (
+          <label className="ca-field">
+            Your password (to confirm it is you)
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+        )}
         {error && (
           <p className="ca-inline-error" role="alert">
             <AlertTriangle size={15} aria-hidden="true" /> {error}
@@ -215,7 +230,11 @@ export function ConfirmDialog({
             type="button"
             className={request.danger ? "ca-danger" : "ac-primary"}
             onClick={() => void confirm()}
-            disabled={busy || (!!request.reason && reason.trim().length < request.reason.min)}
+            disabled={
+              busy ||
+              (!!request.reason && reason.trim().length < request.reason.min) ||
+              (!!request.password && !password)
+            }
           >
             {busy ? "Working…" : request.confirmLabel}
           </button>

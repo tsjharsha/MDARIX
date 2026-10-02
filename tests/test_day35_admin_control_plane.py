@@ -91,9 +91,10 @@ def test_admin_edit_workflow_covers_every_editable_resource():
 
 def test_admin_route_renders_the_simplified_platform_admin_shell():
     assert "<SimplifiedPlatformAdminScreen" in UI
-    assert compact('["admin", "platform-tenants"].includes(activeView) && (<SimplifiedPlatformAdminScreen') in compact(
-        UI
-    )
+    # The console also opens for the older customer screens, on the matching Customers & Tenants section.
+    assert compact(
+        'isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS) && (<SimplifiedPlatformAdminScreen'
+    ) in compact(UI)
     assert "Administrator control plane" in SIMPLIFIED_ADMIN_UI
 
 

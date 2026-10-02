@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
+import { CustomersAndTenants } from "./customers/CustomersAndTenants";
+import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
 import "./console/admin-console.css";
 
 type Props = {
@@ -14,9 +16,9 @@ type Props = {
 type Location = { domain: string; item: string };
 
 const OVERVIEW = "Overview";
+const CUSTOMERS_AND_TENANTS = "Customers & Tenants";
 // "Platform Overview" is replaced by the dashboard below; every other domain keeps its real workspaces.
 const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
-const FALLBACK_PLANS = ["ENTERPRISE_TEST", "STARTER", "PROFESSIONAL"];
 
 function locationFor(target: OverviewTarget | string): Location {
   const domainName = typeof target === "string" ? target : target.domain;
@@ -29,31 +31,15 @@ function locationFor(target: OverviewTarget | string): Location {
 
 export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = OVERVIEW }: Props) {
   const [location, setLocation] = useState<Location>(() =>
-    initialSection === "Customers" || initialSection === "Tenants"
-      ? locationFor({ domain: "Customers & Tenants", item: "Customer Directory" })
+    (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
+      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection })
       : locationFor(initialSection),
   );
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
   const [message, setMessage] = useState<{ tone: "good" | "critical"; text: string } | null>(null);
-  const [plans, setPlans] = useState<string[]>(FALLBACK_PLANS);
-  const [customerForm, setCustomerForm] = useState({ company_name: "", tenant_code: "", plan_code: FALLBACK_PLANS[0] });
-
-  useEffect(() => {
-    if (!showCreate) return;
-    requestJson<any[]>("/api/v1/platform-admin/plans")
-      .then((rows) => {
-        const codes = (Array.isArray(rows) ? rows : []).map((plan) => plan.code).filter(Boolean);
-        if (codes.length) {
-          setPlans(codes);
-          setCustomerForm((form) => (codes.includes(form.plan_code) ? form : { ...form, plan_code: codes[0] }));
-        }
-      })
-      .catch(() => undefined);
-  }, [showCreate]);
 
   const searchResults = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -76,20 +62,6 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
   const signOut = async () => {
     await requestJson("/api/v1/auth/signout", { method: "POST", retries: 0 }).catch(() => undefined);
     window.location.replace("/signin");
-  };
-
-  const createCustomer = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setMessage(null);
-    try {
-      await requestJson("/api/v1/platform-admin/customers", { method: "POST", body: JSON.stringify(customerForm) });
-      setMessage({ tone: "good", text: "Customer and tenant created successfully." });
-      setCustomerForm({ company_name: "", tenant_code: "", plan_code: plans[0] });
-      setShowCreate(false);
-      setRefreshKey((value) => value + 1);
-    } catch (error) {
-      setMessage({ tone: "critical", text: error instanceof Error ? error.message : "Customer creation failed." });
-    }
   };
 
   return (
@@ -215,7 +187,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
               <AdminOverview
                 refreshKey={refreshKey}
                 onOpen={open}
-                onCreateCustomer={() => setShowCreate(true)}
+                onCreateCustomer={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Onboarding" })}
                 onUpdated={setUpdatedAt}
               />
               <section className="ac-areas" aria-label="Administration areas">
@@ -256,77 +228,30 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                   ))}
                 </div>
                 <div className="ac-workspace" role="tabpanel" aria-label={location.item}>
-                  <PlatformAdminScreen
-                    embedded
-                    securityContext={securityContext}
-                    onNavigate={onNavigate}
-                    initialDomain={location.domain}
-                    initialItem={location.item}
-                    onLocationChange={(domain, item) => {
-                      if (domain === "Platform Overview") open(OVERVIEW);
-                      else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
-                    }}
-                  />
+                  {location.domain === CUSTOMERS_AND_TENANTS ? (
+                    <CustomersAndTenants
+                      section={location.item as CustomerTenantSection}
+                      onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
+                    />
+                  ) : (
+                    <PlatformAdminScreen
+                      embedded
+                      securityContext={securityContext}
+                      onNavigate={onNavigate}
+                      initialDomain={location.domain}
+                      initialItem={location.item}
+                      onLocationChange={(domain, item) => {
+                        if (domain === "Platform Overview") open(OVERVIEW);
+                        else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
+                      }}
+                    />
+                  )}
                 </div>
               </>
             )
           )}
         </main>
       </div>
-
-      {showCreate && (
-        <div className="ac-modal-backdrop" role="presentation">
-          <form
-            className="ac-modal"
-            onSubmit={createCustomer}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="create-customer-title"
-          >
-            <p className="ac-eyebrow">Customer and tenant lifecycle</p>
-            <h2 id="create-customer-title">Create customer / tenant</h2>
-            <label>
-              Customer name
-              <input
-                required
-                value={customerForm.company_name}
-                onChange={(event) => setCustomerForm({ ...customerForm, company_name: event.target.value })}
-              />
-            </label>
-            <label>
-              Tenant code
-              <input
-                required
-                value={customerForm.tenant_code}
-                onChange={(event) => setCustomerForm({ ...customerForm, tenant_code: event.target.value })}
-                placeholder="TENANT_C"
-              />
-            </label>
-            <label>
-              Plan
-              <select
-                value={customerForm.plan_code}
-                onChange={(event) => setCustomerForm({ ...customerForm, plan_code: event.target.value })}
-              >
-                {plans.map((plan) => (
-                  <option key={plan}>{plan}</option>
-                ))}
-              </select>
-            </label>
-            <div className="ac-modal-actions">
-              <button type="button" className="ac-secondary" onClick={() => setShowCreate(false)}>
-                Cancel
-              </button>
-              <button type="button" className="ac-secondary" onClick={() => onNavigate("admin-create-customer")}>
-                Full onboarding
-              </button>
-              <button className="ac-primary" type="submit">
-                Create customer
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

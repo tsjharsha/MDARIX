@@ -16,10 +16,6 @@ import { RiskTraceabilityWorkspace } from "../features/risk/RiskTraceabilityWork
 import { SignatureVerificationWorkspace } from "../features/signature/SignatureVerificationWorkspace";
 import { SimplifiedPlatformAdminScreen } from "../features/admin/SimplifiedPlatformAdminScreen";
 import { UserWorkspace } from "../features/workspace/UserWorkspace";
-import { PlatformCustomers } from "../features/admin/PlatformCustomers";
-import { CreateCustomer } from "../features/admin/CreateCustomer";
-import { Customer360 } from "../features/admin/Customer360";
-import { CustomerAdminManagement } from "../features/admin/CustomerAdminManagement";
 import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministrationAudit";
 import { AuthPage } from "../features/auth/AuthPage";
 
@@ -63,6 +59,17 @@ export function App() {
     return <AuthPage mode={publicPath.slice(1)} />;
   return <PrivateApplicationGate />;
 }
+
+// Older customer screens open the platform console on the matching Customers & Tenants section.
+const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
+  "platform-tenants": "Customers",
+  "platform-customers": "Customers",
+  "admin-customers": "Customers",
+  "admin-customer-360": "Customers",
+  "admin-manage": "Customer administrators",
+  "admin-create-customer": "Onboarding",
+  "platform-onboarding": "Onboarding",
+};
 
 export function PrivateApplicationGate() {
   const [state, setState] = useState<"CHECKING" | "AUTHORIZED" | "DENIED">("CHECKING");
@@ -206,11 +213,12 @@ export function PrivateApplication() {
         {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
         {activeView === "risk-traceability" && <RiskTraceabilityWorkspace />}
         {activeView === "signature-verification" && <SignatureVerificationWorkspace />}
-        {isPlatformAdmin && ["admin", "platform-tenants"].includes(activeView) && (
+        {isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS) && (
           <SimplifiedPlatformAdminScreen
+            key={activeView}
             securityContext={securityContext}
             onNavigate={changeView}
-            initialSection={activeView === "platform-tenants" ? "Customers" : "Overview"}
+            initialSection={CUSTOMER_CONSOLE_VIEWS[activeView] ?? "Overview"}
           />
         )}
         {isPlatformAdmin &&
@@ -280,15 +288,7 @@ export function PrivateApplication() {
         {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
         {activeView === "admin-subscriptions" && <SubscriptionAdministration />}
         {activeView === "admin-mapping" && <MappingStudio />}
-        {activeView === "admin-customers" && <PlatformCustomers onNavigate={changeView} />}
-        {activeView === "admin-create-customer" && <CreateCustomer onCreated={() => changeView("admin-customers")} />}
-        {activeView === "admin-customer-360" && <Customer360 />}
-        {activeView === "admin-manage" && <CustomerAdminManagement />}
         {activeView === "admin-audit" && <PlatformAdministrationAudit />}
-        {isPlatformAdmin && activeView === "platform-customers" && <PlatformCustomers onNavigate={changeView} />}
-        {isPlatformAdmin && activeView === "platform-onboarding" && (
-          <CreateCustomer onCreated={() => changeView("platform-customers")} />
-        )}
         {isPlatformAdmin && activeView === "platform-licenses" && <SubscriptionAdministration />}
         {isPlatformAdmin && activeView === "platform-tenant-audit" && <PlatformAdministrationAudit />}
       </main>

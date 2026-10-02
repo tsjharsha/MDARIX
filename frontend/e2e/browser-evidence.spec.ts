@@ -102,16 +102,23 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("navigation", { name: "Administrator navigation" });
+    // Customers & Tenants has its own four sections, each with a clear heading.
+    const customerSections: Record<string, string> = {
+      Customers: "Customer directory",
+      "Customer administrators": "Customer administrators",
+      Tenants: "Tenant directory",
+      Onboarding: "New customers and trial requests",
+    };
+    await openAdminNavigation(page);
+    await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
+    const customerTabs = page.getByRole("tablist", { name: "Customers & Tenants sections" });
+    for (const [item, heading] of Object.entries(customerSections)) {
+      await customerTabs.getByRole("tab", { name: item, exact: true }).click();
+      await expect(page.getByRole("heading", { name: heading, exact: true, level: 2 })).toBeVisible({
+        timeout: 20_000,
+      });
+    }
     const domains: Record<string, string[]> = {
-      "Customers & Tenants": [
-        "Customer Directory",
-        "Customer 360",
-        "Tenant Management",
-        "Tenant 360",
-        "Customer Onboarding",
-        "Customer Administrators",
-        "Tenant Health",
-      ],
       "Plans & Licensing": ["Plans", "Entitlements", "Subscriptions", "Expirations", "Reminder rules"],
       "Identity & Access": ["Platform users", "Platform roles", "Permission sets", "MFA & SSO", "Sessions"],
       "Data & Configuration": ["Master data", "Data mapping", "Mapping versions", "Configuration releases"],
@@ -144,7 +151,7 @@ test.describe("MDARIX browser evidence", () => {
     }
   });
 
-  test("admin workflows expose actionable Customer/Tenant 360 and onboarding states", async ({ page }) => {
+  test("admin opens a customer page with working sections, and onboards a new customer", async ({ page }) => {
     test.setTimeout(90_000);
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
@@ -152,39 +159,22 @@ test.describe("MDARIX browser evidence", () => {
     const sections = page.getByRole("tablist", { name: "Customers & Tenants sections" });
     await openAdminNavigation(page);
     await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
-    await sections.getByRole("tab", { name: "Customer Directory", exact: true }).click();
-    // The embedded workspace loads its governed data sources first.
-    await expect(page.getByRole("heading", { name: "Customers & tenants", exact: true })).toBeVisible({
+    await sections.getByRole("tab", { name: "Customers", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Customer directory", exact: true })).toBeVisible({
       timeout: 20_000,
     });
-    const customerLink = page.locator(".platform-admin-table .table-link").first();
+    const customerLink = page.getByRole("table", { name: "Customers" }).getByRole("button").first();
     if (await customerLink.count()) {
       await customerLink.click();
-      const detailTabs = page.getByRole("navigation", { name: /customer detail tabs/i });
-      await expect(detailTabs).toBeVisible();
-      for (const tab of [
-        "Overview",
-        "Administrators",
-        "Environments",
-        "Subscription",
-        "Integrations",
-        "Security",
-        "Audit",
-      ]) {
-        const tabButton = detailTabs.getByRole("button", { name: tab, exact: true });
-        if (await tabButton.count()) {
-          await tabButton.click();
-          await expect(page.locator(".platform-admin-record-page")).toBeVisible();
-          await expect(page.locator(".platform-admin-error")).toHaveCount(0);
-        }
+      const customerSections = page.getByRole("tablist", { name: "Customer sections" });
+      await expect(customerSections).toBeVisible();
+      for (const tab of ["Overview", "Administrators", "Subscription", "Usage", "Activity"]) {
+        await customerSections.getByRole("tab", { name: tab, exact: true }).click();
+        await expect(page.locator(".ca-inline-error, .ac-panel [role='alert']")).toHaveCount(0);
       }
     }
-    await page.goto("/app/admin");
-    await openAdminNavigation(page);
-    await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();
-    await sections.getByRole("tab", { name: "Customer Onboarding", exact: true }).click();
-    await page.getByRole("button", { name: /start provisioning/i }).click();
-    await expect(page).toHaveURL(/admin-create-customer|platform-admin\/onboarding|\/app\/admin\/customers\/new/);
+    await sections.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    await page.getByRole("button", { name: /new customer/i }).click();
     await expect(page.getByText(/Create Customer|Provision a customer tenant/i).first()).toBeVisible();
   });
 
@@ -308,15 +298,15 @@ test.describe("MDARIX browser evidence", () => {
     await openAdminNavigation(page);
     await page
       .getByRole("navigation", { name: "Administrator navigation" })
-      .getByRole("button", { name: /^Customers & Tenants/ })
+      .getByRole("button", { name: /^Security/ })
       .click();
     await page
-      .getByRole("tablist", { name: "Customers & Tenants sections" })
-      .getByRole("tab", { name: "Tenant Audit", exact: true })
+      .getByRole("tablist", { name: "Security sections" })
+      .getByRole("tab", { name: "Security events", exact: true })
       .click();
-    // The tenant audit view loads the customer directory first (a known slow call, tracked for Phase 4).
-    await expect(page.getByRole("button", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("button", { name: /create evidence package/i })).toBeVisible();
+    // The platform audit trail, with export and the evidence package.
+    await expect(page.getByRole("link", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("link", { name: /download evidence package/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
 
     await page.goto("/app/decision");
