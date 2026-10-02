@@ -1,8 +1,8 @@
 """Manage the AcmeCare demo workspace.
 
 Usage (from the repository root, owner database credentials in .env):
-    python scripts/demo_tenant.py setup    # register the workspace and create the demo team (MDARIX_DEMO_PASSWORD)
-    python scripts/demo_tenant.py reset    # delete everything the demo created and reload the original story
+    python scripts/demo_tenant.py setup    # create the demo tenant and story, and the demo team (MDARIX_DEMO_PASSWORD)
+    python scripts/demo_tenant.py reset    # delete everything in the demo tenant and reload the story (dated from today)
     python scripts/demo_tenant.py status   # what the workspace holds and who can sign in
 """
 
