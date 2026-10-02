@@ -16,6 +16,7 @@ type Model = {
   human_review_required?: boolean;
   hidden_chain_of_thought_persisted?: boolean;
 };
+type Fallback = { provider: string; model: string; configured: boolean; resting?: boolean };
 type Execution = {
   id: string;
   at?: string | null;
@@ -53,7 +54,7 @@ const seconds = (ms: number | null | undefined) =>
 
 /** Which model is in use, and how the AI has been used across every tenant in the last 30 days. */
 function Overview() {
-  const models = useResource<{ models: Model[] }>("/api/v1/platform-admin/ai/models");
+  const models = useResource<{ models: Model[]; fallbacks?: Fallback[] }>("/api/v1/platform-admin/ai/models");
   const activity = useResource<AiActivity>("/api/v1/platform-admin/console/ai-activity");
   const model = models.data?.models?.[0];
   const data = activity.data;
@@ -142,6 +143,49 @@ function Overview() {
         ) : (
           <p className="ac-muted">No model is configured.</p>
         )}
+      </Panel>
+      <Panel
+        eyebrow="When the model is limited or down"
+        title="Fallback providers"
+        state={models.state}
+        error={models.error}
+      >
+        <Intro>
+          If the model in use hits its limit or does not answer, the next provider below answers instead, in this order;
+          if none can, MDARIX gives its rule-based answer. Free tiers suit demonstrations on synthetic data only.
+        </Intro>
+        <Table
+          caption="Fallback providers"
+          rows={(models.data?.fallbacks ?? []).map((item, index) => ({ ...item, order: index + 1 }))}
+          rowKey={(row) => row.provider}
+          empty={{
+            title: "No fallback configured",
+            detail: "Set MDARIX_GENAI_FALLBACKS and each provider's key on the server (see the AI provider runbook).",
+          }}
+          columns={[
+            { key: "order", label: "Order", numeric: true, render: (row) => row.order },
+            { key: "provider", label: "Provider", render: (row) => <strong>{titleCase(row.provider)}</strong> },
+            { key: "model", label: "Model", render: (row) => row.model },
+            {
+              key: "state",
+              label: "State",
+              render: (row) =>
+                !row.configured ? (
+                  <span className="ar-no">
+                    <CircleSlash size={14} aria-hidden="true" /> No key set
+                  </span>
+                ) : row.resting ? (
+                  <span className="ar-no">
+                    <AlertTriangle size={14} aria-hidden="true" /> Resting after a limit
+                  </span>
+                ) : (
+                  <span className="ar-yes">
+                    <CheckCircle2 size={14} aria-hidden="true" /> Ready
+                  </span>
+                ),
+            },
+          ]}
+        />
       </Panel>
     </div>
   );

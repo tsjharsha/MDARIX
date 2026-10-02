@@ -54,6 +54,8 @@ def get_platform_ai_models(request: Request, db: Session = Depends(get_db)):
                 "hidden_chain_of_thought_persisted": False,
             }
         ],
+        # Free providers used in order when the one before is limited or down (keys are never returned).
+        "fallbacks": health.get("fallbacks", []),
         "scope": {"secrets_redacted": True},
     }
 

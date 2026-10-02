@@ -17,6 +17,20 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_DEFAULT_MODEL = "openai/gpt-oss-20b"
 OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1/chat/completions"
 OLLAMA_DEFAULT_MODEL = "llama3.2"
+# OpenAI-compatible chat-completions services: address and default model. Every value can be overridden in the
+# environment (MDARIX_GENAI_<NAME>_BASE_URL / _MODEL); models change often, so check the provider's list.
+OPENAI_COMPATIBLE = {
+    "groq": (GROQ_BASE_URL, GROQ_DEFAULT_MODEL),
+    "cerebras": ("https://api.cerebras.ai/v1/chat/completions", "gpt-oss-120b"),
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-2.5-flash"),
+    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "openai/gpt-oss-20b:free"),
+    "mistral": ("https://api.mistral.ai/v1/chat/completions", "mistral-small-latest"),
+    "github": ("https://models.github.ai/inference/chat/completions", "openai/gpt-4.1-mini"),
+    "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
+}
+# A provider that refused us (rate or daily limit) is skipped until this time (monotonic seconds), so a demo does not
+# wait on it for every request; any other failure is skipped for a short time only.
+_COOLDOWN_UNTIL: dict[str, float] = {}
 SENSITIVE = re.compile(r"(?i)(password|token|secret|cookie|authorization|api[_-]?key|credential)\s*[:=]\s*[^,;\n]+")
 logger = logging.getLogger(__name__)
 
@@ -63,42 +77,49 @@ class GenAIProvider:
         max_input_tokens=None,
         max_output_tokens=None,
         cost_per_1k_tokens=None,
+        provider_name=None,
+        fallbacks=None,
     ):
-        self.provider_name = os.getenv("MDARIX_GENAI_PROVIDER", "controlled").strip().lower()
-        configured_base_url = base_url or os.getenv("MDARIX_GENAI_BASE_URL")
-        self.base_url = configured_base_url or (
-            GROQ_BASE_URL
-            if self.provider_name == "groq"
-            else OLLAMA_BASE_URL
-            if self.provider_name == "ollama"
-            else None
-        )
-        self.api_key = api_key or os.getenv("MDARIX_GENAI_API_KEY")
-        default_model = (
-            GROQ_DEFAULT_MODEL
-            if self.provider_name == "groq"
-            else OLLAMA_DEFAULT_MODEL
-            if self.provider_name == "ollama"
-            else "mdarix-controlled"
-        )
-        self.model = model or os.getenv("MDARIX_GENAI_MODEL", default_model)
-        self.model_version = os.getenv("MDARIX_GENAI_MODEL_VERSION", "unconfigured")
+        # The primary provider reads MDARIX_GENAI_*; a fallback named "x" reads MDARIX_GENAI_X_* (see fallback_chain).
+        prefix = f"MDARIX_GENAI_{provider_name.upper()}_" if provider_name else "MDARIX_GENAI_"
+        self.provider_name = (provider_name or os.getenv("MDARIX_GENAI_PROVIDER", "controlled")).strip().lower()
+        known_url, known_model = OPENAI_COMPATIBLE.get(self.provider_name, (None, "mdarix-controlled"))
+        self.base_url = base_url or os.getenv(prefix + "BASE_URL") or known_url
+        self.api_key = api_key or os.getenv(prefix + "API_KEY")
+        self.model = model or os.getenv(prefix + "MODEL", known_model)
+        self.model_version = os.getenv(prefix + "MODEL_VERSION", "unconfigured")
         default_timeout = "120" if self.provider_name == "ollama" else "20"
         self.timeout = int(timeout_seconds or os.getenv("MDARIX_GENAI_TIMEOUT_SECONDS", default_timeout))
         self.retries = int(max_retries if max_retries is not None else os.getenv("MDARIX_GENAI_MAX_RETRIES", "2"))
         self.max_input = int(max_input_tokens or os.getenv("MDARIX_GENAI_MAX_INPUT_TOKENS", "4000"))
         self.max_output = int(max_output_tokens or os.getenv("MDARIX_GENAI_MAX_OUTPUT_TOKENS", "1000"))
         self.cost_per_1k = float(cost_per_1k_tokens or os.getenv("MDARIX_GENAI_COST_PER_1K_TOKENS", "0"))
+        # Fallbacks only for the primary provider (a fallback never has fallbacks of its own).
+        self.fallbacks = fallbacks if fallbacks is not None else ([] if provider_name else fallback_chain(self))
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.base_url and (self.api_key or self.provider_name == "ollama"))
 
     def health(self):
-        configured = bool(self.base_url and (self.api_key or self.provider_name == "ollama"))
+        now = time.monotonic()
         return {
-            "configured": configured,
+            "configured": self.configured,
             "provider": self.provider_name if self.base_url else "controlled",
             "model": self.model,
             "configuration_version": CONFIG_VERSION,
             "human_review_required": True,
             "hidden_chain_of_thought_persisted": False,
+            # Used in order when the one before is limited or down; the rule-based answer comes last.
+            "fallbacks": [
+                {
+                    "provider": item.provider_name,
+                    "model": item.model,
+                    "configured": item.configured,
+                    "resting": _COOLDOWN_UNTIL.get(item.provider_name, 0) > now,
+                }
+                for item in self.fallbacks
+            ],
         }
 
     @staticmethod
@@ -132,7 +153,8 @@ class GenAIProvider:
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
         started = time.monotonic()
-        if not self.base_url or (not self.api_key and self.provider_name != "ollama"):
+        usable = [item for item in self.fallbacks if item.configured]
+        if not self.configured and not usable:
             return GenAIResult(
                 "controlled",
                 self.model,
@@ -149,7 +171,43 @@ class GenAIProvider:
                 0.0,
                 int((time.monotonic() - started) * 1000),
             )
-        if self.provider_name in {"groq", "ollama"}:
+        chain = ([self] if self.configured else []) + usable
+        resting = [item for item in chain if _COOLDOWN_UNTIL.get(item.provider_name, 0) > time.monotonic()]
+        # Providers that are resting are tried last, so a request still gets an answer if every provider rests.
+        ordered = [item for item in chain if item not in resting] + resting
+        last_error: GenAIUnavailable | None = None
+        for item in ordered:
+            try:
+                return item._send(
+                    safe_prompt,
+                    safe_context,
+                    system=system,
+                    json_output=json_output,
+                    max_output_tokens=max_output_tokens,
+                    input_tokens=input_tokens,
+                    started=started,
+                    fail_fast=len(ordered) > 1,
+                )
+            except GenAIUnavailable as exc:
+                last_error = exc
+                logger.warning("GenAI provider %s unavailable; trying the next one", item.provider_name)
+        raise last_error or GenAIUnavailable("GENAI_PROVIDER_UNAVAILABLE: no provider")
+
+    def _send(
+        self,
+        safe_prompt: str,
+        safe_context: dict,
+        *,
+        system: str | None,
+        json_output: bool,
+        max_output_tokens: int | None,
+        input_tokens: int,
+        started: float,
+        fail_fast: bool,
+    ) -> GenAIResult:
+        """One provider: the request with its retries. With other providers to fall back to (fail_fast), a rate
+        limit moves on at once and the provider rests for a while instead of being waited on."""
+        if self.provider_name in OPENAI_COMPATIBLE:
             body = {
                 "model": self.model,
                 "messages": [
@@ -185,7 +243,7 @@ class GenAIProvider:
                     req.add_header("Authorization", f"Bearer {self.api_key}")
                 with request.urlopen(req, timeout=self.timeout) as response:
                     raw = json.loads(response.read())
-                if self.provider_name in {"groq", "ollama"}:
+                if self.provider_name in OPENAI_COMPATIBLE:
                     answer = ((raw.get("choices") or [{}])[0].get("message") or {}).get("content")
                     usage = raw.get("usage") or {}
                     output_tokens = int(usage.get("completion_tokens") or max(1, len(str(answer or "")) // 4))
@@ -220,6 +278,11 @@ class GenAIProvider:
                     status,
                     type(exc).__name__,
                 )
+                if fail_fast and status == 429:
+                    _COOLDOWN_UNTIL[self.provider_name] = time.monotonic() + float(
+                        os.getenv("MDARIX_GENAI_RATE_LIMIT_REST_SECONDS", "900")
+                    )
+                    break
                 wait = min(2**attempt, 4)
                 if status == 429 and attempt < self.retries:
                     # Rate limited: wait as long as the provider asks, within a cap that keeps requests responsive.
@@ -228,5 +291,32 @@ class GenAIProvider:
                     except (TypeError, ValueError):
                         asked = 0.0
                     wait = max(wait, min(asked, float(os.getenv("MDARIX_GENAI_MAX_RETRY_WAIT_SECONDS", "10"))))
-                time.sleep(wait)
+                if attempt < self.retries:
+                    time.sleep(wait)
+        if fail_fast and _COOLDOWN_UNTIL.get(self.provider_name, 0) <= time.monotonic():
+            # Down rather than limited: rest briefly so the next requests go straight to a working provider.
+            _COOLDOWN_UNTIL[self.provider_name] = time.monotonic() + float(
+                os.getenv("MDARIX_GENAI_OUTAGE_REST_SECONDS", "60")
+            )
         raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: {type(error).__name__}")
+
+
+def fallback_chain(primary: GenAIProvider) -> list[GenAIProvider]:
+    """The providers named in MDARIX_GENAI_FALLBACKS (comma-separated, in order), each read from MDARIX_GENAI_<NAME>_*.
+
+    Example: MDARIX_GENAI_FALLBACKS=cerebras,gemini,ollama with MDARIX_GENAI_CEREBRAS_API_KEY=... and so on.
+    Free tiers suit demonstrations on synthetic data only: several may use the requests to improve their models.
+    """
+    names = [name.strip().lower() for name in os.getenv("MDARIX_GENAI_FALLBACKS", "").split(",") if name.strip()]
+    return [
+        GenAIProvider(
+            provider_name=name,
+            timeout_seconds=os.getenv(f"MDARIX_GENAI_{name.upper()}_TIMEOUT_SECONDS") or primary.timeout,
+            max_retries=int(os.getenv(f"MDARIX_GENAI_{name.upper()}_MAX_RETRIES", "1")),
+            max_input_tokens=primary.max_input,
+            max_output_tokens=primary.max_output,
+            fallbacks=[],
+        )
+        for name in names
+        if name != primary.provider_name and name in OPENAI_COMPATIBLE
+    ]
