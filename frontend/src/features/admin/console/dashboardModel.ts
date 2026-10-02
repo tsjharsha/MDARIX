@@ -232,10 +232,16 @@ export function healthSignals(sources: {
     },
     {
       key: "worker",
-      label: "Worker heartbeat",
+      label: "Background worker",
       value: worker ? titleCase(worker) : null,
-      tone: "neutral",
-      detail: worker ? "Background worker health is not reported yet" : "Source unavailable",
+      tone: worker === "RUNNING" ? "good" : worker === "STOPPED" ? "critical" : "neutral",
+      detail: !worker
+        ? "Source unavailable"
+        : worker === "RUNNING"
+          ? "Processing queued work and reports"
+          : worker === "STOPPED"
+            ? "No heartbeat for over a minute: queued work is not processed"
+            : "The worker has not reported a heartbeat",
     },
   ];
 }

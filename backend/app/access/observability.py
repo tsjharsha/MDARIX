@@ -38,6 +38,7 @@ from backend.app.access.authz import (
     visible_user_filters,
 )
 from backend.app.runtime_env import environment
+from backend.app.worker_status import worker_status
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -466,7 +467,8 @@ def admin_operations_summary(request: Request, db: Session = Depends(get_db)):
             "outbox_dead_lettered": dead_lettered,
             "configured_connectors": connectors,
         },
-        "worker": {"heartbeat": "NOT_REPORTED", "deployment": "ENVIRONMENT_DEPENDENT"},
+        # Only whether the shared worker runs: its counters cover every tenant, so they are not shown here.
+        "worker": {"heartbeat": worker_status(db)["state"], "deployment": "ENVIRONMENT_DEPENDENT"},
         "scope": {"tenant_scoped": True},
     }
 

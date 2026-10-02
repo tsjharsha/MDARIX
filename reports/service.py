@@ -347,21 +347,22 @@ def get_report_job(job_id: str, tenant_id: str, db=None) -> dict:
         return dict(job)
 
 
-def run_pending_report_jobs(db, *, limit: int = 10) -> dict:
-    """Claim and process queued jobs safely for one tenant data plane."""
+def run_pending_report_jobs(db, *, limit: int = 10, tenant_id=None) -> dict:
+    """Claim and process queued jobs safely for one tenant data plane (only `tenant_id`'s jobs when given)."""
     from backend.app.db.models.reporting import ReportJob
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     # Recover a claim left behind by a terminated worker. The timeout is
     # intentionally conservative so a slow render is not double-processed.
     stale_before = now - __import__("datetime").timedelta(minutes=15)
-    db.query(ReportJob).filter(ReportJob.status == "CLAIMED", ReportJob.updated_at < stale_before).update(
-        {ReportJob.status: "QUEUED", ReportJob.updated_at: now}, synchronize_session=False
-    )
+    tenant_filter = [ReportJob.tenant_id == tenant_id] if tenant_id is not None else []
+    db.query(ReportJob).filter(
+        ReportJob.status == "CLAIMED", ReportJob.updated_at < stale_before, *tenant_filter
+    ).update({ReportJob.status: "QUEUED", ReportJob.updated_at: now}, synchronize_session=False)
     db.commit()
     rows = (
         db.query(ReportJob)
-        .filter(ReportJob.status == "QUEUED")
+        .filter(ReportJob.status == "QUEUED", *tenant_filter)
         .order_by(ReportJob.created_at)
         .with_for_update(skip_locked=True)
         .limit(limit)

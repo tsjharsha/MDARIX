@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Database, Inbox, Mail, ServerCog, TriangleAlert } from "lucide-react";
+import { Activity, Database, Inbox, Mail, ServerCog, TriangleAlert } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
 import { SearchBox, Table, formatDate, useResource } from "../../customer-admin/shared";
 import { titleCase } from "../customers/model";
@@ -9,6 +9,19 @@ import { Intro, TenantCell } from "./common";
 type Ops = {
   database: string;
   worker_heartbeat: string;
+  worker?: {
+    state: "RUNNING" | "STOPPED" | "NOT_REPORTED";
+    last_seen_at: string | null;
+    seconds_since: number | null;
+    started_at: string | null;
+    metrics?: {
+      cycles?: number;
+      published?: number;
+      failed?: number;
+      dead_lettered?: number;
+      report_jobs?: { claimed?: number; ready?: number; failed?: number };
+    };
+  };
   queue: {
     pending: number;
     retrying: number;
@@ -87,11 +100,7 @@ function Health() {
         />
       </section>
       <Panel eyebrow="Background worker" title="Worker" state={ops.state} error={ops.error}>
-        <Intro>
-          {data?.worker_heartbeat === "NOT_REPORTED"
-            ? "The background worker does not report a heartbeat yet, so its health is shown through the queue: work that waits a long time or gives up means it needs attention."
-            : `Last heartbeat: ${data?.worker_heartbeat}`}
-        </Intro>
+        <WorkerStatus worker={data?.worker} />
         {data?.queue.oldest_pending_at && (
           <p>
             Oldest waiting item: <strong>{formatDate(data.queue.oldest_pending_at)}</strong>
@@ -99,6 +108,68 @@ function Health() {
         )}
       </Panel>
     </div>
+  );
+}
+
+const sinceText = (seconds: number | null) =>
+  seconds === null
+    ? ""
+    : seconds < 60
+      ? `${seconds} second${seconds === 1 ? "" : "s"} ago`
+      : seconds < 3600
+        ? `${Math.floor(seconds / 60)} minute${seconds < 120 ? "" : "s"} ago`
+        : `${Math.floor(seconds / 3600)} hour${seconds < 7200 ? "" : "s"} ago`;
+
+/** Whether the background worker runs (from the heartbeat it records every few seconds) and what it has done. */
+function WorkerStatus({ worker }: { worker: Ops["worker"] }) {
+  if (!worker || worker.state === "NOT_REPORTED")
+    return (
+      <Intro>
+        The background worker has not reported a heartbeat. It sends queued work (integration records, report jobs) and
+        records a heartbeat every few seconds while it runs. Start it with{" "}
+        <code>docker compose up -d mdarix-outbox-worker</code>.
+      </Intro>
+    );
+  const running = worker.state === "RUNNING";
+  const metrics = worker.metrics ?? {};
+  const reports = metrics.report_jobs ?? {};
+  return (
+    <>
+      <Intro>
+        {running
+          ? "The background worker is running: it sends queued work and produces requested reports every few seconds."
+          : "The background worker has stopped: no heartbeat for over a minute, so queued work and reports wait. Restart it with docker compose up -d mdarix-outbox-worker."}
+      </Intro>
+      <section className="ac-stats ar-stats-4" aria-label="Background worker">
+        <StatTile
+          label="State"
+          value={running ? "Running" : "Stopped"}
+          detail={`Last heartbeat ${sinceText(worker.seconds_since)}`}
+          icon={<Activity size={18} />}
+          tone={running ? "good" : "critical"}
+        />
+        <StatTile
+          label="Running since"
+          value={worker.started_at ? formatDate(worker.started_at) : null}
+          detail={`${(metrics.cycles ?? 0).toLocaleString()} cycles`}
+          icon={<ServerCog size={18} />}
+        />
+        <StatTile
+          label="Sent"
+          value={metrics.published ?? 0}
+          detail={`${metrics.failed ?? 0} attempts failed, ${metrics.dead_lettered ?? 0} gave up (since start)`}
+          icon={<Inbox size={18} />}
+          tone={metrics.dead_lettered ? "warning" : "good"}
+        />
+        <StatTile
+          label="Reports in last cycle"
+          value={reports.ready ?? 0}
+          detail={`${reports.claimed ?? 0} picked up, ${reports.failed ?? 0} failed`}
+          icon={<Database size={18} />}
+          tone={reports.failed ? "warning" : "good"}
+        />
+      </section>
+    </>
   );
 }
 

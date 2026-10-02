@@ -6,6 +6,8 @@ import os
 import signal
 import sys
 import urllib.request
+import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,13 +17,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from outbox.worker import OutboxWorker
-from backend.app.db.data_plane import session_factory
+from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, session_factory
 from backend.app.db.models.customer_lifecycle import TenantDataPlane
 from backend.app.db.models.enterprise import ConnectorRun, ConnectorSourceRecord
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_tenant
+from backend.app.worker_status import OUTBOX_WORKER, record_heartbeat
 from integration.api_contract import idempotency_key
 from uuid import UUID
 from reports.service import run_pending_report_jobs
+
+
+@contextmanager
+def plane_session(plane):
+    """A session on one tenant's business data: its dedicated database, or (for tenants without one) the shared
+    control database bound to that tenant, as the API does (data_plane.get_data_plane_db)."""
+    if plane.connection_secret_ref == SHARED_CONTROL_DATA_PLANE:
+        db = SessionLocal()
+        bind_tenant(db, plane.tenant_id)
+    else:
+        db = session_factory(plane.database_ref, plane.connection_secret_ref)()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 def route_provider_event_to_data_plane(payload):
@@ -50,8 +69,7 @@ def route_provider_event_to_data_plane(payload):
         )
         if plane is None:
             raise RuntimeError("DATA_PLANE_NOT_REGISTERED")
-        factory = session_factory(plane.database_ref, plane.connection_secret_ref)
-        with factory() as data_db:
+        with plane_session(plane) as data_db:
             existing = (
                 data_db.query(ConnectorSourceRecord)
                 .filter(
@@ -143,6 +161,15 @@ def write_heartbeat(metrics):
     temporary.replace(path)
 
 
+def record_database_heartbeat(instance_id, started_at, metrics):
+    """Record the heartbeat where the platform console reads it. A failure is logged, never fatal to the worker."""
+    try:
+        with SessionLocal() as db:
+            record_heartbeat(db, OUTBOX_WORKER, instance_id, started_at, metrics)
+    except Exception:
+        logging.getLogger(__name__).exception("worker heartbeat could not be recorded")
+
+
 def process_pending_reports(limit: int = 10):
     """Drain report jobs from every registered tenant data plane."""
     claimed = ready = failed = 0
@@ -150,9 +177,12 @@ def process_pending_reports(limit: int = 10):
         planes = control_db.query(TenantDataPlane).filter(TenantDataPlane.status == "ACTIVE").all()
         for plane in planes:
             try:
-                factory = session_factory(plane.database_ref, plane.connection_secret_ref)
-                with factory() as data_db:
-                    result = run_pending_report_jobs(data_db, limit=limit)
+                with plane_session(plane) as data_db:
+                    # The shared database holds every such tenant's jobs: take only this tenant's.
+                    shared = plane.connection_secret_ref == SHARED_CONTROL_DATA_PLANE
+                    result = run_pending_report_jobs(
+                        data_db, limit=limit, tenant_id=plane.tenant_id if shared else None
+                    )
                     claimed += result["claimed"]
                     ready += result["ready"]
                     failed += result["failed"]
@@ -175,11 +205,13 @@ if __name__ == "__main__":
         publish, max_attempts=int(os.getenv("MDARIX_OUTBOX_MAX_ATTEMPTS", "5")), alert=alert_dead_letter
     )
     interval = int(os.getenv("MDARIX_OUTBOX_INTERVAL_SECONDS", "5"))
+    instance_id, started_at = str(uuid.uuid4()), datetime.now(timezone.utc)
     while not nonlocal_stop[0]:
         stats = worker.process_once(limit=int(os.getenv("MDARIX_OUTBOX_BATCH_SIZE", "50")))
         reports = process_pending_reports(limit=int(os.getenv("MDARIX_REPORT_WORKER_BATCH_SIZE", "10")))
         metrics = {**worker.metrics.snapshot(), "report_jobs": reports}
         write_heartbeat({**metrics, "last_cycle": stats})
+        record_database_heartbeat(instance_id, started_at, {**metrics, "last_cycle": stats})
         logging.getLogger(__name__).info(
             "outbox metrics=%s cycle=%s reports=%s", worker.metrics.snapshot(), stats, reports
         )

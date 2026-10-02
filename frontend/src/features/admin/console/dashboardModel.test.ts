@@ -73,6 +73,10 @@ describe("platform admin dashboard model", () => {
     expect(live.find((signal) => signal.key === "connectors")?.tone).toBe("critical");
     expect(live.find((signal) => signal.key === "mappings")?.tone).toBe("good");
     expect(live.find((signal) => signal.key === "worker")?.tone).toBe("neutral");
+    const worker = (heartbeat: string) =>
+      healthSignals({ operations: { worker: { heartbeat } } }).find((signal) => signal.key === "worker")?.tone;
+    expect(worker("RUNNING")).toBe("good");
+    expect(worker("STOPPED")).toBe("critical");
   });
 
   it("ranks attention items by severity", () => {

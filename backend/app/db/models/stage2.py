@@ -178,6 +178,17 @@ class OutboxEvent(Base):
     __table_args__ = (Index("ix_event_outbox_pending", "published_at", "occurred_at"),)
 
 
+class WorkerHeartbeat(Base):
+    """The last sign of life of each background service, written every cycle (platform-level: no tenant data)."""
+
+    __tablename__ = "worker_heartbeats"
+    service: Mapped[str] = mapped_column(String(80), primary_key=True)
+    instance_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    started_at = _ts(False)
+    updated_at = _ts(False)
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 class SubscriptionLifecycle(Base):
     __tablename__ = "subscription_lifecycles"
     id = _id()

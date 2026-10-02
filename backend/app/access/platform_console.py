@@ -31,6 +31,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
 from backend.app.db.session import get_db
+from backend.app.worker_status import worker_status
 
 router = APIRouter(prefix="/api/v1", tags=["Platform console"])
 
@@ -544,9 +545,11 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
     recent_jobs = db.query(ProvisioningJob).order_by(ProvisioningJob.created_at.desc()).limit(10).all()
     names = _tenant_names(db, [row.tenant_id for row in recent_jobs])
     smtp = smtp_configuration_status()
+    worker = worker_status(db, with_metrics=True)
     return {
         "database": "OK" if database_ok else "UNAVAILABLE",
-        "worker_heartbeat": "NOT_REPORTED",
+        "worker_heartbeat": worker["state"],
+        "worker": worker,
         "queue": {
             "pending": pending.count(),
             "retrying": pending.filter(OutboxEvent.attempts > 0).count(),
