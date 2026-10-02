@@ -318,3 +318,38 @@ class NotificationRecipientRequest(BaseModel):
 class RenewalRequestPayload(BaseModel):
     details: dict = Field(default_factory=dict)
     reason: str = Field(min_length=10, max_length=500)
+
+
+class CustomerAdminCreateRequest(BaseModel):
+    """A platform administrator adds a Customer Administrator to a customer tenant (sent an activation email)."""
+
+    email: str = Field(min_length=3, max_length=254, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    display_name: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+class CustomerAdminActionRequest(BaseModel):
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+class CustomerAdminStatusRequest(BaseModel):
+    status: str = Field(pattern="^(ACTIVE|SUSPENDED)$")
+    reason: str = Field(min_length=5, max_length=1000)
+
+
+class CustomerLifecycleRequest(BaseModel):
+    """Suspend or reactivate a whole customer (every tenant it owns). Re-authentication is required."""
+
+    status: str = Field(pattern="^(ACTIVE|SUSPENDED)$")
+    reason: str = Field(min_length=5, max_length=1000)
+    password: str = Field(min_length=1, max_length=512)
+
+
+class EnvironmentCreateRequest(BaseModel):
+    environment_identifier: str = Field(min_length=2, max_length=120, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+    environment_type: str = Field(pattern="^(PRODUCTION|SANDBOX|VALIDATION|UAT|DEMO)$")
+    region: str = Field(min_length=2, max_length=80)
+    residency_region: str = Field(min_length=2, max_length=80)
+    application_version: str | None = Field(default=None, max_length=80)
+    schema_version: str | None = Field(default=None, max_length=80)
+    configuration_version: str | None = Field(default=None, max_length=80)

@@ -10,6 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.customer_lifecycle import (
+    allowed_lifecycle_transition,
     build_customer_tenant,
 )
 from backend.app.db.models.customer_lifecycle import (
@@ -33,7 +34,7 @@ from backend.app.db.models.stage2 import (
     SubscriptionLifecycle,
 )
 from backend.app.db.session import get_db
-from backend.app.access.schemas import CustomerCreateRequest, CustomerImportRequest
+from backend.app.access.schemas import CustomerCreateRequest, CustomerImportRequest, CustomerLifecycleRequest
 from backend.app.access.authz import _require_platform_admin
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -556,75 +557,78 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
             }
             for t in tenants
         ],
-        "tabs": [
-            "Overview",
-            "Tenants",
-            "Environments",
-            "Administrators",
-            "Subscription",
-            "Entitlements",
-            "Identity",
-            "Integrations",
-            "Usage",
-            "Security",
-            "Audit",
-            "Support",
-        ],
+        # Sections of the customer page; each is served by the tabs endpoint below.
+        "tabs": ["Overview", "Administrators", "Subscription", "Usage", "Activity"],
     }
 
 
-@router.patch("/platform-admin/customer-records/{customer_id}")
-def update_platform_customer_record(
-    customer_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)
+@router.post("/platform-admin/customer-records/{customer_id}/lifecycle")
+def transition_platform_customer(
+    customer_id: uuid.UUID, payload: CustomerLifecycleRequest, request: Request, db: Session = Depends(get_db)
 ):
-    """Update editable Customer 360 profile fields with optimistic locking and audit."""
+    """Suspend or reactivate a whole customer: every tenant it owns moves together (same rules as one tenant).
+
+    Customer details are maintained by the customer; the platform administrator only changes its standing.
+    Tenants already in the target state are left alone; tenants that cannot make the change are reported.
+    """
+    from auth.service import _verify
+    from backend.app.access.platform_tenants import apply_tenant_transition
+
     admin = _require_platform_admin(request, db)
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if customer is None:
         raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
-    expected = payload.get("lock_version")
-    if expected is not None and int(expected) != int(customer.lock_version or 0):
+    actor = db.query(AuthUser).filter(AuthUser.id == admin.id, AuthUser.tenant_id == admin.tenant_id).first()
+    if actor is None or not _verify(payload.password, actor.password_hash):
+        db.rollback()
         raise HTTPException(
-            409, detail={"code": "STALE_CUSTOMER_VERSION", "message": "Customer changed; reload before editing"}
+            403,
+            detail={
+                "code": "INVALID_REAUTHENTICATION",
+                "message": "Current password is required to change a customer's status",
+            },
         )
-    allowed = {
-        "legal_name",
-        "display_name",
-        "trading_name",
-        "customer_type",
-        "industry",
-        "company_size",
-        "country",
-        "state_province",
-        "headquarters",
-        "website",
-        "crm_reference",
-    }
-    changes = {key: value for key, value in payload.items() if key in allowed and value is not None}
-    if not changes:
+    now = datetime.now(timezone.utc)
+    changed, unchanged, refused = [], [], []
+    for tenant in db.query(Tenant).filter(Tenant.customer_id == customer.id).order_by(Tenant.tenant_key).all():
+        current = str(tenant.status).upper()
+        if current == payload.status:
+            unchanged.append(tenant.tenant_key)
+        elif allowed_lifecycle_transition(current, payload.status):
+            apply_tenant_transition(
+                db,
+                tenant,
+                payload.status,
+                payload.reason,
+                admin.id,
+                now,
+                scope="CUSTOMER",
+                customer_id=str(customer.id),
+            )
+            changed.append(tenant.tenant_key)
+        else:
+            refused.append({"tenant_key": tenant.tenant_key, "status": current})
+    if not changed and refused:
+        db.rollback()
         raise HTTPException(
-            422,
-            detail={"code": "CUSTOMER_FIELDS_REQUIRED", "message": "At least one editable customer field is required"},
+            409,
+            detail={
+                "code": "INVALID_CUSTOMER_TRANSITION",
+                "message": f"No tenant of this customer can become {payload.status.lower()}",
+                "refused": refused,
+            },
         )
-    before = {key: getattr(customer, key) for key in changes}
-    for key, value in changes.items():
-        setattr(customer, key, str(value).strip() if isinstance(value, str) else value)
+    customer.lifecycle_status = payload.status
     customer.lock_version = int(customer.lock_version or 0) + 1
-    customer.updated_at = datetime.now(timezone.utc)
-    db.add(
-        AuditEvent(
-            id=uuid.uuid4(),
-            tenant_id=admin.tenant_id,
-            actor_ref=str(admin.id),
-            action="CUSTOMER_UPDATED",
-            entity_type="Customer",
-            entity_id=customer.id,
-            details={"before": before, "after": changes, "reason": payload.get("reason", "Customer 360 edit")},
-            created_at=datetime.now(timezone.utc),
-        )
-    )
+    customer.updated_at = now
     db.commit()
-    return {"id": str(customer.id), "lock_version": customer.lock_version, "updated": changes}
+    return {
+        "customer_id": str(customer.id),
+        "status": payload.status,
+        "tenants_changed": changed,
+        "tenants_unchanged": unchanged,
+        "tenants_refused": refused,
+    }
 
 
 @router.get("/platform-admin/customer-records/{customer_id}/tabs/{tab}")
@@ -640,10 +644,8 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
     if key in {"administrators", "users"}:
         rows = (
             db.query(AuthUser)
-            .filter(
-                AuthUser.tenant_id.in_(tenant_ids),
-                func.upper(AuthUser.role).in_(["ADMINISTRATOR", "ADMIN", "CUSTOMER_ADMIN"]),
-            )
+            .filter(AuthUser.tenant_id.in_(tenant_ids), func.upper(AuthUser.role) == "CUSTOMER_ADMIN")
+            .order_by(AuthUser.username)
             .all()
         )
         items = [
@@ -771,14 +773,12 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             }
             for row in rows
         ]
-    elif key in {"security", "audit"}:
-        rows = (
-            db.query(AuditEvent)
-            .filter(AuditEvent.tenant_id.in_(tenant_ids))
-            .order_by(AuditEvent.created_at.desc())
-            .limit(100)
-            .all()
-        )
+    elif key in {"security", "audit", "activity"}:
+        query = db.query(AuditEvent).filter(AuditEvent.tenant_id.in_(tenant_ids))
+        if key == "activity":
+            # What people changed, without the automatic per-request log entries (still in the full audit log).
+            query = query.filter(~AuditEvent.action.like("REQUEST\\_%"))
+        rows = query.order_by(AuditEvent.created_at.desc()).limit(100).all()
         items = [
             {
                 "id": str(row.id),

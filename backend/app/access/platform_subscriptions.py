@@ -221,6 +221,40 @@ def get_platform_usage(tenant_id: uuid.UUID, request: Request, db: Session = Dep
     }
 
 
+def _assign_plan(db: Session, tenant_id: uuid.UUID, plan: PlanDefinition, now: datetime, reason: str) -> str | None:
+    """Make `plan` the tenant's active plan assignment (the one plan columns, entitlements and limits read).
+
+    The previous active assignment is ended (SUPERSEDED), not deleted, so the plan history stays visible.
+    Returns the previous plan code, if any.
+    """
+    current = (
+        db.query(TenantPlanAssignment)
+        .filter(TenantPlanAssignment.tenant_id == tenant_id, TenantPlanAssignment.status == "ACTIVE")
+        .all()
+    )
+    previous = None
+    for assignment in current:
+        if assignment.plan_id == plan.id:
+            return plan.code
+        old_plan = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first()
+        previous = old_plan.code if old_plan else None
+        assignment.status, assignment.effective_to, assignment.updated_at = "SUPERSEDED", now, now
+    db.add(
+        TenantPlanAssignment(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            plan_id=plan.id,
+            status="ACTIVE",
+            effective_from=now,
+            effective_to=None,
+            reason=reason[:1000],
+            created_at=now,
+            updated_at=now,
+        )
+    )
+    return previous
+
+
 @router.post("/platform/customers/{tenant_id}/subscription")
 def set_platform_subscription(
     tenant_id: uuid.UUID, payload: SubscriptionRequest, request: Request, db: Session = Depends(get_db)
@@ -278,6 +312,7 @@ def set_platform_subscription(
             updated_at=now,
         )
         db.add(row)
+    previous_plan = _assign_plan(db, tenant_id, plan, now, payload.reason)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -286,7 +321,12 @@ def set_platform_subscription(
             action="SUBSCRIPTION_CHANGED",
             entity_type="SubscriptionLifecycle",
             entity_id=row.id,
-            details={"reason": payload.reason, "plan_version": plan.version},
+            details={
+                "reason": payload.reason,
+                "plan_version": plan.version,
+                "plan_code": plan.code,
+                "previous_plan_code": previous_plan,
+            },
             created_at=now,
         )
     )

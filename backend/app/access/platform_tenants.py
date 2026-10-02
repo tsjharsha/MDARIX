@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from auth.service import _verify
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth.durable import issue_invitation
@@ -48,6 +48,7 @@ from backend.app.db.models.stage2 import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import (
     CustomerAdminReplacementRequest,
+    EnvironmentCreateRequest,
     ScheduledLifecycleRequest,
     SupportAccessDecisionRequest,
     SupportAccessRequest,
@@ -56,6 +57,9 @@ from backend.app.access.authz import _is_platform_admin, _require_platform_admin
 from backend.app.access.common import _enforce_invite_limits, _expire_support_grants, _parse_support_time
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+# The values the tenant_environments check constraint allows.
+ENVIRONMENT_STATUSES = frozenset({"DRAFT", "PROVISIONING", "ACTIVE", "SUSPENDED", "ARCHIVED", "FAILED"})
 
 
 @router.get("/platform/tenants/{tenant_id}/health")
@@ -126,24 +130,7 @@ def transition_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Req
             },
         )
     now = datetime.now(timezone.utc)
-    next_status = "ACTIVE" if target == "REACTIVATED" else target
-    tenant.status = next_status
-    tenant.provisioning_status = "ACTIVE" if next_status == "ACTIVE" else tenant.provisioning_status
-    tenant.activated_at = now if next_status == "ACTIVE" else tenant.activated_at
-    tenant.suspended_at = now if next_status == "SUSPENDED" else tenant.suspended_at
-    tenant.lock_version = int(tenant.lock_version or 0) + 1
-    db.add(
-        AuditEvent(
-            id=uuid.uuid4(),
-            tenant_id=tenant.id,
-            actor_ref=str(admin.id),
-            action="TENANT_LIFECYCLE_TRANSITION",
-            entity_type="Tenant",
-            entity_id=tenant.id,
-            details={"from": current, "to": next_status, "reason": reason},
-            created_at=now,
-        )
-    )
+    next_status = apply_tenant_transition(db, tenant, target, reason, admin.id, now)
     db.commit()
     return {
         "tenant_id": str(tenant.id),
@@ -152,6 +139,29 @@ def transition_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Req
         "reason": reason,
         "transitioned_at": now,
     }
+
+
+def apply_tenant_transition(db: Session, tenant: Tenant, target: str, reason: str, actor_id, now: datetime, **details):
+    """Move a tenant to `target` (already checked as allowed) and audit it. Does not commit. Returns the status."""
+    current = str(tenant.status).upper()
+    tenant.status = target
+    tenant.provisioning_status = "ACTIVE" if target == "ACTIVE" else tenant.provisioning_status
+    tenant.activated_at = now if target == "ACTIVE" else tenant.activated_at
+    tenant.suspended_at = now if target == "SUSPENDED" else tenant.suspended_at
+    tenant.lock_version = int(tenant.lock_version or 0) + 1
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant.id,
+            actor_ref=str(actor_id),
+            action="TENANT_LIFECYCLE_TRANSITION",
+            entity_type="Tenant",
+            entity_id=tenant.id,
+            details={"from": current, "to": target, "reason": reason, **details},
+            created_at=now,
+        )
+    )
+    return target
 
 
 @router.post("/platform-admin/tenants/{tenant_id}/lifecycle/schedule")
@@ -843,6 +853,16 @@ def update_platform_environment(
     )
     if row is None:
         raise HTTPException(404, detail={"code": "ENVIRONMENT_NOT_FOUND", "message": "Environment is not available"})
+    if "status" in payload:
+        payload = {**payload, "status": str(payload["status"]).upper()}
+        if payload["status"] not in ENVIRONMENT_STATUSES:
+            raise HTTPException(
+                422,
+                detail={
+                    "code": "ENVIRONMENT_STATUS_INVALID",
+                    "message": f"Status must be one of {', '.join(sorted(ENVIRONMENT_STATUSES))}",
+                },
+            )
     for field in (
         "region",
         "residency_region",
@@ -877,30 +897,46 @@ def update_platform_environment(
 
 
 @router.post("/platform-admin/tenants/{tenant_id}/environments")
-def create_platform_environment(tenant_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+def create_platform_environment(
+    tenant_id: uuid.UUID, payload: EnvironmentCreateRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = _require_platform_admin(request, db)
     if db.query(Tenant).filter(Tenant.id == tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    required = ("environment_identifier", "environment_type", "region", "residency_region")
-    if any(not str(payload.get(field, "")).strip() for field in required):
+    identifier = payload.environment_identifier.strip()
+    existing = (
+        db.query(TenantEnvironment)
+        .filter(
+            TenantEnvironment.tenant_id == tenant_id,
+            or_(
+                TenantEnvironment.environment_type == payload.environment_type,
+                func.lower(TenantEnvironment.environment_identifier) == identifier.lower(),
+            ),
+        )
+        .first()
+    )
+    if existing is not None:
+        same_type = existing.environment_type == payload.environment_type
         raise HTTPException(
-            422,
+            409,
             detail={
-                "code": "ENVIRONMENT_FIELDS_REQUIRED",
-                "message": "Environment identifier, type, region, and residency are required",
+                "code": "ENVIRONMENT_EXISTS",
+                "message": f"This tenant already has a {payload.environment_type.lower()} environment"
+                if same_type
+                else f"An environment named {existing.environment_identifier} already exists",
             },
         )
     now = datetime.now(timezone.utc)
     row = TenantEnvironment(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
-        environment_identifier=payload["environment_identifier"],
-        environment_type=payload["environment_type"].upper(),
-        region=payload["region"],
-        residency_region=payload["residency_region"],
-        application_version=payload.get("application_version"),
-        schema_version=payload.get("schema_version"),
-        configuration_version=payload.get("configuration_version"),
+        environment_identifier=identifier,
+        environment_type=payload.environment_type,
+        region=payload.region.strip(),
+        residency_region=payload.residency_region.strip(),
+        application_version=payload.application_version,
+        schema_version=payload.schema_version,
+        configuration_version=payload.configuration_version,
         status="DRAFT",
         created_at=now,
         updated_at=now,
@@ -1181,6 +1217,13 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
         )
     elif key == "audit":
         items = get_platform_tenant_audit(tenant_id, request, db)["items"]
+    elif key == "activity":
+        # What people changed, without the automatic per-request log entries (still in the full audit log).
+        items = [
+            item
+            for item in get_platform_tenant_audit(tenant_id, request, db)["items"]
+            if not str(item.get("action", "")).startswith("REQUEST_")
+        ]
     else:
         raise HTTPException(404, detail={"code": "TENANT_TAB_NOT_FOUND", "message": "Tenant 360 tab is not available"})
     return {
