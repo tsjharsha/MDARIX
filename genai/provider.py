@@ -153,8 +153,8 @@ class GenAIProvider:
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
         started = time.monotonic()
-        usable = [item for item in self.fallbacks if item.configured]
-        if not self.configured and not usable:
+        # Fallbacks stand in for a configured primary only: without one (controlled mode) no model is called.
+        if not self.configured:
             return GenAIResult(
                 "controlled",
                 self.model,
@@ -171,7 +171,7 @@ class GenAIProvider:
                 0.0,
                 int((time.monotonic() - started) * 1000),
             )
-        chain = ([self] if self.configured else []) + usable
+        chain = [self] + [item for item in self.fallbacks if item.configured]
         resting = [item for item in chain if _COOLDOWN_UNTIL.get(item.provider_name, 0) > time.monotonic()]
         # Providers that are resting are tried last, so a request still gets an answer if every provider rests.
         ordered = [item for item in chain if item not in resting] + resting

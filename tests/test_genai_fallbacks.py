@@ -106,6 +106,14 @@ def test_without_fallbacks_the_primary_keeps_its_retries(monkeypatch):
     assert len(calls) == 3 and not provider_module._COOLDOWN_UNTIL
 
 
+def test_without_a_primary_no_fallback_is_called(monkeypatch):
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "controlled")
+    monkeypatch.delenv("MDARIX_GENAI_API_KEY")
+    calls = _route(monkeypatch, {"cerebras": "ok", "generativelanguage": "ok"})
+    result = GenAIProvider().complete("Summarize", {})
+    assert result.provider == "controlled" and calls == []
+
+
 def test_health_lists_the_chain_without_keys():
     health = GenAIProvider().health()
     assert health["provider"] == "groq"

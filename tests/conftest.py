@@ -25,6 +25,7 @@ if os.environ.get("MDARIX_TEST_ALLOW_LIVE_PROVIDERS") != "1":
     os.environ["MDARIX_GENAI_PROVIDER"] = "controlled"
     os.environ["MDARIX_GENAI_API_KEY"] = ""
     os.environ["MDARIX_GENAI_BASE_URL"] = ""
+    os.environ["MDARIX_GENAI_FALLBACKS"] = ""  # no fallback provider either (their keys may be in .env)
     os.environ["RESEND_API_KEY"] = ""
     # Account emails go through SMTP (auth/emailer.py loads .env itself). Present-but-empty values stop
     # python-dotenv from filling them in, so no test can send a real email. Tests that exercise SMTP patch
