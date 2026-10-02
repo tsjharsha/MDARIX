@@ -55,7 +55,12 @@ from backend.app.access.schemas import (
     SupportAccessRequest,
 )
 from backend.app.access.authz import _is_platform_admin, _require_platform_admin, _role_code
-from backend.app.access.common import _enforce_invite_limits, _expire_support_grants, _parse_support_time
+from backend.app.access.common import (
+    _enforce_invite_limits,
+    _ensure_email_not_used_elsewhere,
+    _expire_support_grants,
+    _parse_support_time,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -467,6 +472,7 @@ def replace_customer_admin(
     )
     created = False
     if replacement is None:
+        _ensure_email_not_used_elsewhere(db, email, tenant_id)
         _enforce_invite_limits(db, tenant_id, "CUSTOMER_ADMIN")
         replacement = AuthUser(
             id=uuid.uuid4(),

@@ -188,6 +188,9 @@ def test_signin_uses_persisted_auth_user_after_service_restart(monkeypatch):
         def first(self):
             return row
 
+        def all(self):
+            return [row]
+
     class DB:
         def query(self, model):
             return Query()

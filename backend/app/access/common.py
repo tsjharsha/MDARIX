@@ -128,6 +128,29 @@ def _active_plan_limits(db: Session, tenant_id: uuid.UUID) -> dict:
     return limits
 
 
+def _ensure_email_not_used_elsewhere(db: Session, email: str, tenant_id: uuid.UUID | None) -> None:
+    """One person, one live account: refuse an email that already has a live account in another tenant.
+
+    Sign-in finds the account by email, so a second live account in another tenant (possibly with another role)
+    would make it ambiguous which one the person signs in to. Retired (INACTIVE/OFFBOARDED) accounts don't count.
+    """
+    query = db.query(AuthUser.id).filter(
+        func.lower(AuthUser.username) == email.strip().lower(),
+        func.upper(AuthUser.status).notin_(["INACTIVE", "OFFBOARDED"]),
+    )
+    if tenant_id is not None:
+        query = query.filter(AuthUser.tenant_id != tenant_id)
+    if query.first() is not None:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "EMAIL_IN_USE",
+                "message": "This email already belongs to an account in another organization. "
+                "Use a different work email.",
+            },
+        )
+
+
 def _seat_counts(db: Session, tenant_id: uuid.UUID) -> dict:
     users = (
         db.query(AuthUser)
@@ -216,6 +239,7 @@ def _validate_onboarding_payload(payload: CustomerProvisionRequest, db: Session)
             },
         )
     existing = db.query(Tenant).filter(Tenant.tenant_key == key).first()
+    _ensure_email_not_used_elsewhere(db, email, existing.id if existing else None)
     if (
         existing is not None
         and not db.query(AuthUser).filter(AuthUser.tenant_id == existing.id, AuthUser.username == email).first()

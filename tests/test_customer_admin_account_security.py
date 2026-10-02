@@ -1,7 +1,7 @@
 """Customer Administrator account: privilege-escalation, self-lockout and tenant-boundary checks against the live API."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -278,3 +278,74 @@ def test_sign_in_uses_the_active_account_when_an_email_also_has_an_unused_invita
         response = client.post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD})
         assert response.status_code == 200, response.text
         assert response.json()["tenant_id"] == active_tenant_id
+
+
+def _two_active_accounts(admin_password, investigator_password, *, admin_password_newer):
+    """The same email active in two tenants: Customer Administrator in one, Investigator (created later) in another."""
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        admin_tenant = _tenant(db, "ADM")
+        other_tenant = _tenant(db, "INVG")
+        email = f"two-roles-{uuid.uuid4().hex[:8]}@synthetic.invalid"
+        admin = _user(db, admin_tenant, "CUSTOMER_ADMIN", "two-admin")
+        investigator = _user(db, other_tenant, "INVESTIGATOR", "two-investigator")
+        admin.username, investigator.username = email, email
+        admin.password_hash, investigator.password_hash = _hash(admin_password), _hash(investigator_password)
+        # The Investigator account is newer, which used to decide the sign-in.
+        admin.created_at, investigator.created_at = now - timedelta(days=10), now - timedelta(days=2)
+        admin.password_changed_at = now if admin_password_newer else now - timedelta(days=5)
+        investigator.password_changed_at = now - timedelta(days=1) if admin_password_newer else now
+        db.commit()
+        return email, str(admin_tenant.id), str(other_tenant.id)
+    finally:
+        db.close()
+
+
+def test_sign_in_uses_the_account_the_password_belongs_to():
+    email, admin_tenant, other_tenant = _two_active_accounts(
+        "Customer admin password 123", "Investigator password 456", admin_password_newer=False
+    )
+    client = TestClient(app)
+    as_admin = client.post("/api/v1/auth/signin", json={"email": email, "password": "Customer admin password 123"})
+    assert as_admin.status_code == 200, as_admin.text
+    assert as_admin.json()["tenant_id"] == admin_tenant
+    as_investigator = TestClient(app).post(
+        "/api/v1/auth/signin", json={"email": email, "password": "Investigator password 456"}
+    )
+    assert as_investigator.status_code == 200 and as_investigator.json()["tenant_id"] == other_tenant
+    wrong = TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": "Not the password 789"})
+    assert wrong.status_code in {400, 401}
+
+
+def test_with_the_same_password_the_account_set_most_recently_wins():
+    # The person just accepted the Customer Administrator invitation and chose a password they also use elsewhere.
+    email, admin_tenant, _ = _two_active_accounts(
+        "Shared password 12345", "Shared password 12345", admin_password_newer=True
+    )
+    response = TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": "Shared password 12345"})
+    assert response.status_code == 200 and response.json()["tenant_id"] == admin_tenant
+
+
+def test_a_tenant_user_cannot_be_created_with_an_email_live_in_another_tenant(world):
+    client, _ = world
+    db = SessionLocal()
+    try:
+        elsewhere = _user(db, _tenant(db, "ELSE"), "INVESTIGATOR", "elsewhere")
+        retired = _user(db, _tenant(db, "RETD"), "INVESTIGATOR", "retired")
+        retired.status = "OFFBOARDED"
+        db.commit()
+        live_email, retired_email = elsewhere.username, retired.username
+    finally:
+        db.close()
+
+    def invite(email):
+        return client.post(
+            "/api/v1/admin/identity/users",
+            json={"email": email, "display_name": "Second account", "company": "Synthetic", "role": "Viewer"},
+        )
+
+    refused = invite(live_email)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EMAIL_IN_USE"
+    # A retired account elsewhere does not block the email.
+    assert invite(retired_email).status_code == 200

@@ -48,6 +48,7 @@ from backend.app.access.authz import (
     _require_administrator,
 )
 from backend.app.access.common import (
+    _ensure_email_not_used_elsewhere,
     _admin_target_tenant,
     _audit_configuration,
     _development_token,
@@ -417,6 +418,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         )
     _enforce_invite_limits(db, target_tenant_id, role)
     email = payload.email.strip().lower()
+    _ensure_email_not_used_elsewhere(db, email, target_tenant_id)
     if (
         db.query(AuthUser)
         .filter(

@@ -17,7 +17,7 @@ from auth.durable import (
     revoke_session,
 )
 from auth.emailer import send_password_reset_email
-from auth.service import _hash, auth_service
+from auth.service import _hash, _verify, auth_service
 from backend.app.db.models.foundation import AuthUser, TenantMembership
 from backend.app.db.models.stage2 import (
     AuthSession,
@@ -316,19 +316,34 @@ def verify(data: Verify, db: Session = Depends(get_db)):
         raise fail(e)
 
 
-def _account_for_email(db: Session, email: str):
-    """The account an email signs in as. The same email can exist in several tenants (for example an
-    active account plus an unused invitation), so prefer an ACTIVE, verified account, then the newest."""
-    return (
+def _account_for_email(db: Session, email: str, password: str | None = None):
+    """The account an email signs in as.
+
+    The same email can exist in several tenants (for example an active account plus an unused invitation, or
+    older accounts created before one email meant one account). Prefer an ACTIVE, verified account, then the one
+    whose password was set most recently (the invitation the person just accepted), then the newest. When the
+    password is known, the account it belongs to wins: a person never lands in another tenant's account, with
+    another role, just because that account is newer.
+    """
+    rows = (
         db.query(AuthUser)
         .filter(AuthUser.username == email)
         .order_by(
             case((func.upper(AuthUser.status) == "ACTIVE", 0), else_=1),
             case((AuthUser.email_verified.is_(True), 0), else_=1),
+            AuthUser.password_changed_at.desc().nulls_last(),
             AuthUser.created_at.desc(),
         )
-        .first()
+        .all()
     )
+    if password is not None and len(rows) > 1:
+        for row in rows:
+            try:
+                if row.password_hash and _verify(password, row.password_hash):
+                    return row
+            except ValueError:
+                continue
+    return rows[0] if rows else None
 
 
 @router.post("/signin")
@@ -352,7 +367,7 @@ def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
                     "message": "Too many failed sign-in attempts. Try again later.",
                 },
             )
-        row = _account_for_email(db, identifier)
+        row = _account_for_email(db, identifier, data.password)
         if not row:
             raise ValueError("INVALID_CREDENTIALS")
         bind_tenant(db, row.tenant_id)
