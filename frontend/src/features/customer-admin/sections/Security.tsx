@@ -72,8 +72,8 @@ function Posture() {
             </a>
           </div>
           <p className="ac-muted">
-            To require MFA for everyone, set single sign-on to <strong>SSO with MFA</strong> or{" "}
-            <strong>Password with MFA</strong>.
+            MFA is required for administrators and before every electronic signature. Other users can turn it on from
+            their account.
           </p>
         </Panel>
         <Panel eyebrow="Sessions" title="How sign-in sessions are protected">
@@ -128,6 +128,11 @@ function SingleSignOn() {
           ]}
         />
       </Panel>
+      <p className="ac-muted" role="note">
+        Single sign-on (OpenID Connect or SAML) is not available yet: everyone signs in with their MDARIX password and
+        an authenticator app. You can record your identity provider here so it is ready when single sign-on is switched
+        on for your organization. Saving it does not change how anyone signs in.
+      </p>
       <Panel eyebrow="Configure" title="Set up or change single sign-on">
         <form
           className="ca-form"

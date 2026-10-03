@@ -1,4 +1,7 @@
+import logging
 import os
+import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -6,8 +9,16 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
+from auth.cookies import read_session_token
 from auth.durable import hash_token
+from backend.app.logging_setup import (
+    accept_request_id,
+    configure_logging,
+    current_request_id,
+    request_id_var,
+)
 from backend.app.access_router import router as access_router
 from backend.app.ask_router import router as ask_router
 from backend.app.auth_router import router as auth_router
@@ -40,6 +51,7 @@ from backend.app.trust_router import router as trust_router
 from backend.app.trial.router import router as trial_router
 from backend.app.demo_requests import router as demo_requests_router
 from backend.app.trial.feedback import router as trial_feedback_router
+from backend.app.site_info import router as site_info_router
 from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
@@ -52,11 +64,25 @@ from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
 from scenario_intelligence.router import router as scenario_router
 from backend.app.runtime_env import is_production_like
-from backend.app.db.tenant_scope import scoped_bind
+from backend.app.db.tenant_scope import bind_tenant, scoped_bind
 
+configure_logging()
+logger = logging.getLogger("mdarix.api")
 _production_like = is_production_like()
 _docs_enabled = os.getenv("MDARIX_ENABLE_API_DOCS", "true" if not _production_like else "false").lower() == "true"
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Staging and production refuse to start with a missing or unsafe configuration."""
+    from backend.app.config_check import enforce
+
+    enforce()
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="MDARIX R1 API",
     version="0.8.0",
     description=(
@@ -95,15 +121,18 @@ def _trusted_origins() -> set[str]:
 async def enforce_cookie_csrf(request: Request, call_next):
     """Reject cross-origin state changes authenticated only by a browser cookie.
 
-    Production-like: the browser origin (Origin, else Referer) must be the app's own (MDARIX_APP_URL or
-    MDARIX_ALLOWED_ORIGINS). Local development: a browser origin that is not the app, not this server and not a
-    loopback address is refused as well; requests without one (scripts, tests) pass.
+    Production-like: an unsafe request that names a browser origin (Origin, else Referer) must name the app's own
+    (MDARIX_APP_URL or MDARIX_ALLOWED_ORIGINS), with or without a session cookie (so sign-in cannot be forged from
+    another site), and a cookie-authenticated one must name it. Local development: a browser origin that is not the
+    app, not this server and not a loopback address is refused as well; requests without one (scripts, tests) pass.
     """
-    if request.method not in {"GET", "HEAD", "OPTIONS"} and request.cookies.get("mdarix_session"):
-        supplied = _origin(request.headers.get("origin", "")) or _origin(request.headers.get("referer", ""))
+    has_session = read_session_token(request) is not None
+    supplied = _origin(request.headers.get("origin", "")) or _origin(request.headers.get("referer", ""))
+    if request.method not in {"GET", "HEAD", "OPTIONS"} and (has_session or supplied):
         trusted = _trusted_origins()
         if is_production_like():
-            allowed = bool(trusted) and supplied in trusted
+            # A browser always names its origin on these requests; scripts without a cookie may omit it.
+            allowed = supplied in trusted if supplied else not has_session
         else:
             host = urlparse(supplied).hostname or ""
             allowed = (
@@ -129,39 +158,42 @@ async def audit_mutating_requests(request: Request, call_next):
     correlation, and outcome metadata.
     """
     response = await call_next(request)
-    if request.method in {"GET", "HEAD", "OPTIONS"} or not request.cookies.get("mdarix_session"):
+    token = read_session_token(request)
+    if request.method in {"GET", "HEAD", "OPTIONS"} or not token:
         return response
+    await run_in_threadpool(_record_mutation, request, token, response.status_code)
+    return response
+
+
+def _record_mutation(request: Request, token: str, status_code: int) -> None:
     db = SessionLocal()
     try:
         session = (
             db.query(AuthSession)
-            .filter(
-                AuthSession.session_hash == hash_token(request.cookies["mdarix_session"]),
-                AuthSession.revoked_at.is_(None),
-            )
+            .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
             .first()
         )
         if session:
-            now = datetime.now(timezone.utc)
+            bind_tenant(db, session.tenant_id)
             db.add(
                 make_audit_event(
                     tenant_id=session.tenant_id,
                     actor_ref=str(session.user_id),
                     action="REQUEST_MUTATION_COMPLETED",
                     entity_type="HTTP_REQUEST",
-                    correlation_id=request.headers.get("X-Correlation-ID"),
-                    details={"method": request.method, "path": request.url.path, "status_code": response.status_code},
+                    correlation_id=current_request_id(request),
+                    details={"method": request.method, "path": request.url.path, "status_code": status_code},
                     request=request,
                     reason=request.headers.get("X-Change-Reason"),
-                    created_at=now,
+                    created_at=datetime.now(timezone.utc),
                 )
             )
             db.commit()
     except Exception:
         db.rollback()
+        logger.exception("Request audit record could not be written")
     finally:
         db.close()
-    return response
 
 
 @app.middleware("http")
@@ -182,14 +214,57 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def request_id_and_log(request: Request, call_next):
+    """Give every request an id (the caller's X-Request-ID when it is plain, else a new one), attach it to every
+    log record written while handling it, return it in X-Request-ID, and log one line per request."""
+    request_id = accept_request_id(request.headers.get("x-request-id") or request.headers.get("x-correlation-id"))
+    request_id = request_id or current_request_id()
+    request.state.request_id = request_id
+    marker = request_id_var.set(request_id)
+    started = time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        if not request.url.path.startswith("/health"):
+            logger.info(
+                "%s %s %s",
+                request.method,
+                request.url.path,
+                status_code,
+                extra={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": status_code,
+                    "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+                },
+            )
+        request_id_var.reset(marker)
+
+
 @app.exception_handler(Exception)
 async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
-    """Keep unexpected customer-facing errors free of implementation details."""
-    correlation_id = request.headers.get("X-Correlation-ID")
-    body = {"code": "INTERNAL_ERROR", "message": "The request could not be completed."}
-    if correlation_id:
-        body["correlation_id"] = correlation_id
-    return JSONResponse(status_code=500, content={"detail": body})
+    """Log the failure in full on the server; the caller gets no implementation details, only the request id."""
+    request_id = current_request_id(request)
+    logger.error(
+        "Unhandled error on %s %s",
+        request.method,
+        request.url.path,
+        exc_info=(type(exc), exc, exc.__traceback__),
+        extra={"method": request.method, "path": request.url.path},
+    )
+    body = {
+        "code": "INTERNAL_ERROR",
+        "message": "The request could not be completed.",
+        "request_id": request_id,
+        # Earlier clients read this name.
+        "correlation_id": request_id,
+    }
+    return JSONResponse(status_code=500, content={"detail": body}, headers={"X-Request-ID": request_id})
 
 
 app.include_router(evidence_router)
@@ -217,6 +292,7 @@ app.include_router(mapping_catalog_router)
 app.include_router(trial_router)
 app.include_router(demo_requests_router)
 app.include_router(trial_feedback_router)
+app.include_router(site_info_router)
 app.include_router(data_import_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
@@ -248,10 +324,13 @@ def liveness() -> dict[str, str]:
 
 
 @app.get("/health/ready")
-def readiness() -> dict[str, str]:
-    with engine.connect() as conn:
-        conn.execute(text("SELECT 1")).scalar_one()
-    return {"status": "ready", "database": "reachable"}
+def readiness():
+    """Ready for traffic: the database answers and its schema is the one this code was built for. Other parts
+    (data planes, object storage, worker, email) are reported but do not take the API out of rotation."""
+    from backend.app.readiness import readiness_report
+
+    report = readiness_report()
+    return JSONResponse(status_code=200 if report["status"] == "ready" else 503, content=report)
 
 
 @app.get("/api/v1/graph/nodes/{entity_type}/{entity_id}")

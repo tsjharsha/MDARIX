@@ -142,6 +142,9 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
 
     status = user.get("/api/v1/trial/status").json()
     assert status["is_trial"] and status["days_left"] == 30 and status["sample"]["products"] == 3
+    # The workspace tells the trial team when its data will be deleted: 30 days after the trial ends.
+    ends, deleted = (datetime.fromisoformat(status[key]) for key in ("expires_at", "data_deleted_at"))
+    assert deleted - ends == timedelta(days=30)
     # The workspace dashboard reads the trial's own data, not another tenant's.
     counts = user.get("/api/v1/analytics/command-center").json()["counts"]
     assert counts["products"] == 3 and counts["complaints"] == 28

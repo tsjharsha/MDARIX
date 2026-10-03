@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { CheckCircle2, KeyRound, LogOut, ShieldCheck } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
@@ -53,14 +53,46 @@ function Profile() {
 function Security() {
   const { session, notify } = useWorkspace();
   const [busy, setBusy] = useState(false);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [problem, setProblem] = useState("");
   const requestReset = async () => {
     if (!session?.email) return;
     setBusy(true);
     try {
       await send("/api/v1/auth/forgot-password", "POST", { email: session.email });
-      notify(`If email delivery is configured, a reset link has been sent to ${session.email}.`);
+      notify(`We have emailed a reset link to ${session.email}. It works once and expires in one hour.`);
     } catch (reason) {
       notify(errorText(reason, "The reset link could not be requested."), "critical");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const changePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setProblem("");
+    if (next !== confirm) {
+      setProblem("The new password and its confirmation do not match.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await send<{ other_sessions_signed_out: number }>("/api/v1/auth/change-password", "POST", {
+        current_password: current,
+        new_password: next,
+      });
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+      const others = result?.other_sessions_signed_out ?? 0;
+      notify(
+        others
+          ? `Password changed. ${others} other session${others === 1 ? " was" : "s were"} signed out.`
+          : "Password changed.",
+      );
+    } catch (reason) {
+      setProblem(errorText(reason, "The password could not be changed."));
     } finally {
       setBusy(false);
     }
@@ -75,18 +107,64 @@ function Security() {
           </a>
         </div>
       </Panel>
-      <Panel eyebrow="Sign-in" title="Password">
-        <p>We email you a one-time link to choose a new password. Nobody else, including administrators, sees it.</p>
-        <div className="ca-action-row">
-          <button
-            type="button"
-            className="ac-secondary"
-            disabled={busy || !session?.email}
-            onClick={() => void requestReset()}
-          >
-            <KeyRound size={16} /> {busy ? "Requesting…" : "Email me a reset link"}
-          </button>
-        </div>
+      <Panel eyebrow="Sign-in" title="Change your password">
+        <form className="uw-password-form" onSubmit={(event) => void changePassword(event)}>
+          <label>
+            Current password
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              maxLength={128}
+              value={current}
+              onChange={(event) => setCurrent(event.target.value)}
+            />
+          </label>
+          <label>
+            New password
+            <input
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+              maxLength={128}
+              value={next}
+              onChange={(event) => setNext(event.target.value)}
+            />
+            <small>At least 12 characters. A phrase of several words works well.</small>
+          </label>
+          <label>
+            Confirm new password
+            <input
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={12}
+              maxLength={128}
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+            />
+          </label>
+          {problem && (
+            <p className="uw-trial-message is-bad" role="alert">
+              {problem}
+            </p>
+          )}
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy}>
+              <KeyRound size={16} /> {busy ? "Saving…" : "Change password"}
+            </button>
+            <button
+              type="button"
+              className="ac-link"
+              disabled={busy || !session?.email}
+              onClick={() => void requestReset()}
+            >
+              Forgot it? Email me a reset link
+            </button>
+          </div>
+          <p className="ac-muted">Your other sessions are signed out when the password changes.</p>
+        </form>
       </Panel>
       <Panel eyebrow="Sessions" title="How your session is protected">
         <ul className="ca-check-list">

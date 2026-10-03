@@ -1,0 +1,6 @@
+# Tools for development, tests and CI (never installed in production images). Install the hashed runtime lock first:
+#   python -m pip install --require-hashes -r requirements.txt && python -m pip install -r requirements-dev.txt
+pip-audit==2.10.1
+pytest==9.1.1
+ruff==0.16.9
+uv==0.11.33

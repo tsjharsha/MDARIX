@@ -5,7 +5,6 @@ import logging
 import os
 import signal
 import sys
-import urllib.request
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -21,7 +20,7 @@ from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, session_factory
 from backend.app.db.models.customer_lifecycle import TenantDataPlane
 from backend.app.db.models.enterprise import ConnectorRun, ConnectorSourceRecord
 from backend.app.db.session import SessionLocal
-from backend.app.db.tenant_scope import bind_tenant
+from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.worker_status import OUTBOX_WORKER, record_heartbeat
 from integration.api_contract import idempotency_key
 from uuid import UUID
@@ -62,6 +61,7 @@ def route_provider_event_to_data_plane(payload):
         or idempotency_key(str(tenant_id), provider, entity, record)
     )
     with SessionLocal() as control_db:
+        bind_system(control_db, "outbox worker: resolve the tenant's data plane")
         plane = (
             control_db.query(TenantDataPlane)
             .filter(TenantDataPlane.tenant_id == tenant_id, TenantDataPlane.status == "ACTIVE")
@@ -118,25 +118,27 @@ def publish(event_name, payload):
     if event_name == "PROVIDER_RECORD_RECEIVED":
         route_provider_event_to_data_plane(payload)
         return
-    # Production deployments replace this adapter with the configured broker.
+    from backend.app.notifications import handle_event
+
+    with SessionLocal() as db:
+        bind_system(db, f"outbox worker: deliver {event_name}")
+        if handle_event(db, event_name, payload):
+            return
+    # Events nobody needs to be told about (for example audit-only events) are acknowledged.
     if os.getenv("MDARIX_OUTBOX_PUBLISHER", "noop") == "noop":
         return
     raise RuntimeError("OUTBOX_PUBLISHER_NOT_IMPLEMENTED")
 
 
 def alert_dead_letter(payload):
-    """Deliver an operational alert without exposing event payload data."""
-    target = os.getenv("MDARIX_OUTBOX_ALERT_WEBHOOK", "").strip()
-    if not target:
-        logging.getLogger(__name__).warning("outbox alert delivery not configured alert=%s", payload)
-        return
-    body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(target, data=body, headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(
-        request, timeout=float(os.getenv("MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS", "5"))
-    ) as response:
-        if response.status >= 300:
-            raise RuntimeError(f"OUTBOX_ALERT_HTTP_{response.status}")
+    """Deliver an operational alert without exposing event payload data (backend/app/alerts.py)."""
+    from backend.app.alerts import send_alert
+
+    send_alert(
+        "Event dead-lettered",
+        f"{payload.get('event_name')} (event {payload.get('event_id')}) failed {payload.get('attempts')} times: "
+        f"{payload.get('error')}. Review it in Platform Admin > Operations > Dead letters.",
+    )
 
 
 def write_heartbeat(metrics):
@@ -165,6 +167,7 @@ def record_database_heartbeat(instance_id, started_at, metrics):
     """Record the heartbeat where the platform console reads it. A failure is logged, never fatal to the worker."""
     try:
         with SessionLocal() as db:
+            bind_system(db, "outbox worker: record heartbeat")
             record_heartbeat(db, OUTBOX_WORKER, instance_id, started_at, metrics)
     except Exception:
         logging.getLogger(__name__).exception("worker heartbeat could not be recorded")
@@ -174,6 +177,7 @@ def process_pending_reports(limit: int = 10):
     """Drain report jobs from every registered tenant data plane."""
     claimed = ready = failed = 0
     with SessionLocal() as control_db:
+        bind_system(control_db, "report worker: list registered data planes")
         planes = control_db.query(TenantDataPlane).filter(TenantDataPlane.status == "ACTIVE").all()
         for plane in planes:
             try:
@@ -193,7 +197,9 @@ def process_pending_reports(limit: int = 10):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=os.getenv("MDARIX_LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
+    from backend.app.logging_setup import configure_logging
+
+    configure_logging()
 
     def stop(_signum, _frame):
         nonlocal_stop[0] = True
@@ -207,6 +213,7 @@ if __name__ == "__main__":
     interval = int(os.getenv("MDARIX_OUTBOX_INTERVAL_SECONDS", "5"))
     instance_id, started_at = str(uuid.uuid4()), datetime.now(timezone.utc)
     while not nonlocal_stop[0]:
+        worker.recover_stale_claims()
         stats = worker.process_once(limit=int(os.getenv("MDARIX_OUTBOX_BATCH_SIZE", "50")))
         reports = process_pending_reports(limit=int(os.getenv("MDARIX_REPORT_WORKER_BATCH_SIZE", "10")))
         metrics = {**worker.metrics.snapshot(), "report_jobs": reports}

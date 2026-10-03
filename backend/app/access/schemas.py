@@ -43,8 +43,9 @@ class RolePermissionRequest(BaseModel):
     permission_set_id: uuid.UUID
 
 
-class TenantSwitchRequest(BaseModel):
-    tenant_id: uuid.UUID
+class MfaResetRequest(BaseModel):
+    # Why the authenticator is being removed; kept in the audit trail.
+    reason: str = Field(min_length=5, max_length=500)
 
 
 class UserStatusRequest(BaseModel):

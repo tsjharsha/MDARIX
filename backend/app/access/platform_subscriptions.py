@@ -456,15 +456,19 @@ def reminder_schedules(db: Session) -> dict:
     return schedules
 
 
-@router.post("/platform/subscriptions/lifecycle/run")
-def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
-    admin = _require_platform_admin(request, db)
-    now = datetime.now(timezone.utc)
+def run_subscription_lifecycle_job(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
+    """Move expired subscriptions to grace or expiry (suspending the tenant) and queue renewal reminders.
+
+    Idempotent: a reminder is queued once per subscription, stage and expiry version. Every status change is
+    audited in the affected tenant. Run by the scheduler every hour and on demand by a Platform Administrator.
+    """
+    now = now or datetime.now(timezone.utc)
     queued = 0
     transitioned = 0
     rows = db.query(SubscriptionLifecycle).all()
     schedules = reminder_schedules(db)
     for row in rows:
+        previous = row.status
         if row.expires_at <= now and row.grace_ends_at and row.grace_ends_at > now and row.status != "GRACE":
             row.status = "GRACE"
             transitioned += 1
@@ -472,6 +476,19 @@ def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
             row.status = "EXPIRED"
             transitioned += 1
             db.query(Tenant).filter(Tenant.id == row.tenant_id).update({"status": "SUSPENDED"})
+        if row.status != previous:
+            db.add(
+                AuditEvent(
+                    id=uuid.uuid4(),
+                    tenant_id=row.tenant_id,
+                    actor_ref=actor_ref,
+                    action="SUBSCRIPTION_STATUS_CHANGED",
+                    entity_type="SubscriptionLifecycle",
+                    entity_id=row.id,
+                    details={"from": previous, "to": row.status, "tenant_suspended": row.status == "EXPIRED"},
+                    created_at=now,
+                )
+            )
         thresholds = schedules.get(row.tenant_id) or DEFAULT_REMINDER_THRESHOLDS
         for stage, threshold in ((f"{days}_DAY", days) for days in thresholds):
             if 0 <= (row.expires_at - now).days <= threshold:
@@ -502,6 +519,14 @@ def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
                         )
                     )
                     queued += 1
+    return {"status": "COMPLETE", "queued": queued, "transitioned": transitioned, "idempotent": True}
+
+
+@router.post("/platform/subscriptions/lifecycle/run")
+def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
+    admin = _require_platform_admin(request, db)
+    now = datetime.now(timezone.utc)
+    result = run_subscription_lifecycle_job(db, str(admin.id), now)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -509,12 +534,12 @@ def run_subscription_lifecycle(request: Request, db: Session = Depends(get_db)):
             actor_ref=str(admin.id),
             action="SUBSCRIPTION_LIFECYCLE_RUN",
             entity_type="SubscriptionLifecycle",
-            details={"queued": queued, "transitioned": transitioned},
+            details={"queued": result["queued"], "transitioned": result["transitioned"]},
             created_at=now,
         )
     )
     db.commit()
-    return {"status": "COMPLETE", "queued": queued, "transitioned": transitioned, "idempotent": True}
+    return result
 
 
 @router.post("/platform/subscriptions/{tenant_id}/reminder-policies")

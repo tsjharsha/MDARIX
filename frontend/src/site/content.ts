@@ -168,7 +168,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
     summary: capabilityCopy.challenger.copy,
     cards: [
       {
-        title: "Challenge the favourite",
+        title: "Challenge the favorite",
         text: "Test the leading explanation against contradicting records and alternative explanations before it hardens into a conclusion.",
       },
       {
@@ -268,7 +268,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
     cards: [
       {
         title: "Separate data per customer",
-        text: "Every record carries its organization, the database enforces that boundary on every query (row-level security), and every request is scoped to the signed-in organization. A dedicated database per customer is supported where required.",
+        text: "Every record carries its organization, the database enforces that boundary on every query (row-level security), and every request is scoped to the signed-in organization.",
       },
       {
         title: "Customer self-administration",
@@ -276,7 +276,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
       },
       {
         title: "Identity and access",
-        text: "Single sign-on, multi-factor authentication, session limits and immediate sign-out on suspension.",
+        text: "Authenticator-app MFA, session limits and immediate sign-out on suspension. Single sign-on is planned.",
       },
       {
         title: "Plans and entitlements",

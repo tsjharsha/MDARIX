@@ -20,6 +20,7 @@ export type TrialStatus = {
   is_trial: boolean;
   is_owner?: boolean;
   expires_at?: string;
+  data_deleted_at?: string;
   days_left?: number;
   limits?: { users: number; rows: number; file_bytes: number };
   usage?: { users: number; rows: number };
@@ -139,13 +140,13 @@ export function GettingStartedSection() {
     {
       id: "talk",
       title: "Talk to us about becoming a design partner",
-      detail: "Live connections to your QMS, PLM and ERP, single sign-on, and onboarding support.",
+      detail: "Live connections to your QMS, PLM and ERP, and onboarding support.",
       icon: MessageSquare,
       done: visited.includes("talk"),
       action: () => {
         markVisited("talk");
         setVisited(readVisited());
-        window.open("/company#contact", "_blank", "noopener");
+        window.open("/contact", "_blank", "noopener");
       },
       label: "Contact us",
     },
@@ -169,7 +170,11 @@ export function GettingStartedSection() {
             <StatTile
               label="Trial ends"
               value={trial?.expires_at ? new Date(trial.expires_at).toLocaleDateString() : null}
-              detail="Your data stays if you continue"
+              detail={
+                trial?.data_deleted_at
+                  ? `Data is deleted on ${new Date(trial.data_deleted_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })} unless you continue`
+                  : "Your data stays if you continue"
+              }
               icon={<ShieldCheck size={18} />}
             />
             <StatTile
@@ -255,13 +260,21 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
         ...(body ? { body: JSON.stringify(body) } : {}),
       });
       const sent = result.email_delivery === "SENT";
-      setMessage({
-        tone: "good",
-        text: sent
-          ? `Invitation emailed to ${result.email}. The link is valid for 72 hours.`
-          : `Email is not set up on this server. Send ${result.email} this one-time link (valid 72 hours):`,
-        link: !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined,
-      });
+      const link = !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined;
+      setMessage(
+        sent
+          ? { tone: "good", text: `Invitation emailed to ${result.email}. The link is valid for 72 hours.` }
+          : link
+            ? {
+                tone: "good",
+                text: `Email is not set up on this development server. Send ${result.email} this one-time link (valid 72 hours):`,
+                link,
+              }
+            : {
+                tone: "bad",
+                text: `The invitation email to ${result.email} could not be sent. Try Resend in a few minutes, or contact MDARIX support.`,
+              },
+      );
       setName("");
       setEmail("");
       team.reload();
@@ -338,7 +351,11 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
           )}
           {data.can_invite && full && (
             <p className="uw-trial-note">
-              All {data.limit} trial seats are in use. Contact us to add more people as a design partner.
+              All {data.limit} trial seats are in use.{" "}
+              <a href="/contact" target="_blank" rel="noopener">
+                Contact us
+              </a>{" "}
+              to add more people as a design partner.
             </p>
           )}
           {!data.can_invite && (

@@ -23,6 +23,8 @@ def test_production_requires_the_apps_own_origin(monkeypatch):
     monkeypatch.setenv("MDARIX_ENV", "production")
     monkeypatch.setenv("MDARIX_APP_URL", "https://app.mdarix.example")
     user = _client_with_role("INVESTIGATOR")
+    # Production reads only the host-bound cookie name (auth/cookies.py).
+    user.cookies.set("__Host-mdarix_session", user.cookies.get("mdarix_session"))
     no_origin = user.post("/api/v1/stage3/interactions", json={"prompt": "Hi"})
     assert no_origin.status_code == 403
     local = user.post("/api/v1/stage3/interactions", json={"prompt": "Hi"}, headers={"Origin": "http://127.0.0.1:5177"})

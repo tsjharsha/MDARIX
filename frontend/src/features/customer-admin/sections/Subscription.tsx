@@ -39,7 +39,7 @@ export function SubscriptionSection() {
               <dd>{context?.plan?.version ?? "—"}</dd>
             </div>
             <div>
-              <dt>Licence</dt>
+              <dt>License</dt>
               <dd>
                 <ToneBadge
                   tone={context?.license?.effective ? "good" : "critical"}

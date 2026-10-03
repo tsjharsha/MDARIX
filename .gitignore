@@ -1,4 +1,8 @@
 .env
+.env.*
+!.env.example
+!.env.production.example
+frontend/vite.zz-*.config.ts
 .venv/
 __pycache__/
 *.pyc
@@ -28,3 +32,13 @@ infrastructure/database/backups/*.dump
 
 # Local embedding model download cache (fastembed)
 .model-cache/
+
+# Generated test evidence: screenshots, browser reports, scans and audit archives are produced by CI and kept as CI
+# artifacts, not committed. Small evaluation results that STATUS.md cites (artifacts/*.json, *.csv, *.md) stay tracked.
+frontend/artifacts/
+artifacts/**/*.png
+artifacts/playwright-report/
+artifacts/zap-*.html
+artifacts/compliance/audit-archives/
+artifacts/audit-archives/
+artifacts/data-plane-backups/

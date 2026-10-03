@@ -20,6 +20,11 @@ os.environ.setdefault("MDARIX_EMBEDDING_PROVIDER", "deterministic")
 # Signatures need an authenticator code by default; the MFA tests (test_mfa_mvp) switch it on themselves, so the
 # many governance tests can exercise authority and separation of duties without enrolling every test user.
 os.environ.setdefault("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
+# Thousands of sign-ins come from the one test client: rate limits are off unless a test switches them on
+# (tests/test_auth_hardening.py). Password hashing uses a lower scrypt cost so the suite stays fast; production
+# refuses a cost below 2^17.
+os.environ.setdefault("MDARIX_RATE_LIMITS_ENABLED", "false")
+os.environ.setdefault("MDARIX_PASSWORD_SCRYPT_LOG2_N", "14")
 # Tests must not call paid or external services with the developer's .env
 # credentials (Groq, Resend). The deterministic provider path is exercised
 # instead; individual tests that need provider behaviour set their own env.
@@ -48,8 +53,8 @@ from datetime import datetime, timezone  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from backend.app.main import app  # noqa: E402
-from auth.service import _hash, auth_service  # noqa: E402
-from auth.durable import persist_session  # noqa: E402
+from auth.service import _hash  # noqa: E402
+from auth.durable import new_session  # noqa: E402
 from backend.app.db.models.foundation import AuthUser, Investigation, Tenant, TenantMembership  # noqa: E402
 from backend.app.db.session import SessionLocal  # noqa: E402
 
@@ -226,18 +231,7 @@ def authenticated_client(application=app):
     db = SessionLocal()
     tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
     user = _ensure_legacy_user(db, tenant)
-    token = auth_service.signin_persisted(
-        "legacy-test-auth@synthetic.invalid",
-        "LegacyTestPassword123!",
-        user_id=user.id,
-        display_name=user.display_name,
-        tenant_id=user.tenant_id,
-        password_hash=user.password_hash,
-        role=user.role,
-        status=user.status,
-        email_verified=user.email_verified,
-    )
-    persist_session(db, token, user.id, user.tenant_id)
+    token = new_session(db, user.id, user.tenant_id)
     db.close()
     client.cookies.set("mdarix_session", token)
     return client
@@ -245,63 +239,17 @@ def authenticated_client(application=app):
 
 @pytest.fixture(autouse=True)
 def authenticate_legacy_module(request):
+    """Modules in LEGACY_PROTECTED call protected routes through module-level clients: give those a session."""
     if request.module.__name__.split(".")[-1] not in LEGACY_PROTECTED:
         yield
         return
     db = SessionLocal()
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
-        email = "legacy-test-auth@synthetic.invalid"
-        user = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id, AuthUser.username == email).first()
-        now = datetime.now(timezone.utc)
-        if user is None:
-            user = AuthUser(
-                id=uuid.uuid4(),
-                tenant_id=tenant.id,
-                username=email,
-                display_name="Legacy Test Auth",
-                company="Test",
-                password_hash=_hash("LegacyTestPassword123!"),
-                role="Administrator",
-                status="ACTIVE",
-                email_verified=True,
-                created_at=now,
-                updated_at=now,
-            )
-            db.add(user)
-            db.flush()
-        membership = (
-            db.query(TenantMembership)
-            .filter(TenantMembership.tenant_id == tenant.id, TenantMembership.user_id == user.id)
-            .first()
-        )
-        if membership is None:
-            db.add(
-                TenantMembership(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant.id,
-                    user_id=user.id,
-                    status="ACTIVE",
-                    is_default=True,
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-        db.commit()
-        token = auth_service.signin_persisted(
-            email,
-            "LegacyTestPassword123!",
-            user_id=user.id,
-            display_name=user.display_name,
-            tenant_id=user.tenant_id,
-            password_hash=user.password_hash,
-            role=user.role,
-            status=user.status,
-            email_verified=user.email_verified,
-        )
-        persist_session(db, token, user.id, user.tenant_id)
+        user = _ensure_legacy_user(db, tenant)
+        token = new_session(db, user.id, user.tenant_id)
         for value in vars(request.module).values():
-            if not isinstance(value, type) and hasattr(value, "cookies") and hasattr(value, "get"):
+            if isinstance(value, TestClient):
                 value.cookies.set("mdarix_session", token)
         yield
     finally:

@@ -15,9 +15,13 @@ export function ConsentBanner() {
       <div>
         <strong>Privacy and data-use notice</strong>
         <p>
-          MDARIX uses essential session storage and tenant-scoped audit records to operate this workspace. This notice
-          does not represent a GDPR, HIPAA, or other compliance certification; review your organization&apos;s
-          obligations before entering regulated data.
+          MDARIX uses one essential sign-in cookie and keeps an audit record of actions in your organization&apos;s
+          workspace. Please do not enter patient-identifiable information. MDARIX is not certified for GDPR, HIPAA or
+          other regulations; review your organization&apos;s obligations before entering regulated data. Read the{" "}
+          <a href="/privacy" target="_blank" rel="noopener">
+            Privacy Policy
+          </a>
+          .
         </p>
       </div>
       <div className="consent-actions">

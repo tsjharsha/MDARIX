@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth.durable import issue_invitation
-from auth.emailer import EmailDeliveryError, send_activation_email
+from auth.emailer import EmailDeliveryError, send_trial_invitation
 from auth.service import _hash
 from backend.app.customer_lifecycle import build_customer_tenant
 from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
@@ -163,13 +163,24 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
     }
 
 
+def long_date(value: datetime) -> str:
+    """An unambiguous date for people in any country, e.g. 3 November 2026 (UTC)."""
+    return f"{value.day} {value:%B %Y}"
+
+
 def _send_invitation(db: Session, user: AuthUser, organization: str, admin_id) -> dict:
     token = issue_invitation(db, user.id, user.tenant_id, admin_id, ttl=TRIAL_INVITATION_TTL_SECONDS)
+    subscription = trial_subscription(db, user.tenant_id)
+    ends_on = long_date(subscription.expires_at) if subscription else f"{TRIAL_DAYS} days after activation"
+    result: dict = {}
     try:
-        delivery = send_activation_email(user.username, token, organization, valid_for="72 hours")
-    except EmailDeliveryError:
+        delivery = send_trial_invitation(
+            user.username, token, organization, ends_on=ends_on, users=TRIAL_USER_LIMIT, rows=TRIAL_ROW_LIMIT
+        )
+    except EmailDeliveryError as exc:
         delivery = "FAILED"
-    result = {"email_delivery": delivery}
+        result["email_error"] = str(exc)
+    result["email_delivery"] = delivery
     # Without working email, a development host shows the link so the admin can pass it on by hand.
     if delivery != "SENT" and is_development():
         result["activation_path"] = f"/activate-account?token={token}"

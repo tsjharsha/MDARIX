@@ -17,6 +17,21 @@ test.describe("public MDARIX shell", () => {
     expect(results.violations.filter((item) => item.impact === "critical")).toEqual([]);
   });
 
+  test("shows legal pages and a not-found page instead of a sign-in prompt", async ({ page }) => {
+    for (const [path, heading] of [
+      ["/privacy", "Privacy policy"],
+      ["/terms", "Terms of service"],
+      ["/trial-agreement", "Free trial agreement"],
+      ["/security", "Security at MDARIX"],
+      ["/contact", "Contact MDARIX"],
+      ["/no-such-page", "Page not found"],
+    ] as const) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+    }
+  });
+
   test("verifies every public header and footer link resolves to a nonblank route", async ({ page }) => {
     // Visits every header, menu and footer link (about 100 pages).
     test.setTimeout(240_000);
@@ -46,6 +61,7 @@ test.describe("public MDARIX shell", () => {
       await page.goto(href);
       await expect(page.locator("body")).not.toBeEmpty();
       await expect(page.locator("body")).toContainText(/MDARIX|Sign in|Create account/i);
+      await expect(page.getByRole("heading", { name: "Page not found" })).toHaveCount(0);
     }
     expect(hrefs.size).toBeGreaterThan(20);
   });

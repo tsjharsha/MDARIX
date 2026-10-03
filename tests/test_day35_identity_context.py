@@ -1,108 +1,125 @@
+"""Identity context comes only from the durable session and the persisted user."""
+
+import uuid
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from starlette.requests import Request
 
-from backend.app.access import authz, schemas, session
+from auth.durable import hash_token, new_session, new_token
+from backend.app.access import authz
+from backend.app.db.models.foundation import Tenant
+from backend.app.db.models.stage2 import AuthSession
+from backend.app.db.session import SessionLocal
+from backend.app.main import app
+from tests.conftest import _ensure_legacy_user
 
 
-@pytest.fixture(autouse=True)
-def explicit_legacy_test_mode(monkeypatch):
-    """These unit tests exercise the legacy compatibility path explicitly."""
-    monkeypatch.setenv("MDARIX_ENV", "development")
-    monkeypatch.setenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "true")
+def _legacy():
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+        user = _ensure_legacy_user(db, tenant)
+        return user.id, user.tenant_id, user.username, user.role
+    finally:
+        db.close()
 
 
-def request_with_cookie(token: str = "") -> Request:
-    headers = [(b"cookie", f"mdarix_session={token}".encode())] if token else []
-    return Request(
-        {"type": "http", "method": "GET", "path": "/api/v1/me/context", "headers": headers, "query_string": b""}
-    )
+def _client(token: str) -> TestClient:
+    client = TestClient(app)
+    client.cookies.set("mdarix_session", token)
+    return client
 
 
-class FakeQuery:
-    def __init__(self, row):
-        self.row = row
-
-    def filter(self, *args):
-        return self
-
-    def first(self):
-        return self.row
-
-
-class FakeDb:
-    def __init__(self, user):
-        self.user = user
-
-    def query(self, model):
-        return FakeQuery(self.user)
-
-
-def active_user(tenant_id="tenant-a", role="Viewer"):
-    return SimpleNamespace(
-        id="user-a",
-        tenant_id=tenant_id,
-        username="user-a@example.invalid",
-        display_name="User A",
-        role=role,
-        status="ACTIVE",
-    )
-
-
-def test_context_uses_authenticated_persisted_user(monkeypatch):
-    monkeypatch.setattr(session.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"})
-
-    result = session.context(request_with_cookie("session-a"), FakeDb(active_user()))
-
-    assert result["user_id"] == "user-a"
-    assert result["tenant_id"] == "tenant-a"
-    assert result["active_role"] == "Viewer"
-    assert result["email"] == "user-a@example.invalid"
+def test_context_uses_the_persisted_user():
+    user_id, tenant_id, email, role = _legacy()
+    db = SessionLocal()
+    try:
+        token = new_session(db, user_id, tenant_id)
+    finally:
+        db.close()
+    result = _client(token).get("/api/v1/me/context")
+    assert result.status_code == 200, result.text
+    body = result.json()
+    assert body["user_id"] == str(user_id)
+    assert body["tenant_id"] == str(tenant_id)
+    assert body["email"] == email
 
 
 def test_context_requires_authentication():
-    with pytest.raises(HTTPException) as error:
-        session.context(request_with_cookie(), FakeDb(active_user()))
-
-    assert error.value.status_code == 401
-    assert error.value.detail["code"] == "UNAUTHENTICATED"
+    response = TestClient(app).get("/api/v1/me/context")
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "UNAUTHENTICATED"
 
 
-def test_context_rejects_session_tenant_mismatch(monkeypatch):
-    monkeypatch.setattr(session.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-b"})
-
-    with pytest.raises(HTTPException) as error:
-        session.context(request_with_cookie("session-a"), FakeDb(active_user("tenant-a")))
-
-    assert error.value.status_code == 401
-    assert error.value.detail["code"] == "UNAUTHENTICATED"
-
-
-def test_active_role_rejects_unassigned_role(monkeypatch):
-    monkeypatch.setattr(session.auth_service, "context", lambda token: {"user_id": "user-a", "tenant_id": "tenant-a"})
-
-    with pytest.raises(HTTPException) as error:
-        session.active_role(
-            schemas.RoleSwitch(role="Administrator"),
-            request_with_cookie("session-a"),
-            FakeDb(active_user()),
+def test_a_session_for_another_tenant_than_the_user_is_refused():
+    user_id, _tenant_id, _email, _role = _legacy()
+    db = SessionLocal()
+    try:
+        other_tenant = db.query(Tenant).filter(Tenant.id != _tenant_id).first()
+        assert other_tenant is not None
+        token = new_token()
+        now = datetime.now(timezone.utc)
+        db.add(
+            AuthSession(
+                session_hash=hash_token(token),
+                user_id=user_id,
+                tenant_id=other_tenant.id,
+                expires_at=now + timedelta(hours=1),
+                created_at=now,
+                last_seen_at=now,
+            )
         )
+        db.commit()
+    finally:
+        db.close()
+    response = _client(token).get("/api/v1/me/context")
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "UNAUTHENTICATED"
 
-    assert error.value.status_code == 403
-    assert error.value.detail["code"] == "ROLE_NOT_ASSIGNED"
+
+def test_active_role_rejects_an_unassigned_role():
+    user_id, tenant_id, _email, role = _legacy()
+    db = SessionLocal()
+    try:
+        token = new_session(db, user_id, tenant_id)
+    finally:
+        db.close()
+    other = "Viewer" if role != "Viewer" else "Approver"
+    response = _client(token).post("/api/v1/me/active-role", json={"role": other})
+    assert response.status_code == 403
+    assert response.json()["detail"]["code"] == "ROLE_NOT_ASSIGNED"
+
+
+def test_the_removed_tenant_switch_endpoint_is_gone():
+    assert TestClient(app).post("/api/v1/me/tenant-context", json={"tenant_id": str(uuid.uuid4())}).status_code in {
+        404,
+        405,
+    }
+
+
+def _request() -> Request:
+    return Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""})
+
+
+def _user(role: str):
+    return SimpleNamespace(
+        id="user-a", tenant_id="tenant-a", username="user-a@example.invalid", role=role, status="ACTIVE"
+    )
 
 
 def test_administrator_gate_rejects_viewer(monkeypatch):
-    monkeypatch.setattr(authz, "_authenticated_user", lambda request, db: active_user(role="Viewer"))
+    monkeypatch.setattr(authz, "_authenticated_user", lambda request, db: _user("Viewer"))
     with pytest.raises(HTTPException) as error:
-        authz._require_administrator(request_with_cookie("session-a"), FakeDb(active_user()))
+        authz._require_administrator(_request(), None)
     assert error.value.status_code == 403
     assert error.value.detail["code"] == "ADMINISTRATOR_REQUIRED"
 
 
 def test_administrator_gate_accepts_administrator(monkeypatch):
-    admin = active_user(role="Administrator")
+    admin = _user("Administrator")
     monkeypatch.setattr(authz, "_authenticated_user", lambda request, db: admin)
-    assert authz._require_administrator(request_with_cookie("session-a"), FakeDb(admin)) is admin
+    assert authz._require_administrator(_request(), None) is admin

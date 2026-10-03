@@ -90,16 +90,44 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
   );
 }
 
+/** Where to go after signing in: a page inside the app the person was on, never another site. */
+export function safeReturnTo(value: string | null): string {
+  if (!value || !value.startsWith("/app") || value.startsWith("//") || value.includes("\\")) return "/app";
+  return value;
+}
+
+const MESSAGES: Record<string, string> = {
+  RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
+  ACCOUNT_TEMPORARILY_LOCKED:
+    "Too many failed sign-in attempts. Wait 15 minutes, then try again or reset your password.",
+  INVALID_CREDENTIALS: "That email and password do not match an active account.",
+  INVALID_RESET: "This reset link has expired or was already used. Request a new one below.",
+  INVALID_ACTIVATION: "This invitation link has expired or was already used. Ask your administrator to send a new one.",
+  VALID_EMAIL_REQUIRED: "Enter a valid work email.",
+};
+
+function problemMessage(data: { detail?: { code?: string; message?: string } } | null, fallback: string): string {
+  const code = data?.detail?.code;
+  if (code && MESSAGES[code]) return MESSAGES[code];
+  return data?.detail?.message ?? fallback;
+}
+
 export function AuthPage({ mode }: { mode: string }) {
-  const [message, setMessage] = useState("");
-  const [email, setEmail] = useState(new URLSearchParams(window.location.search).get("email") ?? "");
+  const query = new URLSearchParams(window.location.search);
+  const returnTo = safeReturnTo(query.get("returnTo"));
+  const [message, setMessage] = useState(
+    query.get("expired") === "1" ? "You were signed out after a period of inactivity. Sign in again to continue." : "",
+  );
+  const [email, setEmail] = useState(query.get("email") ?? "");
   // The email and password open accounts in several organizations: the person picks one.
   const [organizations, setOrganizations] = useState<Array<{ tenant_id: string; tenant_name: string }>>([]);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [company, setCompany] = useState("");
-  const [token, setToken] = useState(new URLSearchParams(window.location.search).get("token") ?? "");
-  const [userId, setUserId] = useState("");
+  const [token, setToken] = useState(query.get("token") ?? "");
+  const [tokenFromLink] = useState(Boolean(query.get("token")));
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
   const isTokenPassword = mode === "activate-account" || mode === "reset-password";
   const isMfa = mode === "mfa";
   const [mfaCode, setMfaCode] = useState("");
@@ -107,9 +135,26 @@ export function AuthPage({ mode }: { mode: string }) {
   const [mfaUri, setMfaUri] = useState("");
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
-  const [mfaEnrollment] = useState(new URLSearchParams(window.location.search).get("setup") === "1");
+  const [mfaEnrollment] = useState(query.get("setup") === "1");
+  const afterSignin = (data: { mfa_enrollment_required?: boolean; mfa_required?: boolean }) => {
+    const next = encodeURIComponent(returnTo);
+    window.location.href = data.mfa_enrollment_required
+      ? `/mfa?setup=1&returnTo=${next}`
+      : data.mfa_required
+        ? `/mfa?returnTo=${next}`
+        : returnTo;
+  };
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await send();
+    } finally {
+      setBusy(false);
+    }
+  };
+  const send = async () => {
     if (isMfa) {
       // Setting up: confirm the new authenticator with its first code. Signing in: the current code, or a
       // one-time recovery code when the phone is not at hand.
@@ -124,12 +169,12 @@ export function AuthPage({ mode }: { mode: string }) {
         setMessage("Authenticator set up. Save your recovery codes before you continue.");
       } else if (response.ok) {
         setMessage("Verified. Loading MDARIX...");
-        window.location.href = "/app";
+        window.location.href = returnTo;
       } else
         setMessage(
           data.detail?.code === "MFA_TEMPORARILY_LOCKED"
             ? "Too many wrong codes. Wait 15 minutes, then try again."
-            : (data.detail?.message ?? "The code could not be verified."),
+            : problemMessage(data, "The code could not be verified."),
         );
       return;
     }
@@ -138,23 +183,19 @@ export function AuthPage({ mode }: { mode: string }) {
         ? "signin"
         : mode === "signup"
           ? "signup"
-          : mode === "verify-email"
-            ? "verify-email"
-            : mode === "activate-account"
-              ? "activate-account"
-              : mode === "reset-password"
-                ? "reset-password"
-                : "forgot-password";
+          : mode === "activate-account"
+            ? "activate-account"
+            : mode === "reset-password"
+              ? "reset-password"
+              : "forgot-password";
     const body =
       mode === "signup"
         ? { email, display_name: name, organization: company }
         : mode === "signin"
           ? { email, password }
-          : mode === "verify-email"
-            ? { token }
-            : isTokenPassword
-              ? { token, password }
-              : { email };
+          : isTokenPassword
+            ? { token, password }
+            : { email };
     let response: Response;
     try {
       response = await fetch(`/api/v1/auth/${endpoint}`, {
@@ -172,45 +213,33 @@ export function AuthPage({ mode }: { mode: string }) {
       setMessage("MDARIX is not responding right now. Please try again in a moment.");
       return;
     }
-    if (response.ok) {
-      if (mode === "signup") {
-        // Sign-up records a request; the account itself is created when the workspace is set up.
-        if (data.user_id) setUserId(data.user_id);
-        setToken(data.development_token ?? "");
-        setMessage(
-          data.status === "ONBOARDING_REQUEST_ACCEPTED"
-            ? `Thank you, your request is in. Once it is approved, we email ${email} an invitation to activate your free trial workspace for ${company || "your organization"}.`
-            : `Account created. Your User ID is ${data.user_id}.`,
-        );
-      } else if (mode === "verify-email") {
-        setMessage("Email verified. You can now sign in with your User ID and password.");
-      } else if (mode === "activate-account") {
-        setMessage("Account activated. You can now sign in with your email and new password.");
-      } else if (mode === "reset-password") {
-        setMessage("Password reset complete. You can now sign in with your new password.");
-      } else if (mode === "signin" && data.status === "TENANT_SELECTION_REQUIRED") {
-        setOrganizations(data.organizations ?? []);
-        setMessage("Your account is in more than one organization. Choose the one to open.");
-      } else if (mode === "signin") {
-        if (data.mfa_enrollment_required) {
-          window.location.href = "/mfa?setup=1";
-        } else if (data.mfa_required) {
-          window.location.href = "/mfa";
-        } else {
-          setMessage("Signed in. Loading MDARIX...");
-          window.location.href = "/app";
-        }
-      } else
-        setMessage(
-          `If an account exists for this email, we have sent reset instructions.${data.development_token ? ` Development token: ${data.development_token}` : ""}`,
-        );
-    } else {
+    if (!response.ok) {
+      setMessage(problemMessage(data, "The request could not be completed."));
+      return;
+    }
+    if (mode === "signup") {
+      setDone(true);
       setMessage(
-        data.detail?.code === "PASSWORD_POLICY"
-          ? "Password must be at least 12 characters."
-          : data.detail?.code === "ACCOUNT_EXISTS"
-            ? "An account with this email already exists. Use Sign in or verify the existing account."
-            : (data.detail?.message ?? "Request could not be completed."),
+        `Thank you. We review every request, usually within one business day. Once it is approved, we email ${email} an invitation to your free trial workspace.`,
+      );
+    } else if (mode === "activate-account") {
+      setDone(true);
+      setMessage("Account activated. You can now sign in with your email and new password.");
+    } else if (mode === "reset-password") {
+      setDone(true);
+      setMessage(
+        "Password changed. For your security, every other session was signed out. Sign in with your new password.",
+      );
+    } else if (mode === "signin" && data.status === "TENANT_SELECTION_REQUIRED") {
+      setOrganizations(data.organizations ?? []);
+      setMessage("Your account is in more than one organization. Choose the one to open.");
+    } else if (mode === "signin") {
+      setMessage("Signed in. Loading MDARIX...");
+      afterSignin(data);
+    } else {
+      setDone(true);
+      setMessage(
+        `If an account exists for ${email}, we have emailed a reset link. It works once and expires in one hour.${data.development_token ? ` Development token: ${data.development_token}` : ""}`,
       );
     }
   };
@@ -222,10 +251,10 @@ export function AuthPage({ mode }: { mode: string }) {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      setMessage(data.detail?.message ?? "Sign-in could not be completed.");
+      setMessage(problemMessage(data, "Sign-in could not be completed."));
       return;
     }
-    window.location.href = data.mfa_enrollment_required ? "/mfa?setup=1" : data.mfa_required ? "/mfa" : "/app";
+    afterSignin(data);
   };
   if (mode === "signin" && organizations.length)
     return (
@@ -271,7 +300,7 @@ export function AuthPage({ mode }: { mode: string }) {
               </li>
             ))}
           </ol>
-          <button className="primary-action" type="button" onClick={() => (window.location.href = "/app")}>
+          <button className="primary-action" type="button" onClick={() => (window.location.href = returnTo)}>
             I have saved these codes, continue
           </button>
         </div>
@@ -303,7 +332,7 @@ export function AuthPage({ mode }: { mode: string }) {
                   setMessage(
                     response.ok
                       ? `Add the key below to your authenticator app.${data.development_code ? ` Development code: ${data.development_code}` : ""}`
-                      : (data.detail?.message ?? "MFA setup is unavailable."),
+                      : problemMessage(data, "MFA setup is unavailable."),
                   );
                 }}
               >
@@ -321,20 +350,24 @@ export function AuthPage({ mode }: { mode: string }) {
               )}
             </>
           )}
-          <input
-            aria-label={useRecovery ? "Recovery code" : "Six digit authentication code"}
-            inputMode={useRecovery ? "text" : "numeric"}
-            autoComplete="one-time-code"
-            minLength={6}
-            maxLength={useRecovery ? 17 : 6}
-            required
-            value={mfaCode}
-            onChange={(e) =>
-              setMfaCode(useRecovery ? e.target.value.replace(/[^0-9a-fA-F-]/g, "") : e.target.value.replace(/\D/g, ""))
-            }
-            placeholder={useRecovery ? "xxxxxxxx-xxxxxxxx" : "000000"}
-          />
-          <button className="primary-action" type="submit">
+          <label className="auth-field">
+            {useRecovery ? "Recovery code" : "Six digit authentication code"}
+            <input
+              inputMode={useRecovery ? "text" : "numeric"}
+              autoComplete="one-time-code"
+              minLength={6}
+              maxLength={useRecovery ? 17 : 6}
+              required
+              value={mfaCode}
+              onChange={(e) =>
+                setMfaCode(
+                  useRecovery ? e.target.value.replace(/[^0-9a-fA-F-]/g, "") : e.target.value.replace(/\D/g, ""),
+                )
+              }
+              placeholder={useRecovery ? "xxxxxxxx-xxxxxxxx" : "000000"}
+            />
+          </label>
+          <button className="primary-action" type="submit" disabled={busy}>
             {mfaEnrollment ? "Verify and turn on MFA" : "Verify"}
           </button>
           {message && <p role="status">{message}</p>}
@@ -356,6 +389,9 @@ export function AuthPage({ mode }: { mode: string }) {
             )}
             <a href="/signin">Return to sign in</a>
           </p>
+          <p className="auth-links">
+            Lost your phone and your recovery codes? Ask your administrator to reset your multi-factor authentication.
+          </p>
         </form>
       </AuthFrame>
     );
@@ -368,100 +404,106 @@ export function AuthPage({ mode }: { mode: string }) {
             ? "Sign in to MDARIX"
             : mode === "signup"
               ? "Start your free trial"
-              : mode === "verify-email"
-                ? "Verify your email"
-                : mode === "activate-account"
-                  ? "Activate your MDARIX account"
-                  : mode === "reset-password"
-                    ? "Create a new password"
-                    : "Reset your password"}
+              : mode === "activate-account"
+                ? "Activate your MDARIX account"
+                : mode === "reset-password"
+                  ? "Create a new password"
+                  : "Reset your password"}
         </h1>
         <p className="auth-lead">
           {mode === "signin"
-            ? "Use your work email or User ID to open your workspace."
+            ? "Use your work email to open your workspace."
             : mode === "signup"
-              ? "30 days, up to 3 users, no credit card. You will create your password from the invitation email."
+              ? "30 days, up to 3 users and 5,000 uploaded rows, no credit card. You create your password from the invitation email."
               : mode === "forgot-password"
                 ? "Enter your work email and we will send you a secure reset link."
-                : "Use the secure link or token from your email."}
+                : "Choose a password of at least 12 characters. A phrase of several words works well."}
         </p>
-        {mode === "signup" && (
+        {!done && (
           <>
-            <input
-              aria-label="Display name"
-              required
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              aria-label="Company"
-              required
-              placeholder="Company / organization"
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-            />
-          </>
-        )}
-        {mode === "verify-email" || isTokenPassword ? (
-          <input
-            aria-label="Token"
-            required
-            placeholder="Secure token"
-            value={token}
-            onChange={(e) => setToken(e.target.value)}
-          />
-        ) : (
-          <input
-            aria-label="User ID or work email"
-            required
-            type={mode === "forgot-password" ? "email" : "text"}
-            placeholder={mode === "signin" ? "User ID or work email" : "Work email"}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        )}{" "}
-        {mode !== "forgot-password" && mode !== "verify-email" && mode !== "signup" && (
-          <>
-            <input
-              aria-label="Password"
-              required
-              minLength={12}
-              type="password"
-              placeholder={
-                isTokenPassword ? "Create password (minimum 12 characters)" : "Password (minimum 12 characters)"
-              }
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {isTokenPassword && <small>Password is created by the user and never shown to administrators.</small>}
-          </>
-        )}
-        <button className="primary-action" type="submit">
-          {mode === "signin"
-            ? "Sign in"
-            : mode === "signup"
-              ? "Request free trial"
-              : mode === "verify-email"
-                ? "Verify email"
-                : mode === "activate-account"
-                  ? "Activate account"
-                  : mode === "reset-password"
-                    ? "Reset password"
-                    : "Send reset instructions"}
-        </button>
-        {message && (
-          <p role="status">
-            {message}
-            {userId && token && (
+            {mode === "signup" && (
               <>
-                {" "}
-                <br />
-                <a href={`/verify-email?token=${encodeURIComponent(token)}`}>Continue to email verification</a>
+                <label className="auth-field">
+                  Full name
+                  <input
+                    required
+                    maxLength={120}
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+                <label className="auth-field">
+                  Company
+                  <input
+                    required
+                    maxLength={160}
+                    autoComplete="organization"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                  />
+                </label>
               </>
             )}
-          </p>
+            {isTokenPassword ? (
+              !tokenFromLink && (
+                <label className="auth-field">
+                  Code from your email
+                  <input required value={token} onChange={(e) => setToken(e.target.value.trim())} />
+                </label>
+              )
+            ) : (
+              <label className="auth-field">
+                Work email
+                <input
+                  required
+                  type="email"
+                  maxLength={254}
+                  autoComplete={mode === "signin" ? "username" : "email"}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+            )}
+            {(mode === "signin" || isTokenPassword) && (
+              <label className="auth-field">
+                {isTokenPassword ? "New password" : "Password"}
+                <input
+                  required
+                  minLength={isTokenPassword ? 12 : 1}
+                  maxLength={128}
+                  type="password"
+                  autoComplete={isTokenPassword ? "new-password" : "current-password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                {isTokenPassword && <small>Only you know it: administrators never see passwords.</small>}
+              </label>
+            )}
+            {mode === "signup" && (
+              <p className="auth-consent">
+                By requesting a trial you agree to the <a href="/terms">Terms of Service</a> and the{" "}
+                <a href="/trial-agreement">Free Trial Agreement</a>, and acknowledge the{" "}
+                <a href="/privacy">Privacy Policy</a>. Trial data is deleted 30 days after the trial ends unless you
+                continue.
+              </p>
+            )}
+            <button className="primary-action" type="submit" disabled={busy}>
+              {busy
+                ? "Please wait…"
+                : mode === "signin"
+                  ? "Sign in"
+                  : mode === "signup"
+                    ? "Request free trial"
+                    : mode === "activate-account"
+                      ? "Activate account"
+                      : mode === "reset-password"
+                        ? "Set new password"
+                        : "Send reset link"}
+            </button>
+          </>
         )}
+        {message && <p role="status">{message}</p>}
         {mode === "signin" ? (
           <p className="auth-links auth-links-split">
             <a href="/forgot-password">Forgot password?</a>
@@ -475,11 +517,11 @@ export function AuthPage({ mode }: { mode: string }) {
           </p>
         ) : (
           <p className="auth-links">
-            <a href="/signin">Return to sign in</a> · <a href="/signup">Start free trial</a>
-            {mode !== "verify-email" && (
+            <a href="/signin">Return to sign in</a>
+            {mode === "reset-password" && (
               <>
                 {" "}
-                · <a href="/verify-email">Verify email</a>
+                · <a href="/forgot-password">Request a new reset link</a>
               </>
             )}
           </p>

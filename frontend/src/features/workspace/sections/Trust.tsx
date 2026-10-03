@@ -62,7 +62,7 @@ function Assurance() {
           ))}
         </ul>
         <p className="ac-muted">
-          These are the rules the AI service declares it enforces. They describe behaviour; they are not a test result.
+          These are the rules the AI service declares it enforces. They describe behavior; they are not a test result.
         </p>
       </Panel>
       <Panel

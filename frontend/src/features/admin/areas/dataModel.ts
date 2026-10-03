@@ -79,7 +79,7 @@ export const nextReleaseAction = (status: unknown): NextAction | null => {
       return {
         action: "ROLLBACK",
         label: "Roll back",
-        explain: "The mapping stops being used; the previous behaviour applies again.",
+        explain: "The mapping stops being used; the previous behavior applies again.",
         done: "rolled back.",
       };
     default:

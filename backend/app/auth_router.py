@@ -1,3 +1,10 @@
+"""Sign-in, sign-up requests, multi-factor authentication and password management.
+
+Every session and one-time link is stored in Postgres (auth/durable.py); nothing about who is signed in lives in
+process memory. Public endpoints are rate limited per client address and per account (backend/app/rate_limit.py);
+repeated wrong passwords from one address lock that address out of the account for 15 minutes.
+"""
+
 import hashlib
 import logging
 import os
@@ -9,15 +16,32 @@ from pydantic import BaseModel, Field
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
+from auth.cookies import (
+    PENDING_MFA_SECONDS,
+    SESSION_SECONDS,
+    clear_session_cookie,
+    read_session_token,
+    set_session_cookie,
+)
 from auth.durable import (
     consume,
     hash_token,
     issue_reset,
-    persist_session,
+    peek,
+    new_session,
     revoke_session,
+    revoke_user_sessions,
 )
 from auth.emailer import send_password_reset_email
-from auth.service import _hash, _verify, auth_service
+from auth.service import (
+    PASSWORD_MESSAGES,
+    _hash,
+    _verify,
+    burn_verification_time,
+    needs_rehash,
+    password_problem,
+)
+from backend.app.client_ip import client_ip
 from backend.app.db.models.foundation import AuthUser, TenantMembership
 from backend.app.db.models.stage2 import (
     AuthSession,
@@ -26,11 +50,16 @@ from backend.app.db.models.stage2 import (
     PasswordHistory,
 )
 from backend.app.db.session import get_db
+from backend.app.db.tenant_scope import bind_system, bind_tenant
+from backend.app.rate_limit import enforce
 from backend.app.request_context import ensure_tenant_access
 from backend.app.runtime_env import is_development
-from backend.app.db.tenant_scope import bind_system, bind_tenant
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
+logger = logging.getLogger(__name__)
+
+LOCK_AFTER_FAILURES = 5
+LOCK_MINUTES = 15
 
 
 class Signup(BaseModel):
@@ -42,14 +71,10 @@ class Signup(BaseModel):
 
 
 class Signin(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=128)
     # Which organization to sign in to, when the email and password match accounts in several.
     tenant_id: uuid.UUID | None = None
-
-
-class Verify(BaseModel):
-    token: str
 
 
 class ResetRequest(BaseModel):
@@ -57,8 +82,13 @@ class ResetRequest(BaseModel):
 
 
 class Reset(BaseModel):
-    token: str
-    password: str = Field(min_length=12, max_length=128)
+    token: str = Field(max_length=200)
+    password: str = Field(max_length=128)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=128)
+    new_password: str = Field(max_length=128)
 
 
 class MfaCode(BaseModel):
@@ -78,16 +108,15 @@ def _development_token(token: str | None) -> str | None:
     return token if is_development() else None
 
 
-def _legacy_compat_enabled() -> bool:
-    """Allow in-process compatibility only for explicitly enabled local tests."""
-    return is_development() and os.getenv("MDARIX_ALLOW_LEGACY_AUTH_FALLBACK", "").lower() == "true"
+def _check_new_password(password: str, email: str | None) -> None:
+    problem = password_problem(password, email=email)
+    if problem:
+        raise HTTPException(422, detail={"code": problem, "message": PASSWORD_MESSAGES[problem]})
 
 
 def _password_reuse(db, row, new_password: str) -> bool:
     """Return true when the proposed password matches the current or last five passwords."""
-    from auth.service import _verify
-
-    if _verify(new_password, row.password_hash):
+    if row.password_hash and _verify(new_password, row.password_hash):
         return True
     history = (
         db.query(PasswordHistory)
@@ -102,7 +131,7 @@ def _password_reuse(db, row, new_password: str) -> bool:
 def _record_password_change(db, row, password_hash: str, now: datetime) -> None:
     db.add(
         PasswordHistory(
-            id=__import__("uuid").uuid4(),
+            id=uuid.uuid4(),
             tenant_id=row.tenant_id,
             user_id=row.id,
             password_hash=password_hash,
@@ -110,7 +139,19 @@ def _record_password_change(db, row, password_hash: str, now: datetime) -> None:
         )
     )
     row.password_changed_at = now
-    row.password_expires_at = now + timedelta(days=int(os.getenv("MDARIX_PASSWORD_MAX_AGE_DAYS", "90")))
+    # No periodic expiry (NIST SP 800-63B): passwords change when there is a reason to, not on a timer.
+    row.password_expires_at = None
+
+
+def _set_password(db, row, password: str, now: datetime) -> None:
+    if _password_reuse(db, row, password):
+        raise HTTPException(
+            422,
+            detail={"code": "PASSWORD_REUSE_NOT_ALLOWED", "message": PASSWORD_MESSAGES["PASSWORD_REUSE_NOT_ALLOWED"]},
+        )
+    row.password_hash = _hash(password)
+    row.updated_at = now
+    _record_password_change(db, row, row.password_hash, now)
 
 
 def _mfa_hash(code: str) -> str:
@@ -119,7 +160,7 @@ def _mfa_hash(code: str) -> str:
 
 def _mfa_session(request: Request, db: Session):
     """The signed-in session and its user, for the MFA steps (which a session that still owes MFA may use)."""
-    token = request.cookies.get("mdarix_session", "")
+    token = read_session_token(request)
     row = (
         db.query(AuthSession)
         .filter(
@@ -144,6 +185,17 @@ def _mfa_session(request: Request, db: Session):
     return row, user
 
 
+def _limit_mfa(request: Request, user) -> None:
+    enforce("mfa:ip", client_ip(request))
+    enforce("mfa:user", str(user.id))
+
+
+def _mfa_complete(session_row) -> None:
+    """The second factor is done: the session gets its full lifetime, counted from sign-in."""
+    session_row.mfa_state = None
+    session_row.expires_at = session_row.created_at + timedelta(seconds=SESSION_SECONDS)
+
+
 @router.post("/mfa/enroll")
 def mfa_enroll(request: Request, db: Session = Depends(get_db)):
     """Start setting up an authenticator app: returns the secret (and its otpauth link for a QR code).
@@ -166,6 +218,7 @@ def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends
     from backend.app import mfa
 
     session_row, user = _mfa_session(request, db)
+    _limit_mfa(request, user)
     mfa.ensure_not_locked(db, user)
     now = datetime.now(timezone.utc)
     if not user.mfa_pending_secret_encrypted:
@@ -178,7 +231,7 @@ def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends
         db.commit()
         raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
     mfa.record_success(db, user)
-    session_row.mfa_state = None
+    _mfa_complete(session_row)
     db.commit()
     return {"status": "MFA_ENROLLED", "user_id": str(user.id), "enrolled_at": now, "recovery_codes": codes}
 
@@ -194,6 +247,7 @@ def mfa_verify(data: MfaVerify, request: Request, db: Session = Depends(get_db))
         if len(data.code) != 6:
             raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
         return mfa_verify_enrollment(MfaCode(code=data.code), request, db)
+    _limit_mfa(request, user)
     mfa.ensure_not_locked(db, user)
     if not mfa.is_enrolled(user):
         raise HTTPException(400, detail={"code": "MFA_NOT_ENROLLED", "message": "Set up an authenticator app first"})
@@ -202,7 +256,7 @@ def mfa_verify(data: MfaVerify, request: Request, db: Session = Depends(get_db))
         db.commit()
         raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
     mfa.record_success(db, user)
-    session_row.mfa_state = None
+    _mfa_complete(session_row)
     db.commit()
     return {"status": "MFA_VERIFIED", "recovery_codes_left": len(user.mfa_recovery_hashes or [])}
 
@@ -253,66 +307,56 @@ def _alert_trial_request(organization: str, display_name: str, email: str) -> No
     try:
         send_trial_request_alert(recipient, organization=organization, display_name=display_name, email=email)
     except Exception as exc:  # the request is already saved; an alert failure must never surface to the visitor
-        logging.getLogger(__name__).warning("Trial request alert failed: %s", type(exc).__name__)
+        logger.warning("Trial request alert failed: %s", type(exc).__name__)
+
+
+SIGNUP_ACCEPTED = {
+    "status": "ONBOARDING_REQUEST_ACCEPTED",
+    "tenant_created": False,
+    "next_step": "We review every request, usually within one business day, and email an invitation once approved.",
+}
 
 
 @router.post("/signup")
-def signup(data: Signup, background: BackgroundTasks, db: Session = Depends(get_db)):
+def signup(data: Signup, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Record a free-trial request. The answer is the same whether or not the email already has an account or a
+    pending request, so this endpoint cannot be used to find out who uses MDARIX."""
+    email = data.email.strip().lower()
+    enforce("signup:ip", client_ip(request))
+    enforce("signup:email", email)
+    if "@" not in email or email.startswith("@") or email.endswith("@") or " " in email:
+        raise HTTPException(422, detail={"code": "VALID_EMAIL_REQUIRED", "message": "Enter a valid work email"})
     try:
-        email = data.email.strip().lower()
-        if db.query(AuthUser).filter(AuthUser.username == email).first():
-            raise ValueError("ACCOUNT_EXISTS")
-        existing = db.query(OnboardingRequest).filter(OnboardingRequest.email == email).first()
-        if existing:
-            return {
-                "status": "ONBOARDING_REQUEST_ACCEPTED",
-                "request_id": str(existing.id),
-                "request_status": existing.status,
-            }
+        bind_system(db, "trial sign-up: is this email already known")
+        known = (
+            db.query(AuthUser.id).filter(AuthUser.username == email).first() is not None
+            or db.query(OnboardingRequest.id).filter(OnboardingRequest.email == email).first() is not None
+        )
+        if known:
+            return dict(SIGNUP_ACCEPTED)
         now = datetime.now(timezone.utc)
-        request = OnboardingRequest(
-            id=__import__("uuid").uuid4(),
+        row = OnboardingRequest(
+            id=uuid.uuid4(),
             email=email,
-            display_name=data.display_name.strip(),
-            organization=data.organization.strip(),
+            display_name=" ".join(data.display_name.split()),
+            organization=" ".join(data.organization.split()),
             status="PENDING_REVIEW",
             created_at=now,
             updated_at=now,
         )
-        db.add(request)
+        db.add(row)
         db.commit()
-        background.add_task(_alert_trial_request, request.organization, request.display_name, email)
-        return {
-            "status": "ONBOARDING_REQUEST_ACCEPTED",
-            "request_id": str(request.id),
-            "request_status": request.status,
-            "tenant_created": False,
-            "next_step": "A Platform Administrator must provision the tenant and invite the initial Customer Administrator.",
-        }
-    except ValueError as e:
-        raise fail(e)
+        background.add_task(_alert_trial_request, row.organization, row.display_name, email)
+        return dict(SIGNUP_ACCEPTED)
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
+        logger.exception("Trial request could not be recorded")
         raise HTTPException(
             400,
-            detail={"code": "ONBOARDING_REQUEST_FAILED", "message": "The onboarding request could not be recorded."},
+            detail={"code": "ONBOARDING_REQUEST_FAILED", "message": "The request could not be recorded."},
         ) from e
-
-
-@router.post("/verify-email")
-def verify(data: Verify, db: Session = Depends(get_db)):
-    try:
-        result = auth_service.verify_email(data.token)
-        account = next(item for item in auth_service.accounts.values() if item.user_id == result["user_id"])
-        row = db.query(AuthUser).filter(AuthUser.username == account.email).first()
-        if row:
-            row.status = "ACTIVE"
-            row.email_verified = True
-            row.updated_at = datetime.now(timezone.utc)
-            db.commit()
-        return result
-    except ValueError as e:
-        raise fail(e)
 
 
 def _account_for_email(db: Session, email: str, password: str | None = None):
@@ -346,9 +390,20 @@ def _account_for_email(db: Session, email: str, password: str | None = None):
 
 
 def _accounts_for_password(db: Session, email: str, password: str) -> list:
-    """Every active account with this email whose password matches (one per organization)."""
+    """Every active, verified account with this email whose password matches (one per organization).
+
+    An email with no account still spends the time of one password check, so timing does not reveal accounts.
+    """
+    rows = (
+        db.query(AuthUser)
+        .filter(AuthUser.username == email, func.upper(AuthUser.status) == "ACTIVE", AuthUser.email_verified.is_(True))
+        .all()
+    )
+    if not rows:
+        burn_verification_time(password)
+        return []
     matches = []
-    for row in db.query(AuthUser).filter(AuthUser.username == email, func.upper(AuthUser.status) == "ACTIVE").all():
+    for row in rows:
         try:
             if row.password_hash and _verify(password, row.password_hash):
                 matches.append(row)
@@ -373,121 +428,127 @@ def _organizations(db: Session, accounts: list) -> list[dict]:
     return sorted(choices, key=lambda item: item["tenant_name"].lower())
 
 
+def _throttle_key(email: str, address: str | None) -> str:
+    """Lockout is per account *and* client address: wrong passwords from one address cannot lock the owner out
+    everywhere (the per-account rate limit still caps guessing from many addresses)."""
+    return "sha256:" + hashlib.sha256(f"{email}|{address or '-'}".encode()).hexdigest()
+
+
+def _throttle(db: Session, key: str):
+    query = db.query(LoginThrottle).filter(LoginThrottle.identifier == key)
+    return query.with_for_update().first() if hasattr(query, "with_for_update") else query.first()
+
+
+def _record_failed_signin(db: Session, key: str, now: datetime) -> None:
+    throttle = _throttle(db, key)
+    if throttle is None:
+        throttle = LoginThrottle(identifier=key, failure_count=0, updated_at=now)
+        db.add(throttle)
+    throttle.failure_count = (throttle.failure_count or 0) + 1
+    throttle.last_failure_at = now
+    throttle.updated_at = now
+    if throttle.failure_count >= LOCK_AFTER_FAILURES:
+        throttle.locked_until = now + timedelta(minutes=LOCK_MINUTES)
+        # The next lock needs another full run of failures, not a single one.
+        throttle.failure_count = 0
+    db.commit()
+
+
+def _forget_old_throttles(db: Session, now: datetime) -> None:
+    db.query(LoginThrottle).filter(LoginThrottle.updated_at < now - timedelta(days=1)).filter(
+        (LoginThrottle.locked_until.is_(None)) | (LoginThrottle.locked_until < now)
+    ).delete(synchronize_session=False)
+
+
+def _clear_throttle(db: Session, email: str, address: str | None) -> None:
+    db.query(LoginThrottle).filter(LoginThrottle.identifier == _throttle_key(email, address)).delete(
+        synchronize_session=False
+    )
+
+
+def _signin_response(row) -> dict:
+    return {
+        "user_id": str(row.id),
+        "display_name": row.display_name,
+        "email": row.username,
+        "tenant_id": str(row.tenant_id),
+        "active_role": row.role,
+    }
+
+
 @router.post("/signin")
-def signin(data: Signin, response: Response, db: Session = Depends(get_db)):
-    try:
-        identifier = data.email.strip().lower()
-        now = datetime.now(timezone.utc)
-        throttle_query = db.query(LoginThrottle).filter(LoginThrottle.identifier == identifier)
-        throttle = (
-            throttle_query.with_for_update().first()
-            if hasattr(throttle_query, "with_for_update")
-            else throttle_query.first()
+def signin(data: Signin, request: Request, response: Response, db: Session = Depends(get_db)):
+    identifier = data.email.strip().lower()
+    address = client_ip(request)
+    enforce("signin:ip", address)
+    enforce("signin:account", identifier)
+    now = datetime.now(timezone.utc)
+    key = _throttle_key(identifier, address)
+    throttle = _throttle(db, key)
+    if throttle is not None and throttle.locked_until and throttle.locked_until > now:
+        raise HTTPException(
+            429,
+            detail={
+                "code": "ACCOUNT_TEMPORARILY_LOCKED",
+                "message": "Too many failed sign-in attempts. Try again later.",
+            },
         )
-        if throttle is not None and not hasattr(throttle, "failure_count"):
-            throttle = None
-        if throttle and throttle.locked_until and throttle.locked_until > now:
-            raise HTTPException(
-                429,
-                detail={
-                    "code": "ACCOUNT_TEMPORARILY_LOCKED",
-                    "message": "Too many failed sign-in attempts. Try again later.",
-                },
-            )
-        bind_system(db, "sign-in: find this person's accounts across organizations")
-        matches = _accounts_for_password(db, identifier, data.password)
-        chosen_tenant = getattr(data, "tenant_id", None)
-        if chosen_tenant is not None:
-            row = next((item for item in matches if item.tenant_id == chosen_tenant), None)
-        elif len(matches) > 1:
-            choices = _organizations(db, matches)
-            if len(choices) > 1:
-                # The password is right for several organizations: the person chooses; no session exists yet.
-                return {"status": "TENANT_SELECTION_REQUIRED", "organizations": choices}
-            row = next(
-                (item for item in matches if choices and str(item.tenant_id) == choices[0]["tenant_id"]), matches[0]
-            )
-        else:
-            row = matches[0] if matches else _account_for_email(db, identifier, data.password)
-        if not row:
-            raise ValueError("INVALID_CREDENTIALS")
-        bind_tenant(db, row.tenant_id)
-        if getattr(row, "password_expires_at", None) and row.password_expires_at <= now:
-            raise HTTPException(
-                403, detail={"code": "PASSWORD_EXPIRED", "message": "Password change is required before sign-in."}
-            )
-        token = auth_service.signin_persisted(
-            data.email,
-            data.password,
-            user_id=row.id,
-            display_name=row.display_name,
-            tenant_id=row.tenant_id,
-            password_hash=row.password_hash,
-            role=row.role,
-            status=row.status,
-            email_verified=row.email_verified,
-        )
-        # Checked only after the password is verified, so it cannot be used to probe accounts.
-        ensure_tenant_access(db, row)
-        if throttle:
-            throttle.failure_count = 0
-            throttle.locked_until = None
-            throttle.last_failure_at = None
-            throttle.updated_at = now
-        if hasattr(db, "commit"):
-            db.commit()
-        from backend.app import mfa
+    bind_system(db, "sign-in: find this person's accounts across organizations")
+    matches = _accounts_for_password(db, identifier, data.password)
+    row = None
+    if data.tenant_id is not None:
+        row = next((item for item in matches if item.tenant_id == data.tenant_id), None)
+    elif len(matches) > 1:
+        choices = _organizations(db, matches)
+        if len(choices) > 1:
+            # The password is right for several organizations: the person chooses; no session exists yet.
+            db.rollback()
+            return {"status": "TENANT_SELECTION_REQUIRED", "organizations": choices}
+        row = next((item for item in matches if choices and str(item.tenant_id) == choices[0]["tenant_id"]), matches[0])
+    elif matches:
+        row = matches[0]
+    if row is None:
+        db.rollback()
+        _record_failed_signin(db, key, now)
+        raise HTTPException(401, detail={"code": "INVALID_CREDENTIALS", "message": "Invalid credentials."})
+    bind_tenant(db, row.tenant_id)
+    # Checked only after the password is verified, so it cannot be used to probe accounts.
+    ensure_tenant_access(db, row)
+    if needs_rehash(row.password_hash):
+        row.password_hash = _hash(data.password)
+        row.updated_at = now
+    if throttle is not None:
+        db.delete(throttle)
+    _forget_old_throttles(db, now)
+    db.commit()
+    from backend.app import mfa
 
-        # The new session owes MFA when the account is enrolled (VERIFY) or policy requires setting it up (ENROLL);
-        # until then it can only use the MFA steps.
-        mfa_state = mfa.session_state_for(row)
-        persist_session(db, token, row.id, row.tenant_id, mfa_state=mfa_state)
-        development = is_development()
-        secure_cookie = True if not development else os.getenv("MDARIX_COOKIE_SECURE", "false").lower() == "true"
-        response.set_cookie("mdarix_session", token, httponly=True, samesite="lax", secure=secure_cookie, max_age=3600)
-        return {
-            **auth_service.context(token),
-            "mfa_required": mfa_state == "VERIFY",
-            "mfa_enrollment_required": mfa_state == "ENROLL",
-        }
-    except ValueError as e:
-        identifier = data.email.strip().lower()
-        now = datetime.now(timezone.utc)
-        throttle_query = db.query(LoginThrottle).filter(LoginThrottle.identifier == identifier)
-        throttle = (
-            throttle_query.with_for_update().first()
-            if hasattr(throttle_query, "with_for_update")
-            else throttle_query.first()
-        )
-        if throttle is not None and not hasattr(throttle, "failure_count"):
-            throttle = None
-        if throttle is None:
-            throttle = LoginThrottle(identifier=identifier, failure_count=0, updated_at=now)
-            db.add(throttle)
-        throttle.failure_count += 1
-        throttle.last_failure_at = now
-        throttle.updated_at = now
-        if throttle.failure_count >= 5:
-            from datetime import timedelta
-
-            throttle.locked_until = now + timedelta(minutes=15)
-        db.commit()
-        raise HTTPException(401, detail={"code": "INVALID_CREDENTIALS", "message": "Invalid credentials."}) from e
+    # The new session owes MFA when the account is enrolled (VERIFY) or policy requires setting it up (ENROLL);
+    # until then it can only use the MFA steps, and only for a few minutes.
+    mfa_state = mfa.session_state_for(row)
+    token = new_session(
+        db, row.id, row.tenant_id, mfa_state=mfa_state, ttl=PENDING_MFA_SECONDS if mfa_state else SESSION_SECONDS
+    )
+    set_session_cookie(response, token)
+    return {
+        **_signin_response(row),
+        "mfa_required": mfa_state == "VERIFY",
+        "mfa_enrollment_required": mfa_state == "ENROLL",
+    }
 
 
 @router.post("/signout")
 def signout(request: Request, response: Response, db: Session = Depends(get_db)):
-    token = request.cookies.get("mdarix_session")
+    token = read_session_token(request)
     if token:
-        auth_service.signout(token)
         revoke_session(db, token)
-    response.delete_cookie("mdarix_session")
+    clear_session_cookie(response)
     return {"status": "SIGNED_OUT"}
 
 
 @router.get("/session")
 def session(request: Request, db: Session = Depends(get_db)):
-    token = request.cookies.get("mdarix_session", "")
+    token = read_session_token(request)
     row = (
         db.query(AuthSession)
         .filter(
@@ -499,6 +560,8 @@ def session(request: Request, db: Session = Depends(get_db)):
         if token
         else None
     )
+    if row is not None:
+        bind_tenant(db, row.tenant_id)
     user = (
         db.query(AuthUser)
         .filter(AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id, AuthUser.status == "ACTIVE")
@@ -508,7 +571,6 @@ def session(request: Request, db: Session = Depends(get_db)):
     )
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
-    bind_tenant(db, user.tenant_id)
     ensure_tenant_access(db, user)
     from backend.app import mfa
     from backend.app.request_context import _idle_limit
@@ -549,6 +611,46 @@ def _other_organization_count(db: Session, user) -> int:
     return count
 
 
+@router.post("/change-password")
+def change_password(data: PasswordChange, request: Request, db: Session = Depends(get_db)):
+    """Change the signed-in person's password. Their other sessions are signed out; this one stays."""
+    from backend.app.request_context import get_request_context
+
+    ctx = get_request_context(request, db)
+    enforce("password-change:user", ctx.user_id)
+    row = db.query(AuthUser).filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id).first()
+    if row is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    try:
+        current_ok = bool(row.password_hash) and _verify(data.current_password, row.password_hash)
+    except ValueError:
+        current_ok = False
+    if not current_ok:
+        raise HTTPException(
+            403, detail={"code": "INVALID_CURRENT_PASSWORD", "message": "Your current password is wrong"}
+        )
+    _check_new_password(data.new_password, row.username)
+    now = datetime.now(timezone.utc)
+    _set_password(db, row, data.new_password, now)
+    revoked = revoke_user_sessions(db, row.id, row.tenant_id, keep_raw=ctx.session_id)
+    from backend.app.enterprise_audit import make_audit_event
+
+    db.add(
+        make_audit_event(
+            tenant_id=row.tenant_id,
+            actor_ref=str(row.id),
+            action="PASSWORD_CHANGED",
+            entity_type="AuthUser",
+            entity_id=row.id,
+            details={"other_sessions_signed_out": revoked},
+            request=request,
+            created_at=now,
+        )
+    )
+    db.commit()
+    return {"status": "PASSWORD_CHANGED", "other_sessions_signed_out": revoked}
+
+
 # Account states an administrator imposed. A password reset or activation link must never lift them.
 ADMIN_BLOCKED_STATUSES = frozenset({"SUSPENDED", "OFFBOARDED", "LOCKED", "DISABLED"})
 
@@ -578,15 +680,18 @@ def _send_reset_quietly(email: str, token: str, organization: str | None = None)
     try:
         send_password_reset_email(email, token, organization=organization)
     except Exception as exc:  # the answer is already the same for every request
-        logging.getLogger(__name__).warning("Password reset email failed: %s", type(exc).__name__)
+        logger.warning("Password reset email failed: %s", type(exc).__name__)
 
 
 @router.post("/forgot-password")
-def forgot(data: ResetRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+def forgot(data: ResetRequest, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     """The same answer, in the same time, for every email: known, unknown or blocked. The email itself is sent
-    after the response, so neither the body nor its timing reveals whether an account exists."""
+    after the response, so neither the body nor its timing reveals whether an account exists. Each new link
+    replaces the earlier unused one."""
     accepted = {"status": "RESET_REQUEST_ACCEPTED", "email_delivery": "ACCEPTED"}
     email = data.email.strip().lower()
+    enforce("forgot:ip", client_ip(request))
+    enforce("forgot:email", email)
     bind_system(db, "password reset: find this email's accounts across organizations")
     accounts = [row for row in db.query(AuthUser).filter(AuthUser.username == email) if not _admin_blocked(row)]
     if not accounts:
@@ -605,54 +710,58 @@ def forgot(data: ResetRequest, background: BackgroundTasks, db: Session = Depend
     return accepted
 
 
-@router.post("/reset-password")
-def reset(data: Reset, db: Session = Depends(get_db)):
+def _redeem(db: Session, request: Request, data: Reset, kind: str) -> AuthUser:
+    """Use a one-time link to set a password.
+
+    The password is checked before the link is spent, so a refused password leaves the link usable. Then, in one
+    transaction: the password is stored, the link spent, every existing session of the account signed out, and the
+    address's sign-in lockout for the account lifted. Two simultaneous uses of one link: only one succeeds.
+    """
+    enforce("token:ip", client_ip(request))
+    invalid = "INVALID_RESET" if kind == "reset" else "INVALID_ACTIVATION"
+    bind_system(db, f"redeem single-use {kind} token")
     try:
-        bind_system(db, "redeem single-use password reset token")
-        user_id = consume(db, data.token, "reset")
-        row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
-        if row is None or _admin_blocked(row):
-            raise ValueError("INVALID_RESET")
-        bind_tenant(db, row.tenant_id)
-        now = datetime.now(timezone.utc)
-        if _password_reuse(db, row, data.password):
-            raise ValueError("PASSWORD_REUSE_NOT_ALLOWED")
-        row.password_hash = _hash(data.password)
-        row.status = "ACTIVE"
-        row.email_verified = True
-        row.updated_at = now
-        _record_password_change(db, row, row.password_hash, now)
-        _activate_invited_memberships(db, row)
-        db.commit()
-        return {"status": "PASSWORD_RESET"}
+        user_id = peek(db, data.token, kind)
     except ValueError:
-        if not _legacy_compat_enabled():
-            raise fail("INVALID_RESET")
-        try:
-            return auth_service.reset(data.token, data.password)
-        except ValueError as e:
-            raise fail(e)
+        raise fail(invalid)
+    row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if row is None or _admin_blocked(row):
+        raise fail(invalid)
+    _check_new_password(data.password, row.username)
+    now = datetime.now(timezone.utc)
+    _set_password(db, row, data.password, now)
+    row.status = "ACTIVE"
+    row.email_verified = True
+    _activate_invited_memberships(db, row)
+    revoke_user_sessions(db, row.id, row.tenant_id)
+    _clear_throttle(db, row.username, client_ip(request))
+    try:
+        consume(db, data.token, kind)  # commits the whole change, or refuses a link spent meanwhile
+    except ValueError:
+        db.rollback()
+        raise fail(invalid)
+    return row
+
+
+@router.post("/reset-password")
+def reset(data: Reset, request: Request, db: Session = Depends(get_db)):
+    _redeem(db, request, data, "reset")
+    return {"status": "PASSWORD_RESET"}
+
+
+def _send_welcome_quietly(email: str, organization: str) -> None:
+    try:
+        from auth.emailer import send_welcome_email
+
+        send_welcome_email(email, organization)
+    except Exception as exc:  # the account is active either way
+        logger.warning("Welcome email failed: %s", type(exc).__name__)
 
 
 @router.post("/activate-account")
-def activate(data: Reset, db: Session = Depends(get_db)):
-    try:
-        bind_system(db, "redeem single-use activation token")
-        user_id = consume(db, data.token, "activation")
-        row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
-        if row is None or _admin_blocked(row):
-            raise ValueError("INVALID_ACTIVATION")
-        bind_tenant(db, row.tenant_id)
-        now = datetime.now(timezone.utc)
-        if _password_reuse(db, row, data.password):
-            raise ValueError("PASSWORD_REUSE_NOT_ALLOWED")
-        row.password_hash = _hash(data.password)
-        row.status = "ACTIVE"
-        row.email_verified = True
-        row.updated_at = now
-        _record_password_change(db, row, row.password_hash, now)
-        _activate_invited_memberships(db, row)
-        db.commit()
-        return {"status": "ACTIVE", "user_id": str(row.id), "email": row.username}
-    except ValueError as e:
-        raise fail(e)
+def activate(data: Reset, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
+    row = _redeem(db, request, data, "activation")
+    background.add_task(
+        _send_welcome_quietly, row.username, _organization_name(db, row.tenant_id) or "your organization"
+    )
+    return {"status": "ACTIVE", "user_id": str(row.id), "email": row.username}

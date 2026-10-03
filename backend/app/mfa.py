@@ -16,7 +16,7 @@ from fastapi import HTTPException
 
 from auth import totp
 from backend.app.db.models.stage2 import LoginThrottle
-from backend.app.runtime_env import is_local
+from backend.app.runtime_env import is_development, is_local
 from security.mfa_recovery import consume_recovery_code, hash_recovery_codes, issue_recovery_codes
 
 MAX_FAILURES = 5
@@ -112,7 +112,7 @@ def start_enrollment(user) -> dict:
         "secret": secret,
         "otpauth_uri": totp.provisioning_uri(secret, user.username),
         # Local development only: the current code, so the flow can be exercised without a phone.
-        "development_code": totp.current_code(secret) if is_local() else None,
+        "development_code": totp.current_code(secret) if is_development() else None,
     }
 
 
@@ -156,3 +156,24 @@ def check_code(user, code: str, *, allow_recovery: bool) -> bool:
         return False
     user.mfa_last_step = step
     return True
+
+
+def reset(db, user, now: datetime) -> int:
+    """Remove the user's authenticator and recovery codes (an administrator's recovery for a lost device).
+
+    The person sets up a new authenticator at their next sign-in (administrators must; others may). Every session
+    of theirs ends, and their MFA lockout is lifted. Returns how many sessions were ended. The caller audits and
+    commits.
+    """
+    from auth.durable import revoke_user_sessions
+
+    user.mfa_secret_encrypted = None
+    user.mfa_pending_secret_encrypted = None
+    user.mfa_recovery_hashes = None
+    user.mfa_last_step = None
+    user.mfa_enrolled_at = None
+    user.updated_at = now
+    db.query(LoginThrottle).filter(LoginThrottle.identifier.in_([f"mfa:{user.id}", f"sign:{user.id}"])).delete(
+        synchronize_session=False
+    )
+    return revoke_user_sessions(db, user.id, user.tenant_id)

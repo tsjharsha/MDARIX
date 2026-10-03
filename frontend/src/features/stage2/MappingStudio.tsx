@@ -303,7 +303,7 @@ export function MappingStudio() {
         <div>
           <span className="eyebrow">TARGET</span>
           <strong>{entity}</strong>
-          <span>Tenant-scoped canonical model</span>
+          <span>Canonical model for this organization</span>
         </div>
       </section>
       <section className="mapping-panel mapping-selector-grid">

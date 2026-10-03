@@ -104,7 +104,7 @@ export function Dashboard() {
                   : "Everything looks healthy"}
             </h2>
             <p>
-              {context?.plan?.name ? `${context.plan.name} plan` : "No active plan"} · Licence{" "}
+              {context?.plan?.name ? `${context.plan.name} plan` : "No active plan"} · License{" "}
               {context?.license?.effective ? "active" : "inactive"}
             </p>
           </div>

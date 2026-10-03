@@ -5210,7 +5210,7 @@ html[data-public-path^="/platform/"] .public-shell .capability-visual {
 }
 html[data-public-path="/platform/product-360"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #f1f8fa url("/medtech-product-360-hero.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-product-360-hero.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/product-360"] .public-shell .capability-visual::after {
   display: none;
@@ -5227,7 +5227,7 @@ html[data-public-path="/platform/reality-graph"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/reality-graph"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #eef8f6 url("/medtech-product-reality-graph-hero.png") center/cover no-repeat;
+  background: #eef8f6 url("/site/medtech-product-reality-graph-hero.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/reality-graph"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/reality-graph"] .public-shell .capability-visual::before,
@@ -5240,7 +5240,7 @@ html[data-public-path="/platform/product-version"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/product-version"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #f1f8fa url("/medtech-product-versioning.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-product-versioning.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/product-version"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/product-version"] .public-shell .capability-visual::before,
@@ -5253,7 +5253,7 @@ html[data-public-path="/platform/timeline"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/timeline"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #f1f8fa url("/medtech-timeline-intelligence.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-timeline-intelligence.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/timeline"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/timeline"] .public-shell .capability-visual::before,
@@ -5266,7 +5266,7 @@ html[data-public-path="/platform/ask-mdarix"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #f1f8fa url("/medtech-ask-mdarix.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-ask-mdarix.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/ask-mdarix"] .public-shell .capability-visual::before,
@@ -5292,22 +5292,22 @@ html[data-public-path="/platform/enterprise-administration"] .public-shell .capa
   background-size: cover;
 }
 html[data-public-path="/platform/challenger"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-challenger.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-challenger.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-ai-assurance.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-ai-assurance.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/ai-provenance"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-ai-provenance.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-ai-provenance.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/human-review"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-human-review.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-human-review.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/audit-trail"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-audit-trail.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-audit-trail.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/enterprise-administration"] .public-shell .capability-visual {
-  background: #f1f8fa url("/medtech-hero-enterprise-administration.png") center/cover no-repeat;
+  background: #f1f8fa url("/site/medtech-hero-enterprise-administration.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/challenger"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/ai-assurance"] .public-shell .capability-visual::after,
@@ -5476,7 +5476,7 @@ html[data-public-path="/platform/investigation"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/investigation"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #eef8f6 url("/medtech-product-360-device.png") center/cover no-repeat;
+  background: #eef8f6 url("/site/medtech-product-360-device.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/investigation"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/investigation"] .public-shell .capability-visual::before,
@@ -5489,7 +5489,7 @@ html[data-public-path="/platform/evidence"] .public-shell .public-hero {
 }
 html[data-public-path="/platform/evidence"] .public-shell .capability-visual {
   min-height: 340px;
-  background: #eef8f6 url("/medtech-evidence-intelligence-hero.png") center/cover no-repeat;
+  background: #eef8f6 url("/site/medtech-evidence-intelligence-hero.webp") center/cover no-repeat;
 }
 html[data-public-path="/platform/evidence"] .public-shell .capability-visual::after,
 html[data-public-path="/platform/evidence"] .public-shell .capability-visual::before,
@@ -5506,22 +5506,22 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .public-her
   display: none;
 }
 html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual {
-  background-image: url("/medtech-hypotheses-hero.png");
+  background-image: url("/site/medtech-hypotheses-hero.webp");
 }
 html[data-public-path="/platform/unknowns"] .public-shell .capability-visual {
-  background-image: url("/medtech-unknowns-hero.png");
+  background-image: url("/site/medtech-unknowns-hero.webp");
 }
 html[data-public-path="/platform/failure-chain"] .public-shell .capability-visual {
-  background-image: url("/medtech-failure-chain-hero.png");
+  background-image: url("/site/medtech-failure-chain-hero.webp");
 }
 html[data-public-path="/platform/counterfactual"] .public-shell .capability-visual {
-  background-image: url("/medtech-counterfactual-hero.png");
+  background-image: url("/site/medtech-counterfactual-hero.webp");
 }
 html[data-public-path="/platform/decision-center"] .public-shell .capability-visual {
-  background-image: url("/medtech-decision-center-hero.png");
+  background-image: url("/site/medtech-decision-center-hero.webp");
 }
 html[data-public-path="/platform/investigation-brief"] .public-shell .capability-visual {
-  background-image: url("/medtech-investigation-brief-hero.png");
+  background-image: url("/site/medtech-investigation-brief-hero.webp");
 }
 html[data-public-path="/platform/hypotheses"] .public-shell .capability-visual,
 html[data-public-path="/platform/unknowns"] .public-shell .capability-visual,
@@ -10056,7 +10056,7 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: url("/medtech-product-360-device.png") center / cover no-repeat;
+  background: url("/site/medtech-product-360-device.webp") center / cover no-repeat;
   opacity: 0.18;
   filter: saturate(0.6);
 }
@@ -10265,6 +10265,29 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-demo-done strong {
   color: var(--auth-ink);
   overflow-wrap: anywhere;
+}
+.auth-page .auth-card .auth-field {
+  display: grid;
+  gap: 6px;
+  color: var(--auth-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.auth-page .auth-card .auth-field input {
+  font-weight: 400;
+}
+.auth-page .auth-card .auth-field small {
+  font-weight: 400;
+}
+.auth-page .auth-card .auth-consent {
+  margin: 0;
+  color: var(--auth-ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-page .auth-card .auth-consent a {
+  color: var(--auth-teal);
+  text-decoration: underline;
 }
 .auth-links-split {
   display: flex;

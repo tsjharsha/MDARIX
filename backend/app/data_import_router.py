@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
+from backend.app.request_body import read_limited
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
@@ -34,13 +36,7 @@ def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPoli
 
 
 async def _body(request: Request, policy: imports.ImportPolicy) -> bytes:
-    declared = request.headers.get("content-length")
-    if declared and declared.isdigit() and int(declared) > policy.file_limit_bytes:
-        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
-    raw = await request.body()
-    if len(raw) > policy.file_limit_bytes:
-        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
-    return raw
+    return await read_limited(request, policy.file_limit_bytes, message=policy.file_too_large)
 
 
 @router.get("/templates")
@@ -73,30 +69,8 @@ def import_template(entity: str, ctx: AuthenticatedRequestContext = Depends(get_
     )
 
 
-@router.post("/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
-async def check_import(
-    entity: str,
-    request: Request,
-    ctx: AuthenticatedRequestContext = Depends(get_request_context),
-    db: Session = Depends(get_db),
-    data: Session = Depends(get_data_plane_db),
-):
-    policy = _policy(db, ctx)
-    return imports.check_file(data, uuid.UUID(str(ctx.tenant_id)), entity, await _body(request, policy), policy)
-
-
-@router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
-async def run_import(
-    entity: str,
-    request: Request,
-    background: BackgroundTasks,
-    ctx: AuthenticatedRequestContext = Depends(get_request_context),
-    db: Session = Depends(get_db),
-    data: Session = Depends(get_data_plane_db),
-):
-    policy = _policy(db, ctx)
-    tenant_id = uuid.UUID(str(ctx.tenant_id))
-    raw = await _body(request, policy)
+def _import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, policy: imports.ImportPolicy) -> dict:
+    """All-or-nothing import, then its audit record (runs in the thread pool)."""
     try:
         result = imports.import_file(data, tenant_id, entity, raw, policy)
         data.commit()
@@ -120,6 +94,36 @@ async def run_import(
         )
     )
     db.commit()
+    return result
+
+
+@router.post("/{entity}/check", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+async def check_import(
+    entity: str,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    policy = await run_in_threadpool(_policy, db, ctx)
+    raw = await _body(request, policy)
+    # Parsing and checking query the database: off the event loop, so other requests are not held up.
+    return await run_in_threadpool(imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy)
+
+
+@router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+async def run_import(
+    entity: str,
+    request: Request,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    policy = await run_in_threadpool(_policy, db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    raw = await _body(request, policy)
+    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy)
     if result.get("rows"):
         # Semantic search over the imported records, after the response (their text is already searchable).
         background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)

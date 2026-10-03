@@ -357,6 +357,37 @@ def reset_customer_admin_password(
     }
 
 
+@router.post("/platform-admin/users/{user_id}/mfa-reset")
+def reset_user_mfa(
+    user_id: uuid.UUID, payload: CustomerAdminActionRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Remove any account's authenticator after it was lost with its recovery codes (for example a customer
+    administrator, or a colleague on the platform team). Not one's own: another administrator must do that."""
+    from backend.app import mfa
+
+    platform_admin = _require_platform_admin(request, db)
+    if user_id == platform_admin.id:
+        raise HTTPException(
+            409, detail={"code": "SELF_CHANGE_NOT_ALLOWED", "message": "Another administrator must reset your MFA"}
+        )
+    user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if user is None:
+        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
+    now = datetime.now(timezone.utc)
+    revoked = mfa.reset(db, user, now)
+    _audit(
+        db,
+        user.tenant_id,
+        platform_admin,
+        "USER_MFA_RESET",
+        user.id,
+        {"reason": payload.reason, "sessions_revoked": revoked},
+        now,
+    )
+    db.commit()
+    return {"id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
+
+
 @router.post("/platform-admin/customer-admins/{user_id}/status")
 def change_customer_admin_status(
     user_id: uuid.UUID, payload: CustomerAdminStatusRequest, request: Request, db: Session = Depends(get_db)

@@ -1,47 +1,70 @@
-from auth.service import LocalAuthService
+"""Password hashing and the password rules (auth/service.py)."""
+
+import pytest
+
+from auth import service
+from auth.service import _hash, _verify, needs_rehash, password_problem
 
 
-def test_signup_verification_login_logout_and_reset():
-    auth = LocalAuthService()
-    created = auth.signup("person@example.com", "Strong password 123", "Person", "Org")
-    assert created["status"] == "PENDING_VERIFICATION"
-    account = auth.accounts["person@example.com"]
-    assert "Strong password" not in account.password_hash
-    auth.verify_email(created["development_token"])
-    session = auth.signin("person@example.com", "Strong password 123")
-    assert auth.context(session)["tenant_id"].startswith("sandbox-")
-    auth.signout(session)
-    reset = auth.request_reset("person@example.com")
-    auth.reset(reset["development_token"], "Another strong 123")
-    assert auth.signin("person@example.com", "Another strong 123")
+def test_hash_verifies_the_password_and_does_not_contain_it():
+    stored = _hash("Strong password 123")
+    assert stored.startswith("scrypt$")
+    assert "Strong password" not in stored
+    assert _verify("Strong password 123", stored)
+    assert not _verify("Strong password 124", stored)
 
 
-def test_invalid_replay_and_unknown_account_are_safe():
-    auth = LocalAuthService()
-    auth.signup("person@example.com", "Strong password 123", "Person", "Org")
-    try:
-        auth.signin("unknown@example.com", "wrong password")
-    except ValueError as exc:
-        assert str(exc) == "INVALID_CREDENTIALS"
-    else:
-        assert False
+def test_each_hash_has_its_own_salt():
+    assert _hash("Same password 1234") != _hash("Same password 1234")
 
 
-def test_persisted_auth_user_survives_auth_service_restart():
-    original = LocalAuthService()
-    created = original.signup("persisted@example.com", "Strong password 123", "Persisted", "Org")
-    account = original.accounts["persisted@example.com"]
-    original.verify_email(created["development_token"])
-    restarted = LocalAuthService()
-    token = restarted.signin_persisted(
-        account.email,
-        "Strong password 123",
-        user_id="user-1",
-        display_name=account.display_name,
-        tenant_id="tenant-1",
-        password_hash=account.password_hash,
-        role="Viewer",
-        status="ACTIVE",
-        email_verified=True,
-    )
-    assert restarted.context(token)["tenant_id"] == "tenant-1"
+def test_legacy_hashes_still_verify_and_are_upgraded(monkeypatch):
+    import hashlib
+    import secrets
+
+    salt = secrets.token_bytes(16)
+    legacy = salt.hex() + ":" + hashlib.scrypt(b"Legacy password 99", salt=salt, n=2**14, r=8, p=1).hex()
+    assert _verify("Legacy password 99", legacy)
+    assert needs_rehash(legacy)
+
+
+def test_a_lower_cost_hash_needs_rehash_when_the_cost_rises(monkeypatch):
+    monkeypatch.setenv("MDARIX_PASSWORD_SCRYPT_LOG2_N", "12")
+    cheap = _hash("Cost upgrade 12345")
+    monkeypatch.setenv("MDARIX_PASSWORD_SCRYPT_LOG2_N", "14")
+    assert needs_rehash(cheap)
+    assert not needs_rehash(_hash("Cost upgrade 12345"))
+    assert _verify("Cost upgrade 12345", cheap)  # the old hash keeps working until it is replaced
+
+
+def test_a_value_that_is_not_a_hash_is_refused():
+    with pytest.raises(ValueError):
+        _verify("anything", "not-a-hash")
+
+
+@pytest.mark.parametrize(
+    ("password", "email", "problem"),
+    [
+        ("short", None, "PASSWORD_TOO_SHORT"),
+        ("x" * 129, None, "PASSWORD_TOO_LONG"),
+        ("aaaaaaaaaaaaaa", None, "PASSWORD_TOO_SIMPLE"),
+        ("password1234", None, "PASSWORD_BREACHED"),
+        ("Password1234", None, "PASSWORD_BREACHED"),  # case does not matter
+        ("jordan.smith-2026-river", "jordan.smith@example.com", "PASSWORD_CONTAINS_EMAIL"),
+        ("correct horse battery staple 77", "person@example.com", None),
+    ],
+)
+def test_password_rules(password, email, problem):
+    assert password_problem(password, email=email) == problem
+
+
+def test_the_breached_password_list_is_shipped():
+    assert len(service._breached_passwords()) > 10000
+
+
+def test_unknown_email_spends_the_time_of_a_password_check(monkeypatch):
+    calls = []
+    original = service._verify
+    monkeypatch.setattr(service, "_verify", lambda password, stored: calls.append(stored) or original(password, stored))
+    service.burn_verification_time("whatever password")
+    assert calls

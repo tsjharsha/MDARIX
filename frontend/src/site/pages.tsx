@@ -122,16 +122,24 @@ function ScopeClarity() {
   return (
     <section className="ms-section ms-scope" aria-labelledby="scope-title">
       <SectionHead
-        eyebrow="MVP scope clarity"
+        eyebrow="What you get"
         title="Know what is available today."
         id="scope-title"
-        copy="MDARIX distinguishes working demo capabilities from synthetic validation, planned direction, and production-dependent gates."
+        copy="What works in every workspace now, what we build with design partners, and what is still planned."
       />
-      <div className="ms-grid-4">
+      <div className="ms-grid-3">
         {capabilityStatus.map((status, index) => (
           <Reveal key={status.label} delay={index * 80} className="ms-card ms-card-flat">
             <strong>{status.label}</strong>
             <p>{status.text}</p>
+            <ul className="ms-check-list">
+              {status.items.map((item) => (
+                <li key={item}>
+                  <Check size={16} aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </Reveal>
         ))}
       </div>
@@ -195,7 +203,7 @@ export function HomePage() {
                 <Check size={15} aria-hidden="true" /> Works above QMS, PLM, ERP and supplier systems
               </li>
               <li>
-                <Check size={15} aria-hidden="true" /> Every AI statement cited to evidence
+                <Check size={15} aria-hidden="true" /> AI answers show their evidence
               </li>
               <li>
                 <Check size={15} aria-hidden="true" /> Authorized humans decide and sign
@@ -209,7 +217,7 @@ export function HomePage() {
       <section className="ms-section ms-question">
         <SectionHead
           eyebrow="A product investigation question"
-          title="Why did shutdown complaints increase after Product Rev D?"
+          title="Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?"
           copy="MDARIX helps teams follow the question across product reality, evidence, uncertainty, assurance, and controlled human decision-making."
         />
         <Reveal>
@@ -750,12 +758,12 @@ export function TrustPage() {
             [
               Lock,
               "Organization isolation",
-              "Each organization's data is scoped to it on every request and enforced by the database (row-level security); a dedicated database per customer is supported where required.",
+              "Each organization's data is scoped to it on every request and enforced by the database (row-level security).",
             ],
             [
               UserCheck,
               "Identity and sessions",
-              "Single sign-on, multi-factor authentication, 60-minute sessions, idle sign-out, and immediate sign-out when access is suspended.",
+              "Authenticator-app MFA (single sign-on is planned), 60-minute sessions, idle sign-out, and immediate sign-out when access is suspended.",
             ],
             [
               ShieldCheck,
@@ -777,20 +785,20 @@ export function TrustPage() {
         </div>
         <div className="ms-subsection">
           <SectionHead
-            eyebrow="Verified trust claims"
+            eyebrow="What we claim"
             title="What MDARIX can accurately say today."
-            copy="These statements describe implemented product controls and controlled MVP validation. They are not certification claims."
+            copy="These statements describe controls in the product today. They are not certification claims."
           />
         </div>
         <div className="ms-grid-2">
           {[
             [
               "Implemented controls",
-              "Tenant-scoped authorization, role and field policies, audit records, provenance, human approval controls, and advisory AI safeguards are implemented in the MVP.",
+              "Authorization scoped to each organization, role and field policies, audit records, provenance, human approval controls, and advisory AI safeguards are built into the product.",
             ],
             [
-              "Synthetic validation boundary",
-              "Current demonstrations use synthetic tenants, local infrastructure, and validation simulators. They do not represent customer or production certification evidence.",
+              "Pilot boundary",
+              "MDARIX is not yet a validated (GxP) system. Design-partner pilots use exported records without patient-identifiable information, and your systems of record stay authoritative.",
             ],
             [
               "Certification status",
@@ -827,10 +835,7 @@ export function TrustPage() {
             </li>
             <li>
               <Check size={16} aria-hidden="true" />
-              <span>
-                Source-system API keys are encrypted at rest and never shown again, or kept in your secret manager by
-                reference.
-              </span>
+              <span>Source-system API keys are encrypted at rest and never shown again.</span>
             </li>
           </ul>
         </Reveal>
@@ -852,8 +857,7 @@ export function TrustPage() {
 const principleCopy: Record<string, string> = {
   "Challenge the Explanation":
     "Test the leading explanation against contradicting evidence and alternatives before it becomes a conclusion.",
-  "AI You Can Inspect":
-    "Every AI-assisted statement shows its sources, scope, limitations and the model that produced it.",
+  "AI You Can Inspect": "AI-assisted answers show the evidence they used and flag anything unverified.",
   "Humans Decide": "AI supports investigation. Authorized humans make controlled decisions.",
 };
 
@@ -874,20 +878,20 @@ export function ResourcesPage() {
       />
       <section className="ms-section">
         <SectionHead
-          eyebrow="Resource library"
-          title="Practical guidance for every investigation stage."
-          copy="Use these resources to move from a product signal to a traceable, reviewable decision while keeping evidence, uncertainty, and human authority visible."
+          eyebrow="Explore by topic"
+          title="Follow an investigation from signal to decision."
+          copy="See how MDARIX moves from a product signal to a traceable, reviewable decision while keeping evidence, uncertainty, and human authority visible."
         />
         <div className="ms-grid-3">
           {[
             [
-              "Investigation playbooks",
+              "Investigation scenarios",
               "Complaint increases, product changes, supplier issues, affected lots, and missing evidence.",
               "/solutions#challenges",
-              "Explore playbooks",
+              "See the scenarios",
             ],
             [
-              "Trust & governance guides",
+              "Trust & governance",
               "AI assurance, provenance, role boundaries, audit trails, and controlled human review.",
               "/trust#ai",
               "Review trust controls",
@@ -951,7 +955,7 @@ export function ResourcesPage() {
             <Reveal key={resource.href} delay={(index % 2) * 70} className="ms-card ms-resource">
               <div className="ms-resource-meta">
                 <span>{resource.type}</span>
-                <time>{resource.date}</time>
+                {resource.date ? <time dateTime={resource.date}>{resource.date}</time> : <span>Reference page</span>}
               </div>
               <h3>{resource.title}</h3>
               <p>{resource.text}</p>
@@ -985,7 +989,7 @@ export function CompanyPage() {
       />
       <section className="ms-section" aria-labelledby="positioning-title">
         <SectionHead
-          eyebrow="MVP positioning"
+          eyebrow="Positioning"
           title="An investigation intelligence layer for medical-device teams."
           id="positioning-title"
           copy="MDARIX is designed for quality, regulatory, product, supplier-quality, and manufacturing teams investigating a product signal across systems of record."
@@ -997,16 +1001,16 @@ export function CompanyPage() {
               "MDARIX connects product context, complaints, changes, suppliers, lots, evidence, uncertainty, and human decisions. QMS, PLM, ERP, and supplier systems remain authoritative.",
             ],
             [
-              "What makes the MVP different",
-              "The MVP focuses on evidence-bounded investigation: relationships are visible, competing explanations remain separate, missing evidence is explicit, and AI remains advisory.",
+              "What makes MDARIX different",
+              "MDARIX focuses on evidence-bounded investigation: relationships are visible, competing explanations remain separate, missing evidence is explicit, and AI remains advisory.",
             ],
             [
               "What MDARIX is not",
-              "It is not positioned as a replacement QMS, PLM, ERP, or a certified regulatory submission system. Competitor products may be stronger in those system-of-record domains.",
+              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system. Those systems stay the record; MDARIX connects them for investigation.",
             ],
             [
               "Design-partner outcome",
-              "Measure complaint-to-investigation time, evidence retrieval time, mapping/import success, cross-tenant isolation, and decision traceability during a controlled pilot.",
+              "Measure complaint-to-investigation time, evidence retrieval time, import success, and decision traceability during a controlled pilot.",
             ],
           ].map(([title, text], index) => (
             <Reveal key={title} delay={index * 80} className="ms-card">

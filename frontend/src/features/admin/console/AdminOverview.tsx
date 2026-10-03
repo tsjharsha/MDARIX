@@ -290,7 +290,7 @@ export function AdminOverview({
         <KpiTile
           label="Renewals ≤ 30 days"
           value={sources.expiring.state === "ready" ? expiringSoon : null}
-          detail={expiringSoon ? "Licences to renew" : "No renewals due"}
+          detail={expiringSoon ? "Licenses to renew" : "No renewals due"}
           tone={sources.expiring.state === "ready" ? (expiringSoon ? "warning" : "good") : undefined}
           icon={<FileClock size={18} />}
           onOpen={() => onOpen({ domain: "Plans & Licensing", item: "Renewals" })}
@@ -394,12 +394,12 @@ export function AdminOverview({
         </Panel>
         <Panel
           eyebrow="Next 12 months"
-          title="Licences ending"
+          title="Licenses ending"
           state={sources.dashboard.state}
           error={sources.dashboard.error}
           action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Renewals" })} />}
         >
-          <ColumnChart data={model.renewals} unit="licences" caption="by month of end date" />
+          <ColumnChart data={model.renewals} unit="licenses" caption="by month of end date" />
         </Panel>
       </section>
 

@@ -105,7 +105,7 @@ export const menus: Record<string, MenuGroup[]> = {
       title: "Investigate with MDARIX",
       items: [
         current(
-          "Why did complaints increase after Rev D?",
+          "Why did complaints increase after Rev B?",
           "/platform/investigation",
           "Follow a signal through product version, change, component, supplier, lots, evidence, hypotheses, unknowns, assurance, and human decision.",
         ),
@@ -264,21 +264,6 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
     title: "Explore product investigation intelligence.",
     copy: "Learn how MDARIX connects product reality, evidence, temporal context, investigation, decisions, assurance, and governance.",
   },
-  "/plans": {
-    eyebrow: "Plans",
-    title: "Start with Free Early Access.",
-    copy: "Create an account, verify your email, and enter a tenant-scoped development workspace. Future commercial packaging is not represented here.",
-  },
-  "/pricing": {
-    eyebrow: "Pricing",
-    title: "Choose the investigation foundation that fits your team.",
-    copy: "Compare illustrative early-access options for connected product context, evidence intelligence, assurance, and governed human decisions.",
-  },
-  "/capabilities": {
-    eyebrow: "Current capabilities",
-    title: "From connected lifecycle data to traceable decisions.",
-    copy: "Explore the current product reality, investigation, evidence, challenge, decision, assurance, and governance capabilities.",
-  },
   "/roadmap": {
     eyebrow: "Product roadmap",
     title: "Current capabilities and the broader lifecycle direction.",
@@ -291,7 +276,7 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
   },
   "/security": {
     eyebrow: "Security & access",
-    title: "Controlled, tenant-scoped, and traceable by design.",
+    title: "Controlled, separated by organization, and traceable by design.",
     copy: "Authentication, role and field authorization, action controls, provenance, and human authority form the current security foundation. Independent certification is not claimed.",
   },
   "/ai-trust": {
@@ -308,39 +293,6 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
     eyebrow: "Company",
     title: "A more defensible way to investigate product reality.",
     copy: "MDARIX is designed for medical-device teams that need connected evidence, visible uncertainty, and accountable human decisions.",
-  },
-};
-
-export const publicHeroVisuals: Record<string, { src: string; alt: string; caption: string }> = {
-  "/platform/challenger": {
-    src: "/medtech-hero-challenger.png",
-    alt: "MedTech investigation workspace comparing competing explanations against evidence",
-    caption: "Competing explanations → evidence challenge → human review",
-  },
-  "/platform/ai-assurance": {
-    src: "/medtech-hero-ai-assurance.png",
-    alt: "MedTech AI assurance workspace showing validation checkpoints and reviewer controls",
-    caption: "Grounding → guardrails → assurance → human review",
-  },
-  "/platform/ai-provenance": {
-    src: "/medtech-hero-ai-provenance.png",
-    alt: "MedTech evidence chain connecting device observations, source records, and an AI insight",
-    caption: "Observation → source → provenance → inspectable insight",
-  },
-  "/platform/human-review": {
-    src: "/medtech-hero-human-review.png",
-    alt: "MedTech quality and regulatory reviewers examining evidence before approving a decision",
-    caption: "Evidence → review → approval boundary → accountable decision",
-  },
-  "/platform/audit-trail": {
-    src: "/medtech-hero-audit-trail.png",
-    alt: "MedTech investigation audit timeline with version history and signed decision markers",
-    caption: "Event history → version context → signature → traceable record",
-  },
-  "/platform/enterprise-administration": {
-    src: "/medtech-hero-enterprise-administration.png",
-    alt: "MedTech enterprise administration control room connecting tenants, identity, integrations, and operations",
-    caption: "Tenant boundaries → integrations → assurance → operations",
   },
 };
 
@@ -468,11 +420,39 @@ export const capabilityCopy: Record<string, { eyebrow: string; title: string; co
   },
 };
 
-export const capabilityStatus = [
-  { label: "Implemented", text: "Current workflows covered by the MVP code and local checks." },
-  { label: "Synthetic / demo-only", text: "Seeded validation tenants, simulators, and non-customer data." },
-  { label: "Planned", text: "Future product direction, not an available workflow." },
-  { label: "Production-dependent", text: "Requires hosted infrastructure, credentials, or operational evidence." },
+// What a design partner can use today, what is built together during a pilot, and what is planned. Keep this in
+// step with the product: nothing moves to "Available today" until it works for a customer.
+export const capabilityStatus: { label: string; text: string; items: string[] }[] = [
+  {
+    label: "Available today",
+    text: "In every workspace, including the free trial.",
+    items: [
+      "Product 360: products, versions, lots, components and suppliers",
+      "Complaint signals and investigations with competing hypotheses",
+      "Evidence, contradictions and open questions kept side by side",
+      "AI answers that show the evidence they used and flag anything unverified",
+      "Human decisions with electronic signatures and an audit trail",
+      "CSV import with templates and a personal-data check",
+      "Roles, customer administration and authenticator-app MFA",
+    ],
+  },
+  {
+    label: "With design partners",
+    text: "Built and validated together during a pilot.",
+    items: [
+      "Live connections to your QMS, PLM, ERP and supplier systems",
+      "Mapping your fields and reference data to the MDARIX model",
+    ],
+  },
+  {
+    label: "Planned",
+    text: "Not available yet.",
+    items: [
+      "Single sign-on (OpenID Connect and SAML)",
+      "Ready-made connectors for named vendor systems",
+      "A dedicated database for each customer",
+    ],
+  },
 ];
 
 export const lifecycleContent: Record<string, { eyebrow: string; title: string; copy: string }> = {
@@ -732,48 +712,14 @@ export const solutionOverrides: Record<string, { eyebrow: string; title: string;
   },
 };
 
-export const pricingPlans = [
-  {
-    name: "Free",
-    price: "$0",
-    cadence: "forever",
-    note: "Explore the connected investigation workspace.",
-    features: ["1 workspace", "Up to 3 users", "Product 360 and investigation basics", "Community guidance"],
-    action: "Start free",
-  },
-  {
-    name: "Individual",
-    price: "$49",
-    cadence: "per user / month",
-    note: "For focused quality and investigation work.",
-    features: ["1 workspace", "Up to 10 users", "Evidence and hypothesis intelligence", "Standard support"],
-    action: "Choose Individual",
-  },
-  {
-    name: "Pro",
-    price: "$149",
-    cadence: "per user / month",
-    note: "For teams connecting evidence across functions.",
-    features: ["Unlimited workspaces", "Up to 50 users", "AI assurance and decision workflows", "Priority support"],
-    action: "Choose Pro",
-    featured: true,
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    cadence: "annual plan",
-    note: "For governed, tenant-scoped deployment at scale.",
-    features: [
-      "Advanced administration",
-      "SSO and enterprise access",
-      "Custom integrations",
-      "Dedicated success support",
-    ],
-    action: "Talk to us",
-  },
-];
-
-export const postMarketResources = [
+// Each date is the year the document was published; reference pages that change continuously have no date.
+export const postMarketResources: {
+  type: string;
+  date: string | null;
+  title: string;
+  text: string;
+  href: string;
+}[] = [
   {
     type: "FDA guidance",
     date: "2025",
@@ -798,9 +744,9 @@ export const postMarketResources = [
   {
     type: "EU / AI guidance",
     date: "2025",
-    title: "MDCG 2025-6 and AI Act / MDR-IVDR interplay",
+    title: "MDCG 2025-6: FAQ on the interplay between the MDR/IVDR and the AI Act",
     text: "Joint guidance discussing post-market monitoring, interaction with other AI systems, and integration with existing MDR/IVDR monitoring plans.",
-    href: "https://health.ec.europa.eu/medical-devices-sector/new-regulations/guidance-mdcg-endorsed-documents-and-other-guidance_en",
+    href: "https://health.ec.europa.eu/latest-updates/mdcg-2025-6-faq-interplay-between-medical-devices-regulation-vitro-diagnostic-medical-devices-2025-06-19_en",
   },
   {
     type: "WHO publication",
@@ -811,21 +757,21 @@ export const postMarketResources = [
   },
   {
     type: "WHO publication",
-    date: "2023",
+    date: "2021",
     title: "Generating evidence for AI-based medical devices",
     text: "Framework for training, validation, evaluation, and post-deployment monitoring of AI-based medical devices.",
     href: "https://iris.who.int/bitstream/handle/10665/349093/9789240038462-eng.pdf",
   },
   {
     type: "FDA resource",
-    date: "Updated",
+    date: null,
     title: "FDA AI-enabled medical device list",
     text: "Reference list of AI-enabled devices authorized for marketing in the United States; useful for landscape and surveillance research.",
     href: "https://www.fda.gov/medical-devices/artificial-intelligence-enabled-medical-devices/list-artificial-intelligence-enabled-medical-devices",
   },
   {
     type: "FDA resource",
-    date: "Ongoing",
+    date: null,
     title: "FDA postmarket requirements and safety monitoring",
     text: "FDA overview of reporting, device tracking, surveillance studies, recalls, and other postmarket obligations and resources.",
     href: "https://www.fda.gov/medical-devices/device-advice-comprehensive-regulatory-assistance/postmarket-requirements-devices",
@@ -994,7 +940,7 @@ export const platformCapabilityData: Record<
       },
       {
         title: "Review with provenance",
-        text: "Keep each event tied to its source, tenant scope, ProductVersion, and limitations before it informs a human decision.",
+        text: "Keep each event tied to its source, organization, product version and limitations before it informs a human decision.",
       },
     ],
     steps: ["Effective", "Recorded", "Known", "Change", "Signal", "Evidence", "Review"],
@@ -1100,60 +1046,4 @@ export const evidenceCapability = {
     },
   ],
   steps: ["Sources", "Context", "Provenance", "Evidence", "Gaps", "Review", "Decision"],
-};
-
-export const capabilityStory = (slug: string, title: string) => {
-  const investigation = ["ask-mdarix", "investigation", "evidence", "hypotheses", "challenger", "unknowns"].includes(
-    slug,
-  );
-  const decision = ["failure-chain", "counterfactual", "decision-center", "investigation-brief"].includes(slug);
-  const trust = ["ai-assurance", "ai-provenance", "human-review", "audit-trail", "enterprise-administration"].includes(
-    slug,
-  );
-  const kicker = investigation
-    ? "Investigation intelligence"
-    : decision
-      ? "Decision intelligence"
-      : trust
-        ? "Trust & governance"
-        : "Product lifecycle intelligence";
-  const lens = investigation
-    ? "signal, evidence, competing explanations, and unknowns"
-    : decision
-      ? "evidence, limitations, review, and an authorized human decision"
-      : trust
-        ? "identity, provenance, assurance, and governed human authority"
-        : "product intent, development evidence, release context, and post-market learning";
-  return {
-    kicker,
-    summary: `${title} helps teams move through an inspectable E2E workflow across ${lens}. Every step keeps source context, scope, limitations, and responsibility visible.`,
-    stats: investigation
-      ? ["Signal", "Evidence", "Hypotheses", "Unknowns"]
-      : decision
-        ? ["Context", "Challenge", "Review", "Decision"]
-        : trust
-          ? ["Identity", "Provenance", "Assurance", "Audit"]
-          : ["Define", "Develop", "Release", "Improve"],
-    cards: [
-      {
-        title: "Start with context",
-        text: `Bring the relevant ${lens} into one reviewable workspace without losing the source boundary.`,
-      },
-      {
-        title: "Inspect before inference",
-        text: "Separate observed facts from interpretation, uncertainty, recommendations, and conclusions.",
-      },
-      {
-        title: "Close the loop",
-        text: "Preserve limitations, reviewer responsibility, and the traceable next action at the end of the journey.",
-      },
-    ],
-    steps: investigation
-      ? ["Question", "Scope", "Evidence", "Challenge", "Unknowns", "Review"]
-      : decision
-        ? ["Context", "Analysis", "Challenge", "Readiness", "Human", "Decision"]
-        : trust
-          ? ["Identity", "Access", "Evidence", "Assurance", "Review", "Audit"]
-          : ["Define", "Develop", "Prove", "Release", "Monitor", "Improve"],
-  };
 };

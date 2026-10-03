@@ -8,8 +8,8 @@ import uuid
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
-from auth.service import LocalAuthService, auth_service, _hash
-from auth.durable import persist_session
+from auth.service import _hash
+from auth.durable import consume, issue_reset, new_session
 from backend.app.main import app
 from backend.app.governance_router import bootstrap
 from backend.app.db.session import SessionLocal
@@ -27,31 +27,27 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.customer_lifecycle import Customer
 
 
-def account():
-    service = LocalAuthService()
-    created = service.signup("day23@example.com", "Correct current password 123", "Day23 User", "Synthetic Co")
-    return service, created
+def _legacy_user():
+    from tests.conftest import _ensure_legacy_user
+
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+        user = _ensure_legacy_user(db, tenant)
+        return user.id, user.tenant_id
+    finally:
+        db.close()
 
 
-def test_user_id_is_server_account_identity_and_hash_is_not_password():
-    service, created = account()
-    assert created["user_id"] == "day23@example.com"
-    assert "Correct current password 123" not in service.accounts["day23@example.com"].password_hash
+def test_stored_password_is_a_hash_not_the_password():
+    stored = _hash("Correct current password 123")
+    assert "Correct current password 123" not in stored
 
 
-def test_wrong_reauthentication_does_not_sign_or_change_account():
-    service, created = account()
-    service.verify_email(created["development_token"])
-    session = service.signin("day23@example.com", "Correct current password 123")
-    with pytest.raises(ValueError, match="INVALID_REAUTHENTICATION"):
-        service.verify_current_password(session, "wrong password")
-    assert service.context(session)["user_id"] == "day23@example.com"
-
-
-def test_expired_or_unknown_session_cannot_reauthenticate():
-    service, _ = account()
-    with pytest.raises(ValueError, match="UNAUTHENTICATED"):
-        service.verify_current_password("not-a-session", "Correct current password 123")
+def test_unknown_or_forged_session_is_refused():
+    client = TestClient(app)
+    client.cookies.set("mdarix_session", "not-a-session")
+    assert client.get("/api/v1/me/context").status_code == 401
 
 
 def test_signed_content_fingerprint_changes_on_material_change():
@@ -63,28 +59,44 @@ def test_signed_content_fingerprint_changes_on_material_change():
 
 
 def test_replay_token_cannot_be_reused():
-    service, created = account()
-    service.verify_email(created["development_token"])
-    with pytest.raises(ValueError, match="INVALID_VERIFICATION_TOKEN"):
-        service.verify_email(created["development_token"])
+    user_id, tenant_id = _legacy_user()
+    db = SessionLocal()
+    try:
+        raw = issue_reset(db, user_id, tenant_id)
+        assert consume(db, raw, "reset") == str(user_id)
+        with pytest.raises(ValueError, match="INVALID_RESET_TOKEN"):
+            consume(db, raw, "reset")
+    finally:
+        db.close()
 
 
-def test_password_is_not_in_context_or_reset_response():
-    service, created = account()
-    service.verify_email(created["development_token"])
-    assert (
-        "password"
-        not in str(service.context(service.signin("day23@example.com", "Correct current password 123"))).lower()
+def test_a_new_reset_link_replaces_the_earlier_one():
+    user_id, tenant_id = _legacy_user()
+    db = SessionLocal()
+    try:
+        first = issue_reset(db, user_id, tenant_id)
+        second = issue_reset(db, user_id, tenant_id)
+        with pytest.raises(ValueError):
+            consume(db, first, "reset")
+        assert consume(db, second, "reset") == str(user_id)
+    finally:
+        db.close()
+
+
+def test_password_is_not_in_signin_or_reset_responses():
+    _legacy_user()
+    client = TestClient(app)
+    signin = client.post(
+        "/api/v1/auth/signin",
+        json={"email": "legacy-test-auth@synthetic.invalid", "password": "LegacyTestPassword123!"},
     )
-    reset = service.request_reset("day23@example.com")
-    assert "Correct current password 123" not in str(reset)
+    assert signin.status_code == 200, signin.text
+    assert "password" not in signin.text.lower()
+    reset = client.post("/api/v1/auth/forgot-password", json={"email": "legacy-test-auth@synthetic.invalid"})
+    assert "LegacyTestPassword123!" not in reset.text
 
 
 def _client(email, tenant_id):
-    created = auth_service.signup(email, "Correct current password 123", email.split("@")[0], "Day23")
-    auth_service.accounts[email].tenant_id = str(tenant_id)
-    auth_service.verify_email(created["development_token"])
-    token = auth_service.signin(email, "Correct current password 123")
     db = SessionLocal()
     now = datetime.now(timezone.utc)
     # The governance bootstrap grants approval authority to the Approver role
@@ -117,7 +129,7 @@ def _client(email, tenant_id):
     )
     db.commit()
     persisted_user_id = str(user.id)
-    persist_session(db, token, user.id, tenant_id)
+    token = new_session(db, user.id, tenant_id)
     db.close()
     client = TestClient(app)
     client.cookies.set("mdarix_session", token)

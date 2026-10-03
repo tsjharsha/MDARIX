@@ -14,7 +14,7 @@ const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "";
 async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
   await page.goto("/signin");
-  await page.getByLabel("User ID or work email").fill(email);
+  await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/app/);
@@ -41,7 +41,7 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.getByRole("heading", { name: /sign in to mdarix/i })).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
-    await page.getByLabel("User ID or work email").fill("invalid@example.invalid");
+    await page.getByLabel("Work email").fill("invalid@example.invalid");
     await page.getByLabel("Password").fill("InvalidPassword123!");
     await page.getByRole("button", { name: /sign in/i }).click();
     // The browser job may run without the backend. In that case the app must
@@ -124,7 +124,7 @@ test.describe("MDARIX browser evidence", () => {
       "Plans & Licensing": {
         Plans: "Plans",
         Subscriptions: "Subscriptions",
-        Renewals: "Licences by end date",
+        Renewals: "Licenses by end date",
         Reminders: "Reminders",
       },
       "Identity & Access": {

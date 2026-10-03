@@ -61,7 +61,7 @@ function watch(page: Page, persona: string, where: () => string) {
 
 async function signIn(page: Page, persona: any) {
   await page.goto("/signin");
-  await page.getByLabel("User ID or work email").fill(persona.email);
+  await page.getByLabel("Work email").fill(persona.email);
   await page.getByLabel("Password").fill(persona.password ?? config.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/(app|mfa)/, { timeout: 30_000 });

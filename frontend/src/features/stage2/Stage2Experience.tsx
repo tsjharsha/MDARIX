@@ -47,7 +47,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
         : mode === "persona"
           ? {
               title: "Persona Dashboard",
-              copy: "Focus the workspace on the decisions and evidence that matter to the selected role. Access remains tenant-scoped and governed by the authenticated session.",
+              copy: "Focus the workspace on the decisions and evidence that matter to the selected role. You still see only your organization's data, as your role allows.",
             }
           : {
               title: "Connected Story View",
@@ -91,7 +91,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
       ) : (
         data && (
           <section className="panel stage2-results">
-            <div className="section-title">Tenant-scoped results</div>
+            <div className="section-title">Results for your organization</div>
             {mode === "signals" && (
               <div className="evidence-list">
                 {(data.signals ?? []).map((item: any) => (
@@ -146,7 +146,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
                 <article>
                   <span className="eyebrow">Investigations</span>
                   <strong>{data.counts?.investigations ?? 0}</strong>
-                  <p>Tenant-scoped workspaces</p>
+                  <p>Separate workspace for each organization</p>
                 </article>
                 <article>
                   <span className="eyebrow">Evidence</span>
@@ -195,7 +195,7 @@ function SignalDetail({ data }: { data: any }) {
         <article>
           <span className="eyebrow">Review state</span>
           <strong>Human review required</strong>
-          <p>Tenant-scoped source record</p>
+          <p>Source record in your organization</p>
         </article>
       </div>
       <p>{signal.description ?? "No source description recorded."}</p>

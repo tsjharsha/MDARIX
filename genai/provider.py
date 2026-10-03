@@ -29,6 +29,13 @@ OPENAI_COMPATIBLE = {
     "mistral": ("https://api.mistral.ai/v1/chat/completions", "mistral-small-latest"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
 }
+
+
+def default_model(name: str) -> str | None:
+    """The model a provider uses when MDARIX_GENAI_*_MODEL does not name one."""
+    return OPENAI_COMPATIBLE.get(name, (None, None))[1]
+
+
 # Services that no longer exist: named in MDARIX_GENAI_FALLBACKS they are skipped with a warning.
 RETIRED_PROVIDERS = {"github": "GitHub Models was retired by GitHub on 30 July 2026"}
 # A provider that refused us (rate or daily limit) is skipped until this time (monotonic seconds), so a demo does not
@@ -176,7 +183,15 @@ class GenAIProvider:
                 0.0,
                 int((time.monotonic() - started) * 1000),
             )
-        chain = [self] + [item for item in self.fallbacks if item.configured]
+        from genai.policy import allowed
+
+        chain = [
+            item for item in [self, *self.fallbacks] if item.configured and allowed(item.provider_name, item.model)
+        ]
+        if not chain:
+            # Every configured provider is forbidden here (for example a free tier in production): no model is called.
+            logger.error("No AI provider may receive customer data in this environment; answering without a model")
+            raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED")
         resting = [item for item in chain if _COOLDOWN_UNTIL.get(item.provider_name, 0) > time.monotonic()]
         # Providers that are resting are tried last, so a request still gets an answer if every provider rests.
         ordered = [item for item in chain if item not in resting] + resting

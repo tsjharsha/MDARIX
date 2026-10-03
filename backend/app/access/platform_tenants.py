@@ -233,11 +233,10 @@ def schedule_tenant_lifecycle(
     }
 
 
-@router.post("/platform/lifecycle/run-scheduled")
-def run_scheduled_lifecycle(request: Request, db: Session = Depends(get_db)):
-    """Apply due scheduled transitions and enqueue tenant notifications."""
-    admin = _require_platform_admin(request, db)
-    now = datetime.now(timezone.utc)
+def run_scheduled_lifecycle_job(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
+    """Apply due scheduled tenant transitions and queue the notifications (caller commits). Run by the scheduler
+    every 15 minutes and on demand by a Platform Administrator; rows are locked, so two runs never apply one twice."""
+    now = now or datetime.now(timezone.utc)
     applied = 0
     queued = 0
     rows = (
@@ -260,7 +259,7 @@ def run_scheduled_lifecycle(request: Request, db: Session = Depends(get_db)):
             AuditEvent(
                 id=uuid.uuid4(),
                 tenant_id=tenant.id,
-                actor_ref=str(admin.id),
+                actor_ref=actor_ref,
                 action="SCHEDULED_TENANT_LIFECYCLE_APPLIED",
                 entity_type="Tenant",
                 entity_id=tenant.id,
@@ -292,8 +291,16 @@ def run_scheduled_lifecycle(request: Request, db: Session = Depends(get_db)):
             queued += 1
         row.transition_type = "APPLIED"
         applied += 1
-    db.commit()
     return {"status": "COMPLETE", "applied": applied, "notifications_queued": queued, "run_at": now}
+
+
+@router.post("/platform/lifecycle/run-scheduled")
+def run_scheduled_lifecycle(request: Request, db: Session = Depends(get_db)):
+    """Apply due scheduled transitions and enqueue tenant notifications."""
+    admin = _require_platform_admin(request, db)
+    result = run_scheduled_lifecycle_job(db, str(admin.id))
+    db.commit()
+    return result
 
 
 @router.get("/platform-admin/support-access")

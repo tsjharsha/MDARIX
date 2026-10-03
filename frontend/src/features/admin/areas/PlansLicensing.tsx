@@ -50,7 +50,7 @@ function Plans() {
   const plans = useResource<Plan[]>("/api/v1/platform-admin/plans");
   const rows = Array.isArray(plans.data) ? plans.data : [];
   return (
-    <Panel eyebrow="Catalogue" title="Plans" state={plans.state} error={plans.error}>
+    <Panel eyebrow="Catalog" title="Plans" state={plans.state} error={plans.error}>
       <Intro>
         A plan sets what a tenant can use (features) and how much (limits). Every tenant has one plan; change it from
         Subscriptions.
@@ -118,7 +118,7 @@ type TenantRow = {
   status?: string | null;
 };
 
-/** Every tenant's plan and licence period, with Change subscription on each row. */
+/** Every tenant's plan and license period, with Change subscription on each row. */
 function Subscriptions({ onMessage }: { onMessage: Notify }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -130,8 +130,8 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
     `/api/v1/platform-admin/customers?${params}`,
   );
   return (
-    <Panel eyebrow="Licences" title="Subscriptions" state={tenants.state} error={tenants.error}>
-      <Intro>Each tenant has its own plan and licence period. The previous subscription stays in the history.</Intro>
+    <Panel eyebrow="Licenses" title="Subscriptions" state={tenants.state} error={tenants.error}>
+      <Intro>Each tenant has its own plan and license period. The previous subscription stays in the history.</Intro>
       <div className="cc-toolbar">
         <SearchBox
           value={query}
@@ -168,7 +168,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
           {
             key: "period",
             fields: ["license_start", "expires_at"],
-            label: "Licence period",
+            label: "License period",
             render: (row) =>
               row.expires_at
                 ? `${row.license_start ? new Date(row.license_start).toLocaleDateString() : "—"} – ${new Date(row.expires_at).toLocaleDateString()}`
@@ -320,7 +320,7 @@ const WINDOWS = [
   { key: "later", label: "Later", test: (days: number) => days > 90 },
 ] as const;
 
-/** Licences by how soon they end, so renewals are handled before access stops. */
+/** Licenses by how soon they end, so renewals are handled before access stops. */
 function Renewals() {
   const renewals = useResource<{ items: Renewal[] }>("/api/v1/platform-admin/console/renewals");
   const [period, setPeriod] = useState<string>("");
@@ -332,7 +332,7 @@ function Renewals() {
     : rows;
   return (
     <div className="ac-grid">
-      <section className="ac-stats ar-stats-4" aria-label="Licences by end date">
+      <section className="ac-stats ar-stats-4" aria-label="Licenses by end date">
         <StatTile
           label="Ended"
           value={renewals.data ? count("expired") : null}
@@ -366,8 +366,8 @@ function Renewals() {
           onOpen={() => setPeriod("")}
         />
       </section>
-      <Panel eyebrow="Renewals" title="Licences by end date" state={renewals.state} error={renewals.error}>
-        <div className="ca-chips" role="group" aria-label="Show licences">
+      <Panel eyebrow="Renewals" title="Licenses by end date" state={renewals.state} error={renewals.error}>
+        <div className="ca-chips" role="group" aria-label="Show licenses">
           <button type="button" className={period === "" ? "selected" : ""} onClick={() => setPeriod("")}>
             All ({rows.length})
           </button>
@@ -383,12 +383,12 @@ function Renewals() {
           ))}
         </div>
         <Table
-          caption="Licences by end date"
+          caption="Licenses by end date"
           rows={shown}
           rowKey={(row) => row.subscription_id}
           empty={{
-            title: "No licences here",
-            detail: rows.length ? "Choose another period." : "Licences with an end date appear here.",
+            title: "No licenses here",
+            detail: rows.length ? "Choose another period." : "Licenses with an end date appear here.",
           }}
           columns={[
             {
@@ -445,9 +445,9 @@ type ReminderSettings = {
 };
 
 const STAGES = [
-  ["EXPIRING", "Before the licence ends"],
+  ["EXPIRING", "Before the license ends"],
   ["GRACE", "During the grace period"],
-  ["EXPIRED", "After the licence has ended"],
+  ["EXPIRED", "After the license has ended"],
 ] as const;
 
 const SAMPLE: Record<string, string> = {
@@ -472,7 +472,7 @@ function Reminders({ onMessage }: { onMessage: Notify }) {
     <div className="ac-grid">
       <Panel eyebrow="Renewal reminders" title="Reminders">
         <Intro>
-          Reminders are set per tenant: when they are due before the licence ends, and what the email says. Choose the
+          Reminders are set per tenant: when they are due before the license ends, and what the email says. Choose the
           tenant first.
         </Intro>
         <TenantPicker value={tenantId} onChange={setTenantId} />
@@ -519,7 +519,7 @@ function Schedule({
         recipient_types: ["CUSTOMER_ADMIN"],
         version: nextVersion(settings.data?.policy?.version),
       });
-      onMessage(`Reminder schedule saved: ${parsed.days.join(", ")} days before the licence ends.`);
+      onMessage(`Reminder schedule saved: ${parsed.days.join(", ")} days before the license ends.`);
       setText(null);
       settings.reload();
     } catch (reason) {
@@ -540,7 +540,7 @@ function Schedule({
       </ul>
       <form className="cc-form" onSubmit={save}>
         <label className="ca-field">
-          Days before the licence ends
+          Days before the license ends
           <input value={value} onChange={(event) => setText(event.target.value)} placeholder="e.g. 90, 45, 14" />
         </label>
         <p className="ac-muted">Sent to the tenant&apos;s Customer Administrators.</p>
@@ -569,8 +569,8 @@ function TemplateEditor({
   const allowed = settings.data?.template_variables ?? [];
   const [form, setForm] = useState({
     stage: "EXPIRING",
-    subject: "Your MDARIX licence ends on {{expiry_date}}",
-    body: "Hello {{customer_name}},\n\nYour MDARIX licence ends in {{days_remaining}} days, on {{expiry_date}}. Contact us to renew.",
+    subject: "Your MDARIX license ends on {{expiry_date}}",
+    body: "Hello {{customer_name}},\n\nYour MDARIX license ends in {{days_remaining}} days, on {{expiry_date}}. Contact us to renew.",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

@@ -4,3 +4,8 @@
 data/golden/** text eol=lf
 evaluation/ground_truth/** text eol=lf
 evaluation/scenarios/** text eol=lf
+# Files that run inside Linux containers must keep LF line endings on every platform.
+*.sh text eol=lf
+Dockerfile* text eol=lf
+infrastructure/docker/** text eol=lf
+docker-compose*.yml text eol=lf

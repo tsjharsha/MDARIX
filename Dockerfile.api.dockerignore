@@ -1,0 +1,34 @@
+# The API image carries the server code only: no secrets, tests, simulators, frontend sources or local files.
+.env
+.env.*
+**/.env
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.pytest_tmp
+.ruff_cache
+node_modules
+frontend
+tests
+source_simulator/*
+# Migration md11 reads the source catalog.
+!source_simulator/source_catalog.json
+docs
+artifacts
+.mdarix-object-storage
+.mdarix-embedding-cache
+infrastructure/database/backups
+infrastructure/docker
+*.db
+*.sqlite
+*.log
+*.dump
+Dockerfile*
+docker-compose*.yml
+Caddyfile*
+STATUS.md
+requirements-dev.txt

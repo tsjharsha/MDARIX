@@ -1,9 +1,10 @@
 """Bind each database session to one tenant, or to an explicit system scope, for row-level security.
 
-Postgres policies (migration md05) show a tenant-owned row only when app.tenant_id matches it, or when the
-transaction runs in system scope (app.rls_bypass = 'on'). The scope is stored on the SQLAlchemy session and applied
-at the start of every transaction, so it survives commits within a request. A session with no scope sees no
-tenant-owned rows at all.
+Postgres policies (migrations md05 and md15) show a tenant-owned row only when app.tenant_id matches it, or when the
+transaction runs in system scope: app.rls_bypass holds the secret MDARIX_RLS_SYSTEM_TOKEN, which the database checks
+against a hash the runtime role cannot read (``mdarix_system_scope()``). So SQL sent by the application role alone
+can never widen its scope. The scope is stored on the SQLAlchemy session and applied at the start of every
+transaction, so it survives commits within a request. A session with no scope sees no tenant-owned rows at all.
 
 - bind_tenant: a signed-in request, after the server has resolved the session's tenant.
 - bind_system: platform-administrator actions and pre-authentication steps (sign-in, activation, password reset)
@@ -12,7 +13,9 @@ tenant-owned rows at all.
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
+
 from sqlalchemy import event, text
 from sqlalchemy.orm import Session
 
@@ -21,10 +24,24 @@ _SYSTEM_KEY = "mdarix_system_reason"
 _APPLY = text("SELECT set_config('app.tenant_id', :tenant, true), set_config('app.rls_bypass', :bypass, true)")
 
 
+# Stored by migration md15 when MDARIX_RLS_SYSTEM_TOKEN is not set; local development and tests use it.
+LOCAL_SYSTEM_TOKEN = "mdarix-local-development-rls-system-scope"
+
+
+def system_token() -> str:
+    """The secret that opens system scope (staging/production refuse to start without their own)."""
+    from backend.app.runtime_env import is_local
+
+    configured = os.getenv("MDARIX_RLS_SYSTEM_TOKEN", "").strip()
+    if configured:
+        return configured
+    return LOCAL_SYSTEM_TOKEN if is_local() else ""
+
+
 def _values(session: Session) -> dict:
     return {
         "tenant": session.info.get(_TENANT_KEY) or "",
-        "bypass": "on" if session.info.get(_SYSTEM_KEY) else "off",
+        "bypass": system_token() if session.info.get(_SYSTEM_KEY) else "",
     }
 
 
@@ -73,3 +90,12 @@ class _SessionConnectionSource:
 
 def scoped_bind(session: Session) -> _SessionConnectionSource:
     return _SessionConnectionSource(session)
+
+
+def system_token_accepted(connection) -> bool:
+    """True when the database accepts this server's system token (both sides hold the same secret)."""
+    try:
+        connection.execute(text("SELECT set_config('app.rls_bypass', :token, true)"), {"token": system_token()})
+        return bool(connection.execute(text("SELECT public.mdarix_system_scope()")).scalar())
+    finally:
+        connection.rollback()  # the setting was transaction-local; nothing else was done

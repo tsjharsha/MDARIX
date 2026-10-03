@@ -84,6 +84,31 @@ class LoginThrottle(Base):
     updated_at = _ts(False)
 
 
+class SchedulerRun(Base):
+    """The last run of one scheduled job (scripts/run_scheduler.py); platform-level, no tenant data."""
+
+    __tablename__ = "scheduler_runs"
+    job: Mapped[str] = mapped_column(String(80), primary_key=True)
+    last_started_at = _ts()
+    last_finished_at = _ts()
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    last_result = mapped_column(JSONB)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    state = mapped_column(JSONB, nullable=False, server_default="{}")
+
+
+class RateLimitCounter(Base):
+    """Attempts in one fixed window for one hashed key (backend/app/rate_limit.py); platform-level, no tenant data."""
+
+    __tablename__ = "rate_limit_counters"
+    scope: Mapped[str] = mapped_column(String(40), primary_key=True)
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window_start = mapped_column(DateTime(timezone=True), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    __table_args__ = (Index("ix_rate_limit_counters_window", "window_start"),)
+
+
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
     id = _id()
@@ -251,7 +276,7 @@ class WorkerHeartbeat(Base):
 
     __tablename__ = "worker_heartbeats"
     service: Mapped[str] = mapped_column(String(80), primary_key=True)
-    instance_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    instance_id: Mapped[str] = mapped_column(String(120), primary_key=True)
     started_at = _ts(False)
     updated_at = _ts(False)
     metrics: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

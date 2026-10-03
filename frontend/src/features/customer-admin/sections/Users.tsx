@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { KeyRound, Mail, UserPlus } from "lucide-react";
+import { KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { userTone, type TenantUser } from "../customerAdminModel";
@@ -400,6 +400,27 @@ function UserDrawer({
               {user.email && (status === "ACTIVE" || status === "SUSPENDED") && (
                 <button type="button" className="ac-secondary" onClick={() => void resetPassword()}>
                   <KeyRound size={15} /> Send password reset
+                </button>
+              )}
+              {!isSelf && status === "ACTIVE" && (
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  onClick={() =>
+                    confirm({
+                      title: `Reset multi-factor authentication for ${name}?`,
+                      body: "Use this when they lost their authenticator app and recovery codes. Their authenticator is removed, they are signed out, and they set up a new one at their next sign-in.",
+                      confirmLabel: "Reset MFA",
+                      reason: { label: "Why is the authenticator being reset?", min: 5 },
+                      done: `${name} sets up a new authenticator at their next sign-in.`,
+                      run: async (reason) => {
+                        await send(`/api/v1/admin/identity/users/${user.id}/mfa-reset`, "POST", { reason });
+                        onChanged();
+                      },
+                    })
+                  }
+                >
+                  <ShieldOff size={15} /> Reset MFA
                 </button>
               )}
               {!isSelf && status === "ACTIVE" && (

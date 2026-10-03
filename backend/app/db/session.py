@@ -5,6 +5,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import URL
 from sqlalchemy.orm import sessionmaker
 
+from backend.app.db.tls import connect_args
+
 load_dotenv()
 
 
@@ -27,6 +29,7 @@ def _engine(url: URL):
         max_overflow=int(os.getenv("MDARIX_DB_MAX_OVERFLOW", "10")),
         pool_timeout=int(os.getenv("MDARIX_DB_POOL_TIMEOUT_SECONDS", "30")),
         pool_pre_ping=True,
+        connect_args=connect_args(),
     )
 
 

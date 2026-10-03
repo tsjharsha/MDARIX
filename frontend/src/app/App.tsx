@@ -21,43 +21,16 @@ import { RequestDemoPage } from "../features/auth/RequestDemoPage";
 
 export function App() {
   const publicPath = window.location.pathname;
-  if (
-    publicPath === "/" ||
-    [
-      // Current website pages.
-      "/platform",
-      "/solutions",
-      "/product-lifecycle",
-      "/trust",
-      "/resources",
-      "/company",
-      // Former pages; the site redirects them to the section that now holds their content.
-      "/why-mdarix",
-      "/pricing",
-      "/plans",
-      "/roadmap",
-      "/capabilities",
-      "/ai-trust",
-      "/integrations",
-      "/security",
-      // Match whole path segments only, so app routes such as /platform-admin/... are never sent to the website.
-    ].some((route) => publicPath === route || publicPath.startsWith(`${route}/`))
-  )
-    return <PublicMegaSite path={publicPath} />;
-  if (
-    [
-      "/signin",
-      "/signup",
-      "/forgot-password",
-      "/verify-email",
-      "/activate-account",
-      "/reset-password",
-      "/mfa",
-    ].includes(publicPath)
-  )
+  if (["/signin", "/signup", "/forgot-password", "/activate-account", "/reset-password", "/mfa"].includes(publicPath))
     return <AuthPage mode={publicPath.slice(1)} />;
   if (publicPath === "/request-demo") return <RequestDemoPage />;
-  return <PrivateApplicationGate />;
+  // The signed-in application lives under /app and /platform-admin (router.ts). Match whole path segments, so a
+  // website page such as /platform is never mistaken for /platform-admin.
+  if (["/app", "/platform-admin"].some((root) => publicPath === root || publicPath.startsWith(`${root}/`)))
+    return <PrivateApplicationGate />;
+  // Everything else is the website: its pages, former page addresses it redirects, legal pages, and a "not found"
+  // page for unknown addresses (rather than a sign-in prompt).
+  return <PublicMegaSite path={publicPath} />;
 }
 
 // Older customer screens open the platform console on the matching Customers & Tenants section.

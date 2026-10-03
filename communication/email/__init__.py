@@ -1,3 +1,2 @@
-from .service import EmailService
-
-__all__ = ["EmailService"]
+"""Email: inbound evidence email arrives through Resend (inbound.py); every outbound email goes through SMTP
+(auth/emailer.py)."""

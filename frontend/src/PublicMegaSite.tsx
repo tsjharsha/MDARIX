@@ -13,17 +13,29 @@ import {
   TrustPage,
   type SitePage,
 } from "./site/pages";
+import {
+  ContactPage,
+  LEGAL_PAGES,
+  LegalDocumentPage,
+  NotFoundPage,
+  SecurityPage,
+  useSiteInfo,
+  type LegalPath,
+} from "./site/legal";
+
+// Pages outside the main navigation: legal documents, security and contact. Anything else is "not found".
+const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/contact"] as const;
+type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
 // The website was consolidated from ~65 URLs into 8 pages. Every old URL lands on the section that now holds its
 // content, so existing links and bookmarks keep working.
 const LEGACY_PAGES: Record<string, string> = {
   "/why-mdarix": "/trust#principles",
   "/ai-trust": "/trust#ai",
-  "/security": "/trust#security",
   "/integrations": "/trust#integrations",
-  // Pricing was removed until plans and billing are offered; its links go to Get started.
-  "/pricing": "/company#contact",
-  "/plans": "/company#contact",
+  // Pricing was removed until plans and billing are offered; its links go to the contact page.
+  "/pricing": "/contact",
+  "/plans": "/contact",
   "/capabilities": "/platform",
   "/roadmap": "/product-lifecycle#roadmap",
 };
@@ -32,9 +44,10 @@ const PLATFORM_SLUGS = new Set(
   platformGroups.flatMap((group) => group.capabilities.map((capability) => capability.slug)),
 );
 
-export function resolveSitePath(path: string, hash: string): { page: SitePage; hash: string } {
+export function resolveSitePath(path: string, hash: string): { page: Page; hash: string } {
   const clean = path.replace(/\/+$/, "") || "/";
   if ((SITE_PAGES as readonly string[]).includes(clean)) return { page: clean as SitePage, hash };
+  if ((INFO_PAGES as readonly string[]).includes(clean)) return { page: clean as Page, hash };
   if (clean.startsWith("/platform/")) {
     const slug = clean.slice("/platform/".length);
     if (PLATFORM_SLUGS.has(slug)) return { page: "/platform", hash: slug };
@@ -45,9 +58,9 @@ export function resolveSitePath(path: string, hash: string): { page: SitePage; h
   if (legacy) {
     const [page, anchor] = legacy.split("#");
     // A legacy page's own anchor (e.g. /why-mdarix#not-qms or /roadmap#capa) wins over the default section.
-    return { page: page as SitePage, hash: hash || anchor || "" };
+    return { page: page as Page, hash: hash || anchor || "" };
   }
-  return { page: "/", hash: "" };
+  return { page: "not-found", hash: "" };
 }
 
 type NavMenu = {
@@ -151,6 +164,16 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
       ["Request a demo", "/request-demo"],
+      ["Contact", "/contact"],
+    ],
+  },
+  {
+    title: "Legal",
+    links: [
+      ["Privacy policy", "/privacy"],
+      ["Terms of service", "/terms"],
+      ["Free trial agreement", "/trial-agreement"],
+      ["Security", "/security"],
     ],
   },
 ];
@@ -159,11 +182,14 @@ export function PublicMegaSite({ path }: { path: string }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [{ page, hash }, setLocation] = useState(() => resolveSitePath(path, window.location.hash.slice(1)));
+  const siteInfo = useSiteInfo();
 
-  // Normalize legacy URLs in the address bar, then bring the requested section into view.
+  // Normalize legacy URLs in the address bar (a "not found" address is left as typed), then bring the requested
+  // section into view.
   useEffect(() => {
     const target = `${page}${hash ? `#${hash}` : ""}`;
-    if (`${window.location.pathname}${window.location.hash}` !== target) window.history.replaceState(null, "", target);
+    if (page !== "not-found" && `${window.location.pathname}${window.location.hash}` !== target)
+      window.history.replaceState(null, "", target);
     document.title = page === "/" ? "MDARIX · Product investigation intelligence" : `MDARIX · ${pageTitle(page)}`;
     if (hash) window.setTimeout(() => document.getElementById(hash)?.scrollIntoView({ block: "start" }), 60);
     else window.scrollTo({ top: 0 });
@@ -273,6 +299,10 @@ export function PublicMegaSite({ path }: { path: string }) {
         {page === "/trust" && <TrustPage />}
         {page === "/resources" && <ResourcesPage />}
         {page === "/company" && <CompanyPage />}
+        {page in LEGAL_PAGES && <LegalDocumentPage path={page as LegalPath} />}
+        {page === "/security" && <SecurityPage />}
+        {page === "/contact" && <ContactPage />}
+        {page === "not-found" && <NotFoundPage />}
       </main>
 
       <footer className="ms-footer">
@@ -306,7 +336,16 @@ export function PublicMegaSite({ path }: { path: string }) {
           ))}
         </div>
         <div className="ms-footer-bottom">
-          <span>MDARIX — System of Intelligence, not System of Record.</span>
+          <span>
+            © {new Date().getFullYear()} {siteInfo?.company_name ?? "MDARIX"}
+            {siteInfo?.company_address ? ` · ${siteInfo.company_address}` : ""}
+            {siteInfo?.support_email && (
+              <>
+                {" · "}
+                <a href={`mailto:${siteInfo.support_email}`}>{siteInfo.support_email}</a>
+              </>
+            )}
+          </span>
           <span>Evidence before inference · Humans decide</span>
         </div>
       </footer>
@@ -314,7 +353,7 @@ export function PublicMegaSite({ path }: { path: string }) {
   );
 }
 
-function pageTitle(page: SitePage) {
+function pageTitle(page: Page) {
   return {
     "/": "Home",
     "/platform": "Platform",
@@ -323,5 +362,11 @@ function pageTitle(page: SitePage) {
     "/trust": "Trust",
     "/resources": "Resources",
     "/company": "Company",
+    "/privacy": LEGAL_PAGES["/privacy"].title,
+    "/terms": LEGAL_PAGES["/terms"].title,
+    "/trial-agreement": LEGAL_PAGES["/trial-agreement"].title,
+    "/security": "Security",
+    "/contact": "Contact",
+    "not-found": "Page not found",
   }[page];
 }

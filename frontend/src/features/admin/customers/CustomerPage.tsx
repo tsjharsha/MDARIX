@@ -254,7 +254,7 @@ function Subscription({
   const [changing, setChanging] = useState(false);
   return (
     <Panel
-      eyebrow="Plan and licence"
+      eyebrow="Plan and license"
       title="Subscription"
       state={subscription.state}
       error={subscription.error}
@@ -324,7 +324,7 @@ export function ChangeSubscription({
   const planId = form.plan_id || current?.id || active[0]?.id || "";
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (form.expires <= form.starts) return setError("The licence must end after it starts.");
+    if (form.expires <= form.starts) return setError("The license must end after it starts.");
     setBusy(true);
     setError("");
     try {
@@ -372,7 +372,7 @@ export function ChangeSubscription({
         </label>
         <div className="cc-two-fields">
           <label className="ca-field">
-            Licence starts
+            License starts
             <input
               type="date"
               required
@@ -381,7 +381,7 @@ export function ChangeSubscription({
             />
           </label>
           <label className="ca-field">
-            Licence ends
+            License ends
             <input
               type="date"
               required

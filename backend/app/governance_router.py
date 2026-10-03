@@ -398,15 +398,9 @@ def sign(
             .filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id)
             .first()
         )
-        password_ok = user is not None and _verify(payload.password, user.password_hash)
+        password_ok = user is not None and bool(user.password_hash) and _verify(payload.password, user.password_hash)
     except (ValueError, TypeError):
-        from auth.service import auth_service
-
-        try:
-            auth_service.verify_current_password(ctx.session_id, payload.password)
-            password_ok = True
-        except ValueError:
-            password_ok = False
+        password_ok = False
     if not password_ok:
         audit(db, t, actor["user_id"], "SIGNATURE_REAUTHENTICATION_FAILED", decision_id)
         if signer is not None:

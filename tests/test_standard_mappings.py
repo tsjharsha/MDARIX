@@ -14,7 +14,7 @@ from sqlalchemy import text
 
 from backend.app.access.connector_mapping import check_mapping, import_connector_records
 from backend.app.db.session import SessionLocal, engine
-from backend.app.db.tenant_scope import bind_tenant
+from backend.app.db.tenant_scope import bind_tenant, system_token
 from backend.app.trial.retention import TRIAL_DATA_TABLES
 from tests.test_customer_admin_account_security import _tenant
 
@@ -35,7 +35,7 @@ def tenant_id():
         identifier = tenant.id
     yield identifier
     with engine.begin() as connection:
-        connection.execute(text("SET LOCAL app.rls_bypass = 'on'"))
+        connection.execute(text("SELECT set_config('app.rls_bypass', :token, true)"), {"token": system_token()})
         for table in (*TRIAL_DATA_TABLES, "evidence_entity_links"):
             connection.execute(text(f"DELETE FROM {table} WHERE tenant_id = :tenant"), {"tenant": identifier})
 
@@ -63,7 +63,7 @@ def test_loading_every_template_in_order_imports_the_whole_story(tenant_id):
 
     def count(table: str, where: str = "") -> int:
         with engine.connect() as connection:
-            connection.execute(text("SET app.rls_bypass = 'on'"))
+            connection.execute(text("SELECT set_config('app.rls_bypass', :token, false)"), {"token": system_token()})
             return connection.execute(
                 text(f"SELECT count(*) FROM {table} WHERE tenant_id = :tenant {where}"), {"tenant": tenant_id}
             ).scalar()

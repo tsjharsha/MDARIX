@@ -6,8 +6,17 @@ from datetime import datetime, timedelta, timezone
 
 from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 logger = logging.getLogger(__name__)
+
+
+def describe_failure(exc: Exception) -> str:
+    """What went wrong, for the operator: the error type and its message with anything secret-like removed."""
+    from genai.provider import SENSITIVE
+
+    message = SENSITIVE.sub(lambda match: match.group(1) + ": [REDACTED]", str(exc)).strip()
+    return f"{type(exc).__name__}: {message[:300]}" if message else type(exc).__name__
 
 
 @dataclass
@@ -37,6 +46,7 @@ class OutboxWorker:
 
     def process_once(self, limit=50):
         db = SessionLocal()
+        bind_system(db, "outbox worker: claim and deliver due events of every tenant")
         now = datetime.now(timezone.utc)
         stats = {"published": 0, "failed": 0, "dead_lettered": 0, "stale_recovered": 0}
         worker_id = getattr(self, "worker_id", None) or str(uuid.uuid4())
@@ -67,7 +77,7 @@ class OutboxWorker:
                     stats["published"] += 1
                 except Exception as exc:
                     row.attempts += 1
-                    row.last_error = f"{type(exc).__name__}: delivery failed"
+                    row.last_error = describe_failure(exc)
                     stats["failed"] += 1
                     self.metrics.last_error = row.last_error
                     logger.warning("outbox delivery failed event=%s attempt=%s", row.id, row.attempts)
@@ -110,6 +120,7 @@ class OutboxWorker:
         if timeout_seconds < 1:
             raise ValueError("timeout_seconds must be positive")
         db = SessionLocal()
+        bind_system(db, "outbox worker: return abandoned claims to the queue")
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(seconds=timeout_seconds)
         try:
@@ -142,6 +153,7 @@ class OutboxWorker:
         logger.info("outbox worker started batch_size=%s interval_seconds=%s", limit, interval_seconds)
         while not stopped():
             started = time.monotonic()
+            self.recover_stale_claims()
             stats = self.process_once(limit=limit)
             logger.info(
                 "outbox metrics=%s cycle_published=%s cycle_failed=%s cycle_dead_lettered=%s duration_ms=%s",

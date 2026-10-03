@@ -6,17 +6,18 @@ import { Reveal } from "./motion";
 
 /* ------------------------------------------------------------------------- An investigation in numbers */
 
-// Weekly complaints for one product: Rev D (change ECN-4471) is released in week 13.
+// The free trial's sample story (backend/app/trial/sample_data.py): OrbitCare 300 Rev B moved its pressure sensor to a
+// new supplier (change CHG-014), released in week 13; pressure-alarm complaints rise afterwards.
 const WEEKLY = [3, 2, 4, 3, 2, 3, 4, 2, 3, 3, 2, 3, 4, 6, 7, 6, 9, 8, 11, 10, 9, 12, 10, 11, 9, 10];
 const RELEASE_WEEK = 13;
-// Complaints per lot; lots built with sensor lot KS-5521 are marked.
+// Complaints per lot; lots built with the new supplier's first sensors are marked.
 const LOTS = [
-  { lot: "L24-0518", count: 2, sensor: false, rev: "Rev C" },
-  { lot: "L24-0611", count: 3, sensor: false, rev: "Rev C" },
-  { lot: "L24-0702", count: 4, sensor: false, rev: "Rev D" },
-  { lot: "L24-0815", count: 17, sensor: true, rev: "Rev D" },
-  { lot: "L24-0902", count: 13, sensor: true, rev: "Rev D" },
-  { lot: "L24-0927", count: 3, sensor: false, rev: "Rev D" },
+  { lot: "Lot 001", count: 2, sensor: false, rev: "Rev A" },
+  { lot: "Lot 002", count: 3, sensor: false, rev: "Rev A" },
+  { lot: "Lot 003", count: 17, sensor: true, rev: "Rev B" },
+  { lot: "Lot 004", count: 13, sensor: true, rev: "Rev B" },
+  { lot: "Lot 005", count: 4, sensor: false, rev: "Rev B" },
+  { lot: "Lot 006", count: 3, sensor: false, rev: "Rev B" },
 ];
 const LINKS = [
   { label: "Linked to a lot", value: 94 },
@@ -39,7 +40,7 @@ function WeeklyChart() {
   return (
     <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-weekly-title">
       <title id="viz-weekly-title">
-        Weekly complaints rise from about 3 a week to about 10 a week after Rev D is released in week 13
+        Weekly complaints rise from about 3 a week to about 10 a week after Rev B is released in week 13
       </title>
       {[0, 4, 8, 12].map((tick) => (
         <g key={tick}>
@@ -53,7 +54,7 @@ function WeeklyChart() {
       <path className="ms-viz-line" d={line} pathLength={1} />
       <line className="ms-viz-marker" x1={releaseX} x2={releaseX} y1={pad.top - 8} y2={y(0)} />
       <text className="ms-viz-note" x={releaseX + 6} y={pad.top - 10}>
-        Rev D released · ECN-4471
+        Rev B released · CHG-014
       </text>
       {WEEKLY.map((value, index) => (
         <circle key={index} className="ms-viz-point" cx={x(index)} cy={y(value)} r={7}>
@@ -80,7 +81,7 @@ function LotChart() {
   return (
     <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-lots-title">
       <title id="viz-lots-title">
-        Complaints per lot: the two lots built with sensor lot KS-5521 hold 30 of 42 complaints
+        Complaints per lot: the two lots built with the new supplier's sensors hold 30 of 42 complaints
       </title>
       {LOTS.map((item, index) => {
         const top = pad.top + index * rowHeight;
@@ -98,7 +99,7 @@ function LotChart() {
               height={16}
               rx={4}
             >
-              <title>{`${item.lot} (${item.rev}): ${item.count} complaints${item.sensor ? ", sensor lot KS-5521" : ""}`}</title>
+              <title>{`${item.lot} (${item.rev}): ${item.count} complaints${item.sensor ? ", new supplier's sensors" : ""}`}</title>
             </rect>
             <text className="ms-viz-value" x={pad.left + scale(item.count) + 8} y={top + 18}>
               {item.count}
@@ -153,17 +154,17 @@ export function SignalStory() {
       <div className="ms-viz-grid-2">
         <Reveal className="ms-card ms-viz-card">
           <span className="ms-eyebrow">Signal</span>
-          <h3>Complaints per week, AquaFlow 200</h3>
+          <h3>Pressure-alarm complaints per week, OrbitCare 300</h3>
           <WeeklyChart />
-          <p className="ms-viz-read">Complaints roughly triple after Rev D. A change is a lead, not a cause.</p>
+          <p className="ms-viz-read">Complaints roughly triple after Rev B. A change is a lead, not a cause.</p>
         </Reveal>
         <Reveal className="ms-card ms-viz-card" delay={120}>
           <span className="ms-eyebrow">Where it concentrates</span>
           <h3>Complaints per lot</h3>
           <LotChart />
           <p className="ms-viz-read">
-            <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with sensor lot KS-5521: 30 of 42
-            complaints.
+            <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with the new supplier's sensors: 30
+            of 42 complaints.
           </p>
         </Reveal>
       </div>
@@ -184,20 +185,21 @@ export function SignalStory() {
 
 /* ------------------------------------------------------------------------------ Customer systems */
 
+// Typical source systems, by kind: named vendor connectors are not offered yet (they are built with design partners).
 const SOURCES = [
-  ["TrackWise Digital", "Complaints · CAPAs"],
-  ["Veeva Vault QMS", "Quality events · documents"],
-  ["Teamcenter / Windchill", "Items · BOM · changes"],
-  ["SAP S/4HANA / Oracle", "Batches · plants · vendors"],
+  ["QMS", "Complaints · CAPAs"],
+  ["Document control", "Quality events · documents"],
+  ["PLM", "Items · BOM · changes"],
+  ["ERP", "Batches · plants · vendors"],
   ["MES", "Production · genealogy"],
   ["LIMS", "Test results"],
   ["Risk file", "Risks · FMEA · controls"],
-  ["Coupa", "Suppliers · certificates"],
+  ["Supplier portal", "Suppliers · certificates"],
 ] as const;
 const OUTCOMES = [
   ["Product 360", "Versions, lots, components, suppliers"],
   ["Investigations", "Question, evidence, hypotheses"],
-  ["Ask MDARIX", "Answers cited to records"],
+  ["Ask MDARIX", "Answers with their evidence"],
   ["Decisions", "Signed, traceable, audited"],
 ] as const;
 
@@ -212,11 +214,11 @@ export function SourceFlow() {
   return (
     <section className="ms-section" aria-labelledby="source-flow-title">
       <Reveal className="ms-section-head">
-        <span className="ms-eyebrow">Connected systems</span>
+        <span className="ms-eyebrow">Typical source systems</span>
         <h2 id="source-flow-title">Your systems stay the record. MDARIX connects the story.</h2>
         <p>
-          Each system keeps its data. MDARIX reads it with the customer's own API key and a standard mapping, checks
-          every record, and links complaints to versions, lots, components, suppliers, risks and evidence.
+          Each system keeps its data. Today MDARIX imports CSV exports from them; live connections are built with design
+          partners. Every record is checked and linked to versions, lots, components, suppliers, risks and evidence.
         </p>
       </Reveal>
       <Reveal className="ms-sysflow">
@@ -279,7 +281,7 @@ export function SourceFlow() {
             checked import
           </text>
           <text className="ms-flow-core-detail" x="500" y={center.y + 28} textAnchor="middle">
-            tenant-isolated
+            your data only
           </text>
         </svg>
         <ul className="ms-flow-list">

@@ -20,7 +20,7 @@ type TrialRequest = {
   owner_status: string | null;
 };
 type DueTrial = { tenant_id: string; tenant_key: string; name: string; trial_ended_at: string; delete_after: string };
-type ReviewResult = TrialRequest & { email_delivery?: string; activation_path?: string };
+type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
 
 const FILTERS: [string, string][] = [
   ["PENDING_REVIEW", "Pending"],
@@ -66,18 +66,25 @@ export function TrialRequestsWorkspace() {
       });
       const link = data.activation_path ? `${window.location.origin}${data.activation_path}` : undefined;
       const sent = data.email_delivery === "SENT";
-      setResult({
-        tone: "good",
-        text:
-          path === "decline"
-            ? `Declined ${row.organization}.`
-            : `${path === "approve" ? `Trial workspace ${data.tenant_key} created for ${row.organization}. ` : ""}${
-                sent
-                  ? `Invitation emailed to ${row.email}.`
-                  : `Email is not configured on this server. Send ${row.email} this one-time activation link (valid 72 hours):`
-              }`,
-        link: sent ? undefined : link,
-      });
+      const created = path === "approve" ? `Trial workspace ${data.tenant_key} created for ${row.organization}. ` : "";
+      setResult(
+        path === "decline"
+          ? { tone: "good", text: `Declined ${row.organization}.` }
+          : sent
+            ? { tone: "good", text: `${created}Invitation emailed to ${row.email}.` }
+            : link
+              ? {
+                  tone: "good",
+                  text: `${created}Email is not configured on this development server. Send ${row.email} this one-time activation link (valid 72 hours):`,
+                  link,
+                }
+              : {
+                  tone: "bad",
+                  text: `${created}The invitation email to ${row.email} could not be sent${
+                    data.email_error ? `: ${data.email_error}` : "."
+                  } Fix the email settings, then use Resend invitation.`,
+                },
+      );
       load();
     } catch (error) {
       setResult({ tone: "bad", text: error instanceof Error ? error.message : "The request could not be completed." });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyRound, MailPlus, PauseCircle, PlayCircle, UserPlus } from "lucide-react";
+import { KeyRound, MailPlus, PauseCircle, PlayCircle, ShieldOff, UserPlus } from "lucide-react";
 import { Panel } from "../console/charts";
 import {
   ConfirmDialog,
@@ -85,6 +85,24 @@ export function CustomerAdmins({
           }
         >
           <KeyRound size={14} aria-hidden="true" /> Reset password
+        </button>
+      )}
+      {row.status === "ACTIVE" && (
+        <button
+          type="button"
+          className="ac-link"
+          onClick={() =>
+            setConfirm({
+              title: `Reset multi-factor authentication for ${name(row)}?`,
+              body: `Use this when they lost their authenticator app and recovery codes. Their authenticator is removed, they are signed out, and they set up a new one at their next sign-in.`,
+              confirmLabel: "Reset MFA",
+              reason: REASON,
+              run: (reason) => send(`/api/v1/platform-admin/users/${row.id}/mfa-reset`, "POST", { reason }),
+              done: `${name(row)} sets up a new authenticator at their next sign-in.`,
+            })
+          }
+        >
+          <ShieldOff size={14} aria-hidden="true" /> Reset MFA
         </button>
       )}
       {row.can_suspend && (

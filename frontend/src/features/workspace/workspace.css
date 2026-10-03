@@ -823,3 +823,34 @@
   color: var(--ac-ink);
   font-style: italic;
 }
+
+/* My Account: change password */
+.uw-password-form {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
+}
+.uw-password-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--ac-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.uw-password-form input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  font: inherit;
+  font-weight: 400;
+}
+.uw-password-form input:focus {
+  outline: 3px solid #087b7833;
+  border-color: var(--ac-teal);
+}
+.uw-password-form small {
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 400;
+}

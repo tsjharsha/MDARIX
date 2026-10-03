@@ -2,12 +2,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from fastapi import Response
 
 from backend.app.main import app, ask_router
 from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
-from backend.app.auth_router import signin as signin_route
 
 
 def test_anonymous_ask_is_denied():
@@ -20,7 +18,7 @@ def test_ask_uses_server_context_and_ignores_client_authority(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
+        lambda request, db: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     tenant = SimpleNamespace(id=tenant_id, status="active")
 
@@ -77,7 +75,7 @@ def test_missing_server_entitlement_is_denied(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
+        lambda request, db: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     tenant = SimpleNamespace(id=tenant_id, status="active")
 
@@ -119,7 +117,7 @@ def test_unexpected_ask_dependency_error_is_customer_safe(monkeypatch):
     tenant_id = uuid4()
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
+        lambda request, db: {"user_id": "u1", "tenant_id": str(tenant_id), "active_role": "Investigator"},
     )
     monkeypatch.setattr(
         "backend.app.ask_router._has_ask_entitlement",
@@ -154,60 +152,39 @@ def test_unexpected_ask_dependency_error_is_customer_safe(monkeypatch):
     assert body["detail"] == {
         "code": "INTERNAL_ERROR",
         "message": "The request could not be completed.",
+        "request_id": "corr-error",
         "correlation_id": "corr-error",
     }
+    assert response.headers["X-Request-ID"] == "corr-error"
     assert "Traceback" not in serialized
     assert "TEST_DB_PASSWORD_DAY26" not in serialized
 
 
-def test_signin_uses_persisted_auth_user_after_service_restart(monkeypatch):
-    from backend.app.auth_router import auth_service as route_auth_service
+def test_signin_session_is_durable_and_survives_a_restart():
+    """Sessions live in Postgres: a new client (another API process, or one after a restart) accepts the cookie."""
+    from tests.conftest import authenticated_client
 
-    row = SimpleNamespace(
-        id=uuid4(),
-        tenant_id=uuid4(),
-        username="persisted@example.com",
-        display_name="Persisted",
-        password_hash="invalid",
-        role="Viewer",
-        status="ACTIVE",
-        email_verified=True,
+    authenticated_client()  # makes sure the shared test account exists
+    first = TestClient(app)
+    signed_in = first.post(
+        "/api/v1/auth/signin",
+        json={"email": "legacy-test-auth@synthetic.invalid", "password": "LegacyTestPassword123!"},
     )
-    seeded = route_auth_service.signup("persisted@example.com", "Strong password 123", "Persisted", "Org")
-    row.password_hash = route_auth_service.accounts["persisted@example.com"].password_hash
-    route_auth_service.verify_email(seeded["development_token"])
-    monkeypatch.setattr("backend.app.auth_router.auth_service", type(route_auth_service)())
-
-    class Query:
-        def filter(self, *args):
-            return self
-
-        def order_by(self, *args):
-            return self
-
-        def first(self):
-            return row
-
-        def all(self):
-            return [row]
-
-    class DB:
-        def query(self, model):
-            return Query()
-
-    response = Response()
-    result = signin_route(
-        type("SigninData", (), {"email": "persisted@example.com", "password": "Strong password 123"})(), response, DB()
-    )
-    assert result["tenant_id"] == str(row.tenant_id)
-    assert response.headers.get("set-cookie", "").startswith("mdarix_session=")
+    assert signed_in.status_code == 200, signed_in.text
+    token = first.cookies.get("mdarix_session")
+    assert token
+    other_process = TestClient(app)
+    other_process.cookies.set("mdarix_session", token)
+    session = other_process.get("/api/v1/auth/session")
+    assert session.status_code == 200
+    assert session.json()["tenant_id"] == signed_in.json()["tenant_id"]
 
 
 def test_a_viewer_may_not_run_ask(monkeypatch):
     """Ask sends tenant records to the AI provider, so read-only Viewers are refused."""
     monkeypatch.setattr(
         "backend.app.ask_router._authenticated_context",
-        lambda request: {"user_id": "u1", "tenant_id": str(uuid4()), "active_role": "Viewer"},
+        lambda request, db: {"user_id": "u1", "tenant_id": str(uuid4()), "active_role": "Viewer"},
     )
     app.dependency_overrides[get_db] = lambda: SimpleNamespace()
     app.dependency_overrides[get_data_plane_db] = lambda: SimpleNamespace()

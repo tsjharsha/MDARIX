@@ -16,6 +16,7 @@ from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from backend.app.db.session import get_db
+from backend.app.db.tls import connect_args
 from backend.app.request_context import get_request_context
 from backend.app.runtime_env import is_local
 
@@ -108,6 +109,7 @@ def session_factory(database_ref: str, secret_ref: str) -> sessionmaker[Session]
         pool_pre_ping=True,
         pool_size=int(os.getenv("MDARIX_DATA_PLANE_POOL_SIZE", "3")),
         max_overflow=int(os.getenv("MDARIX_DATA_PLANE_MAX_OVERFLOW", "5")),
+        connect_args=connect_args(),
     )
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 

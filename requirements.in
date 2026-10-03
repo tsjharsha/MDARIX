@@ -1,0 +1,19 @@
+# Direct runtime dependencies of the API, the worker and the scheduler. requirements.txt is the full lock compiled
+# from this file (every transitive package pinned, with hashes):
+#   python -m uv pip compile requirements.in --universal --python-version 3.13 --generate-hashes -o requirements.txt
+# Development and test tools are in requirements-dev.txt.
+alembic==1.20.0
+boto3==1.43.108
+cryptography==50.0.2
+# Local embedding model (ONNX on CPU): evidence text is never sent out to be indexed.
+fastembed==0.8.1
+fastapi==0.141.1
+httpx==0.28.1
+pg8000==1.31.5
+pydantic==2.13.5
+python-multipart==0.0.31
+python-dotenv==1.2.3
+# Error reporting; active only when MDARIX_SENTRY_DSN is set (backend/app/logging_setup.py).
+sentry-sdk==2.71.0
+SQLAlchemy==2.0.54
+uvicorn==0.53.0

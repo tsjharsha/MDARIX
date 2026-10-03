@@ -7,7 +7,7 @@ const FOCUSABLE =
   'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
 
 /**
- * Keyboard behaviour for a modal dialog, placed as the first child of its backdrop: focus moves into the dialog when
+ * Keyboard behavior for a modal dialog, placed as the first child of its backdrop: focus moves into the dialog when
  * it opens, Escape closes it from anywhere on the page, and focus returns to what opened it when it closes.
  */
 export function DialogBehaviour({ onClose }: { onClose: () => void }) {

@@ -17,7 +17,6 @@ from ask_mdarix.lifecycle_retrieval import (
     LifecycleRetrievalService,
 )
 from ask_mdarix.retrieval import build_retrieval_plan
-from auth.service import auth_service
 from backend.app.db.models.ask import InvestigationSessionRecord
 from backend.app.db.models.foundation import (
     Evidence,
@@ -33,7 +32,6 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
-from backend.app.runtime_env import is_production_like
 from backend.app.access.permissions import AI_RUN, effective_role, permissions_for_role
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
@@ -59,21 +57,15 @@ class AskRequest(BaseModel):
     investigation_id: str | None = None
 
 
-def _authenticated_context(request: Request, db: Session | None = None) -> dict:
-    if db is not None and is_production_like():
-        ctx = get_request_context(request, db)
-        return {
-            "user_id": ctx.user_id,
-            "tenant_id": ctx.tenant_id,
-            "active_role": ctx.active_role_id or "Viewer",
-            "correlation_id": ctx.correlation_id,
-        }
-    try:
-        return auth_service.context(request.cookies.get("mdarix_session", ""))
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}
-        ) from exc
+def _authenticated_context(request: Request, db: Session) -> dict:
+    """The caller's durable session: user, tenant and the role the server trusts (never one the client names)."""
+    ctx = get_request_context(request, db)
+    return {
+        "user_id": ctx.user_id,
+        "tenant_id": ctx.tenant_id,
+        "active_role": effective_role(db, ctx),
+        "correlation_id": ctx.correlation_id,
+    }
 
 
 def _has_ask_entitlement(db: Session, tenant_id: str) -> bool:
@@ -203,9 +195,9 @@ def ask(
     db: Session = Depends(get_db),
     data_db: Session = Depends(get_data_plane_db),
 ) -> dict:
-    context = _authenticated_context(request, db) if is_production_like() else _authenticated_context(request)
+    context = _authenticated_context(request, db)
     # Ask resolves its own session, so its AI permission is checked here with the server-trusted role.
-    role = effective_role(db, get_request_context(request, db)) if is_production_like() else context.get("active_role")
+    role = context["active_role"]
     if AI_RUN not in permissions_for_role(role):
         raise HTTPException(
             403,

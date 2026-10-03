@@ -27,6 +27,8 @@ from backend.app.trial.service import TRIAL_FILE_LIMIT_BYTES, TRIAL_ROW_LIMIT
 UPLOAD_SOURCE = "TRIAL_UPLOAD"
 WORKSPACE_UPLOAD_SOURCE = "CSV_IMPORT"
 MAX_ISSUES = 50
+# Rows one file (or one connector sync) may bring in at once; larger loads are split, so a request stays short.
+MAX_ROWS_PER_FILE = 50_000
 
 
 @dataclass(frozen=True)
@@ -419,7 +421,14 @@ def check_records(db: Session, tenant_id, entity: str, records: list[dict], poli
 
 def _check_rows(db: Session, tenant_id, entity: str, rows, report: _Report, policy: ImportPolicy) -> dict:
     new_rows = 0
-    if rows:
+    oversized = len(rows) > MAX_ROWS_PER_FILE
+    if oversized:
+        report.add(
+            None,
+            None,
+            f"This file has {len(rows):,} rows; one file can have up to {MAX_ROWS_PER_FILE:,}. Split it into smaller files.",
+        )
+    if rows and not oversized:
         _check_values(entity, rows, report)
         if not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report)

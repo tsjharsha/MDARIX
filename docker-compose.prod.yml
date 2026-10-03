@@ -1,0 +1,156 @@
+# MDARIX production stack for one Linux VM (docs/runbooks/DEPLOYMENT.md).
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Postgres is a managed service with point-in-time recovery (not in this file). Only Caddy is reachable from the
+# internet (80/443); the API, worker, scheduler and virus scanner talk on a private network. No simulators, no mail
+# catcher, no published database ports, and no default passwords: every secret must be in .env.production.
+
+name: mdarix
+
+x-app: &app
+  image: mdarix-app:${MDARIX_RELEASE:-latest}
+  build:
+    context: .
+    dockerfile: Dockerfile.api
+  env_file: .env.production
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  networks: [internal]
+  logging:
+    driver: json-file
+    options: {max-size: "20m", max-file: "10"}
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    image: mdarix-web:${MDARIX_RELEASE:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      MDARIX_DOMAIN: ${MDARIX_DOMAIN:?set MDARIX_DOMAIN in .env.production}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.production}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: {condition: service_healthy}
+    networks: [internal]
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "10"}
+
+  # One-shot: schema migrations, the least-privilege runtime role, and the system-scope token. Runs before every
+  # start of the API; uses the database owner's credentials, which no long-running service holds.
+  migrate:
+    <<: *app
+    restart: "no"
+    command: >-
+      sh -c "alembic upgrade head
+      && python scripts/configure_runtime_role.py
+      && python scripts/grant_runtime_privileges.py
+      && python scripts/set_rls_system_token.py"
+    environment:
+      POSTGRES_USER: ${MDARIX_DB_OWNER_USER:?set MDARIX_DB_OWNER_USER in .env.production}
+      POSTGRES_PASSWORD: ${MDARIX_DB_OWNER_PASSWORD:?set MDARIX_DB_OWNER_PASSWORD in .env.production}
+      MDARIX_DB_HARDENING_APPLY: "1"
+
+  api:
+    <<: *app
+    volumes:
+      - objects:/var/lib/mdarix/objects
+      - reports:/var/lib/mdarix/reports
+      # The lawyer-approved privacy policy, terms and trial agreement (legal/README.md).
+      - ./legal:/var/lib/mdarix/legal:ro
+    environment:
+      MDARIX_LEGAL_DIR: /var/lib/mdarix/legal
+      MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
+      MDARIX_REPORT_TEMP_ROOT: /var/lib/mdarix/reports
+      MDARIX_TRUSTED_PROXY_HOPS: "1"
+      MDARIX_CLAMD_HOST: clamav
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      clamav: {condition: service_healthy}
+
+  worker:
+    <<: *app
+    command: ["python", "scripts/run_outbox_worker.py"]
+    volumes:
+      - objects:/var/lib/mdarix/objects
+      - reports:/var/lib/mdarix/reports
+    environment:
+      MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
+      MDARIX_REPORT_TEMP_ROOT: /var/lib/mdarix/reports
+      MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,time,datetime; d=json.load(open('/tmp/mdarix-outbox-heartbeat.json')); assert time.time()-datetime.datetime.fromisoformat(d['updated_at']).timestamp() < 60"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  scheduler:
+    <<: *app
+    command: ["python", "scripts/run_scheduler.py"]
+    volumes:
+      - objects:/var/lib/mdarix/objects
+    environment:
+      MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
+    healthcheck:
+      disable: true
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  # Virus scanning for every uploaded file (object_storage/service.py, clamd INSTREAM). Signatures refresh daily.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    networks: [internal]
+    volumes:
+      - clamav_db:/var/lib/clamav
+    healthcheck:
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 60s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  # Encrypted backups on demand (host cron, see docs/runbooks/BACKUP_AND_RESTORE.md):
+  #   docker compose -f docker-compose.prod.yml --profile backup run --rm backup
+  backup:
+    profiles: ["backup"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/backup/Dockerfile
+    image: mdarix-backup:${MDARIX_RELEASE:-latest}
+    env_file: .env.production
+    restart: "no"
+    networks: [internal]
+    volumes:
+      - ${MDARIX_BACKUP_DIR:-/var/backups/mdarix}:/backups
+      - objects:/objects:ro
+
+networks:
+  internal: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}
+  objects: {}
+  reports: {}
+  clamav_db: {}

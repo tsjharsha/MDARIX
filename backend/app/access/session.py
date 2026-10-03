@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from access_control.personas import get_persona
 from access_control.policy import PermissionSet, Role, User, effective_permissions
-from auth.service import auth_service
 from backend.app.db.models.foundation import (
     FeatureEntitlement,
     PermissionSetDefinition,
@@ -22,7 +21,7 @@ from backend.app.db.models.foundation import (
     TenantPlanAssignment,
 )
 from backend.app.db.session import get_db
-from backend.app.access.schemas import RoleSwitch, TenantSwitchRequest
+from backend.app.access.schemas import RoleSwitch
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
 from backend.app.access.permissions import permissions_for_role, role_of_user
 from backend.app.runtime_env import environment
@@ -249,31 +248,6 @@ def active_role(request: RoleSwitch, http_request: Request, db: Session = Depend
             detail={"code": "ROLE_NOT_ASSIGNED", "message": "Requested role is not assigned to the authenticated user"},
         )
     return context(http_request, db)
-
-
-@router.post("/me/tenant-context")
-def switch_tenant(payload: TenantSwitchRequest, request: Request, db: Session = Depends(get_db)):
-    user = _authenticated_user(request, db)
-    membership = (
-        db.query(TenantMembership)
-        .filter(
-            TenantMembership.user_id == user.id,
-            TenantMembership.tenant_id == payload.tenant_id,
-            TenantMembership.status == "ACTIVE",
-        )
-        .first()
-    )
-    if membership is None:
-        raise HTTPException(
-            403,
-            detail={"code": "TENANT_MEMBERSHIP_REQUIRED", "message": "Active membership is required for this tenant"},
-        )
-    token = request.cookies.get("mdarix_session", "")
-    try:
-        auth_service.switch_tenant(token, str(payload.tenant_id))
-    except ValueError as exc:
-        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}) from exc
-    return {"status": "SWITCHED", "tenant_id": str(payload.tenant_id)}
 
 
 @router.get("/me/entitlements/{feature_code}")

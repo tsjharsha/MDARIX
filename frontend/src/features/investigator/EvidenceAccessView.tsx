@@ -37,7 +37,8 @@ export function EvidenceAccessView({ productEvidenceCount }: { productEvidenceCo
           <h2>Tenant evidence records</h2>
           <p>
             Product 360 currently shows {productEvidenceCount} evidence record{productEvidenceCount === 1 ? "" : "s"}{" "}
-            linked to the selected product scope. This list is tenant-scoped and does not imply a product link.
+            linked to the selected product scope. This list covers your organization's evidence and does not imply a
+            product link.
           </p>
         </div>
         <div className="version-pill">
@@ -49,8 +50,8 @@ export function EvidenceAccessView({ productEvidenceCount }: { productEvidenceCo
         <section className="panel empty-state">
           <h2>No evidence records available</h2>
           <p>
-            No tenant-scoped evidence records were returned. This is an empty state, not a conclusion about the selected
-            product.
+            No evidence records were found for your organization. This is an empty state, not a conclusion about the
+            selected product.
           </p>
         </section>
       )}

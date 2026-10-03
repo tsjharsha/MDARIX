@@ -1,6 +1,7 @@
 import json
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_webhook
@@ -16,7 +17,7 @@ def provider_health(ctx: AuthenticatedRequestContext = Depends(get_request_conte
 
 @router.post("/resend/webhook")
 async def resend_webhook(request: Request, x_resend_signature: str | None = Header(default=None)):
-    body = await request.body()
+    body = await read_limited(request, WEBHOOK_LIMIT_BYTES, code="PAYLOAD_TOO_LARGE")
     if not verify_webhook(body, x_resend_signature):
         raise HTTPException(
             401, detail={"code": "INVALID_WEBHOOK_SIGNATURE", "message": "Webhook authentication failed"}

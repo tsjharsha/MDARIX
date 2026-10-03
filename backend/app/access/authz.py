@@ -10,7 +10,6 @@ from backend.app.db.models.foundation import (
     AuthUser,
 )
 from backend.app.request_context import get_request_context
-from backend.app.runtime_env import is_development
 from backend.app.db.tenant_scope import bind_system
 
 
@@ -133,12 +132,6 @@ def _authenticated_user(request: Request, db: Session) -> AuthUser:
         )
     except (ValueError, TypeError):
         user = None
-    if user is None and is_development():
-        user = (
-            db.query(AuthUser)
-            .filter(AuthUser.username == context.user_id.lower(), AuthUser.tenant_id == context.tenant_id)
-            .first()
-        )
     if user is None or user.status != "ACTIVE":
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     return user

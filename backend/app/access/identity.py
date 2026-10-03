@@ -31,6 +31,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import (
     MembershipRequest,
+    MfaResetRequest,
     PasswordActionRequest,
     PermissionSetRequest,
     PersonaRequest,
@@ -326,6 +327,34 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
     )
     db.commit()
     return {"user_id": str(user.id), "tenant_id": str(user.tenant_id), "status": user.status}
+
+
+@router.post("/admin/identity/users/{user_id}/mfa-reset")
+def reset_user_mfa(user_id: uuid.UUID, payload: MfaResetRequest, request: Request, db: Session = Depends(get_db)):
+    """Remove a user's authenticator after they lost it (and their recovery codes). They set up a new one at their
+    next sign-in. A customer administrator cannot reset their own MFA or a platform account's."""
+    from backend.app import mfa
+
+    admin = _admin_tenant(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    user = ensure_user_visible(admin, user)
+    _guard_user_administration(admin, target=user, changes_access=True)
+    now = datetime.now(timezone.utc)
+    revoked = mfa.reset(db, user, now)
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            actor_ref=str(admin.id),
+            action="USER_MFA_RESET",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={"reason": payload.reason.strip(), "sessions_revoked": revoked, "source": "ADMIN_CONTROL_PLANE"},
+            created_at=now,
+        )
+    )
+    db.commit()
+    return {"user_id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
 
 
 @router.post("/admin/identity/users/{user_id}/reactivate")

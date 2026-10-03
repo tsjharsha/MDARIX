@@ -11,7 +11,7 @@ export function SignatureVerificationWorkspace() {
       const result = await requestJson<any>("/api/v1/auth/mfa/challenge", { method: "POST" });
       setMessage(
         result.development_code
-          ? `Synthetic MVP challenge: ${result.development_code}`
+          ? `Development server code: ${result.development_code}`
           : "MFA challenge issued. Enter the code from your authenticator.",
       );
     } catch (error) {
@@ -95,10 +95,11 @@ export function SignatureVerificationWorkspace() {
         </section>
       )}
       <section className="panel advisory-box">
-        <strong>Certificate and IdP boundary</strong>
+        <strong>What a signature records</strong>
         <span>
-          The MVP records an immutable signature fingerprint and verification result. Certificate-backed signatures and
-          enterprise IdP ceremonies are adapter-dependent and must not be represented as active until configured.
+          Each signature records who signed, its meaning, the time and a fingerprint of the signed decision, so any
+          later change is detected. Certificate-based digital signatures and signing through your own identity provider
+          are not available yet.
         </span>
       </section>
     </div>

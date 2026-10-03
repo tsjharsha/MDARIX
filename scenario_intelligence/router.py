@@ -3,32 +3,36 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from auth.service import auth_service
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from .schemas import ScenarioRequest, ScenarioResponse
 from .service import ScenarioError, ScenarioService
 from backend.app.access.permissions import AI_RUN, require_permission
+from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Day 32 Scenario Intelligence"])
 service = ScenarioService()
 
 
-def _context(request: Request) -> dict:
-    try:
-        return auth_service.context(request.cookies.get("mdarix_session", ""))
-    except ValueError as exc:
-        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"}) from exc
+def _context(request: Request, control: Session) -> dict:
+    """The caller's durable session (the tenant always comes from it, never from the request)."""
+    ctx = get_request_context(request, control)
+    return {"user_id": ctx.user_id, "tenant_id": ctx.tenant_id}
 
 
 @router.post(
     "/{investigation_id}/scenarios", response_model=ScenarioResponse, dependencies=[Depends(require_permission(AI_RUN))]
 )
 def execute_scenario(
-    investigation_id: uuid.UUID, request: Request, data: ScenarioRequest, db: Session = Depends(get_data_plane_db)
+    investigation_id: uuid.UUID,
+    request: Request,
+    data: ScenarioRequest,
+    db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
 ):
-    context = _context(request)
+    context = _context(request, control)
     tenant_id = uuid.UUID(context["tenant_id"])
     correlation = request.headers.get("X-Correlation-ID") or str(uuid.uuid4())
     try:

@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from sqlalchemy import func, or_, text
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk, EvidenceEntityLink, EvidenceObservation
@@ -30,84 +30,108 @@ class TrustedRetrievalService:
     def __init__(self, embedding_provider: EmbeddingProvider | None = None):
         self.embedding_provider = embedding_provider or active_embedding_provider()
 
-    def index_evidence_chunks(self, db: Session, tenant_id: uuid.UUID, reprocess: bool = False) -> dict[str, Any]:
+    BATCH_SIZE = 64
+
+    def index_evidence_chunks(
+        self, db: Session, tenant_id: uuid.UUID, reprocess: bool = False, limit: int | None = None
+    ) -> dict[str, Any]:
+        """Embed the tenant's evidence chunks that have no current embedding (all of them with ``reprocess``).
+
+        One query finds the work (no per-chunk lookups); embeddings are computed in batches. ``limit`` caps how many
+        chunks one call embeds, so a scheduled run stays short; the rest are picked up by the next run.
+        """
         metadata = self.embedding_provider.model_metadata()
-        chunks = (
-            db.query(EvidenceChunk)
+        current = (
+            (EvidenceChunkEmbedding.tenant_id == EvidenceChunk.tenant_id)
+            & (EvidenceChunkEmbedding.chunk_id == EvidenceChunk.id)
+            & (EvidenceChunkEmbedding.chunk_checksum == func.coalesce(EvidenceChunk.checksum, ""))
+            & (EvidenceChunkEmbedding.embedding_model == metadata.model)
+            & (EvidenceChunkEmbedding.model_version == metadata.model_version)
+            & (EvidenceChunkEmbedding.pipeline_version == metadata.pipeline_version)
+        )
+        rows = (
+            db.query(EvidenceChunk, EvidenceChunkEmbedding)
             .join(Evidence, Evidence.id == EvidenceChunk.evidence_id)
+            .outerjoin(EvidenceChunkEmbedding, current)
             .filter(EvidenceChunk.tenant_id == tenant_id, Evidence.tenant_id == tenant_id)
             .filter(~func.lower(Evidence.evidence_identifier).like("%ground_truth%"))
-            .order_by(EvidenceChunk.evidence_id, EvidenceChunk.sequence_number)
+            .order_by(
+                EvidenceChunk.evidence_id,
+                EvidenceChunk.sequence_number,
+                EvidenceChunk.id,
+                # A chunk with several embedding rows: its INDEXED one is seen first.
+                case((EvidenceChunkEmbedding.indexing_status == "INDEXED", 0), else_=1),
+            )
             .all()
         )
-        indexed = 0
+        work: list[tuple[EvidenceChunk, EvidenceChunkEmbedding | None]] = []
         skipped = 0
-        failed = 0
-
-        for chunk in chunks:
-            existing = (
-                db.query(EvidenceChunkEmbedding)
-                .filter(
-                    EvidenceChunkEmbedding.tenant_id == tenant_id,
-                    EvidenceChunkEmbedding.chunk_id == chunk.id,
-                    EvidenceChunkEmbedding.chunk_checksum == chunk.checksum,
-                    EvidenceChunkEmbedding.embedding_model == metadata.model,
-                    EvidenceChunkEmbedding.model_version == metadata.model_version,
-                    EvidenceChunkEmbedding.pipeline_version == metadata.pipeline_version,
-                )
-                .first()
-            )
-            if existing and existing.indexing_status == "INDEXED" and not reprocess:
+        seen_chunks: set[uuid.UUID] = set()
+        for chunk, existing in rows:
+            if chunk.id in seen_chunks:
+                continue
+            seen_chunks.add(chunk.id)
+            if existing is not None and existing.indexing_status == "INDEXED" and not reprocess:
                 skipped += 1
                 continue
-            if existing:  # reprocess, or retry an earlier failure
-                db.delete(existing)
-                db.flush()
+            work.append((chunk, existing))
+        deferred = 0
+        if limit is not None and len(work) > limit:
+            deferred = len(work) - limit
+            work = work[:limit]
 
+        def record(chunk: EvidenceChunk, vector=None, failure: str | None = None) -> None:
+            db.add(
+                EvidenceChunkEmbedding(
+                    id=uuid.uuid4(),
+                    tenant_id=tenant_id,
+                    evidence_id=chunk.evidence_id,
+                    chunk_id=chunk.id,
+                    chunk_checksum=chunk.checksum or "",
+                    provider=metadata.provider,
+                    embedding_model=metadata.model,
+                    model_version=metadata.model_version,
+                    embedding_dimension=metadata.dimension,
+                    pipeline_version=metadata.pipeline_version,
+                    distance_metric=metadata.distance_metric,
+                    embedding=vector_literal(vector) if vector is not None else None,
+                    indexing_status="INDEXED" if vector is not None else "FAILED",
+                    failure_reason=failure,
+                )
+            )
+
+        indexed = 0
+        failed = 0
+        for start in range(0, len(work), self.BATCH_SIZE):
+            batch = work[start : start + self.BATCH_SIZE]
+            for _chunk, existing in batch:
+                if existing is not None:  # reprocess, or retry an earlier failure
+                    db.delete(existing)
+            db.flush()
             try:
-                vector = self.embedding_provider.embed_text(chunk.text_content)
-                row = EvidenceChunkEmbedding(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    evidence_id=chunk.evidence_id,
-                    chunk_id=chunk.id,
-                    chunk_checksum=chunk.checksum or "",
-                    provider=metadata.provider,
-                    embedding_model=metadata.model,
-                    model_version=metadata.model_version,
-                    embedding_dimension=metadata.dimension,
-                    pipeline_version=metadata.pipeline_version,
-                    distance_metric=metadata.distance_metric,
-                    embedding=vector_literal(vector),
-                    indexing_status="INDEXED",
-                )
-                indexed += 1
-            except Exception as exc:
-                row = EvidenceChunkEmbedding(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    evidence_id=chunk.evidence_id,
-                    chunk_id=chunk.id,
-                    chunk_checksum=chunk.checksum or "",
-                    provider=metadata.provider,
-                    embedding_model=metadata.model,
-                    model_version=metadata.model_version,
-                    embedding_dimension=metadata.dimension,
-                    pipeline_version=metadata.pipeline_version,
-                    distance_metric=metadata.distance_metric,
-                    embedding=None,
-                    indexing_status="FAILED",
-                    failure_reason=str(exc),
-                )
-                failed += 1
-            db.add(row)
+                vectors = self.embedding_provider.embed_batch([chunk.text_content for chunk, _ in batch])
+            except Exception:
+                vectors = None  # find the chunk that fails, one at a time
+            for position, (chunk, _existing) in enumerate(batch):
+                if vectors is not None:
+                    record(chunk, vectors[position])
+                    indexed += 1
+                    continue
+                try:
+                    record(chunk, self.embedding_provider.embed_text(chunk.text_content))
+                    indexed += 1
+                except Exception as exc:
+                    record(chunk, failure=str(exc)[:500])
+                    failed += 1
+            db.flush()
 
         db.commit()
         return {
-            "chunks_seen": len(chunks),
+            "chunks_seen": len(seen_chunks),
             "indexed": indexed,
             "skipped": skipped,
             "failed": failed,
+            "deferred": deferred,
             "embedding_model": metadata.model,
             "embedding_dimension": metadata.dimension,
             "pipeline_version": metadata.pipeline_version,

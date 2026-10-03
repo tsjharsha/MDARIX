@@ -140,7 +140,36 @@ class ObjectStorageService:
             "retention_until": retention_until,
         }
 
+    @staticmethod
+    def _clamd_scan(content: bytes) -> bool:
+        """Scan with a ClamAV daemon (clamd INSTREAM over TCP). Any failure to get a clean verdict refuses the file."""
+        import socket
+        import struct
+
+        host = os.getenv("MDARIX_CLAMD_HOST", "").strip()
+        port = int(os.getenv("MDARIX_CLAMD_PORT", "3310"))
+        try:
+            with socket.create_connection(
+                (host, port), timeout=float(os.getenv("MDARIX_CLAMD_TIMEOUT_SECONDS", "30"))
+            ) as conn:
+                conn.sendall(b"zINSTREAM\0")
+                for start in range(0, len(content), 65536):
+                    chunk = content[start : start + 65536]
+                    conn.sendall(struct.pack("!I", len(chunk)) + chunk)
+                conn.sendall(struct.pack("!I", 0))
+                reply = b""
+                while not reply.endswith(b"\0"):
+                    part = conn.recv(4096)
+                    if not part:
+                        break
+                    reply += part
+        except OSError:
+            return False
+        return reply.rstrip(b"\0").strip().endswith(b"OK")
+
     def scan(self, content: bytes, content_type: str) -> bool:
+        if os.getenv("MDARIX_CLAMD_HOST", "").strip():
+            return self._clamd_scan(content)
         scanner = os.getenv("MDARIX_MALWARE_SCANNER_COMMAND")
         if scanner:
             try:

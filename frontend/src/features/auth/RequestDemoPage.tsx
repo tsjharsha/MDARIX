@@ -63,41 +63,38 @@ export function RequestDemoPage() {
         <p className="auth-lead">
           Leave your details and someone from the MDARIX team will contact you to arrange a live demo.
         </p>
-        <input
-          aria-label="Full name"
-          name="name"
-          autoComplete="name"
-          required
-          maxLength={120}
-          placeholder="Full name"
-          value={form.name}
-          onChange={update("name")}
-        />
-        <input
-          aria-label="Work email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          maxLength={254}
-          placeholder="Work email"
-          value={form.email}
-          onChange={update("email")}
-        />
-        <input
-          aria-label="Phone number"
-          name="phone"
-          type="tel"
-          autoComplete="tel"
-          required
-          minLength={7}
-          maxLength={30}
-          pattern={"\\+?[0-9 \\(\\)\\.\\-]{7,30}"}
-          title="Digits, spaces and + ( ) - . only, for example +1 617 555 0100"
-          placeholder="Phone number, e.g. +1 617 555 0100"
-          value={form.phone}
-          onChange={update("phone")}
-        />
+        <label className="auth-field">
+          Full name
+          <input name="name" autoComplete="name" required maxLength={120} value={form.name} onChange={update("name")} />
+        </label>
+        <label className="auth-field">
+          Work email
+          <input
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            maxLength={254}
+            value={form.email}
+            onChange={update("email")}
+          />
+        </label>
+        <label className="auth-field">
+          Phone number
+          <input
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            required
+            minLength={7}
+            maxLength={30}
+            pattern={"\\+?[0-9 \\(\\)\\.\\-]{7,30}"}
+            title="Digits, spaces and + ( ) - . only, for example +1 617 555 0100"
+            placeholder="e.g. +1 617 555 0100"
+            value={form.phone}
+            onChange={update("phone")}
+          />
+        </label>
         {/* Left empty by people; filled only by automated form fillers. */}
         <div className="auth-demo-trap" aria-hidden="true">
           <input name="website" tabIndex={-1} autoComplete="off" value={form.website} onChange={update("website")} />
@@ -110,8 +107,10 @@ export function RequestDemoPage() {
         <button className="primary-action" type="submit" disabled={state.status === "sending"}>
           {state.status === "sending" ? "Sending…" : "Request a demo"}
         </button>
+        <p className="auth-consent">
+          We use these details only to arrange your demo, as described in our <a href="/privacy">Privacy Policy</a>.
+        </p>
         <p className="auth-links auth-links-split">
-          <span>We use these details only to arrange your demo.</span>
           <span>
             Explore on your own? <a href="/signup">Start free trial</a>
           </span>

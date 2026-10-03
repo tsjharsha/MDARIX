@@ -14,6 +14,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -32,7 +33,6 @@ from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_webhook
-from communication.email.service import EmailService
 from object_storage.service import ObjectStorageService
 from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, require_permission
 
@@ -374,11 +374,36 @@ def _limit_supplier_requests(db: Session, ctx: AuthenticatedRequestContext, now)
         )
 
 
+def _send_supplier_request(control_db: Session, ctx: AuthenticatedRequestContext, payload) -> str:
+    """Email the request to the supplier from the requesting organization; replies go to the person who asked.
+
+    Returns the delivery state ("SENT", "NOT_CONFIGURED" or "FAILED"); a failure never loses the request, which
+    stays PENDING_DELIVERY.
+    """
+    from auth.emailer import EmailDeliveryError, send_supplier_evidence_request
+    from backend.app.db.models.foundation import AuthUser, Tenant
+
+    requester = control_db.query(AuthUser).filter(AuthUser.id == uuid.UUID(str(ctx.user_id))).first()
+    tenant = control_db.query(Tenant).filter(Tenant.id == uuid.UUID(str(ctx.tenant_id))).first()
+    organization = (tenant.display_name or tenant.name) if tenant else "An MDARIX customer"
+    try:
+        return send_supplier_evidence_request(
+            payload.recipient,
+            organization,
+            title=payload.title,
+            items=[str(item) for item in payload.requested_items],
+            reply_to=requester.username if requester else None,
+        )
+    except EmailDeliveryError:
+        return "FAILED"
+
+
 @router.post("/supplier-evidence-requests", dependencies=[Depends(require_permission(RECORDS_WRITE))])
 def request_supplier_evidence(
     payload: SupplierEvidenceRequestPayload,
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    control_db: Session = Depends(get_db),
 ):
     from backend.app.db.models.foundation import Investigation, Supplier
 
@@ -408,16 +433,9 @@ def request_supplier_evidence(
     )
     db.add(row)
     db.flush()
-    delivery = "NOT_CONFIGURED"
-    try:
-        delivery = EmailService().send_template(
-            payload.recipient,
-            "evidence_request",
-            {"intro": payload.title, "link": "Use the authorized supplier evidence channel."},
-        )
-        row.status = "SENT"
-    except Exception:
-        row.status = "PENDING_DELIVERY"
+    delivery = _send_supplier_request(control_db, ctx, payload)
+    # Only an email the provider accepted counts as sent; otherwise the request waits for delivery.
+    row.status = "SENT" if delivery == "SENT" else "PENDING_DELIVERY"
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -640,7 +658,7 @@ async def persisted_resend_webhook(
     x_provider_account_id: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    body = await request.body()
+    body = await read_limited(request, WEBHOOK_LIMIT_BYTES, code="PAYLOAD_TOO_LARGE")
     if not verify_webhook(body, x_resend_signature):
         raise HTTPException(
             401, detail={"code": "INVALID_WEBHOOK_SIGNATURE", "message": "Webhook authentication failed"}

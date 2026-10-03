@@ -43,8 +43,8 @@ export function ProductVersionStory({ productId, versionId }: Props) {
     <section className="panel product-version-story">
       <div className="section-title">Product Version Story</div>
       <p className="story-lead">
-        A tenant-scoped story of the selected release, the field signals it received, the investigations opened, and the
-        evidence available for review.
+        The story of the selected release, the field signals it received, the investigations opened, and the evidence
+        available for review.
       </p>
       <div className="home-insight-grid">
         <article>

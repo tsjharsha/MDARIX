@@ -43,7 +43,7 @@ function Catalog() {
           caption="Source systems"
           rows={rows}
           rowKey={(row) => row.application_id}
-          empty={{ title: "No source systems", detail: "The catalogue is empty." }}
+          empty={{ title: "No source systems", detail: "The catalog is empty." }}
           columns={[
             {
               key: "system",
@@ -404,7 +404,7 @@ function Schemas() {
               caption="Source records"
               rows={objectRows}
               rowKey={(row) => row.source_object_id}
-              empty={{ title: "No records", detail: "This system has no catalogued record yet." }}
+              empty={{ title: "No records", detail: "This system has no cataloged record yet." }}
               columns={[
                 {
                   key: "object",
@@ -429,7 +429,7 @@ function Schemas() {
                 caption="Fields"
                 rows={listOf(fields.data)}
                 rowKey={(row) => row.source_field_id}
-                empty={{ title: "No fields", detail: "No field is catalogued for this record." }}
+                empty={{ title: "No fields", detail: "No field is cataloged for this record." }}
                 columns={[
                   {
                     key: "field",

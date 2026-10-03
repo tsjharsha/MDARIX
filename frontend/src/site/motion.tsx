@@ -77,7 +77,8 @@ export function FlowChain({ steps, label }: { steps: string[]; label: string }) 
 }
 
 /**
- * Illustrative product animation for the home hero: a complaint signal rises after Rev D, evidence is gathered,
+ * Illustrative product animation for the home hero, following the free trial's sample story (OrbitCare 300 Rev B):
+ * a complaint signal rises after the release, evidence is gathered,
  * competing hypotheses are weighed, unknowns stay visible, and an authorized person signs. Synthetic example data.
  */
 export function InvestigationAnimation() {
@@ -91,14 +92,14 @@ export function InvestigationAnimation() {
         <span className="ms-dot" />
         <span className="ms-dot" />
         <span className="ms-dot" />
-        <strong>Investigation · AsterFlow shutdown complaints</strong>
+        <strong>Investigation · OrbitCare 300 pressure alarms</strong>
         <em>Illustrative · synthetic data</em>
       </div>
       <div className="ms-demo-body">
         <section className="ms-demo-chart" aria-hidden="true">
           <header>
             <small>Complaint signal</small>
-            <b>Shutdowns per week</b>
+            <b>Pressure alarms per week</b>
           </header>
           <svg viewBox="0 0 320 120" preserveAspectRatio="none">
             <line x1="0" y1="110" x2="320" y2="110" className="ms-axis" />
@@ -108,7 +109,7 @@ export function InvestigationAnimation() {
               d="M0 98 L30 96 L60 99 L90 95 L120 97 L150 94 L170 92 L190 80 L210 62 L230 48 L250 40 L270 36 L290 30 L320 26"
             />
             <text x="176" y="18" className="ms-marker-label">
-              Rev D released
+              Rev B released
             </text>
           </svg>
         </section>
@@ -116,13 +117,13 @@ export function InvestigationAnimation() {
           <small>Evidence gathered</small>
           <ul>
             <li style={{ animationDelay: "1.2s" }}>
-              <i className="tag-change" /> Supplier change · NovaCap capacitor
+              <i className="tag-change" /> Supplier change · pressure sensor
             </li>
             <li style={{ animationDelay: "1.8s" }}>
-              <i className="tag-lot" /> 17 lots built with the new part
+              <i className="tag-lot" /> 2 lots built with the new sensor
             </li>
             <li style={{ animationDelay: "2.4s" }}>
-              <i className="tag-test" /> Thermal test report · v4.2
+              <i className="tag-test" /> Incoming inspection · lots 003-004
             </li>
             <li style={{ animationDelay: "3s" }}>
               <i className="tag-gap" /> 2 complaints without lot reference
@@ -132,14 +133,14 @@ export function InvestigationAnimation() {
         <section className="ms-demo-hypotheses" aria-hidden="true">
           <small>Competing hypotheses</small>
           <div className="ms-hyp" style={{ animationDelay: "3.6s" }}>
-            <span>Capacitor supplier change</span>
+            <span>Pressure sensor supplier change</span>
             <span className="ms-bar">
               <i className="support" style={{ width: "64%" }} />
               <i className="contra" style={{ width: "12%" }} />
             </span>
           </div>
           <div className="ms-hyp" style={{ animationDelay: "4.1s" }}>
-            <span>Firmware power timing</span>
+            <span>Firmware alarm threshold</span>
             <span className="ms-bar">
               <i className="support" style={{ width: "22%" }} />
               <i className="contra" style={{ width: "40%" }} />

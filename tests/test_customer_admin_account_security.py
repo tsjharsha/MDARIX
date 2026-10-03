@@ -6,8 +6,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from auth.durable import persist_session
-from auth.service import _hash, auth_service
+from auth.durable import new_session
+from auth.service import _hash
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
 from backend.app.db.session import SessionLocal
@@ -90,18 +90,7 @@ def _user(db, tenant, role, label):
 
 
 def _client_for(db, user):
-    token = auth_service.signin_persisted(
-        user.username,
-        PASSWORD,
-        user_id=user.id,
-        display_name=user.display_name,
-        tenant_id=user.tenant_id,
-        password_hash=user.password_hash,
-        role=user.role,
-        status=user.status,
-        email_verified=user.email_verified,
-    )
-    persist_session(db, token, user.id, user.tenant_id)
+    token = new_session(db, user.id, user.tenant_id)
     client = TestClient(app)
     client.cookies.set("mdarix_session", token)
     return client
