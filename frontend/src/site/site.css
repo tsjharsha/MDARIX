@@ -1981,3 +1981,247 @@
 .ms-subsection {
   margin-top: 64px;
 }
+
+/* Lifecycle hero: an animated loop on a deep navy panel */
+.ms-lc-hero {
+  margin: 0;
+  padding: 22px 22px 18px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(115, 214, 203, 0.16), transparent 62%),
+    linear-gradient(160deg, var(--ms-navy) 0%, var(--ms-navy-deep) 100%);
+  box-shadow: 0 24px 60px rgba(15, 34, 51, 0.28);
+}
+.ms-lc-hero svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.ms-lc-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.14);
+  stroke-width: 10;
+}
+.ms-lc-dash {
+  fill: none;
+  stroke: var(--ms-teal-bright);
+  stroke-width: 2;
+  stroke-dasharray: 2 10;
+  stroke-linecap: round;
+  opacity: 0.7;
+  animation: ms-lc-dash 6s linear infinite;
+}
+.ms-lc-spoke {
+  stroke: rgba(115, 214, 203, 0.35);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 9;
+  animation: ms-lc-flow 1.6s linear infinite;
+}
+.ms-lc-spoke-today {
+  stroke: var(--ms-teal-bright);
+  stroke-width: 2.5;
+  opacity: 0.9;
+}
+.ms-lc-orbit {
+  transform-box: view-box;
+  transform-origin: 300px 230px;
+  animation: ms-lc-spin 14s linear infinite;
+}
+.ms-lc-comet {
+  fill: #ffffff;
+}
+.ms-lc-comet-tail {
+  fill: var(--ms-teal-bright);
+  opacity: 0.35;
+}
+.ms-lc-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ms-lc-breathe 4s ease-in-out infinite;
+}
+.ms-lc-core {
+  fill: rgba(15, 34, 51, 0.9);
+  stroke: var(--ms-teal-bright);
+  stroke-width: 2;
+}
+.ms-lc-pump {
+  fill: #eaf4f6;
+  stroke: #ffffff;
+}
+.ms-lc-screen {
+  fill: var(--ms-navy-deep);
+}
+.ms-lc-beat {
+  fill: none;
+  stroke: var(--ms-teal-bright);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 60;
+  animation: ms-lc-beat 2.4s linear infinite;
+}
+.ms-lc-key {
+  fill: var(--ms-teal);
+}
+.ms-lc-line {
+  fill: none;
+  stroke: #eaf4f6;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.ms-lc-core-label {
+  fill: var(--ms-teal-bright);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ms-lc-dot {
+  fill: var(--ms-navy-deep);
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 2;
+}
+.ms-lc-node-today .ms-lc-dot {
+  fill: var(--ms-teal);
+  stroke: var(--ms-teal-bright);
+  stroke-width: 3;
+}
+.ms-lc-num {
+  fill: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.ms-lc-label {
+  fill: #dbe7ef;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ms-lc-node-today .ms-lc-label {
+  fill: var(--ms-teal-bright);
+  font-weight: 700;
+}
+.ms-lc-ping {
+  fill: var(--ms-teal-bright);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ms-lc-ping 14s ease-out infinite;
+}
+.ms-lc-hero figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-top: 10px;
+  color: #dbe7ef;
+  font-size: 13px;
+}
+.ms-lc-key-today,
+.ms-lc-key-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ms-lc-key-today::before,
+.ms-lc-key-next::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ms-teal-bright);
+}
+.ms-lc-key-next::before {
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+}
+.ms-lc-standards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+.ms-lc-standards span {
+  padding: 3px 10px;
+  border: 1px solid rgba(115, 214, 203, 0.45);
+  border-radius: 999px;
+  background: rgba(115, 214, 203, 0.1);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+}
+@keyframes ms-lc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ms-lc-dash {
+  to {
+    stroke-dashoffset: -120;
+  }
+}
+@keyframes ms-lc-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes ms-lc-breathe {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes ms-lc-beat {
+  from {
+    stroke-dashoffset: 60;
+  }
+  to {
+    stroke-dashoffset: -60;
+  }
+}
+@keyframes ms-lc-ping {
+  0% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  10% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+.ms-lc-phases {
+  margin-top: 28px;
+}
+@media (max-width: 640px) {
+  .ms-lc-hero {
+    padding: 14px 10px 14px;
+  }
+  .ms-lc-label {
+    font-size: 17px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ms-lc-dash,
+  .ms-lc-spoke,
+  .ms-lc-orbit,
+  .ms-lc-halo,
+  .ms-lc-beat,
+  .ms-lc-ping {
+    animation: none;
+  }
+  .ms-lc-beat {
+    stroke-dasharray: none;
+  }
+  .ms-lc-orbit {
+    display: none;
+  }
+}

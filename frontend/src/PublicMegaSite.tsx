@@ -26,7 +26,6 @@ const LEGACY_PAGES: Record<string, string> = {
   "/plans": "/company#contact",
   "/capabilities": "/platform",
   "/roadmap": "/product-lifecycle#roadmap",
-  "/request-demo": "/company#contact",
 };
 const LIFECYCLE_SLUGS = new Set(lifecycleStages.flatMap((stage) => stage.items.map((item) => item.slug)));
 const PLATFORM_SLUGS = new Set(
@@ -151,7 +150,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     links: [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
-      ["Request a demo", "/company#contact"],
+      ["Request a demo", "/request-demo"],
     ],
   },
 ];
@@ -238,7 +237,7 @@ export function PublicMegaSite({ path }: { path: string }) {
           </a>
           <div className="ms-nav-actions">
             <a href="/signin">Sign in</a>
-            <a className="ms-btn ms-btn-primary" href="/company#contact" onClick={closeMenus}>
+            <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={closeMenus}>
               Request a demo
             </a>
           </div>

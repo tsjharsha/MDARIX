@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { CreateCustomer } from "../CreateCustomer";
+import { DemoRequestsWorkspace } from "../DemoRequestsWorkspace";
 import { TrialRequestsWorkspace } from "../TrialRequestsWorkspace";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { CustomerDirectory } from "./CustomerDirectory";
@@ -77,7 +78,7 @@ function Onboarding({ onCreated }: { onCreated: () => void }) {
       <div className="cc-title">
         <div>
           <p className="ac-eyebrow">Onboarding</p>
-          <h2>New customers and trial requests</h2>
+          <h2>New customers, demo and trial requests</h2>
           <p className="ac-muted">
             A new customer gets its first tenant, with a plan and the tenant&apos;s first Customer Administrator, who is
             invited by email. Further tenants are added from the customer&apos;s page.
@@ -97,7 +98,10 @@ function Onboarding({ onCreated }: { onCreated: () => void }) {
           <CreateCustomer onCreated={onCreated} />
         </section>
       ) : (
-        <TrialRequestsWorkspace />
+        <>
+          <DemoRequestsWorkspace />
+          <TrialRequestsWorkspace />
+        </>
       )}
     </div>
   );

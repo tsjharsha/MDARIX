@@ -1,5 +1,5 @@
 import React, { useState, type ReactNode } from "react";
-import { FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+import { CalendarCheck, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
   signin: {
@@ -24,6 +24,15 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
       [UserCheck, "Then try your own data", "Simple CSV templates, checked for personal data before import."],
     ],
   },
+  "request-demo": {
+    eyebrow: "Request a demo",
+    title: "See MDARIX on an investigation like yours.",
+    points: [
+      [FileSearch, "A walkthrough on a real signal", "One complaint trend, traced to the supplier lot it shares."],
+      [CalendarCheck, "At a time that suits you", "Our team contacts you to agree the date and who should join."],
+      [UserCheck, "Governance you can defend", "Evidence citations, visible unknowns and human sign-off."],
+    ],
+  },
   security: {
     eyebrow: "Account security",
     title: "Your access is protected at every step.",
@@ -36,7 +45,7 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
 };
 
 // Shared frame for every sign-in and account page: website brand, light med-tech backdrop, value panel and the form.
-function AuthFrame({ mode, children }: { mode: string; children: ReactNode }) {
+export function AuthFrame({ mode, children }: { mode: string; children: ReactNode }) {
   const aside = ASIDE[mode] ?? ASIDE.security;
   return (
     <div className="auth-page">

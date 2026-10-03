@@ -72,7 +72,9 @@ textarea {
     text-align: center;
   }
 }
-.app-shell main {
+.app-shell main,
+.app-shell .app-main,
+.app-shell .platform-admin-workspace {
   min-width: 0;
   background: var(--canvas);
 }
@@ -422,7 +424,9 @@ textarea {
   color: #ffffff;
 }
 
-main {
+main,
+.app-main,
+.platform-admin-workspace {
   min-width: 0;
   position: relative;
 }
@@ -2386,7 +2390,9 @@ th {
 .segmented button.selected {
   border-left-color: var(--brand-primary) !important;
 }
-.app-shell main {
+.app-shell main,
+.app-shell .app-main,
+.app-shell .platform-admin-workspace {
   display: flex;
   flex-direction: column;
 }
@@ -2405,10 +2411,12 @@ th {
   background: var(--surface-primary);
   box-shadow: 0 8px 24px #17212b0d;
 }
-.app-shell main > .content {
+.app-shell main > .content,
+.app-shell .app-main > .content {
   order: 2;
 }
-.app-shell main > .error {
+.app-shell main > .error,
+.app-shell .app-main > .error {
   order: 4;
 }
 
@@ -10227,6 +10235,36 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-page .auth-links {
   margin: 4px 0 0;
   font-size: 14px;
+}
+.auth-page .auth-card .primary-action:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+.auth-page .auth-card .auth-demo-error {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fdeeee;
+  color: #a12a2a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.auth-demo-trap {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+.auth-page .auth-card.auth-demo-done {
+  justify-items: start;
+}
+.auth-demo-done > svg {
+  color: #0ca30c;
+}
+.auth-demo-done strong {
+  color: var(--auth-ink);
+  overflow-wrap: anywhere;
 }
 .auth-links-split {
   display: flex;

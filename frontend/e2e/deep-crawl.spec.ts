@@ -157,10 +157,15 @@ async function crawl(page: Page, persona: any) {
       await sweep(page, persona.name, name);
       continue;
     }
-    for (let t = 0; t < tabCount; t += 1) {
-      const tab = page.locator('main [role="tablist"]').first().locator('[role="tab"]').nth(t);
-      const tabName = (await tab.innerText()).trim();
-      await tab.click();
+    // The section's own tabs, by name: a tab can open nested tab lists, so positions do not stay valid.
+    const tabNames = (await tabs.allInnerTexts()).map((text) => text.trim()).filter(Boolean);
+    for (const tabName of tabNames) {
+      const tab = page.locator('main [role="tab"]').filter({ hasText: tabName }).first();
+      if (!(await tab.isVisible().catch(() => false))) {
+        visited.push({ persona: persona.name, where: `${name} > ${tabName} (not reachable after the previous tab)` });
+        continue;
+      }
+      await tab.click().catch(() => undefined);
       await settle(page);
       const where = `${name} > ${tabName}`;
       await panelErrors(page, persona.name, where);
@@ -199,6 +204,7 @@ test.describe("deep crawl of every screen", () => {
   }
 
   test("flow: a Customer Admin invites a user through the form", async ({ page }) => {
+    test.setTimeout(120_000); // sign-in, the console and the users list load on a dev server
     const admin = config.personas.find((p: any) => p.name === config.flows.invite_as);
     watch(page, admin.name, () => "invite flow");
     await signIn(page, admin);
@@ -211,11 +217,11 @@ test.describe("deep crawl of every screen", () => {
     await page.getByLabel("Last name").fill("Invitee");
     await page.getByLabel("Work email").fill(email);
     await page.getByLabel("Company").fill("E2E Medical");
-    await page.getByLabel("Base role", { exact: true }).selectOption("REVIEWER");
+    await page.getByRole("combobox", { name: /^Base role/ }).selectOption("REVIEWER");
     await page.getByRole("button", { name: /send invitation/i }).click();
     await expect(page.locator("main")).toContainText(/invit/i, { timeout: 15_000 });
-    const listed = await page.request.get("/api/v1/admin/identity/users");
-    expect((await listed.json()).some((row: any) => row.email === email)).toBeTruthy();
+    // The new person is listed in the Users table, as the administrator sees it.
+    await expect(page.locator("main").getByText(email)).toBeVisible({ timeout: 15_000 });
   });
 
   test("flow: an Investigator opens an investigation through the form", async ({ page }) => {

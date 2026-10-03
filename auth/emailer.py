@@ -119,3 +119,16 @@ def send_trial_request_alert(recipient: str, *, organization: str, display_name:
         "Review it in Platform Admin > Customers & Tenants > Customer Onboarding:\n"
         f"{app_url}/app/admin\n",
     )
+
+
+def send_demo_request_alert(recipient: str, *, display_name: str, email: str, phone: str) -> str:
+    """Tell the MDARIX team that a website visitor asked for a demo."""
+    app_url = os.getenv("MDARIX_APP_URL", "http://127.0.0.1:5178")
+    return _send_email(
+        recipient,
+        f"New MDARIX demo request: {display_name}",
+        "A website visitor asked for a demo. Please contact them.\n\n"
+        f"Name: {display_name}\nEmail: {email}\nPhone: {phone}\n\n"
+        "Mark it contacted in Platform Admin > Customers & Tenants > Onboarding:\n"
+        f"{app_url}/app/admin\n",
+    )

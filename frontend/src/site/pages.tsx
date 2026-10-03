@@ -22,7 +22,7 @@ import {
   type Capability,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
-import { SignalStory, SourceFlow, StandardsSection } from "./visuals";
+import { LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
 
 export const SITE_PAGES = [
   "/",
@@ -55,12 +55,14 @@ function PageHero({
   title,
   copy,
   image,
+  visual,
   children,
 }: {
   eyebrow: string;
   title: string;
   copy: string;
   image?: { src: string; alt: string; contain?: boolean };
+  visual?: ReactNode;
   children?: ReactNode;
 }) {
   return (
@@ -71,6 +73,7 @@ function PageHero({
         <p>{copy}</p>
         {children}
       </div>
+      {visual}
       {image && (
         <Photo
           src={image.src}
@@ -103,7 +106,7 @@ function CtaBand() {
           are.
         </p>
         <div className="ms-cta-row">
-          <a className="ms-btn ms-btn-light" href="/company#contact">
+          <a className="ms-btn ms-btn-light" href="/request-demo">
             Request a demo <ArrowRight size={16} aria-hidden="true" />
           </a>
           <a className="ms-btn ms-btn-ghost-light" href="/signup">
@@ -180,7 +183,7 @@ export function HomePage() {
             <h1>{home.title}</h1>
             <p>{home.copy}</p>
             <div className="ms-cta-row">
-              <a className="ms-btn ms-btn-light" href="/company#contact">
+              <a className="ms-btn ms-btn-light" href="/request-demo">
                 Request a demo <ArrowRight size={16} aria-hidden="true" />
               </a>
               <a className="ms-btn ms-btn-ghost-light" href="/platform">
@@ -551,16 +554,7 @@ export function LifecyclePage() {
   const roadmap = pages["/roadmap"];
   return (
     <>
-      <PageHero
-        eyebrow={lifecycle.eyebrow}
-        title={lifecycle.title}
-        copy={lifecycle.copy}
-        image={{
-          src: img("medtech-product-lifecycle-hero"),
-          alt: "Medical-device product lifecycle from design to post-market",
-          contain: true,
-        }}
-      />
+      <PageHero eyebrow={lifecycle.eyebrow} title={lifecycle.title} copy={lifecycle.copy} visual={<LifecycleHero />} />
       <section className="ms-section">
         <div className="ms-legend-row">
           <span className="ms-badge ms-badge-current">
@@ -585,6 +579,21 @@ export function LifecyclePage() {
             </Reveal>
           ))}
         </div>
+      </section>
+      <section className="ms-section ms-band" aria-labelledby="design-phases">
+        <SectionHead
+          id="design-phases"
+          eyebrow="Design and development"
+          title="Medical device design and development phases."
+          copy="Each phase leaves design-control records: user needs, design inputs and outputs, verification, validation and the risk file. When a field problem appears, investigators trace back through those records, which is where MDARIX starts."
+        />
+        <Reveal className="ms-lc-phases">
+          <Photo
+            src={img("medtech-product-lifecycle-hero")}
+            alt="Medical device design and development phases 0 to 6: concept and ideation, user needs and feasibility, design inputs and prototyping, detailed design and design controls, verification and validation, manufacturing transfer and regulatory submission, post-market surveillance and feedback loops"
+            className="ms-photo-contain"
+          />
+        </Reveal>
       </section>
       <section className="ms-section">
         <SectionHead eyebrow="Current capabilities" title="Lifecycle intelligence available today." />

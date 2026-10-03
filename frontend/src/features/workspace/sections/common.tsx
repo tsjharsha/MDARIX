@@ -73,7 +73,8 @@ export function RecordTable({
     <Table
       caption={caption}
       rows={rows}
-      rowKey={(row, index) => String(row.id ?? row.event_id ?? index)}
+      // Relationship lists repeat a record (a supplier once per component it supplies): the position keeps keys unique.
+      rowKey={(row, index) => `${row.id ?? row.event_id ?? "row"}:${index}`}
       empty={empty}
       columns={columns.map((key) => ({
         key,

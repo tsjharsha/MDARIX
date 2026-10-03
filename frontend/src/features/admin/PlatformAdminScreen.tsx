@@ -141,6 +141,7 @@ export function PlatformAdminScreen({
   embedded = false,
   onLocationChange,
 }: PlatformAdminScreenProps) {
+  const Workspace = embedded ? "div" : "main";
   const [data, setData] = useState<AdminData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [, setUnavailable] = useState<string[]>([]);
@@ -693,10 +694,11 @@ export function PlatformAdminScreen({
             );
           })}
         </aside>
-        <main className="platform-admin-workspace" data-admin-view={`${activeDomain}:${activeItem}`}>
+        {/* Embedded in the console, whose main landmark already contains it. */}
+        <Workspace className="platform-admin-workspace" data-admin-view={`${activeDomain}:${activeItem}`}>
           {workspaceHeading}
           {renderWorkspace()}
-        </main>
+        </Workspace>
       </div>
     </div>
   );

@@ -127,6 +127,29 @@ class OnboardingRequest(Base):
     decision_reason: Mapped[str | None] = mapped_column(Text)
 
 
+class DemoRequest(Base):
+    """Public demo request from the website: who to contact. MDARIX staff follow up; nothing else is created."""
+
+    __tablename__ = "demo_requests"
+    id = _id()
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    phone: Mapped[str] = mapped_column(String(30), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="NEW")
+    # A one-way hash of the sender's address, kept only to limit how many requests one address can send.
+    source_hash: Mapped[str | None] = mapped_column(String(64))
+    created_at = _ts(False)
+    updated_at = _ts(False)
+    handled_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    handled_at = _ts()
+    note: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        Index("ix_demo_requests_created", "created_at"),
+        Index("ix_demo_requests_email", "email"),
+        Index("ix_demo_requests_source", "source_hash", "created_at"),
+    )
+
+
 class AuthenticationEvent(Base):
     __tablename__ = "authentication_events"
     id = _id()

@@ -107,7 +107,7 @@ test.describe("MDARIX browser evidence", () => {
       Customers: "Customer directory",
       "Customer administrators": "Customer administrators",
       Tenants: "Tenant directory",
-      Onboarding: "New customers and trial requests",
+      Onboarding: "New customers, demo and trial requests",
     };
     await openAdminNavigation(page);
     await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();

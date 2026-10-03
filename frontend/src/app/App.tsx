@@ -17,6 +17,7 @@ import { SimplifiedPlatformAdminScreen } from "../features/admin/SimplifiedPlatf
 import { UserWorkspace } from "../features/workspace/UserWorkspace";
 import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministrationAudit";
 import { AuthPage } from "../features/auth/AuthPage";
+import { RequestDemoPage } from "../features/auth/RequestDemoPage";
 
 export function App() {
   const publicPath = window.location.pathname;
@@ -39,7 +40,6 @@ export function App() {
       "/ai-trust",
       "/integrations",
       "/security",
-      "/request-demo",
       // Match whole path segments only, so app routes such as /platform-admin/... are never sent to the website.
     ].some((route) => publicPath === route || publicPath.startsWith(`${route}/`))
   )
@@ -56,6 +56,7 @@ export function App() {
     ].includes(publicPath)
   )
     return <AuthPage mode={publicPath.slice(1)} />;
+  if (publicPath === "/request-demo") return <RequestDemoPage />;
   return <PrivateApplicationGate />;
 }
 
@@ -215,11 +216,15 @@ export function PrivateApplication() {
       </>
     );
 
+  // The admin consoles provide their own main landmark; other views use the shell's.
+  const ownsMain =
+    activeView === "customer-admin" ||
+    (isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS));
   return (
     <div
       className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""} ${isCustomerAdmin ? "customer-admin-shell" : "quality-shell"}`}
     >
-      <main>
+      <div className="app-main" role={ownsMain ? undefined : "main"}>
         {isPlatformAdmin &&
           activeView !== "admin" &&
           [
@@ -259,7 +264,7 @@ export function PrivateApplication() {
         {activeView === "admin-audit" && <PlatformAdministrationAudit />}
         {isPlatformAdmin && activeView === "platform-licenses" && <SubscriptionAdministration />}
         {isPlatformAdmin && activeView === "platform-tenant-audit" && <PlatformAdministrationAudit />}
-      </main>
+      </div>
       <ConsentBanner />
     </div>
   );

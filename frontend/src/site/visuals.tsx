@@ -416,3 +416,126 @@ export function StandardsSection({ id }: { id?: string }) {
     </section>
   );
 }
+
+/* ------------------------------------------------------------------------- Lifecycle hero (animated) */
+
+// The device lifecycle as a closed loop: post-market findings feed the next design. MDARIX works in post-market today.
+const LIFECYCLE_LOOP = [
+  { label: ["Concept"], today: false },
+  { label: ["Design", "controls"], today: false },
+  { label: ["Verification &", "validation"], today: false },
+  { label: ["Regulatory", "submission"], today: false },
+  { label: ["Manufacturing"], today: false },
+  { label: ["Distribution"], today: false },
+  { label: ["Post-market", "surveillance"], today: true },
+];
+const LOOP_STANDARDS = ["ISO 13485", "ISO 14971", "IEC 62304", "FDA QMSR", "EU MDR"];
+
+export function LifecycleHero() {
+  const cx = 300;
+  const cy = 230;
+  const radius = 150;
+  const nodes = LIFECYCLE_LOOP.map((stage, index) => {
+    const angle = -Math.PI / 2 + (index / LIFECYCLE_LOOP.length) * 2 * Math.PI;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    return {
+      ...stage,
+      x: cx + radius * cos,
+      y: cy + radius * sin,
+      lx: cx + (radius + 30) * cos,
+      ly: cy + (radius + 30) * sin + (sin > 0.3 ? 14 : sin < -0.3 ? -14 - (stage.label.length - 1) * 15 : 0),
+      anchor: (cos > 0.3 ? "start" : cos < -0.3 ? "end" : "middle") as "start" | "end" | "middle",
+    };
+  });
+  return (
+    <figure className="ms-lc-hero">
+      <svg viewBox="0 0 600 470" role="img" aria-labelledby="lc-hero-title">
+        <title id="lc-hero-title">
+          The medical device lifecycle as a loop, from concept, design controls, verification and validation, regulatory
+          submission, manufacturing and distribution to post-market surveillance, whose findings feed the next design.
+          MDARIX works in post-market surveillance today.
+        </title>
+        <defs>
+          <radialGradient id="lc-glow">
+            <stop offset="0" stopColor="#73d6cb" stopOpacity="0.45" />
+            <stop offset="1" stopColor="#73d6cb" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <circle className="ms-lc-halo" cx={cx} cy={cy} r={110} fill="url(#lc-glow)" />
+        <circle className="ms-lc-track" cx={cx} cy={cy} r={radius} />
+        <circle className="ms-lc-dash" cx={cx} cy={cy} r={radius} />
+        {nodes.map((node, index) => (
+          <line
+            key={`spoke-${index}`}
+            className={node.today ? "ms-lc-spoke ms-lc-spoke-today" : "ms-lc-spoke"}
+            x1={node.x}
+            y1={node.y}
+            x2={cx}
+            y2={cy}
+          />
+        ))}
+        <g className="ms-lc-orbit">
+          <circle className="ms-lc-comet-tail" cx={cx} cy={cy - radius} r={12} />
+          <circle className="ms-lc-comet" cx={cx} cy={cy - radius} r={5} />
+        </g>
+        {/* Infusion pump at the centre: one product reality. */}
+        <g className="ms-lc-device">
+          <circle cx={cx} cy={cy} r={66} className="ms-lc-core" />
+          <g transform="translate(0 -10)">
+            <rect x={cx - 30} y={cy - 38} width={60} height={64} rx={9} className="ms-lc-pump" />
+            <rect x={cx - 21} y={cy - 29} width={42} height={20} rx={3} className="ms-lc-screen" />
+            <polyline
+              className="ms-lc-beat"
+              points={`${cx - 18},${cy - 19} ${cx - 8},${cy - 19} ${cx - 4},${cy - 26} ${cx + 1},${cy - 12} ${cx + 5},${cy - 19} ${cx + 18},${cy - 19}`}
+            />
+            {[-14, 0, 14].map((dx) => (
+              <circle key={dx} cx={cx + dx} cy={cy + 5} r={4} className="ms-lc-key" />
+            ))}
+            <rect x={cx - 16} y={cy + 15} width={32} height={4} rx={2} className="ms-lc-key" />
+            <path d={`M${cx + 30},${cy - 10} q18,6 14,32`} className="ms-lc-line" />
+          </g>
+          <text textAnchor="middle" className="ms-lc-core-label">
+            <tspan x={cx} y={cy + 33}>
+              One product
+            </tspan>
+            <tspan x={cx} y={cy + 45}>
+              reality
+            </tspan>
+          </text>
+        </g>
+        {nodes.map((node, index) => (
+          <g key={node.label.join(" ")} className={node.today ? "ms-lc-node ms-lc-node-today" : "ms-lc-node"}>
+            <circle
+              className="ms-lc-ping"
+              cx={node.x}
+              cy={node.y}
+              r={node.today ? 15 : 11}
+              style={{ animationDelay: `${index * 2}s` }}
+            />
+            <circle className="ms-lc-dot" cx={node.x} cy={node.y} r={node.today ? 11 : 8} />
+            <text className="ms-lc-num" x={node.x} y={node.y + 4} textAnchor="middle">
+              {index + 1}
+            </text>
+            <text className="ms-lc-label" x={node.lx} y={node.ly} textAnchor={node.anchor}>
+              {node.label.map((line, row) => (
+                <tspan key={line} x={node.lx} dy={row ? 15 : 0}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <figcaption>
+        <span className="ms-lc-key-today">MDARIX today: post-market investigation</span>
+        <span className="ms-lc-key-next">Roadmap: the rest of the loop</span>
+        <span className="ms-lc-standards" aria-label="Standards that govern the lifecycle">
+          {LOOP_STANDARDS.map((code) => (
+            <span key={code}>{code}</span>
+          ))}
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
