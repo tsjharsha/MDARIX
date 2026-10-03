@@ -228,6 +228,9 @@ jobs:
       # The API connects as the least-privilege runtime role, so tests exercise Postgres row-level security.
       MDARIX_DB_RUNTIME_USER: mdarix_runtime
       MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
+      # The browser suite signs the same fixture accounts in many times; sign-in limits are covered by
+      # tests/test_auth_hardening.py and the production-mode job (production refuses this setting).
+      MDARIX_RATE_LIMITS_ENABLED: 'false'
       DAY35_FIXTURE_APPLY: '1'
       # Disposable per-run password for the seeded fixture accounts (never a shared or real password).
       DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!
@@ -272,6 +275,10 @@ jobs:
         env:
           # The Chromium installed above, not a system Chrome that varies by runner image.
           PLAYWRIGHT_CHANNEL: chromium
+          E2E_PASSWORD: ${{ env.DAY35_FIXTURE_PASSWORD }}
+          # Every screen, tab and safe button for a platform administrator and an investigator.
+          E2E_DEEP_PERSONAS: e2e/personas.ci.json
+          E2E_DEEP_REPORT: ../artifacts/deep-crawl.json
         run: npm --prefix frontend run test:e2e
       - name: Upload browser evidence
         if: always()
@@ -281,6 +288,7 @@ jobs:
           path: |
             frontend/artifacts
             frontend/test-results
+            artifacts/deep-crawl.json
           if-no-files-found: warn
 
   container-validation:

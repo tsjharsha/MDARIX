@@ -17,7 +17,8 @@ async function signIn(page: any, email: string, password: string) {
   await page.getByLabel("Work email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
-  await expect(page).toHaveURL(/\/app/);
+  // Signing in checks the password with a deliberately slow hash; allow for a busy test server.
+  await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
   const consent = page.getByRole("dialog", { name: /privacy/i });
   await consent
     .waitFor({ state: "visible", timeout: 2000 })
@@ -59,10 +60,10 @@ test.describe("MDARIX browser evidence", () => {
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
     for (const [route, name, expected] of [
-      ["/app/admin", "admin", /platform overview/i],
+      ["/app/admin", "admin", /administrator control plane/i],
       ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i],
       // Business routes are not part of the platform-admin role; the app returns the admin to the console.
-      ["/app/decision", "decision", /platform overview/i],
+      ["/app/decision", "decision", /administrator control plane/i],
     ] as const) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
@@ -347,7 +348,7 @@ test.describe("MDARIX browser evidence", () => {
 
     await page.goto("/mfa?setup=1");
     await expect(page.locator("body")).toContainText(/MFA|authenticator|identity/i, { timeout: 20_000 });
-    await expect(page.locator('input[aria-label="Six digit authentication code"]')).toBeVisible();
+    await expect(page.getByLabel("Six digit authentication code")).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-mfa.png`, fullPage: true });
   });
 });

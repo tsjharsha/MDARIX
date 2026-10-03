@@ -62,7 +62,8 @@ function watch(page: Page, persona: string, where: () => string) {
 async function signIn(page: Page, persona: any) {
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(persona.email);
-  await page.getByLabel("Password").fill(persona.password ?? config.password);
+  // The personas file committed for CI holds no password; the run supplies it (E2E_PASSWORD).
+  await page.getByLabel("Password").fill(persona.password ?? config.password ?? process.env.E2E_PASSWORD ?? "");
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/(app|mfa)/, { timeout: 30_000 });
   if (page.url().includes("/mfa")) {
@@ -187,6 +188,8 @@ async function crawl(page: Page, persona: any) {
 
 test.describe("deep crawl of every screen", () => {
   test.skip(!config, "Set E2E_DEEP_PERSONAS to run the deep crawl.");
+  // One desktop pass covers every screen; the mobile project would repeat the same crawl.
+  test.skip(({ isMobile }) => isMobile, "The deep crawl runs on desktop only.");
   // A control that never becomes ready is skipped after a few seconds instead of stalling the whole crawl.
   test.use({ actionTimeout: 5_000, navigationTimeout: 20_000 });
 
@@ -200,12 +203,18 @@ test.describe("deep crawl of every screen", () => {
       where = "home";
       await settle(page);
       await crawl(page, persona);
+      // A crashed screen or a server error fails the crawl; console messages are reported for review.
+      const serious = issues.filter(
+        (issue) => issue.persona === persona.name && (issue.kind === "page-error" || issue.kind === "server-error"),
+      );
+      expect(serious, JSON.stringify(serious, null, 1)).toEqual([]);
     });
   }
 
   test("flow: a Customer Admin invites a user through the form", async ({ page }) => {
     test.setTimeout(120_000); // sign-in, the console and the users list load on a dev server
-    const admin = config.personas.find((p: any) => p.name === config.flows.invite_as);
+    const admin = config.personas.find((p: any) => p.name === config.flows?.invite_as);
+    test.skip(!admin, "No Customer Administrator persona is configured for the invite flow.");
     watch(page, admin.name, () => "invite flow");
     await signIn(page, admin);
     await page.goto("/app/customer-admin");
@@ -225,7 +234,8 @@ test.describe("deep crawl of every screen", () => {
   });
 
   test("flow: an Investigator opens an investigation through the form", async ({ page }) => {
-    const investigator = config.personas.find((p: any) => p.name === config.flows.open_case_as);
+    const investigator = config.personas.find((p: any) => p.name === config.flows?.open_case_as);
+    test.skip(!investigator, "No Investigator persona is configured for the open-investigation flow.");
     watch(page, investigator.name, () => "open-investigation flow");
     await signIn(page, investigator);
     await page.goto("/app");
