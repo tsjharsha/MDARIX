@@ -42,3 +42,4 @@ artifacts/zap-*.html
 artifacts/compliance/audit-archives/
 artifacts/audit-archives/
 artifacts/data-plane-backups/
+artifacts/automated-release-gate.md

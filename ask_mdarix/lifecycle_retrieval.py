@@ -85,7 +85,8 @@ class LifecycleRetrievalService:
                 .limit(limit)
                 .all()
             )
-        product_ids = {row.id for row in products}  # noqa: F841 -- computed but unused; possible missing filter (see STATUS.md)
+        # Everything below is scoped through version_ids, which come from the requested product (or its version), so
+        # no separate product filter is needed.
         version_ids = {row.id for row in versions}
         if (
             request.product_version_id
@@ -181,7 +182,7 @@ class LifecycleRetrievalService:
             if component_ids
             else []
         )
-        supplier_ids = {row.id for row in suppliers}  # noqa: F841 -- computed but unused; possible missing filter (see STATUS.md)
+        # Suppliers are reached only through the version's components, so they are already in scope.
         sites: list[ManufacturingSite] = []
         lots = (
             db.query(LotBatch)

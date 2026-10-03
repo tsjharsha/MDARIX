@@ -1,7 +1,14 @@
-"""Read-only local validation report for the repeatable demo/test stack."""
+"""Read-only validation report for the local demo/test stack.
+
+    python scripts/validate_local_stack.py [--require 8101,8102,8025]
+
+Writes artifacts/local-stack-validation.json. With --require, exits 1 unless every listed port answers, so a CI job
+that needs those services fails when they are down instead of passing with a report nobody reads.
+"""
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import socket
@@ -27,6 +34,10 @@ def http(url: str) -> dict:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Local stack validation report")
+    parser.add_argument("--require", default="", help="comma-separated ports that must answer")
+    args = parser.parse_args()
+    required = [int(item) for item in args.require.split(",") if item.strip()]
     result = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "ports": {
@@ -46,6 +57,10 @@ def main() -> int:
     path = output / "local-stack-validation.json"
     path.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))
+    down = [port for port in required if not tcp(port)]
+    if down:
+        print(f"Required services are not answering on ports: {', '.join(map(str, down))}")
+        return 1
     return 0
 
 

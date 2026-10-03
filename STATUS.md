@@ -13,7 +13,7 @@ are kept below for comparison. Update this file only from real command output.
 | Migrations | `alembic upgrade head` on the test and dev databases; `downgrade -1` and back on test | Both at `md11masterseedv2`; md10 downgrades and re-applies |
 | Dedicated data planes | `scripts/upgrade_data_planes.py --apply`, then a dry run | Before: 4 tables and 29 columns missing on each of the four planes. After: 0 and 0; schema version recorded |
 | Simulated customer systems | `docker compose up -d --build` (14 simulators), then `scripts/load_source_templates.py --tenant E2E_DEMO` | All 14 healthy; a separate database per tenant created in all 11 systems; 36 template files loaded, none refused |
-| Live connector run | `scratchpad e2e part4_sources.py` against the API on the test database | 358/358 checks: all 39 standard mappings created, approved by a second administrator, released, connected with an encrypted API key, synced and imported; complaint list shows severity and safety flags; CAPAs and suppliers present; Ask MDARIX answered from the imported records (lots L24-0815 and L24-0902, citations verified) |
+| Live connector run | One-off script (not in the repository, so not reproducible from it); the same path is covered by `tests/test_standard_mappings.py`, `tests/test_trackwise_integration_path.py` and `tests/test_connector_sync.py` | Recorded result at the time, 358/358 checks: all 39 standard mappings created, approved by a second administrator, released, connected with an encrypted API key, synced and imported; complaint list shows severity and safety flags; CAPAs and suppliers present; Ask MDARIX answered from the imported records (lots L24-0815 and L24-0902, citations verified) |
 | Standard mappings, offline | `pytest tests/test_standard_mappings.py` | 41 passed: every standard mapping passes the release check, and loading every template in order imports the whole story |
 | Screen crawl (Playwright, `e2e/deep-crawl.spec.ts`) | One persona at a time against the dev server | Platform admin 51 screens, two customer admins 28 each, investigator, viewer, investigator (AcmeCare) and approver with MFA 69 + 61 + 53 + 53: 0 issues. Both form flows (invite a user, open an investigation) pass. Found and fixed: a duplicate React key in Product 360 suppliers, and nested `main` landmarks in the admin consoles. The admin consoles have not yet been re-crawled after the landmark fix |
 | Request a demo | `pytest tests/test_demo_requests.py tests/test_business_permissions.py tests/test_public_signup_onboarding.py`; browser run at 1440 and 390 px | 18 passed. Form submits, thank-you shown, no console errors, no sideways scroll; request listed for the Platform Admin and marked contacted (first browser run; a later retest of that step hit "Failed to fetch" while the backend suite shared the test database, and is to be repeated) |
@@ -151,13 +151,14 @@ Architecture gaps:
   outputs are supplied. *Addressed on `mvp/phase-3-ai` (see above).*
 - No reachable UI creates roles, permission sets, personas, connectors,
   approval authorities or SoD policies (backend routes exist).
-- Computed-but-unused values that suggest missing logic (marked `noqa: F841`):
-  deterministic evidence observations are extracted and never persisted
-  (`evidence/services/evidence_service.py`); product/supplier id sets in
-  `ask_mdarix/lifecycle_retrieval.py` and the unknowns map in
-  `failure_chain/engine.py` are built but not used.
+- Computed-but-unused values (formerly marked `noqa: F841`): reviewed and
+  removed. The deterministic observations were saved all along (the extractor
+  adds them to the session); the lifecycle retrieval is already scoped through
+  the product's versions and components; the failure chain reads the unknowns
+  directly. *Addressed in the readiness work (phase 10).*
 - Deep links to `/platform-admin/*` render the public site (public-path prefix
-  match on `/platform`).
+  match on `/platform`). *Addressed: the application is matched by whole path
+  segments (`/app`, `/platform-admin`); every other address is the website.*
 
 ## How to re-verify
 

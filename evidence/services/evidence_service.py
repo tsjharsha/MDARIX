@@ -120,10 +120,8 @@ class EvidenceIntelligenceService:
         # 2. Chunk Evidence
         chunks = self.chunker.create_chunks_for_evidence(db, tenant_id, evidence_id, content, metadata)
 
-        # 3. Deterministic Extraction
-        det_observations = self.deterministic_extractor.extract_deterministic_observations(  # noqa: F841 -- result is never persisted (see STATUS.md)
-            db, tenant_id, evidence_id, content, metadata
-        )
+        # 3. Deterministic Extraction (the extractor adds its observations to the session; they are saved below)
+        self.deterministic_extractor.extract_deterministic_observations(db, tenant_id, evidence_id, content, metadata)
 
         # 4. Narrative AI Extraction & AIExecution Provenance Logging
         ai_result, ai_execution_id = self.ai_extractor.extract_evidence(

@@ -12,7 +12,6 @@ class ControlledFailureChain:
     def generate(self, hs: HypothesisSet, us: UnknownSet | None = None) -> FailureChainSet:
         now = datetime.now(timezone.utc)
         chains = []
-        all_unknowns = {str(u.unknown_id): u for u in (us.unknowns if us else [])}  # noqa: F841 -- computed but unused (see STATUS.md)
         for h in hs.hypotheses:
             refs = h.source_references[:4]
             links = []

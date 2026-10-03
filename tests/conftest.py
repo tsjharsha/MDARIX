@@ -92,6 +92,9 @@ DB_MODULES = {
     "test_public_signup_onboarding",
     "test_simulator_ingestion",
     "test_stage2_operations",
+    # Read the golden investigation directly, so they need it ingested even when they run first (fresh CI database).
+    "test_analysis_reuse",
+    "test_grounded_ask",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

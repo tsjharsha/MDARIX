@@ -49,6 +49,7 @@ not list.
 | `MDARIX_PASSWORD_SCRYPT_LOG2_N` | no | Password hash cost (default 17; production refuses less). Tests use 14. |
 | `MDARIX_RATE_LIMITS_ENABLED` | no | `false` only in automated tests; refused in production. |
 | `MDARIX_CONNECTOR_SECRET_<TENANT ID>_<NAME>` | no | Server secrets a connector may reference by name (prefer the per-connector API key). In staging and production a connector may only name secrets that start with its tenant's identifier, for example `MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE`. |
+| `MDARIX_CONNECTOR_MAX_BYTES` | no | Most a connector sync may read from a provider across all pages (50,000,000 bytes; each page at most 5 MB). |
 | `MDARIX_CONNECTOR_ENCRYPTION_KEY_ID` | no | ID of the current connector encryption key (`k1`). Change it whenever the key changes. |
 | `MDARIX_CONNECTOR_ENCRYPTION_KEYS` | no | Older connector keys still readable during a rotation: `k1:<base64>,k0:<base64>`. Run `scripts/reseal_connector_keys.py --apply`, then remove them. |
 
