@@ -233,7 +233,9 @@ def create_interaction(
         }
         response["grounding"] = {
             "policy_version": grounded.get("policy_version") or grounded.get("context_policy_version"),
-            "tenant_scope_enforced": bool(payload.investigation_id),
+            # The search is always limited to the signed-in tenant; it is narrowed to one case when one is given.
+            "tenant_scope_enforced": True,
+            "investigation_scoped": bool(payload.investigation_id),
             "searched_tenant_evidence": bool(search["sources"]),
             "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
         }

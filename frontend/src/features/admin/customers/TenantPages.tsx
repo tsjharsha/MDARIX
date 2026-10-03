@@ -15,6 +15,7 @@ import {
 import { CustomerAdmins } from "./CustomerAdmins";
 import { lifecycleAction, titleCase } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 /** Every tenant (customer workspace). Opening a row shows the tenant's page. */
 export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void }) {
@@ -388,7 +389,8 @@ function AddEnvironment({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="cc-add-env" onSubmit={submit}>
         <p className="ac-eyebrow">Environments</p>
         <h2 id="cc-add-env">Add environment</h2>

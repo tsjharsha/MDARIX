@@ -15,6 +15,7 @@ import { AddTenant } from "./AddTenant";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { isoDate, lifecycleAction, titleCase, type Plan, type TenantSummary } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 const SECTIONS = ["Overview", "Administrators", "Subscription", "Usage", "Activity"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -341,7 +342,8 @@ export function ChangeSubscription({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="cc-change-sub" onSubmit={submit}>
         <p className="ac-eyebrow">Subscription</p>
         <h2 id="cc-change-sub">Change subscription</h2>

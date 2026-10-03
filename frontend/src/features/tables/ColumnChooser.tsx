@@ -2,6 +2,7 @@ import { createContext, useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Columns3, Plus, RotateCcw, X } from "lucide-react";
 import { fieldLabel, moveField } from "./columnModel";
 import "./columns.css";
+import { DialogBehaviour } from "../shared/DialogBehaviour";
 
 /**
  * Turns on "choose the fields to show" for every table inside it. The value names the area (part of the key under
@@ -57,8 +58,8 @@ export function ColumnChooser({
           className="ac-modal-backdrop"
           role="presentation"
           onClick={(event) => event.target === event.currentTarget && setOpen(false)}
-          onKeyDown={(event) => event.key === "Escape" && setOpen(false)}
         >
+          <DialogBehaviour onClose={() => setOpen(false)} />
           <div className="ac-modal tc-modal" role="dialog" aria-modal="true" aria-labelledby="tc-title">
             <p className="ac-eyebrow">{caption}</p>
             <h2 id="tc-title">Fields to show</h2>

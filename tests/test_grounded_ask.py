@@ -79,7 +79,8 @@ def test_ask_searches_the_evidence_and_checks_the_citations(model):
 def test_ask_without_an_investigation_searches_the_whole_tenant(model):
     response = _ask("Which records describe a supplier process change?", investigation=False)
     assert response["search"]["records_found"] >= 1
-    assert response["grounding"]["tenant_scope_enforced"] is False
+    assert response["grounding"]["tenant_scope_enforced"] is True
+    assert response["grounding"]["investigation_scoped"] is False
     assert response["grounding"]["searched_tenant_evidence"] is True
     tenant_evidence = {item["id"] for item in model.calls[-1]["context"]["retrieved_evidence"]}
     assert all(not identifier.lower().count("ground_truth") for identifier in tenant_evidence)

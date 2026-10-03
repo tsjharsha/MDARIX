@@ -12,6 +12,7 @@ import {
 } from "../../customer-admin/shared";
 import { tenantOptionLabel, type CustomerAdmin, type TenantSummary } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 const REASON = { label: "Reason (kept in the audit trail)", min: 5 };
 
@@ -285,7 +286,8 @@ function AddAdministrator({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="cc-add-admin" onSubmit={submit}>
         <p className="ac-eyebrow">Customer administrators</p>
         <h2 id="cc-add-admin">Add administrator</h2>

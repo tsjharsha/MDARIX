@@ -16,6 +16,7 @@ import {
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -443,7 +444,8 @@ function RequestAccess({ onClose, onRequested }: { onClose: () => void; onReques
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ar-request-access" onSubmit={submit}>
         <p className="ac-eyebrow">Support access</p>
         <h2 id="ar-request-access">Request access</h2>

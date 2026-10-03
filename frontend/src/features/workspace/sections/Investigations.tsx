@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
-import { Drawer, Table, Tabs, errorText, listOf, send, useResource } from "../../customer-admin/shared";
+import { Drawer, Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { Embedded, StatusBadge } from "./common";
 
-const TABS = ["All investigations", "Workspace", "Story"] as const;
+const TABS = ["All investigations", "Workspace", "Story", "CAPAs"] as const;
 type Tab = (typeof TABS)[number];
 
 export function InvestigationsSection({ tab }: { tab?: string }) {
@@ -136,12 +136,68 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
             />
           </Panel>
         ))}
-      {selected && active !== "All investigations" && (
+      {active === "CAPAs" && <Capas />}
+      {selected && active !== "All investigations" && active !== "CAPAs" && (
         <p className="ac-note">
           Showing {selected.investigation_identifier} · {selected.status}
         </p>
       )}
     </>
+  );
+}
+
+/** Corrective and preventive actions from the quality system, with the case they came from. */
+function Capas() {
+  const capas = useResource<any>("/api/v1/data-plane/capas");
+  const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
+  const caseName = new Map(
+    listOf(cases.data?.records).map((row) => [String(row.id), String(row.investigation_identifier)] as const),
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <Panel eyebrow="Quality system" title="CAPAs" state={capas.state} error={capas.error}>
+      <Table
+        caption="CAPAs"
+        rows={listOf(capas.data?.records)}
+        rowKey={(row) => String(row.id)}
+        empty={{ title: "No CAPAs yet", detail: "CAPAs arrive from your quality system through its connection." }}
+        columns={[
+          {
+            key: "capa",
+            label: "CAPA",
+            fields: ["capa_identifier", "title"],
+            render: (row) => (
+              <span className="ca-person">
+                <strong>{row.capa_identifier}</strong>
+                <small>{row.title}</small>
+              </span>
+            ),
+          },
+          { key: "type", label: "Type", fields: ["action_type"], render: (row) => row.action_type ?? "—" },
+          {
+            key: "case",
+            label: "From",
+            fields: ["investigation_id", "source_reference"],
+            render: (row) => caseName.get(String(row.investigation_id)) ?? row.source_reference ?? "—",
+          },
+          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+          {
+            key: "due",
+            label: "Due",
+            fields: ["due_at"],
+            render: (row) => {
+              const due = row.due_at ? String(row.due_at).slice(0, 10) : "";
+              const late = due && due < today && !/closed/i.test(String(row.status));
+              return late ? (
+                <span className="uw-flag-critical">{formatDate(row.due_at)} · overdue</span>
+              ) : (
+                formatDate(row.due_at)
+              );
+            },
+          },
+        ]}
+      />
+    </Panel>
   );
 }
 

@@ -113,9 +113,14 @@ async function sweep(page: Page, persona: string, where: string) {
   const startUrl = page.url();
   for (let index = 0; index < count && pressed < 15; index += 1) {
     const button = buttons.nth(index);
-    const text = ((await button.innerText().catch(() => "")) || (await button.getAttribute("aria-label")) || "").trim();
+    // A button can disappear while the page refreshes: skip it instead of failing the crawl.
+    const text = (
+      (await button.innerText().catch(() => "")) ||
+      (await button.getAttribute("aria-label").catch(() => "")) ||
+      ""
+    ).trim();
     if (!text || UNSAFE.test(text) || !SAFE.test(text) || (await button.isDisabled().catch(() => true))) continue;
-    if ((await button.getAttribute("role")) === "tab") continue;
+    if ((await button.getAttribute("role").catch(() => "")) === "tab") continue;
     await button.click({ timeout: 3000 }).catch(() => undefined);
     pressed += 1;
     await page.waitForTimeout(400);
@@ -206,7 +211,7 @@ test.describe("deep crawl of every screen", () => {
     await page.getByLabel("Last name").fill("Invitee");
     await page.getByLabel("Work email").fill(email);
     await page.getByLabel("Company").fill("E2E Medical");
-    await page.getByLabel("Base role").selectOption("REVIEWER");
+    await page.getByLabel("Base role", { exact: true }).selectOption("REVIEWER");
     await page.getByRole("button", { name: /send invitation/i }).click();
     await expect(page.locator("main")).toContainText(/invit/i, { timeout: 15_000 });
     const listed = await page.request.get("/api/v1/admin/identity/users");

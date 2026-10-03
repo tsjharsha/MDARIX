@@ -21,6 +21,7 @@ import type { MappingCheck } from "../../mapping/mappingModel";
 import { requestJson } from "../../../app/apiClient";
 import { Intro, TenantPicker } from "./common";
 import { RELEASE_STEPS, changePolicyLabel, mappingRuleCount, nextReleaseAction, releaseStageOf } from "./dataModel";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -1077,7 +1078,8 @@ function ProductForm({
   const title =
     dialog.kind === "product" ? "Add product" : dialog.kind === "edit" ? `Edit ${dialog.product.name}` : "Add version";
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ar-product-form" onSubmit={submit}>
         <p className="ac-eyebrow">Customer configuration</p>
         <h2 id="ar-product-form">{title}</h2>

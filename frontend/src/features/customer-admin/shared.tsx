@@ -11,6 +11,7 @@ import {
   resolveSelection,
   saveSelection,
 } from "../tables/columnModel";
+import { DialogBehaviour } from "../shared/DialogBehaviour";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
@@ -262,7 +263,8 @@ export function ConfirmDialog({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <section className="ac-modal" role="alertdialog" aria-modal="true" aria-labelledby="ca-confirm-title">
         <p className="ac-eyebrow">Confirm change · recorded in the audit trail</p>
         <h2 id="ca-confirm-title">{request.title}</h2>
@@ -324,6 +326,7 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
       role="presentation"
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
+      <DialogBehaviour onClose={onClose} />
       <aside className="ca-drawer" role="dialog" aria-modal="true" aria-label={title}>
         <header>
           <h2>{title}</h2>

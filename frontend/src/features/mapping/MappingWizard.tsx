@@ -11,6 +11,7 @@ import {
   withFilter,
 } from "./mappingModel";
 import "./mapping.css";
+import { DialogBehaviour } from "../shared/DialogBehaviour";
 
 type Target = { entity: string; label: string; required: string[]; optional: string[] };
 type Targets = { targets: Target[]; transforms: Array<{ code: string; label: string }> };
@@ -124,7 +125,8 @@ export function MappingWizard({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <div className="ac-modal mw-modal" role="dialog" aria-modal="true" aria-labelledby="mw-title">
         <p className="ac-eyebrow">Step {step} of 3</p>
         <h2 id="mw-title">New mapping</h2>

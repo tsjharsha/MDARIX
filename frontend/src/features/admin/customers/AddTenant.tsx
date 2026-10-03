@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { ENVIRONMENT_TYPES, titleCase, type Plan } from "./model";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 /**
  * Add a tenant to an existing customer: another region, business unit or validation workspace. The tenant is a
@@ -61,7 +62,8 @@ export function AddTenant({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="cc-add-tenant" onSubmit={submit}>
         <p className="ac-eyebrow">{customerName}</p>
         <h2 id="cc-add-tenant">Add tenant</h2>

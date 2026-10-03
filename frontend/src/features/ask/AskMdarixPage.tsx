@@ -125,7 +125,8 @@ function AskAnswer({ result }: { result: any }) {
   const answer: string | null = response.provider_output?.answer ?? null;
   const sources = listOf(response.sources_provenance) as Source[];
   const citations = new Set(sources.map((source) => source.evidence_identifier).filter(Boolean) as string[]);
-  const grounded = response.grounding?.tenant_scope_enforced === true;
+  // Narrowed to one investigation (answers stored before investigation_scoped existed used the older flag).
+  const grounded = (response.grounding?.investigation_scoped ?? response.grounding?.tenant_scope_enforced) === true;
   const searched = response.grounding?.searched_tenant_evidence === true;
   const unverified = listOf(response.answer_check?.unverified_citations).map(asText);
   const sections = SECTIONS.map(([key, title]) => [title, listOf(response[key])] as const).filter(

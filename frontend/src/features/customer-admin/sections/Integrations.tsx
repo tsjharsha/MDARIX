@@ -5,6 +5,7 @@ import { dailyCounts, runOutcomes, titleCase, type Tone } from "../../admin/cons
 import { useConsole } from "../context";
 import { Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../shared";
 import { LifecycleActions, LifecycleBadge } from "./Access";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 const TABS = ["Connections", "Sync activity", "Reconciliation"] as const;
 
@@ -65,7 +66,8 @@ function LinkMapping({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ca-link-mapping" onSubmit={submit}>
         <p className="ac-eyebrow">{connection.code}</p>
         <h2 id="ca-link-mapping">Mapping for this connection</h2>
@@ -139,7 +141,8 @@ function ApiKeyDialog({
     }
   };
   return (
-    <div className="ac-modal-backdrop" role="presentation" onKeyDown={(event) => event.key === "Escape" && onClose()}>
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ca-api-key" onSubmit={save}>
         <p className="ac-eyebrow">{connection.code}</p>
         <h2 id="ca-api-key">API key for this connection</h2>
