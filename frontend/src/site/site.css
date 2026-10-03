@@ -1095,6 +1095,9 @@
   margin-top: 12px;
   color: #c9d7e3;
 }
+.ms-featured .ms-flow {
+  margin-top: 22px;
+}
 .ms-featured .ms-flow span {
   border-color: rgb(255 255 255 / 18%);
   background: rgb(255 255 255 / 8%);
@@ -1746,14 +1749,14 @@
 }
 
 /* Connected systems flow */
-.ms-flow {
+.ms-sysflow {
   margin-top: 8px;
   padding: 18px;
   border: 1px solid var(--ms-line);
   border-radius: var(--ms-radius);
   background: linear-gradient(180deg, var(--ms-surface), var(--ms-ground));
 }
-.ms-flow svg {
+.ms-sysflow svg {
   width: 100%;
   height: auto;
   display: block;
@@ -1939,7 +1942,7 @@
   .ms-standards {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ms-flow svg {
+  .ms-sysflow svg {
     display: none;
   }
   .ms-flow-list {

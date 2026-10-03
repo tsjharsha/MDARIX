@@ -218,7 +218,7 @@ export function SourceFlow() {
           every record, and links complaints to versions, lots, components, suppliers, risks and evidence.
         </p>
       </Reveal>
-      <Reveal className="ms-flow">
+      <Reveal className="ms-sysflow">
         <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="source-flow-svg-title">
           <title id="source-flow-svg-title">
             Eight customer systems flow into MDARIX, which serves Product 360, investigations, Ask MDARIX and decisions
