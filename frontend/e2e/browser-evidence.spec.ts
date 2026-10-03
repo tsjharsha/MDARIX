@@ -287,6 +287,11 @@ test.describe("MDARIX browser evidence", () => {
     await page.goto("/app/ask");
     await expect(page.locator("body")).not.toBeEmpty();
     await expect(page.locator("body")).toContainText(/Ask MDARIX|authorized|human review/i);
+    // A page wider than a phone screen pushes fixed panels (the privacy notice) out of reach.
+    const sidewaysOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(sidewaysOverflow).toBe(0);
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-ai-ask.png`, fullPage: true });
     await page.goto("/app/investigations");
     await expect(page.locator("body")).not.toBeEmpty();
