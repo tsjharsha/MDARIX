@@ -20,8 +20,13 @@ def test_outbox_worker_publishes(monkeypatch):
     db.commit()
     db.close()
     seen = []
-    result = OutboxWorker(lambda name, payload: seen.append((name, payload))).process_once()
-    assert result["published"] >= 1 and ("TEST", {"ok": True}) in seen
+    worker = OutboxWorker(lambda name, payload: seen.append((name, payload)))
+    # Events queued earlier in a shared test database are published first, a batch at a time.
+    for _ in range(200):
+        result = worker.process_once()
+        if ("TEST", {"ok": True}) in seen or not result["published"]:
+            break
+    assert ("TEST", {"ok": True}) in seen
 
 
 def test_outbox_worker_dead_letters_after_retries(monkeypatch):

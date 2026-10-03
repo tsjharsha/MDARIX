@@ -1,9 +1,51 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-10-02, branch `mvp/phase-3-ai`, local Windows development stack
-(Docker Compose). The 2026-09-30 results are kept below for comparison. This file replaces
-the earlier GO/NO-GO documents (archived in `docs/history/release-decisions/`). Update it
-only from real command output.
+**Last verified:** 2026-10-03, branch `mvp/admin-console-areas`, local Windows development stack (Docker Compose). Earlier results
+are kept below for comparison. Update this file only from real command output.
+
+## 2026-10-03 verified results (branch `mvp/admin-console-areas`)
+
+| Check | Command | Result |
+|---|---|---|
+| Backend tests | `python -m pytest` on `mdarix_r1_test` | 793 passed, 1 failed, 4 deselected (21 min 28 s). The failure was a test pinned to exactly seven investigations on the demo product while end-to-end runs had opened more; it now checks the seeded cases (21/21 in that file pass) |
+| Lint / format | `ruff check .`, `ruff format --check .`, `npm run lint`, `npm run format:check` | All clean |
+| Frontend | `npx vitest run`, `npm run build` | 78 tests passed; build succeeds |
+| Migrations | `alembic upgrade head` on the test and dev databases; `downgrade -1` and back on test | Both at `md11masterseedv2`; md10 downgrades and re-applies |
+| Dedicated data planes | `scripts/upgrade_data_planes.py --apply`, then a dry run | Before: 4 tables and 29 columns missing on each of the four planes. After: 0 and 0; schema version recorded |
+| Simulated customer systems | `docker compose up -d --build` (14 simulators), then `scripts/load_source_templates.py --tenant E2E_DEMO` | All 14 healthy; a separate database per tenant created in all 11 systems; 36 template files loaded, none refused |
+| Live connector run | `scratchpad e2e part4_sources.py` against the API on the test database | 358/358 checks: all 39 standard mappings created, approved by a second administrator, released, connected with an encrypted API key, synced and imported; complaint list shows severity and safety flags; CAPAs and suppliers present; Ask MDARIX answered from the imported records (lots L24-0815 and L24-0902, citations verified) |
+| Standard mappings, offline | `pytest tests/test_standard_mappings.py` | 41 passed: every standard mapping passes the release check, and loading every template in order imports the whole story |
+| Screen crawl (Playwright, `e2e/deep-crawl.spec.ts`) | One persona at a time against the dev server | Platform admin 51 screens, two customer admins 28 each, investigator, viewer, investigator (AcmeCare) and approver with MFA 69 + 61 + 53 + 53: 0 issues. Both form flows (invite a user, open an investigation) pass. Found and fixed: a duplicate React key in Product 360 suppliers, and nested `main` landmarks in the admin consoles. The admin consoles have not yet been re-crawled after the landmark fix |
+| Request a demo | `pytest tests/test_demo_requests.py tests/test_business_permissions.py tests/test_public_signup_onboarding.py`; browser run at 1440 and 390 px | 18 passed. Form submits, thank-you shown, no console errors, no sideways scroll; request listed for the Platform Admin and marked contacted (first browser run; a later retest of that step hit "Failed to fetch" while the backend suite shared the test database, and is to be repeated) |
+| Backend tests after these changes | `python -m pytest -x` on `mdarix_r1_test` | 683 passed, 1 failed, then stopped: `test_outbox_worker_publishes` assumed an empty outbox and published only one batch of 50 behind earlier events; it now runs batches until its event is published (7/7 in that file). Full rerun without `-x` in progress at the time of this commit |
+| Migration md12 | `alembic upgrade head`, `downgrade -1`, `upgrade head` on test; `upgrade head` on dev | Both at `md12demorequests` |
+
+What changed (details in `git log`):
+
+- Each tenant has its own database and API key in every simulated customer system; CSV upload API and page.
+- 14 more record types import (components, suppliers, sites, BOM, approved suppliers, lot genealogy, changes,
+  requirements, risks, failure modes, controls, investigations, evidence, CAPAs); complaints keep regulatory
+  details. Mappings can filter rows and set fixed values; 39 standard mappings ship with the templates.
+- Connectors keep the customer system's API key encrypted. Imported records are searchable by Ask MDARIX and the
+  investigator.
+- Supplier evidence requests are limited to the tenant's suppliers and cases, refuse links and are rate limited.
+- Every dialog takes focus, closes with Escape and returns focus (it blocked the page before).
+- Website: MedTech standards, connected-systems flow, example investigation charts; corrected two inaccurate
+  claims about data isolation and credentials.
+- Website: an animated lifecycle loop is the Product Lifecycle hero; the design-phases picture moved to its own
+  section on that page.
+- Request a demo: its own page in the sign-in frame (name, work email, phone), stored in `demo_requests` and listed
+  for Platform Admins (Customers & Tenants > Onboarding) to mark contacted or closed; validated, rate limited, with an
+  optional email alert. Start free trial is unchanged.
+- Each admin page has one `main` landmark (the consoles nested up to three).
+
+Known limits:
+
+- Production has not been run: HTTPS, real email, backups, monitoring, load and a penetration test are untested.
+- No formal validation package (IQ/OQ/PQ, Part 11 traceability) exists yet.
+- AI runs on free provider tiers, which must not receive real customer data.
+- Dedicated data planes are kept in line by script, not by Alembic; tenant-admin dashboards
+  (`access/observability.py`) and platform product configuration still read the control database.
 
 ## 2026-10-02 verified results (branch `mvp/phase-3-ai`)
 
