@@ -4,7 +4,7 @@ import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { signOut } from "../../shared/session";
-import { WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
+import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
 
 const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
@@ -127,7 +127,9 @@ function Access() {
     <div className="ac-grid two">
       <Panel eyebrow="Access" title="What you can open">
         <ul className="ca-boundary">
-          {WORKSPACE_SECTIONS.filter((section) => section !== "My Account").map((section) => {
+          {WORKSPACE_SECTIONS.filter(
+            (section) => section !== "My Account" && !TRIAL_ONLY_SECTIONS.includes(section),
+          ).map((section) => {
             const allowed = sectionAllowed(section, session?.allowed_menu);
             return (
               <li key={section} className={allowed ? "" : "ac-muted"}>

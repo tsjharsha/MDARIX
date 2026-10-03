@@ -3,6 +3,7 @@
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Index,
@@ -147,6 +148,48 @@ class DemoRequest(Base):
         Index("ix_demo_requests_created", "created_at"),
         Index("ix_demo_requests_email", "email"),
         Index("ix_demo_requests_source", "source_hash", "created_at"),
+    )
+
+
+class TrialFeedback(Base):
+    """A free-trial user's feedback on MDARIX, with their consent for showing it on the website.
+
+    publish_consent is what the person agreed to (NAMED, ANONYMOUS or PRIVATE) and consent_text the exact words they
+    saw; nothing is shown publicly until a Platform Administrator publishes it, and withdrawing consent unpublishes it.
+    """
+
+    __tablename__ = "trial_feedback"
+    id = _id()
+    tenant_id = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    organization_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    role_area: Mapped[str | None] = mapped_column(String(40))
+    job_title: Mapped[str | None] = mapped_column(String(120))
+    rating_overall: Mapped[int] = mapped_column(Integer, nullable=False)
+    rating_ease: Mapped[int | None] = mapped_column(Integer)
+    rating_usefulness: Mapped[int | None] = mapped_column(Integer)
+    rating_ai_trust: Mapped[int | None] = mapped_column(Integer)
+    rating_speed: Mapped[int | None] = mapped_column(Integer)
+    rating_import: Mapped[int | None] = mapped_column(Integer)
+    recommend_score: Mapped[int | None] = mapped_column(Integer)
+    features_used = mapped_column(JSONB, nullable=False, server_default="[]")
+    liked: Mapped[str | None] = mapped_column(Text)
+    improve: Mapped[str | None] = mapped_column(Text)
+    missing: Mapped[str | None] = mapped_column(Text)
+    adoption: Mapped[str | None] = mapped_column(String(40))
+    quote: Mapped[str | None] = mapped_column(Text)
+    publish_consent: Mapped[str] = mapped_column(String(20), nullable=False, server_default="PRIVATE")
+    consent_text: Mapped[str] = mapped_column(Text, nullable=False)
+    consent_at = _ts(False)
+    contact_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    publication_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NOT_REQUESTED")
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reviewed_at = _ts()
+    created_at = _ts(False)
+    updated_at = _ts(False)
+    __table_args__ = (
+        Index("ix_trial_feedback_tenant_user", "tenant_id", "user_id"),
+        Index("ix_trial_feedback_publication", "publication_status"),
     )
 
 

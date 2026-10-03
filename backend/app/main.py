@@ -39,6 +39,7 @@ from backend.app.stage3_workflow_router import router as stage3_workflow_router
 from backend.app.trust_router import router as trust_router
 from backend.app.trial.router import router as trial_router
 from backend.app.demo_requests import router as demo_requests_router
+from backend.app.trial.feedback import router as trial_feedback_router
 from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
@@ -215,6 +216,7 @@ app.include_router(stage3_workflow_router)
 app.include_router(mapping_catalog_router)
 app.include_router(trial_router)
 app.include_router(demo_requests_router)
+app.include_router(trial_feedback_router)
 app.include_router(data_import_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)

@@ -22,7 +22,7 @@ import {
   type Capability,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
-import { LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
+import { CustomerVoices, LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
 
 export const SITE_PAGES = [
   "/",
@@ -385,6 +385,7 @@ export function HomePage() {
         </Reveal>
       </section>
 
+      <CustomerVoices />
       <ScopeClarity />
       <CtaBand />
     </>

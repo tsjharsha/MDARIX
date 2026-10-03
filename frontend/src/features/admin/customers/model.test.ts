@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { SECTIONS, lifecycleAction, statusTone, tenantOptionLabel, titleCase } from "./model";
 
 describe("Customers & Tenants model", () => {
-  it("has four sections instead of fourteen", () => {
-    expect(SECTIONS).toEqual(["Customers", "Customer administrators", "Tenants", "Onboarding"]);
+  it("has five sections instead of fourteen", () => {
+    expect(SECTIONS).toEqual(["Customers", "Customer administrators", "Tenants", "Onboarding", "Feedback"]);
   });
 
   it("offers only the standing change that is valid", () => {

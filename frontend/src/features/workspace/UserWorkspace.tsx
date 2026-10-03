@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquareText,
   Package,
   Radio,
   Rocket,
@@ -22,6 +23,7 @@ import "../customer-admin/customer-admin.css";
 import "./workspace.css";
 import { signOut, useIdleSignOut } from "../shared/session";
 import {
+  TRIAL_ONLY_SECTIONS,
   WORKSPACE_SECTIONS,
   WorkspaceContext,
   sectionAllowed,
@@ -43,6 +45,7 @@ import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
+import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
 import { requestJson } from "../../app/apiClient";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
@@ -57,6 +60,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   Intelligence: { icon: Bot, description: "Ask, regulatory, risk", context: true },
   "Trust & Audit": { icon: ShieldCheck, description: "AI assurance and records", context: true },
   "My Account": { icon: UserRound, description: "Profile, security, access", context: false },
+  "Share feedback": { icon: MessageSquareText, description: "Tell us about your trial", context: false },
 };
 
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
@@ -101,7 +105,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     () =>
       WORKSPACE_SECTIONS.filter(
         (section) =>
-          (section !== "Getting started" || trial?.is_trial) && sectionAllowed(section, session?.allowed_menu),
+          (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) && sectionAllowed(section, session?.allowed_menu),
       ),
     [session?.allowed_menu, trial?.is_trial],
   );
@@ -206,6 +210,9 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
               </div>
             </div>
             {NAV[section].context && <ContextBar />}
+            {trial?.is_trial && section !== "Share feedback" && (
+              <FeedbackPrompt onOpen={() => open("Share feedback")} />
+            )}
             {message && (
               <div className={`ac-message tone-${message.tone}`} role="status">
                 {message.text}
@@ -228,6 +235,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
                 {section === "Intelligence" && <IntelligenceSection tab={tab} />}
                 {section === "Trust & Audit" && <TrustSection tab={tab} />}
                 {section === "My Account" && <AccountSection tab={tab} />}
+                {section === "Share feedback" && <FeedbackSection />}
               </div>
             </ColumnScopeProvider>
           </main>

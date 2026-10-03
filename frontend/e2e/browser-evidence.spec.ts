@@ -102,12 +102,13 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("navigation", { name: "Administrator navigation" });
-    // Customers & Tenants has its own four sections, each with a clear heading.
+    // Customers & Tenants has its own five sections, each with a clear heading.
     const customerSections: Record<string, string> = {
       Customers: "Customer directory",
       "Customer administrators": "Customer administrators",
       Tenants: "Tenant directory",
       Onboarding: "New customers, demo and trial requests",
+      Feedback: "Trial feedback and website quotes",
     };
     await openAdminNavigation(page);
     await navigation.getByRole("button", { name: /^Customers & Tenants/ }).click();

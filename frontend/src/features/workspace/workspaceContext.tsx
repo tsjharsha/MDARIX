@@ -14,7 +14,12 @@ export const WORKSPACE_SECTIONS = [
   "Intelligence",
   "Trust & Audit",
   "My Account",
+  // Shown only in free-trial workspaces (see UserWorkspace).
+  "Share feedback",
 ] as const;
+
+/** Sections that exist only in a free-trial workspace. */
+export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Share feedback"];
 
 export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
@@ -31,6 +36,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Intelligence: ["home"],
   "Trust & Audit": ["assurance", "audit"],
   "My Account": [],
+  "Share feedback": [],
 };
 
 export type SessionContext = {

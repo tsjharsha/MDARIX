@@ -1,6 +1,6 @@
 // Shapes and small helpers for the platform administrator's Customers & Tenants area.
 
-export const SECTIONS = ["Customers", "Customer administrators", "Tenants", "Onboarding"] as const;
+export const SECTIONS = ["Customers", "Customer administrators", "Tenants", "Onboarding", "Feedback"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export type CustomerAdmin = {

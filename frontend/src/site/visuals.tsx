@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Reveal } from "./motion";
 
 /* Website visuals drawn from data (SVG): an example investigation in numbers, the customer systems MDARIX reads,
@@ -537,5 +538,45 @@ export function LifecycleHero() {
         </span>
       </figcaption>
     </figure>
+  );
+}
+
+/* ------------------------------------------------------------------------- Customer voices */
+
+type Voice = { quote: string; attribution: string; rating: number };
+
+/** Quotes trial customers agreed to share, credited as they chose. Shows nothing until one has been published. */
+export function CustomerVoices() {
+  const [voices, setVoices] = useState<Voice[]>([]);
+  useEffect(() => {
+    fetch("/api/v1/public/testimonials", { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : { items: [] }))
+      .then((data) => setVoices(Array.isArray(data?.items) ? data.items.slice(0, 6) : []))
+      .catch(() => setVoices([]));
+  }, []);
+  if (!voices.length) return null;
+  return (
+    <section className="ms-section" aria-labelledby="voices-title">
+      <Reveal className="ms-section-head">
+        <span className="ms-eyebrow">Customer voices</span>
+        <h2 id="voices-title">What MedTech teams say after their trial.</h2>
+        <p>In their own words, shared with their permission.</p>
+      </Reveal>
+      <div className="ms-voices">
+        {voices.map((voice, index) => (
+          <Reveal key={`${voice.attribution}-${index}`} delay={(index % 3) * 80} className="ms-card ms-voice">
+            <span className="ms-voice-mark" aria-hidden="true">
+              &ldquo;
+            </span>
+            <blockquote>{voice.quote}</blockquote>
+            <span className="ms-voice-rating" aria-label={`Rated ${voice.rating} of 5`}>
+              {"★".repeat(voice.rating)}
+              <span aria-hidden="true">{"★".repeat(5 - voice.rating)}</span>
+            </span>
+            <cite>{voice.attribution}</cite>
+          </Reveal>
+        ))}
+      </div>
+    </section>
   );
 }

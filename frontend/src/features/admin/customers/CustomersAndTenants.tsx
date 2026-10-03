@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { CreateCustomer } from "../CreateCustomer";
 import { DemoRequestsWorkspace } from "../DemoRequestsWorkspace";
+import { TrialFeedbackWorkspace } from "../TrialFeedbackWorkspace";
 import { TrialRequestsWorkspace } from "../TrialRequestsWorkspace";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { CustomerDirectory } from "./CustomerDirectory";
@@ -15,7 +16,7 @@ import "./customers.css";
 type Open = { kind: "customer"; id: string } | { kind: "tenant"; id: string; from?: string } | null;
 
 /**
- * The platform administrator's Customers & Tenants area: four sections instead of fourteen overlapping tabs.
+ * The platform administrator's Customers & Tenants area: five sections instead of fourteen overlapping tabs.
  * A customer or tenant opens as one page; switching section always returns to that section's list.
  */
 export function CustomersAndTenants({
@@ -63,6 +64,20 @@ export function CustomersAndTenants({
           <CustomerAdmins onMessage={notify} />
         ) : section === "Tenants" ? (
           <TenantDirectory onOpen={(id) => setOpen({ kind: "tenant", id })} />
+        ) : section === "Feedback" ? (
+          <div className="cc-page">
+            <div className="cc-title">
+              <div>
+                <p className="ac-eyebrow">Feedback</p>
+                <h2>Trial feedback and website quotes</h2>
+                <p className="ac-muted">
+                  What trial users think of MDARIX. Publish a quote only where the person agreed; it is credited as they
+                  chose.
+                </p>
+              </div>
+            </div>
+            <TrialFeedbackWorkspace />
+          </div>
         ) : (
           <Onboarding onCreated={() => onSection("Customers")} />
         )}

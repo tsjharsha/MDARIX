@@ -43,6 +43,8 @@ EXEMPT = {
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",
     ("GET", "/api/v1/data/import/templates/{entity}.csv"): "blank CSV template, no customer data",
     ("POST", "/api/v1/public/demo-requests"): "public website form; stores contact details only, rate limited",
+    ("POST", "/api/v1/trial/feedback"): "the trial user's own feedback; trial workspaces only, checked in the route",
+    ("POST", "/api/v1/trial/feedback/{feedback_id}/withdraw-consent"): "the user's own feedback only",
 }
 
 

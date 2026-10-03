@@ -17,8 +17,10 @@ are kept below for comparison. Update this file only from real command output.
 | Standard mappings, offline | `pytest tests/test_standard_mappings.py` | 41 passed: every standard mapping passes the release check, and loading every template in order imports the whole story |
 | Screen crawl (Playwright, `e2e/deep-crawl.spec.ts`) | One persona at a time against the dev server | Platform admin 51 screens, two customer admins 28 each, investigator, viewer, investigator (AcmeCare) and approver with MFA 69 + 61 + 53 + 53: 0 issues. Both form flows (invite a user, open an investigation) pass. Found and fixed: a duplicate React key in Product 360 suppliers, and nested `main` landmarks in the admin consoles. The admin consoles have not yet been re-crawled after the landmark fix |
 | Request a demo | `pytest tests/test_demo_requests.py tests/test_business_permissions.py tests/test_public_signup_onboarding.py`; browser run at 1440 and 390 px | 18 passed. Form submits, thank-you shown, no console errors, no sideways scroll; request listed for the Platform Admin and marked contacted (first browser run; a later retest of that step hit "Failed to fetch" while the backend suite shared the test database, and is to be repeated) |
-| Backend tests after these changes | `python -m pytest -x` on `mdarix_r1_test` | 683 passed, 1 failed, then stopped: `test_outbox_worker_publishes` assumed an empty outbox and published only one batch of 50 behind earlier events; it now runs batches until its event is published (7/7 in that file). Full rerun without `-x` in progress at the time of this commit |
-| Migration md12 | `alembic upgrade head`, `downgrade -1`, `upgrade head` on test; `upgrade head` on dev | Both at `md12demorequests` |
+| Backend tests after these changes | `python -m pytest` on `mdarix_r1_test` | First run (`-x`): 683 passed, then `test_outbox_worker_publishes` failed: it assumed an empty outbox and published only one batch of 50 behind earlier events; it now runs batches until its event is published. Rerun: 804 passed, 0 failed. After trial feedback was added: 810 passed, 0 failed (14 min 46 s) |
+| Migrations md12, md13 | `alembic upgrade head`, `downgrade -1`, `upgrade head` on test; `upgrade head` on dev | Both at `md13trialfeedback` |
+| Trial feedback | `pytest tests/test_trial_feedback.py`; browser run against the API on the test database | 6 tests pass (trial only, named and anonymous credit, private never published, withdrawal unpublishes, list values enforced, another person's feedback untouched). Browser: invitation shown to a trial user; questionnaire sent; an anonymous quote naming the company refused; invitation gone after sending; Platform Admin read and published it; the home page showed it credited "Regulatory affairs lead, medical-device company" without the company name |
+| Request a demo, admin step | Browser run after the backend suite | Request listed for the Platform Admin, marked contacted, shown under Contacted. The earlier "Failed to fetch" was the dev server having stopped |
 
 What changed (details in `git log`):
 
@@ -38,6 +40,12 @@ What changed (details in `git log`):
   for Platform Admins (Customers & Tenants > Onboarding) to mark contacted or closed; validated, rate limited, with an
   optional email alert. Start free trial is unchanged.
 - Each admin page has one `main` landmark (the consoles nested up to three).
+- Trial feedback: a trial workspace invites feedback (banner, "Not now" for three days) and has a Share feedback
+  page: ratings, likelihood to recommend, features tried, what is good, what to improve, adoption, and consent to
+  show a quote with the company's name, anonymously, or not at all. The consent wording is stored with the answer
+  and can be withdrawn. Platform Admins read responses (Customers & Tenants > Feedback) and publish consented
+  quotes; the home page shows published quotes, credited as the person chose. Migration md13 (`trial_feedback`,
+  row-level security).
 
 Known limits:
 
