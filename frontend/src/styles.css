@@ -10720,3 +10720,73 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   background: #e3f2f1;
   color: #06625f;
 }
+
+/* A button that reads as a link, for actions inside link rows (trial-ended page). */
+.auth-links .link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Help menu in the signed-in headers (features/shared/HelpMenu.tsx). */
+.help-menu {
+  position: relative;
+}
+.help-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  min-width: 260px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid #dde5ec;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(16 32 47 / 14%);
+  list-style: none;
+}
+.help-menu-list a,
+.help-menu-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #10202f;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.help-menu-list a:hover,
+.help-menu-list button:hover,
+.help-menu-list a:focus-visible,
+.help-menu-list button:focus-visible {
+  background: #e3f2f1;
+}
+
+/* Keyboard users jump past the header and navigation to the screen's content. */
+.app-skip {
+  position: absolute;
+  top: -48px;
+  left: 16px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #183249;
+  color: #ffffff;
+  font-weight: 600;
+}
+.app-skip:focus {
+  top: 10px;
+}

@@ -1,11 +1,7 @@
 """Tenant configuration: connectors, mappings, releases and the generic control-plane editor."""
 
-import json
 import uuid
 from datetime import datetime, timezone
-from urllib.error import HTTPError, URLError
-from urllib.request import Request as UrlRequest
-from backend.app.access.outbound import safe_urlopen
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -27,9 +23,6 @@ from backend.app.db.models.foundation import (
     SegregationOfDutiesPolicy,
     Tenant,
 )
-from backend.app.db.models.stage2 import (
-    OutboxEvent,
-)
 from backend.app.db.session import get_db
 from integration.gateway import ConnectionConfig, Connector, MappingDefinition, preview
 from backend.app.access.schemas import (
@@ -48,20 +41,15 @@ from backend.app.access.authz import (
     _require_platform_admin,
     is_hidden_from,
 )
-from backend.app.access.common import _audit_configuration, _connector_credential, _provider_get, _safe_provider_url
+from backend.app.access.common import _audit_configuration, _provider_get
 from backend.app.access.connector_mapping import (
     IMPORTABLE_TARGETS,
-    MappingNotUsable,
     check_mapping,
     field_rules,
-    import_connector_records,
     mapping_targets,
-    released_mapping,
     standard_mappings,
 )
 from backend.app.db.models.enterprise import ConnectorRun
-from backend.app.db.data_plane import get_data_plane_db
-from backend.app.request_context import get_request_context
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -129,6 +117,25 @@ def _commit_unique(db: Session, kind: str, code: str) -> None:
         ) from exc
 
 
+def _check_secret_namespace(db: Session, tenant_id, configuration: dict) -> None:
+    """A credential reference must be in this tenant's namespace (staging and production)."""
+    from backend.app.access.outbound import secret_ref_problem, tenant_secret_prefix
+
+    ref = (configuration or {}).get("credential_ref")
+    if ref is None:
+        return
+    tenant = db.get(Tenant, tenant_id)
+    identifier = tenant.tenant_identifier if tenant else None
+    if secret_ref_problem(ref, identifier) == "CONNECTOR_CREDENTIAL_REF_NOT_FOR_TENANT":
+        raise HTTPException(
+            422,
+            detail={
+                "code": "CONNECTOR_CREDENTIAL_REF_NOT_FOR_TENANT",
+                "message": f"Name a server secret that starts with {tenant_secret_prefix(identifier or '')}",
+            },
+        )
+
+
 @router.post("/admin/configuration/connectors")
 def create_connector(payload: ConnectorRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
@@ -151,6 +158,7 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
                 "message": "Secrets must be stored in a managed secret provider, not configuration",
             },
         ) from exc
+    _check_secret_namespace(db, admin.tenant_id, configuration)
     _code_taken(db, ConnectorConfiguration, admin.tenant_id, payload.code, payload.version, "connector")
     _enforce_connector_limit(db, admin.tenant_id)
     row = ConnectorConfiguration(
@@ -656,6 +664,7 @@ def update_control_plane_resource(
                     "message": "Secrets must use a managed secret provider",
                 },
             ) from exc
+        _check_secret_namespace(db, admin.tenant_id, payload.values["configuration"])
     if resource == "persona-assignments" and "persona_code" in payload.values:
         try:
             payload.values["persona_code"] = get_persona(payload.values["persona_code"]).code
@@ -790,99 +799,16 @@ def execute_connector(
                 "message": "Active connector is not available for this tenant",
             },
         )
-    records = payload.records
-    configuration = row.configuration or {}
-    if not records and configuration.get("endpoint"):
-        source_object = configuration.get("source_object", payload.source_system)
-        timeout = float(configuration.get("timeout_seconds", 10))
-        try:
-            url = _safe_provider_url(
-                configuration["endpoint"],
-                configuration.get("records_path", f"records/{source_object}"),
-                timeout=timeout,
-            )
-            token = _connector_credential(configuration, row)
-        except ValueError as exc:
-            raise HTTPException(
-                422, detail={"code": str(exc), "message": "Connector endpoint configuration is not safe or valid"}
-            ) from exc
-        tenant_key = configuration.get("tenant_key")
-        if tenant_key:
-            url += ("&" if "?" in url else "?") + f"tenant={tenant_key}"
-        headers = {"Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-            headers["X-Provider-Token"] = token
-        try:
-            with safe_urlopen(UrlRequest(url, headers=headers, method="GET"), timeout=timeout) as response:
-                raw = response.read(5_000_001)
-                if len(raw) > 5_000_000:
-                    raise HTTPException(
-                        502,
-                        detail={
-                            "code": "PROVIDER_RESPONSE_TOO_LARGE",
-                            "message": "Provider response exceeds the configured safety limit",
-                        },
-                    )
-                body = json.loads(raw.decode())
-            if tenant_key and body.get("tenant_key") != tenant_key:
-                raise HTTPException(
-                    502,
-                    detail={
-                        "code": "PROVIDER_TENANT_SCOPE_INVALID",
-                        "message": "Provider returned an unexpected tenant scope",
-                    },
-                )
-            records = body.get("records", [])
-        except HTTPException:
-            raise
-        except (HTTPError, URLError, TimeoutError, ValueError) as exc:
-            raise HTTPException(
-                502, detail={"code": "PROVIDER_READ_FAILED", "message": "Provider read failed"}
-            ) from exc
-    connector = Connector(
-        ConnectionConfig(str(admin.tenant_id), str(row.id), row.code, row.connector_type, payload.source_system),
-        records,
-    )
-    result = connector.read_records()
-    # With a released mapping, the records also become the tenant's products, lots or complaints through the same
-    # checked import as CSV uploads (all or nothing). The raw records are staged in the outbox either way.
-    canonical_import = None
-    mapping_code = (row.configuration or {}).get("mapping_code")
-    if mapping_code and result:
-        try:
-            mapping = released_mapping(db, admin.tenant_id, str(mapping_code))
-        except MappingNotUsable as exc:
-            canonical_import = {"status": "BLOCKED", "reason": str(exc)}
-        else:
-            # The tenant's data plane is opened only when a mapping is configured.
-            sessions = get_data_plane_db(get_request_context(request, db), db)
-            data = next(sessions)
-            try:
-                canonical_import = import_connector_records(data, admin.tenant_id, row.code, mapping, result)
-            except MappingNotUsable as exc:
-                canonical_import = {"status": "BLOCKED", "reason": str(exc)}
-            try:
-                if canonical_import.get("status") == "IMPORTED":
-                    data.commit()
-                else:
-                    data.rollback()
-            finally:
-                sessions.close()
-    for record in result:
-        db.add(
-            OutboxEvent(
-                tenant_id=admin.tenant_id,
-                event_name="PROVIDER_RECORD_RECEIVED",
-                aggregate_type=f"{row.code}:{payload.source_system}",
-                payload={"tenant_id": str(admin.tenant_id), "source_system": payload.source_system, "record": record},
-                occurred_at=datetime.now(timezone.utc),
-            )
+    from backend.app.access.connector_sync import ProviderReadError, sync_connector
+
+    try:
+        outcome = sync_connector(
+            db, admin.tenant_id, row, payload.source_system, str(admin.id), records=payload.records, run_type="MANUAL"
         )
-    run = _record_sync(admin.tenant_id, row, payload.source_system, len(result), canonical_import)
-    db.add(run)
-    _audit_configuration(db, admin, "CONNECTOR_EXECUTED", "ConnectorConfiguration", row.id, row.version)
-    db.commit()
+    except ProviderReadError as exc:
+        db.rollback()
+        raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
+    canonical_import = outcome["canonical_import"]
     if canonical_import and canonical_import.get("status") == "IMPORTED" and canonical_import.get("rows"):
         # Semantic search over the imported records (their text is already searchable by product and record).
         from backend.app.db.data_plane import open_tenant_data_session
@@ -891,12 +817,11 @@ def execute_connector(
         background.add_task(embed_tenant_evidence, open_tenant_data_session, admin.tenant_id)
     return {
         "status": "COMPLETE",
-        "run_id": str(run.id),
+        "run_id": str(outcome["run"].id),
         "tenant_id": str(admin.tenant_id),
         "connector_id": str(row.id),
-        "records_read": len(result),
-        "outbox_enqueued": len(result),
-        "records": result,
+        "records_read": outcome["records_read"],
+        "outbox_enqueued": outcome["records_read"],
         "canonical_import": canonical_import,
     }
 

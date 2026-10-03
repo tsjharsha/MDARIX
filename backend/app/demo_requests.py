@@ -71,9 +71,11 @@ def _clean(payload: DemoRequestIn) -> tuple[str, str, str]:
 
 
 def _source_hash(request: Request) -> str | None:
-    address = request.client.host if request.client else None
-    if os.getenv("MDARIX_TRUST_PROXY_HEADERS", "").lower() in {"1", "true", "yes"}:
-        address = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or address
+    from backend.app.client_ip import client_ip
+
+    # Only the address our own proxy saw counts; anything further left in X-Forwarded-For can be forged. A peer that
+    # is not an IP address (a local socket) still identifies the sender.
+    address = client_ip(request) or (request.client.host if request.client else None)
     if not address:
         return None
     salt = os.getenv("MDARIX_DEMO_REQUEST_SALT", "mdarix-demo-requests")

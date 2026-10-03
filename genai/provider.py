@@ -27,6 +27,8 @@ OPENAI_COMPATIBLE = {
     # Free OpenRouter models come and go; check https://openrouter.ai/models?max_price=0 when this one stops answering.
     "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "nvidia/nemotron-3-super-120b-a12b:free"),
     "mistral": ("https://api.mistral.ai/v1/chat/completions", "mistral-small-latest"),
+    # Anthropic's OpenAI-compatible endpoint; for production use under a commercial agreement (genai/policy.py).
+    "anthropic": ("https://api.anthropic.com/v1/chat/completions", "claude-sonnet-5-5"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
 }
 
@@ -38,9 +40,12 @@ def default_model(name: str) -> str | None:
 
 # Services that no longer exist: named in MDARIX_GENAI_FALLBACKS they are skipped with a warning.
 RETIRED_PROVIDERS = {"github": "GitHub Models was retired by GitHub on 30 July 2026"}
-# A provider that refused us (rate or daily limit) is skipped until this time (monotonic seconds), so a demo does not
-# wait on it for every request; any other failure is skipped for a short time only.
+# A provider that refused us (rate or daily limit) is skipped until this time (epoch seconds), so a request does not
+# wait on it every time; any other failure is skipped for a short time only. This is the process's own copy; every
+# process also reads and writes the shared rest periods (genai/governance.py).
 _COOLDOWN_UNTIL: dict[str, float] = {}
+# Retired or misspelt fallback names already warned about, so the warning is logged once per process.
+_WARNED_FALLBACKS: set[str] = set()
 SENSITIVE = re.compile(r"(?i)(password|token|secret|cookie|authorization|api[_-]?key|credential)\s*[:=]\s*[^,;\n]+")
 logger = logging.getLogger(__name__)
 
@@ -112,7 +117,8 @@ class GenAIProvider:
         return bool(self.base_url and (self.api_key or self.provider_name == "ollama"))
 
     def health(self):
-        now = time.monotonic()
+        now = time.time()
+        resting_until = _resting_until()
         return {
             "configured": self.configured,
             "provider": self.provider_name if self.base_url else "controlled",
@@ -126,7 +132,7 @@ class GenAIProvider:
                     "provider": item.provider_name,
                     "model": item.model,
                     "configured": item.configured,
-                    "resting": _COOLDOWN_UNTIL.get(item.provider_name, 0) > now,
+                    "resting": resting_until.get(item.provider_name, 0) > now,
                 }
                 for item in self.fallbacks
             ],
@@ -159,8 +165,14 @@ class GenAIProvider:
         max_output_tokens: int | None = None,
     ) -> GenAIResult:
         """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request."""
+        from genai import pii
+
         safe_prompt = SENSITIVE.sub(lambda m: m.group(1) + ": [REDACTED]", prompt)
         safe_context = redact_context(context or {})
+        if pii.enabled():
+            # Personal information never leaves for a model (genai/pii.py); identifiers of records are kept.
+            safe_prompt = pii.mask_text(safe_prompt)
+            safe_context = pii.mask(safe_context)
         input_tokens = max(1, (len(safe_prompt) + len(json.dumps(safe_context, default=str)) + len(system or "")) // 4)
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
@@ -192,13 +204,18 @@ class GenAIProvider:
             # Every configured provider is forbidden here (for example a free tier in production): no model is called.
             logger.error("No AI provider may receive customer data in this environment; answering without a model")
             raise GenAIUnavailable("GENAI_PROVIDER_NOT_ALLOWED")
-        resting = [item for item in chain if _COOLDOWN_UNTIL.get(item.provider_name, 0) > time.monotonic()]
+        from genai import governance
+
+        # The organization's AI switch and monthly budget (raises when it may not use a model now).
+        tenant_id = governance.check_allowed(input_tokens + (max_output_tokens or self.max_output))
+        resting_until = _resting_until()
+        resting = [item for item in chain if resting_until.get(item.provider_name, 0) > time.time()]
         # Providers that are resting are tried last, so a request still gets an answer if every provider rests.
         ordered = [item for item in chain if item not in resting] + resting
         last_error: GenAIUnavailable | None = None
         for item in ordered:
             try:
-                return item._send(
+                result = item._send(
                     safe_prompt,
                     safe_context,
                     system=system,
@@ -208,6 +225,8 @@ class GenAIProvider:
                     started=started,
                     fail_fast=len(ordered) > 1,
                 )
+                governance.record_usage(tenant_id, result.input_tokens, result.output_tokens, result.estimated_cost)
+                return result
             except GenAIUnavailable as exc:
                 last_error = exc
                 logger.warning("GenAI provider %s unavailable; trying the next one", item.provider_name)
@@ -299,8 +318,10 @@ class GenAIProvider:
                     type(exc).__name__,
                 )
                 if fail_fast and status == 429:
-                    _COOLDOWN_UNTIL[self.provider_name] = time.monotonic() + float(
-                        os.getenv("MDARIX_GENAI_RATE_LIMIT_REST_SECONDS", "900")
+                    _rest(
+                        self.provider_name,
+                        float(os.getenv("MDARIX_GENAI_RATE_LIMIT_REST_SECONDS", "900")),
+                        "RATE_LIMITED",
                     )
                     break
                 wait = min(2**attempt, 4)
@@ -313,12 +334,27 @@ class GenAIProvider:
                     wait = max(wait, min(asked, float(os.getenv("MDARIX_GENAI_MAX_RETRY_WAIT_SECONDS", "10"))))
                 if attempt < self.retries:
                     time.sleep(wait)
-        if fail_fast and _COOLDOWN_UNTIL.get(self.provider_name, 0) <= time.monotonic():
+        if fail_fast and _COOLDOWN_UNTIL.get(self.provider_name, 0) <= time.time():
             # Down rather than limited: rest briefly so the next requests go straight to a working provider.
-            _COOLDOWN_UNTIL[self.provider_name] = time.monotonic() + float(
-                os.getenv("MDARIX_GENAI_OUTAGE_REST_SECONDS", "60")
-            )
+            _rest(self.provider_name, float(os.getenv("MDARIX_GENAI_OUTAGE_REST_SECONDS", "60")), "UNAVAILABLE")
         raise GenAIUnavailable(f"GENAI_PROVIDER_UNAVAILABLE: {type(error).__name__}")
+
+
+def _resting_until() -> dict[str, float]:
+    """Each resting provider's end of rest (epoch seconds): this process's own, or the shared one if later."""
+    from genai import governance
+
+    merged = dict(_COOLDOWN_UNTIL)
+    for name, until in governance.shared_rest_until().items():
+        merged[name] = max(until, merged.get(name, 0.0))
+    return merged
+
+
+def _rest(name: str, seconds: float, reason: str) -> None:
+    from genai import governance
+
+    _COOLDOWN_UNTIL[name] = max(_COOLDOWN_UNTIL.get(name, 0.0), time.time() + seconds)
+    governance.share_rest(name, seconds, reason)
 
 
 def fallback_chain(primary: GenAIProvider) -> list[GenAIProvider]:
@@ -329,7 +365,9 @@ def fallback_chain(primary: GenAIProvider) -> list[GenAIProvider]:
     """
     names = [name.strip().lower() for name in os.getenv("MDARIX_GENAI_FALLBACKS", "").split(",") if name.strip()]
     for name, reason in unusable_fallbacks(names).items():
-        logger.warning("GenAI fallback %s is skipped: %s", name, reason)
+        if name not in _WARNED_FALLBACKS:
+            _WARNED_FALLBACKS.add(name)
+            logger.warning("GenAI fallback %s is skipped: %s", name, reason)
     return [
         GenAIProvider(
             provider_name=name,

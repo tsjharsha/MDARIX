@@ -52,7 +52,18 @@ class Product360Service:
     def tenant_id(self) -> str:
         return self.graph.tenant_id()
 
-    def list_products(self, tenant_id: str | None = None, db_engine=None) -> list[ProductSummary]:
+    def count_products(self, tenant_id: str, db_engine=None) -> int:
+        with (db_engine or engine).connect() as conn:
+            return int(
+                conn.execute(
+                    text("SELECT count(*) FROM products WHERE tenant_id=:tenant_id"), {"tenant_id": tenant_id}
+                ).scalar()
+                or 0
+            )
+
+    def list_products(
+        self, tenant_id: str | None = None, db_engine=None, *, limit: int | None = None, offset: int = 0
+    ) -> list[ProductSummary]:
         tenant_id = tenant_id or self.tenant_id()
         with (db_engine or engine).connect() as conn:
             rows = (
@@ -62,9 +73,9 @@ class Product360Service:
                         "array_agg(pv.version_identifier ORDER BY pv.version_identifier) AS versions "
                         "FROM products p LEFT JOIN product_versions pv ON pv.tenant_id=p.tenant_id AND pv.product_id=p.id "
                         "WHERE p.tenant_id=:tenant_id GROUP BY p.id, p.product_identifier, p.name, p.product_family, p.lifecycle_status "
-                        "ORDER BY p.name"
+                        "ORDER BY p.name, p.id LIMIT :limit OFFSET :offset"
                     ),
-                    {"tenant_id": tenant_id},
+                    {"tenant_id": tenant_id, "limit": limit, "offset": offset},
                 )
                 .mappings()
                 .all()

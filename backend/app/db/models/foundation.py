@@ -63,6 +63,9 @@ class Tenant(Base):
     ai_processing_region: Mapped[str | None] = mapped_column(String(80))
     disaster_recovery_region: Mapped[str | None] = mapped_column(String(80))
     cross_border_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    # Whether this organization's content may be sent to an AI model, and its monthly token budget (genai/governance.py).
+    ai_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    ai_monthly_token_budget: Mapped[int | None] = mapped_column(BigInteger)
     application_version: Mapped[str | None] = mapped_column(String(80))
     schema_version: Mapped[str | None] = mapped_column(String(80))
     configuration_version: Mapped[str | None] = mapped_column(String(80))
@@ -77,7 +80,7 @@ class Tenant(Base):
     __table_args__ = (
         UniqueConstraint("customer_id", "id", name="uq_tenants_customer_id_id"),
         CheckConstraint(
-            "status in ('DRAFT','PENDING_APPROVAL','PROVISIONING','PROVISIONED','PENDING_CUSTOMER_ACTIVATION','ACTIVE','EXPIRING_SOON','EXPIRED','SUSPENDED','TERMINATED','ARCHIVED')",
+            "status in ('DRAFT','PENDING_APPROVAL','PROVISIONING','PROVISIONED','PENDING_CUSTOMER_ACTIVATION','ACTIVE','EXPIRING_SOON','EXPIRED','SUSPENDED','TERMINATED','ARCHIVED','PURGING')",
             name="tenant_lifecycle_status_allowed",
         ),
         CheckConstraint(
@@ -532,6 +535,8 @@ class AuditEvent(Base):
     reason: Mapped[str | None] = mapped_column(Text)
     old_values: Mapped[dict | None] = mapped_column(JSONB)
     new_values: Mapped[dict | None] = mapped_column(JSONB)
+    # Set by the database when the row is inserted (migration md18); anything the application sets is replaced.
+    chain_seq: Mapped[int | None] = mapped_column(BigInteger)
     previous_hash: Mapped[str | None] = mapped_column(String(64))
     event_hash: Mapped[str | None] = mapped_column(String(64))
     retention_until = tz(True)

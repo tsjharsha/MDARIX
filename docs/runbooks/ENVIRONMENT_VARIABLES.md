@@ -48,7 +48,9 @@ not list.
 | `MDARIX_RATE_LIMIT_SALT` | yes | Salts rate-limit keys. |
 | `MDARIX_PASSWORD_SCRYPT_LOG2_N` | no | Password hash cost (default 17; production refuses less). Tests use 14. |
 | `MDARIX_RATE_LIMITS_ENABLED` | no | `false` only in automated tests; refused in production. |
-| `MDARIX_CONNECTOR_SECRET_<NAME>` | no | Server-wide secrets a connector may reference by name (legacy; prefer the per-connector API key). |
+| `MDARIX_CONNECTOR_SECRET_<TENANT ID>_<NAME>` | no | Server secrets a connector may reference by name (prefer the per-connector API key). In staging and production a connector may only name secrets that start with its tenant's identifier, for example `MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE`. |
+| `MDARIX_CONNECTOR_ENCRYPTION_KEY_ID` | no | ID of the current connector encryption key (`k1`). Change it whenever the key changes. |
+| `MDARIX_CONNECTOR_ENCRYPTION_KEYS` | no | Older connector keys still readable during a rotation: `k1:<base64>,k0:<base64>`. Run `scripts/reseal_connector_keys.py --apply`, then remove them. |
 
 ## Files
 
@@ -97,6 +99,9 @@ not list.
 | `MDARIX_GENAI_TIMEOUT_SECONDS`, `MDARIX_GENAI_MAX_RETRIES`, `MDARIX_GENAI_MAX_RETRY_WAIT_SECONDS` | no | Request limits (20 s, 2, 10 s). |
 | `MDARIX_GENAI_MAX_INPUT_TOKENS`, `MDARIX_GENAI_MAX_OUTPUT_TOKENS`, `MDARIX_GENAI_COST_PER_1K_TOKENS` | no | Size limits and cost estimate. |
 | `MDARIX_GENAI_RATE_LIMIT_REST_SECONDS`, `MDARIX_GENAI_OUTAGE_REST_SECONDS` | no | How long a limited or failing provider rests. |
+| `MDARIX_GENAI_SHARED_REST` | no | `true` (default): a resting provider is skipped by every API, worker and scheduler process (table `genai_provider_rest`). Tests set `false`. |
+| `MDARIX_GENAI_TENANT_MONTHLY_TOKENS` | no | Monthly AI token allowance of an organization without its own (2,000,000). Platform administrators set per-organization allowances; customer administrators can switch AI off. |
+| `MDARIX_GENAI_PII_MASKING` | no | `true` (default): names, contact details, dates of birth and record numbers are masked before any model request (`genai/pii.py`). `false` is honoured only in local development on synthetic data; staging and production always mask. |
 | `MDARIX_EMBEDDING_PROVIDER`, `MDARIX_EMBEDDING_CACHE_DIR` | no | Local embedding model (runs on the server; nothing is sent out). |
 
 ## Security policy

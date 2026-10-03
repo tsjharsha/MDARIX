@@ -73,13 +73,8 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
         .first()
     )
     if row is None:
-        # Unit/integration fixtures create short-lived tenants that are not
-        # part of the four synthetic MVP planes. Keep those tests focused on
-        # endpoint behavior without weakening runtime behavior; every real
-        # request outside pytest still fails closed.
-        if os.getenv("PYTEST_CURRENT_TEST"):
-            yield control_db
-            return
+        # Every organization is registered (migration md20 registers new ones on the shared plane); one without an
+        # ACTIVE plane (retired, suspended, failed) gets no business data.
         raise HTTPException(
             503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "No active tenant data plane is registered"}
         )
@@ -88,15 +83,69 @@ def get_data_plane_db(ctx=Depends(get_request_context), control_db=Depends(get_d
         return
     try:
         factory = session_factory(row.database_ref, row.connection_secret_ref)
+        schema_ok = plane_schema_ok(row.database_ref, row.connection_secret_ref)
         db = factory()
     except Exception as exc:
         raise HTTPException(
             503, detail={"code": "DATA_PLANE_UNAVAILABLE", "message": "Tenant data plane is unavailable"}
         ) from exc
+    if not schema_ok:
+        db.close()
+        raise HTTPException(
+            503,
+            detail={"code": "DATA_PLANE_SCHEMA_OUTDATED", "message": "Tenant data plane is being upgraded; try again"},
+        )
+    from backend.app.db.tenant_scope import bind_tenant
+
+    # The plane enforces the same row-level security as the shared database, for this organization only.
+    bind_tenant(db, UUID(str(ctx.tenant_id)))
     try:
         yield db
     finally:
         db.close()
+
+
+_SCHEMA_CHECKED: dict[str, tuple[float, bool]] = {}
+SCHEMA_CHECK_SECONDS = 60
+
+
+@lru_cache(maxsize=1)
+def schema_head() -> str:
+    """The migration head this code expects (the control database and every dedicated plane must be at it)."""
+    from pathlib import Path
+
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    root = Path(__file__).resolve().parents[3]
+    return ScriptDirectory.from_config(Config(str(root / "alembic.ini"))).get_current_head()
+
+
+def plane_schema_ok(database_ref: str, secret_ref: str) -> bool:
+    """A dedicated plane serves requests only at the code's migration head (scripts/migrate_data_planes.py).
+
+    A plane built by the older scripts records no revision; it is accepted in local development only. The answer is
+    cached for a minute per plane."""
+    import time
+
+    from sqlalchemy import text
+
+    cached = _SCHEMA_CHECKED.get(database_ref)
+    if cached and time.monotonic() - cached[0] < SCHEMA_CHECK_SECONDS:
+        return cached[1]
+    db = session_factory(database_ref, secret_ref)()
+    try:
+        revision = (
+            db.execute(text("SELECT to_regclass('public.alembic_version') IS NOT NULL")).scalar()
+            and db.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        )
+        ok = revision == schema_head() if revision else is_local()
+    except Exception:
+        ok = False
+    finally:
+        db.close()
+    _SCHEMA_CHECKED[database_ref] = (time.monotonic(), ok)
+    return ok
 
 
 @lru_cache(maxsize=32)
@@ -127,8 +176,9 @@ def data_plane_session(database_ref: str, secret_ref: str):
 @contextmanager
 def open_tenant_data_session(tenant_id):
     """A session on one tenant's business data for work outside a request, such as a background step after an
-    import. Resolved from the registry exactly like get_data_plane_db; a tenant without a dedicated plane uses the
-    control database bound to that tenant (row-level security)."""
+    import. Resolved from the registry exactly like get_data_plane_db: the shared plane is the control database
+    bound to the tenant (row-level security); a dedicated plane is its own database, bound the same way. A tenant
+    without an ACTIVE plane raises RuntimeError("DATA_PLANE_UNAVAILABLE:...")."""
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.session import SessionLocal
     from backend.app.db.tenant_scope import bind_system, bind_tenant
@@ -141,15 +191,43 @@ def open_tenant_data_session(tenant_id):
             .filter(TenantDataPlane.tenant_id == tenant_id, TenantDataPlane.status == "ACTIVE")
             .first()
         )
-        if row is None or row.connection_secret_ref == SHARED_CONTROL_DATA_PLANE:
+        if row is None:
+            raise RuntimeError(f"DATA_PLANE_UNAVAILABLE:{tenant_id}")
+        if row.connection_secret_ref == SHARED_CONTROL_DATA_PLANE:
             control.commit()
             bind_tenant(control, tenant_id)
             yield control
             return
+        if not plane_schema_ok(row.database_ref, row.connection_secret_ref):
+            raise RuntimeError(f"DATA_PLANE_SCHEMA_OUTDATED:{tenant_id}")
         db = session_factory(row.database_ref, row.connection_secret_ref)()
+        bind_tenant(db, tenant_id)
         try:
             yield db
         finally:
             db.close()
     finally:
         control.close()
+
+
+@contextmanager
+def tenant_data_session(tenant_id):
+    """open_tenant_data_session for request handlers that name a tenant (platform and admin screens): an unknown
+    tenant, or one without an active plane, is 404; a plane whose schema is behind is 503."""
+    from fastapi import HTTPException
+
+    try:
+        with open_tenant_data_session(tenant_id) as session:
+            yield session
+    except RuntimeError as exc:
+        if str(exc).startswith("DATA_PLANE_SCHEMA_OUTDATED"):
+            raise HTTPException(
+                503,
+                detail={"code": "DATA_PLANE_SCHEMA_OUTDATED", "message": "Tenant data plane is being upgraded"},
+            ) from exc
+        if str(exc).startswith("DATA_PLANE_UNAVAILABLE"):
+            raise HTTPException(
+                404,
+                detail={"code": "TENANT_DATA_NOT_AVAILABLE", "message": "This organization's data is not available"},
+            ) from exc
+        raise

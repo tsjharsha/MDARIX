@@ -4,7 +4,8 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import (
@@ -16,6 +17,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
+from backend.app.paging import Page
 from backend.app.request_context import get_request_context
 from backend.app.access.schemas import (
     AdminUpdateRequest,
@@ -87,11 +89,21 @@ def create_product(payload: ProductRequest, request: Request, db: Session = Depe
 
 
 @router.get("/admin/catalog/products")
-def list_products(request: Request, db: Session = Depends(get_db)):
-    """Return the authenticated tenant's master product catalog and version counts."""
+def list_products(request: Request, response: Response, page: Page = Depends(), db: Session = Depends(get_db)):
+    """Return the authenticated tenant's master product catalog and version counts (paged: backend/app/paging.py)."""
     admin = _admin_tenant(request, db)
     with _tenant_business(request, db) as business:
-        rows = business.query(Product).filter(Product.tenant_id == admin.tenant_id).order_by(Product.name.asc()).all()
+        query = business.query(Product).filter(Product.tenant_id == admin.tenant_id).order_by(Product.name.asc())
+        rows = page.apply(query, response)
+        # One grouped count for the page's products, not one query per product.
+        counts = dict(
+            business.query(ProductVersion.product_id, func.count(ProductVersion.id))
+            .filter(
+                ProductVersion.tenant_id == admin.tenant_id, ProductVersion.product_id.in_([row.id for row in rows])
+            )
+            .group_by(ProductVersion.product_id)
+            .all()
+        )
         return [
             {
                 "id": str(row.id),
@@ -104,26 +116,27 @@ def list_products(request: Request, db: Session = Depends(get_db)):
                 "lifecycle_status": row.lifecycle_status,
                 "created_at": row.created_at.isoformat() if row.created_at else None,
                 "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-                "version_count": business.query(ProductVersion)
-                .filter(
-                    ProductVersion.tenant_id == admin.tenant_id,
-                    ProductVersion.product_id == row.id,
-                )
-                .count(),
+                "version_count": counts.get(row.id, 0),
             }
             for row in rows
         ]
 
 
 @router.get("/admin/catalog/product-versions")
-def list_product_versions(request: Request, product_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
+def list_product_versions(
+    request: Request,
+    response: Response,
+    product_id: uuid.UUID | None = None,
+    page: Page = Depends(),
+    db: Session = Depends(get_db),
+):
     """Return version history, optionally scoped to one tenant-owned product."""
     admin = _admin_tenant(request, db)
     with _tenant_business(request, db) as business:
         query = business.query(ProductVersion).filter(ProductVersion.tenant_id == admin.tenant_id)
         if product_id is not None:
             query = query.filter(ProductVersion.product_id == product_id)
-        rows = query.order_by(ProductVersion.version_identifier.asc()).all()
+        rows = page.apply(query.order_by(ProductVersion.version_identifier.asc()), response)
         return [
             {
                 "id": str(row.id),

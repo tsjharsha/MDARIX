@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -52,6 +52,10 @@ from backend.app.trial.router import router as trial_router
 from backend.app.demo_requests import router as demo_requests_router
 from backend.app.trial.feedback import router as trial_feedback_router
 from backend.app.site_info import router as site_info_router
+from backend.app.paging import Page
+from backend.app.ai_settings import router as ai_settings_router
+from backend.app.audit_chain_api import router as audit_chain_router
+from backend.app.tenant_export_api import router as tenant_export_router
 from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
@@ -215,6 +219,19 @@ async def security_headers(request: Request, call_next):
 
 
 @app.middleware("http")
+async def genai_request_scope(request: Request, call_next):
+    """Open this request's AI scope; the authenticated request context records the organization in it, so every
+    model call made while handling the request applies that organization's AI controls (genai/governance.py)."""
+    from genai.governance import begin_request_scope, end_request_scope
+
+    marker = begin_request_scope()
+    try:
+        return await call_next(request)
+    finally:
+        end_request_scope(marker)
+
+
+@app.middleware("http")
 async def request_id_and_log(request: Request, call_next):
     """Give every request an id (the caller's X-Request-ID when it is plain, else a new one), attach it to every
     log record written while handling it, return it in X-Request-ID, and log one line per request."""
@@ -293,6 +310,9 @@ app.include_router(trial_router)
 app.include_router(demo_requests_router)
 app.include_router(trial_feedback_router)
 app.include_router(site_info_router)
+app.include_router(ai_settings_router)
+app.include_router(audit_chain_router)
+app.include_router(tenant_export_router)
 app.include_router(data_import_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
@@ -423,9 +443,18 @@ def get_path(
 
 @app.get("/api/v1/products", response_model=list[ProductSummary])
 def list_products(
-    ctx: AuthenticatedRequestContext = Depends(get_request_context), data_db: Session = Depends(get_data_plane_db)
+    response: Response,
+    page: Page = Depends(),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data_db: Session = Depends(get_data_plane_db),
 ) -> list[ProductSummary]:
-    return product360_service.list_products(ctx.tenant_id, db_engine=scoped_bind(data_db))
+    """The tenant's products, paged (backend/app/paging.py: X-Total-Count, X-Next-Offset)."""
+    source = scoped_bind(data_db)
+    total = product360_service.count_products(ctx.tenant_id, db_engine=source)
+    response.headers["X-Total-Count"] = str(total)
+    following = page.offset + page.limit
+    response.headers["X-Next-Offset"] = str(following) if following < total else ""
+    return product360_service.list_products(ctx.tenant_id, db_engine=source, limit=page.limit, offset=page.offset)
 
 
 @app.get("/api/v1/products/{product_id}/investigations")

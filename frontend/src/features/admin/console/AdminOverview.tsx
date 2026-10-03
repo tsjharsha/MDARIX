@@ -32,6 +32,7 @@ import {
   type Tone,
 } from "./dashboardModel";
 import { KpiTile, TrendChart, toPoints, type DailyRow, type TrendPoint } from "./trendCharts";
+import { formatDateTime } from "../../../app/dates";
 
 type DashboardTrends = {
   days: number;
@@ -488,7 +489,7 @@ export function AdminOverview({
                   </small>
                 </span>
                 <time className="ac-muted" dateTime={row.at}>
-                  {row.at ? new Date(row.at).toLocaleString() : "—"}
+                  {row.at ? formatDateTime(row.at) : "—"}
                 </time>
               </li>
             ))}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, RefreshCw, Star } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { Table } from "../customer-admin/shared";
+import { formatDay, formatDateTime } from "../../app/dates";
 
 type Feedback = {
   id: string;
@@ -219,7 +220,7 @@ export function TrialFeedbackWorkspace() {
             },
             { key: "recommend", label: "Recommend", render: (row) => (row.recommend_score ?? "—").toString() },
             { key: "consent", label: "Website consent", render: (row) => CONSENT[row.publish_consent] },
-            { key: "sent", label: "Sent", render: (row) => new Date(row.created_at).toLocaleDateString() },
+            { key: "sent", label: "Sent", render: (row) => formatDay(row.created_at) },
             {
               key: "actions",
               label: "",
@@ -309,7 +310,7 @@ export function TrialFeedbackWorkspace() {
             <div>
               <dt>Consent given</dt>
               <dd>
-                {open.consent_text} <small>({new Date(open.consent_at).toLocaleString()})</small>
+                {open.consent_text} <small>({formatDateTime(open.consent_at)})</small>
               </dd>
             </div>
             <div>

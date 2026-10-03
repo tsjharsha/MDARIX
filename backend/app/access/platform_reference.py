@@ -14,6 +14,7 @@ from backend.app.db.models.foundation import (
     Tenant,
     TenantMappingVersion,
 )
+from backend.app.db.data_plane import tenant_data_session
 from backend.app.db.session import get_db
 from backend.app.access.schemas import (
     PlatformProductRequest,
@@ -149,13 +150,16 @@ def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: S
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
-    products = db.query(Product).filter(Product.tenant_id == tenant_id).order_by(Product.name).all()
-    versions = (
-        db.query(ProductVersion)
-        .filter(ProductVersion.tenant_id == tenant_id)
-        .order_by(ProductVersion.version_identifier)
-        .all()
-    )
+    # Products and versions are business records: read them from the tenant's own data plane.
+    with tenant_data_session(tenant_id) as data:
+        products = data.query(Product).filter(Product.tenant_id == tenant_id).order_by(Product.name).all()
+        versions = (
+            data.query(ProductVersion)
+            .filter(ProductVersion.tenant_id == tenant_id)
+            .order_by(ProductVersion.version_identifier)
+            .all()
+        )
+        data.expunge_all()
     connectors = (
         db.query(ConnectorConfiguration)
         .filter(ConnectorConfiguration.tenant_id == tenant_id)
@@ -212,37 +216,40 @@ def platform_create_product(payload: PlatformProductRequest, request: Request, d
     tenant = db.query(Tenant).filter(Tenant.id == payload.tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
-    if (
-        db.query(Product)
-        .filter(Product.tenant_id == payload.tenant_id, Product.product_identifier == payload.product_identifier)
-        .first()
-    ):
-        raise HTTPException(
-            409, detail={"code": "PRODUCT_EXISTS", "message": "Product identifier already exists for this tenant"}
-        )
     now = datetime.now(timezone.utc)
-    row = Product(
-        id=uuid.uuid4(),
-        tenant_id=payload.tenant_id,
-        product_identifier=payload.product_identifier,
-        name=payload.name,
-        description=payload.description,
-        product_family=payload.product_family,
-        manufacturer_context=payload.manufacturer_context,
-        lifecycle_status="active",
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    _audit_configuration(db, admin, "PLATFORM_PRODUCT_CREATED", "Product", row.id, "v1")
+    with tenant_data_session(payload.tenant_id) as data:
+        if (
+            data.query(Product)
+            .filter(Product.tenant_id == payload.tenant_id, Product.product_identifier == payload.product_identifier)
+            .first()
+        ):
+            raise HTTPException(
+                409, detail={"code": "PRODUCT_EXISTS", "message": "Product identifier already exists for this tenant"}
+            )
+        row = Product(
+            id=uuid.uuid4(),
+            tenant_id=payload.tenant_id,
+            product_identifier=payload.product_identifier,
+            name=payload.name,
+            description=payload.description,
+            product_family=payload.product_family,
+            manufacturer_context=payload.manufacturer_context,
+            lifecycle_status="active",
+            created_at=now,
+            updated_at=now,
+        )
+        data.add(row)
+        data.commit()
+        result = {
+            "id": str(row.id),
+            "tenant_id": str(payload.tenant_id),
+            "product_identifier": row.product_identifier,
+            "name": row.name,
+            "status": row.lifecycle_status,
+        }
+    _audit_configuration(db, admin, "PLATFORM_PRODUCT_CREATED", "Product", uuid.UUID(result["id"]), "v1")
     db.commit()
-    return {
-        "id": str(row.id),
-        "tenant_id": str(payload.tenant_id),
-        "product_identifier": row.product_identifier,
-        "name": row.name,
-        "status": row.lifecycle_status,
-    }
+    return result
 
 
 @router.patch("/platform/product-configuration/{tenant_id}/products/{product_id}")
@@ -255,29 +262,40 @@ def platform_update_product(
 ):
     """Edit a tenant's product: name, description, family, manufacturer or lifecycle (identifier is fixed)."""
     admin = _require_platform_admin(request, db)
-    row = db.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
-    if row is None:
-        raise HTTPException(
-            404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
-        )
     changes = payload.model_dump(exclude_unset=True)
-    if not changes:
-        raise HTTPException(422, detail={"code": "NOTHING_TO_CHANGE", "message": "No change was given"})
-    before = {field: getattr(row, field) for field in changes}
-    for field, value in changes.items():
-        setattr(row, field, value)
-    row.updated_at = datetime.now(timezone.utc)
+    with tenant_data_session(tenant_id) as data:
+        row = data.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
+        if row is None:
+            raise HTTPException(
+                404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+            )
+        if not changes:
+            raise HTTPException(422, detail={"code": "NOTHING_TO_CHANGE", "message": "No change was given"})
+        before = {field: getattr(row, field) for field in changes}
+        for field, value in changes.items():
+            setattr(row, field, value)
+        row.updated_at = datetime.now(timezone.utc)
+        data.commit()
+        result = {
+            "id": str(row.id),
+            "tenant_id": str(tenant_id),
+            "product_identifier": row.product_identifier,
+            "name": row.name,
+            "status": row.lifecycle_status,
+        }
     _audit_configuration(
-        db, admin, "PLATFORM_PRODUCT_UPDATED", "Product", row.id, "v1", request=request, before=before, after=changes
+        db,
+        admin,
+        "PLATFORM_PRODUCT_UPDATED",
+        "Product",
+        product_id,
+        "v1",
+        request=request,
+        before=before,
+        after=changes,
     )
     db.commit()
-    return {
-        "id": str(row.id),
-        "tenant_id": str(tenant_id),
-        "product_identifier": row.product_identifier,
-        "name": row.name,
-        "status": row.lifecycle_status,
-    }
+    return result
 
 
 @router.post("/platform/product-configuration/product-versions")
@@ -285,43 +303,50 @@ def platform_create_product_version(
     payload: PlatformProductVersionRequest, request: Request, db: Session = Depends(get_db)
 ):
     admin = _require_platform_admin(request, db)
-    product = db.query(Product).filter(Product.id == payload.product_id, Product.tenant_id == payload.tenant_id).first()
-    if product is None:
-        raise HTTPException(
-            404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
-        )
-    if (
-        db.query(ProductVersion)
-        .filter(
-            ProductVersion.tenant_id == payload.tenant_id,
-            ProductVersion.product_id == product.id,
-            ProductVersion.version_identifier == payload.version_identifier,
-        )
-        .first()
-    ):
-        raise HTTPException(409, detail={"code": "PRODUCT_VERSION_EXISTS", "message": "ProductVersion already exists"})
     now = datetime.now(timezone.utc)
     release = (
         datetime.fromisoformat(payload.release_timestamp.replace("Z", "+00:00")) if payload.release_timestamp else None
     )
-    row = ProductVersion(
-        id=uuid.uuid4(),
-        tenant_id=payload.tenant_id,
-        product_id=product.id,
-        version_identifier=payload.version_identifier,
-        description=payload.description,
-        lifecycle_status="active",
-        release_timestamp=release,
-        created_at=now,
-        updated_at=now,
-    )
-    db.add(row)
-    _audit_configuration(db, admin, "PLATFORM_PRODUCT_VERSION_CREATED", "ProductVersion", row.id, "v1")
+    with tenant_data_session(payload.tenant_id) as data:
+        product = (
+            data.query(Product).filter(Product.id == payload.product_id, Product.tenant_id == payload.tenant_id).first()
+        )
+        if product is None:
+            raise HTTPException(
+                404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
+            )
+        if (
+            data.query(ProductVersion)
+            .filter(
+                ProductVersion.tenant_id == payload.tenant_id,
+                ProductVersion.product_id == product.id,
+                ProductVersion.version_identifier == payload.version_identifier,
+            )
+            .first()
+        ):
+            raise HTTPException(
+                409, detail={"code": "PRODUCT_VERSION_EXISTS", "message": "ProductVersion already exists"}
+            )
+        row = ProductVersion(
+            id=uuid.uuid4(),
+            tenant_id=payload.tenant_id,
+            product_id=product.id,
+            version_identifier=payload.version_identifier,
+            description=payload.description,
+            lifecycle_status="active",
+            release_timestamp=release,
+            created_at=now,
+            updated_at=now,
+        )
+        data.add(row)
+        data.commit()
+        result = {
+            "id": str(row.id),
+            "tenant_id": str(payload.tenant_id),
+            "product_id": str(row.product_id),
+            "version_identifier": row.version_identifier,
+            "status": row.lifecycle_status,
+        }
+    _audit_configuration(db, admin, "PLATFORM_PRODUCT_VERSION_CREATED", "ProductVersion", uuid.UUID(result["id"]), "v1")
     db.commit()
-    return {
-        "id": str(row.id),
-        "tenant_id": str(payload.tenant_id),
-        "product_id": str(row.product_id),
-        "version_identifier": row.version_identifier,
-        "status": row.lifecycle_status,
-    }
+    return result

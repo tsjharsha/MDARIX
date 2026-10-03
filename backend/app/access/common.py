@@ -85,6 +85,22 @@ def _safe_provider_url(endpoint: str, path: str, *, timeout: float = 10.0) -> st
     return urlunparse((parsed.scheme, parsed.netloc, safe_path, "", parsed.query, ""))
 
 
+def _tenant_identifier(stored) -> str | None:
+    """The platform-issued identifier of a stored connector's tenant (its secret namespace)."""
+    from sqlalchemy.orm import object_session
+
+    from backend.app.db.models.foundation import Tenant
+
+    from sqlalchemy.orm.exc import UnmappedInstanceError
+
+    try:
+        session = object_session(stored) if stored is not None else None
+    except UnmappedInstanceError:  # a plain object standing in for a stored connector
+        session = None
+    tenant = session.get(Tenant, stored.tenant_id) if session is not None else None
+    return tenant.tenant_identifier if tenant is not None else None
+
+
 def _connector_credential(configuration: dict, stored=None, *, allow_header: bool = True) -> str | None:
     """The API key for the customer's system: the connector's own encrypted key, else its credential_ref secret."""
     if stored is not None and getattr(stored, "credential_encrypted", None):
@@ -97,9 +113,13 @@ def _connector_credential(configuration: dict, stored=None, *, allow_header: boo
     ref = configuration.get("credential_ref")
     if ref is None:
         return None
-    # Only MDARIX_CONNECTOR_SECRET_* names: a connector can never read database, AI, email or session secrets.
-    if not is_allowed_secret_ref(ref):
-        raise ValueError("CONNECTOR_CREDENTIAL_REF_INVALID")
+    # Only MDARIX_CONNECTOR_SECRET_* names: a connector can never read database, AI, email or session secrets;
+    # in staging and production only names in the connector's own tenant namespace.
+    from backend.app.access.outbound import secret_ref_problem
+
+    problem = secret_ref_problem(ref, _tenant_identifier(stored))
+    if problem:
+        raise ValueError(problem)
     token = os.getenv(ref)
     if token and allow_header:
         return token

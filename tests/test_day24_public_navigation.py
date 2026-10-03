@@ -116,5 +116,7 @@ def test_website_is_consolidated_and_every_former_url_still_resolves():
         "/request-demo",
     ):
         assert f'"{legacy}"' in SITE
-    # App routes such as /platform-admin/... must never be captured by the website's /platform prefix.
-    assert "publicPath.startsWith(`${route}/`)" in MAIN
+    # The application is matched by whole path segments (/app, /platform-admin), so the website's /platform page is
+    # never mistaken for /platform-admin/..., and every other address is the website (its pages or "not found").
+    assert "publicPath.startsWith(`${root}/`)" in MAIN
+    assert '["/app", "/platform-admin"]' in MAIN

@@ -1,0 +1,67 @@
+name: AI evaluation gate
+# Runs the golden evaluation (VS001-VS012) against the contracted model before a release. It needs the model's API key,
+# so it is started by hand (Actions > AI evaluation gate > Run workflow) rather than on every pull request. A release
+# is promoted only after this passes (docs/runbooks/DEPLOYMENT.md).
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Provider name (must be the contracted production provider)
+        required: true
+        default: anthropic
+      model:
+        description: Model name (empty for the provider's default)
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: mdarix_app
+      POSTGRES_PASSWORD: mdarix_app
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mdarix_r1
+      MDARIX_DB_HARDENING_APPLY: '1'
+      MDARIX_ENV: development
+      MDARIX_GENAI_PROVIDER: ${{ inputs.provider }}
+      MDARIX_GENAI_MODEL: ${{ inputs.model }}
+      MDARIX_GENAI_API_KEY: ${{ secrets.MDARIX_EVALUATION_API_KEY }}
+      MDARIX_GENAI_FALLBACKS: ''
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mdarix_app
+          POSTGRES_PASSWORD: mdarix_app
+          POSTGRES_DB: mdarix_r1
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Require the model key
+        run: test -n "$MDARIX_GENAI_API_KEY" || { echo "Set the MDARIX_EVALUATION_API_KEY repository secret."; exit 1; }
+      - run: python -m pip install --require-hashes -r requirements.txt
+      - run: alembic upgrade head
+      - name: Load the synthetic golden dataset
+        run: >-
+          python -c "from ingestion.services.ingestion_service import GOLDEN_SOURCE, IngestionService;
+          from ingestion.normalization.service import NormalizationService;
+          IngestionService(GOLDEN_SOURCE).ingest_all(); NormalizationService().normalize_all()"
+      - name: Index the evidence for search
+        run: python scripts/index_evidence.py --tenant ACME_CARE_SYNTHETIC
+      - name: Golden evaluation (release gate)
+        run: python scripts/run_real_evaluation.py --pause 5 --gate --require-model
+      - name: Upload the evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdarix-ai-evaluation
+          path: artifacts/real-golden-evaluation.json

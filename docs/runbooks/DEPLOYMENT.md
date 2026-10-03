@@ -71,6 +71,11 @@ first customer from Platform Admin > Customers & Tenants > Onboarding.
 
 ## 3. Upgrading
 
+Before promoting a release that changes AI behaviour (prompts, providers, models, retrieval), run **Actions > AI
+evaluation gate > Run workflow** with the contracted provider. It needs the `MDARIX_EVALUATION_API_KEY` repository
+secret and fails unless every golden scenario passes with model-written analyses
+(`scripts/run_real_evaluation.py --gate --require-model`). Do not promote a release whose gate failed.
+
 ```bash
 cd mdarix && git fetch --tags && git checkout <new release tag>
 docker compose -f docker-compose.prod.yml --profile backup run --rm backup     # backup first
@@ -80,6 +85,11 @@ docker compose -f docker-compose.prod.yml ps
 ```
 
 Readiness reports `not_ready` (HTTP 503) until the schema matches the code, so a missed migration is visible at once.
+The `migrate` job also upgrades every dedicated customer database (data plane) with the same migrations
+(`scripts/migrate_data_planes.py --apply`; a no-op while every customer is on the shared plane). A plane whose schema
+is not at the code's head refuses requests (`DATA_PLANE_SCHEMA_OUTDATED`) and readiness names it. Each plane's
+connection string is `MDARIX_DATA_PLANE_<KEY>_DATABASE_URL`; give the migrate job the plane owner's connection string
+as `MDARIX_DATA_PLANE_<KEY>_DATABASE_URL_OWNER`.
 
 ## 4. Rolling back
 

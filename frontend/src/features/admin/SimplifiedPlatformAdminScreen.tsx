@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
+import { HelpMenu } from "../shared/HelpMenu";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
@@ -74,6 +75,9 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
   return (
     <div className="admin-console">
       <header className="ac-header">
+        <a className="app-skip" href="#app-main">
+          Skip to content
+        </a>
         <button
           type="button"
           className="ac-menu-toggle"
@@ -123,6 +127,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
             <small>{securityContext?.active_role ?? "Platform Administrator"}</small>
           </span>
           <SwitchOrganization />
+          <HelpMenu />
           <button type="button" className="ac-secondary" onClick={signOut} aria-label="Sign out of MDARIX">
             <LogOut size={16} /> <span className="ac-hide-sm">Logout</span>
           </button>
@@ -163,7 +168,12 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
           ))}
         </nav>
 
-        <main className="ac-main" data-admin-section={`${location.domain}:${location.item}`}>
+        <main
+          className="ac-main"
+          id="app-main"
+          tabIndex={-1}
+          data-admin-section={`${location.domain}:${location.item}`}
+        >
           {message && (
             <div className={`ac-message tone-${message.tone}`} role="status">
               {message.text}

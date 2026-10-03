@@ -16,6 +16,7 @@ import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { parseThresholds, previewTemplate, templateVariables } from "./sections";
+import { formatDay } from "../../../app/dates";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -171,7 +172,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
             label: "License period",
             render: (row) =>
               row.expires_at
-                ? `${row.license_start ? new Date(row.license_start).toLocaleDateString() : "—"} – ${new Date(row.expires_at).toLocaleDateString()}`
+                ? `${row.license_start ? formatDay(row.license_start) : "—"} – ${formatDay(row.expires_at)}`
                 : "No end date",
           },
           { key: "seats", fields: ["seat_usage"], label: "Users", numeric: true, render: (row) => row.seat_usage ?? 0 },
@@ -404,7 +405,7 @@ function Renewals() {
               label: "Ends",
               render: (row) => (
                 <span className="cc-stack">
-                  <strong>{row.expires_at ? new Date(row.expires_at).toLocaleDateString() : "—"}</strong>
+                  <strong>{row.expires_at ? formatDay(row.expires_at) : "—"}</strong>
                   <small>
                     {row.days_remaining === null
                       ? ""
@@ -452,7 +453,7 @@ const STAGES = [
 
 const SAMPLE: Record<string, string> = {
   customer_name: "Apex Medical Devices",
-  expiry_date: new Date(Date.now() + 30 * 86_400_000).toLocaleDateString(),
+  expiry_date: formatDay(Date.now() + 30 * 86_400_000),
   days_remaining: "30",
   activation_link: "https://app.mdarix.example/renew",
 };

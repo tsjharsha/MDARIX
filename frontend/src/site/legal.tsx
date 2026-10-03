@@ -151,7 +151,7 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
   {
     title: "Accountability",
     points: [
-      "An append-only audit trail records who did what and when, and electronic signatures record the signer, meaning and time.",
+      "An append-only audit trail records who did what and when; each event is hash-chained to the one before it and verified daily, so any change to history is detected. Electronic signatures record the signer, meaning and time.",
       "AI suggestions are advisory: they show the evidence they used, flag what could not be verified, and a person makes every decision.",
       "In production, AI processing uses only providers under a contract that forbids training on your data, or models we host ourselves.",
     ],

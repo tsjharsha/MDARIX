@@ -86,6 +86,22 @@ def trial_has_ended(db: Session, tenant_id, now: datetime | None = None) -> bool
     return expires_at <= now and not (isinstance(grace, datetime) and grace > now)
 
 
+def trial_end_dates(db: Session, tenant_id) -> tuple[str | None, str | None]:
+    """When a Free Trial ended and when its data is deleted (long dates), for the trial-ended page."""
+    from backend.app.trial.retention import RETENTION_DAYS
+
+    free_trial = select(PlanDefinition.id).where(PlanDefinition.code == FREE_TRIAL_PLAN).scalar_subquery()
+    row = (
+        db.query(SubscriptionLifecycle)
+        .filter(SubscriptionLifecycle.tenant_id == tenant_id, SubscriptionLifecycle.plan_id.in_(free_trial))
+        .first()
+    )
+    if row is None or not isinstance(row.expires_at, datetime):
+        return None, None
+    ended = max(row.expires_at, row.grace_ends_at or row.expires_at)
+    return long_date(ended), long_date(ended + timedelta(days=RETENTION_DAYS))
+
+
 def _free_trial_plan(db: Session, now: datetime) -> PlanDefinition:
     plan = (
         db.query(PlanDefinition)

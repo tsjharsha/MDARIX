@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { requestJson } from "../../app/apiClient";
+import { formatDateTime, formatUtc } from "../../app/dates";
 
 export function SignatureVerificationWorkspace() {
   const [decisionId, setDecisionId] = useState("");
@@ -86,7 +87,9 @@ export function SignatureVerificationWorkspace() {
                   Signer: {item.signer_user_id} · {item.signer_role}
                 </span>
                 <span>Object version: {item.object_version}</span>
-                <span>Signed: {String(item.signed_at)}</span>
+                <span>
+                  Signed: {formatUtc(item.signed_at)} ({formatDateTime(item.signed_at)})
+                </span>
                 <small>{item.meaning}</small>
               </article>
             ))}

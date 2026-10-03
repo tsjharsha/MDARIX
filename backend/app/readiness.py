@@ -69,7 +69,7 @@ def _database() -> dict:
 
 
 def _data_planes() -> dict:
-    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, session_factory
+    from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, plane_schema_ok, session_factory
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.session import SessionLocal
     from backend.app.db.tenant_scope import bind_system
@@ -84,7 +84,7 @@ def _data_planes() -> dict:
         ]
     finally:
         control.close()
-    failed = []
+    failed, outdated = [], []
     for database_ref, secret_ref in sorted(set(planes)):
         try:
             session = session_factory(database_ref, secret_ref)()
@@ -94,8 +94,13 @@ def _data_planes() -> dict:
                 session.close()
         except Exception:
             failed.append(database_ref)
+            continue
+        if not plane_schema_ok(database_ref, secret_ref):
+            outdated.append(database_ref)
     if failed:
         raise RuntimeError(f"unreachable: {', '.join(failed)}")
+    if outdated:
+        raise RuntimeError(f"schema not at head (run scripts/migrate_data_planes.py): {', '.join(outdated)}")
     return {"dedicated": len(set(planes))}
 
 

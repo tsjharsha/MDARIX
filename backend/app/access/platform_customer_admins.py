@@ -357,6 +357,29 @@ def reset_customer_admin_password(
     }
 
 
+@router.post("/platform-admin/users/{user_id}/erase")
+def erase_user_personal_data(
+    user_id: uuid.UUID, payload: CustomerAdminActionRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Erase an offboarded person's personal data on their request (irreversible; docs/runbooks/DATA_REQUESTS.md)."""
+    from backend.app.tenant_purge import PurgeFailed, erase_person
+
+    platform_admin = _require_platform_admin(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if user is None:
+        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
+    if user_id == platform_admin.id:
+        raise HTTPException(409, detail={"code": "SELF_CHANGE_NOT_ALLOWED", "message": "You cannot erase yourself"})
+    try:
+        result = erase_person(db, user, str(platform_admin.id), payload.reason.strip())
+    except PurgeFailed:
+        raise HTTPException(
+            409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
+        )
+    db.commit()
+    return {**result, "status": "ERASED"}
+
+
 @router.post("/platform-admin/users/{user_id}/mfa-reset")
 def reset_user_mfa(
     user_id: uuid.UUID, payload: CustomerAdminActionRequest, request: Request, db: Session = Depends(get_db)

@@ -1,3 +1,4 @@
+import { formatDay } from "../../app/dates";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   availableFieldKeys,
@@ -55,7 +56,9 @@ describe("fields a list can offer", () => {
     expect(formatFieldValue(["EU", "IN"])).toBe("EU, IN");
     expect(formatFieldValue("READY_FOR_APPROVAL")).toBe("Ready for approval");
     expect(formatFieldValue(42)).toBe("42");
-    expect(formatFieldValue("2026-09-01")).toBe(new Date("2026-09-01").toLocaleDateString());
+    // Dates name the month (app/dates.ts), so day and month cannot be confused.
+    expect(formatFieldValue("2026-09-01")).toBe(formatDay("2026-09-01"));
+    expect(formatFieldValue("2026-09-01")).toMatch(/Sep|Aug/);
   });
 });
 

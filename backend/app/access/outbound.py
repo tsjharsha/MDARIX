@@ -25,6 +25,25 @@ def is_allowed_secret_ref(name: object) -> bool:
     return isinstance(name, str) and bool(_SECRET_NAME.match(name))
 
 
+def tenant_secret_prefix(tenant_identifier: str) -> str:
+    """The names one tenant's connectors may reference: MDARIX_CONNECTOR_SECRET_<tenant identifier>_<NAME>."""
+    return f"{CONNECTOR_SECRET_PREFIX}{re.sub(r'[^A-Z0-9]', '_', str(tenant_identifier).upper())}_"
+
+
+def secret_ref_problem(name: object, tenant_identifier: str | None) -> str | None:
+    """Why a credential reference may not be used by this tenant (None when it may). Staging and production also
+    require the tenant's own namespace, so one tenant can never name another tenant's server secret."""
+    from backend.app.runtime_env import is_production_like
+
+    if not is_allowed_secret_ref(name):
+        return "CONNECTOR_CREDENTIAL_REF_INVALID"
+    if is_production_like() and (
+        not tenant_identifier or not str(name).startswith(tenant_secret_prefix(tenant_identifier))
+    ):
+        return "CONNECTOR_CREDENTIAL_REF_NOT_FOR_TENANT"
+    return None
+
+
 def _allowed_hosts() -> set[str]:
     raw = os.getenv("MDARIX_CONNECTOR_ALLOWED_HOSTS", "")
     return {item.strip().lower() for item in raw.split(",") if item.strip()}

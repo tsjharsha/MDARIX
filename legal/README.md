@@ -67,7 +67,7 @@ in the footer, on `/contact` and in every email.
 **Security measures** (also stated on `/security`): TLS for all traffic, row-level isolation between organizations
 in the database, encrypted authenticator secrets and connector credentials, passwords hashed with scrypt and checked
 against known breached passwords, sign-in rate limits and lockout, authenticator-app MFA, virus scanning of uploads,
-an append-only audit trail and encrypted backups.
+an append-only, hash-chained audit trail verified daily, and encrypted backups.
 
 **Not offered today** (the documents should not promise them): single sign-on (OIDC/SAML), certifications such as
 ISO 27001, SOC 2 or HIPAA attestation, a validated (GxP/Part 11) system, data residency choices beyond the chosen

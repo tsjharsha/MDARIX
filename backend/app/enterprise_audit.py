@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from backend.app.db.models.foundation import AuditEvent
-from backend.app.audit_chain import audit_event_hash
 
 SECRET_TERMS = ("password", "token", "secret", "credential", "api_key", "authorization")
 
@@ -53,19 +52,14 @@ def make_audit_event(
     reason: str | None = None,
     old_values: dict[str, Any] | None = None,
     new_values: dict[str, Any] | None = None,
-    previous_hash: str | None = None,
 ) -> AuditEvent:
     now = created_at or datetime.now(timezone.utc)
     source_ip = user_agent = None
     if request is not None:
-        # Only trust forwarding headers when the deployment explicitly opts in.
-        # This keeps local clients and untrusted proxies from spoofing audit origin.
-        if request.client:
-            source_ip = request.client.host
-        if str(__import__("os").environ.get("MDARIX_TRUST_PROXY_HEADERS", "")).lower() in {"1", "true", "yes"}:
-            forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-            if forwarded:
-                source_ip = forwarded
+        from backend.app.client_ip import client_ip
+
+        # The address our own proxy saw (MDARIX_TRUSTED_PROXY_HOPS); client-written forwarding entries are ignored.
+        source_ip = client_ip(request)
         user_agent = request.headers.get("user-agent")
     payload = {
         "tenant_id": tenant_id,
@@ -82,10 +76,5 @@ def make_audit_event(
         "new_values": safe_details(new_values),
         "created_at": now,
     }
-    return AuditEvent(
-        id=None,
-        **payload,
-        previous_hash=previous_hash,
-        event_hash=audit_event_hash(payload, previous_hash),
-        retention_until=now + timedelta(days=365 * 7),
-    )
+    # The database chains the event (chain_seq, previous_hash, event_hash) when it is inserted (migration md18).
+    return AuditEvent(id=None, **payload, retention_until=now + timedelta(days=365 * 7))

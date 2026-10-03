@@ -25,6 +25,8 @@ os.environ.setdefault("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
 # refuses a cost below 2^17.
 os.environ.setdefault("MDARIX_RATE_LIMITS_ENABLED", "false")
 os.environ.setdefault("MDARIX_PASSWORD_SCRYPT_LOG2_N", "14")
+# Provider rest periods stay per process in tests (test_ai_controls.py exercises the shared table itself).
+os.environ.setdefault("MDARIX_GENAI_SHARED_REST", "false")
 # Tests must not call paid or external services with the developer's .env
 # credentials (Groq, Resend). The deterministic provider path is exercised
 # instead; individual tests that need provider behaviour set their own env.

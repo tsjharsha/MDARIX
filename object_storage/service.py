@@ -88,13 +88,22 @@ class ObjectStorageService:
         *,
         content_type: str = "application/octet-stream",
         retention_until: datetime | None = None,
+        internal: bool = False,
     ) -> dict:
-        if len(content) > self.max_object_bytes:
-            raise StorageError("OBJECT_SIZE_QUOTA_EXCEEDED")
-        if not self.scan(content, content_type):
-            raise StorageError("MALWARE_SCAN_REJECTED")
+        """Store one object under the tenant's prefix. ``internal=True`` is for files MDARIX generates itself
+        (reports, data exports): they are not virus-scanned and not held to the upload size and quota limits, but are
+        encrypted and tenant-scoped like everything else."""
+        if not internal:
+            if len(content) > self.max_object_bytes:
+                raise StorageError("OBJECT_SIZE_QUOTA_EXCEEDED")
+            if not self.scan(content, content_type):
+                raise StorageError("MALWARE_SCAN_REJECTED")
         object_key = self._tenant_key(tenant_id, key)
-        if self.provider == "local" and self._tenant_usage(tenant_id) + len(content) > self.tenant_quota_bytes:
+        if (
+            not internal
+            and self.provider == "local"
+            and self._tenant_usage(tenant_id) + len(content) > self.tenant_quota_bytes
+        ):
             raise StorageError("TENANT_STORAGE_QUOTA_EXCEEDED")
         checksum = hashlib.sha256(content).hexdigest()
         if self.provider == "s3":
@@ -275,3 +284,43 @@ class ObjectStorageService:
             if path.exists():
                 path.unlink()
         self._audit("OBJECT_DELETED", str(tenant_id), expected)
+
+    def list_tenant_objects(self, tenant_id: str) -> list[str]:
+        """Every stored object key of one tenant (``<tenant>/...``)."""
+        prefix = self._tenant_key(tenant_id, "x")[:-1]
+        if self.provider == "s3":
+            keys: list[str] = []
+            for page in self.client.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix):
+                keys.extend(item["Key"] for item in page.get("Contents", []))
+            return keys
+        base = self.root / str(tenant_id)
+        if not base.is_dir():
+            return []
+        return sorted(
+            f"{prefix}{path.relative_to(base).as_posix()}"
+            for path in base.rglob("*")
+            if path.is_file() and not path.name.endswith(".retention")
+        )
+
+    def delete_tenant(self, tenant_id: str) -> int:
+        """Delete every object of one tenant (organization offboarding or trial deletion). Returns how many.
+
+        On a versioned S3 bucket this leaves delete markers; the bucket's noncurrent-version expiry rule removes the
+        old versions (docs/runbooks/DATA_REQUESTS.md)."""
+        keys = self.list_tenant_objects(tenant_id)
+        if self.provider == "s3":
+            for start in range(0, len(keys), 1000):
+                batch = [{"Key": key} for key in keys[start : start + 1000]]
+                response = self.client.delete_objects(Bucket=self.bucket, Delete={"Objects": batch, "Quiet": True})
+                if response.get("Errors"):
+                    raise StorageError(f"OBJECT_DELETE_FAILED:{len(response['Errors'])}")
+        else:
+            import shutil
+
+            base = self.root / str(tenant_id)
+            if base.is_dir():
+                shutil.rmtree(base)
+        if self.list_tenant_objects(tenant_id):
+            raise StorageError("OBJECT_DELETE_INCOMPLETE")
+        self._audit("TENANT_OBJECTS_DELETED", str(tenant_id), f"{tenant_id}/", count=len(keys))
+        return len(keys)

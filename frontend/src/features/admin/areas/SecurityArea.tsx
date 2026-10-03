@@ -17,6 +17,7 @@ import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { formatDay } from "../../../app/dates";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -521,13 +522,13 @@ function Retention() {
         />
         <StatTile
           label="Oldest event"
-          value={retention?.oldest_event_at ? new Date(retention.oldest_event_at).toLocaleDateString() : null}
+          value={retention?.oldest_event_at ? formatDay(retention.oldest_event_at) : null}
           detail="Earliest record held"
           icon={<ShieldCheck size={18} />}
         />
         <StatTile
           label="First release date"
-          value={retention?.earliest_release_at ? new Date(retention.earliest_release_at).toLocaleDateString() : null}
+          value={retention?.earliest_release_at ? formatDay(retention.earliest_release_at) : null}
           detail="Nothing may be removed before this"
           icon={<LockKeyhole size={18} />}
         />

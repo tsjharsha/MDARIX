@@ -5,7 +5,8 @@ import { Stage2AdminControlPlane } from "../features/stage2/Stage2AdminControlPl
 import { MappingStudio } from "../features/stage2/MappingStudio";
 import { SubscriptionAdministration } from "../features/stage2/SubscriptionAdministration";
 import { allowedViewsForRole, isCustomerAdminRole, isPlatformAdminRole } from "./navigationPolicy";
-import { requestJson } from "./apiClient";
+import { ApiError, requestJson } from "./apiClient";
+import { signOut } from "../features/shared/session";
 import { api } from "./api";
 import { PlatformProductConfiguration } from "../features/stage2/PlatformProductConfiguration";
 import { ConsentBanner } from "../features/shared/ConsentBanner";
@@ -111,7 +112,8 @@ export function PrivateApplication() {
     current_tenant?: { tenant_id: string; tenant_name?: string };
     entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
   } | null>(null);
-  const [contextState, setContextState] = useState<"LOADING" | "READY" | "ERROR">("LOADING");
+  const [contextState, setContextState] = useState<"LOADING" | "READY" | "ERROR" | "TRIAL_ENDED">("LOADING");
+  const [trialEndedMessage, setTrialEndedMessage] = useState("");
   const [activeView, setActiveView] = useState<AppView>(() => viewFromPath(window.location.pathname));
 
   useEffect(() => {
@@ -136,9 +138,12 @@ export function PrivateApplication() {
         document.documentElement.style.setProperty("--tenant-accent", "#087b73");
         setContextState("READY");
       })
-      .catch(() => {
+      .catch((error) => {
         setSecurityContext(null);
-        setContextState("ERROR");
+        if (error instanceof ApiError && error.code === "TRIAL_ENDED") {
+          setTrialEndedMessage(error.message);
+          setContextState("TRIAL_ENDED");
+        } else setContextState("ERROR");
       });
   }, []);
   useEffect(() => {
@@ -160,6 +165,7 @@ export function PrivateApplication() {
     if (isCustomerAdmin && activeView !== "customer-admin") changeView("customer-admin");
   }, [isPlatformAdmin, isCustomerAdmin]);
 
+  if (contextState === "TRIAL_ENDED") return <TrialEnded message={trialEndedMessage} />;
   if (contextState !== "READY")
     return (
       <div className="auth-shell">
@@ -240,5 +246,31 @@ export function PrivateApplication() {
       </div>
       <ConsentBanner />
     </div>
+  );
+}
+
+/** A free trial past its end date: what happens to the data, and how to continue. */
+function TrialEnded({ message }: { message: string }) {
+  return (
+    <main className="auth-shell" id="main">
+      <div className="auth-card">
+        <span className="eyebrow">Free trial</span>
+        <h1>Your free trial has ended</h1>
+        <p>{message || "Your MDARIX free trial has ended. Contact us to continue with your data intact."}</p>
+        <p>
+          Nothing is lost yet: your workspace and data are kept until the deletion date, and continuing keeps them as
+          they are.
+        </p>
+        <a className="primary-action" href="/contact">
+          Contact us to continue
+        </a>
+        <p className="auth-links">
+          <button type="button" className="link-button" onClick={() => void signOut()}>
+            Sign out
+          </button>
+          <a href="/trial-agreement">Free trial agreement</a>
+        </p>
+      </div>
+    </main>
   );
 }

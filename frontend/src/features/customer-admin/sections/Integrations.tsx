@@ -6,6 +6,7 @@ import { useConsole } from "../context";
 import { Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../shared";
 import { LifecycleActions, LifecycleBadge } from "./Access";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { formatTime } from "../../../app/dates";
 
 const TABS = ["Connections", "Sync activity", "Reconciliation"] as const;
 
@@ -431,7 +432,7 @@ function Connections() {
                     </strong>
                     {check.reason && <small>{String(check.reason)}</small>}
                   </span>
-                  <small className="ac-muted">{check.at.toLocaleTimeString()}</small>
+                  <small className="ac-muted">{formatTime(check.at)}</small>
                 </li>
               ))}
             </ul>
@@ -497,7 +498,7 @@ function Connections() {
               <input
                 pattern="MDARIX_CONNECTOR_SECRET_[A-Z0-9_]{1,80}"
                 title="The name of the server secret (MDARIX_CONNECTOR_SECRET_…), never the secret itself"
-                placeholder="e.g. MDARIX_CONNECTOR_SECRET_TRACKWISE"
+                placeholder="e.g. MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE"
                 value={form.credential_ref}
                 onChange={(event) => setForm({ ...form, credential_ref: event.target.value })}
               />

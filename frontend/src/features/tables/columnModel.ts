@@ -1,3 +1,5 @@
+import { formatDateTime, formatDay } from "../../app/dates";
+
 // Choosing which fields a list shows: the fields a list can offer, how a raw value is shown, and the saved choice.
 
 // Secrets, and the flags screens use to decide which buttons to offer, are never offered as fields.
@@ -47,7 +49,7 @@ export const formatFieldValue = (value: unknown): string => {
   if (Array.isArray(value)) return value.length ? value.map((item) => formatFieldValue(item)).join(", ") : "—";
   if (typeof value === "string" && ISO_DATE.test(value)) {
     const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) return value.length > 10 ? date.toLocaleString() : date.toLocaleDateString();
+    if (!Number.isNaN(date.getTime())) return value.length > 10 ? formatDateTime(date) : formatDay(date);
   }
   if (typeof value === "string" && /^[A-Z][A-Z0-9_]+$/.test(value) && value.includes("_"))
     return value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " ");

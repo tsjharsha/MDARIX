@@ -12,6 +12,7 @@ import {
   saveSelection,
 } from "../tables/columnModel";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
+import { formatDateTime } from "../../app/dates";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
@@ -61,10 +62,10 @@ export const humanize = (value: unknown) =>
         .replace(/_/g, " ")
         .replace(/^\w/, (letter) => letter.toUpperCase());
 
+/** A date and time with its time zone (app/dates.ts); an unreadable value is shown as it is. */
 export const formatDate = (value: unknown) => {
   if (!value) return "—";
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+  return formatDateTime(String(value), String(value));
 };
 
 /** Section card bound to one resource: shows loading / error / forbidden, then the content. */

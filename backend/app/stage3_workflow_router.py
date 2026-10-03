@@ -2,7 +2,6 @@ import os
 import re
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -32,7 +31,7 @@ from backend.app.db.models.stage3 import (
 from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from communication.email.inbound import classify_inbound_event, verify_webhook
+from communication.email.inbound import classify_inbound_event, verify_resend_webhook
 from object_storage.service import ObjectStorageService
 from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, require_permission
 
@@ -659,7 +658,7 @@ async def persisted_resend_webhook(
     db: Session = Depends(get_db),
 ):
     body = await read_limited(request, WEBHOOK_LIMIT_BYTES, code="PAYLOAD_TOO_LARGE")
-    if not verify_webhook(body, x_resend_signature):
+    if not verify_resend_webhook(body, request.headers):
         raise HTTPException(
             401, detail={"code": "INVALID_WEBHOOK_SIGNATURE", "message": "Webhook authentication failed"}
         )
@@ -959,7 +958,8 @@ def download_report(
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    from reports.service import get_report_job
+    from object_storage.service import StorageError
+    from reports.service import get_report_job, read_report_artifact
 
     try:
         job = get_report_job(str(job_id), ctx.tenant_id, db=data_db)
@@ -970,8 +970,8 @@ def download_report(
     if job.get("status") != "READY":
         raise HTTPException(409, detail={"code": "REPORT_NOT_READY", "message": "Report is not ready for download"})
     try:
-        content = Path(job["path"]).read_bytes()
-    except OSError as exc:
+        content = read_report_artifact(ctx.tenant_id, job["path"])
+    except (OSError, StorageError) as exc:
         raise HTTPException(
             404, detail={"code": "REPORT_FILE_NOT_FOUND", "message": "Report file is no longer available"}
         ) from exc

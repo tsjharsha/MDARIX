@@ -3,6 +3,7 @@ import { CheckCircle2, MessageSquareText, Star, X } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { useWorkspace } from "../workspaceContext";
+import { formatDay } from "../../../app/dates";
 
 type Consent = "NAMED" | "ANONYMOUS" | "PRIVATE";
 type Submission = {
@@ -54,6 +55,20 @@ const STATUS: Record<Submission["publication_status"], string> = {
 
 const DISMISSED_KEY = "mdarix.trial.feedback-dismissed-until";
 
+// Ask once people have had time to form a view: from day 3 of the trial, or as soon as they import their own data.
+const ASK_AFTER_DAYS = 3;
+
+/** Whether to ask for feedback yet: not on a first visit, only after real use (exported for tests). */
+export function readyForFeedback(
+  status: { starts_at?: string; own_data?: { products: number; lots: number; complaints: number } },
+  now = Date.now(),
+): boolean {
+  const started = status.starts_at ? Date.parse(status.starts_at) : NaN;
+  const days = Number.isFinite(started) ? (now - started) / (24 * 3600 * 1000) : 0;
+  const own = status.own_data ?? { products: 0, lots: 0, complaints: 0 };
+  return days >= ASK_AFTER_DAYS || own.products + own.lots + own.complaints > 0;
+}
+
 /** Invitation shown across the trial workspace until the person has given feedback (or chose "Not now"). */
 export function FeedbackPrompt({ onOpen }: { onOpen: () => void }) {
   const [state, setState] = useState<"hidden" | "shown">("hidden");
@@ -65,8 +80,13 @@ export function FeedbackPrompt({ onOpen }: { onOpen: () => void }) {
       until = 0;
     }
     if (until > Date.now()) return;
-    requestJson<FeedbackForm>("/api/v1/trial/feedback")
-      .then((data) => setState(data.submissions.length ? "hidden" : "shown"))
+    Promise.all([
+      requestJson<FeedbackForm>("/api/v1/trial/feedback"),
+      requestJson<{ starts_at?: string; own_data?: { products: number; lots: number; complaints: number } }>(
+        "/api/v1/trial/status",
+      ),
+    ])
+      .then(([data, status]) => setState(!data.submissions.length && readyForFeedback(status) ? "shown" : "hidden"))
       .catch(() => setState("hidden"));
   }, []);
   if (state === "hidden") return null;
@@ -266,7 +286,7 @@ export function FeedbackSection() {
               <li key={submission.id}>
                 <div>
                   <strong>
-                    Sent {new Date(submission.created_at).toLocaleDateString()} · overall {submission.rating_overall}/5
+                    Sent {formatDay(submission.created_at)} · overall {submission.rating_overall}/5
                   </strong>
                   <span>
                     {submission.publish_consent === "NAMED"

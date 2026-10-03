@@ -3,11 +3,14 @@
 import uuid
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -107,6 +110,50 @@ class RateLimitCounter(Base):
     window_start = mapped_column(DateTime(timezone=True), primary_key=True)
     count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     __table_args__ = (Index("ix_rate_limit_counters_window", "window_start"),)
+
+
+class AiUsageMonthly(Base):
+    """AI tokens, requests and estimated cost per organization and calendar month (genai/governance.py)."""
+
+    __tablename__ = "ai_usage_monthly"
+    tenant_id = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True)
+    month = mapped_column(Date, primary_key=True)
+    requests: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    refused: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    input_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    output_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    estimated_cost = mapped_column(Numeric(12, 4), nullable=False, server_default="0")
+    updated_at = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class GenAIProviderRest(Base):
+    """A provider every process skips until rest_until (rate-limited or down); platform-level, no tenant data."""
+
+    __tablename__ = "genai_provider_rest"
+    provider: Mapped[str] = mapped_column(String(40), primary_key=True)
+    rest_until = mapped_column(DateTime(timezone=True), nullable=False)
+    reason: Mapped[str] = mapped_column(String(40), nullable=False)
+    updated_at = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TenantExport(Base):
+    """One full data export of an organization: a zip in object storage, downloadable until expires_at."""
+
+    __tablename__ = "tenant_exports"
+    id = _id()
+    tenant_id = _tenant()
+    requested_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="QUEUED")
+    object_key: Mapped[str | None] = mapped_column(Text)
+    size_bytes: Mapped[int | None] = mapped_column(BigInteger)
+    sha256: Mapped[str | None] = mapped_column(String(64))
+    summary = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(String(200))
+    created_at = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at = mapped_column(DateTime(timezone=True))
+    expires_at = mapped_column(DateTime(timezone=True))
+    __table_args__ = (Index("ix_tenant_exports_tenant_created", "tenant_id", "created_at"),)
 
 
 class UserInvitation(Base):

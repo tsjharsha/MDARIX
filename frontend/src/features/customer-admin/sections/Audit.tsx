@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Download, FileArchive } from "lucide-react";
+import { Download, FileArchive, ShieldCheck } from "lucide-react";
+import { requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { SearchBox, Table, formatDate, listOf, matches, useResource } from "../shared";
@@ -29,6 +30,19 @@ export function AuditSection() {
   );
   const rows = useMemo(() => listOf(audit.data).filter((row) => matches(row, query)), [audit.data, query]);
   const scope = entity ? `&entity_type=${encodeURIComponent(entity)}` : "";
+  const [integrity, setIntegrity] = useState<{
+    state: "idle" | "checking" | "done" | "error";
+    result?: { valid: boolean; checked: number; first_broken_seq: number | null; last_hash: string | null };
+    error?: string;
+  }>({ state: "idle" });
+  const verify = async () => {
+    setIntegrity({ state: "checking" });
+    try {
+      setIntegrity({ state: "done", result: await requestJson("/api/v1/admin/audit-chain", { timeoutMs: 60000 }) });
+    } catch (error) {
+      setIntegrity({ state: "error", error: error instanceof Error ? error.message : "The check could not run." });
+    }
+  };
 
   return (
     <Panel
@@ -52,8 +66,24 @@ export function AuditSection() {
       }
     >
       <p className="ac-muted">
-        Records are immutable and kept for at least 7 years. Exports contain only your organization's events.
+        Records are immutable and kept for at least 7 years. Each event is linked to the one before it by a hash, so any
+        change to history is detected. Exports contain only your organization&apos;s events.
       </p>
+      <div className="ca-action-row">
+        <button type="button" className="ac-secondary" onClick={verify} disabled={integrity.state === "checking"}>
+          <ShieldCheck size={15} aria-hidden="true" />{" "}
+          {integrity.state === "checking" ? "Verifying…" : "Verify audit trail integrity"}
+        </button>
+        <span role="status" className={integrity.result && !integrity.result.valid ? "ca-inline-error" : "ac-muted"}>
+          {integrity.state === "done" && integrity.result
+            ? integrity.result.valid
+              ? `All ${integrity.result.checked.toLocaleString()} events verified: the trail is intact.`
+              : `The trail does not verify from event #${integrity.result.first_broken_seq}. Contact MDARIX support.`
+            : integrity.state === "error"
+              ? integrity.error
+              : ""}
+        </span>
+      </div>
       <div className="ca-toolbar">
         <SearchBox value={query} onChange={setQuery} label="Search action, actor or reason" />
         <label className="ca-inline-select">

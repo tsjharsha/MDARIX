@@ -147,6 +147,19 @@ def generate_report(
     return data
 
 
+# A report stored in object storage records its key with this prefix; older reports hold a file path.
+OBJECT_PREFIX = "object:"
+
+
+def read_report_artifact(tenant_id: str, path: str) -> bytes:
+    """The bytes of a generated report, from object storage (or, for reports made before, the file path)."""
+    if path.startswith(OBJECT_PREFIX):
+        from object_storage.service import ObjectStorageService
+
+        return ObjectStorageService().get(str(tenant_id), path[len(OBJECT_PREFIX) :])
+    return Path(path).read_bytes()
+
+
 def _job_dict(job):
     if isinstance(job, dict):
         return dict(job)
@@ -237,12 +250,6 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
                     output_format=job.output_format,
                     hidden_fields=set(job.hidden_fields or []),
                 )
-                directory = (
-                    Path(os.getenv("MDARIX_REPORT_TEMP_ROOT", tempfile.gettempdir()))
-                    / "mdarix-reports"
-                    / str(job.tenant_id)
-                )
-                directory.mkdir(parents=True, exist_ok=True)
                 suffix = {
                     "PDF": ".pdf",
                     "CSV": ".csv",
@@ -251,17 +258,26 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
                     "DOC": ".doc",
                     "ESTAR_XML": ".xml",
                 }[job.output_format]
-                path = directory / f"{job.id}{suffix}"
                 payload = (
                     result["content"]
                     if isinstance(result.get("content"), (bytes, str))
                     else json.dumps(result, default=str)
                 )
-                path.write_bytes(payload if isinstance(payload, bytes) else payload.encode())
+                content_type = result.get("content_type", "application/json")
+                # Encrypted, tenant-scoped object storage, readable by every API and worker instance and backed up.
+                from object_storage.service import ObjectStorageService
+
+                stored = ObjectStorageService().put(
+                    str(job.tenant_id),
+                    f"reports/{job.id}{suffix}",
+                    payload if isinstance(payload, bytes) else payload.encode(),
+                    content_type=content_type,
+                    internal=True,
+                )
                 job.status = "READY"
                 job.attempts = attempt
-                job.artifact_path = str(path)
-                job.content_type = result.get("content_type", "application/json")
+                job.artifact_path = OBJECT_PREFIX + stored["object_key"]
+                job.content_type = content_type
                 job.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
                 db.commit()
                 return _job_dict(job)

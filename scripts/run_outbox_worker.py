@@ -118,6 +118,11 @@ def publish(event_name, payload):
     if event_name == "PROVIDER_RECORD_RECEIVED":
         route_provider_event_to_data_plane(payload)
         return
+    if event_name == "TENANT_EXPORT_REQUESTED":
+        from backend.app.tenant_export import run_export
+
+        run_export(payload["export_id"])
+        return
     from backend.app.notifications import handle_event
 
     with SessionLocal() as db:

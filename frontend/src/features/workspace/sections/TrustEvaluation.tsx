@@ -4,6 +4,7 @@ import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { listOf, useResource } from "../../customer-admin/shared";
 import "../../investigator/analysis-visuals.css";
+import { formatDateTime } from "../../../app/dates";
 
 const CHECK_LABELS: Record<string, string> = {
   CONTRADICTIONS_FOUND: "Contradictions found",
@@ -113,7 +114,7 @@ export function TrustEvaluation() {
           <p className="av-note">
             <ListChecks size={14} aria-hidden="true" /> {evaluation.data_notice} The AI never sees the expected answers;
             they are compared only after it has answered.
-            {evaluation.completed_at ? ` Last run ${new Date(evaluation.completed_at).toLocaleString()}.` : ""}
+            {evaluation.completed_at ? ` Last run ${formatDateTime(evaluation.completed_at)}.` : ""}
           </p>
         </div>
       )}

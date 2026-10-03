@@ -482,6 +482,28 @@ function UserDrawer({
                   <Mail size={15} /> Re-invite
                 </button>
               )}
+              {!isSelf && status === "OFFBOARDED" && (
+                <button
+                  type="button"
+                  className="ca-danger-outline"
+                  onClick={() =>
+                    confirm({
+                      title: `Erase ${name}'s personal data?`,
+                      body: "Use this when the person asks for their data to be erased. Their name, email and sign-in details are removed for good and the account can no longer be re-invited. Records they created stay, linked to an anonymous account. This cannot be undone.",
+                      confirmLabel: "Erase personal data",
+                      danger: true,
+                      reason: { label: "The person's request (and how you verified it)", min: 10 },
+                      done: `${name}'s personal data has been erased.`,
+                      run: async (reason) => {
+                        await send(`/api/v1/admin/identity/users/${user.id}/erase`, "POST", { reason });
+                        onChanged();
+                      },
+                    })
+                  }
+                >
+                  Erase personal data
+                </button>
+              )}
             </div>
           </section>
         </>

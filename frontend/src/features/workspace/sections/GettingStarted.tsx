@@ -15,6 +15,7 @@ import { BarList, Empty, Panel, RingMeter, StatTile } from "../../admin/console/
 import type { Slice } from "../../admin/console/dashboardModel";
 import { useResource } from "../../customer-admin/shared";
 import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { formatDay } from "../../../app/dates";
 
 export type TrialStatus = {
   is_trial: boolean;
@@ -169,10 +170,10 @@ export function GettingStartedSection() {
           <div className="uw-trial-stats">
             <StatTile
               label="Trial ends"
-              value={trial?.expires_at ? new Date(trial.expires_at).toLocaleDateString() : null}
+              value={trial?.expires_at ? formatDay(trial.expires_at) : null}
               detail={
                 trial?.data_deleted_at
-                  ? `Data is deleted on ${new Date(trial.data_deleted_at).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" })} unless you continue`
+                  ? `Data is deleted on ${formatDay(trial.data_deleted_at)} unless you continue`
                   : "Your data stays if you continue"
               }
               icon={<ShieldCheck size={18} />}

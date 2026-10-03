@@ -346,7 +346,7 @@ export function PublicMegaSite({ path }: { path: string }) {
               </>
             )}
           </span>
-          <span>Evidence before inference · Humans decide</span>
+          <span>System of Intelligence, not System of Record · Evidence before inference · Humans decide</span>
         </div>
       </footer>
     </div>

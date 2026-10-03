@@ -32,6 +32,7 @@ from backend.app.db.session import get_db
 from backend.app.access.schemas import (
     MembershipRequest,
     MfaResetRequest,
+    PersonalDataErasureRequest,
     PasswordActionRequest,
     PermissionSetRequest,
     PersonaRequest,
@@ -355,6 +356,27 @@ def reset_user_mfa(user_id: uuid.UUID, payload: MfaResetRequest, request: Reques
     )
     db.commit()
     return {"user_id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
+
+
+@router.post("/admin/identity/users/{user_id}/erase")
+def erase_user_personal_data(
+    user_id: uuid.UUID, payload: PersonalDataErasureRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Erase an offboarded person's personal data on their request (irreversible; docs/runbooks/DATA_REQUESTS.md)."""
+    from backend.app.tenant_purge import PurgeFailed, erase_person
+
+    admin = _admin_tenant(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    user = ensure_user_visible(admin, user)
+    _guard_user_administration(admin, target=user, changes_access=True)
+    try:
+        result = erase_person(db, user, str(admin.id), payload.reason.strip())
+    except PurgeFailed:
+        raise HTTPException(
+            409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
+        )
+    db.commit()
+    return {**result, "status": "ERASED"}
 
 
 @router.post("/admin/identity/users/{user_id}/reactivate")

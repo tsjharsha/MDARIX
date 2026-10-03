@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.db.models.regulatory import RegulatoryDocument, RegulatoryDocumentVersion
 from backend.app.enterprise_audit import make_audit_event
@@ -52,6 +53,7 @@ def _hash_content(content: dict, citations: list[dict]) -> str:
 def generate_regulatory_draft(
     payload: RegulatoryDraftRequest,
     db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Generate a bounded, citation-checked draft for the authenticated tenant.
@@ -63,7 +65,7 @@ def generate_regulatory_draft(
     now = datetime.now(timezone.utc)
     identifier = payload.document_identifier or f"REG-{uuid.uuid4().hex[:12].upper()}"
     document = (
-        db.query(RegulatoryDocument)
+        data_db.query(RegulatoryDocument)
         .filter(
             RegulatoryDocument.tenant_id == ctx.tenant_id,
             RegulatoryDocument.document_identifier == identifier,
@@ -84,7 +86,7 @@ def generate_regulatory_draft(
             created_at=now,
             updated_at=now,
         )
-        db.add(document)
+        data_db.add(document)
     elif document.document_type != draft.document_type:
         raise HTTPException(
             409,
@@ -127,7 +129,7 @@ def generate_regulatory_draft(
         created_by=str(ctx.user_id),
         created_at=now,
     )
-    db.add(version)
+    data_db.add(version)
     db.add(
         make_audit_event(
             tenant_id=ctx.tenant_id,
@@ -139,6 +141,7 @@ def generate_regulatory_draft(
             created_at=now,
         )
     )
+    data_db.commit()
     db.commit()
     return {
         "tenant_id": str(ctx.tenant_id),
@@ -158,10 +161,12 @@ def generate_regulatory_draft(
 
 @router.get("/documents")
 def list_regulatory_documents(
-    db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     rows = (
-        db.query(RegulatoryDocument)
+        data_db.query(RegulatoryDocument)
         .filter(RegulatoryDocument.tenant_id == ctx.tenant_id)
         .order_by(RegulatoryDocument.updated_at.desc())
         .all()
@@ -184,10 +189,11 @@ def list_regulatory_documents(
 def get_regulatory_document(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     document = (
-        db.query(RegulatoryDocument)
+        data_db.query(RegulatoryDocument)
         .filter(RegulatoryDocument.id == document_id, RegulatoryDocument.tenant_id == ctx.tenant_id)
         .first()
     )
@@ -196,7 +202,7 @@ def get_regulatory_document(
             404, detail={"code": "REGULATORY_DOCUMENT_NOT_FOUND", "message": "Regulatory document is not available"}
         )
     versions = (
-        db.query(RegulatoryDocumentVersion)
+        data_db.query(RegulatoryDocumentVersion)
         .filter(
             RegulatoryDocumentVersion.document_id == document.id, RegulatoryDocumentVersion.tenant_id == ctx.tenant_id
         )
@@ -232,10 +238,11 @@ def update_regulatory_status(
     document_id: uuid.UUID,
     payload: RegulatoryStatusRequest,
     db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     document = (
-        db.query(RegulatoryDocument)
+        data_db.query(RegulatoryDocument)
         .filter(
             RegulatoryDocument.id == document_id,
             RegulatoryDocument.tenant_id == ctx.tenant_id,
@@ -282,7 +289,7 @@ def update_regulatory_status(
         # Anyone who wrote the document or any version of its text is an author and cannot approve it.
         authors = {str(document.created_by or "")} | {
             str(created_by)
-            for (created_by,) in db.query(RegulatoryDocumentVersion.created_by).filter(
+            for (created_by,) in data_db.query(RegulatoryDocumentVersion.created_by).filter(
                 RegulatoryDocumentVersion.document_id == document.id,
                 RegulatoryDocumentVersion.tenant_id == ctx.tenant_id,
             )
@@ -313,6 +320,7 @@ def update_regulatory_status(
             created_at=now,
         )
     )
+    data_db.commit()
     db.commit()
     return {"id": str(document.id), "status": document.status, "lock_version": document.lock_version}
 
@@ -321,10 +329,11 @@ def update_regulatory_status(
 def download_estar_preparation(
     document_id: uuid.UUID,
     db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     document = (
-        db.query(RegulatoryDocument)
+        data_db.query(RegulatoryDocument)
         .filter(RegulatoryDocument.id == document_id, RegulatoryDocument.tenant_id == ctx.tenant_id)
         .first()
     )
@@ -333,7 +342,7 @@ def download_estar_preparation(
             404, detail={"code": "REGULATORY_DOCUMENT_NOT_FOUND", "message": "Regulatory document is not available"}
         )
     version = (
-        db.query(RegulatoryDocumentVersion)
+        data_db.query(RegulatoryDocumentVersion)
         .filter(
             RegulatoryDocumentVersion.document_id == document.id,
             RegulatoryDocumentVersion.tenant_id == ctx.tenant_id,

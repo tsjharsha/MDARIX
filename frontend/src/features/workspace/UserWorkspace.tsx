@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
+import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bot,
   Briefcase,
@@ -139,6 +140,9 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     <WorkspaceContext.Provider value={api}>
       <div className="admin-console user-workspace">
         <header className="ac-header">
+          <a className="app-skip" href="#app-main">
+            Skip to content
+          </a>
           <button
             type="button"
             className="ac-menu-toggle"
@@ -164,6 +168,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
               <small>{session?.active_role ?? "No active role"}</small>
             </span>
             <SwitchOrganization />
+            <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started") : undefined} />
             <button
               type="button"
               className="ac-secondary"
@@ -201,7 +206,7 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             </p>
           </nav>
 
-          <main className="ac-main" data-workspace-section={section}>
+          <main className="ac-main" id="app-main" tabIndex={-1} data-workspace-section={section}>
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">{tenantName}</p>

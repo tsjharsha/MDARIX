@@ -1,8 +1,9 @@
 """Free-trial data retention: a closed trial keeps its data for 30 days so it can be converted, then it is deleted.
 
 Only workspaces still on the Free Trial plan whose data lives in the shared trial store are touched; a trial that
-was extended or converted no longer qualifies. Business and AI records are deleted; the audit trail, the customer
-and workspace identity, and the review history are kept. Users can no longer sign in and the workspace is archived.
+was extended or converted no longer qualifies. Everything the trial stored is deleted and its people pseudonymized
+(backend/app/tenant_purge.py); the workspace is archived. ``delete_tenant_records`` (business records only) is what
+the demo workspace reset uses.
 """
 
 from __future__ import annotations
@@ -16,8 +17,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
 from backend.app.db.models.customer_lifecycle import TenantDataPlane
-from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantMembership
-from backend.app.db.models.stage2 import AuthSession, SubscriptionLifecycle
+from backend.app.db.models.foundation import PlanDefinition, Tenant
+from backend.app.db.models.stage2 import SubscriptionLifecycle
 from backend.app.trial.service import FREE_TRIAL_PLAN
 
 RETENTION_DAYS = 30
@@ -164,49 +165,33 @@ def delete_tenant_records(db: Session, tenant_id: uuid.UUID) -> tuple[dict[str, 
     return deleted, remaining
 
 
-def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime | None = None) -> dict:
-    """Delete one closed trial's records, close its accounts and archive it. Commits; returns what was removed."""
-    now = now or datetime.now(timezone.utc)
-    deleted, remaining = delete_tenant_records(db, tenant_id)
+def purge_trial(db: Session, tenant_id: uuid.UUID, actor_ref: str, now: datetime | None = None, storage=None) -> dict:
+    """Delete one closed trial's data completely and archive it (backend/app/tenant_purge.py). Commits; raises
+    PurgeFailed with nothing changed when anything would remain."""
+    from backend.app.tenant_purge import purge_tenant
 
-    user_ids = [user_id for (user_id,) in db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id)]
-    db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id).update(
-        {"status": "REMOVED", "updated_at": now}, synchronize_session=False
+    return purge_tenant(
+        db,
+        tenant_id,
+        actor_ref,
+        reason=f"Free trial ended more than {RETENTION_DAYS} days ago; its data is deleted as the trial terms state.",
+        storage=storage,
+        now=now,
     )
-    db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant_id).update(
-        {"status": "REMOVED", "updated_at": now}, synchronize_session=False
-    )
-    if user_ids:
-        db.query(AuthSession).filter(AuthSession.user_id.in_(user_ids), AuthSession.revoked_at.is_(None)).update(
-            {"revoked_at": now}, synchronize_session=False
-        )
-    db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).update(
-        {"status": "RETIRED", "updated_at": now}, synchronize_session=False
-    )
-    db.query(Tenant).filter(Tenant.id == tenant_id).update(
-        {"status": "ARCHIVED", "updated_at": now}, synchronize_session=False
-    )
-    result = {"deleted_records": deleted, "not_deleted_tables": remaining, "users_closed": len(user_ids)}
-    db.add(
-        AuditEvent(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            actor_ref=actor_ref,
-            action="TRIAL_DATA_DELETED",
-            entity_type="Tenant",
-            entity_id=tenant_id,
-            details={**result, "retention_days": RETENTION_DAYS},
-            created_at=now,
-        )
-    )
-    db.commit()
-    return result
 
 
 def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
+    """Purge every trial that is due. A trial that cannot be purged completely is left untouched and reported;
+    the scheduled job then fails (and alerts) so an operator looks at it."""
+    from backend.app.tenant_purge import PurgeFailed
+
     due = trials_due(db, now)
-    results = []
+    results, failed = [], []
     for trial in due:
-        outcome = purge_trial(db, uuid.UUID(trial["tenant_id"]), actor_ref, now)
+        try:
+            outcome = purge_trial(db, uuid.UUID(trial["tenant_id"]), actor_ref, now)
+        except PurgeFailed as exc:
+            failed.append({**trial, "error": str(exc)})
+            continue
         results.append({**trial, **outcome})
-    return {"purged": len(results), "trials": results}
+    return {"purged": len(results), "trials": results, "failed": failed}

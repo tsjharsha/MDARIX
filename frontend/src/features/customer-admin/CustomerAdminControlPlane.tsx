@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
+import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bell,
   Building2,
@@ -90,6 +91,9 @@ export function CustomerAdminControlPlane({
     <ConsoleContext.Provider value={api}>
       <div className="admin-console customer-admin-console">
         <header className="ac-header">
+          <a className="app-skip" href="#app-main">
+            Skip to content
+          </a>
           <button
             type="button"
             className="ac-menu-toggle"
@@ -108,6 +112,7 @@ export function CustomerAdminControlPlane({
               <small>Customer Administrator</small>
             </span>
             <SwitchOrganization />
+            <HelpMenu />
             <button
               type="button"
               className="ac-secondary"
@@ -145,7 +150,7 @@ export function CustomerAdminControlPlane({
             </p>
           </nav>
 
-          <main className="ac-main" data-customer-admin-section={section}>
+          <main className="ac-main" id="app-main" tabIndex={-1} data-customer-admin-section={section}>
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">Customer administration</p>

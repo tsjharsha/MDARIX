@@ -55,6 +55,14 @@ def trial_retention(db: Session, _state: dict) -> dict:
     from backend.app.trial.retention import run_retention
 
     result = run_retention(db, ACTOR)
+    if result["failed"]:
+        names = ", ".join(f"{item.get('tenant_key')} ({item['error']})" for item in result["failed"])
+        send_alert(
+            "Trial data could not be deleted",
+            f"{len(result['failed'])} ended trial(s) still hold data past the retention period: {names}. "
+            "Nothing was changed for them; see the scheduler log.",
+        )
+        raise RuntimeError(f"{len(result['failed'])} trial purge(s) failed")
     return {"purged": result["purged"], "tenants": [item.get("tenant_key") for item in result["trials"]]}
 
 
@@ -105,6 +113,36 @@ def operations_alerts(db: Session, state: dict) -> dict:
     return {"dead_letters": dead, "worker": worker}
 
 
+def connector_sync(db: Session, _state: dict) -> dict:
+    from backend.app.access.connector_sync import run_scheduled_syncs
+
+    return run_scheduled_syncs(db)
+
+
+def export_expiry(db: Session, _state: dict) -> dict:
+    from backend.app.tenant_export import expire_exports
+
+    return {"expired": expire_exports(db)}
+
+
+def audit_chain_verification(db: Session, state: dict) -> dict:
+    """Recompute every organization's audit hash chain from its last verified anchor; alert on any break."""
+    from backend.app.audit_chain import verify_all
+
+    result = verify_all(db, state)
+    reported = set(state.get("reported_broken") or [])
+    new = [item for item in result["broken"] if f"{item['tenant_id']}:{item['seq']}" not in reported]
+    if new:
+        send_alert(
+            "Audit trail integrity check failed",
+            f"The audit hash chain of {len(new)} organization(s) no longer verifies: "
+            + ", ".join(f"{item['tenant_id']} ({item['reason']} at #{item['seq']})" for item in new)
+            + ". Treat as a security incident: preserve the database and logs and investigate before any change.",
+        )
+    state["reported_broken"] = sorted(reported | {f"{item['tenant_id']}:{item['seq']}" for item in result["broken"]})
+    return result
+
+
 JOBS: tuple[Job, ...] = (
     Job("tenant-lifecycle", timedelta(minutes=15), tenant_lifecycle, "Apply scheduled tenant status changes"),
     Job("subscription-lifecycle", timedelta(hours=1), subscription_lifecycle, "Expiry, grace and renewal reminders"),
@@ -112,6 +150,14 @@ JOBS: tuple[Job, ...] = (
     Job("trial-retention", timedelta(hours=24), trial_retention, "Delete trial data 30 days after the trial ends"),
     Job("embedding-catch-up", timedelta(minutes=15), embedding_catch_up, "Embed evidence that has no embedding yet"),
     Job("operations-alerts", timedelta(minutes=5), operations_alerts, "Alert on dead letters and a stopped worker"),
+    Job("export-expiry", timedelta(hours=1), export_expiry, "Delete data exports after their download period"),
+    Job("connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule"),
+    Job(
+        "audit-chain-verification",
+        timedelta(hours=24),
+        audit_chain_verification,
+        "Verify every organization's tamper-evident audit trail",
+    ),
 )
 
 

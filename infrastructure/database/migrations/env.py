@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,10 +9,10 @@ from backend.app.db.session import database_url
 from backend.app.db.tls import connect_args
 
 config = context.config
-config.set_main_option(
-    "sqlalchemy.url",
-    database_url().render_as_string(hide_password=False).replace("%", "%%"),
-)
+# The control database by default; scripts/migrate_data_planes.py points the same migrations at a dedicated customer
+# database (data plane) with MDARIX_MIGRATION_DATABASE_URL, so every plane has the identical, versioned schema.
+_target = os.getenv("MDARIX_MIGRATION_DATABASE_URL", "").strip() or database_url().render_as_string(hide_password=False)
+config.set_main_option("sqlalchemy.url", _target.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

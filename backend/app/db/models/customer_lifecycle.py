@@ -97,7 +97,8 @@ class TenantDataPlane(Base):
 
     __tablename__ = "tenant_data_planes"
     id = uuid_pk()
-    tenant_id = tenant_fk()
+    # Removed with its organization (migration md22).
+    tenant_id = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     database_ref: Mapped[str] = mapped_column(String(160), nullable=False)
     connection_secret_ref: Mapped[str] = mapped_column(String(160), nullable=False)
     region: Mapped[str] = mapped_column(String(80), nullable=False)

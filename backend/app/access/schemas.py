@@ -48,6 +48,11 @@ class MfaResetRequest(BaseModel):
     reason: str = Field(min_length=5, max_length=500)
 
 
+class PersonalDataErasureRequest(BaseModel):
+    # The person's request (and how it was verified); kept in the audit trail.
+    reason: str = Field(min_length=10, max_length=1000)
+
+
 class UserStatusRequest(BaseModel):
     status: str = Field(pattern="^(ACTIVE|SUSPENDED|OFFBOARDED)$")
 

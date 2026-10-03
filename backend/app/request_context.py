@@ -36,14 +36,20 @@ BLOCKED_MEMBERSHIP_STATUSES = frozenset({"SUSPENDED", "REVOKED", "REMOVED", "OFF
 
 def _ensure_trial_open(db: Session, tenant_id) -> None:
     """A Free Trial workspace closes on its end date, even if no admin has run the subscription job."""
-    from backend.app.trial.service import trial_has_ended
+    from backend.app.trial.service import trial_end_dates, trial_has_ended
 
     if trial_has_ended(db, tenant_id):
+        ended_on, deleted_on = trial_end_dates(db, tenant_id)
         raise HTTPException(
             403,
             detail={
                 "code": "TRIAL_ENDED",
-                "message": "Your MDARIX free trial has ended. Contact us to continue with your data intact.",
+                "message": (
+                    "Your MDARIX free trial has ended. Contact us to continue with your data intact"
+                    + (f"; otherwise it is deleted on {deleted_on}." if deleted_on else ".")
+                ),
+                "ended_on": ended_on,
+                "data_deleted_on": deleted_on,
             },
         )
 
@@ -128,6 +134,10 @@ def get_request_context(request: Request, db: Session = Depends(get_db)) -> Auth
     if user is None:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     ensure_tenant_access(db, user)
+    from genai.governance import set_request_tenant
+
+    # Model calls made while handling this request apply this organization's AI switch and budget.
+    set_request_tenant(tenant_id)
     membership = (
         db.query(TenantMembership)
         .filter(

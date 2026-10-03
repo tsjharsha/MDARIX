@@ -20,10 +20,10 @@ covered by `tests/test_trackwise_integration_path.py`.
 
 | # | Who | Step | Where |
 |---|---|---|---|
-| 1 | Ops | Store the system's API key as a server secret named `MDARIX_CONNECTOR_SECRET_<NAME>`. If the host is internal, add it to `MDARIX_CONNECTOR_ALLOWED_HOSTS`. | Server environment |
+| 1 | Ops | Prefer the connection's own API key (Integrations > connection > Set API key, encrypted at rest). Only if a server secret is needed, name it `MDARIX_CONNECTOR_SECRET_<TENANT ID>_<NAME>` with the tenant's identifier (for example `TEN0351`); other names are refused in staging and production. If the host is internal, add it to `MDARIX_CONNECTOR_ALLOWED_HOSTS`. | Server environment |
 | 2 | Customer Administrator | **New mapping**. (1) Name it, choose the system (TrackWise Digital), the record in that system (Complaint) and the MDARIX record it fills (Complaints). (2) Click "Add the required fields": TrackWise fields are matched by name (complaint_id, product_code → product ID, problem_description → description). Add optional fields such as received date, and choose how each value is carried over. (3) Check: it says whether the mapping can import records, then save it as a draft. | Customer administration → Data Mapping |
 | 3 | Two different administrators | Open the mapping: request approval, approve (a different administrator), release. The release is refused if the mapping has no field rules. | Data Mapping → the mapping |
-| 4 | Customer Administrator | **Add a connection**: code, system type, https endpoint, credential reference (`MDARIX_CONNECTOR_SECRET_…`), the record to read (Complaint) and the mapping. For an existing connection, use "Choose mapping". | Customer administration → Integrations |
+| 4 | Customer Administrator | **Add a connection**: code, system type, https endpoint, credential reference (`MDARIX_CONNECTOR_SECRET_<TENANT ID>_…`) or, better, the connection's own API key, the record to read (Complaint) and the mapping. For an existing connection, use "Choose mapping". | Customer administration → Integrations |
 | 5 | Customer Administrator | Health check, then activate the connection. | Integrations → Connections |
 | 6 | Customer Administrator | **Sync now**. The records read are imported through the released mapping as one checked batch: all of it is written, or none of it if a record is invalid. Each sync is recorded as a run (records read, kept, rejected; reconciled match or mismatch). | Integrations; results under Sync activity and Reconciliation |
 

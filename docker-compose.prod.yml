@@ -59,7 +59,8 @@ services:
       sh -c "alembic upgrade head
       && python scripts/configure_runtime_role.py
       && python scripts/grant_runtime_privileges.py
-      && python scripts/set_rls_system_token.py"
+      && python scripts/set_rls_system_token.py
+      && python scripts/migrate_data_planes.py --apply"
     environment:
       POSTGRES_USER: ${MDARIX_DB_OWNER_USER:?set MDARIX_DB_OWNER_USER in .env.production}
       POSTGRES_PASSWORD: ${MDARIX_DB_OWNER_PASSWORD:?set MDARIX_DB_OWNER_PASSWORD in .env.production}

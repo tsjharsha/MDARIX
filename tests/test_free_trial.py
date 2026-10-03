@@ -337,7 +337,9 @@ def test_closed_trial_data_is_deleted_after_30_days():
     try:
         assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 0
         assert db.query(Tenant).filter(Tenant.id == tenant_id).one().status == "ARCHIVED"
-        assert db.query(AuthUser).filter(AuthUser.username == email).one().status == "REMOVED"
+        # The trial's people are pseudonymized: their email address is gone and nobody can sign in.
+        assert db.query(AuthUser).filter(AuthUser.username == email).count() == 0
+        assert {user.status for user in db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id)} == {"REMOVED"}
         # The trial that closed 10 days ago keeps its data.
         assert db.query(Product).filter(Product.tenant_id == uuid.UUID(recent_approval["tenant_id"])).count() == 3
     finally:

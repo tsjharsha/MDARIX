@@ -6,6 +6,7 @@ import { KpiTile, TrendChart, toPoints, type DailyRow } from "../../admin/consol
 import { customerAttention, roleMix, seatUsage, userStatusSlices, type TenantUser } from "../customerAdminModel";
 import { licensedSeatLimit, useConsole } from "../context";
 import { listOf, useResource } from "../shared";
+import { formatDateTime } from "../../../app/dates";
 
 const SEAT_STATUSES = ["ACTIVE", "INVITED", "PENDING_VERIFICATION"];
 
@@ -321,7 +322,7 @@ export function Dashboard() {
                     </small>
                   </span>
                   <time className="ac-muted" dateTime={row.created_at}>
-                    {row.created_at ? new Date(row.created_at).toLocaleString() : "—"}
+                    {row.created_at ? formatDateTime(row.created_at) : "—"}
                   </time>
                 </li>
               ))}

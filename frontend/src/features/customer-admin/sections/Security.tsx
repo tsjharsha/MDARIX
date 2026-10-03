@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { BadgeCheck, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bot, Gauge, ShieldCheck } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { Table, Tabs, formatDate, listOf, send, useResource } from "../shared";
 
-const TABS = ["Posture", "Single sign-on", "Security events"] as const;
+const TABS = ["Posture", "AI processing", "Single sign-on", "Security events"] as const;
 type Tab = (typeof TABS)[number];
 
 const SECURITY_ACTIONS = [
@@ -19,6 +19,7 @@ const SECURITY_ACTIONS = [
   "MFA",
   "IDP",
   "ROLE_ASSIGNMENT",
+  "AI_PROCESSING",
 ];
 
 export function SecuritySection({ tab }: { tab?: string }) {
@@ -27,6 +28,7 @@ export function SecuritySection({ tab }: { tab?: string }) {
     <>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Security sections" />
       {active === "Posture" && <Posture />}
+      {active === "AI processing" && <AiProcessing />}
       {active === "Single sign-on" && <SingleSignOn />}
       {active === "Security events" && <SecurityEvents />}
     </>
@@ -94,6 +96,96 @@ function Posture() {
           ))}
         </ul>
       </Panel>
+    </>
+  );
+}
+
+type AiSettings = {
+  ai_processing_allowed: boolean;
+  monthly_token_budget: number;
+  tokens_used: number;
+  requests: number;
+  refused: number;
+  month: string;
+  models: { provider: string; model: string }[];
+};
+
+/** Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. */
+function AiProcessing() {
+  const { confirm } = useConsole();
+  const settings = useResource<AiSettings>("/api/v1/admin/ai-settings");
+  const data = settings.data;
+  const on = data?.ai_processing_allowed ?? false;
+  const share =
+    data && data.monthly_token_budget ? Math.min(100, (data.tokens_used / data.monthly_token_budget) * 100) : 0;
+  const change = () =>
+    confirm({
+      title: on ? "Turn AI processing off?" : "Turn AI processing on?",
+      body: on
+        ? "Nothing from your organization will be sent to an AI model. Ask MDARIX, hypotheses and briefs answer from rules only, and say so."
+        : "AI features may send the records needed for an answer to the AI model listed here, with personal information masked first.",
+      confirmLabel: on ? "Turn AI off" : "Turn AI on",
+      reason: { label: "Reason for the change", min: 10 },
+      done: on ? "AI processing is off for your organization." : "AI processing is on for your organization.",
+      run: async (reason) => {
+        await send("/api/v1/admin/ai-settings", "PUT", { ai_processing_allowed: !on, reason });
+        settings.reload();
+      },
+    });
+  return (
+    <>
+      <section className="ac-stats three" aria-label="AI processing figures">
+        <StatTile
+          label="AI processing"
+          value={data ? (on ? "On" : "Off") : null}
+          detail={on ? "AI features may use a model" : "Rule-based answers only"}
+          tone={data ? (on ? "good" : "warning") : undefined}
+          icon={<Bot size={18} />}
+        />
+        <StatTile
+          label="Tokens used this month"
+          value={data ? data.tokens_used.toLocaleString() : null}
+          detail={data ? `of ${data.monthly_token_budget.toLocaleString()} (${share.toFixed(0)}%)` : "Unavailable"}
+          tone={data ? (share >= 90 ? "serious" : share >= 75 ? "warning" : "good") : undefined}
+          icon={<Gauge size={18} />}
+        />
+        <StatTile
+          label="AI requests this month"
+          value={data ? data.requests.toLocaleString() : null}
+          detail={data ? `${data.refused.toLocaleString()} answered from rules instead` : "Unavailable"}
+          icon={<Bot size={18} />}
+        />
+      </section>
+      <div className="ac-grid two">
+        <Panel eyebrow="Your organization" title="AI processing" state={settings.state} error={settings.error}>
+          <p>
+            {on
+              ? "AI features (Ask MDARIX, hypotheses, challenges and briefs) may send the records an answer needs to the model below. A person reviews every AI suggestion."
+              : "AI processing is off: nothing from your organization is sent to an AI model, and every feature answers from rules."}
+          </p>
+          <div className="ca-action-row">
+            <button type="button" className={on ? "ac-secondary" : "ac-primary"} onClick={change} disabled={!data}>
+              {on ? "Turn AI off" : "Turn AI on"}
+            </button>
+          </div>
+          <p className="ac-muted">
+            When the monthly allowance is used up, features answer from rules until next month.
+          </p>
+        </Panel>
+        <Panel eyebrow="What is sent" title="How your data is protected">
+          <ul className="ca-check-list">
+            <li>Names, email addresses, phone numbers, dates of birth and record numbers are masked before sending.</li>
+            <li>Only providers under a contract that forbids training on your data, or models we host, are used.</li>
+            <li>Every AI request is counted against your organization&apos;s monthly allowance.</li>
+            <li>Changing this setting is recorded in the audit trail with your reason.</li>
+          </ul>
+          <p className="ac-muted">
+            {data?.models.length
+              ? `Model in use: ${data.models.map((item) => `${item.provider} (${item.model})`).join(", ")}.`
+              : "No AI model is configured on this server, so every answer comes from rules."}
+          </p>
+        </Panel>
+      </div>
     </>
   );
 }

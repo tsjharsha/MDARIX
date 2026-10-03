@@ -30,6 +30,7 @@ from backend.app.db.models.stage2 import (
     OutboxEvent,
     UserInvitation,
 )
+from backend.app.db.data_plane import tenant_data_session
 from backend.app.db.session import get_db
 from backend.app.access.authz import (
     _admin_detail_tenant,
@@ -353,8 +354,10 @@ def tenant_dashboard(request: Request, db: Session = Depends(get_db)):
     active_users = (
         db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.status == "ACTIVE", *visible).count()
     )
-    products = db.query(Product).filter(Product.tenant_id == tenant_id).count()
-    investigations = db.query(Investigation).filter_by(tenant_id=tenant_id).count()
+    # Business records live in the tenant's data plane (a dedicated database, or the shared one).
+    with tenant_data_session(tenant_id) as data:
+        products = data.query(Product).filter(Product.tenant_id == tenant_id).count()
+        investigations = data.query(Investigation).filter_by(tenant_id=tenant_id).count()
     connectors = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id == tenant_id).count()
     return {
         "tenant": {
@@ -396,25 +399,26 @@ def tenant_dashboard_trends(request: Request, days: int = 30, db: Session = Depe
     runs = per_day(
         db, since, ConnectorRun.started_at, ConnectorRun.tenant_id == tenant_id, key=func.upper(ConnectorRun.status)
     )
-    ai = per_day(
-        db,
-        since,
-        AIExecution.execution_timestamp,
-        AIExecution.tenant_id == tenant_id,
-        key=AIExecution.error_state.is_(None),
-    )
+    with tenant_data_session(tenant_id) as data:
+        ai = per_day(
+            data,
+            since,
+            AIExecution.execution_timestamp,
+            AIExecution.tenant_id == tenant_id,
+            key=AIExecution.error_state.is_(None),
+        )
+        investigations = (
+            data.query(func.upper(Investigation.status), func.count(Investigation.id))
+            .filter(Investigation.tenant_id == tenant_id)
+            .group_by(func.upper(Investigation.status))
+            .order_by(func.count(Investigation.id).desc())
+            .all()
+        )
     in_tenant = AuditEvent.tenant_id == tenant_id
     refused = or_(AuditEvent.action.like("%DENIED%"), AuditEvent.action.like("%FAILED%"))
     audit = [(day, "events", count) for day, _, count in per_day(db, since, AuditEvent.created_at, in_tenant)] + [
         (day, "refused", count) for day, _, count in per_day(db, since, AuditEvent.created_at, in_tenant, refused)
     ]
-    investigations = (
-        db.query(func.upper(Investigation.status), func.count(Investigation.id))
-        .filter(Investigation.tenant_id == tenant_id)
-        .group_by(func.upper(Investigation.status))
-        .order_by(func.count(Investigation.id).desc())
-        .all()
-    )
     return {
         "days": days,
         "sign_ins": daily([(day, "sign_ins", count) for day, count in sign_ins], days, today),
@@ -618,13 +622,15 @@ def admin_integration_credentials(request: Request, db: Session = Depends(get_db
 @router.get("/admin/ai-executions")
 def admin_ai_executions(request: Request, db: Session = Depends(get_db)):
     tenant_id = _admin_detail_tenant(request, db)
-    rows = (
-        db.query(AIExecution)
-        .filter(AIExecution.tenant_id == tenant_id)
-        .order_by(AIExecution.execution_timestamp.desc())
-        .limit(200)
-        .all()
-    )
+    with tenant_data_session(tenant_id) as data:
+        rows = (
+            data.query(AIExecution)
+            .filter(AIExecution.tenant_id == tenant_id)
+            .order_by(AIExecution.execution_timestamp.desc())
+            .limit(200)
+            .all()
+        )
+        data.expunge_all()
     return [
         {
             "id": str(row.id),

@@ -120,7 +120,15 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
   );
 }
 
-const SECTIONS = ["Overview", "Administrators", "Environments", "Domain & identity", "Activity"] as const;
+const SECTIONS = [
+  "Overview",
+  "Administrators",
+  "Environments",
+  "Domain & identity",
+  "AI processing",
+  "Data",
+  "Activity",
+] as const;
 type Section = (typeof SECTIONS)[number];
 
 export function TenantPage({
@@ -234,6 +242,19 @@ export function TenantPage({
       {tenant && section === "Domain & identity" && (
         <DomainIdentity tenantId={tenantId} providers={record.data?.identity_providers ?? []} onMessage={onMessage} />
       )}
+      {tenant && section === "AI processing" && (
+        <TenantAiSettings tenantId={tenantId} name={name} onMessage={onMessage} />
+      )}
+      {tenant && section === "Data" && (
+        <TenantData
+          tenantId={tenantId}
+          tenantKey={tenant.tenant_key}
+          status={tenant.status}
+          name={name}
+          onMessage={onMessage}
+          onChanged={() => record.reload()}
+        />
+      )}
       {tenant && section === "Activity" && <TenantActivity tenantId={tenantId} />}
       <ConfirmDialog
         request={confirm}
@@ -280,6 +301,298 @@ function TenantOverview({ tenant }: { tenant: any }) {
         </div>
       </dl>
     </Panel>
+  );
+}
+
+type AiSettings = {
+  ai_processing_allowed: boolean;
+  monthly_token_budget: number;
+  budget_is_default: boolean;
+  tokens_used: number;
+  requests: number;
+  refused: number;
+  month: string;
+  models: { provider: string; model: string }[];
+};
+
+/** Whether the tenant's content may go to an AI model, its monthly token allowance, and this month's use. */
+function TenantAiSettings({
+  tenantId,
+  name,
+  onMessage,
+}: {
+  tenantId: string;
+  name: string;
+  onMessage: (text: string, tone?: "good" | "critical") => void;
+}) {
+  const url = `/api/v1/platform-admin/tenants/${tenantId}/ai-settings`;
+  const settings = useResource<AiSettings>(url);
+  const [budget, setBudget] = useState("");
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const data = settings.data;
+  const on = data?.ai_processing_allowed ?? false;
+  const ask = (body: Record<string, unknown>, title: string, effect: string, done: string) =>
+    setConfirm({
+      title,
+      body: effect,
+      confirmLabel: "Save",
+      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+      run: (reason) => send(url, "PUT", { ...body, reason }),
+      done,
+    });
+  return (
+    <>
+      <Panel eyebrow="AI processing" title={`AI for ${name}`} state={settings.state} error={settings.error}>
+        {data && (
+          <dl className="cc-details">
+            <div>
+              <dt>AI processing</dt>
+              <dd>{on ? "On" : "Off: rule-based answers only"}</dd>
+            </div>
+            <div>
+              <dt>Tokens used this month</dt>
+              <dd>
+                {data.tokens_used.toLocaleString()} of {data.monthly_token_budget.toLocaleString()}
+                {data.budget_is_default ? " (server default)" : ""}
+              </dd>
+            </div>
+            <div>
+              <dt>AI requests this month</dt>
+              <dd>
+                {data.requests.toLocaleString()} · {data.refused.toLocaleString()} answered from rules instead
+              </dd>
+            </div>
+            <div>
+              <dt>Model in use</dt>
+              <dd>{data.models.length ? data.models.map((item) => item.provider).join(", ") : "None configured"}</dd>
+            </div>
+          </dl>
+        )}
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className={on ? "ca-danger" : "ac-primary"}
+            disabled={!data}
+            onClick={() =>
+              ask(
+                { ai_processing_allowed: !on },
+                on ? `Turn AI off for ${name}?` : `Turn AI on for ${name}?`,
+                on
+                  ? "Nothing from this tenant is sent to an AI model; its features answer from rules."
+                  : "This tenant's AI features may send the records an answer needs to the configured model, with personal information masked.",
+                on ? `AI processing is off for ${name}.` : `AI processing is on for ${name}.`,
+              )
+            }
+          >
+            {on ? "Turn AI off" : "Turn AI on"}
+          </button>
+        </div>
+        <form
+          className="ca-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = Number(budget);
+            if (!Number.isInteger(value) || value < 0) return onMessage("Enter a whole number of tokens.", "critical");
+            ask(
+              { monthly_token_budget: value },
+              "Change the monthly AI allowance?",
+              `${name} may use up to ${value.toLocaleString()} tokens a month; after that its features answer from rules.`,
+              "Monthly AI allowance saved.",
+            );
+          }}
+        >
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Monthly token allowance
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                inputMode="numeric"
+                required
+                placeholder={data ? String(data.monthly_token_budget) : ""}
+                value={budget}
+                onChange={(event) => setBudget(event.target.value)}
+              />
+            </label>
+          </div>
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={!data}>
+              Save allowance
+            </button>
+            {data && !data.budget_is_default && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={() =>
+                  ask(
+                    { use_default_budget: true },
+                    "Use the standard allowance?",
+                    "The tenant goes back to the server's standard monthly allowance.",
+                    "Standard allowance restored.",
+                  )
+                }
+              >
+                Use standard allowance
+              </button>
+            )}
+          </div>
+        </form>
+      </Panel>
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(message) => {
+          setConfirm(null);
+          setBudget("");
+          onMessage(message);
+          settings.reload();
+        }}
+      />
+    </>
+  );
+}
+
+type DataExport = {
+  id: string;
+  status: string;
+  reason: string;
+  summary: { tables: number; rows: number; files: number } | null;
+  created_at: string;
+  expires_at: string | null;
+};
+
+/** Export everything the tenant stored (to hand it back), and delete it at the end of a contract or on request. */
+function TenantData({
+  tenantId,
+  tenantKey,
+  status,
+  name,
+  onMessage,
+  onChanged,
+}: {
+  tenantId: string;
+  tenantKey: string;
+  status: string;
+  name: string;
+  onMessage: (text: string, tone?: "good" | "critical") => void;
+  onChanged: () => void;
+}) {
+  const base = `/api/v1/platform-admin/tenants/${tenantId}`;
+  const exports = useResource<{ exports: DataExport[] }>(`${base}/exports`);
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [typedKey, setTypedKey] = useState("");
+  const rows = exports.data?.exports ?? [];
+  const busy = rows.some((row) => row.status === "QUEUED" || row.status === "RUNNING");
+  const deletable = ["SUSPENDED", "TERMINATED"].includes(String(status).toUpperCase());
+  return (
+    <>
+      <Panel eyebrow="Data" title="Exports" state={exports.state} error={exports.error}>
+        <p className="ac-muted">
+          A zip of every record, the audit trail and every stored file (no passwords or secrets), kept for 7 days.
+        </p>
+        <div className="ca-action-row">
+          <button
+            type="button"
+            className="ac-primary"
+            disabled={busy}
+            onClick={() =>
+              setConfirm({
+                title: `Prepare a full export of ${name}?`,
+                body: "The export is prepared in the background; refresh this page to download it.",
+                confirmLabel: "Prepare export",
+                reason: { label: "Reason (kept in the audit trail)", min: 10 },
+                run: (reason) => send(`${base}/exports`, "POST", { reason }),
+                done: "The export is being prepared.",
+              })
+            }
+          >
+            {busy ? "Export in progress…" : "Prepare export"}
+          </button>
+          <button type="button" className="ac-secondary" onClick={() => exports.reload()}>
+            Refresh
+          </button>
+        </div>
+        <Table
+          caption="Exports"
+          rows={rows}
+          rowKey={(row) => row.id}
+          empty={{ title: "No exports", detail: "Prepare one to hand the data back to the customer." }}
+          columns={[
+            { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
+            { key: "status", label: "Status", render: (row) => titleCase(row.status) },
+            {
+              key: "contents",
+              label: "Contents",
+              render: (row) =>
+                row.summary ? `${row.summary.rows.toLocaleString()} records · ${row.summary.files} files` : "—",
+            },
+            {
+              key: "download",
+              label: "Download",
+              render: (row) =>
+                row.status === "READY" ? (
+                  <a className="ac-link" href={`${base}/exports/${row.id}/download`} download>
+                    Download zip
+                  </a>
+                ) : (
+                  "—"
+                ),
+            },
+          ]}
+        />
+      </Panel>
+      <Panel eyebrow="Danger zone" title="Delete all of this organization's data">
+        <p>
+          Deletes every record, the audit trail and every stored file, pseudonymizes the people and archives the
+          organization. Contract history is kept. This cannot be undone; prepare an export first if the data is to be
+          returned.
+        </p>
+        {deletable ? (
+          <form
+            className="ca-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (typedKey.trim() !== tenantKey) return onMessage("Type the organization key exactly.", "critical");
+              setConfirm({
+                title: `Delete all of ${name}'s data?`,
+                body: "Everything this organization stored is deleted for good and the organization is archived.",
+                confirmLabel: "Delete all data",
+                danger: true,
+                reason: { label: "Reason (for example the customer's written request)", min: 10 },
+                password: true,
+                run: (reason, password) =>
+                  send(`${base}/purge`, "POST", { reason, password, confirm_tenant_key: typedKey.trim() }),
+                done: `${name}'s data has been deleted.`,
+              });
+            }}
+          >
+            <label className="ca-field">
+              Type the organization key <strong>{tenantKey}</strong> to confirm
+              <input value={typedKey} onChange={(event) => setTypedKey(event.target.value)} autoComplete="off" />
+            </label>
+            <div className="ca-action-row">
+              <button type="submit" className="ca-danger" disabled={busy || typedKey.trim() !== tenantKey}>
+                Delete all data
+              </button>
+            </div>
+          </form>
+        ) : (
+          <p className="ac-muted">Suspend or terminate the organization first.</p>
+        )}
+      </Panel>
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(message) => {
+          setConfirm(null);
+          setTypedKey("");
+          onMessage(message);
+          exports.reload();
+          onChanged();
+        }}
+      />
+    </>
   );
 }
 
