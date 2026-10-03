@@ -310,20 +310,11 @@ jobs:
         run: |
           docker build -f Dockerfile.api -t mdarix-app:ci .
           docker build -f Dockerfile.web -t mdarix-web:ci .
-      - name: Scan the API image (high and critical, with a fix available)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: mdarix-app:ci
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
-      - name: Scan the web image
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: mdarix-web:ci
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
+      - name: Scan both images (high and critical findings that have a fix fail the job)
+        run: |
+          for image in mdarix-app:ci mdarix-web:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image               --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$image"
+          done
 
   security:
     name: Security and static gates
@@ -334,6 +325,9 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          # gitleaks scans the pull request's commits, which needs the history (a shallow clone cannot list them).
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'

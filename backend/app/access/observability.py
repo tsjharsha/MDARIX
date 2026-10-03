@@ -107,6 +107,28 @@ def audit_history(
     ]
 
 
+# Every exported audit event carries its place in the organization's hash chain (migration md18), so whoever
+# receives an export can check that nothing between the first and last event is missing or changed.
+AUDIT_EXPORT_FIELDS = [
+    "id",
+    "tenant_id",
+    "chain_seq",
+    "previous_hash",
+    "event_hash",
+    "actor_ref",
+    "action",
+    "entity_type",
+    "entity_id",
+    "source_ip",
+    "user_agent",
+    "reason",
+    "old_values",
+    "new_values",
+    "retention_until",
+    "created_at",
+]
+
+
 @router.get("/admin/audit-history/export")
 def export_audit_history(
     request: Request,
@@ -122,22 +144,9 @@ def export_audit_history(
         rows = rows.filter(AuditEvent.action == action)
     if entity_type:
         rows = rows.filter(AuditEvent.entity_type == entity_type)
-    events = rows.order_by(AuditEvent.created_at.desc()).limit(5000).all()
-    fields = [
-        "id",
-        "tenant_id",
-        "actor_ref",
-        "action",
-        "entity_type",
-        "entity_id",
-        "source_ip",
-        "user_agent",
-        "reason",
-        "old_values",
-        "new_values",
-        "retention_until",
-        "created_at",
-    ]
+    # The whole trail, in chain order: an export is evidence, so it is never cut short.
+    events = rows.order_by(AuditEvent.chain_seq.asc()).yield_per(1000)
+    fields = AUDIT_EXPORT_FIELDS
     if output_format.upper() == "JSON":
         return [
             {
@@ -167,6 +176,15 @@ def export_audit_history(
     )
 
 
+def _chain_summary(db: Session, tenant_id) -> dict:
+    from backend.app.audit_chain import verify_tenant_chain
+
+    result = verify_tenant_chain(db, tenant_id)
+    return {
+        key: result[key] for key in ("valid", "checked", "first_broken_seq", "last_seq", "last_hash", "verified_at")
+    }
+
+
 @router.get("/admin/audit-history/evidence-package")
 def download_audit_evidence_package(
     request: Request, action: str | None = None, entity_type: str | None = None, db: Session = Depends(get_db)
@@ -182,22 +200,8 @@ def download_audit_evidence_package(
         query = query.filter(AuditEvent.action == action)
     if entity_type:
         query = query.filter(AuditEvent.entity_type == entity_type)
-    events = query.order_by(AuditEvent.created_at.desc()).limit(10000).all()
-    fields = [
-        "id",
-        "tenant_id",
-        "actor_ref",
-        "action",
-        "entity_type",
-        "entity_id",
-        "source_ip",
-        "user_agent",
-        "reason",
-        "old_values",
-        "new_values",
-        "retention_until",
-        "created_at",
-    ]
+    events = query.order_by(AuditEvent.chain_seq.asc()).yield_per(1000)
+    fields = AUDIT_EXPORT_FIELDS
     rows = []
     for row in events:
         item = {field: getattr(row, field) for field in fields}
@@ -210,8 +214,11 @@ def download_audit_evidence_package(
         "version": "1",
         "tenant_id": str(admin.tenant_id),
         "event_count": len(rows),
+        "complete": True,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "filters": {"action": action, "entity_type": entity_type},
+        # The organization's whole chain, verified in the database when the package was made.
+        "audit_chain": _chain_summary(db, admin.tenant_id),
         "retention_policy": "7-year minimum",
         "redaction": "secret-bearing fields excluded by audit writer",
     }

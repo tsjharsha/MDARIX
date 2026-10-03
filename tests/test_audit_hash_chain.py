@@ -57,8 +57,11 @@ def test_every_new_event_is_linked_to_the_one_before_it(db):
 
 
 def test_hashes_supplied_by_the_application_are_replaced(db):
-    event = _add(db, _tenant(db), "CHAIN_TEST_FORGED", previous_hash="0" * 64, event_hash="f" * 64, chain_seq=1)
-    assert event.event_hash != "f" * 64 and event.previous_hash != "0" * 64 and event.chain_seq > 1
+    tenant_id = _tenant(db)
+    before = _add(db, tenant_id, "CHAIN_TEST_BEFORE")
+    event = _add(db, tenant_id, "CHAIN_TEST_FORGED", previous_hash="0" * 64, event_hash="f" * 64, chain_seq=1)
+    assert event.event_hash != "f" * 64 and event.previous_hash == before.event_hash
+    assert event.chain_seq == before.chain_seq + 1
 
 
 def test_a_changed_event_breaks_the_chain(db):
@@ -94,8 +97,32 @@ def test_a_rewritten_history_is_caught_by_the_last_verified_anchor(db):
     assert {"tenant_id": str(tenant_id), "reason": "ANCHOR_CHANGED", "seq": anchor["seq"]} in second["broken"]
 
 
-def test_an_administrator_can_verify_the_trail():
+def test_an_administrator_can_verify_the_trail(db):
+    _add(db, _tenant(db), "CHAIN_TEST_VERIFY")  # the organization's trail is never empty, even on a fresh database
+    db.commit()
     response = authenticated_client().get("/api/v1/admin/audit-chain")
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["valid"] is True and body["checked"] == body["last_seq"] and len(body["last_hash"]) == 64
+
+
+def test_exports_carry_the_chain_and_its_verification(db):
+    import csv
+    import io
+    import json
+    import zipfile
+
+    _add(db, _tenant(db), "CHAIN_TEST_EXPORT")
+    db.commit()
+    client = authenticated_client()
+    exported = client.get("/api/v1/admin/audit-history/export?output_format=CSV")
+    assert exported.status_code == 200
+    rows = list(csv.DictReader(io.StringIO(exported.text)))
+    assert rows and {"chain_seq", "previous_hash", "event_hash"} <= set(rows[0])
+    sequence = [int(row["chain_seq"]) for row in rows]
+    assert sequence == sorted(sequence) and sequence[0] == 1  # the whole trail, from its first event
+
+    package = client.get("/api/v1/admin/audit-history/evidence-package")
+    manifest = json.loads(zipfile.ZipFile(io.BytesIO(package.content)).read("manifest.json"))
+    assert manifest["complete"] is True and manifest["audit_chain"]["valid"] is True
+    assert manifest["event_count"] == len(rows)

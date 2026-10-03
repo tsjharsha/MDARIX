@@ -1,5 +1,7 @@
 name: CodeQL
-# Static security analysis of the Python and TypeScript code on every pull request and weekly.
+# Static security analysis of the Python and TypeScript code on every pull request and weekly. The repository is
+# private without code-scanning upload, so the results are kept as a build artifact and the job fails on any finding
+# rated high or critical (security severity 7.0 or above).
 on:
   pull_request:
   push:
@@ -8,7 +10,7 @@ on:
     - cron: '17 3 * * 1'
 permissions:
   contents: read
-  security-events: write
+  actions: read
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -25,3 +27,31 @@ jobs:
       - uses: github/codeql-action/analyze@v3
         with:
           category: /language:${{ matrix.language }}
+          upload: never
+          output: codeql-results
+      - name: Fail on high and critical findings
+        run: |
+          python - <<'PY'
+          import glob, json, sys
+          serious = []
+          for path in glob.glob("codeql-results/*.sarif"):
+              for run in json.load(open(path))["runs"]:
+                  rules = {rule["id"]: rule for rule in run["tool"]["driver"].get("rules", [])}
+                  for result in run.get("results", []):
+                      rule = rules.get(result.get("ruleId"), {})
+                      severity = float(rule.get("properties", {}).get("security-severity", 0) or 0)
+                      where = result["locations"][0]["physicalLocation"]
+                      line = f"{severity:>4}  {result.get('ruleId')}  {where['artifactLocation']['uri']}:{where.get('region', {}).get('startLine')}"
+                      print(line)
+                      if severity >= 7.0:
+                          serious.append(line)
+          print(f"{len(serious)} high or critical finding(s)")
+          sys.exit(1 if serious else 0)
+          PY
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-${{ matrix.language }}
+          path: codeql-results
+          if-no-files-found: warn

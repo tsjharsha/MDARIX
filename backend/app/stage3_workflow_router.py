@@ -653,7 +653,6 @@ def download_supplier_attachment(
 @router.post("/resend/webhook")
 async def persisted_resend_webhook(
     request: Request,
-    x_resend_signature: str | None = Header(default=None),
     x_provider_account_id: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -851,7 +850,13 @@ def compliance_report(
             "audit_events": len(rows),
             "signatures": len(signature_rows),
             "valid_signatures": sum(1 for item in signature_rows if item["valid"]),
+            # The report lists the most recent records; these are the organization's totals.
+            "audit_events_total": db.query(AuditEvent).filter(AuditEvent.tenant_id == ctx.tenant_id).count(),
+            "signatures_total": db.query(SignedApprovalRecord)
+            .filter(SignedApprovalRecord.tenant_id == ctx.tenant_id)
+            .count(),
         },
+        "scope": "The latest 1,000 audit events and 500 signatures; the complete trail is in the audit export.",
     }
     from reports.service import generate_report as build_report
 

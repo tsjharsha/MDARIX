@@ -513,8 +513,12 @@ def ai_cost_reconciliation(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Reconcile persisted estimated provider cost with an supplied invoice total."""
-    rows = db.query(AIExecution).filter(AIExecution.tenant_id == ctx.tenant_id).limit(10000).all()
-    estimated = sum((_execution_cost(row) for row in rows), Decimal(0))
+    # Every execution counts: a reconciliation against an invoice must never stop at an arbitrary number of rows.
+    rows = db.query(AIExecution).filter(AIExecution.tenant_id == ctx.tenant_id).yield_per(1000)
+    estimated, count = Decimal(0), 0
+    for row in rows:
+        estimated += _execution_cost(row)
+        count += 1
     invoice = None
     variance = None
     if provider_invoice_total is not None:
@@ -526,7 +530,7 @@ def ai_cost_reconciliation(
     return {
         "tenant_id": ctx.tenant_id,
         "currency": "USD",
-        "execution_count": len(rows),
+        "execution_count": count,
         "estimated_total": str(estimated),
         "provider_invoice_total": str(invoice) if invoice is not None else None,
         "variance": str(variance) if variance is not None else None,

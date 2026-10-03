@@ -95,6 +95,13 @@ DB_MODULES = {
     # Read the golden investigation directly, so they need it ingested even when they run first (fresh CI database).
     "test_analysis_reuse",
     "test_grounded_ask",
+    # Use the shared test account (authenticated_client), which belongs in the golden organization: loading the
+    # golden data first stops a fresh database from creating that account in another organization too.
+    "test_admin_route_walk",
+    "test_ai_controls",
+    "test_audit_hash_chain",
+    "test_connector_sync",
+    "test_tenant_data",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -16,7 +16,7 @@ def provider_health(ctx: AuthenticatedRequestContext = Depends(get_request_conte
 
 
 @router.post("/resend/webhook")
-async def resend_webhook(request: Request, x_resend_signature: str | None = Header(default=None)):
+async def resend_webhook(request: Request):
     body = await read_limited(request, WEBHOOK_LIMIT_BYTES, code="PAYLOAD_TOO_LARGE")
     if not verify_resend_webhook(body, request.headers):
         raise HTTPException(

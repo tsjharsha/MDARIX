@@ -280,6 +280,8 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated AI workflow surfaces grounded review state", async ({ page }, testInfo) => {
+    // Sign-in plus two full-page screenshots on the slower mobile profile can exceed the default 30 seconds.
+    test.setTimeout(90_000);
     // Investigation workflows belong to business users; a platform admin is returned to the admin console.
     await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
     await page.goto("/app/ask");
