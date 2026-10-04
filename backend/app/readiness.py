@@ -2,9 +2,10 @@
 
 The API is *ready* when its database answers as the role it runs as and the schema is at the migration this code
 was built for (a deploy that skipped its migration job is taken out of rotation instead of failing at random).
-Data planes, object storage, the background worker and email are checked too; when one fails the report says
-``degraded`` but the API stays in rotation, since most screens still work. Results are cached for a few seconds so
-frequent probes do not load the databases.
+Data planes, object storage, the background worker, the scheduler and email are checked too; when one fails the
+report says ``degraded`` but the API stays in rotation, since most screens still work. Results are cached for a few
+seconds so frequent probes do not load the databases. ``public_status`` reduces the report to one word for
+``/health/status``.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import logging
 import os
 import threading
 import time
+from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 
@@ -140,6 +142,30 @@ def _email() -> dict:
     return {}
 
 
+# The operations-alerts job runs every 5 minutes; three missed runs mean the scheduler is not doing its work.
+SCHEDULER_WATCH_JOB = "operations-alerts"
+SCHEDULER_MAX_AGE = timedelta(minutes=15)
+
+
+def _scheduler(job: str = SCHEDULER_WATCH_JOB, max_age: timedelta = SCHEDULER_MAX_AGE) -> dict:
+    """The scheduler has finished ``job`` within ``max_age`` (scheduler_runs is platform-level, no tenant scope)."""
+    from backend.app.db.models.stage2 import SchedulerRun
+    from backend.app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        row = db.get(SchedulerRun, job)
+        finished = row.last_finished_at if row is not None else None
+    finally:
+        db.close()
+    if finished is None:
+        raise RuntimeError("NOT_REPORTED")
+    age = (datetime.now(timezone.utc) - finished).total_seconds()
+    if age > max_age.total_seconds():
+        raise RuntimeError(f"STALE: last run {int(age)}s ago")
+    return {"seconds_since": int(age)}
+
+
 def readiness_report() -> dict:
     global _cached
     with _lock:
@@ -151,6 +177,7 @@ def readiness_report() -> dict:
             _check("data_planes", _data_planes),
             _check("object_storage", _object_storage),
             _check("worker", _worker),
+            _check("scheduler", _scheduler),
             _check("email", _email),
         ]
         status = "ready" if database["ok"] else "not_ready"
@@ -159,3 +186,14 @@ def readiness_report() -> dict:
         report = {"status": status, "checks": [database, *others]}
         _cached = (now, report)
         return report
+
+
+# What /health/status says for each readiness state: the public word and the HTTP status.
+_PUBLIC = {"ready": ("ok", 200), "degraded": ("degraded", 200), "not_ready": ("down", 503)}
+
+
+def public_status() -> tuple[int, dict]:
+    """(HTTP status, body) for the public status endpoint: one word, no component names, errors or timings, so a
+    status page can poll it without learning anything about the deployment. Shares the readiness cache."""
+    word, code = _PUBLIC.get(readiness_report()["status"], ("down", 503))
+    return code, {"status": word}

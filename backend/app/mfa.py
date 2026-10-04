@@ -1,8 +1,9 @@
 """Multi-factor authentication policy and checks (authenticator app, auth/totp.py).
 
-- Who must use MFA at sign-in: everyone who has enrolled; and, by policy, administrators who have not enrolled
-  yet must set it up before they can do anything else (MDARIX_REQUIRE_MFA_ROLES, default platform and customer
-  administrators outside local development).
+- Who must use MFA at sign-in: everyone who has enrolled; and, by policy, people in the roles that can change the
+  record of an investigation or sign for it must set it up before they can do anything else
+  (MDARIX_REQUIRE_MFA_ROLES; default platform and customer administrators, Leaders and Approvers outside local
+  development; backend/app/config_check.py refuses a weaker production setting).
 - Governed decision signatures need a fresh authenticator code (MDARIX_REQUIRE_MFA_FOR_SIGNATURES, default on).
 - Wrong codes are limited: 5 failures lock MFA checks for the account for 15 minutes.
 """
@@ -31,10 +32,13 @@ def _normalize(role) -> str:
     return "PLATFORM_ADMIN" if value in PLATFORM_ROLES else value
 
 
+DEFAULT_REQUIRED_ROLES = "PLATFORM_ADMIN,CUSTOMER_ADMIN,LEADER,APPROVER"
+
+
 def required_roles() -> set[str]:
     configured = os.getenv("MDARIX_REQUIRE_MFA_ROLES")
     if configured is None:
-        configured = "" if is_local() else "PLATFORM_ADMIN,CUSTOMER_ADMIN"
+        configured = "" if is_local() else DEFAULT_REQUIRED_ROLES
     return {_normalize(role) for role in configured.split(",") if role.strip()}
 
 
@@ -72,7 +76,8 @@ def ensure_not_locked(db, user, scope: str = "mfa") -> None:
         raise HTTPException(429, detail={"code": code, "message": "Too many failed attempts. Try again in 15 minutes."})
 
 
-def record_failure(db, user, scope: str = "mfa") -> None:
+def record_failure(db, user, scope: str = "mfa") -> bool:
+    """Count one wrong code (or password, for signatures). True when this failure locked the account's checks."""
     now = datetime.now(timezone.utc)
     row = _throttle(db, user, scope)
     row.failure_count += 1
@@ -81,6 +86,8 @@ def record_failure(db, user, scope: str = "mfa") -> None:
     if row.failure_count >= MAX_FAILURES:
         row.locked_until = now + timedelta(minutes=LOCK_MINUTES)
         row.failure_count = 0
+        return True
+    return False
 
 
 def record_success(db, user, scope: str = "mfa") -> None:

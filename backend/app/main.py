@@ -60,6 +60,8 @@ from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
 from backend.app.complaints_router import router as complaints_router
+from backend.app.client_errors import router as client_errors_router
+from backend.app.support_api import router as support_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -317,6 +319,8 @@ app.include_router(data_import_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
+app.include_router(client_errors_router)
+app.include_router(support_router)
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 
@@ -346,11 +350,21 @@ def liveness() -> dict[str, str]:
 @app.get("/health/ready")
 def readiness():
     """Ready for traffic: the database answers and its schema is the one this code was built for. Other parts
-    (data planes, object storage, worker, email) are reported but do not take the API out of rotation."""
+    (data planes, object storage, worker, scheduler, email) are reported but do not take the API out of rotation."""
     from backend.app.readiness import readiness_report
 
     report = readiness_report()
     return JSONResponse(status_code=200 if report["status"] == "ready" else 503, content=report)
+
+
+@app.get("/health/status")
+def public_status():
+    """For a status page or an uptime monitor: ``ok``, ``degraded`` (200) or ``down`` (503) and nothing else. The
+    component details stay on /health/ready, which only the deployment's own probes call."""
+    from backend.app.readiness import public_status
+
+    code, body = public_status()
+    return JSONResponse(status_code=code, content=body, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/v1/graph/nodes/{entity_type}/{entity_id}")

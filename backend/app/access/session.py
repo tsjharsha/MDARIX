@@ -214,8 +214,12 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         else ["home", "products", "investigations", "evidence", "decision-center", "assurance", "audit"]
     )
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    # Tenant lifecycle statuses are stored in upper case (ACTIVE); compare without regard to case so an older
+    # lower-case row is not shown to its administrators as an inactive licence either.
     license_state = (
-        "ACTIVE" if tenant is not None and tenant.status == "active" and assignment is not None else "INACTIVE"
+        "ACTIVE"
+        if tenant is not None and str(tenant.status or "").upper() == "ACTIVE" and assignment is not None
+        else "INACTIVE"
     )
     return {
         **base,

@@ -1,6 +1,5 @@
 """Platform administration: tenants, lifecycle transitions, environments, Tenant 360, support access and audit events."""
 
-import csv
 import io
 import secrets
 import uuid
@@ -23,6 +22,7 @@ from backend.app.customer_admin_continuity import (
 from backend.app.customer_lifecycle import (
     allowed_lifecycle_transition,
 )
+from backend.app import csv_safe
 from backend.app.db.models.customer_lifecycle import (
     Customer,
     IdentityProviderConfiguration,
@@ -800,7 +800,7 @@ def list_platform_tenants(
             "environment_count",
         ]
         stream = io.StringIO()
-        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer = csv_safe.writer(stream, fieldnames=fields)
         writer.writeheader()
         writer.writerows({field: row.get(field, "") or "" for field in fields} for row in payload)
         content = stream.getvalue()

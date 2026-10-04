@@ -15,6 +15,7 @@ import contextvars
 import json
 import logging
 import os
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -29,13 +30,25 @@ class _RequestIdFilter(logging.Filter):
         return True
 
 
+# Secrets that travel in URLs (activation and reset links, webhook signatures) or in "key=value" error text. Whatever
+# a record says, these values leave the process as [REDACTED]; the request log line itself carries the path only.
+_SECRET_PARAMETER = re.compile(
+    r"(?i)\b(token|password|secret|api[_-]?key|access[_-]?key|signature|code|authorization)=([^&\s\"'<>;,]+)"
+)
+
+
+def redact(text: str) -> str:
+    """``token=abc`` becomes ``token=[REDACTED]`` wherever it appears in logged text."""
+    return _SECRET_PARAMETER.sub(lambda match: f"{match.group(1)}=[REDACTED]", text)
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {
             "ts": datetime.fromtimestamp(record.created, timezone.utc).isoformat(timespec="milliseconds"),
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": redact(record.getMessage()),
         }
         request_id = getattr(record, "request_id", None)
         if request_id:
@@ -43,10 +56,17 @@ class JsonFormatter(logging.Formatter):
         for key in ("method", "path", "status_code", "duration_ms", "tenant_id"):
             value = getattr(record, key, None)
             if value is not None:
-                payload[key] = value
+                payload[key] = redact(value) if isinstance(value, str) else value
         if record.exc_info:
-            payload["exception"] = self.formatException(record.exc_info)
+            payload["exception"] = redact(self.formatException(record.exc_info))
         return json.dumps(payload, default=str)
+
+
+class TextFormatter(logging.Formatter):
+    """The local-development line format, with the same redaction as the JSON output."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return redact(super().format(record))
 
 
 def _json_output() -> bool:
@@ -96,7 +116,7 @@ def configure_logging() -> None:
     handler.setFormatter(
         JsonFormatter()
         if _json_output()
-        else logging.Formatter("%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s")
+        else TextFormatter("%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s")
     )
     root = logging.getLogger()
     for existing in list(root.handlers):

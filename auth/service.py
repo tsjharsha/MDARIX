@@ -9,7 +9,8 @@ reports them (and any hash below the current cost) so sign-in can upgrade them w
 
 The cost defaults to N=2^17, r=8, p=1 (OWASP Password Storage guidance; 128 MiB per hash).
 ``MDARIX_PASSWORD_SCRYPT_LOG2_N`` may lower it for automated tests only; production refuses a value below 17
-(``backend/app/config_check.py``).
+(``backend/app/config_check.py``). At most ``MDARIX_PASSWORD_HASH_CONCURRENCY`` hashes (default 3) run at once in a
+process; the rest wait, so a burst of sign-ins cannot exhaust memory.
 
 Passwords follow NIST SP 800-63B: 12 to 128 characters, no composition rules, no periodic expiry, and refused when
 they appear in a list of breached passwords or contain the person's email name.
@@ -23,6 +24,7 @@ import hmac
 import logging
 import os
 import secrets
+import threading
 from functools import lru_cache
 from pathlib import Path
 
@@ -46,10 +48,29 @@ def _log2_n() -> int:
     return min(max(value, 10), 20)
 
 
+def _hash_concurrency() -> int:
+    """How many password hashes may run at once in this process (MDARIX_PASSWORD_HASH_CONCURRENCY, default 3).
+
+    Each scrypt at the production cost holds about 128 MiB while it runs, so a burst of sign-in attempts (an attack
+    or just Monday morning) must queue rather than exhaust the server's memory. Three keeps a small VM safe; a
+    larger host may raise it. Waiting attempts hold no memory.
+    """
+    try:
+        value = int(os.getenv("MDARIX_PASSWORD_HASH_CONCURRENCY", "3"))
+    except ValueError:
+        value = 3
+    return max(1, min(value, 64))
+
+
+# Process-wide: every hash and verification in this process, whatever thread serves the request, takes a slot.
+_HASH_SLOTS = threading.BoundedSemaphore(_hash_concurrency())
+
+
 def _scrypt(password: str, salt: bytes, log2_n: int, r: int, p: int) -> bytes:
     n = 2**log2_n
-    # scrypt needs 128 * r * N bytes (plus a little); give it head room above hashlib's 32 MiB default.
-    return hashlib.scrypt(password.encode("utf-8"), salt=salt, n=n, r=r, p=p, maxmem=256 * r * n + 1024 * 1024)
+    with _HASH_SLOTS:
+        # scrypt needs 128 * r * N bytes (plus a little); give it head room above hashlib's 32 MiB default.
+        return hashlib.scrypt(password.encode("utf-8"), salt=salt, n=n, r=r, p=p, maxmem=256 * r * n + 1024 * 1024)
 
 
 def _hash(password: str, salt: bytes | None = None) -> str:

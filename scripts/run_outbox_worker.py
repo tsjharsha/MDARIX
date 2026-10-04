@@ -1,10 +1,17 @@
-"""Run the continuously operating transactional-outbox worker."""
+"""Run the continuously operating transactional-outbox worker.
+
+The worker delivers one event per transaction (outbox/worker.py), records a heartbeat for the platform console and the
+container health check every cycle, and stops promptly on SIGTERM/SIGINT: the event in hand is finished, nothing new
+is started. Staging and production refuse to start with a missing or unsafe configuration (the API's own gate), and
+an unsupported ``MDARIX_OUTBOX_PUBLISHER`` is refused here, at startup, rather than on the first unhandled event.
+"""
 
 import json
 import logging
 import os
 import signal
 import sys
+import threading
 import uuid
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -25,6 +32,24 @@ from backend.app.worker_status import OUTBOX_WORKER, record_heartbeat
 from integration.api_contract import idempotency_key
 from uuid import UUID
 from reports.service import run_pending_report_jobs
+
+logger = logging.getLogger(__name__)
+
+# Delivery adapters for events no built-in handler takes. ``noop`` acknowledges them (audit-only events); nothing
+# else exists yet, and a name that is not implemented must be refused before the worker takes any event.
+SUPPORTED_PUBLISHERS = ("noop",)
+
+
+def configured_publisher() -> str:
+    """The MDARIX_OUTBOX_PUBLISHER value, or SystemExit explaining what is supported when it is something else."""
+    value = os.getenv("MDARIX_OUTBOX_PUBLISHER", "noop").strip().lower() or "noop"
+    if value not in SUPPORTED_PUBLISHERS:
+        raise SystemExit(
+            f"OUTBOX_PUBLISHER_NOT_IMPLEMENTED: MDARIX_OUTBOX_PUBLISHER={value!r} names a delivery adapter this build "
+            f"does not have. Supported values: {', '.join(SUPPORTED_PUBLISHERS)} (events without a built-in handler "
+            "are acknowledged). Unset the variable or set it to noop."
+        )
+    return value
 
 
 @contextmanager
@@ -123,16 +148,22 @@ def publish(event_name, payload):
 
         run_export(payload["export_id"])
         return
+    if event_name == "SUPPORT_PROBLEM_REPORTED":
+        from backend.app.support_api import deliver_problem_report
+
+        with SessionLocal() as db:
+            bind_system(db, "outbox worker: email the support team about a reported problem")
+            deliver_problem_report(db, payload)
+        return
     from backend.app.notifications import handle_event
 
     with SessionLocal() as db:
         bind_system(db, f"outbox worker: deliver {event_name}")
         if handle_event(db, event_name, payload):
             return
-    # Events nobody needs to be told about (for example audit-only events) are acknowledged.
-    if os.getenv("MDARIX_OUTBOX_PUBLISHER", "noop") == "noop":
-        return
-    raise RuntimeError("OUTBOX_PUBLISHER_NOT_IMPLEMENTED")
+    # Events nobody needs to be told about (for example audit-only events) are acknowledged by the noop publisher;
+    # configured_publisher() already refused anything else at startup.
+    configured_publisher()
 
 
 def alert_dead_letter(payload):
@@ -175,7 +206,7 @@ def record_database_heartbeat(instance_id, started_at, metrics):
             bind_system(db, "outbox worker: record heartbeat")
             record_heartbeat(db, OUTBOX_WORKER, instance_id, started_at, metrics)
     except Exception:
-        logging.getLogger(__name__).exception("worker heartbeat could not be recorded")
+        logger.exception("worker heartbeat could not be recorded")
 
 
 def process_pending_reports(limit: int = 10):
@@ -196,38 +227,46 @@ def process_pending_reports(limit: int = 10):
                     ready += result["ready"]
                     failed += result["failed"]
             except Exception:
-                logging.getLogger(__name__).exception("report worker plane failed tenant=%s", plane.tenant_id)
+                logger.exception("report worker plane failed tenant=%s", plane.tenant_id)
                 failed += 1
     return {"claimed": claimed, "ready": ready, "failed": failed}
 
 
-if __name__ == "__main__":
+def main(shutdown: threading.Event | None = None) -> int:
+    from backend.app.config_check import enforce
     from backend.app.logging_setup import configure_logging
 
     configure_logging()
+    enforce()
+    configured_publisher()
+    shutdown = shutdown or threading.Event()
 
     def stop(_signum, _frame):
-        nonlocal_stop[0] = True
+        logger.info("outbox worker shutdown requested")
+        shutdown.set()
 
-    nonlocal_stop = [False]
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    worker = OutboxWorker(
-        publish, max_attempts=int(os.getenv("MDARIX_OUTBOX_MAX_ATTEMPTS", "5")), alert=alert_dead_letter
-    )
+    worker = OutboxWorker(publish, alert=alert_dead_letter, should_stop=shutdown.is_set)
     interval = int(os.getenv("MDARIX_OUTBOX_INTERVAL_SECONDS", "5"))
+    batch = int(os.getenv("MDARIX_OUTBOX_BATCH_SIZE", "50"))
+    report_batch = int(os.getenv("MDARIX_REPORT_WORKER_BATCH_SIZE", "10"))
     instance_id, started_at = str(uuid.uuid4()), datetime.now(timezone.utc)
-    while not nonlocal_stop[0]:
-        worker.recover_stale_claims()
-        stats = worker.process_once(limit=int(os.getenv("MDARIX_OUTBOX_BATCH_SIZE", "50")))
-        reports = process_pending_reports(limit=int(os.getenv("MDARIX_REPORT_WORKER_BATCH_SIZE", "10")))
-        metrics = {**worker.metrics.snapshot(), "report_jobs": reports}
-        write_heartbeat({**metrics, "last_cycle": stats})
-        record_database_heartbeat(instance_id, started_at, {**metrics, "last_cycle": stats})
-        logging.getLogger(__name__).info(
-            "outbox metrics=%s cycle=%s reports=%s", worker.metrics.snapshot(), stats, reports
-        )
-        import time
+    while not shutdown.is_set():
+        try:
+            worker.recover_stale_claims()
+            stats = worker.process_once(limit=batch)
+            reports = process_pending_reports(limit=report_batch)
+            metrics = {**worker.metrics.snapshot(), "report_jobs": reports, "last_cycle": stats}
+            write_heartbeat(metrics)
+            record_database_heartbeat(instance_id, started_at, metrics)
+            logger.info("outbox metrics=%s cycle=%s reports=%s", worker.metrics.snapshot(), stats, reports)
+        except Exception:  # the database may be briefly unavailable; the next cycle tries again
+            logger.exception("outbox worker cycle failed")
+        shutdown.wait(max(0, interval))
+    logger.info("outbox worker stopped gracefully")
+    return 0
 
-        time.sleep(max(0, interval))
-    logging.getLogger(__name__).info("outbox worker stopped gracefully")
+
+if __name__ == "__main__":
+    sys.exit(main())

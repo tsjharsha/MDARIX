@@ -1,6 +1,5 @@
 """Tenant administration read models: audit history/export, retention, health, dashboards, integrations, AI executions."""
 
-import csv
 import io
 import json
 import uuid
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 from auth.emailer import (
     smtp_configuration_status,
 )
+from backend.app import csv_safe
 from backend.app.db.models.foundation import (
     AuditEvent,
     AuthUser,
@@ -163,7 +163,7 @@ def export_audit_history(
     if output_format.upper() != "CSV":
         raise HTTPException(400, detail={"code": "AUDIT_EXPORT_FORMAT_NOT_SUPPORTED", "message": "Use CSV or JSON"})
     stream = io.StringIO()
-    writer = csv.DictWriter(stream, fieldnames=fields)
+    writer = csv_safe.writer(stream, fieldnames=fields)
     writer.writeheader()
     for row in events:
         writer.writerow(
@@ -223,7 +223,7 @@ def download_audit_evidence_package(
         "redaction": "secret-bearing fields excluded by audit writer",
     }
     csv_stream = io.StringIO()
-    writer = csv.DictWriter(csv_stream, fieldnames=fields)
+    writer = csv_safe.writer(csv_stream, fieldnames=fields)
     writer.writeheader()
     for row in rows:
         writer.writerow(

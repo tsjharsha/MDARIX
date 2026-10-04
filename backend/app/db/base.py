@@ -20,6 +20,7 @@ from backend.app.db.models.enterprise import *
 from backend.app.db.models.foundation import *
 from backend.app.db.models.ingestion import *
 from backend.app.db.models.normalization import *
+from backend.app.db.models.pilot_support import *
 from backend.app.db.models.stage2 import *
 from backend.app.db.models.stage3 import *
 from backend.app.db.models.reporting import *

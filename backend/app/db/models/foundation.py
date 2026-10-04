@@ -64,8 +64,14 @@ class Tenant(Base):
     disaster_recovery_region: Mapped[str | None] = mapped_column(String(80))
     cross_border_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     # Whether this organization's content may be sent to an AI model, and its monthly token budget (genai/governance.py).
-    ai_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # Off for new organizations (md23): an administrator switches it on with a recorded reason (ai_settings.py).
+    ai_processing_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     ai_monthly_token_budget: Mapped[int | None] = mapped_column(BigInteger)
+    # While a legal hold is set, nothing of this organization is purged or retired (tenant_purge.py, trial/retention.py).
+    legal_hold: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    legal_hold_reason: Mapped[str | None] = mapped_column(Text)
+    legal_hold_set_at = tz()
+    legal_hold_set_by: Mapped[str | None] = mapped_column(String(255))
     application_version: Mapped[str | None] = mapped_column(String(80))
     schema_version: Mapped[str | None] = mapped_column(String(80))
     configuration_version: Mapped[str | None] = mapped_column(String(80))

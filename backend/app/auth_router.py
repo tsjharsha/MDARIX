@@ -3,6 +3,11 @@
 Every session and one-time link is stored in Postgres (auth/durable.py); nothing about who is signed in lives in
 process memory. Public endpoints are rate limited per client address and per account (backend/app/rate_limit.py);
 repeated wrong passwords from one address lock that address out of the account for 15 minutes.
+
+Every authentication event is audited (sign-in and its failures, lockouts, sign-out, each MFA step, password
+resets and activations) with ``make_audit_event``: the record holds account ids, outcomes and the client address,
+never an email address, password, code or link. A failed sign-in is audited in its own short transaction, so the
+record survives the rollback of the attempt; everything else is written in the transaction of the change itself.
 """
 
 import hashlib
@@ -19,6 +24,7 @@ from sqlalchemy.orm import Session
 from auth.cookies import (
     PENDING_MFA_SECONDS,
     SESSION_SECONDS,
+    SESSION_WINDOW_SECONDS,
     clear_session_cookie,
     read_session_token,
     set_session_cookie,
@@ -33,6 +39,7 @@ from auth.durable import (
     revoke_user_sessions,
 )
 from auth.emailer import send_password_reset_email
+from auth.security_notices import queue_security_notice
 from auth.service import (
     PASSWORD_MESSAGES,
     _hash,
@@ -42,7 +49,7 @@ from auth.service import (
     password_problem,
 )
 from backend.app.client_ip import client_ip
-from backend.app.db.models.foundation import AuthUser, TenantMembership
+from backend.app.db.models.foundation import AuthUser, Tenant, TenantMembership
 from backend.app.db.models.stage2 import (
     AuthSession,
     LoginThrottle,
@@ -51,8 +58,9 @@ from backend.app.db.models.stage2 import (
 )
 from backend.app.db.session import get_db
 from backend.app.db.tenant_scope import bind_system, bind_tenant
+from backend.app.enterprise_audit import make_audit_event
 from backend.app.rate_limit import enforce
-from backend.app.request_context import ensure_tenant_access
+from backend.app.request_context import ensure_tenant_access, renew_session_if_due, session_expiry
 from backend.app.runtime_env import is_development
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
@@ -60,6 +68,10 @@ logger = logging.getLogger(__name__)
 
 LOCK_AFTER_FAILURES = 5
 LOCK_MINUTES = 15
+# Failed sign-ins for an email nobody has are recorded under the MDARIX operator organization, when it exists
+# (scripts/create_platform_admin.py creates it), so guessing against unknown names is visible to the platform team.
+PLATFORM_TENANT_KEY = "MDARIX_PLATFORM"
+ANONYMOUS_ACTOR = "ANONYMOUS"
 
 
 class Signup(BaseModel):
@@ -98,6 +110,14 @@ class MfaCode(BaseModel):
 class MfaVerify(BaseModel):
     # A 6-digit authenticator code, or a one-time recovery code (xxxxxxxx-xxxxxxxx).
     code: str = Field(min_length=6, max_length=32)
+
+
+class Reauthentication(BaseModel):
+    """Proof that the person at the keyboard is the account's owner, for changes to how they sign in: the current
+    password or a fresh authenticator code. A stolen, still-open session gives neither."""
+
+    password: str | None = Field(default=None, max_length=128)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
 
 
 def fail(exc):
@@ -158,6 +178,59 @@ def _mfa_hash(code: str) -> str:
     return hashlib.sha256(code.encode("ascii")).hexdigest()
 
 
+# ------------------------------------------------------------------------------------------- audit trail
+
+
+def _audit(
+    db: Session,
+    *,
+    tenant_id,
+    action: str,
+    actor_ref: str,
+    entity_id=None,
+    details: dict | None = None,
+    request: Request | None = None,
+    now: datetime | None = None,
+) -> None:
+    """Add one authentication audit event to the current transaction (the caller commits).
+
+    ``details`` carry ids and outcomes only; ``make_audit_event`` redacts secret-named keys as a second line.
+    """
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=actor_ref,
+            action=action,
+            entity_type="AuthUser",
+            entity_id=entity_id,
+            details=details,
+            request=request,
+            created_at=now,
+        )
+    )
+
+
+def _audit_user(db: Session, user, action: str, request: Request, details: dict | None = None, now=None) -> None:
+    _audit(
+        db,
+        tenant_id=user.tenant_id,
+        action=action,
+        actor_ref=str(user.id),
+        entity_id=user.id,
+        details=details,
+        request=request,
+        now=now,
+    )
+
+
+def _platform_tenant_id(db: Session):
+    row = db.query(Tenant.id).filter(Tenant.tenant_key == PLATFORM_TENANT_KEY).first()
+    return row[0] if row else None
+
+
+# ------------------------------------------------------------------------------------------- MFA
+
+
 def _mfa_session(request: Request, db: Session):
     """The signed-in session and its user, for the MFA steps (which a session that still owes MFA may use)."""
     token = read_session_token(request)
@@ -190,30 +263,80 @@ def _limit_mfa(request: Request, user) -> None:
     enforce("mfa:user", str(user.id))
 
 
-def _mfa_complete(session_row) -> None:
-    """The second factor is done: the session gets its full lifetime, counted from sign-in."""
+def _mfa_complete(session_row, response: Response | None, token: str | None) -> None:
+    """The second factor is done: the session gets a full window, counted from now and capped at the absolute limit
+    from sign-in, and the browser's cookie is extended to match."""
+    now = datetime.now(timezone.utc)
     session_row.mfa_state = None
-    session_row.expires_at = session_row.created_at + timedelta(seconds=SESSION_SECONDS)
+    session_row.expires_at = min(
+        now + timedelta(seconds=SESSION_WINDOW_SECONDS),
+        session_row.created_at + timedelta(seconds=SESSION_SECONDS),
+    )
+    if response is not None and token:
+        set_session_cookie(response, token, max_age=int((session_row.expires_at - now).total_seconds()))
+
+
+def _record_mfa_failure(db: Session, user, request: Request, step: str) -> None:
+    """A wrong code or password at an MFA step: counted towards the lockout, audited, committed."""
+    from backend.app import mfa
+
+    locked = mfa.record_failure(db, user)
+    _audit_user(db, user, "MFA_FAILED", request, {"step": step})
+    if locked:
+        _audit_user(db, user, "ACCOUNT_LOCKED", request, {"scope": "MFA", "minutes": mfa.LOCK_MINUTES})
+    db.commit()
+
+
+def _reauthenticate(db: Session, request: Request, user, proof: Reauthentication | None) -> None:
+    """Changing how an account signs in needs the current password or a fresh authenticator code, even from a fully
+    verified session: a session left open on a shared screen must not be enough to replace the authenticator."""
+    from backend.app import mfa
+
+    if proof is None or not (proof.password or proof.mfa_code):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "REAUTHENTICATION_REQUIRED",
+                "message": "Confirm with your current password or an authenticator code",
+            },
+        )
+    _limit_mfa(request, user)
+    mfa.ensure_not_locked(db, user)
+    if proof.mfa_code:
+        ok = mfa.check_code(user, proof.mfa_code, allow_recovery=False)
+    else:
+        try:
+            ok = bool(user.password_hash) and _verify(proof.password, user.password_hash)
+        except ValueError:
+            ok = False
+    if not ok:
+        _record_mfa_failure(db, user, request, "REAUTHENTICATION")
+        raise HTTPException(403, detail={"code": "REAUTHENTICATION_FAILED", "message": "The password or code is wrong"})
+    mfa.record_success(db, user)
 
 
 @router.post("/mfa/enroll")
-def mfa_enroll(request: Request, db: Session = Depends(get_db)):
+def mfa_enroll(request: Request, proof: Reauthentication | None = None, db: Session = Depends(get_db)):
     """Start setting up an authenticator app: returns the secret (and its otpauth link for a QR code).
 
-    Replacing an existing authenticator needs a fully verified session, so a stolen password alone cannot do it.
+    Replacing an existing authenticator needs a fully verified session and, in the body, the current password or
+    a fresh code from the current app (``{"password": ...}`` or ``{"mfa_code": ...}``), so neither a stolen
+    password nor a stolen session alone can do it.
     """
     from backend.app import mfa
 
     session_row, user = _mfa_session(request, db)
-    if mfa.is_enrolled(user) and session_row.mfa_state:
-        raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your current code first"})
+    if mfa.is_enrolled(user):
+        if session_row.mfa_state:
+            raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your current code first"})
+        _reauthenticate(db, request, user, proof)
     started = mfa.start_enrollment(user)
     db.commit()
     return started
 
 
 @router.post("/mfa/verify-enrollment")
-def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends(get_db)):
+def mfa_verify_enrollment(data: MfaCode, request: Request, response: Response, db: Session = Depends(get_db)):
     """Confirm the new authenticator with its first code; returns one-time recovery codes (shown once)."""
     from backend.app import mfa
 
@@ -225,19 +348,21 @@ def mfa_verify_enrollment(data: MfaCode, request: Request, db: Session = Depends
         raise HTTPException(
             400, detail={"code": "MFA_CHALLENGE_INVALID", "message": "Start MFA setup before verifying a code"}
         )
+    replaced = mfa.is_enrolled(user)
     codes = mfa.finish_enrollment(user, data.code, now)
     if codes is None:
-        mfa.record_failure(db, user)
-        db.commit()
+        _record_mfa_failure(db, user, request, "ENROLLMENT")
         raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
     mfa.record_success(db, user)
-    _mfa_complete(session_row)
+    _mfa_complete(session_row, response, read_session_token(request))
+    _audit_user(db, user, "MFA_ENROLLED", request, {"replaced": replaced, "recovery_codes": len(codes)}, now)
+    queue_security_notice(db, user, "MFA_REPLACED" if replaced else "MFA_ENROLLED", now)
     db.commit()
     return {"status": "MFA_ENROLLED", "user_id": str(user.id), "enrolled_at": now, "recovery_codes": codes}
 
 
 @router.post("/mfa/verify")
-def mfa_verify(data: MfaVerify, request: Request, db: Session = Depends(get_db)):
+def mfa_verify(data: MfaVerify, request: Request, response: Response, db: Session = Depends(get_db)):
     """Complete sign-in with an authenticator code (or a one-time recovery code). Also confirms a new authenticator
     when one is being set up, for clients that use this endpoint for both."""
     from backend.app import mfa
@@ -246,32 +371,41 @@ def mfa_verify(data: MfaVerify, request: Request, db: Session = Depends(get_db))
     if user.mfa_pending_secret_encrypted and (not mfa.is_enrolled(user) or not session_row.mfa_state):
         if len(data.code) != 6:
             raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
-        return mfa_verify_enrollment(MfaCode(code=data.code), request, db)
+        return mfa_verify_enrollment(MfaCode(code=data.code), request, response, db)
     _limit_mfa(request, user)
     mfa.ensure_not_locked(db, user)
     if not mfa.is_enrolled(user):
         raise HTTPException(400, detail={"code": "MFA_NOT_ENROLLED", "message": "Set up an authenticator app first"})
+    recovery = "-" in data.code.strip()
     if not mfa.check_code(user, data.code, allow_recovery=True):
-        mfa.record_failure(db, user)
-        db.commit()
+        _record_mfa_failure(db, user, request, "SIGN_IN")
         raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
     mfa.record_success(db, user)
-    _mfa_complete(session_row)
+    _mfa_complete(session_row, response, read_session_token(request))
+    left = len(user.mfa_recovery_hashes or [])
+    _audit_user(db, user, "MFA_VERIFIED", request, {"method": "RECOVERY_CODE" if recovery else "AUTHENTICATOR"})
+    if recovery:
+        _audit_user(db, user, "MFA_RECOVERY_CODE_USED", request, {"recovery_codes_left": left})
     db.commit()
-    return {"status": "MFA_VERIFIED", "recovery_codes_left": len(user.mfa_recovery_hashes or [])}
+    return {"status": "MFA_VERIFIED", "recovery_codes_left": left}
 
 
 @router.post("/mfa/recovery-codes")
-def mfa_recovery_codes(request: Request, db: Session = Depends(get_db)):
-    """Replace the recovery codes (fully verified session only); the old ones stop working."""
+def mfa_recovery_codes(request: Request, proof: Reauthentication | None = None, db: Session = Depends(get_db)):
+    """Replace the recovery codes (fully verified session, plus the current password or a fresh authenticator code
+    in the body); the old ones stop working."""
     from backend.app import mfa
     from security.mfa_recovery import hash_recovery_codes, issue_recovery_codes
 
     session_row, user = _mfa_session(request, db)
     if session_row.mfa_state or not mfa.is_enrolled(user):
         raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your code first"})
+    _reauthenticate(db, request, user, proof)
+    now = datetime.now(timezone.utc)
     codes = issue_recovery_codes(8)
     user.mfa_recovery_hashes = hash_recovery_codes(codes)
+    _audit_user(db, user, "MFA_RECOVERY_CODES_REGENERATED", request, {"recovery_codes": len(codes)}, now)
+    queue_security_notice(db, user, "MFA_RECOVERY_CODES_REGENERATED", now)
     db.commit()
     return {"status": "RECOVERY_CODES_ISSUED", "recovery_codes": codes}
 
@@ -295,6 +429,9 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
         except totp.MfaUnavailable:
             development_code = None
     return {"status": "USE_AUTHENTICATOR_CODE", "development_code": development_code}
+
+
+# ------------------------------------------------------------------------------------------- sign-up
 
 
 def _alert_trial_request(organization: str, display_name: str, email: str) -> None:
@@ -359,6 +496,9 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
         ) from e
 
 
+# ------------------------------------------------------------------------------------------- sign-in
+
+
 def _account_for_email(db: Session, email: str, password: str | None = None):
     """The account an email signs in as.
 
@@ -414,8 +554,6 @@ def _accounts_for_password(db: Session, email: str, password: str) -> list:
 
 def _organizations(db: Session, accounts: list) -> list[dict]:
     """The organizations a person may choose between: names only, and only those that are open to them."""
-    from backend.app.db.models.foundation import Tenant
-
     choices = []
     for account in accounts:
         try:
@@ -439,7 +577,14 @@ def _throttle(db: Session, key: str):
     return query.with_for_update().first() if hasattr(query, "with_for_update") else query.first()
 
 
-def _record_failed_signin(db: Session, key: str, now: datetime) -> None:
+def _record_failed_signin(
+    db: Session, key: str, now: datetime, *, request: Request | None = None, email: str | None = None, reason: str
+) -> None:
+    """Count a failed sign-in and audit it, in one short transaction of its own (the attempt itself rolled back).
+
+    The audit event is written under the account the email belongs to when there is one (its id, never the email),
+    else under the operator organization; the caller's answer is the same either way.
+    """
     throttle = _throttle(db, key)
     if throttle is None:
         throttle = LoginThrottle(identifier=key, failure_count=0, updated_at=now)
@@ -447,10 +592,40 @@ def _record_failed_signin(db: Session, key: str, now: datetime) -> None:
     throttle.failure_count = (throttle.failure_count or 0) + 1
     throttle.last_failure_at = now
     throttle.updated_at = now
-    if throttle.failure_count >= LOCK_AFTER_FAILURES:
+    locked = throttle.failure_count >= LOCK_AFTER_FAILURES
+    if locked:
         throttle.locked_until = now + timedelta(minutes=LOCK_MINUTES)
         # The next lock needs another full run of failures, not a single one.
         throttle.failure_count = 0
+    if request is not None and email is not None:
+        bind_system(db, "sign-in failure: audit under the account's organization")
+        account = _account_for_email(db, email)
+        tenant_id = account.tenant_id if account is not None else _platform_tenant_id(db)
+        if tenant_id is not None:
+            actor = str(account.id) if account is not None else ANONYMOUS_ACTOR
+            entity_id = account.id if account is not None else None
+            details = {"reason": reason, "account_known": account is not None}
+            _audit(
+                db,
+                tenant_id=tenant_id,
+                action="SIGN_IN_FAILED",
+                actor_ref=actor,
+                entity_id=entity_id,
+                details=details,
+                request=request,
+                now=now,
+            )
+            if locked:
+                _audit(
+                    db,
+                    tenant_id=tenant_id,
+                    action="ACCOUNT_LOCKED",
+                    actor_ref=actor,
+                    entity_id=entity_id,
+                    details={"scope": "SIGN_IN_ADDRESS", "minutes": LOCK_MINUTES, "account_known": account is not None},
+                    request=request,
+                    now=now,
+                )
     db.commit()
 
 
@@ -481,7 +656,6 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
     identifier = data.email.strip().lower()
     address = client_ip(request)
     enforce("signin:ip", address)
-    enforce("signin:account", identifier)
     now = datetime.now(timezone.utc)
     key = _throttle_key(identifier, address)
     throttle = _throttle(db, key)
@@ -509,11 +683,21 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
         row = matches[0]
     if row is None:
         db.rollback()
-        _record_failed_signin(db, key, now)
+        _record_failed_signin(db, key, now, request=request, email=identifier, reason="INVALID_CREDENTIALS")
+        # Only failures count against the account (a correct password is never refused by this limit), so nobody
+        # can lock a person out of their account by sending their email with wrong passwords from many addresses.
+        enforce("signin:account", identifier)
         raise HTTPException(401, detail={"code": "INVALID_CREDENTIALS", "message": "Invalid credentials."})
     bind_tenant(db, row.tenant_id)
     # Checked only after the password is verified, so it cannot be used to probe accounts.
-    ensure_tenant_access(db, row)
+    try:
+        ensure_tenant_access(db, row)
+    except HTTPException as refused:
+        db.rollback()
+        code = refused.detail.get("code") if isinstance(refused.detail, dict) else str(refused.status_code)
+        _audit_user(db, row, "SIGN_IN_FAILED", request, {"reason": code, "account_known": True}, now)
+        db.commit()
+        raise
     if needs_rehash(row.password_hash):
         row.password_hash = _hash(data.password)
         row.updated_at = now
@@ -526,10 +710,11 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
     # The new session owes MFA when the account is enrolled (VERIFY) or policy requires setting it up (ENROLL);
     # until then it can only use the MFA steps, and only for a few minutes.
     mfa_state = mfa.session_state_for(row)
-    token = new_session(
-        db, row.id, row.tenant_id, mfa_state=mfa_state, ttl=PENDING_MFA_SECONDS if mfa_state else SESSION_SECONDS
-    )
-    set_session_cookie(response, token)
+    ttl = PENDING_MFA_SECONDS if mfa_state else SESSION_WINDOW_SECONDS
+    # Audited in the transaction that creates the session (new_session commits both).
+    _audit_user(db, row, "SIGN_IN_SUCCEEDED", request, {"mfa": mfa_state or "NONE"}, now)
+    token = new_session(db, row.id, row.tenant_id, mfa_state=mfa_state, ttl=ttl)
+    set_session_cookie(response, token, max_age=ttl)
     return {
         **_signin_response(row),
         "mfa_required": mfa_state == "VERIFY",
@@ -541,13 +726,29 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
 def signout(request: Request, response: Response, db: Session = Depends(get_db)):
     token = read_session_token(request)
     if token:
-        revoke_session(db, token)
+        row = (
+            db.query(AuthSession)
+            .filter(AuthSession.session_hash == hash_token(token), AuthSession.revoked_at.is_(None))
+            .first()
+        )
+        if row is not None:
+            bind_tenant(db, row.tenant_id)
+            _audit(
+                db,
+                tenant_id=row.tenant_id,
+                action="SIGN_OUT",
+                actor_ref=str(row.user_id),
+                entity_id=row.user_id,
+                details={"mfa_pending": bool(row.mfa_state)},
+                request=request,
+            )
+        revoke_session(db, token)  # commits the revocation together with the audit event
     clear_session_cookie(response)
     return {"status": "SIGNED_OUT"}
 
 
 @router.get("/session")
-def session(request: Request, db: Session = Depends(get_db)):
+def session(request: Request, response: Response, db: Session = Depends(get_db)):
     token = read_session_token(request)
     row = (
         db.query(AuthSession)
@@ -581,6 +782,7 @@ def session(request: Request, db: Session = Depends(get_db)):
         db.commit()
         raise HTTPException(401, detail={"code": "SESSION_IDLE_TIMEOUT", "message": "Signed out after inactivity"})
     row.last_seen_at = now
+    renew_session_if_due(row, now, response, token)
     db.commit()
     return {
         "user_id": str(user.id),
@@ -592,6 +794,8 @@ def session(request: Request, db: Session = Depends(get_db)):
         "mfa_state": row.mfa_state,
         "mfa_enrolled": mfa.is_enrolled(user),
         "other_organizations": _other_organization_count(db, user),
+        # When this session ends if nothing happens: the browser warns shortly before idle_expires_at.
+        **session_expiry(row, now),
     }
 
 
@@ -609,6 +813,9 @@ def _other_organization_count(db: Session, user) -> int:
     )
     bind_tenant(db, user.tenant_id)
     return count
+
+
+# ------------------------------------------------------------------------------------------- passwords
 
 
 @router.post("/change-password")
@@ -633,20 +840,8 @@ def change_password(data: PasswordChange, request: Request, db: Session = Depend
     now = datetime.now(timezone.utc)
     _set_password(db, row, data.new_password, now)
     revoked = revoke_user_sessions(db, row.id, row.tenant_id, keep_raw=ctx.session_id)
-    from backend.app.enterprise_audit import make_audit_event
-
-    db.add(
-        make_audit_event(
-            tenant_id=row.tenant_id,
-            actor_ref=str(row.id),
-            action="PASSWORD_CHANGED",
-            entity_type="AuthUser",
-            entity_id=row.id,
-            details={"other_sessions_signed_out": revoked},
-            request=request,
-            created_at=now,
-        )
-    )
+    _audit_user(db, row, "PASSWORD_CHANGED", request, {"other_sessions_signed_out": revoked}, now)
+    queue_security_notice(db, row, "PASSWORD_CHANGED", now)
     db.commit()
     return {"status": "PASSWORD_CHANGED", "other_sessions_signed_out": revoked}
 
@@ -669,8 +864,6 @@ def _activate_invited_memberships(db: Session, row) -> None:
 
 
 def _organization_name(db: Session, tenant_id) -> str | None:
-    from backend.app.db.models.foundation import Tenant
-
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     return (tenant.display_name or tenant.name) if tenant else None
 
@@ -700,7 +893,10 @@ def forgot(data: ResetRequest, request: Request, background: BackgroundTasks, db
 
     # One link per organization (each account has its own password); each email names its organization.
     tokens = []
+    now = datetime.now(timezone.utc)
     for row in accounts:
+        # Audited with the link's creation (issue_reset commits both); the record names the account, not the email.
+        _audit_user(db, row, "PASSWORD_RESET_REQUESTED", request, {"source": "SELF_SERVICE"}, now)
         token = issue_reset(db, row.id, row.tenant_id)
         tokens.append(token)
         background.add_task(_send_reset_quietly, row.username, token, _organization_name(db, row.tenant_id))
@@ -714,8 +910,9 @@ def _redeem(db: Session, request: Request, data: Reset, kind: str) -> AuthUser:
     """Use a one-time link to set a password.
 
     The password is checked before the link is spent, so a refused password leaves the link usable. Then, in one
-    transaction: the password is stored, the link spent, every existing session of the account signed out, and the
-    address's sign-in lockout for the account lifted. Two simultaneous uses of one link: only one succeeds.
+    transaction: the password is stored, the link spent, every existing session of the account signed out, the
+    address's sign-in lockout for the account lifted, and the event audited. Two simultaneous uses of one link:
+    only one succeeds.
     """
     enforce("token:ip", client_ip(request))
     invalid = "INVALID_RESET" if kind == "reset" else "INVALID_ACTIVATION"
@@ -730,11 +927,17 @@ def _redeem(db: Session, request: Request, data: Reset, kind: str) -> AuthUser:
     _check_new_password(data.password, row.username)
     now = datetime.now(timezone.utc)
     _set_password(db, row, data.password, now)
+    was_active = str(row.status or "").upper() == "ACTIVE"
     row.status = "ACTIVE"
     row.email_verified = True
     _activate_invited_memberships(db, row)
-    revoke_user_sessions(db, row.id, row.tenant_id)
+    revoked = revoke_user_sessions(db, row.id, row.tenant_id)
     _clear_throttle(db, row.username, client_ip(request))
+    if kind == "reset":
+        _audit_user(db, row, "PASSWORD_RESET_COMPLETED", request, {"sessions_signed_out": revoked}, now)
+        queue_security_notice(db, row, "PASSWORD_RESET", now)
+    else:
+        _audit_user(db, row, "ACCOUNT_ACTIVATED", request, {"was_active": was_active}, now)
     try:
         consume(db, data.token, kind)  # commits the whole change, or refuses a link spent meanwhile
     except ValueError:

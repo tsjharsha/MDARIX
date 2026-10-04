@@ -2,22 +2,32 @@
 
 ``request_export`` records the request and queues an outbox event; the background worker runs ``run_export``:
 every table with rows for the organization (discovered from the database, so new tables are included) is written as
-JSON Lines under ``data/``, every stored file under ``files/``, and ``manifest.json`` lists row counts, file counts,
-a SHA-256 of each entry and the audit trail's verified head. Credentials are never exported: columns holding
-passwords, secrets, tokens, recovery codes or encrypted keys are left out. The zip goes to encrypted object storage
-and can be downloaded for ``EXPORT_DAYS`` days; the scheduler then deletes it (``expire_exports``).
+JSON Lines under ``data/``, every stored file under ``files/``, a human-readable CSV bundle of the quality records
+under ``readable/`` (investigations, complaints, CAPAs and an evidence index), and ``manifest.json`` lists row
+counts, file counts, a SHA-256 of each entry and the audit trail's verified head. Credentials are never exported:
+columns holding passwords, secrets, tokens, recovery codes or encrypted keys are left out.
+
+The zip is built on disk, not in memory: the archive is written to a temporary file and handed to object storage
+as a memory-mapped file, so the server never holds a second copy of a large export. It goes to encrypted object
+storage and can be downloaded for ``EXPORT_DAYS`` days (streamed, tenant_export_api.py); the scheduler then deletes
+it (``expire_exports``).
 """
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import json
 import logging
+import mmap
+import os
 import re
 import tempfile
 import uuid
 import zipfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -34,6 +44,52 @@ SECRET_COLUMN = re.compile(
     r"(?i)(password|secret|token|encrypted|api_key|private_key|recovery_hashes|session_hash|key_hash|code_hash|signing)"
 )
 SCHEMAS = ("public", "md_master")
+FETCH_ROWS = 1000
+# The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order).
+# Columns absent from a schema are skipped, so an older dedicated plane still exports.
+READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "investigations": (
+        "readable/investigations.csv",
+        ("investigation_identifier", "status", "investigation_question", "product_id", "owner_ref", "opened_at", "closed_at", "created_at", "updated_at", "id"),
+    ),
+    "complaints": (
+        "readable/complaints.csv",
+        (
+            "complaint_identifier",
+            "status",
+            "severity",
+            "complaint_type",
+            "problem_code",
+            "description",
+            "product_id",
+            "product_version_id",
+            "lot_batch_id",
+            "serial_number",
+            "udi",
+            "country",
+            "reporter_type",
+            "event_timestamp",
+            "complaint_timestamp",
+            "awareness_timestamp",
+            "device_returned",
+            "patient_involved",
+            "serious_injury",
+            "death",
+            "malfunction",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
+    ),
+    "capas": (
+        "readable/capas.csv",
+        ("capa_identifier", "title", "status", "action_type", "source_type", "source_reference", "product_id", "investigation_id", "opened_at", "due_at", "effectiveness_check_at", "created_at", "updated_at", "id"),
+    ),
+    "evidence": (
+        "readable/evidence_index.csv",
+        ("evidence_identifier", "title", "evidence_type", "fact_type", "reliability_status", "investigation_id", "source_reference", "document_ref", "created_at", "updated_at", "id"),
+    ),
+}
 
 
 class ExportInProgress(RuntimeError):
@@ -113,36 +169,138 @@ def _tables(db: Session) -> list[tuple[str, str]]:
     ]
 
 
+class _HashingWriter:
+    """Writes to a zip entry while keeping its SHA-256 and byte count, so the manifest is built without re-reading."""
+
+    def __init__(self, handle):
+        self.handle = handle
+        self.digest = hashlib.sha256()
+        self.size = 0
+
+    def write(self, data) -> int:
+        chunk = data.encode("utf-8") if isinstance(data, str) else data
+        self.handle.write(chunk)
+        self.digest.update(chunk)
+        self.size += len(chunk)
+        return len(chunk)
+
+
 def _write_tables(db: Session, archive: zipfile.ZipFile, tenant_id, prefix: str, manifest: dict) -> None:
     for schema, table in _tables(db):
         result = db.execute(
             text(f'SELECT * FROM "{schema}"."{table}" WHERE tenant_id = :tenant'), {"tenant": tenant_id}
         )
         columns = [name for name in result.keys() if not SECRET_COLUMN.search(name)]
-        digest = hashlib.sha256()
         count = 0
         name = f"{prefix}{schema}.{table}.jsonl"
         with archive.open(name, "w") as handle:
-            while rows := result.fetchmany(1000):
+            writer = _HashingWriter(handle)
+            while rows := result.fetchmany(FETCH_ROWS):
                 for row in rows:
-                    line = (json.dumps({key: row._mapping[key] for key in columns}, default=str) + "\n").encode()
-                    handle.write(line)
-                    digest.update(line)
+                    writer.write(json.dumps({key: row._mapping[key] for key in columns}, default=str) + "\n")
                     count += 1
         # Tables from a dedicated data plane are listed as "plane:<schema>.<table>" beside the control database's.
         key = f"{schema}.{table}" if prefix == "data/" else f"plane:{schema}.{table}"
-        manifest["tables"][key] = {"rows": count, "file": name, "sha256": digest.hexdigest()}
+        manifest["tables"][key] = {"rows": count, "file": name, "sha256": writer.digest.hexdigest()}
+
+
+def _write_readable(db: Session, archive: zipfile.ZipFile, tenant_id, manifest: dict) -> None:
+    """The CSV bundle: one spreadsheet per quality record type, columns in reading order, rows streamed."""
+    present = {
+        name
+        for (name,) in db.execute(
+            text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
+        )
+    }
+    for table, (name, preferred) in READABLE_TABLES.items():
+        if table not in present:
+            continue
+        result = db.execute(text(f'SELECT * FROM "{table}" WHERE tenant_id = :tenant ORDER BY created_at, id'), {"tenant": tenant_id})
+        available = set(result.keys())
+        columns = [column for column in preferred if column in available]
+        count = 0
+        with archive.open(name, "w") as handle:
+            writer = _HashingWriter(handle)
+            # csv writes text: each batch of rows is rendered to a small text buffer and flushed into the entry.
+            buffer = io.StringIO()
+            sheet = csv.DictWriter(buffer, fieldnames=columns, extrasaction="ignore", lineterminator="\r\n")
+            sheet.writeheader()
+            while rows := result.fetchmany(FETCH_ROWS):
+                for row in rows:
+                    sheet.writerow({key: _cell(row._mapping[key]) for key in columns})
+                    count += 1
+                writer.write(buffer.getvalue())
+                buffer.seek(0)
+                buffer.truncate()
+            writer.write(buffer.getvalue())
+        manifest["readable"][table] = {"rows": count, "file": name, "sha256": writer.digest.hexdigest()}
+
+
+def _cell(value):
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str)
+    return value
+
+
+def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path: Path) -> dict:
+    """Write the export zip to ``path`` and return its manifest."""
+    from backend.app.audit_chain import verify_tenant_chain
+    from backend.app.db.data_plane import open_tenant_data_session
+
+    now = datetime.now(timezone.utc)
+    manifest: dict = {
+        "organization": {"id": str(tenant_id), "name": tenant.display_name if tenant else None},
+        "generated_at": now.isoformat(),
+        "format": (
+            "JSON Lines per table under data/; CSV spreadsheets of the quality records under readable/; "
+            "stored files under files/. Credentials and secrets are not included"
+        ),
+        "tables": {},
+        "readable": {},
+        "files": {},
+    }
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        _write_tables(db, archive, tenant_id, "data/", manifest)
+        # A dedicated data plane holds the business records in its own database; the shared plane is the control
+        # database. The readable bundle always comes from wherever the business records live.
+        with open_tenant_data_session(tenant_id) as data:
+            if str(data.get_bind().url) != str(db.get_bind().url):
+                _write_tables(data, archive, tenant_id, "data/plane/", manifest)
+            _write_readable(data, archive, tenant_id, manifest)
+        for key in storage.list_tenant_objects(str(tenant_id)):
+            relative = key.split("/", 1)[1]
+            if relative.startswith("exports/"):
+                continue
+            content = storage.get(str(tenant_id), key)
+            archive.writestr(f"files/{relative}", content)
+            manifest["files"][relative] = {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+        chain = verify_tenant_chain(db, tenant_id)
+        manifest["audit_chain"] = {key: chain[key] for key in ("valid", "checked", "last_seq", "last_hash")}
+        archive.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))
+    return manifest
+
+
+def _store_archive(storage, tenant_id, export_id, path: Path) -> dict:
+    """Hand the finished zip to object storage without reading it into a Python bytes object: the file is memory-
+    mapped, so the storage client reads it page by page and the operating system frees the pages behind it."""
+    with open(path, "rb") as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as view:
+        return storage.put(
+            str(tenant_id), f"exports/{export_id}.zip", view, content_type="application/zip", internal=True
+        )
 
 
 def run_export(export_id) -> dict:
     """Build the export's zip (worker). Raises on failure so the outbox retries; the row records the outcome."""
-    from backend.app.audit_chain import verify_tenant_chain
-    from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.db.session import SessionLocal
     from backend.app.db.tenant_scope import bind_system
     from object_storage.service import ObjectStorageService
 
     db = SessionLocal()
+    temp: Path | None = None
     try:
         bind_system(db, f"tenant export {export_id}")
         row = db.get(TenantExport, uuid.UUID(str(export_id)))
@@ -153,47 +311,22 @@ def run_export(export_id) -> dict:
         row.status, row.error = "RUNNING", None
         db.commit()
         storage = ObjectStorageService()
-        now = datetime.now(timezone.utc)
-        manifest: dict = {
-            "organization": {"id": str(tenant_id), "name": tenant.display_name if tenant else None},
-            "generated_at": now.isoformat(),
-            "format": "JSON Lines per table; credentials and secrets are not included",
-            "tables": {},
-            "files": {},
-        }
         bind_system(db, f"tenant export {export_id}")
-        with tempfile.TemporaryFile() as buffer:
-            with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-                _write_tables(db, archive, tenant_id, "data/", manifest)
-                # A dedicated data plane holds the business records in its own database.
-                with open_tenant_data_session(tenant_id) as data:
-                    if str(data.get_bind().url) != str(db.get_bind().url):
-                        _write_tables(data, archive, tenant_id, "data/plane/", manifest)
-                for key in storage.list_tenant_objects(str(tenant_id)):
-                    relative = key.split("/", 1)[1]
-                    if relative.startswith("exports/"):
-                        continue
-                    content = storage.get(str(tenant_id), key)
-                    archive.writestr(f"files/{relative}", content)
-                    manifest["files"][relative] = {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
-                chain = verify_tenant_chain(db, tenant_id)
-                manifest["audit_chain"] = {key: chain[key] for key in ("valid", "checked", "last_seq", "last_hash")}
-                archive.writestr("manifest.json", json.dumps(manifest, indent=2, default=str))
-            buffer.seek(0)
-            content = buffer.read()
-        stored = storage.put(
-            str(tenant_id), f"exports/{export_id}.zip", content, content_type="application/zip", internal=True
-        )
+        with tempfile.NamedTemporaryFile(prefix="mdarix-export-", suffix=".zip", delete=False) as handle:
+            temp = Path(handle.name)
+        manifest = _build_archive(db, tenant_id, tenant, storage, temp)
+        stored = _store_archive(storage, tenant_id, export_id, temp)
         bind_system(db, f"tenant export {export_id}: done")
         row = db.get(TenantExport, uuid.UUID(str(export_id)))
         row.status = "READY"
         row.object_key = stored["object_key"]
-        row.size_bytes = len(content)
+        row.size_bytes = temp.stat().st_size
         row.sha256 = stored["checksum"]
         row.summary = {
             "tables": sum(1 for item in manifest["tables"].values() if item["rows"]),
             "rows": sum(item["rows"] for item in manifest["tables"].values()),
             "files": len(manifest["files"]),
+            "readable": {table: item["rows"] for table, item in manifest["readable"].items()},
         }
         row.completed_at = datetime.now(timezone.utc)
         row.expires_at = row.completed_at + timedelta(days=EXPORT_DAYS)
@@ -222,6 +355,11 @@ def run_export(export_id) -> dict:
         raise
     finally:
         db.close()
+        if temp is not None:
+            try:
+                os.unlink(temp)
+            except OSError:
+                logger.warning("Temporary export file %s could not be removed", temp)
 
 
 def read_export(db: Session, tenant_id, export_id) -> tuple[TenantExport, bytes]:

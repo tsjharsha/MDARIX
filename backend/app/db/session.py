@@ -25,6 +25,9 @@ def _engine(url: URL):
     return create_engine(
         url,
         future=True,
+        # A failing statement is logged with its SQL only: bound values (passwords, tokens, customer records) never
+        # reach the log collector through an exception message.
+        hide_parameters=True,
         pool_size=int(os.getenv("MDARIX_DB_POOL_SIZE", "5")),
         max_overflow=int(os.getenv("MDARIX_DB_MAX_OVERFLOW", "10")),
         pool_timeout=int(os.getenv("MDARIX_DB_POOL_TIMEOUT_SECONDS", "30")),

@@ -4,16 +4,25 @@ Each job runs when its interval has passed since it last finished. A Postgres ad
 scheduler instances never run the same job at once, so running a spare instance is safe. Every run is recorded in
 ``scheduler_runs`` (status, result, error type); a job that fails three times in a row raises an alert, and so does
 its recovery. Jobs run in system scope and record their own audit events.
+
+The loop itself is watched three ways: it touches a heartbeat file every cycle (``MDARIX_SCHEDULER_HEARTBEAT_FILE``,
+the container health check reads it), it alerts when any job has not run within twice its interval (another
+instance holding the lock, or one slow job starving the rest) and, when ``MDARIX_SCHEDULER_HEARTBEAT_URL`` is set,
+the operations-alerts job pings that dead-man's-switch so an outside monitor notices a scheduler that stopped.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import threading
 import time
 import traceback
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Callable
+from urllib import request as urlrequest
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -26,6 +35,9 @@ from backend.app.db.tenant_scope import bind_system
 logger = logging.getLogger("mdarix.scheduler")
 ACTOR = "system:scheduler"
 ALERT_AFTER_FAILURES = 3
+# A job that has not started or finished within this many of its intervals is "missed".
+MISSED_AFTER_INTERVALS = 2
+DEFAULT_HEARTBEAT_FILE = "/tmp/mdarix-scheduler-heartbeat"
 
 
 @dataclass(frozen=True)
@@ -91,16 +103,41 @@ def embedding_catch_up(db: Session, _state: dict) -> dict:
     return totals
 
 
+def _ping(url: str, timeout: float) -> None:
+    """One GET to the dead-man's-switch URL. Separate so tests can replace the transport."""
+    with urlrequest.urlopen(urlrequest.Request(url, headers={"User-Agent": "MDARIX-scheduler/1.0"}), timeout=timeout):
+        pass
+
+
+def ping_heartbeat_url() -> str:
+    """Tell the outside monitor (healthchecks.io, Cronitor, ...) the scheduler ran. SENT, FAILED or NOT_CONFIGURED;
+    a failure is logged and never fails the job, since the monitor firing is exactly what it is there for."""
+    url = os.getenv("MDARIX_SCHEDULER_HEARTBEAT_URL", "").strip()
+    if not url:
+        return "NOT_CONFIGURED"
+    try:
+        _ping(url, float(os.getenv("MDARIX_ALERT_TIMEOUT_SECONDS", "10")))
+        return "SENT"
+    except Exception as exc:
+        logger.warning("Scheduler heartbeat URL could not be reached (%s)", type(exc).__name__)
+        return "FAILED"
+
+
 def operations_alerts(db: Session, state: dict) -> dict:
-    """Alert on new dead-lettered events and on the worker stopping or recovering. State keeps what was reported."""
+    """Alert when the dead-letter count rises and when the worker stops or recovers; ping the dead-man's switch.
+
+    The worker alerts per event as it dead-letters it; this job is the summary that also catches events dead-lettered
+    while alerting itself was broken, so it compares the count with the one it saw last run (kept in ``state``, which
+    lives in ``scheduler_runs``). The first run reports everything already in the queue, nothing is assumed seen.
+    """
     from backend.app.worker_status import worker_status
 
     dead = int(db.execute(text("SELECT count(*) FROM event_outbox WHERE dead_lettered_at IS NOT NULL")).scalar() or 0)
-    reported_dead = int(state.get("dead_letters", dead if "dead_letters" not in state else 0))
+    reported_dead = int(state.get("dead_letters") or 0)
     if dead > reported_dead:
         send_alert(
-            "Events could not be delivered",
-            f"{dead - reported_dead} new event(s) were dead-lettered ({dead} in total). "
+            "Dead-letter queue grew",
+            f"{dead - reported_dead} more event(s) are dead-lettered since the last check ({dead} in total). "
             "Review them in Platform Admin > Operations > Dead letters.",
         )
     state["dead_letters"] = dead
@@ -110,7 +147,7 @@ def operations_alerts(db: Session, state: dict) -> dict:
     if worker == "RUNNING" and state.get("worker") == "STOPPED":
         send_alert("Background worker recovered", "The background worker is sending heartbeats again.")
     state["worker"] = worker
-    return {"dead_letters": dead, "worker": worker}
+    return {"dead_letters": dead, "worker": worker, "heartbeat_url": ping_heartbeat_url()}
 
 
 def connector_sync(db: Session, _state: dict) -> dict:
@@ -248,16 +285,22 @@ def _jsonable(value):
     return str(value)
 
 
-def run_due_jobs(now: datetime | None = None) -> list[dict]:
-    now = now or datetime.now(timezone.utc)
+def _run_rows() -> dict[str, SchedulerRun]:
     db = SessionLocal()
     try:
         bind_system(db, "scheduler: which jobs are due")
         rows = {row.job: row for row in db.query(SchedulerRun).all()}
+        db.expunge_all()
+        return rows
     finally:
         db.close()
+
+
+def run_due_jobs(now: datetime | None = None, jobs: tuple[Job, ...] = JOBS) -> list[dict]:
+    now = now or datetime.now(timezone.utc)
+    rows = _run_rows()
     outcomes = []
-    for job in JOBS:
+    for job in jobs:
         if _due(rows.get(job.name), job, now):
             outcome = run_job(job, now)
             if outcome is not None:
@@ -265,12 +308,83 @@ def run_due_jobs(now: datetime | None = None) -> list[dict]:
     return outcomes
 
 
-def serve(poll_seconds: float = 30.0, stop=None) -> None:
-    """Run due jobs every ``poll_seconds`` until ``stop()`` returns true (forever by default)."""
-    logger.info("Scheduler started with %d jobs", len(JOBS))
-    while not (stop and stop()):
+# ------------------------------------------------------------------------------------------- watchdog
+
+
+def heartbeat_file() -> Path:
+    return Path(os.getenv("MDARIX_SCHEDULER_HEARTBEAT_FILE", "").strip() or DEFAULT_HEARTBEAT_FILE)
+
+
+def write_heartbeat(now: datetime | None = None) -> Path | None:
+    """Record that the loop is alive: the file holds the time of the last cycle (nothing else), written atomically.
+    The container health check compares its age with the poll interval. A failure to write is logged, never fatal."""
+    path = heartbeat_file()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(path.name + ".tmp")
+        temporary.write_text((now or datetime.now(timezone.utc)).isoformat(), encoding="utf-8")
+        temporary.replace(path)
+        return path
+    except OSError as exc:
+        logger.warning("Scheduler heartbeat file %s could not be written (%s)", path, type(exc).__name__)
+        return None
+
+
+def missed_jobs(rows: dict[str, SchedulerRun], now: datetime, jobs: tuple[Job, ...] = JOBS) -> list[tuple[Job, float]]:
+    """Jobs whose last activity (start or finish) is older than MISSED_AFTER_INTERVALS times their interval, with the
+    age in seconds. A job that has never run is not missed: it is due and runs on this cycle."""
+    found = []
+    for job in jobs:
+        row = rows.get(job.name)
+        if row is None:
+            continue
+        seen = [stamp for stamp in (row.last_started_at, row.last_finished_at) if stamp is not None]
+        if not seen:
+            continue
+        age = (now - max(seen)).total_seconds()
+        if age > MISSED_AFTER_INTERVALS * job.every.total_seconds():
+            found.append((job, age))
+    return found
+
+
+_missed_reported: set[str] = set()
+
+
+def check_missed_jobs(now: datetime | None = None, jobs: tuple[Job, ...] = JOBS, rows=None) -> list[str]:
+    """Alert once when a job becomes missed and once more when it runs again; returns the names currently missed."""
+    now = now or datetime.now(timezone.utc)
+    rows = _run_rows() if rows is None else rows
+    missed = {job.name: (job, age) for job, age in missed_jobs(rows, now, jobs)}
+    for name, (job, age) in missed.items():
+        if name not in _missed_reported:
+            send_alert(
+                f"Scheduled job missed: {name}",
+                f"{job.description}. It runs every {job.every} but last ran {int(age // 60)} minutes ago. "
+                "Check that the scheduler is running and that no other job is blocking the loop.",
+            )
+    for name in sorted(_missed_reported - set(missed)):
+        job = next((item for item in jobs if item.name == name), None)
+        if job is not None:
+            send_alert(f"Scheduled job running again: {name}", f"{job.description} has run within its interval.")
+    _missed_reported.clear()
+    _missed_reported.update(missed)
+    return sorted(missed)
+
+
+def serve(
+    poll_seconds: float = 30.0, shutdown: threading.Event | None = None, stop: Callable[[], bool] | None = None
+) -> None:
+    """Run due jobs every ``poll_seconds`` until ``shutdown`` is set (the signal handlers set it, so the loop ends at
+    once instead of finishing a sleep) or ``stop()`` returns true. Every cycle writes the heartbeat file and checks
+    for missed jobs; a cycle that fails (the database may be briefly unavailable) is logged and tried again."""
+    shutdown = shutdown or threading.Event()
+    logger.info("Scheduler started with %d jobs; heartbeat file %s", len(JOBS), heartbeat_file())
+    while not shutdown.is_set() and not (stop and stop()):
         try:
             run_due_jobs()
-        except Exception:  # the database may be briefly unavailable; try again next cycle
+            check_missed_jobs()
+        except Exception:
             logger.exception("Scheduler cycle failed")
-        time.sleep(poll_seconds)
+        write_heartbeat()
+        shutdown.wait(poll_seconds)
+    logger.info("Scheduler stopped")

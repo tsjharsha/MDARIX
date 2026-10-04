@@ -1,6 +1,5 @@
 """Platform administration: customer directory, customer records and Customer 360 tabs."""
 
-import csv
 import io
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -14,6 +13,7 @@ from backend.app.customer_lifecycle import (
     build_customer_tenant,
     shared_data_plane,
 )
+from backend.app import csv_safe
 from backend.app.db.models.customer_lifecycle import (
     Customer,
     IdentityProviderConfiguration,
@@ -458,7 +458,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
             "created_at",
         ]
         stream = io.StringIO()
-        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer = csv_safe.writer(stream, fieldnames=fields)
         writer.writeheader()
         writer.writerows(
             {field: item.get(field, "") if item.get(field) is not None else "" for field in fields} for item in payload

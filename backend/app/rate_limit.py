@@ -7,6 +7,10 @@ still counts.
 
 ``MDARIX_RATE_LIMITS_ENABLED=false`` turns the limits off for automated test runs; staging and production refuse to
 start with it (``backend/app/config_check.py``).
+
+When the counter table cannot be reached, authentication scopes (``AUTH_SCOPES``) refuse with 503 in staging and
+production and raise an alert; everything else fails open. ``signin:account`` counts failed attempts only
+(backend/app/auth_router.py), so nobody can lock a known person out by sending their email with wrong passwords.
 """
 
 from __future__ import annotations
@@ -44,11 +48,49 @@ LIMITS: dict[str, Limit] = {
     "password-change:user": Limit(10, 3600),
     "demo:ip": Limit(5, 3600),
     "feedback:user": Limit(10, 86400),
+    # Browser error reports are unauthenticated: a page in an error loop must not fill the table.
+    "client-errors:ip": Limit(30, 300),
 }
+
+
+# Scopes that protect authentication. When the counter store is down, these refuse (503) in staging and production
+# rather than let an attacker who can break the counters guess passwords unthrottled; other scopes (feedback, demo
+# requests) fail open, because losing them costs nothing. A scope added without being listed here fails open.
+AUTH_SCOPES = frozenset(
+    {
+        "signin:ip",
+        "signin:account",
+        "signup:ip",
+        "signup:email",
+        "forgot:ip",
+        "forgot:email",
+        "token:ip",
+        "mfa:ip",
+        "mfa:user",
+        "password-change:user",
+    }
+)
 
 
 def enabled() -> bool:
     return os.getenv("MDARIX_RATE_LIMITS_ENABLED", "true").strip().lower() not in {"0", "false", "no"}
+
+
+def fails_closed(scope: str) -> bool:
+    from backend.app.runtime_env import is_production_like
+
+    return scope in AUTH_SCOPES and is_production_like()
+
+
+def _unavailable() -> HTTPException:
+    return HTTPException(
+        503,
+        detail={
+            "code": "RATE_LIMITER_UNAVAILABLE",
+            "message": "Sign-in is temporarily unavailable. Please try again in a few minutes.",
+        },
+        headers={"Retry-After": "60"},
+    )
 
 
 def _key_hash(scope: str, key: str) -> str:
@@ -88,7 +130,13 @@ def enforce(scope: str, key: str | None) -> None:
                 connection.execute(
                     text("DELETE FROM rate_limit_counters WHERE window_start < now() - interval '2 days'")
                 )
-    except Exception:  # a broken counter must never lock everyone out; the account lockout still applies
+    except Exception:
+        if fails_closed(scope):
+            # Authentication without its limits is worse than no authentication for a few minutes: refuse, and
+            # tell the operators (the ALERT prefix is what the log collector pages on; backend/app/alerts.py).
+            logger.critical("ALERT Rate limit counter unavailable for authentication scope %s: refusing", scope)
+            raise _unavailable()
+        # Elsewhere a broken counter must never lock everyone out; the account lockout still applies.
         logger.exception("Rate limit counter unavailable for scope %s", scope)
         return
     if count > rule.limit:

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import csv
 import io
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app import csv_safe
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
@@ -90,7 +90,7 @@ def export_csv(deps=Depends(_deps)):
     ctx, db = deps
     records = _rows(db, "products", ctx.tenant_id, 5000)
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["id", "tenant_id", "product_identifier", "name", "lifecycle_status"])
+    writer = csv_safe.writer(output, fieldnames=["id", "tenant_id", "product_identifier", "name", "lifecycle_status"])
     writer.writeheader()
     for row in records:
         writer.writerow({key: row.get(key) for key in writer.fieldnames})
