@@ -50,12 +50,7 @@ def main() -> int:
     report: dict[str, object] = {"status": "PASS", "tenants": {}}
     with SessionLocal() as control:
         bind_system(control, "validate local synthetic tenant dataset")
-        tenants = (
-            control.query(Tenant)
-            .filter(Tenant.tenant_key.in_(TENANT_PROFILES))
-            .order_by(Tenant.tenant_key)
-            .all()
-        )
+        tenants = control.query(Tenant).filter(Tenant.tenant_key.in_(TENANT_PROFILES)).order_by(Tenant.tenant_key).all()
         if len(tenants) != len(TENANT_PROFILES):
             raise RuntimeError("VALIDATION_TENANT_REGISTRY_INCOMPLETE")
 
@@ -73,8 +68,7 @@ def main() -> int:
                     tenant_tables.append(table)
                     invalid_count = connection.execute(
                         text(
-                            f"SELECT count(*) FROM public.{_quoted(table)} "
-                            "WHERE tenant_id IS DISTINCT FROM :tenant_id"
+                            f"SELECT count(*) FROM public.{_quoted(table)} WHERE tenant_id IS DISTINCT FROM :tenant_id"
                         ),
                         {"tenant_id": tenant.id},
                     ).scalar_one()
@@ -86,10 +80,7 @@ def main() -> int:
                 for table, minimum in MINIMUM_COUNTS.items():
                     count = int(
                         connection.execute(
-                            text(
-                                f"SELECT count(*) FROM public.{_quoted(table)} "
-                                "WHERE tenant_id = :tenant_id"
-                            ),
+                            text(f"SELECT count(*) FROM public.{_quoted(table)} WHERE tenant_id = :tenant_id"),
                             {"tenant_id": tenant.id},
                         ).scalar_one()
                     )
@@ -98,20 +89,15 @@ def main() -> int:
                         below_minimum[table] = {"actual": count, "minimum": minimum}
 
                 identity = connection.execute(
-                    text(
-                        "SELECT tenant_key, customer_id FROM tenants "
-                        "WHERE id = :tenant_id"
-                    ),
+                    text("SELECT tenant_key, customer_id FROM tenants WHERE id = :tenant_id"),
                     {"tenant_id": tenant.id},
                 ).one_or_none()
                 identity_matches = bool(
-                    identity
-                    and identity.tenant_key == tenant.tenant_key
-                    and identity.customer_id == tenant.customer_id
+                    identity and identity.tenant_key == tenant.tenant_key and identity.customer_id == tenant.customer_id
                 )
                 passed = not invalid and not below_minimum and identity_matches
                 report["tenants"][tenant.tenant_key] = {
-                    "database": connection.execute(text("SELECT current_database()" )).scalar_one(),
+                    "database": connection.execute(text("SELECT current_database()")).scalar_one(),
                     "identity_matches_control_plane": identity_matches,
                     "tenant_owned_tables_checked": len(tenant_tables),
                     "foreign_tenant_rows": invalid,

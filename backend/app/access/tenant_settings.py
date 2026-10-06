@@ -314,7 +314,8 @@ def add_customer_notification_recipient(
         row.id,
         policy.version,
         request=request,
-        after={"email": payload.email, "recipient_type": payload.recipient_type},
+        # Audit rows are immutable and outlive an erasure, so they name the contact by id, never by address or name.
+        after={"contact_id": str(contact.id), "recipient_type": payload.recipient_type},
         reason=payload.reason,
     )
     db.commit()
@@ -333,11 +334,27 @@ def get_customer_lifecycle(request: Request, db: Session = Depends(get_db)):
     tenant = db.query(Tenant).filter(Tenant.id == admin.tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    # The current subscription (latest end date) so the Plan screen can show when it ends and how many days remain.
+    subscription = (
+        db.query(SubscriptionLifecycle)
+        .filter(SubscriptionLifecycle.tenant_id == tenant.id)
+        .order_by(SubscriptionLifecycle.expires_at.desc())
+        .first()
+    )
     return {
         "tenant_id": str(tenant.id),
         "status": tenant.status,
         "lifecycle_status": tenant.status,  # the tenant status column is its lifecycle status
         "lock_version": tenant.lock_version,
+        "subscription": (
+            {
+                "status": subscription.status,
+                "expires_at": subscription.expires_at.isoformat(),
+                "grace_ends_at": subscription.grace_ends_at.isoformat() if subscription.grace_ends_at else None,
+            }
+            if subscription is not None
+            else None
+        ),
         "customer_admin_actions": ["REQUEST_RENEWAL"],
         "platform_controlled_actions": ["SUSPEND", "REACTIVATE", "TERMINATE", "ARCHIVE"],
     }

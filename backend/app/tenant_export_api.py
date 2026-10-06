@@ -15,13 +15,22 @@ from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _admin_tenant, _require_platform_admin, ensure_user_visible
 from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantMembership
-from backend.app.db.models.stage2 import AuthenticationEvent, AuthSession, SubscriptionLifecycle, TenantExport, TrialFeedback
+from backend.app.db.models.stage2 import (
+    AuthenticationEvent,
+    AuthSession,
+    SubscriptionLifecycle,
+    TenantExport,
+    TrialFeedback,
+)
 from backend.app.db.session import get_db
+from backend.app.enterprise_audit import make_audit_event
 from backend.app.legal_hold_api import router as legal_hold_router
 from backend.app.tenant_export import ExportInProgress, describe, read_export, request_export
 
 router = APIRouter(prefix="/api/v1", tags=["Data export"])
-router.include_router(legal_hold_router)
+# The legal-hold routes already carry the /api/v1 prefix, so they are added as they are. (Nesting the router with
+# include_router doubled the prefix and the routes never reached the application.)
+router.routes.extend(legal_hold_router.routes)
 
 DOWNLOAD_CHUNK = 1024 * 1024
 # The most audit events one person's export carries; a longer trail is flagged and continued in the organization
@@ -157,12 +166,19 @@ def person_export(db: Session, user: AuthUser) -> dict:
     )
     total_events = events_query.count()
     events = events_query.limit(PERSON_AUDIT_LIMIT).all()
-    feedback = db.query(TrialFeedback).filter(TrialFeedback.user_id == user.id, TrialFeedback.tenant_id == tenant_id).all()
+    feedback = (
+        db.query(TrialFeedback).filter(TrialFeedback.user_id == user.id, TrialFeedback.tenant_id == tenant_id).all()
+    )
     return {
         "generated_at": now.isoformat(),
         "account": _account_record(user),
         "memberships": [
-            {"id": str(row.id), "tenant_id": str(row.tenant_id), "status": row.status, "is_default": bool(row.is_default)}
+            {
+                "id": str(row.id),
+                "tenant_id": str(row.tenant_id),
+                "status": row.status,
+                "is_default": bool(row.is_default),
+            }
             for row in db.query(TenantMembership).filter(TenantMembership.user_id == user.id).all()
         ],
         "sessions": {
@@ -201,9 +217,7 @@ def person_export(db: Session, user: AuthUser) -> dict:
         "audit_events_truncated": total_events > len(events),
         "feedback": [
             {
-                column.name: (
-                    value.isoformat() if isinstance(value := getattr(row, column.name), datetime) else value
-                )
+                column.name: (value.isoformat() if isinstance(value := getattr(row, column.name), datetime) else value)
                 for column in TrialFeedback.__table__.columns
             }
             for row in feedback
@@ -352,6 +366,22 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
             },
         )
     if tenant.legal_hold:
+        # The refusal is part of the hold's record: a reviewer sees that deletion was attempted and stopped.
+        db.add(
+            make_audit_event(
+                tenant_id=tenant.id,
+                actor_ref=str(platform_admin.id),
+                action="TENANT_PURGE_REFUSED_LEGAL_HOLD",
+                entity_type="Tenant",
+                entity_id=tenant.id,
+                request=request,
+                reason=payload.reason.strip(),
+                details={
+                    "legal_hold_set_at": tenant.legal_hold_set_at.isoformat() if tenant.legal_hold_set_at else None
+                },
+            )
+        )
+        db.commit()
         raise HTTPException(
             409,
             detail={"code": "LEGAL_HOLD", "message": "This organization is under a legal hold; nothing can be deleted"},
@@ -372,14 +402,17 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
     )
     if busy is not None:
         raise HTTPException(409, detail={"code": "EXPORT_IN_PROGRESS", "message": "Wait for the export to finish"})
-    evidence = export_evidence(db, tenant, payload.export_waiver_reason)
+    # Resuming a purge left PURGING: its export evidence is already in the erasure log, and the export rows it
+    # pointed to were deleted with the rest of the organization's data, so the requirement is not asked again.
+    resuming = str(tenant.status).upper() == "PURGING"
+    evidence = None if resuming else export_evidence(db, tenant, payload.export_waiver_reason)
     try:
-        result = purge_tenant(
-            db, tenant_id, str(platform_admin.id), reason=payload.reason.strip(), evidence=evidence
-        )
+        result = purge_tenant(db, tenant_id, str(platform_admin.id), reason=payload.reason.strip(), evidence=evidence)
     except PurgeFailed as exc:
         if str(exc) == "LEGAL_HOLD":
-            raise HTTPException(409, detail={"code": "LEGAL_HOLD", "message": "This organization is under a legal hold"})
+            raise HTTPException(
+                409, detail={"code": "LEGAL_HOLD", "message": "This organization is under a legal hold"}
+            )
         raise HTTPException(
             409,
             detail={"code": "PURGE_INCOMPLETE", "message": f"Nothing was deleted: {exc}. See the server log."},

@@ -10,23 +10,29 @@ import pytest
 
 from auth.service import _hash
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Product, Tenant, TenantMembership
+from backend.app.db.models.pilot_support import ErasureLog
 from backend.app.db.models.stage2 import AuthSession, TenantExport
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.tenant_export import expire_exports, run_export
-from backend.app.tenant_purge import purge_tenant, tenant_tables
+from backend.app.tenant_purge import PurgeFailed, purge_tenant, tenant_tables
 from object_storage.service import ObjectStorageService
 from tests.conftest import authenticated_client
 
 PASSWORD = "LegacyTestPassword123!"  # the shared platform-administrator test account (tests/conftest.py)
 
 
-@pytest.fixture(autouse=True)
-def storage_root(monkeypatch, tmp_path):
+def use_local_storage(monkeypatch, tmp_path):
+    """Stored files go to a fresh local folder (shared with the other data-governance test modules)."""
     monkeypatch.setenv("MDARIX_OBJECT_STORAGE_ROOT", str(tmp_path / "objects"))
     monkeypatch.setenv("MDARIX_OBJECT_STORAGE_PROVIDER", "local")
     monkeypatch.delenv("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY", raising=False)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def storage_root(monkeypatch, tmp_path):
+    return use_local_storage(monkeypatch, tmp_path)
 
 
 @pytest.fixture
@@ -36,6 +42,10 @@ def platform():
 
 @pytest.fixture
 def organization(platform):
+    return make_organization(platform)
+
+
+def make_organization(platform) -> dict:
     """A fresh customer organization with a product, a user, a session, an audit event and a stored file."""
     code = f"PRG{uuid.uuid4().hex[:6].upper()}"
     created = platform.post(
@@ -114,11 +124,48 @@ def _count(model, **filters) -> int:
 
 
 def _set_status(tenant_id, status):
+    """Move the organization to ``status``; a suspension is stamped now, as the lifecycle transition does."""
     db = SessionLocal()
     bind_system(db, "test")
-    db.query(Tenant).filter(Tenant.id == tenant_id).update({"status": status})
+    changes = {"status": status}
+    if status == "SUSPENDED":
+        changes["suspended_at"] = datetime.now(timezone.utc)
+    db.query(Tenant).filter(Tenant.id == tenant_id).update(changes)
     db.commit()
     db.close()
+
+
+def _erasure_logs(tenant_id) -> list[ErasureLog]:
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        return db.query(ErasureLog).filter(ErasureLog.tenant_id == tenant_id).order_by(ErasureLog.performed_at).all()
+    finally:
+        db.close()
+
+
+def _export(platform, tenant_id) -> str:
+    queued = platform.post(f"/api/v1/platform-admin/tenants/{tenant_id}/exports", json={"reason": "Hand the data back"})
+    assert queued.status_code == 202, queued.text
+    assert run_export(queued.json()["id"])["status"] == "READY"
+    return queued.json()["id"]
+
+
+PURGE_BODY = {"reason": "Pilot ended; customer asked us to delete everything", "password": PASSWORD}
+
+
+class BrokenStorage:
+    """A file store that is down: every deletion fails."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def delete_tenant(self, tenant):
+        self.calls += 1
+        raise OSError("disk unavailable")
+
+    def list_tenant_objects(self, tenant):
+        return ObjectStorageService().list_tenant_objects(tenant)
 
 
 # ------------------------------------------------------------------------------------------------ purge
@@ -139,31 +186,27 @@ def test_the_purge_covers_every_tenant_table_it_finds():
         "user_invitations",
         "connector_configurations",
     } <= names
-    assert not names & {"auth_users", "subscription_lifecycles", "audit_events", "trial_feedback"}
+    assert not names & {"auth_users", "subscription_lifecycles", "audit_events", "trial_feedback", "erasure_log"}
 
 
 def test_deleting_an_organization_removes_its_data_files_and_trail(platform, organization):
     tenant_id = organization["tenant_id"]
     url = f"/api/v1/platform-admin/tenants/{tenant_id}/purge"
-    body = {"reason": "Pilot ended; customer asked us to delete everything", "password": PASSWORD}
+    confirmed = {**PURGE_BODY, "confirm_tenant_key": organization["tenant_key"]}
     # Guards: still active, wrong key, wrong password.
-    assert platform.post(url, json={**body, "confirm_tenant_key": organization["tenant_key"]}).status_code == 409
+    assert platform.post(url, json=confirmed).status_code == 409
     _set_status(tenant_id, "SUSPENDED")
-    assert platform.post(url, json={**body, "confirm_tenant_key": "WRONG"}).status_code == 422
-    wrong = {**body, "password": "not my password", "confirm_tenant_key": organization["tenant_key"]}
-    assert platform.post(url, json=wrong).status_code == 403
+    assert platform.post(url, json={**PURGE_BODY, "confirm_tenant_key": "WRONG"}).status_code == 422
+    assert platform.post(url, json={**confirmed, "password": "not my password"}).status_code == 403
 
-    response = platform.post(
-        url,
-        json={
-            **body,
-            "confirm_tenant_key": organization["tenant_key"],
-            "export_waiver_reason": "Synthetic test organization; no customer data requires hand-back",
-        },
-    )
+    # The customer's data is handed back first: an export prepared after the suspension satisfies the rule.
+    export_id = _export(platform, tenant_id)
+    response = platform.post(url, json=confirmed)
     assert response.status_code == 200, response.text
     result = response.json()
-    assert result["deleted_records"]["products"] == 1 and result["files_deleted"] == 1
+    assert result["status"] == "ARCHIVED" and result["export"]["id"] == export_id
+    # The evidence file and the export archive itself are both deleted.
+    assert result["deleted_records"]["products"] == 1 and result["files_deleted"] == 2
     assert result["audit_events_deleted"] >= 1 and result["users_pseudonymized"] == 1
 
     assert _count(Product, tenant_id=tenant_id) == 0
@@ -177,48 +220,141 @@ def test_deleting_an_organization_removes_its_data_files_and_trail(platform, org
         assert person.status == "REMOVED" and person.password_hash == "!removed"
         trail = db.query(AuditEvent).filter(AuditEvent.tenant_id == tenant_id).all()
         assert [event.action for event in trail] == ["TENANT_DATA_DELETED"] and trail[0].chain_seq == 1
+        assert trail[0].details["export"]["id"] == export_id
     finally:
         db.close()
+    # The erasure log survives the purge (a restore re-applies it) and names the export that was handed back.
+    [log] = _erasure_logs(tenant_id)
+    assert log.kind == "TENANT_PURGED" and log.details["completed"] is True
+    assert log.details["export"]["id"] == export_id
 
 
-def test_a_purge_with_an_unavailable_file_store_is_durable_and_resumable(organization):
+def test_a_purge_needs_an_export_made_after_the_suspension_or_a_recorded_waiver(platform, organization):
     tenant_id = organization["tenant_id"]
+    url = f"/api/v1/platform-admin/tenants/{tenant_id}/purge"
+    confirmed = {**PURGE_BODY, "confirm_tenant_key": organization["tenant_key"]}
+    _export(platform, tenant_id)  # made while the organization was still active: it is not the hand-back
+    _set_status(tenant_id, "SUSPENDED")
 
-    class BrokenStorage:
-        def delete_tenant(self, tenant):
-            raise OSError("disk unavailable")
+    refused = platform.post(url, json=confirmed)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "EXPORT_REQUIRED"
+    assert _count(Product, tenant_id=tenant_id) == 1 and _erasure_logs(tenant_id) == []
+    # A waiver must say why (at least ten characters).
+    assert platform.post(url, json={**confirmed, "export_waiver_reason": "no"}).status_code == 422
 
+    waiver = "Customer declined a copy in writing (ticket 4711)"
+    response = platform.post(url, json={**confirmed, "export_waiver_reason": waiver})
+    assert response.status_code == 200, response.text
+    assert response.json()["export"] == "WAIVED"
+    [log] = _erasure_logs(tenant_id)
+    assert log.details["export"] == "WAIVED" and log.details["export_waiver_reason"] == waiver
+
+
+def test_a_purge_whose_rows_cannot_all_be_deleted_changes_nothing(organization, monkeypatch):
+    from backend.app import tenant_purge
+
+    tenant_id = organization["tenant_id"]
+    _set_status(tenant_id, "SUSPENDED")
+    real_delete_rows = tenant_purge.delete_rows
+
+    def one_table_refuses(db, tables, tenant):
+        deleted, remaining = real_delete_rows(db, tables, tenant)  # the deletes really run in the transaction
+        return deleted, [*remaining, '"public"."stubborn_table"']
+
+    monkeypatch.setattr(tenant_purge, "delete_rows", one_table_refuses)
     db = SessionLocal()
     try:
-        incomplete = purge_tenant(db, tenant_id, "test", reason="Testing a failed purge", storage=BrokenStorage())
+        with pytest.raises(PurgeFailed, match="ROWS_REMAIN:"):
+            purge_tenant(db, tenant_id, "test", reason="Testing an incomplete database stage")
     finally:
         db.close()
-    assert incomplete["status"] == "PURGING"
-    assert "files" in incomplete["incomplete"]
-    # The database stage commits atomically before external storage is touched.  Its
-    # erasure log is therefore a durable recovery checkpoint, not a false rollback.
+    # Stage one is all-or-nothing: rows, trail, people, status and files are exactly as before.
+    assert _count(Product, tenant_id=tenant_id) == 1
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TEST_EVENT") == 1
+    assert _erasure_logs(tenant_id) == []
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        assert db.get(Tenant, tenant_id).status == "SUSPENDED"
+        assert db.get(AuthUser, organization["user_id"]).display_name == "Pat Person"
+    finally:
+        db.close()
+    assert ObjectStorageService().list_tenant_objects(str(tenant_id)) != []
+
+
+def test_a_purge_with_an_unavailable_file_store_stays_purging_alerts_and_is_finished_by_the_script(
+    organization, monkeypatch
+):
+    from scripts import complete_tenant_purge
+
+    tenant_id = organization["tenant_id"]
+    _set_status(tenant_id, "SUSPENDED")
+    alerts = []
+    monkeypatch.setattr("backend.app.alerts.send_alert", lambda subject, body: alerts.append((subject, body)) or {})
+    storage = BrokenStorage()
+    db = SessionLocal()
+    try:
+        incomplete = purge_tenant(db, tenant_id, "test", reason="Testing a failed file deletion", storage=storage)
+    finally:
+        db.close()
+    # The database rows are committed (stage one) before the file store is touched; the files step is retried.
+    assert incomplete["status"] == "PURGING" and set(incomplete["incomplete"]) == {"files"}
+    assert storage.calls == 3
     assert _count(Product, tenant_id=tenant_id) == 0
+    assert ObjectStorageService().list_tenant_objects(str(tenant_id)) != []
+    assert len(alerts) == 1 and "complete_tenant_purge.py" in alerts[0][1]
+    assert _count(AuditEvent, tenant_id=tenant_id, action="TENANT_PURGE_INCOMPLETE") == 1
+    [log] = _erasure_logs(tenant_id)
+    assert log.details["completed"] is False and "files" in log.details["incomplete"]
     db = SessionLocal()
     bind_system(db, "test")
     try:
         assert db.get(Tenant, tenant_id).status == "PURGING"
-        assert (
-            db.query(AuditEvent)
-            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "TENANT_PURGE_INCOMPLETE")
-            .count()
-            == 1
-        )
-        completed = purge_tenant(
-            db,
-            tenant_id,
-            "test-recovery",
-            reason="Resume the recorded purge after storage recovery",
-            storage=ObjectStorageService(),
-        )
-        assert completed["status"] == "ARCHIVED"
-        assert db.get(Tenant, tenant_id).status == "ARCHIVED"
     finally:
         db.close()
+
+    # The operator's dry run reports what is left and changes nothing.
+    assert complete_tenant_purge.main(["--dry-run", "--tenant", str(tenant_id)]) == 0
+    assert ObjectStorageService().list_tenant_objects(str(tenant_id)) != []
+    # A run while the store is still down keeps the organization PURGING and exits 1 (a scheduled run alerts).
+    assert complete_tenant_purge.main(["--tenant", str(tenant_id)], storage=BrokenStorage()) == 1
+    assert len(alerts) == 2
+    # Once the store is back, the script finishes the purge and only then archives the organization.
+    assert complete_tenant_purge.main(["--tenant", str(tenant_id)]) == 0
+    assert ObjectStorageService().list_tenant_objects(str(tenant_id)) == []
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        assert db.get(Tenant, tenant_id).status == "ARCHIVED"
+        actions = [event.action for event in db.query(AuditEvent).filter(AuditEvent.tenant_id == tenant_id)]
+        assert actions.count("TENANT_DATA_DELETED") == 1
+    finally:
+        db.close()
+    [log] = _erasure_logs(tenant_id)
+    assert log.details["completed"] is True and log.details["files_deleted"] == 1
+    # Nothing is pending any more.
+    assert complete_tenant_purge.main(["--tenant", str(tenant_id)]) == 0
+
+
+def test_a_purge_left_purging_is_resumed_from_the_screen_without_asking_for_the_export_again(
+    platform, organization, monkeypatch
+):
+    monkeypatch.setattr("backend.app.alerts.send_alert", lambda subject, body: {})
+    tenant_id = organization["tenant_id"]
+    _set_status(tenant_id, "SUSPENDED")
+    db = SessionLocal()
+    try:
+        evidence = {"export": "WAIVED", "export_waiver_reason": "Synthetic test organization"}
+        first = purge_tenant(db, tenant_id, "test", reason="First attempt", storage=BrokenStorage(), evidence=evidence)
+    finally:
+        db.close()
+    assert first["status"] == "PURGING"
+    response = platform.post(
+        f"/api/v1/platform-admin/tenants/{tenant_id}/purge",
+        json={**PURGE_BODY, "confirm_tenant_key": organization["tenant_key"]},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "ARCHIVED" and response.json()["export"] == "WAIVED"
     assert ObjectStorageService().list_tenant_objects(str(tenant_id)) == []
 
 
@@ -266,6 +402,10 @@ def test_erasing_a_persons_data_requires_offboarding_and_removes_what_identifies
         )
     finally:
         db.close()
+    # The erasure is logged by account id only, so a restore from an older backup can repeat it.
+    [log] = _erasure_logs(organization["tenant_id"])
+    assert log.kind == "PERSON_ERASED" and log.subject_ref == str(user_id) and log.reapplied_at is None
+    assert "Pat" not in str(log.details) and "person-" not in str(log.details)
 
 
 # ------------------------------------------------------------------------------------------------ export

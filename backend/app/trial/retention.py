@@ -197,7 +197,10 @@ def _note_legal_hold(db: Session, trial: dict, actor_ref: str, now: datetime) ->
             entity_type="Tenant",
             entity_id=tenant.id,
             reason=tenant.legal_hold_reason,
-            details={"delete_after": trial["delete_after"], "legal_hold_set_at": tenant.legal_hold_set_at.isoformat() if tenant.legal_hold_set_at else None},
+            details={
+                "delete_after": trial["delete_after"],
+                "legal_hold_set_at": tenant.legal_hold_set_at.isoformat() if tenant.legal_hold_set_at else None,
+            },
             created_at=now,
         )
     )

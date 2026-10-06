@@ -2,8 +2,10 @@
 
 A customer, regulator or court may require an organization's data to be preserved (a recall investigation,
 litigation). A platform administrator with a fully verified session records the hold with its reason; the purge
-(backend/app/tenant_purge.py), personal-data erasure and trial retention (backend/app/trial/retention.py) then
-refuse until the hold is cleared, each time with an audit record. Setting and clearing are audited with the reason
+(backend/app/tenant_purge.py), personal-data erasure, trial retention (backend/app/trial/retention.py), completing an
+unfinished purge and re-applying erasures after a restore then refuse until the hold is cleared. A refused purge
+(``TENANT_PURGE_REFUSED_LEGAL_HOLD``) and a skipped trial retention run (``TRIAL_RETENTION_SKIPPED_LEGAL_HOLD``) are
+recorded in the organization's audit trail. Setting and clearing are audited with the reason
 (``LEGAL_HOLD_SET`` / ``LEGAL_HOLD_CLEARED``). Procedure: docs/runbooks/DATA_REQUESTS.md.
 """
 
@@ -45,7 +47,9 @@ def require_mfa_complete_session(request: Request, db: Session, user: AuthUser) 
         .first()
     )
     if row is None or row.mfa_state:
-        raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Complete multi-factor authentication first"})
+        raise HTTPException(
+            403, detail={"code": "MFA_REQUIRED", "message": "Complete multi-factor authentication first"}
+        )
     if mfa._normalize(user.role) in mfa.required_roles() and not mfa.is_enrolled(user):
         raise HTTPException(
             403,

@@ -120,9 +120,7 @@ def _control_counts(db, tenant: Tenant) -> dict[str, int]:
 def _data_counts(tenant: Tenant) -> dict[str, int | str]:
     with open_tenant_data_session(tenant.id) as data:
         table_names = set(inspect(data.get_bind()).get_table_names(schema="public"))
-        result: dict[str, int | str] = {
-            "database": str(data.execute(select(func.current_database())).scalar_one())
-        }
+        result: dict[str, int | str] = {"database": str(data.execute(select(func.current_database())).scalar_one())}
         for table in DATA_TABLES:
             if table not in table_names:
                 result[table] = "MISSING"

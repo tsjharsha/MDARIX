@@ -124,14 +124,10 @@ def _ensure_data_plane_identity(data, customer: Customer, tenant: Tenant) -> dic
     local_customer = data.get(Customer, customer.id)
     if local_customer is None:
         identifier_owner = (
-            data.query(Customer)
-            .filter(Customer.customer_identifier == customer.customer_identifier)
-            .first()
+            data.query(Customer).filter(Customer.customer_identifier == customer.customer_identifier).first()
         )
         if identifier_owner is not None:
-            raise RuntimeError(
-                f"DATA_PLANE_CUSTOMER_IDENTITY_CONFLICT:{customer.customer_identifier}"
-            )
+            raise RuntimeError(f"DATA_PLANE_CUSTOMER_IDENTITY_CONFLICT:{customer.customer_identifier}")
         data.add(
             Customer(
                 id=customer.id,
@@ -311,9 +307,7 @@ def _seed_customer_metadata(db, tenant: Tenant, profile: dict, plan: PlanDefinit
         counts["customer_domains"] = 1
     else:
         counts["customer_domains"] = 0
-    verification = (
-        db.query(DomainVerification).filter(DomainVerification.customer_domain_id == domain.id).first()
-    )
+    verification = db.query(DomainVerification).filter(DomainVerification.customer_domain_id == domain.id).first()
     if verification is None:
         db.add(
             DomainVerification(
@@ -813,16 +807,26 @@ def _seed_investigation_intelligence(
     unknowns = 0
     for index, (category, description, needed) in enumerate(
         (
-            ("SUPPLIER", "Supplier process capability for the affected sensor lots is not confirmed.", "Supplier capability study"),
-            ("DESIGN", "Upper-range alarm tolerance across temperature extremes is not confirmed.", "Environmental bench test"),
-            ("LOT", "The full serial-number distribution across affected lots is incomplete.", "Returned-device serial reconciliation"),
+            (
+                "SUPPLIER",
+                "Supplier process capability for the affected sensor lots is not confirmed.",
+                "Supplier capability study",
+            ),
+            (
+                "DESIGN",
+                "Upper-range alarm tolerance across temperature extremes is not confirmed.",
+                "Environmental bench test",
+            ),
+            (
+                "LOT",
+                "The full serial-number distribution across affected lots is incomplete.",
+                "Returned-device serial reconciliation",
+            ),
         ),
         1,
     ):
         if (
-            data.query(Unknown)
-            .filter(Unknown.tenant_id == tenant.id, Unknown.description == description)
-            .first()
+            data.query(Unknown).filter(Unknown.tenant_id == tenant.id, Unknown.description == description).first()
             is None
         ):
             data.add(
@@ -1143,9 +1147,7 @@ def _seed_investigation_intelligence(
                         source_system=source,
                         source_record_id=f"{tenant.tenant_key}-{source}-{record_index:03d}",
                         source_record_version="1",
-                        fingerprint=uuid.uuid5(
-                            uuid.NAMESPACE_URL, f"{tenant.tenant_key}:{source}:{record_index}"
-                        ).hex,
+                        fingerprint=uuid.uuid5(uuid.NAMESPACE_URL, f"{tenant.tenant_key}:{source}:{record_index}").hex,
                         processing_status="ACCEPTED",
                         effective_at=NOW - timedelta(days=record_index),
                         ingested_at=NOW,
@@ -1218,10 +1220,32 @@ def _seed_investigation_intelligence(
     return counts
 
 
-def main() -> int:
+class SyntheticSeedRefused(RuntimeError):
+    """The synthetic dataset may only be written on a development or test database."""
+
+
+def refuse_outside_local() -> None:
+    """Defence in depth beside the fixed validation tenant keys: synthetic people, records and audit events must
+    never reach a staging or production database, even if those tenant keys exist there. ``runtime_env`` fails
+    safe, so an unset or unknown MDARIX_ENV counts as production and is refused too."""
+    from backend.app.runtime_env import environment, is_local, is_production_like
+
+    if is_production_like() or not is_local():
+        raise SyntheticSeedRefused(
+            f"Refusing to seed synthetic validation data: MDARIX_ENV is {environment()!r}; "
+            "this command runs only with MDARIX_ENV=development or test."
+        )
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="write the synthetic validation dataset")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    try:
+        refuse_outside_local()
+    except SyntheticSeedRefused as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     if not args.apply:
         print("Dry run only. Re-run with --apply to populate the four synthetic validation tenants.")
         return 0
@@ -1229,12 +1253,7 @@ def main() -> int:
     report: dict[str, object] = {"scope": "synthetic MVP validation only", "tenants": {}}
     with SessionLocal() as control:
         bind_system(control, "seed local synthetic validation dataset")
-        tenants = (
-            control.query(Tenant)
-            .filter(Tenant.tenant_key.in_(TENANT_PROFILES))
-            .order_by(Tenant.tenant_key)
-            .all()
-        )
+        tenants = control.query(Tenant).filter(Tenant.tenant_key.in_(TENANT_PROFILES)).order_by(Tenant.tenant_key).all()
         found = {tenant.tenant_key for tenant in tenants}
         missing = sorted(set(TENANT_PROFILES) - found)
         if missing:

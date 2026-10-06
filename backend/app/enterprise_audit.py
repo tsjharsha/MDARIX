@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from backend.app.db.models.foundation import AuditEvent
@@ -38,6 +38,18 @@ def safe_details(details: dict[str, Any] | None) -> dict[str, Any]:
     return clean(details)
 
 
+AUDIT_RETENTION_YEARS = 7
+
+
+def retention_until(created_at: datetime) -> datetime:
+    """Seven calendar years after the event, the same date the database trigger sets when none is given (md23:
+    ``created_at + interval '7 years'``; 29 February becomes 28 February)."""
+    try:
+        return created_at.replace(year=created_at.year + AUDIT_RETENTION_YEARS)
+    except ValueError:
+        return created_at.replace(year=created_at.year + AUDIT_RETENTION_YEARS, day=28)
+
+
 def make_audit_event(
     *,
     tenant_id,
@@ -60,7 +72,8 @@ def make_audit_event(
 
         # The address our own proxy saw (MDARIX_TRUSTED_PROXY_HOPS); client-written forwarding entries are ignored.
         source_ip = client_ip(request)
-        user_agent = request.headers.get("user-agent")
+        # Cut to the audit_events.user_agent column (512): an over-long header must never fail the audited action.
+        user_agent = (request.headers.get("user-agent") or "")[:512] or None
     payload = {
         "tenant_id": tenant_id,
         "actor_ref": actor_ref,
@@ -77,4 +90,4 @@ def make_audit_event(
         "created_at": now,
     }
     # The database chains the event (chain_seq, previous_hash, event_hash) when it is inserted (migration md18).
-    return AuditEvent(id=None, **payload, retention_until=now + timedelta(days=365 * 7))
+    return AuditEvent(id=None, **payload, retention_until=retention_until(now))

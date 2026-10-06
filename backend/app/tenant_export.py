@@ -32,6 +32,7 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.csv_safe import safe_cell
 from backend.app.db.models.foundation import AuditEvent, Tenant
 from backend.app.db.models.stage2 import OutboxEvent, TenantExport
 
@@ -50,7 +51,18 @@ FETCH_ROWS = 1000
 READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "investigations": (
         "readable/investigations.csv",
-        ("investigation_identifier", "status", "investigation_question", "product_id", "owner_ref", "opened_at", "closed_at", "created_at", "updated_at", "id"),
+        (
+            "investigation_identifier",
+            "status",
+            "investigation_question",
+            "product_id",
+            "owner_ref",
+            "opened_at",
+            "closed_at",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
     "complaints": (
         "readable/complaints.csv",
@@ -83,11 +95,38 @@ READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "capas": (
         "readable/capas.csv",
-        ("capa_identifier", "title", "status", "action_type", "source_type", "source_reference", "product_id", "investigation_id", "opened_at", "due_at", "effectiveness_check_at", "created_at", "updated_at", "id"),
+        (
+            "capa_identifier",
+            "title",
+            "status",
+            "action_type",
+            "source_type",
+            "source_reference",
+            "product_id",
+            "investigation_id",
+            "opened_at",
+            "due_at",
+            "effectiveness_check_at",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
     "evidence": (
         "readable/evidence_index.csv",
-        ("evidence_identifier", "title", "evidence_type", "fact_type", "reliability_status", "investigation_id", "source_reference", "document_ref", "created_at", "updated_at", "id"),
+        (
+            "evidence_identifier",
+            "title",
+            "evidence_type",
+            "fact_type",
+            "reliability_status",
+            "investigation_id",
+            "source_reference",
+            "document_ref",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
 }
 
@@ -209,13 +248,17 @@ def _write_readable(db: Session, archive: zipfile.ZipFile, tenant_id, manifest: 
     present = {
         name
         for (name,) in db.execute(
-            text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
+            text(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
         )
     }
     for table, (name, preferred) in READABLE_TABLES.items():
         if table not in present:
             continue
-        result = db.execute(text(f'SELECT * FROM "{table}" WHERE tenant_id = :tenant ORDER BY created_at, id'), {"tenant": tenant_id})
+        result = db.execute(
+            text(f'SELECT * FROM "{table}" WHERE tenant_id = :tenant ORDER BY created_at, id'), {"tenant": tenant_id}
+        )
         available = set(result.keys())
         columns = [column for column in preferred if column in available]
         count = 0
@@ -227,7 +270,8 @@ def _write_readable(db: Session, archive: zipfile.ZipFile, tenant_id, manifest: 
             sheet.writeheader()
             while rows := result.fetchmany(FETCH_ROWS):
                 for row in rows:
-                    sheet.writerow({key: _cell(row._mapping[key]) for key in columns})
+                    # Formula-safe: a value starting with =, +, -, @ must not run when the sheet is opened.
+                    sheet.writerow({key: safe_cell(_cell(row._mapping[key])) for key in columns})
                     count += 1
                 writer.write(buffer.getvalue())
                 buffer.seek(0)
