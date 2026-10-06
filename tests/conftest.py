@@ -103,6 +103,7 @@ DB_MODULES = {
     "test_replay_outbox_script",
     "test_approval_authority_roles",
     "test_customer_lifecycle_subscription",
+    "test_business_ids",
     "test_connector_sync",
     "test_tenant_data",
     "test_role_canonicalization",
@@ -130,6 +131,12 @@ DB_MODULES = {
     "test_evaluation_router",
     "test_supplier_reply",
     "test_stage3_refusals",
+    # bizid-api: API responses carry each record's business identifier (md26).
+    "test_business_ids_platform_api",
+    "test_business_ids_ops_api",
+    "test_business_ids_custadmin_api",
+    "test_business_ids_workspace_api",
+    "test_business_ids_reports_api",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

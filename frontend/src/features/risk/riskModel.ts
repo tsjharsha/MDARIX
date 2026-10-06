@@ -1,4 +1,5 @@
 import type { Tone } from "../admin/console/dashboardModel";
+import { safeText } from "../../app/displayId";
 
 /*
  * The risk register and ISO 14971 traceability as GET /api/v1/risk/register and /api/v1/risk/traceability return
@@ -9,12 +10,14 @@ import type { Tone } from "../admin/console/dashboardModel";
 
 export type LinkedControl = {
   id: string;
+  business_id?: string | null;
   control_identifier: string;
   control_type?: string | null;
   description?: string | null;
   status?: string | null;
   verification_evidence: Array<{
     id: string;
+    business_id?: string | null;
     evidence_identifier: string;
     title?: string | null;
     evidence_type?: string;
@@ -23,20 +26,32 @@ export type LinkedControl = {
 
 export type RiskItem = {
   id: string;
+  business_id?: string | null;
   risk_identifier: string;
   description?: string | null;
   status?: string | null;
-  product?: { id: string; product_identifier: string; name?: string | null } | null;
-  product_version?: { id: string; version_identifier: string } | null;
+  product?: { id: string; business_id?: string | null; product_identifier: string; name?: string | null } | null;
+  product_version?: { id: string; business_id?: string | null; version_identifier: string } | null;
   hazard?: string | null;
   harm?: string | null;
   severity?: string | number | null;
   probability?: string | number | null;
   risk_level?: string | null;
   residual_risk: { state: string; basis: string };
-  failure_modes: Array<{ id: string; failure_mode_identifier: string; name?: string | null }>;
+  failure_modes: Array<{
+    id: string;
+    business_id?: string | null;
+    failure_mode_identifier: string;
+    name?: string | null;
+  }>;
   controls: LinkedControl[];
-  requirements: Array<{ id: string; requirement_identifier: string; text?: string | null; status?: string | null }>;
+  requirements: Array<{
+    id: string;
+    business_id?: string | null;
+    requirement_identifier: string;
+    text?: string | null;
+    status?: string | null;
+  }>;
   open_complaints_on_product: number;
   source_system?: string | null;
   recorded_at?: string | null;
@@ -52,14 +67,21 @@ export type RegisterPage = {
   data_notice: string;
 };
 
+// Each list of source identifiers has its MDARIX IDs (`*_business_ids`) in the same order.
 export type Chain = {
   risk_id: string;
+  risk_business_id?: string | null;
   risk_identifier: string;
   product: string | null;
+  product_business_id?: string | null;
   requirements: string[];
+  requirement_business_ids?: Array<string | null>;
   failure_modes: string[];
+  failure_mode_business_ids?: Array<string | null>;
   controls: string[];
+  control_business_ids?: Array<string | null>;
   verification_evidence: string[];
+  verification_evidence_business_ids?: Array<string | null>;
   residual_risk: string;
   complete: boolean;
 };
@@ -75,6 +97,8 @@ export type Traceability = {
     unlinked: Record<string, number>;
   };
   unlinked: Record<string, string[]>;
+  // The same records as `unlinked`, in the same order, by MDARIX ID.
+  unlinked_business_ids?: Record<string, Array<string | null>>;
   standard: string;
   data_notice: string;
 };
@@ -131,14 +155,17 @@ export const reviewReasonValid = (reason: string) => reason.trim().length >= 10;
 export type Gap = {
   key: string;
   label: string;
+  /** The records, as shown (MDARIX ID with the source number). */
   items: string[];
+  /** For each record, what finds it in the chains: its MDARIX ID, else its source number. */
+  search: string[];
   /** What the person can do about it. */
   fix: string;
   /** The listed identifiers are risks (they can be found in the chains below). */
   risks: boolean;
 };
 
-const GAPS: Array<Omit<Gap, "items">> = [
+const GAPS: Array<Omit<Gap, "items" | "search">> = [
   {
     key: "risks_without_control",
     label: "Risks without a control",
@@ -184,24 +211,56 @@ const GAPS: Array<Omit<Gap, "items">> = [
 ];
 
 /** The traceability gaps that have entries, most consequential first, each with what to do about it. */
-export function traceabilityGaps(unlinked: Record<string, string[]> | undefined): Gap[] {
-  return GAPS.map((gap) => ({ ...gap, items: unlinked?.[gap.key] ?? [] })).filter((gap) => gap.items.length > 0);
+export function traceabilityGaps(
+  unlinked: Record<string, string[]> | undefined,
+  businessIds?: Record<string, Array<string | null>>,
+): Gap[] {
+  return GAPS.map((gap) => {
+    const sources = unlinked?.[gap.key] ?? [];
+    const ids = businessIds?.[gap.key] ?? [];
+    return {
+      ...gap,
+      items: linkedIds(sources, ids),
+      search: sources.map((source, index) => safeText(ids[index]) ?? source),
+    };
+  }).filter((gap) => gap.items.length > 0);
 }
 
-/** The chains matching a search (risk, product or any linked identifier), complete ones last when asked. */
+/** A linked record as shown: its MDARIX ID with its source number ("REQ000003 (REQ-12)"), or the source number. */
+export const linkedId = (source: string | null | undefined, businessId?: string | null): string => {
+  const id = safeText(businessId);
+  const own = safeText(source);
+  if (id && own && own !== id) return `${id} (${own})`;
+  return id ?? own ?? "—";
+};
+
+/** Source identifiers paired with their MDARIX IDs (same order), as shown. */
+export const linkedIds = (sources: string[], businessIds?: Array<string | null>): string[] =>
+  sources.map((source, index) => linkedId(source, businessIds?.[index]));
+
+/**
+ * The chains matching a search (risk, product or any linked record, by MDARIX ID or source identifier), complete ones
+ * left out when asked.
+ */
 export function filterChains(chains: Chain[], query: string, gapsOnly: boolean): Chain[] {
   const needle = query.trim().toLowerCase();
   return chains.filter((chain) => {
     if (gapsOnly && chain.complete) return false;
     if (!needle) return true;
     return [
+      chain.risk_business_id,
       chain.risk_identifier,
-      chain.product ?? "",
+      chain.product_business_id,
+      chain.product,
       ...chain.requirements,
+      ...(chain.requirement_business_ids ?? []),
       ...chain.failure_modes,
+      ...(chain.failure_mode_business_ids ?? []),
       ...chain.controls,
+      ...(chain.control_business_ids ?? []),
       ...chain.verification_evidence,
-    ].some((value) => value.toLowerCase().includes(needle));
+      ...(chain.verification_evidence_business_ids ?? []),
+    ].some((value) => (value ?? "").toLowerCase().includes(needle));
   });
 }
 

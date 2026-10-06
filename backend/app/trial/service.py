@@ -162,6 +162,7 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
     subscription = trial_subscription(db, row.tenant_id) if row.tenant_id else None
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "email": row.email,
         "display_name": row.display_name,
         "organization": row.organization,
@@ -170,6 +171,7 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
         "decision_reason": row.decision_reason,
         "tenant_id": str(row.tenant_id) if row.tenant_id else None,
+        "tenant_business_id": tenant.business_id if tenant else None,
         "tenant_key": tenant.tenant_key if tenant else None,
         "tenant_identifier": tenant.tenant_identifier if tenant else None,
         "trial_expires_at": subscription.expires_at.isoformat() if subscription else None,

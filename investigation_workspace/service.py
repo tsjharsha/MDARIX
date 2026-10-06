@@ -6,7 +6,8 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk, EvidenceEntityLink, EvidenceObservation
-from backend.app.db.models.foundation import Evidence, Investigation, ProductVersion
+from backend.app.business_ids import business_id_map
+from backend.app.db.models.foundation import Evidence, Investigation, Product, ProductVersion
 from backend.app.product360.service import Product360Service
 from graph.service import GraphError, RealityGraphService
 from investigation_workspace.schemas import InvestigationWorkspaceRequest, InvestigationWorkspaceResponse
@@ -26,6 +27,29 @@ class InvestigationWorkspaceError(ValueError):
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def with_business_ids(db: Session, workspace: InvestigationWorkspaceResponse) -> InvestigationWorkspaceResponse:
+    """The workspace as the screens get it: the investigation, its product and each evidence record with its MDARIX
+    ID (``business_id``).
+
+    Added only to the API response: ``InvestigationWorkspaceService.workspace`` is also the grounding context of the
+    AI workflows, which stays unchanged.
+    """
+    header = workspace.investigation
+    investigation_ids = business_id_map(db, Investigation, [header.get("id")])
+    product_ids = business_id_map(db, Product, [header.get("product_id")])
+    evidence_ids = business_id_map(db, Evidence, (item.get("id") for item in workspace.evidence_context))
+    investigation = {
+        **header,
+        "business_id": investigation_ids.get(str(header.get("id"))),
+        "product_business_id": product_ids.get(str(header.get("product_id"))),
+    }
+    evidence = [
+        {"id": item.get("id"), "business_id": evidence_ids.get(str(item.get("id"))), **item}
+        for item in workspace.evidence_context
+    ]
+    return workspace.model_copy(update={"investigation": investigation, "evidence_context": evidence})
 
 
 class InvestigationWorkspaceService:

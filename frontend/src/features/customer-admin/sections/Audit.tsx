@@ -4,6 +4,7 @@ import { requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { SearchBox, Table, formatDate, listOf, matches, useResource } from "../shared";
+import { hideUuid, safeText } from "../../../app/displayId";
 
 export function AuditSection() {
   const [entity, setEntity] = useState("");
@@ -12,7 +13,8 @@ export function AuditSection() {
   const users = useResource<any[]>("/api/v1/admin/identity/users");
   const actorName = useMemo(() => {
     const names = new Map(listOf(users.data).map((user) => [String(user.id), user.display_name ?? user.email]));
-    return (ref: unknown) => names.get(String(ref)) ?? String(ref ?? "—");
+    // A reference to someone no longer listed is never shown as their UUID.
+    return (ref: unknown) => names.get(String(ref)) ?? (ref ? hideUuid(ref, "Former user") : "System");
   }, [users.data]);
   const path = `/api/v1/admin/audit-history${entity ? `?entity_type=${encodeURIComponent(entity)}` : ""}`;
   const audit = useResource<any[]>(path);
@@ -111,7 +113,11 @@ export function AuditSection() {
             key: "actor",
             label: "Actor",
             // Actions by MDARIX staff come labelled by the server instead of naming the person.
-            render: (row) => <span className="ca-mono-sm">{row.actor_label ?? actorName(row.actor_ref)}</span>,
+            render: (row) => (
+              <span className="ca-mono-sm">
+                {safeText(row.actor_label) ?? safeText(row.actor_business_id) ?? actorName(row.actor_ref)}
+              </span>
+            ),
           },
           { key: "reason", label: "Reason", render: (row) => row.reason ?? row.details?.reason ?? "—" },
         ]}

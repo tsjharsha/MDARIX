@@ -9,10 +9,12 @@ import {
   Tabs,
   errorText,
   formatDate,
+  idColumn,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
+import { displayId, referenceId } from "../../../app/displayId";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { lifecycleAction, titleCase } from "./model";
 import { StatusBadge } from "./StatusBadge";
@@ -52,7 +54,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             setQuery(value);
             setPage(1);
           }}
-          label="Search tenant name"
+          label="Search tenant name or ID"
         />
         <select
           aria-label="Tenant status"
@@ -74,6 +76,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
         rowKey={(row) => row.id}
         empty={{ title: "No matching tenants", detail: "Change the search or status filter." }}
         columns={[
+          idColumn("Tenant ID", "tenant_key"),
           {
             key: "tenant",
             fields: ["name", "tenant_key", "tenant_identifier"],
@@ -81,18 +84,18 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
                 <strong>{row.name}</strong>
-                <small>{row.tenant_key ?? row.tenant_identifier}</small>
+                {row.tenant_key && <small>{row.tenant_key}</small>}
               </button>
             ),
           },
           {
             key: "customer",
-            fields: ["customer_name", "customer_identifier", "customer_id"],
+            fields: ["customer_name", "customer_business_id", "customer_identifier", "customer_id"],
             label: "Customer",
             render: (row) => (
               <span className="cc-stack">
                 <strong>{row.customer_name ?? "—"}</strong>
-                <small>{row.customer_identifier}</small>
+                <small>{referenceId(row, "customer", row.customer_identifier)}</small>
               </span>
             ),
           },
@@ -193,7 +196,7 @@ export function TenantPage({
         </button>
         <div className="cc-title">
           <div>
-            <p className="ac-eyebrow">Tenant · {tenant?.tenant_key ?? "…"}</p>
+            <p className="ac-eyebrow">Tenant · {tenant ? displayId(tenant, "tenant_key") : "…"}</p>
             <h2>{name}</h2>
             {tenant?.customer_name && (
               <p className="ac-muted">
@@ -205,7 +208,7 @@ export function TenantPage({
                 ) : (
                   <strong>{tenant.customer_name}</strong>
                 )}{" "}
-                ({tenant.customer_identifier})
+                ({referenceId(tenant, "customer", tenant.customer_identifier)})
               </p>
             )}
           </div>
@@ -291,8 +294,8 @@ export function TenantPage({
 }
 
 const TENANT_DETAILS: Array<[string, string]> = [
+  ["Tenant ID", "business_id"],
   ["Tenant key", "tenant_key"],
-  ["Tenant ID", "tenant_identifier"],
   ["Deployment", "deployment_model"],
   ["Primary region", "primary_region"],
   ["Data residency", "residency_region"],
@@ -309,7 +312,7 @@ function TenantOverview({ tenant }: { tenant: any }) {
         {TENANT_DETAILS.map(([label, key]) => (
           <div key={key}>
             <dt>{label}</dt>
-            <dd>{tenant[key] || "—"}</dd>
+            <dd>{key === "business_id" ? displayId(tenant, "tenant_identifier") : tenant[key] || "—"}</dd>
           </div>
         ))}
         <div>
@@ -677,6 +680,7 @@ function TenantData({
           rowKey={(row) => row.id}
           empty={{ title: "No exports", detail: "Prepare one to hand the data back to the customer." }}
           columns={[
+            idColumn("Export ID"),
             { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
             { key: "status", label: "Status", render: (row) => titleCase(row.status) },
             {

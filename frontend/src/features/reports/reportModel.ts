@@ -1,4 +1,5 @@
 import { titleCase } from "../admin/console/dashboardModel";
+import { isUuid } from "../../app/displayId";
 
 /** One entry of GET /api/v1/reports/catalog. */
 export type CatalogReport = { code: string; label: string; formats: string[] };
@@ -34,7 +35,7 @@ const isScalar = (value: unknown) => value === null || ["string", "number", "boo
 
 /** A cell or fact as text: scalars as they are, lists by their length, objects as "n fields". Never "[object Object]". */
 export function cellText(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "" || isUuid(value)) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (isScalar(value)) return String(value);
   if (Array.isArray(value))
@@ -44,8 +45,9 @@ export function cellText(value: unknown): string {
 
 /**
  * The report's content (its ``context``) as sections a screen can show without knowing each report's layout: a list
- * of records becomes a table of its first rows (scalar columns only, at most six), a mapping becomes label/value
- * facts, anything else one value. The full content is in the CSV and PDF downloads.
+ * of records becomes a table of its first rows (scalar columns only, at most six, the MDARIX ID first and never a
+ * column of UUIDs), a mapping becomes label/value facts, anything else one value. The full content is in the CSV and
+ * PDF downloads.
  */
 export function previewSections(context: unknown, maxRows = 10, maxColumns = 6): PreviewSection[] {
   if (!context || typeof context !== "object" || Array.isArray(context)) return [];
@@ -57,10 +59,19 @@ export function previewSections(context: unknown, maxRows = 10, maxColumns = 6):
         if (!value.length) return { key, label, kind: "empty" };
         if (value.every((item) => item && typeof item === "object" && !Array.isArray(item))) {
           const rows = (value as Array<Record<string, unknown>>).slice(0, maxRows);
-          const columns: string[] = [];
+          // Technical keys (UUIDs) are left out; people read the business_id instead.
+          const technical = new Set(
+            rows.flatMap((row) =>
+              Object.entries(row)
+                .filter(([, cell]) => isUuid(cell))
+                .map(([column]) => column),
+            ),
+          );
+          const columns: string[] = rows.some((row) => row.business_id) ? ["business_id"] : [];
           for (const row of rows)
             for (const [column, cell] of Object.entries(row))
-              if (isScalar(cell) && !columns.includes(column) && columns.length < maxColumns) columns.push(column);
+              if (isScalar(cell) && !technical.has(column) && !columns.includes(column) && columns.length < maxColumns)
+                columns.push(column);
           return { key, label, kind: "table", columns, rows, total: value.length };
         }
         return { key, label, kind: "value", value: cellText(value) };

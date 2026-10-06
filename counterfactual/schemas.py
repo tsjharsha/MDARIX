@@ -44,6 +44,7 @@ class CounterfactualRequest(BaseModel):
 
 class CounterfactualResponse(BaseModel):
     id: UUID
+    business_id: str | None = None
     investigation_id: UUID
     status: str
     result: dict[str, Any]

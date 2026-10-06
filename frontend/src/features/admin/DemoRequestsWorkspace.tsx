@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Archive, PhoneCall, RefreshCw, RotateCcw } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import { Table } from "../customer-admin/shared";
+import { Table, idColumn } from "../customer-admin/shared";
 
 type DemoRequest = {
   id: string;
@@ -121,6 +121,7 @@ export function DemoRequestsWorkspace() {
           rowKey={(row) => row.id}
           empty={{ title: "Nothing here yet", detail: "Requests appear here as visitors ask for a demo." }}
           columns={[
+            idColumn("Request ID"),
             { key: "name", label: "Name", render: (row) => <strong>{row.name}</strong> },
             {
               key: "contact",

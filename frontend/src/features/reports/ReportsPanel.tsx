@@ -4,6 +4,7 @@ import { describeError, requestJson } from "../../app/apiClient";
 import { Empty, Panel } from "../admin/console/charts";
 import { Drawer, Table, formatDate, useResource } from "../customer-admin/shared";
 import { useCan } from "../workspace/workspaceContext";
+import { SortableHeader, useSortedRows } from "../../app/tableSort";
 import { downloadFile } from "./download";
 import {
   cellText,
@@ -170,29 +171,7 @@ function ReportPreview({ report, onClose }: { report: ReportDocument; onClose: (
           )}
           {section.kind === "table" && (
             <>
-              <div className="ac-table-wrap">
-                <table className="ac-table">
-                  <caption className="ca-sr-only">{section.label}</caption>
-                  <thead>
-                    <tr>
-                      {section.columns.map((column) => (
-                        <th scope="col" key={column}>
-                          {column.replace(/_/g, " ")}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {section.rows.map((row, index) => (
-                      <tr key={index}>
-                        {section.columns.map((column) => (
-                          <td key={column}>{cellText(row[column])}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <PreviewTable label={section.label} columns={section.columns} rows={section.rows} />
               {section.total > section.rows.length && (
                 <p className="ac-muted">
                   First {section.rows.length} of {section.total}.
@@ -210,5 +189,50 @@ function ReportPreview({ report, onClose }: { report: ReportDocument; onClose: (
         </ul>
       )}
     </Drawer>
+  );
+}
+
+/** One table of a report preview; its headings sort the rows shown. */
+function PreviewTable({
+  label,
+  columns,
+  rows,
+}: {
+  label: string;
+  columns: string[];
+  rows: Array<Record<string, unknown>>;
+}) {
+  const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => {
+    const value = row[key];
+    return value !== null && typeof value === "object" ? cellText(value) : value;
+  });
+  return (
+    <div className="ac-table-wrap">
+      <table className="ac-table">
+        <caption className="ca-sr-only">{label}</caption>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <SortableHeader
+                key={column}
+                label={column === "business_id" ? "ID" : column.replace(/_business_id$/, " ID").replace(/_/g, " ")}
+                sortKey={column}
+                sort={sort}
+                onSort={toggle}
+              />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, index) => (
+            <tr key={index}>
+              {columns.map((column) => (
+                <td key={column}>{cellText(row[column])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

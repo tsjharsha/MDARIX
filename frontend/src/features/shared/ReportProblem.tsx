@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Bug } from "lucide-react";
 import { describeError, lastFailedRequestId, postJson } from "../../app/apiClient";
 import { DialogBehaviour } from "./DialogBehaviour";
+import { safeText } from "../../app/displayId";
 
 export const SUMMARY_LIMIT = 200;
 export const DETAILS_LIMIT = 5000;
@@ -55,10 +56,11 @@ export function ReportProblemDialog({ supportEmail, onClose }: { supportEmail?: 
     setBusy(true);
     setFailure(null);
     try {
-      const result = await postJson<{ id: string }>("/api/v1/support/problems", report, {
+      const result = await postJson<{ id: string; business_id?: string | null }>("/api/v1/support/problems", report, {
         redirectOnUnauthorized: false,
       });
-      setSent(result?.id ?? "");
+      // The report's own number (SUPT000012) to quote in a reply; never its UUID.
+      setSent(safeText(result?.business_id) ?? "");
     } catch (error) {
       setFailure({
         message: describeError(error, "The report could not be sent."),
@@ -87,8 +89,7 @@ export function ReportProblemDialog({ supportEmail, onClose }: { supportEmail?: 
         {sent !== null ? (
           <>
             <p role="status">
-              Thank you. Your report has reached the MDARIX team{sent ? ` (report ${sent.slice(0, 8)})` : ""}. We reply
-              by email.
+              Thank you. Your report has reached the MDARIX team{sent ? ` (report ${sent})` : ""}. We reply by email.
             </p>
             <div className="ac-modal-actions">
               <button type="button" className="ac-primary" onClick={onClose}>

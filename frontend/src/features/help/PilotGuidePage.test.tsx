@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import guide from "../../../../docs/user-guide/PILOT_GUIDE.md?raw";
+import guide from "./PILOT_GUIDE.md?raw";
 import { PilotGuidePage, guideBlocks } from "./PilotGuidePage";
 
 describe("pilot guide page", () => {

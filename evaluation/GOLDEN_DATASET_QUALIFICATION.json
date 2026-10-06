@@ -2,7 +2,7 @@
   "change_control": "MVP-AI-GOLDEN-002 adversarial VS013-VS015",
   "hashes": {
     "canonical_sha256": "888887e62899eef84c1f6be60b6a3c5136783253e9d066f51e7d27347b7760aa",
-    "ground_truth_bundle_sha256": "44650837cca448dfe00923113629a094790cf3deda7a0d43b08c6df38032f63a",
+    "ground_truth_bundle_sha256": "8ea510cca9cc5d33730751d0bd24830cf88b9c41e4d3da0ac187aaca2fa45dc9",
     "scenario_index_sha256": "bd66a99486ef7db59d7b5987192798f3af64a74199cb45f11fbd084c75ce11da",
     "source_bundle_sha256": "280c3fd6980eb8eee8060dbeb9afd5400f7554fc5670789c3610940ff4c2bdc3"
   },

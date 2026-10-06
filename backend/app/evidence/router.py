@@ -41,6 +41,7 @@ def list_evidence(
     return [
         {
             "id": str(ev.id),
+            "business_id": ev.business_id,
             "evidence_identifier": ev.evidence_identifier,
             "evidence_type": ev.evidence_type,
             "title": ev.title,

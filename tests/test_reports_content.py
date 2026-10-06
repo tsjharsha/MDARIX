@@ -1,5 +1,7 @@
 """The twelve governed reports carry the organization's real records, in JSON, formula-safe CSV and PDF."""
 
+import re
+
 import pytest
 
 from reports.pdf import page_count
@@ -131,3 +133,55 @@ def test_unknown_reports_and_viewers_are_refused(investigator):
     assert unknown.status_code == 400 and unknown.json()["detail"]["code"] == "REPORT_TYPE_NOT_SUPPORTED"
     viewer = role_client("VIEWER")[0]
     assert viewer.post("/api/v1/stage3/reports/COMPLAINT_TREND").status_code == 403
+
+
+def test_reports_list_each_record_by_business_id(seeded, investigator):
+    tag = seeded["tag"]
+    product = _row(
+        _report(investigator, "PRODUCT_INTELLIGENCE").json()["context"]["products"], "product_identifier", f"P-{tag}"
+    )
+    assert re.fullmatch(r"PROD\d{6}", product["business_id"])
+    version = _row(
+        _report(investigator, "PRODUCT_VERSION_IMPACT").json()["context"]["versions"], "version_identifier", f"V-{tag}"
+    )
+    assert re.fullmatch(r"PV\d{6}", version["business_id"]) and version["product_business_id"] == product["business_id"]
+    signal = _row(
+        _report(investigator, "SIGNAL_ASSESSMENT").json()["context"]["signals"], "complaint_identifier", f"C-{tag}"
+    )
+    assert re.fullmatch(r"CMP\d{6}", signal["business_id"])
+    case = _row(
+        _report(investigator, "INVESTIGATION").json()["context"]["investigations"],
+        "investigation_identifier",
+        f"INV-{tag}",
+    )
+    assert re.fullmatch(r"INV\d{6}", case["business_id"]) and case["product_business_id"] == product["business_id"]
+    item = _row(
+        _report(investigator, "EVIDENCE_PROVENANCE").json()["context"]["evidence"], "evidence_identifier", f"EV-{tag}-1"
+    )
+    assert re.fullmatch(r"EVD\d{6}", item["business_id"]) and item["investigation_business_id"] == case["business_id"]
+    risk = _row(_report(investigator, "RISK_IMPACT").json()["context"]["risks"], "risk_identifier", f"R-{tag}")
+    assert re.fullmatch(r"RSK\d{6}", risk["business_id"])
+    decision = _row(
+        _report(investigator, "DECISION_BRIEF").json()["context"]["decisions"], "decision_identifier", f"D-{tag}-S"
+    )
+    assert (
+        re.fullmatch(r"DEC\d{6}", decision["business_id"])
+        and decision["investigation_business_id"] == case["business_id"]
+    )
+    assert re.fullmatch(r"ESIG\d{6}", decision["signatures"][0]["business_id"])
+    audit = _report(investigator, "AUDIT_APPROVAL").json()["context"]
+    signature = next(item for item in audit["signature_verification"] if item["signature_id"] == seeded["signature_id"])
+    assert signature["decision_business_id"] == decision["business_id"]
+
+
+def test_the_csv_report_has_a_business_id_column(seeded, investigator):
+    text = _report(investigator, "SIGNAL_ASSESSMENT", "CSV").text
+    header = next(line for line in text.splitlines() if line.startswith("business_id,"))
+    assert "complaint_identifier" in header
+    assert re.search(rf"CMP\d{{6}},C-{seeded['tag']},", text)
+
+
+def test_report_jobs_carry_their_business_id(investigator):
+    job = investigator.post("/api/v1/stage3/reports/COMPLAINT_TREND/jobs", params={"output_format": "JSON"}).json()
+    assert re.fullmatch(r"RPT\d{6}", job["business_id"])
+    assert investigator.get(f"/api/v1/stage3/reports/jobs/{job['id']}").json()["business_id"] == job["business_id"]

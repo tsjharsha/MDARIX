@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, BadgeCheck, FileSignature, Sparkles } from "lucide-react";
 import { AI_TIMEOUT_MS, describeError, postJson, requestJson } from "../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../admin/console/charts";
-import { ConfirmDialog, Table, listOf, useResource, type Confirmation } from "../customer-admin/shared";
+import { ConfirmDialog, Table, idColumn, listOf, useResource, type Confirmation } from "../customer-admin/shared";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { useCan } from "../workspace/workspaceContext";
 import {
@@ -24,9 +24,12 @@ import {
   type Template,
 } from "./regulatoryModel";
 import "./regulatory.css";
+import { displayId, referenceId } from "../../app/displayId";
 
 type DocumentRow = {
   id: string;
+  // The Document ID people see (RDOC000003); document_identifier is the number the author gave it.
+  business_id?: string | null;
   document_identifier: string;
   document_type: string;
   title: string;
@@ -48,6 +51,7 @@ type DraftResult = {
   reason_code?: string | null;
   user_message?: string;
   document_id: string;
+  document_business_id?: string | null;
   document_identifier: string;
   version: number;
 };
@@ -106,6 +110,7 @@ export function RegulatoryCopilot() {
           rowKey={(row) => row.id}
           empty={{ title: "No regulatory drafts yet", detail: "Drafts you create appear here with their versions." }}
           columns={[
+            idColumn("Document ID", "document_identifier"),
             {
               key: "document",
               label: "Document",
@@ -159,7 +164,7 @@ function DraftOutcomeBanner({ result }: { result: DraftResult }) {
       {outcome.aiDrafted ? <Sparkles size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
       <div>
         <strong>
-          {result.document_identifier} version {result.version}: {outcome.title}
+          {referenceId(result, "document", result.document_identifier)} version {result.version}: {outcome.title}
         </strong>
         <span>{outcome.message}</span>
         {!outcome.aiDrafted && result.reason_code && <small>Reason: {result.reason_code}</small>}
@@ -219,7 +224,7 @@ function DraftPanel({ onDrafted }: { onDrafted: (result: DraftResult) => void })
               </option>
               {cases.map((row) => (
                 <option key={row.id} value={row.id}>
-                  {row.investigation_identifier}
+                  {displayId(row, "investigation_identifier", "Investigation")}
                   {row.investigation_question ? ` · ${String(row.investigation_question).slice(0, 60)}` : ""}
                 </option>
               ))}
@@ -312,7 +317,7 @@ function DocumentPanel({ id, onClose, onChanged }: { id: string; onClose: () => 
     if (!document) return;
     if (status === "APPROVED") return setApproving(true);
     setConfirm({
-      title: `${STATUS_ACTION[status]}: ${document.document_identifier}?`,
+      title: `${STATUS_ACTION[status]}: ${displayId(document, "document_identifier")}?`,
       body:
         status === "ARCHIVED"
           ? "An archived document can no longer change status; new content goes into a new document."
@@ -327,12 +332,14 @@ function DocumentPanel({ id, onClose, onChanged }: { id: string; onClose: () => 
           expected_lock_version: document.lock_version,
           reason,
         }),
-      done: `${document.document_identifier} is now ${sectionTitle(status.toLowerCase()).toLowerCase()}.`,
+      done: `${displayId(document, "document_identifier")} is now ${sectionTitle(status.toLowerCase()).toLowerCase()}.`,
     });
   };
   return (
     <Panel
-      eyebrow={document ? `${document.document_identifier} · version ${document.current_version}` : "Document"}
+      eyebrow={
+        document ? `${displayId(document, "document_identifier")} · version ${document.current_version}` : "Document"
+      }
       title={document?.title || document?.document_type || "Regulatory document"}
       source={detail}
       action={
@@ -421,7 +428,9 @@ function DocumentPanel({ id, onClose, onChanged }: { id: string; onClose: () => 
           onClose={() => setApproving(false)}
           onApproved={() => {
             setApproving(false);
-            changed(`${document.document_identifier} version ${document.current_version} is approved and signed.`);
+            changed(
+              `${displayId(document, "document_identifier")} version ${document.current_version} is approved and signed.`,
+            );
           }}
         />
       )}
@@ -553,7 +562,7 @@ function ApproveDialog({
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="rg-approve-title" onSubmit={submit}>
         <p className="ac-eyebrow">Electronic signature · recorded in the audit trail</p>
         <h2 id="rg-approve-title">
-          Approve {document.document_identifier} version {document.current_version}
+          Approve {displayId(document, "document_identifier")} version {document.current_version}
         </h2>
         <p>
           You confirm that you reviewed every section of this version, including the AI-written text, and approve it.

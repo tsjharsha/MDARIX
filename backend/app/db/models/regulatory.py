@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 
@@ -12,6 +13,7 @@ class RegulatoryDocument(Base):
     """Durable tenant-owned regulatory document identity and lifecycle."""
 
     __tablename__ = "regulatory_documents"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     document_identifier: Mapped[str] = mapped_column(String(120), nullable=False)

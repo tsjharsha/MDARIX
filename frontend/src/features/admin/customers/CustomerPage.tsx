@@ -7,10 +7,12 @@ import {
   Tabs,
   errorText,
   formatDate,
+  idColumn,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
+import { displayId } from "../../../app/displayId";
 import { AddTenant } from "./AddTenant";
 import { CustomerAdmins } from "./CustomerAdmins";
 import { isoDate, lifecycleAction, titleCase, type Plan, type TenantSummary } from "./model";
@@ -81,7 +83,7 @@ export function CustomerPage({
         </button>
         <div className="cc-title">
           <div>
-            <p className="ac-eyebrow">Customer · {customer?.customer_identifier ?? "…"}</p>
+            <p className="ac-eyebrow">Customer · {customer ? displayId(customer, "customer_identifier") : "…"}</p>
             <h2>{name}</h2>
           </div>
           <span className="cc-actions">
@@ -182,6 +184,10 @@ function Overview({
     <div className="ac-grid two">
       <Panel eyebrow="Maintained by the customer" title="Customer details">
         <dl className="cc-details">
+          <div>
+            <dt>Customer ID</dt>
+            <dd>{displayId(customer, "customer_identifier")}</dd>
+          </div>
           {DETAILS.map(([label, key]) => (
             <div key={key}>
               <dt>{label}</dt>
@@ -214,6 +220,7 @@ function Overview({
           rowKey={(row) => row.id}
           empty={{ title: "No tenants", detail: "This customer has no tenant yet." }}
           columns={[
+            idColumn("Tenant ID", "tenant_key"),
             {
               key: "tenant",
               label: "Tenant",
@@ -237,9 +244,10 @@ function useTab(customerId: string, tab: string) {
   return useResource<{ items: any[] }>(`/api/v1/platform-admin/customer-records/${customerId}/tabs/${tab}`);
 }
 
+// A tenant by its key or name; a tenant missing from the list is never shown by its UUID.
 const tenantLabel = (tenants: TenantSummary[], id: string) => {
   const tenant = tenants.find((item) => item.id === id);
-  return tenant?.tenant_key ?? tenant?.display_name ?? id.slice(0, 8);
+  return tenant?.tenant_key ?? tenant?.display_name ?? (tenant ? displayId(tenant) : "Other tenant");
 };
 
 function Subscription({
@@ -271,6 +279,7 @@ function Subscription({
         rowKey={(row) => row.id}
         empty={{ title: "No active subscription", detail: "Choose a plan with Change subscription." }}
         columns={[
+          idColumn("Subscription ID"),
           ...(tenants.length > 1
             ? [{ key: "tenant", label: "Tenant", render: (row: any) => tenantLabel(tenants, row.tenant_id) }]
             : []),

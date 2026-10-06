@@ -244,6 +244,7 @@ class EvidenceIntelligenceService:
         return {
             "evidence": {
                 "id": str(evidence.id),
+                "business_id": evidence.business_id,
                 "evidence_identifier": evidence.evidence_identifier,
                 "evidence_type": evidence.evidence_type,
                 "title": evidence.title,
@@ -299,6 +300,7 @@ class EvidenceIntelligenceService:
             "ai_provenance": [
                 {
                     "id": str(ex.id),
+                    "business_id": ex.business_id,
                     "provider": ex.provider,
                     "model_name": ex.model_name,
                     "prompt_template_version": ex.prompt_template_version,

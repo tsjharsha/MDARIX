@@ -58,15 +58,18 @@ def _row(user: AuthUser, tenant: Tenant | None, customer: Customer | None, activ
     status = (user.status or "").upper()
     return {
         "id": str(user.id),
+        "business_id": user.business_id,
         "email": user.username,
         "display_name": user.display_name,
         "status": status,
         "email_verified": bool(user.email_verified),
         "tenant_id": str(user.tenant_id),
+        "tenant_business_id": tenant.business_id if tenant else None,
         "tenant_key": tenant.tenant_key if tenant else None,
         "tenant_name": (tenant.display_name or tenant.name) if tenant else None,
         "tenant_status": (tenant.status or "").upper() if tenant else None,
         "customer_id": str(customer.id) if customer else None,
+        "customer_business_id": customer.business_id if customer else None,
         "customer_name": (customer.display_name or customer.legal_name) if customer else None,
         "last_login_at": user.last_login_at.isoformat() if getattr(user, "last_login_at", None) else None,
         "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -131,6 +134,9 @@ def list_customer_admins(
                 func.lower(Tenant.tenant_key).like(like),
                 func.lower(Tenant.display_name).like(like),
                 func.lower(Customer.display_name).like(like),
+                func.lower(AuthUser.business_id).like(like),
+                func.lower(Tenant.business_id).like(like),
+                func.lower(Customer.business_id).like(like),
             )
         )
     if status:
@@ -158,7 +164,14 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
     """The tenants an administrator can be added to (active ones), for a picker: one light query."""
     _require_platform_admin(request, db)
     rows = (
-        db.query(Tenant.id, Tenant.tenant_key, Tenant.display_name, Customer.display_name)
+        db.query(
+            Tenant.id,
+            Tenant.tenant_key,
+            Tenant.display_name,
+            Customer.display_name,
+            Tenant.business_id,
+            Customer.business_id,
+        )
         .outerjoin(Customer, Customer.id == Tenant.customer_id)
         .filter(func.upper(Tenant.status).in_(["ACTIVE", "PROVISIONED"]))
         .order_by(func.lower(func.coalesce(Customer.display_name, Tenant.display_name)), Tenant.tenant_key)
@@ -168,10 +181,12 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
         "items": [
             {
                 "id": str(row[0]),
+                "business_id": row[4],
                 "tenant_key": row[1],
                 "display_name": row[3] or row[2],
                 "tenant_name": row[2],
                 "customer_name": row[3],
+                "customer_business_id": row[5],
             }
             for row in rows
         ]
@@ -315,6 +330,7 @@ def resend_customer_admin_invitation(
     db.commit()
     return {
         "id": str(user.id),
+        "business_id": user.business_id,
         "status": "INVITED",
         "email_delivery": delivery,
         "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
@@ -355,6 +371,7 @@ def reset_customer_admin_password(
     db.commit()
     return {
         "id": str(user.id),
+        "business_id": user.business_id,
         "status": "RESET_EMAIL_SENT" if delivery != "NOT_CONFIGURED" else "RESET_LINK_CREATED",
         "email_delivery": delivery,
         "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
@@ -477,7 +494,7 @@ def reset_user_mfa(
         now,
     )
     db.commit()
-    return {"id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
+    return {"id": str(user.id), "business_id": user.business_id, "status": "MFA_RESET", "sessions_revoked": revoked}
 
 
 @router.post("/platform-admin/customer-admins/{user_id}/status")

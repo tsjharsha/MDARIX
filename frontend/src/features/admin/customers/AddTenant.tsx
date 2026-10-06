@@ -2,6 +2,7 @@ import { useState } from "react";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { ENVIRONMENT_TYPES, titleCase, type Plan } from "./model";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { safeText } from "../../../app/displayId";
 
 /**
  * Add a tenant to an existing customer: another region, business unit or validation workspace. The tenant is a
@@ -55,7 +56,10 @@ export function AddTenant({
         result.email_delivery === "NOT_CONFIGURED"
           ? "Email is not configured here, so no invitation was delivered."
           : `${result.administrator?.email} is invited by email.`;
-      onAdded(`Tenant ${result.tenant?.display_name ?? form.tenant_name} added to ${customerName}. ${invited}`);
+      const tenantId = safeText(result.tenant?.business_id ?? result.tenant_business_id);
+      onAdded(
+        `Tenant ${result.tenant?.display_name ?? form.tenant_name}${tenantId ? ` (${tenantId})` : ""} added to ${customerName}. ${invited}`,
+      );
     } catch (reason) {
       setError(errorText(reason, "The tenant was not added."));
       setBusy(false);

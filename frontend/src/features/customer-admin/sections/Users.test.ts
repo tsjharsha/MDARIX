@@ -27,7 +27,8 @@ describe("invitation results", () => {
     );
   });
 
-  it("names a person's export after the account", () => {
-    expect(personExportName("1234567890abcdef")).toBe("mdarix-person-12345678.json");
+  it("names a person's export after their User ID, never the UUID", () => {
+    expect(personExportName({ business_id: "USR000042" })).toBe("mdarix-person-USR000042.json");
+    expect(personExportName({ business_id: null })).toBe("mdarix-person-export.json");
   });
 });

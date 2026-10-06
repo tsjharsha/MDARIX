@@ -96,6 +96,7 @@ def admin_user(user_id: uuid.UUID, request: Request, db: Session = Depends(get_d
         if user.id == admin.id
         else {
             "user_id": str(user.id),
+            "business_id": user.business_id,
             "display_name": user.display_name,
             "email": user.username,
             "tenant_id": str(user.tenant_id),
@@ -331,7 +332,12 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
         )
     )
     db.commit()
-    return {"user_id": str(user.id), "tenant_id": str(user.tenant_id), "status": user.status}
+    return {
+        "user_id": str(user.id),
+        "business_id": user.business_id,
+        "tenant_id": str(user.tenant_id),
+        "status": user.status,
+    }
 
 
 @router.post("/admin/identity/users/{user_id}/mfa-reset")
@@ -359,7 +365,12 @@ def reset_user_mfa(user_id: uuid.UUID, payload: MfaResetRequest, request: Reques
         )
     )
     db.commit()
-    return {"user_id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
+    return {
+        "user_id": str(user.id),
+        "business_id": user.business_id,
+        "status": "MFA_RESET",
+        "sessions_revoked": revoked,
+    }
 
 
 @router.post("/admin/identity/users/{user_id}/erase")
@@ -378,7 +389,7 @@ def erase_user_personal_data(
     except PurgeFailed as exc:
         raise erasure_refused(str(exc)) from exc
     db.commit()
-    return {**result, "status": "ERASED"}
+    return {**result, "business_id": user.business_id, "status": "ERASED"}
 
 
 DELIVERY_FAILED = "FAILED"
@@ -468,6 +479,7 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
     return _invitation_response(
         {
             "user_id": str(user.id),
+            "business_id": user.business_id,
             "email": user.username,
             "status": user.status,
             "invitation_status": "RESENT",
@@ -490,6 +502,7 @@ def list_users(request: Request, db: Session = Depends(get_db)):
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "email": row.username,
             "display_name": row.display_name,
             "company": row.company,
@@ -644,6 +657,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
     return _invitation_response(
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "email": row.username,
             "display_name": row.display_name,
             "tenant_id": str(row.tenant_id),
@@ -892,6 +906,7 @@ def user_effective_access(user_id: uuid.UUID, request: Request, db: Session = De
     )
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "tenant_id": str(admin.tenant_id),
         "status": user.status,
         "roles": roles,

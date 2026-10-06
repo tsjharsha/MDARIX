@@ -21,6 +21,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _require_platform_admin
+from backend.app.business_ids import business_id_map
+from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import AuthUser, Tenant
 from backend.app.db.models.pilot_support import SupportProblemReport
 from backend.app.db.models.stage2 import OutboxEvent
@@ -72,12 +74,18 @@ def _request_id(value: str | None) -> str | None:
     return accepted if accepted and len(accepted) <= MAX_REQUEST_ID_CHARS else None
 
 
-def _serialize(row: SupportProblemReport, *, tenant_name: str | None = None, reporter: str | None = None) -> dict:
+def _serialize(row: SupportProblemReport, references: dict | None = None) -> dict:
+    """One report; ``references`` (platform administrators' views) names its organization, customer and reporter."""
+    references = references or {}
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(row.tenant_id),
-        "tenant_name": tenant_name,
-        "reporter": reporter,
+        "tenant_business_id": references.get("tenant_business_id"),
+        "customer_business_id": references.get("customer_business_id"),
+        "tenant_name": references.get("tenant_name"),
+        "reporter": references.get("reporter"),
+        "reporter_business_id": references.get("reporter_business_id"),
         "summary": row.summary,
         "details": row.details,
         "path": row.path,
@@ -147,7 +155,7 @@ def report_problem(
         )
     )
     db.commit()
-    return {"id": str(row.id), "created_at": row.created_at.isoformat()}
+    return {"id": str(row.id), "business_id": row.business_id, "created_at": row.created_at.isoformat()}
 
 
 @router.get("/support/problems")
@@ -193,7 +201,7 @@ def deliver_problem_report(db: Session, payload: dict) -> str:
         f"Page: {row.path or 'not given'}",
         f"Request id: {row.request_id or 'not given'}",
         f"Reported at: {row.created_at.isoformat(timespec='seconds')}",
-        f"Report id: {row.id}",
+        f"Report: {row.business_id} (id {row.id})",
         "",
         row.details,
     ]
@@ -205,12 +213,41 @@ def deliver_problem_report(db: Session, payload: dict) -> str:
 # ------------------------------------------------------------------------------------------- platform admin
 
 
-def _names(db: Session, rows: list[SupportProblemReport]) -> tuple[dict, dict]:
+def _references(db: Session, rows: list[SupportProblemReport]) -> dict:
+    """Report id -> its organization's name and identifiers and its reporter's email and identifier (one query per
+    model, whatever the number of reports)."""
     tenant_ids = {row.tenant_id for row in rows}
     user_ids = {row.user_id for row in rows if row.user_id}
-    tenants = dict(db.query(Tenant.id, Tenant.name).filter(Tenant.id.in_(tenant_ids))) if tenant_ids else {}
-    users = dict(db.query(AuthUser.id, AuthUser.username).filter(AuthUser.id.in_(user_ids))) if user_ids else {}
-    return tenants, users
+    tenants = (
+        {
+            tenant.id: tenant
+            for tenant in db.query(Tenant.id, Tenant.name, Tenant.business_id, Tenant.customer_id).filter(
+                Tenant.id.in_(tenant_ids)
+            )
+        }
+        if tenant_ids
+        else {}
+    )
+    users = (
+        {
+            user.id: user
+            for user in db.query(AuthUser.id, AuthUser.username, AuthUser.business_id).filter(AuthUser.id.in_(user_ids))
+        }
+        if user_ids
+        else {}
+    )
+    customers = business_id_map(db, Customer, (tenant.customer_id for tenant in tenants.values()))
+    references = {}
+    for row in rows:
+        tenant, user = tenants.get(row.tenant_id), users.get(row.user_id)
+        references[row.id] = {
+            "tenant_name": tenant.name if tenant else None,
+            "tenant_business_id": tenant.business_id if tenant else None,
+            "customer_business_id": customers.get(str(tenant.customer_id)) if tenant else None,
+            "reporter": user.username if user else None,
+            "reporter_business_id": user.business_id if user else None,
+        }
+    return references
 
 
 @router.get("/platform-admin/support/problems")
@@ -225,16 +262,14 @@ def list_problems(
     if wanted:
         query = query.filter(SupportProblemReport.status == wanted)
     rows = query.order_by(SupportProblemReport.created_at.desc()).limit(LIST_LIMIT).all()
-    tenants, users = _names(db, rows)
+    references = _references(db, rows)
     counts = dict(
         db.query(SupportProblemReport.status, func.count(SupportProblemReport.id))
         .group_by(SupportProblemReport.status)
         .all()
     )
     return {
-        "items": [
-            _serialize(row, tenant_name=tenants.get(row.tenant_id), reporter=users.get(row.user_id)) for row in rows
-        ],
+        "items": [_serialize(row, references.get(row.id)) for row in rows],
         "counts": {name: int(counts.get(name, 0)) for name in STATUSES},
     }
 
@@ -266,5 +301,4 @@ def close_problem(report_id: uuid.UUID, payload: Resolution, request: Request, d
         )
     )
     db.commit()
-    tenants, users = _names(db, [row])
-    return _serialize(row, tenant_name=tenants.get(row.tenant_id), reporter=users.get(row.user_id))
+    return _serialize(row, _references(db, [row]).get(row.id))

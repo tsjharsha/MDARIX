@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Activity, AlertTriangle, Bot, CheckCircle2, CircleSlash, Gauge, ShieldCheck } from "lucide-react";
 import { BarList, Panel, StatTile } from "../console/charts";
 import type { Slice } from "../console/dashboardModel";
-import { Table, formatDate, useResource } from "../../customer-admin/shared";
+import { Table, formatDate, idColumn, useResource } from "../../customer-admin/shared";
 import { TrustEvaluation } from "../../workspace/sections/TrustEvaluation";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
@@ -238,10 +238,11 @@ function Executions() {
         rowKey={(row) => row.id}
         empty={{ title: failedOnly ? "No failed runs" : "No AI runs yet", detail: "Runs appear as people use AI." }}
         columns={[
+          idColumn("AI execution ID"),
           { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },

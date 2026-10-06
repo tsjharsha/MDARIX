@@ -3,7 +3,9 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_of
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.models.foundation import Scenario
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
@@ -56,7 +58,6 @@ def execute_scenario(
             )
         )
         db.commit()
-        return result
     except ScenarioError as exc:
         status = 404 if exc.code.endswith("NOT_FOUND") else 400
         raise HTTPException(status, detail={"code": exc.code, "message": exc.message}) from exc
@@ -88,3 +89,5 @@ def execute_scenario(
                 "correlation_id": correlation,
             },
         ) from exc
+    # A saved scenario has its MDARIX ID; one that was only explored (persist=false) has no record and no ID.
+    return {**result, "business_id": business_id_of(db, Scenario, result["id"])}

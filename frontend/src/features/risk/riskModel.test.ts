@@ -3,6 +3,8 @@ import {
   NOT_CAPTURED,
   fieldOrNotCaptured,
   filterChains,
+  linkedId,
+  linkedIds,
   missingLinks,
   notCapturedLabels,
   pageSummary,
@@ -68,6 +70,15 @@ describe("traceability", () => {
     expect(traceabilityGaps(undefined)).toEqual([]);
   });
 
+  it("shows each gap's records by MDARIX ID with the source number, and finds them by MDARIX ID", () => {
+    const [gap] = traceabilityGaps(
+      { risks_without_control: ["RISK-002", "RISK-003"] },
+      { risks_without_control: ["RSK000002", null] },
+    );
+    expect(gap.items).toEqual(["RSK000002 (RISK-002)", "RISK-003"]);
+    expect(gap.search).toEqual(["RSK000002", "RISK-003"]);
+  });
+
   it("finds chains by any linked identifier and can hide complete ones", () => {
     const chains = [
       chain({}),
@@ -76,6 +87,14 @@ describe("traceability", () => {
     expect(filterChains(chains, "ev-1", false).map((item) => item.risk_id)).toEqual(["r1"]);
     expect(filterChains(chains, "", true).map((item) => item.risk_id)).toEqual(["r2"]);
     expect(filterChains(chains, "pump", false)).toHaveLength(2);
+    const numbered = [chain({ risk_business_id: "RSK000010", control_business_ids: ["CTL000004"] })];
+    expect(filterChains(numbered, "rsk000010", false)).toHaveLength(1);
+    expect(filterChains(numbered, "ctl000004", false)).toHaveLength(1);
+  });
+
+  it("pairs linked records with their MDARIX IDs, never showing a UUID", () => {
+    expect(linkedIds(["REQ-12", "REQ-13"], ["REQ000003"])).toEqual(["REQ000003 (REQ-12)", "REQ-13"]);
+    expect(linkedId("6f1c2a9e-4b3d-4c8a-9f2e-1a2b3c4d5e6f", null)).toBe("—");
   });
 
   it("names what a chain is missing", () => {

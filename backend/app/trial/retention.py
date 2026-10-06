@@ -132,6 +132,7 @@ def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
             due.append(
                 {
                     "tenant_id": str(tenant.id),
+                    "tenant_business_id": tenant.business_id,
                     "tenant_key": tenant.tenant_key,
                     "name": tenant.name,
                     "trial_ended_at": ended.isoformat(),

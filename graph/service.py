@@ -128,7 +128,8 @@ class RealityGraphService:
             status=row.get("status") or row.get("lifecycle_status") or row.get("reliability_status"),
             quality_state=row.get("data_quality_status") or row.get("reliability_status"),
             source_count=source_count,
-            metadata={"business_identifier": row["business_identifier"]},
+            # ``business_identifier`` is the source system's identifier; ``business_id`` is the MDARIX one (md26).
+            metadata={"business_identifier": row["business_identifier"], "business_id": row.get("business_id")},
         )
 
     def get_relationship(self, relationship_key: str, tenant_id: str | None = None) -> GraphRelationship:

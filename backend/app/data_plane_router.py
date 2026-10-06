@@ -9,7 +9,9 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.app import csv_safe
+from backend.app.business_ids import business_id_map
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.models.foundation import Investigation
 from backend.app.db.session import get_db
 from backend.app.request_context import get_request_context
 from backend.app.access.permissions import DATA_EXPORT, require_permission
@@ -59,7 +61,12 @@ def suppliers(limit: int = Query(200, ge=1, le=500), deps=Depends(_deps)):
 @router.get("/capas")
 def capas(limit: int = Query(200, ge=1, le=500), deps=Depends(_deps)):
     ctx, db = deps
-    return {"tenant_id": ctx.tenant_id, "records": _rows(db, "capas", ctx.tenant_id, limit)}
+    records = _rows(db, "capas", ctx.tenant_id, limit)
+    # The investigation each CAPA came from, by its business id (the screen never shows the UUID).
+    investigations = business_id_map(db, Investigation, (row.get("investigation_id") for row in records))
+    for row in records:
+        row["investigation_business_id"] = investigations.get(str(row.get("investigation_id")))
+    return {"tenant_id": ctx.tenant_id, "records": records}
 
 
 @router.get("/search")
@@ -69,10 +76,11 @@ def search(
     ctx, db = deps
     pattern = f"%{q}%"
     result = []
+    # The MDARIX ID (business_id, e.g. PRD000001) finds a record as well as its source number and its title.
     for table, fields in (
-        ("products", ("product_identifier", "name")),
-        ("investigations", ("investigation_identifier", "investigation_question")),
-        ("evidence", ("evidence_identifier", "title")),
+        ("products", ("business_id", "product_identifier", "name")),
+        ("investigations", ("business_id", "investigation_identifier", "investigation_question")),
+        ("evidence", ("business_id", "evidence_identifier", "title")),
     ):
         where = " OR ".join(f"{field} ILIKE :pattern" for field in fields)
         result.extend(
@@ -90,7 +98,9 @@ def export_csv(deps=Depends(_deps)):
     ctx, db = deps
     records = _rows(db, "products", ctx.tenant_id, 5000)
     output = io.StringIO()
-    writer = csv_safe.writer(output, fieldnames=["id", "tenant_id", "product_identifier", "name", "lifecycle_status"])
+    writer = csv_safe.writer(
+        output, fieldnames=["id", "business_id", "tenant_id", "product_identifier", "name", "lifecycle_status"]
+    )
     writer.writeheader()
     for row in records:
         writer.writerow({key: row.get(key) for key in writer.fieldnames})

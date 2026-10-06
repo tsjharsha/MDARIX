@@ -164,6 +164,7 @@ def attribution(row: TrialFeedback) -> str:
 def _mine(row: TrialFeedback) -> dict:
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "created_at": row.created_at.isoformat(),
         "rating_overall": row.rating_overall,
         "publish_consent": row.publish_consent,
@@ -312,7 +313,21 @@ def withdraw_consent(
 # ------------------------------------------------------------------------------------------- Platform Admin
 
 
-def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
+def _tenant_references(db: Session, tenant_ids) -> dict:
+    """Tenant id -> (tenant key, tenant business id), read in one query."""
+    tenant_ids = set(tenant_ids)
+    if not tenant_ids:
+        return {}
+    return {
+        tenant_id: (tenant_key, business_id)
+        for tenant_id, tenant_key, business_id in db.query(Tenant.id, Tenant.tenant_key, Tenant.business_id).filter(
+            Tenant.id.in_(tenant_ids)
+        )
+    }
+
+
+def _admin_row(row: TrialFeedback, tenants: dict) -> dict:
+    tenant_key, tenant_business_id = tenants.get(row.tenant_id, (None, None))
     return {
         **{
             column: getattr(row, column)
@@ -340,7 +355,9 @@ def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
             )
         },
         "id": str(row.id),
-        "tenant_key": tenant_keys.get(row.tenant_id),
+        "business_id": row.business_id,
+        "tenant_key": tenant_key,
+        "tenant_business_id": tenant_business_id,
         "attribution": attribution(row) if row.publish_consent != "PRIVATE" else None,
         "consent_at": row.consent_at.isoformat(),
         "created_at": row.created_at.isoformat(),
@@ -352,7 +369,7 @@ def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
 def list_feedback(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
     rows = db.query(TrialFeedback).order_by(TrialFeedback.created_at.desc()).limit(500).all()
-    tenant_keys = dict(db.query(Tenant.id, Tenant.tenant_key).filter(Tenant.id.in_({row.tenant_id for row in rows})))
+    tenants = _tenant_references(db, (row.tenant_id for row in rows))
     scores = [row.recommend_score for row in rows if row.recommend_score is not None]
     promoters = sum(1 for score in scores if score >= 9)
     detractors = sum(1 for score in scores if score <= 6)
@@ -362,7 +379,7 @@ def list_feedback(request: Request, db: Session = Depends(get_db)):
         return round(sum(values) / len(values), 1) if values else None
 
     return {
-        "items": [_admin_row(row, tenant_keys) for row in rows],
+        "items": [_admin_row(row, tenants) for row in rows],
         "summary": {
             "responses": len(rows),
             "overall": average("rating_overall"),
@@ -408,8 +425,7 @@ def change_publication(
         now,
     )
     db.commit()
-    tenant_keys = dict(db.query(Tenant.id, Tenant.tenant_key).filter(Tenant.id == row.tenant_id))
-    return _admin_row(row, tenant_keys)
+    return _admin_row(row, _tenant_references(db, [row.tenant_id]))
 
 
 # ------------------------------------------------------------------------------------------- Website

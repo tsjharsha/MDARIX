@@ -7,6 +7,8 @@ import {
   Table,
   errorText,
   formatDate,
+  idColumn,
+  referenceIdColumn,
   send,
   useResource,
   type Resource,
@@ -17,6 +19,7 @@ import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { parseThresholds, previewTemplate, templateVariables } from "./sections";
 import { formatDay } from "../../../app/dates";
+import { safeText } from "../../../app/displayId";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -29,6 +32,7 @@ export function PlansLicensing({ section, onMessage }: { section: string; onMess
 
 type Plan = {
   id: string;
+  business_id?: string | null;
   code: string;
   name: string;
   description?: string | null;
@@ -67,7 +71,7 @@ function Plans() {
                   <span className="cc-stack">
                     <strong>{plan.name}</strong>
                     <small>
-                      {plan.code} · {plan.version ?? "v1"}
+                      {[safeText(plan.business_id), plan.code, plan.version ?? "v1"].filter(Boolean).join(" · ")}
                     </small>
                   </span>
                   <StatusBadge status={plan.status} />
@@ -109,6 +113,7 @@ function Plans() {
 
 type TenantRow = {
   id: string;
+  business_id?: string | null;
   name?: string | null;
   tenant_key?: string | null;
   plan_code?: string | null;
@@ -140,7 +145,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
             setQuery(value);
             setPage(1);
           }}
-          label="Search customer or tenant"
+          label="Search customer, tenant or ID"
         />
       </div>
       <Table
@@ -149,6 +154,7 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
         rowKey={(row) => row.id}
         empty={{ title: "No matching tenants", detail: "Change the search." }}
         columns={[
+          idColumn("Tenant ID", "tenant_key"),
           {
             key: "tenant",
             fields: ["name", "tenant_key"],
@@ -303,6 +309,8 @@ function TenantLimits({ tenant, onClose, onSaved }: { tenant: TenantRow; onClose
 
 type Renewal = {
   subscription_id: string;
+  subscription_business_id?: string | null;
+  tenant_business_id?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
@@ -392,9 +400,10 @@ function Renewals() {
             detail: rows.length ? "Choose another period." : "Licenses with an end date appear here.",
           }}
           columns={[
+            referenceIdColumn("Subscription ID", "subscription"),
             {
               key: "tenant",
-              fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+              fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
               label: "Tenant",
               render: (row) => <TenantCell row={row} />,
             },

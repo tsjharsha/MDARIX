@@ -5,13 +5,16 @@ export type Section = (typeof SECTIONS)[number];
 
 export type CustomerAdmin = {
   id: string;
+  business_id?: string | null;
   email: string;
   display_name: string | null;
   status: string;
   tenant_id: string;
+  tenant_business_id?: string | null;
   tenant_key: string | null;
   tenant_name?: string | null;
   customer_id: string | null;
+  customer_business_id?: string | null;
   customer_name: string | null;
   can_suspend: boolean;
   is_last_active_admin: boolean;
@@ -20,21 +23,25 @@ export type CustomerAdmin = {
   can_reset_password: boolean;
 };
 
-export type Plan = { id: string; code: string; name: string; status?: string };
+export type Plan = { id: string; business_id?: string | null; code: string; name: string; status?: string };
 
 export type TenantSummary = {
   id: string;
+  business_id?: string | null;
   tenant_key?: string | null;
   display_name?: string | null;
   status?: string | null;
   // Set on the all-customers picker, where tenants of different customers are listed together.
   tenant_name?: string | null;
   customer_name?: string | null;
+  customer_business_id?: string | null;
 };
 
 /** One customer (the legal and commercial parent) with the tenants it owns. */
 export type CustomerAccount = {
   id: string;
+  // The Customer ID people see (CUST000001).
+  business_id?: string | null;
   customer_identifier: string;
   name: string;
   legal_name?: string | null;
@@ -44,6 +51,7 @@ export type CustomerAccount = {
   active_admins: number;
   tenants: Array<{
     id: string;
+    business_id?: string | null;
     tenant_key: string;
     display_name?: string | null;
     status?: string | null;

@@ -13,6 +13,7 @@ from auth.emailer import (
     send_activation_email,
 )
 from auth.service import _hash
+from backend.app.business_ids import business_id_of
 from backend.app.customer_lifecycle import (
     build_customer_tenant,
     shared_data_plane,
@@ -277,12 +278,15 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     return {
         "customer_id": str(customer.id) if customer else None,
+        "customer_business_id": customer.business_id if customer else None,
         "customer_identifier": customer.customer_identifier if customer else None,
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "tenant_key": key,
         "tenant_identifier": tenant.tenant_identifier,
         "status": tenant.status,
         "customer_admin_id": str(user.id),
+        "customer_admin_business_id": user.business_id,
         "customer_admin_email": email,
         "invitation": invite_state,
         "email_delivery": delivery,
@@ -510,7 +514,9 @@ def get_provisioning_job(job_id: uuid.UUID, request: Request, db: Session = Depe
         "id": str(job.id),
         "job_identifier": job.job_identifier,
         "customer_id": str(job.customer_id),
+        "customer_business_id": business_id_of(db, Customer, job.customer_id),
         "tenant_id": str(job.tenant_id) if job.tenant_id else None,
+        "tenant_business_id": business_id_of(db, Tenant, job.tenant_id),
         "status": job.status,
         "retry_count": job.retry_count,
         "failure_details": job.failure_details,

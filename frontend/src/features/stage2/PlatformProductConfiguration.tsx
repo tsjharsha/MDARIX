@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { describeError, requestJson } from "../../app/apiClient";
+import { safeText } from "../../app/displayId";
 type Configuration = { tenant: any; products: any[]; versions: any[]; connectors: any[]; mapping_versions: any[] };
 export function PlatformProductConfiguration() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -79,9 +80,7 @@ export function PlatformProductConfiguration() {
               {data.products.map((p) => (
                 <article key={p.id}>
                   <strong>{p.name}</strong>
-                  <span>
-                    {p.identifier} · {p.status}
-                  </span>
+                  <span>{[safeText(p.business_id), safeText(p.identifier), p.status].filter(Boolean).join(" · ")}</span>
                   <small>
                     {data.versions
                       .filter((v) => v.product_id === p.id)
@@ -98,9 +97,7 @@ export function PlatformProductConfiguration() {
             <div className="evidence-list">
               {data.connectors.map((c) => (
                 <article key={c.id}>
-                  <strong>
-                    {c.code} · {c.status}
-                  </strong>
+                  <strong>{[safeText(c.business_id), c.code, c.status].filter(Boolean).join(" · ")}</strong>
                   <span>
                     {c.connector_type} · {c.version}
                   </span>
@@ -120,7 +117,11 @@ export function PlatformProductConfiguration() {
                   <strong>
                     {m.version} · {m.status}
                   </strong>
-                  <span>Master mapping {m.master_mapping_id}</span>
+                  <span>
+                    {safeText(m.master_mapping_id)
+                      ? `Master mapping ${m.master_mapping_id}`
+                      : "Master mapping baseline"}
+                  </span>
                   <small>{Object.keys(m.rules || {}).length} governed field rule(s)</small>
                 </article>
               ))}

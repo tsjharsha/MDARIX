@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 
@@ -10,6 +11,7 @@ class ReportJob(Base):
     """Durable tenant-scoped report job and artifact metadata."""
 
     __tablename__ = "report_jobs"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     actor_id: Mapped[str] = mapped_column(String(255), nullable=False)

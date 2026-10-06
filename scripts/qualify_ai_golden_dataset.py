@@ -38,8 +38,12 @@ def canonical_hash(value: Any) -> str:
 
 
 def file_bundle_hash(root: Path) -> str:
+    # Ordered by the path text, which is the same on every platform: sorting Path objects is case-insensitive on
+    # Windows and case-sensitive on Linux, so a lock approved on one never matched the other.
     entries = []
-    for path in sorted(item for item in root.rglob("*") if item.is_file()):
+    for path in sorted(
+        (item for item in root.rglob("*") if item.is_file()), key=lambda item: item.relative_to(root).as_posix()
+    ):
         entries.append(
             {"path": path.relative_to(root).as_posix(), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
         )

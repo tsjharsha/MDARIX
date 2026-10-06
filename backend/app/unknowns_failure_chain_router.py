@@ -9,6 +9,7 @@ from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.fault_injection import dependency_failure_simulated
 from failure_chain.service import UnknownsFailureChainError, UnknownsFailureChainService
+from investigator.business_ids import with_failure_chain_business_ids, with_unknown_business_ids
 from failure_chain.engine import ORCHESTRATION_VERSION as F_VERSION
 from failure_chain.engine import PROVIDER as F_PROVIDER
 from failure_chain.schemas import (
@@ -52,13 +53,15 @@ def create_unknowns(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     # Same tenant check as failure chains: another tenant's investigation is simply not found.
-    _authorize_investigation(db, uuid.UUID(ctx.tenant_id), investigation_id)
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    _authorize_investigation(db, tenant_id, investigation_id)
     try:
-        return service.unknowns(
-            db, data.model_copy(update={"tenant_id": uuid.UUID(ctx.tenant_id), "investigation_id": investigation_id})
+        result = service.unknowns(
+            db, data.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
         )
     except UnknownsFailureChainError as e:
         raise err(e) from e
+    return with_unknown_business_ids(db, tenant_id, result)
 
 
 @router.get("/{investigation_id}/unknowns", response_model=UnknownResponse)
@@ -72,7 +75,9 @@ def latest_unknowns(
     if not item:
         raise HTTPException(404, detail={"code": "UNKNOWN_SET_NOT_FOUND", "message": "No unknown set exists"})
     result, row = item
-    return UnknownResponse(unknown_set=result, persisted=True, ai_execution_id=row)
+    return with_unknown_business_ids(
+        db, uuid.UUID(ctx.tenant_id), UnknownResponse(unknown_set=result, persisted=True, ai_execution_id=row)
+    )
 
 
 @router.post(
@@ -108,7 +113,6 @@ def create_chains(
             )
         )
         db.commit()
-        return result
     except UnknownsFailureChainError as e:
         raise err(e) from e
     except HTTPException:
@@ -137,6 +141,7 @@ def create_chains(
                 "correlation_id": correlation,
             },
         ) from exc
+    return with_failure_chain_business_ids(db, tenant_id, result)
 
 
 @router.get("/{investigation_id}/failure-chains", response_model=FailureChainResponse)
@@ -152,4 +157,8 @@ def latest_chains(
             404, detail={"code": "FAILURE_CHAIN_SET_NOT_FOUND", "message": "No failure-chain set exists"}
         )
     result, row = item
-    return FailureChainResponse(failure_chain_set=result, persisted=True, ai_execution_id=row)
+    return with_failure_chain_business_ids(
+        db,
+        uuid.UUID(ctx.tenant_id),
+        FailureChainResponse(failure_chain_set=result, persisted=True, ai_execution_id=row),
+    )

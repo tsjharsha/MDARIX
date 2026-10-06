@@ -9,9 +9,13 @@ import {
   Table,
   Tabs,
   formatDate,
+  idColumn,
+  referenceIdColumn,
+  sourceIdColumn,
   useResource,
   type Confirmation,
 } from "../customer-admin/shared";
+import { displayId } from "../../app/displayId";
 import { WorkspaceContext, sectionAllowed, useCan } from "../workspace/workspaceContext";
 import { downloadFile } from "../reports/download";
 import {
@@ -19,6 +23,8 @@ import {
   PAGE_SIZE,
   fieldOrNotCaptured,
   filterChains,
+  linkedId,
+  linkedIds,
   missingLinks,
   notCapturedLabels,
   pageSummary,
@@ -201,23 +207,20 @@ function Register({ onReview }: { onReview: (target: ReviewTarget) => void }) {
             rowKey={(row) => row.id}
             empty={{ title: "No risks on this page", detail: "Go back to the previous page." }}
             columns={[
+              idColumn("Risk ID", "risk_identifier"),
+              sourceIdColumn("risk_identifier"),
               {
                 key: "risk",
                 label: "Risk",
-                fields: ["risk_identifier", "description"],
-                render: (row) => (
-                  <span className="ca-person">
-                    <strong>{row.risk_identifier}</strong>
-                    <small>{row.description || "No description recorded"}</small>
-                  </span>
-                ),
+                fields: ["description"],
+                render: (row) => row.description || <span className="ac-muted">No description recorded</span>,
               },
               {
                 key: "product",
                 label: "Product",
                 render: (row) =>
                   row.product
-                    ? `${row.product.product_identifier}${row.product_version ? ` · ${row.product_version.version_identifier}` : ""}`
+                    ? `${displayId(row.product, "product_identifier")}${row.product_version ? ` · ${row.product_version.version_identifier}` : ""}`
                     : "—",
               },
               { key: "hazard", label: "Hazard", render: (row) => <NotCaptured value={row.hazard} /> },
@@ -255,7 +258,11 @@ function Register({ onReview }: { onReview: (target: ReviewTarget) => void }) {
           />
           {data && (
             <div className="rk-pager">
-              <span>{pageSummary(data.total, data.offset, rows.length)}</span>
+              <span>
+                {pageSummary(data.total, data.offset, rows.length)}
+                {/* The register is paged by the server; a heading click orders the risks on this page. */}
+                {data.total > rows.length && <span className="ac-muted"> · Sorting applies to this page</span>}
+              </span>
               <button
                 type="button"
                 className="ac-secondary"
@@ -305,8 +312,12 @@ function RiskDetail({
 }) {
   const residual = residualLabel(risk.residual_risk?.state);
   return (
-    <Drawer title={`${risk.risk_identifier} · ${risk.description || "Risk"}`} onClose={onClose}>
+    <Drawer title={`${displayId(risk, "risk_identifier")} · ${risk.description || "Risk"}`} onClose={onClose}>
       <dl className="ca-facts">
+        <div>
+          <dt>Risk ID</dt>
+          <dd>{linkedId(risk.risk_identifier, risk.business_id)}</dd>
+        </div>
         <div>
           <dt>Status</dt>
           <dd>{risk.status || "—"}</dd>
@@ -314,7 +325,9 @@ function RiskDetail({
         <div>
           <dt>Product</dt>
           <dd>
-            {risk.product ? `${risk.product.product_identifier} · ${risk.product.name ?? ""}` : "—"}
+            {risk.product
+              ? `${linkedId(risk.product.product_identifier, risk.product.business_id)} · ${risk.product.name ?? ""}`
+              : "—"}
             {risk.product_version ? ` (version ${risk.product_version.version_identifier})` : ""}
           </dd>
         </div>
@@ -346,7 +359,12 @@ function RiskDetail({
       </dl>
       <section className="ca-drawer-section">
         <h3>Failure modes</h3>
-        <LinkedList items={risk.failure_modes.map((row) => [row.failure_mode_identifier, row.name ?? ""])} />
+        <LinkedList
+          items={risk.failure_modes.map((row) => [
+            linkedId(row.failure_mode_identifier, row.business_id),
+            row.name ?? "",
+          ])}
+        />
       </section>
       <section className="ca-drawer-section">
         <h3>Controls and their verification evidence</h3>
@@ -354,13 +372,16 @@ function RiskDetail({
           <ul className="rk-list">
             {risk.controls.map((control) => (
               <li key={control.id}>
-                <strong>{control.control_identifier}</strong> {control.description ?? ""}
+                <strong>{linkedId(control.control_identifier, control.business_id)}</strong> {control.description ?? ""}
                 {control.status ? ` · ${control.status}` : ""}
                 <br />
                 <small className={control.verification_evidence.length ? "" : "ac-muted"}>
                   {control.verification_evidence.length
                     ? `Verification evidence: ${control.verification_evidence
-                        .map((item) => `${item.evidence_identifier}${item.title ? ` (${item.title})` : ""}`)
+                        .map(
+                          (item) =>
+                            `${linkedId(item.evidence_identifier, item.business_id)}${item.title ? ` · ${item.title}` : ""}`,
+                        )
                         .join(", ")}`
                     : "No verification evidence linked"}
                 </small>
@@ -373,7 +394,12 @@ function RiskDetail({
       </section>
       <section className="ca-drawer-section">
         <h3>Requirements</h3>
-        <LinkedList items={risk.requirements.map((row) => [row.requirement_identifier, row.text ?? ""])} />
+        <LinkedList
+          items={risk.requirements.map((row) => [
+            linkedId(row.requirement_identifier, row.business_id),
+            row.text ?? "",
+          ])}
+        />
       </section>
       <p className="ac-note">
         Linked records come from your quality system; change them there and import again. Any change to a control needs
@@ -381,7 +407,7 @@ function RiskDetail({
       </p>
       <div className="ca-action-row">
         <ReviewButton
-          target={{ id: risk.id, identifier: risk.risk_identifier }}
+          target={{ id: risk.id, identifier: displayId(risk, "risk_identifier") }}
           onReview={(target) => {
             onClose();
             onReview(target);
@@ -419,7 +445,7 @@ function TraceabilityView({
   const data = trace.data;
   const nothing =
     !!data && !data.counts.risks && !data.counts.requirements && !data.counts.failure_modes && !data.counts.controls;
-  const gaps = traceabilityGaps(data?.unlinked);
+  const gaps = traceabilityGaps(data?.unlinked, data?.unlinked_business_ids);
   const chains = filterChains(data?.chains ?? [], query, gapsOnly);
   if (nothing)
     return (
@@ -468,13 +494,13 @@ function TraceabilityView({
                   </strong>
                   <small>{gap.fix}</small>
                   <span className="rk-ids">
-                    {gap.items.slice(0, 30).map((identifier) =>
+                    {gap.items.slice(0, 30).map((identifier, index) =>
                       gap.risks ? (
                         <button
                           type="button"
                           key={identifier}
                           className="ac-link"
-                          onClick={() => onQuery(identifier)}
+                          onClick={() => onQuery(gap.search[index] ?? identifier)}
                           title="Show this risk's chain below"
                         >
                           {identifier}
@@ -497,7 +523,7 @@ function TraceabilityView({
       {data && (
         <Panel eyebrow="Requirement → risk → failure mode → control → verification" title="Traceability chains">
           <div className="rk-toolbar">
-            <SearchBox value={query} onChange={onQuery} label="Search risk, product or linked record" />
+            <SearchBox value={query} onChange={onQuery} label="Search risk, product or linked record by ID" />
             <label className="ca-check">
               <input type="checkbox" checked={gapsOnly} onChange={(event) => setGapsOnly(event.target.checked)} />
               Only incomplete chains
@@ -509,22 +535,44 @@ function TraceabilityView({
             rowKey={(row) => row.risk_id}
             empty={{ title: "No matching chains", detail: "Change the search or show complete chains too." }}
             columns={[
-              { key: "risk", label: "Risk", render: (row) => <strong>{row.risk_identifier}</strong> },
-              { key: "product", label: "Product", render: (row) => row.product ?? "—" },
-              { key: "requirements", label: "Requirements", render: (row) => <Ids items={row.requirements} /> },
-              { key: "failure_modes", label: "Failure modes", render: (row) => <Ids items={row.failure_modes} /> },
-              { key: "controls", label: "Controls", render: (row) => <Ids items={row.controls} /> },
+              referenceIdColumn("Risk ID", "risk", "risk_identifier"),
+              sourceIdColumn("risk_identifier"),
+              {
+                key: "product",
+                label: "Product",
+                render: (row) => (row.product ? linkedId(row.product, row.product_business_id) : "—"),
+              },
+              {
+                key: "requirements",
+                label: "Requirements",
+                render: (row) => <Ids items={linkedIds(row.requirements, row.requirement_business_ids)} />,
+              },
+              {
+                key: "failure_modes",
+                label: "Failure modes",
+                render: (row) => <Ids items={linkedIds(row.failure_modes, row.failure_mode_business_ids)} />,
+              },
+              {
+                key: "controls",
+                label: "Controls",
+                render: (row) => <Ids items={linkedIds(row.controls, row.control_business_ids)} />,
+              },
               {
                 key: "verification",
                 label: "Verification evidence",
-                render: (row) => <Ids items={row.verification_evidence} />,
+                render: (row) => (
+                  <Ids items={linkedIds(row.verification_evidence, row.verification_evidence_business_ids)} />
+                ),
               },
               { key: "complete", label: "Chain", render: (row) => <ChainState chain={row} /> },
               {
                 key: "review",
                 label: "",
                 render: (row) => (
-                  <ReviewButton target={{ id: row.risk_id, identifier: row.risk_identifier }} onReview={onReview} />
+                  <ReviewButton
+                    target={{ id: row.risk_id, identifier: linkedId(row.risk_identifier, row.risk_business_id) }}
+                    onReview={onReview}
+                  />
                 ),
               },
             ]}

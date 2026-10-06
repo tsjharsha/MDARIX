@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase, type Tone } from "../../admin/console/dashboardModel";
-import { Table, formatDate } from "../../customer-admin/shared";
+import { Table, formatDate, idColumn, type Column } from "../../customer-admin/shared";
+import { hideUuid, isUuid, safeText } from "../../../app/displayId";
 import { formatDay } from "../../../app/dates";
 import type { Product360 } from "../../../app/types";
 import { sectionAllowed, useWorkspace } from "../workspaceContext";
@@ -76,18 +77,53 @@ const DATE_KEY = /(_at|_time|timestamp)$/;
 const DAY_KEY = /_date$/;
 const STATUS_KEY = /(status|severity)$/;
 
-/** A readable table for record lists whose columns are chosen by the caller. */
+/**
+ * Field keys of a record that can be listed as columns: never its UUID or a reference to another record's UUID, and
+ * never business_id (the ID column shows it). For lists whose columns follow the records' own fields.
+ */
+export const recordFieldKeys = (row: Record<string, unknown> | undefined, fallback: string[]): string[] =>
+  row
+    ? Object.keys(row).filter((key) => key !== "business_id" && key !== "id" && !/_id$/.test(key) && !isUuid(row[key]))
+    : fallback;
+
+/**
+ * A readable table for record lists whose columns are chosen by the caller. With `idLabel` ("Lot ID") and records
+ * that carry their MDARIX ID, the list starts with that ID and the record's own `*_identifier` (the first column, the
+ * number in the customer's system) is shown as its "Source ID". A UUID is never shown.
+ */
 export function RecordTable({
   rows,
   columns,
   caption,
   empty,
+  idLabel,
 }: {
   rows: Array<Record<string, unknown>>;
   columns: string[];
   caption: string;
   empty: { title: string; detail: string };
+  idLabel?: string;
 }) {
+  const withId = !!idLabel && rows.some((row) => safeText(row.business_id));
+  const sourceKey = withId && columns[0]?.endsWith("_identifier") ? columns[0] : null;
+  const fields: Column<Record<string, unknown>>[] = columns
+    .filter((key) => key !== "business_id")
+    .map((key) => ({
+      key,
+      label: key === sourceKey ? "Source ID" : titleCase(key.replace(/_identifier$/, " id")),
+      render: (row: Record<string, unknown>) =>
+        STATUS_KEY.test(key) ? (
+          <StatusBadge value={row[key]} />
+        ) : DAY_KEY.test(key) ? (
+          formatDay(row[key] as string, String(row[key]))
+        ) : DATE_KEY.test(key) ? (
+          formatDate(row[key])
+        ) : safeText(row[key]) === null ? (
+          <span className="ac-muted">—</span>
+        ) : (
+          hideUuid(row[key])
+        ),
+    }));
   return (
     <Table
       caption={caption}
@@ -95,22 +131,9 @@ export function RecordTable({
       // Relationship lists repeat a record (a supplier once per component it supplies): the position keeps keys unique.
       rowKey={(row, index) => `${row.id ?? row.event_id ?? "row"}:${index}`}
       empty={empty}
-      columns={columns.map((key) => ({
-        key,
-        label: titleCase(key.replace(/_identifier$/, " id")),
-        render: (row: Record<string, unknown>) =>
-          STATUS_KEY.test(key) ? (
-            <StatusBadge value={row[key]} />
-          ) : DAY_KEY.test(key) ? (
-            formatDay(row[key] as string, String(row[key]))
-          ) : DATE_KEY.test(key) ? (
-            formatDate(row[key])
-          ) : row[key] === null || row[key] === undefined || row[key] === "" ? (
-            <span className="ac-muted">—</span>
-          ) : (
-            String(row[key])
-          ),
-      }))}
+      columns={
+        withId && idLabel ? [idColumn<Record<string, unknown>>(idLabel, sourceKey ?? undefined), ...fields] : fields
+      }
     />
   );
 }

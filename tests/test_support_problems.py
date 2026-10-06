@@ -128,7 +128,7 @@ def test_a_signed_in_user_files_a_report_which_is_stored_audited_and_queued(repo
     response = reports["client_a"].post(BASE, json=body, headers={"User-Agent": "TestBrowser/1.0"})
     assert response.status_code == 201
     created = response.json()
-    assert set(created) == {"id", "created_at"}
+    assert set(created) == {"id", "business_id", "created_at"}
     reports["id_a"] = created["id"]
     row = _report(created["id"])
     assert row.tenant_id == reports["tenant_a"].id and row.user_id == reports["user_a"]

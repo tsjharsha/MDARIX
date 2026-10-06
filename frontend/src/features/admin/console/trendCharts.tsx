@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
+import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { ToneIcon } from "./charts";
 import type { Tone } from "./dashboardModel";
 import { AnimatedNumber } from "./motion";
@@ -82,7 +83,7 @@ export function Sparkline({ values, label }: { values: number[]; label: string }
       {values.length > 1 && (
         <>
           <path className="ac-spark-area" d={`${path} L100,30 L0,30 Z`} fill={`url(#${gradient})`} />
-          <path className="ac-spark-line" d={path} pathLength={1} vectorEffect="non-scaling-stroke" />
+          <path className="ac-spark-line" d={path} vectorEffect="non-scaling-stroke" />
         </>
       )}
     </svg>
@@ -181,6 +182,9 @@ export function TrendChart({
 }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const table = useSortedRows(data, (row, key) =>
+    key === "date" ? row.date : key === "secondary" ? (row.secondary ?? 0) : row.primary,
+  );
   const gradient = useId();
   const primary = data.map((point) => point.primary);
   const secondary = secondaryLabel ? data.map((point) => point.secondary ?? 0) : null;
@@ -219,19 +223,27 @@ export function TrendChart({
           <table className="ac-table">
             <thead>
               <tr>
-                <th scope="col">Day</th>
-                <th scope="col" className="num">
-                  {primaryLabel}
-                </th>
+                <SortableHeader label="Day" sortKey="date" sort={table.sort} onSort={table.toggle} />
+                <SortableHeader
+                  label={primaryLabel}
+                  sortKey="primary"
+                  sort={table.sort}
+                  onSort={table.toggle}
+                  className="num"
+                />
                 {secondaryLabel && (
-                  <th scope="col" className="num">
-                    {secondaryLabel}
-                  </th>
+                  <SortableHeader
+                    label={secondaryLabel}
+                    sortKey="secondary"
+                    sort={table.sort}
+                    onSort={table.toggle}
+                    className="num"
+                  />
                 )}
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => (
+              {table.sorted.map((row) => (
                 <tr key={row.date}>
                   <td>{row.label}</td>
                   <td className="num">{row.primary}</td>
@@ -268,12 +280,12 @@ export function TrendChart({
                 d={`${primaryPath} L${width},${height} L0,${height} Z`}
                 fill={`url(#${gradient})`}
               />
-              <path className="ac-trend-line" d={primaryPath} pathLength={1} vectorEffect="non-scaling-stroke" />
+              <path className="ac-trend-line" d={primaryPath} vectorEffect="non-scaling-stroke" />
               {secondary && (
                 <path
                   className="ac-trend-line secondary"
                   d={secondaryPath}
-                  pathLength={1}
+
                   vectorEffect="non-scaling-stroke"
                 />
               )}

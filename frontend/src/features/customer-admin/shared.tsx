@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangle, Search, X } from "lucide-react";
+import { SortableHeader, nodeText, useSortedRows } from "../../app/tableSort";
 import { ApiError, describeError, requestJson } from "../../app/apiClient";
 import { Empty, Panel, type PanelState } from "../admin/console/charts";
 import { ColumnChooser, ColumnScope } from "../tables/ColumnChooser";
@@ -23,6 +24,7 @@ import {
 import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { nextTabIndex } from "../shared/focus";
 import { formatDateTime, formatDay, isDateOnly } from "../../app/dates";
+import { businessId, hideUuid, referenceId } from "../../app/displayId";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
@@ -119,7 +121,58 @@ export type Column<T> = {
   numeric?: boolean;
   // The data fields this column already shows (so the field chooser does not offer them again).
   fields?: string[];
+  // What the column sorts by when its heading is clicked; by default the row's field of the same key, then the
+  // first of `fields`, then the text the cell shows. Columns without a heading (row actions) never sort.
+  sortValue?: (row: T) => unknown;
 };
+
+/** The value a column sorts by (see Column.sortValue). */
+export function columnSortValue<T>(column: Column<T>, row: T): unknown {
+  if (column.sortValue) return column.sortValue(row);
+  const record = row as unknown as Record<string, unknown> | null;
+  for (const key of [column.key, ...(column.fields ?? [])]) {
+    const value = record && typeof record === "object" ? record[key] : undefined;
+    if (value !== undefined && (value === null || typeof value !== "object" || value instanceof Date)) return value;
+  }
+  return nodeText(column.render(row));
+}
+
+/**
+ * The first identifying column of a list: the record's MDARIX ID (business_id), labelled for the object ("Customer
+ * ID", "Complaint ID"). Until a response carries business_id it shows the record's source number (`sourceKey`), never
+ * the UUID. Business IDs sort naturally (CMP000002 before CMP000010). T defaults to any so the column fits whichever
+ * row type the list infers from its rows.
+ */
+export function idColumn<T = any>(label: string, sourceKey?: string): Column<T> {
+  return {
+    key: "business_id",
+    label,
+    fields: ["business_id"],
+    render: (row) => businessId(row as object, sourceKey) ?? "—",
+    sortValue: (row) => businessId(row as object, sourceKey),
+  };
+}
+
+/**
+ * The ID column of a list whose rows describe another record (a license row for a subscription): that record's
+ * `<role>_business_id`, else the row's own fields named in `fallbackKeys`, never a UUID.
+ */
+export function referenceIdColumn<T = any>(label: string, role: string, ...fallbackKeys: string[]): Column<T> {
+  const value = (row: T) => {
+    const record = row as unknown as Record<string, unknown>;
+    return referenceId(record, role, ...fallbackKeys.map((key) => record?.[key]));
+  };
+  return { key: `${role}_business_id`, label, fields: [`${role}_business_id`], render: value, sortValue: value };
+}
+
+/** "Source ID": the number a record has in the customer system it was imported from (complaint_identifier, …). */
+export function sourceIdColumn<T = any>(key: string, label = "Source ID"): Column<T> {
+  return {
+    key,
+    label,
+    render: (row) => hideUuid((row as unknown as Record<string, unknown>)?.[key]),
+  };
+}
 
 type TableProps<T> = {
   rows: T[];
@@ -191,23 +244,40 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
 }
 
 function PlainTable<T>({ rows, columns, empty, rowKey, caption }: TableProps<T>) {
+  const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => {
+    const column = columns.find((item) => item.key === key);
+    return column ? columnSortValue(column, row) : undefined;
+  });
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  // Row keys keep the server's position, so a row keeps its identity (and focus) when the list is re-sorted.
+  const position = new Map(rows.map((row, index) => [row, index] as const));
   return (
     <div className="ac-table-wrap">
       <table className="ac-table">
         <caption className="ca-sr-only">{caption}</caption>
         <thead>
           <tr>
-            {columns.map((column) => (
-              <th scope="col" key={column.key} className={column.numeric ? "num" : undefined}>
-                {column.label}
-              </th>
-            ))}
+            {columns.map((column) =>
+              column.label.trim() ? (
+                <SortableHeader
+                  key={column.key}
+                  label={column.label}
+                  sortKey={column.key}
+                  sort={sort}
+                  onSort={toggle}
+                  className={column.numeric ? "num" : undefined}
+                />
+              ) : (
+                <th scope="col" key={column.key} className={column.numeric ? "num" : undefined}>
+                  <span className="ca-sr-only">Actions</span>
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={rowKey(row, index)}>
+          {sorted.map((row, index) => (
+            <tr key={rowKey(row, position.get(row) ?? index)}>
               {columns.map((column) => (
                 <td key={column.key} className={column.numeric ? "num" : undefined}>
                   {column.render(row)}

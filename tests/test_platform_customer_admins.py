@@ -219,7 +219,11 @@ def test_the_add_administrator_picker_lists_active_tenants_quickly(platform, cus
     items = options.json()["items"]
     assert customer["id"] in {item["id"] for item in items}
     # Light rows: the tenant and the customer that owns it, nothing per-tenant to compute.
-    assert all(set(item) == {"id", "tenant_key", "display_name", "tenant_name", "customer_name"} for item in items)
+    assert all(
+        set(item)
+        == {"id", "business_id", "tenant_key", "display_name", "tenant_name", "customer_name", "customer_business_id"}
+        for item in items
+    )
     mine = next(item for item in items if item["id"] == customer["id"])
     assert mine["tenant_name"] == customer["name"] and mine["customer_name"]
     assert _client_with_role("CUSTOMER_ADMIN").get("/api/v1/platform-admin/customer-admin-tenants").status_code == 403

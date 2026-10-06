@@ -21,6 +21,7 @@ from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
 from backend.app.access.schemas import QueueItemsAction
 from backend.app.access.trends import daily as _daily, per_day as _per_day, run_outcome, window
+from backend.app.business_ids import wanted_ids
 from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
 from backend.app.db.models.enterprise import ConnectorRun
 from backend.app.db.models.foundation import (
@@ -53,17 +54,35 @@ RLS_EXCLUDED_TABLES = [
 
 
 def _tenant_names(db: Session, tenant_ids) -> dict:
-    """Tenant id -> {tenant_key, tenant_name, customer_name} for the given tenants, in one query."""
+    """Tenant id -> {tenant_key, tenant_name, customer_name and both business identifiers} for the given tenants,
+    in one query."""
     ids = {tenant_id for tenant_id in tenant_ids if tenant_id}
     if not ids:
         return {}
     rows = (
-        db.query(Tenant.id, Tenant.tenant_key, Tenant.display_name, Tenant.name, Customer.display_name)
+        db.query(
+            Tenant.id,
+            Tenant.tenant_key,
+            Tenant.display_name,
+            Tenant.name,
+            Customer.display_name,
+            Tenant.business_id,
+            Customer.business_id,
+        )
         .outerjoin(Customer, Customer.id == Tenant.customer_id)
         .filter(Tenant.id.in_(ids))
         .all()
     )
-    return {row[0]: {"tenant_key": row[1], "tenant_name": row[2] or row[3], "customer_name": row[4]} for row in rows}
+    return {
+        row[0]: {
+            "tenant_key": row[1],
+            "tenant_name": row[2] or row[3],
+            "customer_name": row[4],
+            "tenant_business_id": row[5],
+            "customer_business_id": row[6],
+        }
+        for row in rows
+    }
 
 
 def _with_tenant(item: dict, names: dict, tenant_id) -> dict:
@@ -71,9 +90,11 @@ def _with_tenant(item: dict, names: dict, tenant_id) -> dict:
     return {
         **item,
         "tenant_id": str(tenant_id) if tenant_id else None,
+        "tenant_business_id": found.get("tenant_business_id"),
         "tenant_key": found.get("tenant_key"),
         "tenant_name": found.get("tenant_name"),
         "customer_name": found.get("customer_name"),
+        "customer_business_id": found.get("customer_business_id"),
     }
 
 
@@ -109,6 +130,7 @@ def subscription_renewals(request: Request, db: Session = Depends(get_db)):
             _with_tenant(
                 {
                     "subscription_id": str(row.id),
+                    "subscription_business_id": row.business_id,
                     "plan_name": plans.get(row.plan_id),
                     "status": row.status,
                     "starts_at": _iso(row.starts_at),
@@ -324,6 +346,7 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
             _with_tenant(
                 {
                     "id": str(row.id),
+                    "business_id": row.business_id,
                     "at": _iso(row.execution_timestamp),
                     "provider": row.provider,
                     "model": row.model_name,
@@ -346,17 +369,15 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
 
 
 def _actor_names(db: Session, refs) -> dict:
-    ids = set()
-    for ref in refs:
-        try:
-            ids.add(uuid.UUID(str(ref)))
-        except (TypeError, ValueError):
-            continue
+    """User id -> {name, business_id} for the references that are user ids, in one query."""
+    ids = wanted_ids(refs)
     if not ids:
         return {}
     return {
-        str(row[0]): row[1] or row[2]
-        for row in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username).filter(AuthUser.id.in_(ids))
+        str(row[0]): {"name": row[1] or row[2], "business_id": row[3]}
+        for row in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username, AuthUser.business_id).filter(
+            AuthUser.id.in_(ids)
+        )
     }
 
 
@@ -397,6 +418,7 @@ def platform_audit(
     items = []
     for row in rows:
         details = row.details if isinstance(row.details, dict) else {}
+        actor = actors.get(str(row.actor_ref), {})
         items.append(
             _with_tenant(
                 {
@@ -404,7 +426,8 @@ def platform_audit(
                     "at": _iso(row.created_at),
                     "action": row.action,
                     "entity_type": row.entity_type,
-                    "actor": actors.get(str(row.actor_ref)) or (row.actor_ref if row.actor_ref else None),
+                    "actor": actor.get("name") or (row.actor_ref if row.actor_ref else None),
+                    "actor_business_id": actor.get("business_id"),
                     "reason": row.reason or details.get("reason"),
                     "source": details.get("source"),
                     "source_ip": row.source_ip,
@@ -495,18 +518,22 @@ def support_access_overview(request: Request, db: Session = Depends(get_db)):
     for row in rows:
         status = (row.status or "").upper()
         expired = bool(row.expires_at and row.expires_at <= now)
+        person = people.get(str(row.platform_user_id), {})
+        approver = people.get(str(row.approved_by), {}) if row.approved_by else {}
         items.append(
             _with_tenant(
                 {
                     "id": str(row.id),
-                    "person": people.get(str(row.platform_user_id)),
+                    "person": person.get("name"),
                     "platform_user_id": str(row.platform_user_id),
+                    "platform_user_business_id": person.get("business_id"),
                     "scope": row.scope or {},
                     "reason": row.reason,
                     "status": "EXPIRED" if expired and status in {"PENDING", "ACTIVE", "APPROVED"} else status,
                     "starts_at": _iso(row.starts_at),
                     "expires_at": _iso(row.expires_at),
-                    "approved_by": people.get(str(row.approved_by)) if row.approved_by else None,
+                    "approved_by": approver.get("name"),
+                    "approved_by_business_id": approver.get("business_id"),
                     "can_approve": status == "PENDING" and not expired,
                     "can_revoke": status in {"PENDING", "ACTIVE", "APPROVED"} and not expired,
                 },

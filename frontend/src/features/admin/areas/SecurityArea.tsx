@@ -18,6 +18,7 @@ import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatDay } from "../../../app/dates";
+import { PersonCell } from "./common";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -145,6 +146,7 @@ type AuditRow = {
   action: string;
   entity_type: string;
   actor?: string | null;
+  actor_business_id?: string | null;
   reason?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
@@ -230,11 +232,16 @@ function AuditTrail() {
           { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },
-          { key: "who", fields: ["actor"], label: "Who", render: (row) => row.actor ?? "System" },
+          {
+            key: "who",
+            fields: ["actor", "actor_business_id"],
+            label: "Who",
+            render: (row) => <PersonCell name={row.actor} businessId={row.actor_business_id} none="System" />,
+          },
           {
             key: "what",
             fields: ["action", "entity_type"],
@@ -257,6 +264,7 @@ function AuditTrail() {
 type Grant = {
   id: string;
   person?: string | null;
+  platform_user_business_id?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
@@ -301,11 +309,16 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
         columns={[
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },
-          { key: "person", fields: ["person", "platform_user_id"], label: "For", render: (row) => row.person ?? "—" },
+          {
+            key: "person",
+            fields: ["person", "platform_user_business_id", "platform_user_id"],
+            label: "For",
+            render: (row) => <PersonCell name={row.person} businessId={row.platform_user_business_id} />,
+          },
           { key: "why", label: "Reason", render: (row) => row.reason },
           {
             key: "window",

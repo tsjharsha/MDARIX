@@ -1,5 +1,6 @@
 """Risk & Traceability reads the organization's real risks, failure modes, controls and requirements."""
 
+import re
 import uuid
 
 import pytest
@@ -79,8 +80,26 @@ def test_the_csv_export_is_formula_safe_and_needs_export_permission(seeded):
     )
     assert response.status_code == 200 and response.headers["content-type"].startswith("text/csv")
     lines = response.text.strip().splitlines()
-    assert lines[0].startswith("risk_identifier,description")
-    assert lines[1].startswith(f"R-{seeded['tag']},")
+    assert lines[0].startswith("business_id,risk_identifier,description")
+    assert re.match(rf"RSK\d{{6}},R-{seeded['tag']},", lines[1])
     # The seeded description is a spreadsheet command; it is exported as text.
     assert "'=cmd" in lines[1] and ",=cmd" not in lines[1]
     assert f"CTL-{seeded['tag']}" in lines[1] and "not captured" in lines[1]
+
+
+def test_the_register_and_traceability_carry_business_ids(seeded):
+    client = role_client("VIEWER")[0]
+    risk = client.get("/api/v1/risk/register", params={"product_id": seeded["product_id"]}).json()["items"][0]
+    assert re.fullmatch(r"RSK\d{6}", risk["business_id"])
+    assert re.fullmatch(r"PROD\d{6}", risk["product"]["business_id"])
+    assert re.fullmatch(r"FM\d{6}", risk["failure_modes"][0]["business_id"])
+    assert re.fullmatch(r"CTL\d{6}", risk["controls"][0]["business_id"])
+    assert re.fullmatch(r"EVD\d{6}", risk["controls"][0]["verification_evidence"][0]["business_id"])
+    assert re.fullmatch(r"REQ\d{6}", risk["requirements"][0]["business_id"])
+    body = client.get("/api/v1/risk/traceability").json()
+    chain = next(item for item in body["chains"] if item["risk_id"] == risk["id"])
+    assert chain["risk_business_id"] == risk["business_id"]
+    assert chain["control_business_ids"] == [risk["controls"][0]["business_id"]]
+    assert len(chain["verification_evidence_business_ids"]) == len(chain["verification_evidence"])
+    for key, identifiers in body["unlinked"].items():
+        assert len(body["unlinked_business_ids"][key]) == len(identifiers)

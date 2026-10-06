@@ -26,6 +26,7 @@ import {
   workspaceAttention,
 } from "../workspaceModel";
 import { StatusBadge } from "./common";
+import { displayId } from "../../../app/displayId";
 
 type Breakdown = Array<{ label: string; count: number }>;
 type Trends = {
@@ -384,7 +385,7 @@ export function DashboardSection() {
               {model.openCases.slice(0, 6).map((row) => (
                 <li key={String(row.id)}>
                   <span>
-                    <strong>{row.investigation_identifier}</strong>
+                    <strong>{displayId(row, "investigation_identifier")}</strong>
                     <small>{row.investigation_question ?? "No question recorded"}</small>
                   </span>
                   <StatusBadge value={row.status} />
@@ -410,7 +411,7 @@ export function DashboardSection() {
                 <li key={String(row.signal_id ?? index)}>
                   <span className="ac-timeline-dot" aria-hidden="true" />
                   <span className="ac-timeline-text">
-                    <strong>{row.signal_id}</strong>
+                    <strong>{displayId(row, "signal_id")}</strong>
                     <small>{row.description ?? "No description"}</small>
                   </span>
                   <time className="ac-muted">{formatDate(row.event_timestamp)}</time>

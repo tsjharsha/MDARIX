@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { describeError, requestJson } from "../../app/apiClient";
+import { displayId } from "../../app/displayId";
 
 type Props = { productId?: string; versionId?: string };
 
@@ -74,7 +75,7 @@ export function ProductVersionStory({ productId, versionId }: Props) {
           <div className="evidence-list">
             {(data.complaints ?? []).slice(0, 5).map((item: any) => (
               <article key={item.complaint_identifier}>
-                <strong>{item.complaint_identifier}</strong>
+                <strong>{displayId(item, "complaint_identifier")}</strong>
                 <span>{item.description ?? "Description not recorded"}</span>
                 <small>{item.status ?? "Status not recorded"}</small>
               </article>
@@ -86,14 +87,14 @@ export function ProductVersionStory({ productId, versionId }: Props) {
           <div className="evidence-list">
             {(data.investigations ?? []).slice(0, 3).map((item: any) => (
               <article key={item.investigation_identifier}>
-                <strong>{item.investigation_identifier}</strong>
+                <strong>{displayId(item, "investigation_identifier")}</strong>
                 <span>{item.investigation_question ?? "Question not recorded"}</span>
                 <small>{item.status ?? "Status not recorded"}</small>
               </article>
             ))}
             {(data.evidence ?? []).slice(0, 3).map((item: any) => (
               <article key={item.evidence_identifier}>
-                <strong>{item.evidence_identifier}</strong>
+                <strong>{displayId(item, "evidence_identifier")}</strong>
                 <span>{item.title ?? "Evidence title not recorded"}</span>
                 <small>{item.reliability_status ?? "Reliability not recorded"}</small>
               </article>

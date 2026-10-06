@@ -33,7 +33,9 @@ def list_complaints(
 ):
     tenant_id = uuid.UUID(ctx.tenant_id)
     query = (
-        db.query(Complaint, Product.product_identifier, Product.name, ProductVersion.version_identifier)
+        db.query(
+            Complaint, Product.product_identifier, Product.name, ProductVersion.version_identifier, Product.business_id
+        )
         .join(Product, (Product.id == Complaint.product_id) & (Product.tenant_id == Complaint.tenant_id))
         .outerjoin(
             ProductVersion,
@@ -50,6 +52,7 @@ def list_complaints(
         query = query.filter(
             or_(
                 func.lower(Complaint.complaint_identifier).like(pattern, escape="\\"),
+                func.lower(Complaint.business_id).like(pattern, escape="\\"),
                 func.lower(Complaint.description).like(pattern, escape="\\"),
             )
         )
@@ -87,8 +90,10 @@ def list_complaints(
         "items": [
             {
                 "id": str(complaint.id),
+                "business_id": complaint.business_id,
                 "complaint_identifier": complaint.complaint_identifier,
                 "product_id": str(complaint.product_id),
+                "product_business_id": product_business_id,
                 "product_identifier": product_identifier,
                 "product_name": product_name,
                 "version": version,
@@ -112,6 +117,6 @@ def list_complaints(
                 "death": complaint.death,
                 "malfunction": complaint.malfunction,
             }
-            for complaint, product_identifier, product_name, version in rows
+            for complaint, product_identifier, product_name, version, product_business_id in rows
         ],
     }

@@ -15,6 +15,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.routing import APIRoute
+from backend.app.business_ids import business_id_map
 from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
@@ -480,13 +481,21 @@ def request_supplier_evidence(
         )
     )
     db.commit()
-    return {"id": str(row.id), "tenant_id": ctx.tenant_id, "status": row.status, "email_delivery": delivery}
+    return {
+        "id": str(row.id),
+        "business_id": row.business_id,
+        "tenant_id": ctx.tenant_id,
+        "status": row.status,
+        "email_delivery": delivery,
+    }
 
 
 @router.get("/supplier-evidence-requests")
 def list_supplier_evidence_requests(
     db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
 ):
+    from backend.app.db.models.foundation import Investigation, Supplier
+
     rows = (
         db.query(SupplierEvidenceRequest)
         .filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
@@ -494,15 +503,20 @@ def list_supplier_evidence_requests(
         .limit(100)
         .all()
     )
+    suppliers = business_id_map(db, Supplier, (r.supplier_id for r in rows))
+    investigations = business_id_map(db, Investigation, (r.investigation_id for r in rows))
     return [
         {
             "id": str(r.id),
+            "business_id": r.business_id,
             "recipient": r.recipient,
             "title": r.title,
             "status": r.status,
             "requested_items": r.requested_items,
             "supplier_id": str(r.supplier_id) if r.supplier_id else None,
+            "supplier_business_id": suppliers.get(str(r.supplier_id)),
             "investigation_id": str(r.investigation_id) if r.investigation_id else None,
+            "investigation_business_id": investigations.get(str(r.investigation_id)),
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "replies": [_reply_view(item) for item in (r.requested_items or {}).get("replies") or []],
         }
@@ -754,6 +768,7 @@ def record_supplier_reply(
     db.commit()
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "status": row.status,
         "reply": _reply_view(reply),
         "replies": [_reply_view(item) for item in document["replies"]],
@@ -986,7 +1001,7 @@ def compliance_report(
     format, including the paginated PDF.
     """
     from backend.app.access.authz import _require_administrator
-    from reports.content import audit_event_rows, signature_verification_rows
+    from reports.content import audit_event_rows, signature_verification_rows, with_decision_business_ids
 
     _require_administrator(request, db)
     fmt = output_format.upper()
@@ -1000,7 +1015,8 @@ def compliance_report(
         )
     tenant = uuid.UUID(str(ctx.tenant_id))
     events = audit_event_rows(db, tenant, limit=1000)
-    signature_rows = signature_verification_rows(db, tenant, limit=500)
+    # Signatures are in the control plane, their decisions in the organization's data plane.
+    signature_rows = with_decision_business_ids(data_db, signature_verification_rows(db, tenant, limit=500))
     context = {
         "counts": {
             "audit_events": len(events),

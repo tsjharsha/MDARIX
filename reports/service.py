@@ -276,7 +276,7 @@ def render_investigation_record(record: dict, tenant_id: str, *, output_format: 
     generated = datetime.now(timezone.utc).isoformat()
     data = {
         "report_type": "INVESTIGATION_RECORD",
-        "title": f"Investigation Record {case.get('investigation_identifier') or case.get('id')}",
+        "title": f"Investigation Record {case.get('business_id') or case.get('investigation_identifier') or case.get('id')}",
         "tenant_id": str(tenant_id),
         "tenant": {"id": str(tenant_id), "name": tenant_name},
         "report_version": REPORT_VERSION,
@@ -309,6 +309,7 @@ def _job_dict(job):
         return dict(job)
     return {
         "id": str(job.id),
+        "business_id": job.business_id,
         "tenant_id": str(job.tenant_id),
         "actor_id": job.actor_id,
         "code": job.report_code,

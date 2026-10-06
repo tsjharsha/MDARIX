@@ -93,6 +93,7 @@ def platform_tenant_health(tenant_id: uuid.UUID, request: Request, db: Session =
     }
     return {
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "tenant_key": tenant.tenant_key,
         "status": "PASS",
         "critical_failure": False,
@@ -140,6 +141,7 @@ def transition_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Req
     db.commit()
     return {
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "previous_status": current,
         "status": next_status,
         "reason": reason,
@@ -226,6 +228,7 @@ def schedule_tenant_lifecycle(
     return {
         "id": str(row.id),
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "status": "SCHEDULED",
         "from_status": current,
         "to_status": target,
@@ -562,8 +565,11 @@ def replace_customer_admin(
     db.commit()
     return {
         "tenant_id": str(tenant_id),
+        "tenant_business_id": tenant.business_id,
         "replaced_admin_id": str(current.id),
+        "replaced_admin_business_id": current.business_id,
         "replacement_admin_id": str(replacement.id),
+        "replacement_admin_business_id": replacement.business_id,
         "replacement_status": replacement.status,
         "invitation_status": "SENT" if delivery != "NOT_CONFIGURED" else "CREATED",
         "email_delivery": delivery,
@@ -593,7 +599,9 @@ def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Sessi
     return {
         "tenant": {
             "id": str(tenant.id),
+            "business_id": tenant.business_id,
             "customer_id": str(tenant.customer_id),
+            "customer_business_id": customer.business_id if customer else None,
             "customer_name": (customer.display_name or customer.legal_name) if customer else None,
             "customer_identifier": customer.customer_identifier if customer else None,
             "tenant_identifier": tenant.tenant_identifier,
@@ -686,7 +694,17 @@ def list_platform_tenants(
     _require_platform_admin(request, db)
     page = max(1, page)
     page_size = min(100, max(1, page_size))
-    rows = db.query(Tenant).filter(Tenant.name.ilike(f"%{q.strip()}%")) if q.strip() else db.query(Tenant)
+    rows = db.query(Tenant)
+    if q.strip():
+        like = f"%{q.strip()}%"
+        # The tenant's name or business identifier, or the business identifier of the customer that owns it.
+        rows = rows.filter(
+            or_(
+                Tenant.name.ilike(like),
+                Tenant.business_id.ilike(like),
+                Tenant.customer_id.in_(db.query(Customer.id).filter(Customer.business_id.ilike(like))),
+            )
+        )
     if status:
         rows = rows.filter(func.upper(Tenant.status) == status.upper())
     if region:
@@ -757,10 +775,12 @@ def list_platform_tenants(
         payload.append(
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "tenant_identifier": row.tenant_identifier,
                 "tenant_key": row.tenant_key,
                 "name": row.name,
                 "customer_id": str(row.customer_id) if row.customer_id else None,
+                "customer_business_id": owner.business_id if owner else None,
                 "customer_name": (owner.display_name or owner.legal_name) if owner else None,
                 "customer_identifier": owner.customer_identifier if owner else None,
                 "status": row.status,
@@ -782,6 +802,7 @@ def list_platform_tenants(
     if request.query_params.get("format") == "csv":
         fields = [
             "id",
+            "business_id",
             "tenant_identifier",
             "tenant_key",
             "name",
@@ -863,7 +884,12 @@ def update_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request
         )
     )
     db.commit()
-    return {"id": str(tenant.id), "lock_version": tenant.lock_version, "updated": changes}
+    return {
+        "id": str(tenant.id),
+        "business_id": tenant.business_id,
+        "lock_version": tenant.lock_version,
+        "updated": changes,
+    }
 
 
 @router.put("/platform-admin/tenants/{tenant_id}/environments/{environment_id}")
@@ -1197,6 +1223,7 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
         items = [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "code": row.code,
                 "connector_type": row.connector_type,
                 "version": row.version,

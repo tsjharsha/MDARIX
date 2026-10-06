@@ -178,6 +178,7 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
     _commit_unique(db, "connector", payload.code)
     return {
         "connector_id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(admin.tenant_id),
         "code": row.code,
         "version": row.version,
@@ -353,6 +354,7 @@ def list_connectors(request: Request, db: Session = Depends(get_db)):
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "code": row.code,
             "connector_type": row.connector_type,
             "version": row.version,
@@ -415,7 +417,12 @@ def set_connector_api_key(
         request=request,
     )
     db.commit()
-    return {"connector_id": str(row.id), "has_api_key": True, "api_key_ends_with": row.credential_hint}
+    return {
+        "connector_id": str(row.id),
+        "business_id": row.business_id,
+        "has_api_key": True,
+        "api_key_ends_with": row.credential_hint,
+    }
 
 
 @router.delete("/admin/configuration/connectors/{configuration_id}/api-key")
@@ -430,7 +437,7 @@ def remove_connector_api_key(configuration_id: uuid.UUID, request: Request, db: 
         db, admin, "CONNECTOR_API_KEY_REMOVED", "ConnectorConfiguration", row.id, row.version, request=request
     )
     db.commit()
-    return {"connector_id": str(row.id), "has_api_key": False}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "has_api_key": False}
 
 
 @router.get("/admin/configuration/mappings")
@@ -528,7 +535,7 @@ def activate_connector(
         db, admin, "CONNECTOR_CONFIGURATION_STATUS_CHANGED", "ConnectorConfiguration", row.id, row.version
     )
     db.commit()
-    return {"id": str(row.id), "status": row.status, "version": row.version}
+    return {"id": str(row.id), "business_id": row.business_id, "status": row.status, "version": row.version}
 
 
 @router.get("/admin/configuration/connectors/{code}/versions")
@@ -543,6 +550,7 @@ def connector_versions(code: str, request: Request, db: Session = Depends(get_db
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "code": row.code,
             "connector_type": row.connector_type,
             "version": row.version,
@@ -691,7 +699,14 @@ def update_control_plane_resource(
     version = getattr(row, "version", "v1")
     _audit_configuration(db, admin, action, model.__name__, row.id, version)
     db.commit()
-    return {"id": str(row.id), "resource": resource, "status": getattr(row, "status", "ACTIVE"), "version": version}
+    return {
+        "id": str(row.id),
+        # Users and connectors have an MDARIX ID; roles, policies and mappings do not (None).
+        "business_id": getattr(row, "business_id", None),
+        "resource": resource,
+        "status": getattr(row, "status", "ACTIVE"),
+        "version": version,
+    }
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/test")
@@ -754,7 +769,7 @@ def provider_health(configuration_id: uuid.UUID, request: Request, db: Session =
     result = _provider_get(row, "health_path")
     _audit_configuration(db, admin, "CONNECTOR_PROVIDER_HEALTH_CHECKED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
-    return {"connector_id": str(row.id), "code": row.code, **result}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "code": row.code, **result}
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/discover-schema")
@@ -774,7 +789,7 @@ def provider_schema(configuration_id: uuid.UUID, request: Request, db: Session =
     result["schema_version"] = (row.configuration or {}).get("schema_version", row.version)
     _audit_configuration(db, admin, "CONNECTOR_SCHEMA_DISCOVERED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
-    return {"connector_id": str(row.id), "code": row.code, **result}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "code": row.code, **result}
 
 
 def _record_sync(tenant_id, connector: ConnectorConfiguration, source_system: str, read: int, outcome) -> ConnectorRun:
@@ -855,6 +870,7 @@ def execute_connector(
         "run_id": str(outcome["run"].id),
         "tenant_id": str(admin.tenant_id),
         "connector_id": str(row.id),
+        "connector_business_id": row.business_id,
         "records_read": outcome["records_read"],
         "outbox_enqueued": outcome["records_read"],
         "canonical_import": canonical_import,

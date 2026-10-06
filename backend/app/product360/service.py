@@ -69,10 +69,10 @@ class Product360Service:
             rows = (
                 conn.execute(
                     text(
-                        "SELECT p.id, p.product_identifier, p.name, p.product_family, p.lifecycle_status, "
+                        "SELECT p.id, p.business_id, p.product_identifier, p.name, p.product_family, p.lifecycle_status, "
                         "array_agg(pv.version_identifier ORDER BY pv.version_identifier) AS versions "
                         "FROM products p LEFT JOIN product_versions pv ON pv.tenant_id=p.tenant_id AND pv.product_id=p.id "
-                        "WHERE p.tenant_id=:tenant_id GROUP BY p.id, p.product_identifier, p.name, p.product_family, p.lifecycle_status "
+                        "WHERE p.tenant_id=:tenant_id GROUP BY p.id, p.business_id, p.product_identifier, p.name, p.product_family, p.lifecycle_status "
                         "ORDER BY p.name, p.id LIMIT :limit OFFSET :offset"
                     ),
                     {"tenant_id": tenant_id, "limit": limit, "offset": offset},
@@ -83,6 +83,7 @@ class Product360Service:
         return [
             ProductSummary(
                 id=str(row["id"]),
+                business_id=row["business_id"],
                 product_identifier=row["product_identifier"],
                 name=row["name"],
                 product_family=row["product_family"],
@@ -141,7 +142,7 @@ class Product360Service:
             risks = (
                 conn.execute(
                     text(
-                        "SELECT id, risk_identifier, description, status FROM risks WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY risk_identifier"
+                        "SELECT id, business_id, risk_identifier, description, status FROM risks WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY risk_identifier"
                     ),
                     {"tenant_id": tenant_id, "product_id": product_id},
                 )
@@ -151,7 +152,7 @@ class Product360Service:
             failure_modes = (
                 conn.execute(
                     text(
-                        "SELECT id, failure_mode_identifier, name FROM failure_modes WHERE tenant_id=:tenant_id ORDER BY failure_mode_identifier"
+                        "SELECT id, business_id, failure_mode_identifier, name FROM failure_modes WHERE tenant_id=:tenant_id ORDER BY failure_mode_identifier"
                     ),
                     {"tenant_id": tenant_id},
                 )
@@ -161,7 +162,7 @@ class Product360Service:
             controls = (
                 conn.execute(
                     text(
-                        "SELECT id, control_identifier, control_type, description, status FROM controls WHERE tenant_id=:tenant_id ORDER BY control_identifier"
+                        "SELECT id, business_id, control_identifier, control_type, description, status FROM controls WHERE tenant_id=:tenant_id ORDER BY control_identifier"
                     ),
                     {"tenant_id": tenant_id},
                 )
@@ -266,7 +267,7 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT DISTINCT c.id, c.component_identifier, c.name, c.revision, c.description, c.status "
+                    "SELECT DISTINCT c.id, c.business_id, c.component_identifier, c.name, c.revision, c.description, c.status "
                     "FROM components c JOIN product_components pc ON pc.tenant_id=c.tenant_id AND pc.component_id=c.id "
                     "WHERE c.tenant_id=:tenant_id AND pc.product_version_id=:version_id ORDER BY c.component_identifier"
                 ),
@@ -283,7 +284,8 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT DISTINCT s.id, s.supplier_identifier, s.name, s.status, c.component_identifier, c.name AS component_name "
+                    "SELECT DISTINCT s.id, s.business_id, s.supplier_identifier, s.name, s.status, c.component_identifier, "
+                    "c.business_id AS component_business_id, c.name AS component_name "
                     "FROM suppliers s JOIN component_suppliers cs ON cs.tenant_id=s.tenant_id AND cs.supplier_id=s.id "
                     "JOIN components c ON c.tenant_id=cs.tenant_id AND c.id=cs.component_id "
                     "WHERE s.tenant_id=:tenant_id AND c.id = ANY(:component_ids) ORDER BY s.name"
@@ -298,7 +300,7 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT id, change_identifier, change_type, description, event_timestamp, effective_timestamp, source_system FROM changes WHERE tenant_id=:tenant_id ORDER BY effective_timestamp NULLS LAST, change_identifier"
+                    "SELECT id, business_id, change_identifier, change_type, description, event_timestamp, effective_timestamp, source_system FROM changes WHERE tenant_id=:tenant_id ORDER BY effective_timestamp NULLS LAST, change_identifier"
                 ),
                 {"tenant_id": tenant_id},
             )
@@ -312,7 +314,8 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT l.id, l.lot_identifier, l.status, l.effective_timestamp AS manufactured_timestamp, ms.site_identifier, ms.name AS site_name, "
+                    "SELECT l.id, l.business_id, l.lot_identifier, l.status, l.effective_timestamp AS manufactured_timestamp, "
+                    "ms.site_identifier, ms.business_id AS site_business_id, ms.name AS site_name, "
                     "CASE WHEN l.source_identifier IN ('LOT-010','LOT-013','LOT-017') THEN 'PARTIAL' ELSE 'COMPLETE' END AS traceability_state "
                     "FROM lot_batches l LEFT JOIN manufacturing_sites ms ON ms.tenant_id=l.tenant_id AND ms.id=l.manufacturing_site_id "
                     "WHERE l.tenant_id=:tenant_id AND l.product_version_id=:version_id ORDER BY l.effective_timestamp NULLS LAST, l.lot_identifier"
@@ -326,7 +329,7 @@ class Product360Service:
     def complaints(
         self, conn, tenant_id: str, product_id: str, version_id: str | None, as_of: datetime | None, mode: str
     ):
-        sql = "SELECT id, complaint_identifier, event_timestamp, recorded_timestamp, ingestion_timestamp, description, status, lot_batch_id FROM complaints WHERE tenant_id=:tenant_id AND product_id=:product_id"
+        sql = "SELECT id, business_id, complaint_identifier, event_timestamp, recorded_timestamp, ingestion_timestamp, description, status, lot_batch_id FROM complaints WHERE tenant_id=:tenant_id AND product_id=:product_id"
         params = {"tenant_id": tenant_id, "product_id": product_id}
         if version_id:
             sql += " AND product_version_id=:version_id"
@@ -338,7 +341,7 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT id, investigation_identifier, investigation_question, status, opened_at, closed_at FROM investigations WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY opened_at"
+                    "SELECT id, business_id, investigation_identifier, investigation_question, status, opened_at, closed_at FROM investigations WHERE tenant_id=:tenant_id AND product_id=:product_id ORDER BY opened_at"
                 ),
                 {"tenant_id": tenant_id, "product_id": product_id},
             )
@@ -376,7 +379,7 @@ class Product360Service:
         return (
             conn.execute(
                 text(
-                    "SELECT e.id, e.evidence_identifier, e.evidence_type, e.title, e.source_reference, e.reliability_status, e.content, "
+                    "SELECT e.id, e.business_id, e.evidence_identifier, e.evidence_type, e.title, e.source_reference, e.reliability_status, e.content, "
                     "e.source_timestamp, e.recorded_timestamp, e.ingestion_timestamp "
                     "FROM evidence e JOIN staged_source_records s ON s.tenant_id=e.tenant_id AND s.raw_payload->>'evidence_id'=e.evidence_identifier "
                     "JOIN investigations i ON i.tenant_id=e.tenant_id AND i.source_identifier=s.raw_payload->>'investigation_id' "
@@ -411,6 +414,7 @@ class Product360Service:
                     f"Version {version['version_identifier']} effective",
                     "product_version",
                     version["id"],
+                    business_id=version.get("business_id"),
                     effective=version["release_timestamp"],
                     source=version.get("source_system"),
                 )
@@ -423,6 +427,7 @@ class Product360Service:
                     change["description"],
                     "change",
                     change["id"],
+                    business_id=change.get("business_id"),
                     event=change["event_timestamp"],
                     effective=change["effective_timestamp"],
                     source=change.get("source_system"),
@@ -436,6 +441,7 @@ class Product360Service:
                     f"Lot {lot['lot_identifier']} manufactured",
                     "lot_batch",
                     lot["id"],
+                    business_id=lot.get("business_id"),
                     effective=lot["manufactured_timestamp"],
                     quality=lot["traceability_state"],
                 )
@@ -448,6 +454,7 @@ class Product360Service:
                     complaint["complaint_identifier"],
                     "complaint",
                     complaint["id"],
+                    business_id=complaint.get("business_id"),
                     event=complaint["event_timestamp"],
                     recorded=complaint["recorded_timestamp"],
                     knowledge=complaint["ingestion_timestamp"],
@@ -462,6 +469,7 @@ class Product360Service:
                     investigation["investigation_identifier"],
                     "investigation",
                     investigation["id"],
+                    business_id=investigation.get("business_id"),
                     event=investigation["opened_at"],
                 )
             )
@@ -478,6 +486,7 @@ class Product360Service:
                     item["title"],
                     "evidence",
                     item["id"],
+                    business_id=item.get("business_id"),
                     event=item["source_timestamp"],
                     recorded=item["recorded_timestamp"],
                     knowledge=item["ingestion_timestamp"],
@@ -505,6 +514,7 @@ class Product360Service:
         title: str,
         entity_type: str,
         entity_id: Any,
+        business_id: str | None = None,
         event=None,
         effective=None,
         recorded=None,
@@ -521,6 +531,7 @@ class Product360Service:
             title=title,
             related_entity_type=entity_type,
             related_entity_id=str(entity_id),
+            related_entity_business_id=business_id,
             event_time=event,
             effective_time=effective,
             recorded_time=recorded,
@@ -633,5 +644,9 @@ class Product360Service:
         seen = {}
         for lot in lots:
             if lot["site_identifier"]:
-                seen[lot["site_identifier"]] = {"site_identifier": lot["site_identifier"], "name": lot["site_name"]}
+                seen[lot["site_identifier"]] = {
+                    "business_id": lot["site_business_id"],
+                    "site_identifier": lot["site_identifier"],
+                    "name": lot["site_name"],
+                }
         return list(seen.values())

@@ -357,7 +357,9 @@ def readiness():
     from backend.app.readiness import readiness_report
 
     report = readiness_report()
-    return JSONResponse(status_code=200 if report["status"] == "ready" else 503, content=report)
+    # Degraded (a worker, scheduler, plane or mail check failing) keeps the API in rotation, as /health/status does:
+    # only a database that does not answer, or a schema this code was not built for, takes it out (503).
+    return JSONResponse(status_code=503 if report["status"] == "not_ready" else 200, content=report)
 
 
 @app.get("/health/status")

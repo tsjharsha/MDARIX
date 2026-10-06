@@ -5,6 +5,7 @@ import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { signOut } from "../../shared/session";
 import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
+import { hideUuid, safeText } from "../../../app/displayId";
 
 const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
@@ -28,6 +29,10 @@ function Profile() {
     <Panel eyebrow="My account" title={session?.display_name ?? "Your profile"}>
       <dl className="ca-facts">
         <div>
+          <dt>User ID</dt>
+          <dd>{hideUuid(session?.business_id)}</dd>
+        </div>
+        <div>
           <dt>Email</dt>
           <dd>{session?.email ?? "—"}</dd>
         </div>
@@ -37,7 +42,10 @@ function Profile() {
         </div>
         <div>
           <dt>Organization</dt>
-          <dd>{session?.current_tenant?.tenant_name ?? "—"}</dd>
+          <dd>
+            {session?.current_tenant?.tenant_name ?? "—"}
+            {safeText(session?.tenant_business_id) ? ` · ${session?.tenant_business_id}` : ""}
+          </dd>
         </div>
         <div>
           <dt>Environment</dt>

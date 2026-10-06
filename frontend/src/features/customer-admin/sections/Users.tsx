@@ -10,6 +10,7 @@ import {
   Table,
   Tabs,
   errorText,
+  idColumn,
   listOf,
   matches,
   send,
@@ -17,6 +18,7 @@ import {
   type Confirmation,
 } from "../shared";
 import { downloadFile } from "../../reports/download";
+import { safeText } from "../../../app/displayId";
 
 /** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
  * the email could not be delivered (201, delivery FAILED), MDARIX support issues an activation link to pass on. */
@@ -39,8 +41,9 @@ export function invitationNotice(
   };
 }
 
-/** The file a person's data export is saved as when the server does not name it. */
-export const personExportName = (userId: string) => `mdarix-person-${userId.slice(0, 8)}.json`;
+/** The file a person's data export is saved as when the server does not name it: after their User ID, never the UUID. */
+export const personExportName = (user: { business_id?: string | null }) =>
+  `mdarix-person-${safeText(user.business_id) ?? "export"}.json`;
 
 const FILTERS = ["All", "Active", "Invited", "Suspended", "Offboarded"] as const;
 // Same role spellings the server treats as MDARIX platform roles; those accounts are managed by MDARIX only.
@@ -92,7 +95,7 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
   return (
     <Panel eyebrow="People" title="Users in your organization" source={users}>
       <div className="ca-toolbar">
-        <SearchBox value={query} onChange={setQuery} label="Search name, email or role" />
+        <SearchBox value={query} onChange={setQuery} label="Search name, email, ID or role" />
         <div className="ca-chips" role="group" aria-label="Filter by status">
           {FILTERS.map((option) => (
             <button
@@ -113,6 +116,7 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
         rowKey={(row) => row.id}
         empty={{ title: "No matching users", detail: "Change the filter or invite someone new." }}
         columns={[
+          idColumn("User ID"),
           {
             key: "name",
             label: "Name",
@@ -222,7 +226,7 @@ function UserDrawer({
   const exportPerson = async () => {
     try {
       const file = await downloadFile(`/api/v1/admin/people/${user.id}/export`, {
-        fallbackName: personExportName(String(user.id)),
+        fallbackName: personExportName(user),
       });
       notify(`${name}'s data was exported as ${file}. The export is recorded in the audit trail.`);
     } catch (reason) {

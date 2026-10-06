@@ -85,10 +85,12 @@ class BriefService:
             raise BriefError("INVESTIGATION_NOT_FOUND", "Investigation is not available for this tenant")
         return row
 
-    def _payload(self, row: InvestigationBrief) -> dict[str, Any]:
+    def _payload(self, row: InvestigationBrief, investigation: Investigation) -> dict[str, Any]:
         return {
             "id": row.id,
+            "business_id": row.business_id,
             "investigation_id": row.investigation_id,
+            "investigation_business_id": investigation.business_id,
             "brief_version": row.brief_version,
             "status": row.status,
             "title": row.title,
@@ -370,12 +372,12 @@ class BriefService:
         )
         db.commit()
         db.refresh(row)
-        return self._payload(row)
+        return self._payload(row, inv)
 
     def list(self, db, tenant_id, investigation_id):
-        self._investigation(db, tenant_id, investigation_id)
+        inv = self._investigation(db, tenant_id, investigation_id)
         return [
-            self._payload(x)
+            self._payload(x, inv)
             for x in db.query(InvestigationBrief)
             .filter(InvestigationBrief.tenant_id == tenant_id, InvestigationBrief.investigation_id == investigation_id)
             .order_by(InvestigationBrief.brief_version.desc())
@@ -383,7 +385,7 @@ class BriefService:
         ]
 
     def get(self, db, tenant_id, investigation_id, brief_id=None, latest=False):
-        self._investigation(db, tenant_id, investigation_id)
+        inv = self._investigation(db, tenant_id, investigation_id)
         q = db.query(InvestigationBrief).filter(
             InvestigationBrief.tenant_id == tenant_id, InvestigationBrief.investigation_id == investigation_id
         )
@@ -394,4 +396,4 @@ class BriefService:
         )
         if not row:
             raise BriefError("BRIEF_NOT_FOUND", "Investigation Brief is not available for this tenant")
-        return self._payload(row)
+        return self._payload(row, inv)

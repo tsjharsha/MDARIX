@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import { Table } from "../customer-admin/shared";
+import { Table, idColumn } from "../customer-admin/shared";
 
 type TrialRequest = {
   id: string;
@@ -194,6 +194,7 @@ export function TrialRequestsWorkspace() {
           rowKey={(row) => row.id}
           empty={{ title: "Nothing here yet", detail: "Requests appear here as companies ask for a trial." }}
           columns={[
+            idColumn("Request ID"),
             { key: "organization", label: "Company", render: (row) => <strong>{row.organization}</strong> },
             {
               key: "requester",

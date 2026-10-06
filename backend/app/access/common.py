@@ -410,6 +410,7 @@ def _safe_connector_summary(row: ConnectorConfiguration) -> dict:
     configuration = row.configuration or {}
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "code": row.code,
         "connector_type": row.connector_type,
         "version": row.version,

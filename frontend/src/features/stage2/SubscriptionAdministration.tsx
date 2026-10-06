@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { describeError, postJson, requestJson } from "../../app/apiClient";
+import { referenceId, safeText } from "../../app/displayId";
 
 type Customer = { id: string; name: string; tenant_key: string };
 type Plan = { id: string; code?: string; name?: string; version?: string; status?: string };
@@ -268,8 +269,16 @@ export function SubscriptionAdministration() {
         <div className="section-title">Subscription timeline</div>
         {expiring.slice(0, 12).map((row) => (
           <div className="audit-row" key={row.subscription_id}>
-            <strong>{row.status}</strong>
-            <span>{row.tenant_id}</span>
+            <strong>
+              {row.status}
+              {safeText(row.subscription_business_id ?? row.business_id)
+                ? ` · ${safeText(row.subscription_business_id ?? row.business_id)}`
+                : ""}
+            </strong>
+            <span>
+              {customers.find((customer) => customer.id === row.tenant_id)?.name ??
+                referenceId(row, "tenant", row.tenant_name, row.tenant_key)}
+            </span>
             <small>
               {row.expires_at} · {row.days_remaining} days
             </small>

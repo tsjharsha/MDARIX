@@ -2,7 +2,14 @@
 import { titleCase, type Slice, type Tone } from "../admin/console/dashboardModel";
 import type { Section } from "./context";
 
-export type TenantUser = { id: string; email?: string; display_name?: string; role?: string; status?: string };
+export type TenantUser = {
+  id: string;
+  business_id?: string | null;
+  email?: string;
+  display_name?: string;
+  role?: string;
+  status?: string;
+};
 
 const USER_STATUS: Record<string, { label: string; tone: Tone; order: number }> = {
   ACTIVE: { label: "Active", tone: "good", order: 0 },

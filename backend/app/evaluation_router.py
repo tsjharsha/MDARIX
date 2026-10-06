@@ -194,6 +194,7 @@ def run_evaluation(
     background.add_task(_complete_run, row.id, str(ctx.tenant_id), request.release_version, scenario_ids)
     return {
         "evaluation_run_id": str(row.id),
+        "business_id": row.business_id,
         "status": "RUNNING",
         "suite_version": row.suite_version,
         "dataset_version": row.dataset_version,
@@ -261,6 +262,7 @@ def get_evaluation(
         db.commit()
     return {
         "evaluation_run_id": row.id,
+        "business_id": row.business_id,
         "started_at": row.started_at,
         "completed_at": row.completed_at,
         "suite_version": row.suite_version,

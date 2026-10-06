@@ -46,12 +46,14 @@ SECRET_COLUMN = re.compile(
 )
 SCHEMAS = ("public", "md_master")
 FETCH_ROWS = 1000
-# The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order).
+# The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order). Each
+# starts with the record's MDARIX identifier (business_id), then the customer's own number for it.
 # Columns absent from a schema are skipped, so an older dedicated plane still exports.
 READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "investigations": (
         "readable/investigations.csv",
         (
+            "business_id",
             "investigation_identifier",
             "status",
             "investigation_question",
@@ -67,6 +69,7 @@ READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "complaints": (
         "readable/complaints.csv",
         (
+            "business_id",
             "complaint_identifier",
             "status",
             "severity",
@@ -96,6 +99,7 @@ READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "capas": (
         "readable/capas.csv",
         (
+            "business_id",
             "capa_identifier",
             "title",
             "status",
@@ -115,6 +119,7 @@ READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "evidence": (
         "readable/evidence_index.csv",
         (
+            "business_id",
             "evidence_identifier",
             "title",
             "evidence_type",
@@ -180,6 +185,7 @@ def request_export(db: Session, tenant_id, requested_by: str, reason: str) -> Te
 def describe(row: TenantExport) -> dict:
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "status": row.status,
         "requested_by": row.requested_by,
         "reason": row.reason,
@@ -297,7 +303,11 @@ def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path:
 
     now = datetime.now(timezone.utc)
     manifest: dict = {
-        "organization": {"id": str(tenant_id), "name": tenant.display_name if tenant else None},
+        "organization": {
+            "id": str(tenant_id),
+            "business_id": tenant.business_id if tenant else None,
+            "name": tenant.display_name if tenant else None,
+        },
         "generated_at": now.isoformat(),
         "format": (
             "JSON Lines per table under data/; CSV spreadsheets of the quality records under readable/; "

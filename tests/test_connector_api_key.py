@@ -1,5 +1,6 @@
 """A connector keeps the customer system's API key encrypted: never returned, bound to its connector, removable."""
 
+import re
 import uuid
 from types import SimpleNamespace
 
@@ -30,7 +31,9 @@ def test_the_api_key_is_stored_encrypted_and_never_shown_again():
     key = "sk_trackwise_" + uuid.uuid4().hex
     saved = admin.put(f"/api/v1/admin/configuration/connectors/{connector_id}/api-key", json={"api_key": key})
     assert saved.status_code == 200, saved.text
-    assert saved.json() == {"connector_id": connector_id, "has_api_key": True, "api_key_ends_with": key[-4:]}
+    body = saved.json()
+    assert re.fullmatch(r"CNX\d{6}", body.pop("business_id"))
+    assert body == {"connector_id": connector_id, "has_api_key": True, "api_key_ends_with": key[-4:]}
     listed = next(
         item for item in admin.get("/api/v1/admin/configuration/connectors").json() if item["id"] == connector_id
     )

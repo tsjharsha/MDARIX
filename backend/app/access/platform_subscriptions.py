@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_map, business_id_of
 from backend.app.db.models.foundation import (
     AuditEvent,
     ConnectorConfiguration,
@@ -50,6 +51,7 @@ def list_platform_plans(request: Request, db: Session = Depends(get_db)):
         result.append(
             {
                 "id": str(plan.id),
+                "business_id": plan.business_id,
                 "code": plan.code,
                 "name": plan.name,
                 "description": plan.description,
@@ -108,7 +110,7 @@ def create_platform_plan(payload: PlanCreateRequest, request: Request, db: Sessi
         )
     )
     db.commit()
-    return {"id": str(plan.id), "code": plan.code, "status": plan.status}
+    return {"id": str(plan.id), "business_id": plan.business_id, "code": plan.code, "status": plan.status}
 
 
 @router.get("/platform-admin/customers/{tenant_id}/subscription")
@@ -137,7 +139,9 @@ def get_platform_subscription(tenant_id: uuid.UUID, request: Request, db: Sessio
     return {
         "subscription_id": str(assignment.id),
         "tenant_id": str(tenant_id),
+        "tenant_business_id": business_id_of(db, Tenant, tenant_id),
         "plan_id": str(assignment.plan_id),
+        "plan_business_id": plan.business_id if plan else None,
         "plan_code": plan.code if plan else None,
         "status": assignment.status,
         "effective_from": assignment.effective_from.isoformat() if assignment.effective_from else None,
@@ -160,7 +164,9 @@ def get_platform_subscription_detail(subscription_id: uuid.UUID, request: Reques
     return {
         "subscription_id": str(assignment.id),
         "tenant_id": str(assignment.tenant_id),
+        "tenant_business_id": business_id_of(db, Tenant, assignment.tenant_id),
         "plan_id": str(assignment.plan_id),
+        "plan_business_id": plan.business_id if plan else None,
         "plan_code": plan.code if plan else None,
         "status": assignment.status,
         "effective_from": assignment.effective_from.isoformat() if assignment.effective_from else None,
@@ -415,7 +421,11 @@ def set_platform_subscription(
     db.commit()
     return {
         "subscription_id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(tenant_id),
+        "tenant_business_id": tenant.business_id,
+        "plan_id": str(plan.id),
+        "plan_business_id": plan.business_id,
         "status": row.status,
         "expiry_version": row.expiry_version,
         "expires_at": row.expires_at.isoformat(),
@@ -480,10 +490,13 @@ def expiring_subscriptions(request: Request, db: Session = Depends(get_db)):
     rows = (
         db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.status.in_(["ACTIVE", "GRACE", "EXPIRED"])).all()
     )
+    tenant_business_ids = business_id_map(db, Tenant, (row.tenant_id for row in rows))
     return [
         {
             "subscription_id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(row.tenant_id),
+            "tenant_business_id": tenant_business_ids.get(str(row.tenant_id)),
             "status": row.status,
             "expires_at": row.expires_at.isoformat(),
             "days_remaining": (row.expires_at - now).days,

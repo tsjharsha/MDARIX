@@ -170,6 +170,7 @@ def submit_demo_request(
 def _serialize(row: DemoRequest) -> dict:
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "name": row.display_name,
         "email": row.email,
         "phone": row.phone,

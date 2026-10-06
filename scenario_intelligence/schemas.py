@@ -37,6 +37,7 @@ class ScenarioRequest(BaseModel):
 
 class ScenarioResponse(BaseModel):
     id: UUID | None
+    business_id: str | None = None
     investigation_id: UUID
     status: str
     result: dict[str, Any]

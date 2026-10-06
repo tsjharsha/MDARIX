@@ -3,7 +3,7 @@ import { KeyRound, Plus } from "lucide-react";
 import { ColumnChart, Panel, ToneBadge } from "../../admin/console/charts";
 import { dailyCounts, runOutcomes, titleCase, type Tone } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
-import { Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../shared";
+import { Table, Tabs, errorText, formatDate, idColumn, listOf, send, useResource } from "../shared";
 import { LifecycleActions, LifecycleBadge } from "./Access";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatTime } from "../../../app/dates";
@@ -300,6 +300,7 @@ function Connections() {
           rowKey={(row) => row.id}
           empty={{ title: "No connections yet", detail: "Add your first source system below." }}
           columns={[
+            idColumn("Connection ID", "code"),
             {
               key: "code",
               label: "Connection",

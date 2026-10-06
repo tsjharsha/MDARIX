@@ -80,6 +80,7 @@ def _verification_evidence(db: Session, tenant_id) -> dict[uuid.UUID, list[dict]
         found[control_id].append(
             {
                 "id": str(evidence.id),
+                "business_id": evidence.business_id,
                 "evidence_identifier": evidence.evidence_identifier,
                 "title": evidence.title,
                 "evidence_type": evidence.evidence_type,
@@ -158,6 +159,7 @@ def register(
         linked_controls = [
             {
                 "id": str(control.id),
+                "business_id": control.business_id,
                 "control_identifier": control.control_identifier,
                 "control_type": control.control_type,
                 "description": control.description,
@@ -172,17 +174,23 @@ def register(
         items.append(
             {
                 "id": str(risk.id),
+                "business_id": risk.business_id,
                 "risk_identifier": risk.risk_identifier,
                 "description": risk.description,
                 "status": risk.status,
                 "product": {
                     "id": str(product.id),
+                    "business_id": product.business_id,
                     "product_identifier": product.product_identifier,
                     "name": product.name,
                 }
                 if product
                 else None,
-                "product_version": {"id": str(version.id), "version_identifier": version.version_identifier}
+                "product_version": {
+                    "id": str(version.id),
+                    "business_id": version.business_id,
+                    "version_identifier": version.version_identifier,
+                }
                 if version
                 else None,
                 # Not in the imported records: reported as unknown, never estimated (see module docstring).
@@ -191,6 +199,7 @@ def register(
                 "failure_modes": [
                     {
                         "id": str(mode.id),
+                        "business_id": mode.business_id,
                         "failure_mode_identifier": mode.failure_mode_identifier,
                         "name": mode.name,
                         "description": mode.description,
@@ -204,6 +213,7 @@ def register(
                 "requirements": [
                     {
                         "id": str(requirement.id),
+                        "business_id": requirement.business_id,
                         "requirement_identifier": requirement.requirement_identifier,
                         "requirement_type": requirement.requirement_type,
                         "text": requirement.text,
@@ -256,13 +266,22 @@ def traceability(db: Session, tenant_id) -> dict:
     chains = [
         {
             "risk_id": item["id"],
+            "risk_business_id": item["business_id"],
             "risk_identifier": item["risk_identifier"],
             "product": item["product"]["product_identifier"] if item["product"] else None,
+            "product_business_id": item["product"]["business_id"] if item["product"] else None,
+            # Each list of source identifiers has a business-identifier list in the same order.
             "requirements": [row["requirement_identifier"] for row in item["requirements"]],
+            "requirement_business_ids": [row["business_id"] for row in item["requirements"]],
             "failure_modes": [row["failure_mode_identifier"] for row in item["failure_modes"]],
+            "failure_mode_business_ids": [row["business_id"] for row in item["failure_modes"]],
             "controls": [row["control_identifier"] for row in item["controls"]],
+            "control_business_ids": [row["business_id"] for row in item["controls"]],
             "verification_evidence": [
                 evidence["evidence_identifier"] for row in item["controls"] for evidence in row["verification_evidence"]
+            ],
+            "verification_evidence_business_ids": [
+                evidence["business_id"] for row in item["controls"] for evidence in row["verification_evidence"]
             ],
             "residual_risk": item["residual_risk"]["state"],
             "complete": bool(item["requirements"] and item["failure_modes"] and item["controls"])
@@ -270,21 +289,33 @@ def traceability(db: Session, tenant_id) -> dict:
         }
         for item in risks
     ]
-    unlinked = {
+    # Each gap as (source identifier, business identifier) pairs.
+    gaps = {
         "requirements_without_risk": [
-            row.requirement_identifier for row in requirements if row.id not in linked_requirements
+            (row.requirement_identifier, row.business_id) for row in requirements if row.id not in linked_requirements
         ],
         "failure_modes_without_risk": [
-            row.failure_mode_identifier for row in failure_modes if row.id not in linked_failure_modes
+            (row.failure_mode_identifier, row.business_id)
+            for row in failure_modes
+            if row.id not in linked_failure_modes
         ],
-        "controls_without_risk": [row.control_identifier for row in controls if row.id not in linked_controls],
+        "controls_without_risk": [
+            (row.control_identifier, row.business_id) for row in controls if row.id not in linked_controls
+        ],
         "controls_without_verification_evidence": [
-            row.control_identifier for row in controls if not verification.get(row.id)
+            (row.control_identifier, row.business_id) for row in controls if not verification.get(row.id)
         ],
-        "risks_without_requirement": [item["risk_identifier"] for item in risks if not item["requirements"]],
-        "risks_without_failure_mode": [item["risk_identifier"] for item in risks if not item["failure_modes"]],
-        "risks_without_control": [item["risk_identifier"] for item in risks if not item["controls"]],
+        "risks_without_requirement": [
+            (item["risk_identifier"], item["business_id"]) for item in risks if not item["requirements"]
+        ],
+        "risks_without_failure_mode": [
+            (item["risk_identifier"], item["business_id"]) for item in risks if not item["failure_modes"]
+        ],
+        "risks_without_control": [
+            (item["risk_identifier"], item["business_id"]) for item in risks if not item["controls"]
+        ],
     }
+    unlinked = {key: [identifier for identifier, _ in value] for key, value in gaps.items()}
     return {
         "chains": chains,
         "counts": {
@@ -296,6 +327,8 @@ def traceability(db: Session, tenant_id) -> dict:
             "unlinked": {key: len(value) for key, value in unlinked.items()},
         },
         "unlinked": unlinked,
+        # The same records as ``unlinked``, in the same order, by business identifier.
+        "unlinked_business_ids": {key: [business_id for _, business_id in value] for key, value in gaps.items()},
         "standard": "ISO 14971 traceability (requirement -> risk -> failure mode -> control -> verification)",
         "data_notice": full["data_notice"],
     }
@@ -304,6 +337,7 @@ def traceability(db: Session, tenant_id) -> dict:
 def register_csv_rows(items: list[dict]) -> list[list]:
     """One row per risk for the CSV export; linked records are joined with ';' inside a cell."""
     header = [
+        "business_id",
         "risk_identifier",
         "description",
         "status",
@@ -325,6 +359,7 @@ def register_csv_rows(items: list[dict]) -> list[list]:
     for item in items:
         rows.append(
             [
+                item["business_id"],
                 item["risk_identifier"],
                 item["description"],
                 item["status"],

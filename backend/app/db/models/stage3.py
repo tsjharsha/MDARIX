@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 
@@ -91,6 +92,7 @@ class InboundProviderMapping(Base):
 
 class SupplierEvidenceRequest(Base):
     __tablename__ = "supplier_evidence_requests"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

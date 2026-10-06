@@ -19,6 +19,16 @@ describe("report preview", () => {
     expect(section.kind === "table" && section.rows).toHaveLength(10);
   });
 
+  it("starts with the MDARIX ID and never offers a column of UUIDs", () => {
+    const rows = [
+      { id: "6f1c2a9e-4b3d-4c8a-9f2e-1a2b3c4d5e6f", business_id: "CMP000002", complaint_identifier: "ACD-1" },
+      { id: "7a1c2a9e-4b3d-4c8a-9f2e-1a2b3c4d5e6f", business_id: "CMP000010", complaint_identifier: "ACD-2" },
+    ];
+    const [section] = previewSections({ complaints: rows });
+    expect(section).toMatchObject({ kind: "table", columns: ["business_id", "complaint_identifier"] });
+    expect(cellText("6f1c2a9e-4b3d-4c8a-9f2e-1a2b3c4d5e6f")).toBe("—");
+  });
+
   it("shows mappings as facts, empty lists as empty, and never [object Object]", () => {
     const sections = previewSections({ counts: { open: 3, closed: { a: 1 } }, signals: [], note: "x" });
     expect(sections.map((item) => item.kind)).toEqual(["facts", "empty", "value"]);

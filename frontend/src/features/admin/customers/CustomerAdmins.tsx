@@ -7,12 +7,14 @@ import {
   Table,
   errorText,
   formatDate,
+  idColumn,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
 import { tenantOptionLabel, type CustomerAdmin, type TenantSummary } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { safeText } from "../../../app/displayId";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { activationLinkError } from "./dataGovernance";
 
@@ -177,7 +179,7 @@ export function CustomerAdmins({
         tenants has administrators for each.
       </p>
       <div className="cc-toolbar">
-        <SearchBox value={query} onChange={setQuery} label="Search name, email, customer or tenant" />
+        <SearchBox value={query} onChange={setQuery} label="Search name, email, ID, customer or tenant" />
         {!tenantId && tenants && tenants.length > 1 && (
           <select aria-label="Tenant" value={tenantFilter} onChange={(event) => setTenantFilter(event.target.value)}>
             <option value="">All tenants</option>
@@ -208,6 +210,7 @@ export function CustomerAdmins({
               : "No administrator matches.",
         }}
         columns={[
+          idColumn("User ID"),
           {
             key: "name",
             fields: ["display_name", "email"],
@@ -224,9 +227,14 @@ export function CustomerAdmins({
             : [
                 {
                   key: "customer",
-                  fields: ["customer_name", "customer_id"],
+                  fields: ["customer_name", "customer_business_id", "customer_id"],
                   label: "Customer",
-                  render: (row: CustomerAdmin) => <strong>{row.customer_name ?? "—"}</strong>,
+                  render: (row: CustomerAdmin) => (
+                    <span className="cc-stack">
+                      <strong>{row.customer_name ?? "—"}</strong>
+                      {safeText(row.customer_business_id) && <small>{row.customer_business_id}</small>}
+                    </span>
+                  ),
                 },
               ]),
           ...(tenantId
@@ -234,12 +242,14 @@ export function CustomerAdmins({
             : [
                 {
                   key: "tenant",
-                  fields: ["tenant_name", "tenant_key", "tenant_id"],
+                  fields: ["tenant_name", "tenant_key", "tenant_business_id", "tenant_id"],
                   label: "Tenant",
                   render: (row: CustomerAdmin) => (
                     <span className="cc-stack">
                       <strong>{row.tenant_name ?? row.tenant_key ?? "—"}</strong>
-                      <small>{row.tenant_key}</small>
+                      <small>
+                        {[safeText(row.tenant_business_id), safeText(row.tenant_key)].filter(Boolean).join(" · ")}
+                      </small>
                     </span>
                   ),
                 },

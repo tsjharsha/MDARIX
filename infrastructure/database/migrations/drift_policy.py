@@ -11,7 +11,10 @@ therefore fail the CI drift gate.
 
 MANAGED_SCHEMAS = frozenset({None, "public", "md_master"})
 
-MIGRATION_OWNED_TABLES = frozenset({"mdarix_rls_secret"})
+from infrastructure.database.migrations.business_ids import COUNTER_TABLE, INDEX_NAMES  # noqa: E402
+
+# business_id_counters is written only by the md26 trigger function; its unique business_id indexes are md26's too.
+MIGRATION_OWNED_TABLES = frozenset({"mdarix_rls_secret", COUNTER_TABLE})
 
 MIGRATION_OWNED_INDEXES = frozenset(
     {
@@ -42,6 +45,7 @@ MIGRATION_OWNED_INDEXES = frozenset(
         "ix_tenant_health_runs_status",
         "ix_tenants_customer_status_region",
     }
+    | INDEX_NAMES
 )
 
 

@@ -464,19 +464,34 @@ def ask(
                 .all()
             )
             evidence_by_id = {row.id: row for row in evidence_rows}
+            hypothesis_business_ids = {row.id: row.business_id for row in hypotheses}
             intelligence = {
                 "hypotheses": [
-                    {"id": str(row.id), "statement": row.statement, "status": row.status, "origin": row.origin}
+                    {
+                        "id": str(row.id),
+                        "business_id": row.business_id,
+                        "statement": row.statement,
+                        "status": row.status,
+                        "origin": row.origin,
+                    }
                     for row in hypotheses
                 ],
                 "unknowns": [
-                    {"id": str(row.id), "category": row.category, "description": row.description, "status": row.status}
+                    {
+                        "id": str(row.id),
+                        "business_id": row.business_id,
+                        "category": row.category,
+                        "description": row.description,
+                        "status": row.status,
+                    }
                     for row in unknowns
                 ],
                 "provenance": [
                     {
                         "hypothesis_id": str(link.hypothesis_id),
+                        "hypothesis_business_id": hypothesis_business_ids.get(link.hypothesis_id),
                         "evidence_id": str(link.evidence_id),
+                        "evidence_business_id": evidence_by_id[link.evidence_id].business_id,
                         "evidence_identifier": evidence_by_id[link.evidence_id].evidence_identifier,
                         "relation_type": link.relation_type,
                         "created_by_type": link.created_by_type,

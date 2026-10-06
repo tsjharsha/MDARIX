@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
 from pydantic import BaseModel, Field
-from investigator.schemas import SourceReference, TemporalMode
+from investigator.schemas import SourceReference, TemporalMode, business_id_field
 
 UnknownCategory = Literal[
     "MISSING_EVIDENCE",
@@ -36,6 +36,7 @@ UnknownStatus = Literal[
 
 class InvestigationUnknown(BaseModel):
     unknown_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    business_id: str | None = business_id_field()
     investigation_id: uuid.UUID
     hypothesis_id: uuid.UUID | None = None
     challenge_id: uuid.UUID | None = None

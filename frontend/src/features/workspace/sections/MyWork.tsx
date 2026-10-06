@@ -3,7 +3,18 @@ import { MessageSquareReply, Paperclip } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
-import { Drawer, Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
+import {
+  Drawer,
+  Table,
+  Tabs,
+  errorText,
+  formatDate,
+  idColumn,
+  listOf,
+  send,
+  useResource,
+} from "../../customer-admin/shared";
+import { displayId, safeText } from "../../../app/displayId";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { isOpenInvestigation } from "../workspaceModel";
 import { StatusBadge } from "./common";
@@ -59,13 +70,17 @@ function Cases({ mine }: { mine: boolean }) {
             : { title: "Every open investigation has an owner", detail: "Unowned open cases would appear here." }
         }
         columns={[
+          idColumn("Investigation ID", "investigation_identifier"),
           {
             key: "case",
-            label: "Investigation",
+            label: "Question",
+            fields: ["investigation_question", "investigation_identifier"],
             render: (row) => (
               <span className="ca-person">
-                <strong>{row.investigation_identifier}</strong>
-                <small>{row.investigation_question ?? "No question recorded"}</small>
+                <span>{row.investigation_question ?? "No question recorded"}</span>
+                {safeText(row.business_id) && safeText(row.investigation_identifier) && (
+                  <small>Source ID {row.investigation_identifier}</small>
+                )}
               </span>
             ),
           },
@@ -141,7 +156,7 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
               <option value="">{suppliers.state === "loading" ? "Loading…" : "Choose a supplier"}</option>
               {options.map((row) => (
                 <option key={row.id} value={row.id}>
-                  {row.name} ({row.supplier_identifier})
+                  {row.name} ({displayId(row, "supplier_identifier")})
                 </option>
               ))}
             </select>
@@ -256,10 +271,11 @@ function EvidenceRequests() {
           rowKey={(row, index) => String(row.id ?? index)}
           empty={{ title: "No evidence requests", detail: "Requests sent to suppliers for evidence appear here." }}
           columns={[
+            idColumn("Request ID", "request_identifier"),
             {
               key: "title",
               label: "Request",
-              render: (row) => <strong>{row.title ?? row.request_identifier ?? "Request"}</strong>,
+              render: (row) => <strong>{row.title ?? "Request"}</strong>,
             },
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
             { key: "recipient", label: "To", render: (row) => row.recipient ?? "—" },

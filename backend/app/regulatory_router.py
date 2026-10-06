@@ -206,6 +206,7 @@ def generate_regulatory_draft(
         "authoritative": False,
         "tenant_id": str(ctx.tenant_id),
         "document_id": str(document.id),
+        "document_business_id": document.business_id,
         "document_identifier": identifier,
         "version": next_version,
         "draft": {
@@ -235,6 +236,7 @@ def list_regulatory_documents(
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "document_identifier": row.document_identifier,
             "document_type": row.document_type,
             "title": row.title,
@@ -272,6 +274,7 @@ def get_regulatory_document(
     )
     return {
         "id": str(document.id),
+        "business_id": document.business_id,
         "document_identifier": document.document_identifier,
         "document_type": document.document_type,
         "title": document.title,
@@ -443,7 +446,12 @@ def update_regulatory_status(
         )
     data_db.commit()
     db.commit()
-    return {"id": str(document.id), "status": document.status, "lock_version": document.lock_version}
+    return {
+        "id": str(document.id),
+        "business_id": document.business_id,
+        "status": document.status,
+        "lock_version": document.lock_version,
+    }
 
 
 @router.get("/documents/{document_id}/estar", dependencies=[Depends(require_permission(DATA_EXPORT))])

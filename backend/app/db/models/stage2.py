@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 
 
 def _id():
@@ -140,6 +141,7 @@ class TenantExport(Base):
     """One full data export of an organization: a zip in object storage, downloadable until expires_at."""
 
     __tablename__ = "tenant_exports"
+    business_id: Mapped[str] = business_id_column()
     id = _id()
     tenant_id = _tenant()
     requested_by: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -186,6 +188,7 @@ class OnboardingRequest(Base):
     """Public free-trial request; it never creates a tenant or identity until a Platform Admin approves it."""
 
     __tablename__ = "onboarding_requests"
+    business_id: Mapped[str] = business_id_column()
     id = _id()
     email: Mapped[str] = mapped_column(String(254), nullable=False, unique=True)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -204,6 +207,7 @@ class DemoRequest(Base):
     """Public demo request from the website: who to contact. MDARIX staff follow up; nothing else is created."""
 
     __tablename__ = "demo_requests"
+    business_id: Mapped[str] = business_id_column()
     id = _id()
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(254), nullable=False)
@@ -231,6 +235,7 @@ class TrialFeedback(Base):
     """
 
     __tablename__ = "trial_feedback"
+    business_id: Mapped[str] = business_id_column()
     id = _id()
     tenant_id = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -331,6 +336,7 @@ class WorkerHeartbeat(Base):
 
 class SubscriptionLifecycle(Base):
     __tablename__ = "subscription_lifecycles"
+    business_id: Mapped[str] = business_id_column()
     id = _id()
     tenant_id = _tenant()
     plan_id = mapped_column(UUID(as_uuid=True), ForeignKey("plan_definitions.id"), nullable=False)

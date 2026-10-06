@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { api } from "../../app/api";
+import { referenceId } from "../../app/displayId";
 
 export function PlatformAdministrationAudit() {
   const [rows, setRows] = useState<any[]>([]);
@@ -46,7 +47,8 @@ export function PlatformAdministrationAudit() {
           <div className="audit-row" key={String(row.id)}>
             <strong>{row.action}</strong>
             <span>
-              {row.entity_type ?? "Configuration"} · {row.actor_ref ?? "System"}
+              {row.entity_type ?? "Configuration"} ·{" "}
+              {row.actor_ref ? referenceId(row, "actor", row.actor_name, row.actor_ref) : "System"}
             </span>
             <small>
               {row.created_at ? String(row.created_at).slice(0, 19).replace("T", " ") : "Server recorded"}

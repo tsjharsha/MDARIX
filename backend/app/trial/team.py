@@ -53,6 +53,7 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
         "members": [
             {
                 "id": str(user.id),
+                "business_id": user.business_id,
                 "display_name": user.display_name,
                 "email": user.username,
                 "status": user.status,
@@ -124,6 +125,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
     db.commit()
     return {
         "id": str(user.id),
+        "business_id": user.business_id,
         "email": email,
         "display_name": name,
         **_send_invitation(db, user, inviter.company, inviter.id),
@@ -136,4 +138,9 @@ def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id).first()
     if user is None or user.status != "INVITED":
         raise _error(409, "NOT_AN_OPEN_INVITATION", "This person has already activated their account")
-    return {"id": str(user.id), "email": user.username, **_send_invitation(db, user, inviter.company, inviter.id)}
+    return {
+        "id": str(user.id),
+        "business_id": user.business_id,
+        "email": user.username,
+        **_send_invitation(db, user, inviter.company, inviter.id),
+    }

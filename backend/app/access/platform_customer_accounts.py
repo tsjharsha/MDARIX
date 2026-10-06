@@ -52,13 +52,18 @@ def list_customer_accounts(
     if q.strip():
         like = f"%{q.strip().lower()}%"
         tenants_matching = db.query(Tenant.customer_id).filter(
-            or_(func.lower(Tenant.tenant_key).like(like), func.lower(Tenant.display_name).like(like))
+            or_(
+                func.lower(Tenant.tenant_key).like(like),
+                func.lower(Tenant.display_name).like(like),
+                func.lower(Tenant.business_id).like(like),
+            )
         )
         query = query.filter(
             or_(
                 func.lower(Customer.display_name).like(like),
                 func.lower(Customer.legal_name).like(like),
                 func.lower(Customer.customer_identifier).like(like),
+                func.lower(Customer.business_id).like(like),
                 Customer.id.in_(tenants_matching),
             )
         )
@@ -113,6 +118,7 @@ def list_customer_accounts(
         by_customer.setdefault(tenant.customer_id, []).append(
             {
                 "id": str(tenant.id),
+                "business_id": tenant.business_id,
                 "tenant_key": tenant.tenant_key,
                 "tenant_identifier": tenant.tenant_identifier,
                 "display_name": tenant.display_name or tenant.name,
@@ -128,6 +134,7 @@ def list_customer_accounts(
         items.append(
             {
                 "id": str(customer.id),
+                "business_id": customer.business_id,
                 "customer_identifier": customer.customer_identifier,
                 "name": customer.display_name or customer.legal_name,
                 "legal_name": customer.legal_name,
@@ -269,7 +276,9 @@ def add_tenant_to_customer(
     return {
         "tenant": {
             "id": str(tenant.id),
+            "business_id": tenant.business_id,
             "customer_id": str(customer.id),
+            "customer_business_id": customer.business_id,
             "tenant_key": tenant.tenant_key,
             "tenant_identifier": tenant.tenant_identifier,
             "display_name": tenant.display_name,

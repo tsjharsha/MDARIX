@@ -142,7 +142,9 @@ def create_customer(payload: CustomerCreateRequest, request: Request, db: Sessio
     db.commit()
     return {
         "id": str(tenant.id),
+        "business_id": tenant.business_id,
         "customer_id": str(customer.id),
+        "customer_business_id": customer.business_id,
         "customer_identifier": customer.customer_identifier,
         "tenant_key": tenant.tenant_key,
         "tenant_identifier": tenant.tenant_identifier,
@@ -181,7 +183,7 @@ def import_customers(payload: CustomerImportRequest, request: Request, db: Sessi
         imported += 1
         for item in results:
             if item["tenant_code"] == row.tenant_code.strip().upper():
-                item.update({"status": "IMPORTED", "id": result["id"]})
+                item.update({"status": "IMPORTED", "id": result["id"], "business_id": result["business_id"]})
                 break
     return {"dry_run": False, "imported": imported, "results": results}
 
@@ -226,6 +228,8 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
             | func.lower(Tenant.tenant_key).contains(query)
             | func.lower(Customer.display_name).contains(query)
             | func.lower(Customer.customer_identifier).contains(query)
+            | func.lower(Tenant.business_id).contains(query)
+            | func.lower(Customer.business_id).contains(query)
         )
     if status:
         rows = rows.filter(func.upper(Tenant.status) == status)
@@ -404,7 +408,9 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         payload.append(
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "customer_id": str(row.customer_id) if row.customer_id else None,
+                "customer_business_id": customer.business_id if customer else None,
                 "customer_identifier": customer.customer_identifier if customer else None,
                 "tenant_key": row.tenant_key,
                 "name": customer.display_name if customer else row.name,
@@ -434,7 +440,9 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     if params.get("format") == "csv":
         fields = [
             "id",
+            "business_id",
             "customer_id",
+            "customer_business_id",
             "customer_identifier",
             "tenant_key",
             "name",
@@ -506,6 +514,7 @@ def get_platform_customer(tenant_id: uuid.UUID, request: Request, db: Session = 
     )
     return {
         "id": str(tenant.id),
+        "business_id": tenant.business_id,
         "tenant_key": tenant.tenant_key,
         "name": tenant.name,
         "status": tenant.status,
@@ -532,6 +541,7 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
     return {
         "customer": {
             "id": str(customer.id),
+            "business_id": customer.business_id,
             "customer_identifier": customer.customer_identifier,
             "legal_name": customer.legal_name,
             "display_name": customer.display_name,
@@ -552,6 +562,7 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
         "tenants": [
             {
                 "id": str(t.id),
+                "business_id": t.business_id,
                 "tenant_identifier": t.tenant_identifier,
                 "tenant_key": t.tenant_key,
                 "display_name": t.display_name,
@@ -631,6 +642,7 @@ def transition_platform_customer(
     db.commit()
     return {
         "customer_id": str(customer.id),
+        "customer_business_id": customer.business_id,
         "status": payload.status,
         "tenants_changed": changed,
         "tenants_unchanged": unchanged,
@@ -647,6 +659,8 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
         raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
     tenants = db.query(Tenant).filter(Tenant.customer_id == customer.id).all()
     tenant_ids = [tenant.id for tenant in tenants]
+    # Rows name their tenant; the screen shows the tenant's business identifier, not its UUID.
+    tenant_business_ids = {tenant.id: tenant.business_id for tenant in tenants}
     key = tab.strip().lower().replace(" ", "_")
     if key in {"administrators", "users"}:
         rows = (
@@ -658,11 +672,13 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
         items = [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "display_name": row.display_name,
                 "email": row.username,
                 "role": row.role,
                 "status": row.status,
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
             }
             for row in rows
         ]
@@ -672,6 +688,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             {
                 "id": str(row.id),
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
                 "environment_identifier": row.environment_identifier,
                 "environment_type": row.environment_type,
                 "region": row.region,
@@ -700,6 +717,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
                     {
                         "id": str(assignment.id),
                         "tenant_id": str(assignment.tenant_id),
+                        "tenant_business_id": tenant_business_ids.get(assignment.tenant_id),
                         "plan_code": plan.code if plan else None,
                         "plan_name": plan.name if plan else None,
                         "status": assignment.status,
@@ -712,6 +730,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
                     {
                         "id": str(feature.id),
                         "tenant_id": str(assignment.tenant_id),
+                        "tenant_business_id": tenant_business_ids.get(assignment.tenant_id),
                         "feature_code": feature.feature_code,
                         "enabled": feature.enabled,
                         "limits": feature.limits or {},
@@ -729,6 +748,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             {
                 "id": str(row.id),
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
                 "provider_type": row.provider_type,
                 "login_mode": row.login_mode,
                 "status": row.status,
@@ -741,7 +761,9 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
         items = [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
                 "code": row.code,
                 "connector_type": row.connector_type,
                 "version": row.version,
@@ -754,6 +776,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
         items = [
             {
                 "tenant_id": str(tenant.id),
+                "tenant_business_id": tenant.business_id,
                 "users": db.query(TenantMembership).filter(TenantMembership.tenant_id == tenant.id).count(),
                 "administrators": db.query(AuthUser)
                 .filter(
@@ -773,6 +796,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             {
                 "id": str(row.id),
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
                 "status": row.status,
                 "reason": row.reason,
                 "expires_at": row.expires_at,
@@ -790,6 +814,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             {
                 "id": str(row.id),
                 "tenant_id": str(row.tenant_id),
+                "tenant_business_id": tenant_business_ids.get(row.tenant_id),
                 "action": row.action,
                 "entity_type": row.entity_type,
                 "entity_id": str(row.entity_id) if row.entity_id else None,
@@ -829,6 +854,7 @@ def get_platform_connector_detail(
     configuration = row.configuration or {}
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(row.tenant_id),
         "code": row.code,
         "connector_type": row.connector_type,

@@ -33,7 +33,8 @@ def test_edit_assign_close_and_reopen():
     )
     assert edited.status_code == 200 and edited.json()["investigation_question"].startswith("Why do occlusion")
     assignees = lead.get("/api/v1/investigation-assignees").json()
-    assert assignees and all(set(person) == {"id", "display_name"} for person in assignees)  # names only
+    # Names and identifiers only, never contact details.
+    assert assignees and all(set(person) == {"id", "business_id", "display_name"} for person in assignees)
     colleague = assignees[0]
     assigned = lead.patch(path, json={"reason": REASON, "assignee_id": colleague["id"]})
     assert assigned.status_code == 200 and assigned.json()["owner_ref"]

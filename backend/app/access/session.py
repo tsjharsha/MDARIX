@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from access_control.personas import get_persona
 from access_control.policy import PermissionSet, Role, User, effective_permissions
+from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import (
     FeatureEntitlement,
     PermissionSetDefinition,
@@ -27,6 +28,18 @@ from backend.app.access.permissions import permissions_for_role, role_of_user
 from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+
+def organization_business_ids(db: Session, tenant_id) -> dict:
+    """The signed-in user's tenant and customer as the screens show them (TEN000001, CUST000001)."""
+    row = (
+        db.query(Tenant.business_id, Customer.business_id)
+        .outerjoin(Customer, Customer.id == Tenant.customer_id)
+        .filter(Tenant.id == tenant_id)
+        .first()
+    )
+    tenant_business_id, customer_business_id = row if row is not None else (None, None)
+    return {"tenant_business_id": tenant_business_id, "customer_business_id": customer_business_id}
 
 
 @router.get("/me/context")
@@ -125,9 +138,11 @@ def context(request: Request, db: Session = Depends(get_db)):
         personas = []
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "display_name": user.display_name,
         "email": user.username,
         "tenant_id": str(user.tenant_id),
+        **organization_business_ids(db, user.tenant_id),
         "active_role": role.name,
         "role_version": role.version,
         "personas": personas,
@@ -163,6 +178,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
                 {
                     "membership_id": str(membership.id),
                     "tenant_id": str(tenant.id),
+                    "tenant_business_id": tenant.business_id,
                     "tenant_key": tenant.tenant_key,
                     "tenant_name": tenant.name,
                     "is_default": bool(membership.is_default),
@@ -184,7 +200,13 @@ def session_context(request: Request, db: Session = Depends(get_db)):
     if assignment is not None:
         plan_row = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first()
         if plan_row is not None:
-            plan = {"id": str(plan_row.id), "code": plan_row.code, "name": plan_row.name, "version": plan_row.version}
+            plan = {
+                "id": str(plan_row.id),
+                "business_id": plan_row.business_id,
+                "code": plan_row.code,
+                "name": plan_row.name,
+                "version": plan_row.version,
+            }
             entitlements = [
                 {"feature_code": item.feature_code, "enabled": bool(item.enabled), "limits": item.limits or {}}
                 for item in db.query(FeatureEntitlement)
@@ -226,7 +248,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "memberships": memberships,
         "current_tenant": next(
             (item for item in memberships if item["tenant_id"] == str(user.tenant_id)),
-            {"tenant_id": str(user.tenant_id)},
+            {"tenant_id": str(user.tenant_id), "tenant_business_id": base["tenant_business_id"]},
         ),
         "plan": plan,
         "license": {"state": license_state, "effective": license_state == "ACTIVE"},

@@ -578,6 +578,7 @@ def status(db: Session) -> dict:
     )
     return {
         "tenant_key": tenant.tenant_key,
+        "tenant_business_id": tenant.business_id,
         "plan": plan,
         "data_location_registered": bool(plane and plane.status == "ACTIVE"),
         "records": {

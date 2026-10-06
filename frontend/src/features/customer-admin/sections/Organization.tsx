@@ -2,8 +2,9 @@ import { CheckCircle2, Download, RefreshCw, XCircle } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
-import { Table, formatDate, listOf, send, useResource } from "../shared";
+import { Table, formatDate, idColumn, listOf, send, useResource } from "../shared";
 import { LifecycleBadge } from "./Access";
+import { hideUuid, safeText } from "../../../app/displayId";
 
 type DataExport = {
   id: string;
@@ -67,6 +68,7 @@ function DataExports() {
           detail: "Prepare an export to download everything your organization stored.",
         }}
         columns={[
+          idColumn("Export ID"),
           { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
           { key: "status", label: "Status", render: (row) => titleCase(row.status) },
           {
@@ -109,12 +111,12 @@ export function OrganizationSection() {
         <Panel eyebrow="Organization" title={context?.current_tenant?.tenant_name ?? "Your organization"}>
           <dl className="ca-facts">
             <div>
-              <dt>Tenant key</dt>
-              <dd>{context?.current_tenant?.tenant_key ?? "—"}</dd>
+              <dt>Tenant ID</dt>
+              <dd>{hideUuid(context?.tenant_business_id ?? context?.current_tenant?.tenant_business_id)}</dd>
             </div>
             <div>
-              <dt>Tenant ID</dt>
-              <dd className="ca-mono-sm">{context?.tenant_id ?? "—"}</dd>
+              <dt>Tenant key</dt>
+              <dd>{context?.current_tenant?.tenant_key ?? "—"}</dd>
             </div>
             <div>
               <dt>Environment</dt>
@@ -175,13 +177,17 @@ export function OrganizationSection() {
           rowKey={(row) => row.id}
           empty={{ title: "No products yet", detail: "Products appear once your product data is connected." }}
           columns={[
+            idColumn("Product ID", "product_identifier"),
             {
               key: "name",
               label: "Product",
+              fields: ["name", "product_identifier"],
               render: (row) => (
                 <span className="ca-person">
                   <strong>{row.name}</strong>
-                  <small>{row.product_identifier}</small>
+                  {safeText(row.business_id) && safeText(row.product_identifier) && (
+                    <small>Source ID {row.product_identifier}</small>
+                  )}
                 </span>
               ),
             },

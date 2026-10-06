@@ -17,11 +17,13 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 from backend.app.db.models.foundation import tenant_fk, tz, uuid_pk
 
 
 class Customer(Base):
     __tablename__ = "customers"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     customer_identifier: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
     legal_name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -522,6 +524,7 @@ class TenantIsolationEvidence(Base):
 
 class PlatformIncident(Base):
     __tablename__ = "platform_incidents"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"))
     incident_identifier: Mapped[str] = mapped_column(String(60), nullable=False, unique=True)

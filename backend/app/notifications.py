@@ -463,7 +463,10 @@ def _one_or_approvers(db: Session, tenant_id, named_user_id, actor_user_id) -> l
 
 
 def _reference(payload: dict, key: str) -> str:
-    return payload.get("reference") or f"#{str(payload.get(key) or '')[:8]}"
+    """How an email names the record: the reference the producer gave (its business id, e.g. INV000012), else the
+    record's business id in the event, else plain words. Never a UUID or part of one: people do not see UUIDs."""
+    business_key = f"{key[: -len('_id')]}_business_id" if key.endswith("_id") else f"{key}_business_id"
+    return payload.get("reference") or payload.get(business_key) or "the record (open MDARIX to see it)"
 
 
 def _staff_alert_address() -> str:

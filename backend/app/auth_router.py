@@ -654,6 +654,7 @@ def _clear_throttle(db: Session, email: str, address: str | None) -> None:
 def _signin_response(row) -> dict:
     return {
         "user_id": str(row.id),
+        "business_id": row.business_id,
         "display_name": row.display_name,
         "email": row.username,
         "tenant_id": str(row.tenant_id),
@@ -799,11 +800,15 @@ def session(request: Request, response: Response, db: Session = Depends(get_db))
         # browser's watcher calls here before its deadline, so the cookie always catches up with the server.
         set_session_cookie(response, token, max_age=max(1, int((row.expires_at - now).total_seconds())))
     db.commit()
+    from backend.app.access.session import organization_business_ids
+
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "display_name": user.display_name,
         "email": user.username,
         "tenant_id": str(user.tenant_id),
+        **organization_business_ids(db, user.tenant_id),
         "active_role": user.role,
         # VERIFY: a code is still due; ENROLL: MFA must be set up first; None: fully signed in.
         "mfa_state": row.mfa_state,
@@ -982,4 +987,4 @@ def activate(data: Reset, request: Request, background: BackgroundTasks, db: Ses
     background.add_task(
         _send_welcome_quietly, row.username, _organization_name(db, row.tenant_id) or "your organization"
     )
-    return {"status": "ACTIVE", "user_id": str(row.id), "email": row.username}
+    return {"status": "ACTIVE", "user_id": str(row.id), "business_id": row.business_id, "email": row.username}

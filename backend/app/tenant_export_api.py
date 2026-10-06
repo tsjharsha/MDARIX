@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _admin_tenant, _require_platform_admin, ensure_user_visible
+from backend.app.business_ids import business_id_of
 from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantMembership
 from backend.app.db.models.stage2 import (
     AuthenticationEvent,
@@ -126,6 +127,7 @@ def _account_record(user: AuthUser) -> dict:
     """The account as the person may see it: no credentials, no authenticator material."""
     return {
         "id": str(user.id),
+        "business_id": user.business_id,
         "tenant_id": str(user.tenant_id),
         "email": user.username,
         "display_name": user.display_name,
@@ -417,4 +419,4 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
             409,
             detail={"code": "PURGE_INCOMPLETE", "message": f"Nothing was deleted: {exc}. See the server log."},
         )
-    return {"tenant_id": str(tenant_id), **result}
+    return {"tenant_id": str(tenant_id), "tenant_business_id": business_id_of(db, Tenant, tenant_id), **result}

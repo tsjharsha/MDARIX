@@ -1,6 +1,7 @@
 import { ArrowLeft, BookOpen } from "lucide-react";
-// The guide's single source is docs/user-guide/PILOT_GUIDE.md; it is bundled as text at build time.
-import guide from "../../../../docs/user-guide/PILOT_GUIDE.md?raw";
+// The guide's single source is PILOT_GUIDE.md beside this file (inside frontend/, so the web image build has it);
+// it is bundled as text at build time.
+import guide from "./PILOT_GUIDE.md?raw";
 import { parseMarkdown, renderInline } from "../../site/markdown";
 
 /** The guide as page blocks: its own "# title" becomes the page heading, "##" sections become h2 and "###" h3. */

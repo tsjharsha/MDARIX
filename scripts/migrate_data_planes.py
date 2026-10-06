@@ -104,7 +104,14 @@ def _copy_rows(table_name: str, column: str, value, plane_engine) -> int:
         return 0
     target = Table(table_name, MetaData(), autoload_with=plane_engine)
     shared = [name for name in rows[0] if name in target.c]
+    # The copy carries the control database's business identifier (md26). Business identifiers refuse to change, so
+    # this owner-only sync lifts that one trigger for its own transaction to correct a copy numbered on the plane.
+    guard = f"{table_name}_business_id_immutable" if "business_id" in shared else None
     with plane_engine.begin() as connection:
+        if guard and _has_trigger(connection, table_name, guard):
+            connection.execute(text(f'ALTER TABLE public."{table_name}" DISABLE TRIGGER "{guard}"'))
+        else:
+            guard = None
         for row in rows:
             values = {name: row[name] for name in shared}
             statement = insert(target).values(**values)
@@ -113,7 +120,18 @@ def _copy_rows(table_name: str, column: str, value, plane_engine) -> int:
                     index_elements=[target.c.id], set_={name: values[name] for name in shared if name != "id"}
                 )
             )
+        if guard:
+            connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE TRIGGER "{guard}"'))
     return len(rows)
+
+
+def _has_trigger(connection, table_name: str, trigger: str) -> bool:
+    return bool(
+        connection.execute(
+            text("SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass(:table) AND tgname = :trigger"),
+            {"table": f"public.{table_name}", "trigger": trigger},
+        ).scalar()
+    )
 
 
 def _grants(plane_engine) -> None:

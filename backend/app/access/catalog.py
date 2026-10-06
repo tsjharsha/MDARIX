@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_map
 from backend.app.db.models.foundation import (
     MasterMapping,
     Product,
@@ -82,6 +83,7 @@ def create_product(payload: ProductRequest, request: Request, db: Session = Depe
         _commit(business, db)
         return {
             "id": str(row.id),
+            "business_id": row.business_id,
             "product_identifier": row.product_identifier,
             "name": row.name,
             "tenant_id": str(row.tenant_id),
@@ -107,6 +109,7 @@ def list_products(request: Request, response: Response, page: Page = Depends(), 
         return [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "tenant_id": str(row.tenant_id),
                 "product_identifier": row.product_identifier,
                 "name": row.name,
@@ -137,11 +140,14 @@ def list_product_versions(
         if product_id is not None:
             query = query.filter(ProductVersion.product_id == product_id)
         rows = page.apply(query.order_by(ProductVersion.version_identifier.asc()), response)
+        products = business_id_map(business, Product, (row.product_id for row in rows))
         return [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "tenant_id": str(row.tenant_id),
                 "product_id": str(row.product_id),
+                "product_business_id": products.get(str(row.product_id)),
                 "version_identifier": row.version_identifier,
                 "description": row.description,
                 "lifecycle_status": row.lifecycle_status,
@@ -200,7 +206,9 @@ def create_product_version(payload: ProductVersionRequest, request: Request, db:
         _commit(business, db)
         return {
             "id": str(row.id),
+            "business_id": row.business_id,
             "product_id": str(row.product_id),
+            "product_business_id": product.business_id,
             "version_identifier": row.version_identifier,
             "tenant_id": str(row.tenant_id),
         }
@@ -230,7 +238,7 @@ def update_product(product_id: uuid.UUID, payload: AdminUpdateRequest, request: 
         row.updated_at = datetime.now(timezone.utc)
         _audit_configuration(db, admin, "PRODUCT_UPDATED", "Product", row.id, "v1")
         _commit(business, db)
-        return {"id": str(row.id), "status": row.lifecycle_status}
+        return {"id": str(row.id), "business_id": row.business_id, "status": row.lifecycle_status}
 
 
 @router.patch("/admin/catalog/product-versions/{version_id}")
@@ -266,7 +274,7 @@ def update_product_version(
         row.updated_at = datetime.now(timezone.utc)
         _audit_configuration(db, admin, "PRODUCT_VERSION_UPDATED", "ProductVersion", row.id, "v1")
         _commit(business, db)
-        return {"id": str(row.id), "status": row.lifecycle_status}
+        return {"id": str(row.id), "business_id": row.business_id, "status": row.lifecycle_status}
 
 
 @router.patch("/admin/catalog/products/{product_id}/lifecycle")

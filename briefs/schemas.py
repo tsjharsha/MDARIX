@@ -12,7 +12,9 @@ class BriefCreateRequest(BaseModel):
 
 class BriefResponse(BaseModel):
     id: uuid.UUID
+    business_id: str | None = None
     investigation_id: uuid.UUID
+    investigation_business_id: str | None = None
     brief_version: int
     status: str
     title: str

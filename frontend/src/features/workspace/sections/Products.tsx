@@ -5,7 +5,8 @@ import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, formatDate } from "../../customer-admin/shared";
 import { ProductVersionStory } from "../../investigator/ProductVersionStory";
 import { useWorkspace } from "../workspaceContext";
-import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
+import { Embedded, NeedsProduct, RecordTable, StatusBadge, recordFieldKeys } from "./common";
+import { displayId, safeText } from "../../../app/displayId";
 
 const TABS = [
   "Overview",
@@ -32,11 +33,21 @@ export function ProductsSection({ tab }: { tab?: string }) {
               {active === "Overview" && (
                 <>
                   <Panel
-                    eyebrow={view.product.product_identifier ?? "Product"}
+                    eyebrow={productEyebrow(view.product)}
                     title={view.product.name ?? "Product"}
                     action={<StatusBadge value={view.product.lifecycle_status} />}
                   >
                     <dl className="ca-facts">
+                      <div>
+                        <dt>Product ID</dt>
+                        <dd>{displayId(view.product, "product_identifier")}</dd>
+                      </div>
+                      {safeText(view.product.business_id) && (
+                        <div>
+                          <dt>Source ID</dt>
+                          <dd>{safeText(view.product.product_identifier) ?? "—"}</dd>
+                        </div>
+                      )}
                       <div>
                         <dt>Family</dt>
                         <dd>{view.product.product_family ?? "—"}</dd>
@@ -110,6 +121,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                   <Panel eyebrow="Configuration" title="Components">
                     <RecordTable
                       caption="Components"
+                      idLabel="Component ID"
                       rows={view.configuration.components}
                       columns={["component_identifier", "name", "revision", "status"]}
                       empty={{
@@ -121,6 +133,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                   <Panel eyebrow="Configuration" title="Suppliers">
                     <RecordTable
                       caption="Suppliers"
+                      idLabel="Supplier ID"
                       rows={view.configuration.suppliers}
                       columns={["supplier_identifier", "name", "component_identifier"]}
                       empty={{
@@ -136,6 +149,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                   <Panel eyebrow="Manufacturing" title="Lots">
                     <RecordTable
                       caption="Lots"
+                      idLabel="Lot ID"
                       rows={view.manufacturing.lots}
                       columns={["lot_identifier", "site_identifier", "traceability_state", "manufactured_timestamp"]}
                       empty={{ title: "No lots recorded", detail: "Lots appear once manufacturing data is connected." }}
@@ -144,10 +158,9 @@ export function ProductsSection({ tab }: { tab?: string }) {
                   <Panel eyebrow="Manufacturing" title="Sites">
                     <RecordTable
                       caption="Sites"
+                      idLabel="Site ID"
                       rows={view.manufacturing.sites}
-                      columns={Object.keys(view.manufacturing.sites[0] ?? { site_identifier: "", name: "" })
-                        .filter((key) => !["id", "tenant_id"].includes(key))
-                        .slice(0, 4)}
+                      columns={recordFieldKeys(view.manufacturing.sites[0], ["site_identifier", "name"]).slice(0, 4)}
                       empty={{
                         title: "No sites recorded",
                         detail: "Sites appear once manufacturing data is connected.",
@@ -160,6 +173,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                 <Panel eyebrow="Change control" title="Design and process changes">
                   <RecordTable
                     caption="Changes"
+                    idLabel="Change ID"
                     rows={view.changes}
                     columns={["change_identifier", "change_type", "effective_timestamp"]}
                     empty={{ title: "No changes recorded", detail: "Approved changes to this product appear here." }}
@@ -172,6 +186,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                     <Panel eyebrow="Risk" title="Risks">
                       <RecordTable
                         caption="Risks"
+                        idLabel="Risk ID"
                         rows={view.risks}
                         columns={["risk_identifier", "description", "status"]}
                         empty={{ title: "No risks recorded", detail: "The risk file appears here when connected." }}
@@ -180,6 +195,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                     <Panel eyebrow="Risk" title="Controls">
                       <RecordTable
                         caption="Controls"
+                        idLabel="Control ID"
                         rows={view.controls}
                         columns={["control_identifier", "control_type", "status"]}
                         empty={{ title: "No controls recorded", detail: "Risk controls appear here when connected." }}
@@ -189,10 +205,12 @@ export function ProductsSection({ tab }: { tab?: string }) {
                   <Panel eyebrow="Risk" title="Failure modes">
                     <RecordTable
                       caption="Failure modes"
+                      idLabel="Failure mode ID"
                       rows={view.failure_modes}
-                      columns={Object.keys(view.failure_modes[0] ?? { failure_mode_identifier: "", description: "" })
-                        .filter((key) => !["id", "tenant_id"].includes(key))
-                        .slice(0, 4)}
+                      columns={recordFieldKeys(view.failure_modes[0], ["failure_mode_identifier", "description"]).slice(
+                        0,
+                        4,
+                      )}
                       empty={{ title: "No failure modes recorded", detail: "FMEA entries appear here when connected." }}
                     />
                   </Panel>
@@ -235,6 +253,12 @@ export function ProductsSection({ tab }: { tab?: string }) {
     </>
   );
 }
+
+/** "Product · PROD000003": the product's MDARIX ID (its source number until the record carries one). */
+const productEyebrow = (product: Record<string, string | null>) => {
+  const id = displayId(product, "product_identifier", "");
+  return id ? `Product · ${id}` : "Product";
+};
 
 export function Limitations({ items }: { items: Array<{ code: string; severity: string; description: string }> }) {
   return (

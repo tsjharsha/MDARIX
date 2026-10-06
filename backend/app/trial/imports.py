@@ -810,7 +810,12 @@ def insights(db: Session, tenant_id) -> dict:
         return sorted(counts.items(), key=lambda item: (-item[1], str(item[0])))
 
     by_product = [
-        {"product_id": products[pid].product_identifier, "name": products[pid].name, "complaints": n}
+        {
+            "product_id": products[pid].product_identifier,
+            "product_business_id": products[pid].business_id,
+            "name": products[pid].name,
+            "complaints": n,
+        }
         for pid, n in tally(lambda c: c.product_id)
         if pid in products
     ]
@@ -819,14 +824,18 @@ def insights(db: Session, tenant_id) -> dict:
             "product_id": products[versions[vid].product_id].product_identifier
             if versions[vid].product_id in products
             else None,
+            "product_business_id": products[versions[vid].product_id].business_id
+            if versions[vid].product_id in products
+            else None,
             "version": versions[vid].version_identifier,
+            "version_business_id": versions[vid].business_id,
             "complaints": n,
         }
         for vid, n in tally(lambda c: c.product_version_id)
         if vid in versions
     ]
     by_lot = [
-        {"lot_id": lots[lid].lot_identifier, "complaints": n}
+        {"lot_id": lots[lid].lot_identifier, "lot_business_id": lots[lid].business_id, "complaints": n}
         for lid, n in tally(lambda c: c.lot_batch_id)
         if lid in lots
     ][:5]

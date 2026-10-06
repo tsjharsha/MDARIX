@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { Panel } from "../console/charts";
-import { SearchBox, Table, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, idColumn, useResource } from "../../customer-admin/shared";
 import { CustomerImportDialog } from "./CustomerImportDialog";
 import type { CustomerAccount } from "./model";
 import { StatusBadge } from "./StatusBadge";
@@ -82,6 +82,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
         rowKey={(row) => row.id}
         empty={{ title: "No matching customers", detail: "Change the search or filters, or onboard a new customer." }}
         columns={[
+          idColumn("Customer ID", "customer_identifier"),
           {
             key: "customer",
             fields: ["name", "customer_identifier", "legal_name"],
@@ -89,7 +90,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
                 <strong>{row.name || "Unnamed customer"}</strong>
-                <small>{row.customer_identifier}</small>
+                {row.legal_name && row.legal_name !== row.name && <small>{row.legal_name}</small>}
               </button>
             ),
           },

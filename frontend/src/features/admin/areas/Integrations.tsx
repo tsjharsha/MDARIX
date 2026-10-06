@@ -2,10 +2,11 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleSlash, RefreshCcw } from "lucide-react";
 import { BarList, Panel, StatTile } from "../console/charts";
 import type { Slice, Tone } from "../console/dashboardModel";
-import { SearchBox, Table, formatDate, listOf, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
+import { hideUuid, referenceId } from "../../../app/displayId";
 
 export function Integrations({ section }: { section: string }) {
   if (section === "Runs & failures") return <Runs />;
@@ -80,7 +81,11 @@ function Catalog() {
               rowKey={(row) => `${row.connector_id}-${row.version}`}
               empty={{ title: "No connector yet", detail: "No connector version is published for this system." }}
               columns={[
-                { key: "connector", label: "Connector", render: (row) => <strong>{row.connector_id}</strong> },
+                {
+                  key: "connector",
+                  label: "Connector",
+                  render: (row) => <strong>{hideUuid(row.connector_id)}</strong>,
+                },
                 { key: "type", label: "Type", render: (row) => row.connector_type },
                 { key: "version", label: "Version", render: (row) => row.version },
                 {
@@ -151,7 +156,7 @@ const RUN_COLUMNS = [
   { key: "when", fields: ["started_at"], label: "Started", render: (row: Run) => formatDate(row.started_at) },
   {
     key: "tenant",
-    fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+    fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
     label: "Tenant",
     render: (row: Run) => <TenantCell row={row} />,
   },
@@ -162,7 +167,7 @@ const RUN_COLUMNS = [
     render: (row: Run) => (
       <span className="cc-stack">
         <strong>{row.source_system}</strong>
-        <small>{row.connection_id}</small>
+        <small>{referenceId(row, "connection", row.connection_id)}</small>
       </span>
     ),
   },
@@ -320,6 +325,7 @@ function Credentials() {
         rowKey={(row) => row.id}
         empty={{ title: "No connections", detail: "Connections of the platform tenant appear here." }}
         columns={[
+          idColumn("Connection ID", "code"),
           {
             key: "connection",
             label: "Connection",

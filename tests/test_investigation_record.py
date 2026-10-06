@@ -1,5 +1,6 @@
 """The investigation record export: the whole case, tenant-scoped and audited; and the evidence-package endpoint."""
 
+import re
 import uuid
 
 import pytest
@@ -82,3 +83,19 @@ def test_the_compliance_pdf_lists_the_audit_events_and_signatures(seeded):
     assert seeded["signature_id"].encode() in response.content
     as_json = admin.get("/api/v1/stage3/compliance-report", params={"output_format": "JSON"}).json()
     assert seeded["audit_event_id"] in {event["id"] for event in as_json["context"]["audit_events"]}
+
+
+def test_the_record_lists_each_record_by_business_id(seeded):
+    body = role_client("INVESTIGATOR")[0].get(PATH.format(seeded["investigation_id"])).json()
+    record = body["context"]
+    assert re.fullmatch(r"INV\d{6}", record["investigation"]["business_id"])
+    assert body["title"] == f"Investigation Record {record['investigation']['business_id']}"
+    assert re.fullmatch(r"PROD\d{6}", record["investigation"]["product"]["business_id"])
+    assert all(re.fullmatch(r"CMP\d{6}", item["business_id"]) for item in record["complaints"])
+    assert all(re.fullmatch(r"EVD\d{6}", item["business_id"]) for item in record["evidence"])
+    assert all(re.fullmatch(r"HYP\d{6}", item["business_id"]) for item in record["hypotheses"])
+    assert all(re.fullmatch(r"UNK\d{6}", item["business_id"]) for item in record["unknowns"])
+    signed = next(item for item in record["decisions"] if item["signatures"])
+    assert re.fullmatch(r"DEC\d{6}", signed["business_id"])
+    assert signed["signatures"][0]["decision_business_id"] == signed["business_id"]
+    assert re.fullmatch(r"ESIG\d{6}", signed["signatures"][0]["business_id"])

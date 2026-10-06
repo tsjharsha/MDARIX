@@ -5,6 +5,7 @@ import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { LifecycleBadge } from "./Access";
 import { Table, listOf, send, useResource } from "../shared";
+import { hideUuid, safeText } from "../../../app/displayId";
 
 const RECIPIENT_TYPES = ["CUSTOMER_ADMIN", "BILLING_CONTACT", "BUSINESS_CONTACT", "ACCOUNT_OWNER"] as const;
 
@@ -104,7 +105,16 @@ export function NotificationsSection() {
           empty={{ title: "No contacts yet", detail: "Add billing or business contacts who should receive reminders." }}
           columns={[
             { key: "type", label: "Type", render: (row) => titleCase(row.recipient_type ?? "") },
-            { key: "contact", label: "Contact", render: (row) => row.contact_id ?? "—" },
+            {
+              key: "contact",
+              label: "Contact",
+              fields: ["contact_name", "contact_email", "contact_id"],
+              // The contact's name or email when the server sends them; never the contact's UUID.
+              render: (row) =>
+                safeText(row.contact_name) ??
+                safeText(row.contact_email) ??
+                (row.contact_id ? hideUuid(row.contact_id, "Contact on file") : "—"),
+            },
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
           ]}
         />

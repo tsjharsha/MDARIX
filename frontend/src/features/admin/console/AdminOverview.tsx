@@ -33,6 +33,7 @@ import {
 } from "./dashboardModel";
 import { KpiTile, TrendChart, toPoints, type DailyRow, type TrendPoint } from "./trendCharts";
 import { formatDateTime } from "../../../app/dates";
+import { safeText } from "../../../app/displayId";
 
 type DashboardTrends = {
   days: number;
@@ -483,7 +484,11 @@ export function AdminOverview({
                 <span className="ac-timeline-text">
                   <strong>{titleCase(row.action ?? "Event")}</strong>
                   <small>
-                    {[row.tenant_name, row.actor, row.entity_type ? titleCase(row.entity_type) : null]
+                    {[
+                      row.tenant_name,
+                      safeText(row.actor) ?? safeText(row.actor_business_id),
+                      row.entity_type ? titleCase(row.entity_type) : null,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </small>

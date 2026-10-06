@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { AlertOctagon, AlertTriangle, CheckCircle2, CircleDashed, Lock, XCircle } from "lucide-react";
+import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { compactNumber, type DayCount, type Slice, type Tone } from "./dashboardModel";
 
 const TONE_LABEL: Record<Tone, string> = {
@@ -246,6 +247,7 @@ function niceMax(value: number) {
 export function ColumnChart({ data, unit, caption }: { data: DayCount[]; unit: string; caption: string }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const table = useSortedRows(data, (day, key) => (key === "date" ? day.date : day.count));
   const peak = Math.max(0, ...data.map((day) => day.count));
   const top = niceMax(peak);
   const peakIndex = peak ? data.findIndex((day) => day.count === peak) : -1;
@@ -266,14 +268,12 @@ export function ColumnChart({ data, unit, caption }: { data: DayCount[]; unit: s
           <table className="ac-table">
             <thead>
               <tr>
-                <th scope="col">Day</th>
-                <th scope="col" className="num">
-                  {unit}
-                </th>
+                <SortableHeader label="Day" sortKey="date" sort={table.sort} onSort={table.toggle} />
+                <SortableHeader label={unit} sortKey="count" sort={table.sort} onSort={table.toggle} className="num" />
               </tr>
             </thead>
             <tbody>
-              {data.map((day) => (
+              {table.sorted.map((day) => (
                 <tr key={day.date}>
                   <td>{day.label}</td>
                   <td className="num">{day.count}</td>

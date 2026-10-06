@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from investigator.schemas import SourceReference, TemporalMode
+from investigator.schemas import SourceReference, TemporalMode, business_id_field
 
 
 HypothesisStatus = Literal[
@@ -38,6 +38,7 @@ class HypothesisEvidenceRelationship(BaseModel):
 
 class Hypothesis(BaseModel):
     hypothesis_id: uuid.UUID
+    business_id: str | None = business_id_field()
     investigation_id: uuid.UUID
     statement: str
     scope: str

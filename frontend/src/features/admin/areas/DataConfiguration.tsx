@@ -8,6 +8,7 @@ import {
   Table,
   errorText,
   formatDate,
+  idColumn,
   listOf,
   matches,
   send,
@@ -827,6 +828,7 @@ type ProductConfiguration = {
   tenant: { id: string; tenant_key: string; name: string; status: string };
   products: Array<{
     id: string;
+    business_id?: string | null;
     identifier: string;
     name: string;
     status: string;
@@ -835,7 +837,14 @@ type ProductConfiguration = {
     manufacturer?: string | null;
   }>;
   versions: Array<{ id: string; product_id: string; identifier: string; status: string; release_timestamp?: string }>;
-  connectors: Array<{ id: string; code: string; connector_type: string; version: string; status: string }>;
+  connectors: Array<{
+    id: string;
+    business_id?: string | null;
+    code: string;
+    connector_type: string;
+    version: string;
+    status: string;
+  }>;
   mapping_versions: Array<{ id: string; master_mapping_id: string; version: string; status: string }>;
 };
 
@@ -903,6 +912,7 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
               rowKey={(row) => row.id}
               empty={{ title: "No products", detail: "Add the tenant's first product." }}
               columns={[
+                idColumn("Product ID", "identifier"),
                 {
                   key: "product",
                   label: "Product",
@@ -958,6 +968,7 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
                 rowKey={(row) => row.id}
                 empty={{ title: "No connections", detail: "This tenant has no source system connected." }}
                 columns={[
+                  idColumn("Connection ID", "code"),
                   {
                     key: "connection",
                     label: "Connection",

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, validates
 from sqlalchemy.types import UserDefinedType
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 from backend.app.role_codes import canonical_stored_role
 
 
@@ -47,6 +48,7 @@ def tz(nullable: bool = True) -> Mapped[object]:
 
 class Tenant(Base):
     __tablename__ = "tenants"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
     tenant_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
@@ -136,6 +138,7 @@ class TenantOwned:
 
 class Product(TenantOwned, Base):
     __tablename__ = "products"
+    business_id: Mapped[str] = business_id_column()
     product_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -150,6 +153,7 @@ class Product(TenantOwned, Base):
 
 class ProductVersion(TenantOwned, Base):
     __tablename__ = "product_versions"
+    business_id: Mapped[str] = business_id_column()
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     version_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -166,6 +170,7 @@ class ProductVersion(TenantOwned, Base):
 
 class Component(TenantOwned, Base):
     __tablename__ = "components"
+    business_id: Mapped[str] = business_id_column()
     component_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     revision: Mapped[str | None] = mapped_column(String(80))
@@ -181,6 +186,7 @@ class Component(TenantOwned, Base):
 
 class Supplier(TenantOwned, Base):
     __tablename__ = "suppliers"
+    business_id: Mapped[str] = business_id_column()
     supplier_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
@@ -192,6 +198,7 @@ class Supplier(TenantOwned, Base):
 
 class ManufacturingSite(TenantOwned, Base):
     __tablename__ = "manufacturing_sites"
+    business_id: Mapped[str] = business_id_column()
     site_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255))
@@ -204,6 +211,7 @@ class ManufacturingSite(TenantOwned, Base):
 
 class LotBatch(TenantOwned, Base):
     __tablename__ = "lot_batches"
+    business_id: Mapped[str] = business_id_column()
     lot_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     manufacturing_site_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -222,6 +230,7 @@ class LotBatch(TenantOwned, Base):
 
 class Requirement(TenantOwned, Base):
     __tablename__ = "requirements"
+    business_id: Mapped[str] = business_id_column()
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     requirement_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -240,6 +249,7 @@ class Requirement(TenantOwned, Base):
 
 class Change(TenantOwned, Base):
     __tablename__ = "changes"
+    business_id: Mapped[str] = business_id_column()
     change_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     change_type: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -252,6 +262,7 @@ class Change(TenantOwned, Base):
 
 class Complaint(TenantOwned, Base):
     __tablename__ = "complaints"
+    business_id: Mapped[str] = business_id_column()
     complaint_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -287,6 +298,7 @@ class Complaint(TenantOwned, Base):
 
 class Investigation(TenantOwned, Base):
     __tablename__ = "investigations"
+    business_id: Mapped[str] = business_id_column()
     investigation_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     investigation_question: Mapped[str] = mapped_column(Text, nullable=False)
@@ -305,6 +317,7 @@ class Capa(TenantOwned, Base):
     """A corrective or preventive action from the customer's quality system."""
 
     __tablename__ = "capas"
+    business_id: Mapped[str] = business_id_column()
     capa_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     action_type: Mapped[str | None] = mapped_column(String(40))
@@ -326,6 +339,7 @@ class Capa(TenantOwned, Base):
 
 class Risk(TenantOwned, Base):
     __tablename__ = "risks"
+    business_id: Mapped[str] = business_id_column()
     risk_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -343,6 +357,7 @@ class Risk(TenantOwned, Base):
 
 class FailureMode(TenantOwned, Base):
     __tablename__ = "failure_modes"
+    business_id: Mapped[str] = business_id_column()
     failure_mode_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -354,6 +369,7 @@ class FailureMode(TenantOwned, Base):
 
 class Control(TenantOwned, Base):
     __tablename__ = "controls"
+    business_id: Mapped[str] = business_id_column()
     control_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     control_type: Mapped[str | None] = mapped_column(String(80))
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -366,6 +382,7 @@ class Control(TenantOwned, Base):
 
 class Evidence(TenantOwned, Base):
     __tablename__ = "evidence"
+    business_id: Mapped[str] = business_id_column()
     evidence_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     evidence_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -388,6 +405,7 @@ class Evidence(TenantOwned, Base):
 
 class Hypothesis(TenantOwned, Base):
     __tablename__ = "hypotheses"
+    business_id: Mapped[str] = business_id_column()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     statement: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="proposed")
@@ -402,6 +420,7 @@ class Hypothesis(TenantOwned, Base):
 
 class Unknown(Base):
     __tablename__ = "unknowns"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -422,6 +441,7 @@ class Unknown(Base):
 
 class FailureChain(Base):
     __tablename__ = "failure_chains"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -437,6 +457,7 @@ class FailureChain(Base):
 
 class Scenario(TenantOwned, Base):
     __tablename__ = "scenarios"
+    business_id: Mapped[str] = business_id_column()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     scenario_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
@@ -452,6 +473,7 @@ class Scenario(TenantOwned, Base):
 
 class AIExecution(Base):
     __tablename__ = "ai_executions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -480,6 +502,7 @@ class AIExecution(Base):
 
 class Decision(Base):
     __tablename__ = "decisions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -554,6 +577,7 @@ class InvestigationBrief(Base):
     """Immutable, versioned investigation brief snapshot."""
 
     __tablename__ = "investigation_briefs"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -631,6 +655,7 @@ class AssuranceCheck(Base):
 
 class EvaluationRun(Base):
     __tablename__ = "evaluation_runs"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     suite_version: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -669,6 +694,7 @@ class ReleaseAssuranceResult(Base):
 
 class AuthUser(Base):
     __tablename__ = "auth_users"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     username: Mapped[str] = mapped_column(String(254), nullable=False)
@@ -807,6 +833,7 @@ class RoleAssignment(Base):
 
 class PlanDefinition(Base):
     __tablename__ = "plan_definitions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     code: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -884,6 +911,7 @@ class SegregationOfDutiesPolicy(Base):
 
 class SignedApprovalRecord(Base):
     __tablename__ = "signed_approval_records"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     object_type: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -1123,6 +1151,7 @@ class EvidenceEmbedding(Base):
 
 class ConnectorConfiguration(Base):
     __tablename__ = "connector_configurations"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     code: Mapped[str] = mapped_column(String(100), nullable=False)

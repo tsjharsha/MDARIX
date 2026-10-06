@@ -140,7 +140,7 @@ def request_risk_review(
         control_db,
         tenant_id=tenant_id,
         risk_id=risk.id,
-        risk_identifier=risk.risk_identifier,
+        risk_identifier=risk.business_id,
         requested_by=str(ctx.user_id),
         reason=payload.reason,
     )
@@ -158,6 +158,7 @@ def request_risk_review(
     control_db.commit()
     return {
         "risk_id": str(risk.id),
+        "risk_business_id": risk.business_id,
         "risk_identifier": risk.risk_identifier,
         "status": "REVIEW_REQUESTED",
         "approvers_notified": notified,

@@ -7,6 +7,7 @@ import { customerAttention, roleMix, seatUsage, userStatusSlices, type TenantUse
 import { licensedSeatLimit, useConsole } from "../context";
 import { listOf, useResource } from "../shared";
 import { formatDateTime } from "../../../app/dates";
+import { safeText } from "../../../app/displayId";
 
 const SEAT_STATUSES = ["ACTIVE", "INVITED", "PENDING_VERIFICATION"];
 
@@ -310,7 +311,7 @@ export function Dashboard() {
                   <span className="ac-timeline-text">
                     <strong>{titleCase(row.action ?? "Event")}</strong>
                     <small>
-                      {[row.actor_label, row.entity_type ? titleCase(row.entity_type) : null]
+                      {[safeText(row.actor_label), row.entity_type ? titleCase(row.entity_type) : null]
                         .filter(Boolean)
                         .join(" · ") || "Administration"}
                     </small>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { EvidenceSummary } from "../../app/types";
 import { api } from "../../app/api";
+import { displayId } from "../../app/displayId";
 
 export function EvidenceAccessView({ productEvidenceCount }: { productEvidenceCount: number }) {
   const [evidence, setEvidence] = useState<EvidenceSummary[]>([]);
@@ -63,7 +64,7 @@ export function EvidenceAccessView({ productEvidenceCount }: { productEvidenceCo
           <div className="evidence-list">
             {evidence.map((item) => (
               <article key={item.id}>
-                <strong>{item.evidence_identifier}</strong>
+                <strong>{displayId(item, "evidence_identifier")}</strong>
                 <span>{item.title}</span>
                 <small>
                   {item.evidence_type} | {item.reliability_status ?? "reliability not recorded"} |{" "}

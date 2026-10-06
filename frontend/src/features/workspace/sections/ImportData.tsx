@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Upload } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
+import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
 import { useCan, useWorkspace } from "../workspaceContext";
@@ -240,31 +241,7 @@ export function ImportPanel({
               </ul>
             </>
           )}
-          {report.preview.length > 0 && (
-            <div className="ac-table-wrap">
-              <table className="ac-table">
-                <caption className="ca-sr-only">First rows of the file</caption>
-                <thead>
-                  <tr>
-                    {Object.keys(report.preview[0]).map((column) => (
-                      <th key={column} scope="col">
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.preview.map((row, index) => (
-                    <tr key={index}>
-                      {Object.values(row).map((value, cell) => (
-                        <td key={cell}>{value || "—"}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {report.preview.length > 0 && <FilePreviewTable rows={report.preview} />}
           {report.ready && canImport && (
             <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
               <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${report.rows} rows`}
@@ -310,5 +287,34 @@ export function ImportDataSection() {
         </>
       )}
     </>
+  );
+}
+
+/** The first rows of the checked file, as they will be imported; the headings sort the rows shown. */
+function FilePreviewTable({ rows }: { rows: Record<string, string>[] }) {
+  const columns = Object.keys(rows[0] ?? {});
+  const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => row[key]);
+  return (
+    <div className="ac-table-wrap">
+      <table className="ac-table">
+        <caption className="ca-sr-only">First rows of the file</caption>
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <SortableHeader key={column} label={column} sortKey={column} sort={sort} onSort={toggle} />
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((row, index) => (
+            <tr key={index}>
+              {columns.map((column) => (
+                <td key={column}>{row[column] || "—"}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

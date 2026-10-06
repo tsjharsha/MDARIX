@@ -1,5 +1,6 @@
 import { useWorkspace } from "./workspaceContext";
 import type { TemporalMode } from "../../app/types";
+import { displayId } from "../../app/displayId";
 
 const MODES: Array<{ value: TemporalMode; label: string; hint: string }> = [
   { value: "current", label: "Current", hint: "Latest recorded state" },
@@ -55,7 +56,7 @@ export function ContextBar() {
           {!work.investigations.length && <option value="">No investigations</option>}
           {work.investigations.map((item) => (
             <option key={String(item.id)} value={String(item.id ?? "")}>
-              {item.investigation_identifier ?? "Investigation"} · {item.status ?? "unknown"}
+              {displayId(item, "investigation_identifier", "Investigation")} · {item.status ?? "unknown"}
             </option>
           ))}
         </select>

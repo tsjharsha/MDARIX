@@ -33,6 +33,7 @@ export function EvidenceSection({ tab }: { tab?: string }) {
               <Panel eyebrow={view.product.name ?? "Product"} title="Evidence linked to the selected version">
                 <RecordTable
                   caption="Product evidence"
+                  idLabel="Evidence ID"
                   rows={view.evidence}
                   columns={["evidence_identifier", "evidence_type", "reliability_status", "ingestion_timestamp"]}
                   empty={{ title: "No linked evidence", detail: "Evidence linked to this version appears here." }}

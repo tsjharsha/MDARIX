@@ -4,6 +4,7 @@ import {
   ConfirmDialog,
   SearchBox,
   Table,
+  idColumn,
   listOf,
   matches,
   send,
@@ -93,6 +94,7 @@ function PlatformUsers() {
         rowKey={(row) => row.id}
         empty={{ title: "No matching users", detail: "Change the search or status." }}
         columns={[
+          idColumn("User ID"),
           {
             key: "user",
             fields: ["display_name", "email"],

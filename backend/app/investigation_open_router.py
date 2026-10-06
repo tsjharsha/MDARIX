@@ -132,8 +132,10 @@ def open_investigation(
     db.commit()
     return {
         "id": str(investigation.id),
+        "business_id": investigation.business_id,
         "investigation_identifier": identifier,
         "product_id": str(product.id),
+        "product_business_id": product.business_id,
         "status": investigation.status,
         "owner_ref": owner,
         "complaints_linked": len(complaint_ids),
@@ -159,7 +161,7 @@ def list_assignees(
     from backend.app.access.authz import _is_platform_role
 
     return [
-        {"id": str(person.id), "display_name": person.display_name}
+        {"id": str(person.id), "business_id": person.business_id, "display_name": person.display_name}
         for person in people
         if not _is_platform_role(person.role) and _can_work_cases(control_db, person)
     ]
@@ -287,11 +289,12 @@ def manage_investigation(
             investigation_id=case.id,
             assignee_ref=case.owner_ref,
             assigned_by_user_id=str(ctx.user_id),
-            reference=case.investigation_identifier,
+            reference=case.business_id,
         ):
             control_db.commit()
     return {
         "id": str(case.id),
+        "business_id": case.business_id,
         "investigation_identifier": case.investigation_identifier,
         "investigation_question": case.investigation_question,
         "owner_ref": case.owner_ref,

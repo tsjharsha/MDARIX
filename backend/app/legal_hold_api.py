@@ -22,6 +22,7 @@ from auth.cookies import read_session_token
 from auth.durable import hash_token
 from backend.app import mfa
 from backend.app.access.authz import _require_platform_admin
+from backend.app.business_ids import business_id_of
 from backend.app.db.models.foundation import AuthUser, Tenant
 from backend.app.db.models.stage2 import AuthSession
 from backend.app.db.session import get_db
@@ -102,6 +103,15 @@ def set_legal_hold(
     return after
 
 
+def _identifiers(db: Session, tenant: Tenant) -> dict:
+    """The organization's business identifier and that of the administrator who set the hold (response only: the
+    audited hold fields stay those of ``legal_hold_summary``)."""
+    return {
+        "tenant_business_id": tenant.business_id,
+        "legal_hold_set_by_business_id": business_id_of(db, AuthUser, tenant.legal_hold_set_by),
+    }
+
+
 def _tenant(db: Session, tenant_id: uuid.UUID) -> Tenant:
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
@@ -112,7 +122,8 @@ def _tenant(db: Session, tenant_id: uuid.UUID) -> Tenant:
 @router.get("/platform-admin/tenants/{tenant_id}/legal-hold")
 def get_legal_hold(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
-    return {"tenant_id": str(tenant_id), **legal_hold_summary(_tenant(db, tenant_id))}
+    tenant = _tenant(db, tenant_id)
+    return {"tenant_id": str(tenant_id), **legal_hold_summary(tenant), **_identifiers(db, tenant)}
 
 
 @router.put("/platform-admin/tenants/{tenant_id}/legal-hold")
@@ -125,4 +136,4 @@ def put_legal_hold(tenant_id: uuid.UUID, payload: LegalHoldRequest, request: Req
         db, tenant, hold=payload.hold, reason=payload.reason.strip(), actor_ref=str(admin.id), request=request
     )
     db.commit()
-    return {"tenant_id": str(tenant.id), **state}
+    return {"tenant_id": str(tenant.id), **state, **_identifiers(db, tenant)}
