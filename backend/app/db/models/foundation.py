@@ -422,6 +422,13 @@ class Hypothesis(TenantOwned, Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="proposed")
     origin: Mapped[str] = mapped_column(String(20), nullable=False)
     reviewer_disposition: Mapped[str | None] = mapped_column(String(80))
+    # A person's judgement of the hypothesis (md30), kept apart from the AI's own status: PROPOSED, HYPOTHESIZED,
+    # PARTIALLY_SUPPORTED, STRONGLY_SUPPORTED, WEAKLY_SUPPORTED, CONTRADICTED or RETIRED, with the reason.
+    human_status: Mapped[str | None] = mapped_column(String(30))
+    status_reason: Mapped[str | None] = mapped_column(Text)
+    status_changed_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_at = tz()
+    created_by: Mapped[str | None] = mapped_column(String(255))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         CheckConstraint("origin in ('ai','human','system')", name="hypothesis_origin_allowed"),
@@ -443,6 +450,12 @@ class Unknown(Base):
     resolution: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
     updated_at = tz(False)
+    # md30: where the unknown came from (system/ai or a person) and who last changed its status. Statuses: open,
+    # in_progress, resolved, accepted_limitation, superseded.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         ForeignKeyConstraint(["tenant_id", "hypothesis_id"], ["hypotheses.tenant_id", "hypotheses.id"]),
@@ -460,6 +473,10 @@ class FailureChain(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="draft")
     created_at = tz(False)
     updated_at = tz(False)
+    # md30: a chain a person built or adopted from an AI run (source_ai_execution_id), and who last changed it.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    source_ai_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "id", name="uq_failure_chains_tenant_id_id"),
@@ -1082,10 +1099,18 @@ class HypothesisEvidence(Base):
     rationale: Mapped[str | None] = mapped_column(Text)
     created_by_type: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at = tz(False)
+    # md30: who linked it (a person, or the system for AI links), and a withdrawal instead of a deletion.
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    retracted_at = tz()
+    retracted_by: Mapped[str | None] = mapped_column(String(255))
+    retraction_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "hypothesis_id"], ["hypotheses.tenant_id", "hypotheses.id"]),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
-        CheckConstraint("relation_type in ('support','contradict')", name="hypothesis_evidence_relation_allowed"),
+        CheckConstraint(
+            "relation_type in ('support','contradict','contextual','unresolved')",
+            name="hypothesis_evidence_relation_allowed",
+        ),
         CheckConstraint("created_by_type in ('ai','human','system')", name="hypothesis_evidence_creator_allowed"),
     )
 
@@ -1121,6 +1146,9 @@ class FailureChainEdge(Base):
     evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     rationale: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
+    # md30: link states SUPPORTED, PARTIALLY_SUPPORTED, HYPOTHESIZED, UNKNOWN, CONTRADICTED; who set them.
+    updated_by: Mapped[str | None] = mapped_column(String(255))
+    updated_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "failure_chain_id"], ["failure_chains.tenant_id", "failure_chains.id"]),
         ForeignKeyConstraint(
@@ -1135,7 +1163,9 @@ class FailureChainEdge(Base):
         ),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
         CheckConstraint(
-            "edge_status in ('established_fact','hypothesized','contradicted')",
+            # md31 adds the link states people and adopted AI chains use; the original three stay valid.
+            "edge_status in ('established_fact','hypothesized','contradicted',"
+            "'SUPPORTED','PARTIALLY_SUPPORTED','HYPOTHESIZED','UNKNOWN','CONTRADICTED')",
             name="failure_chain_edge_status_allowed",
         ),
     )

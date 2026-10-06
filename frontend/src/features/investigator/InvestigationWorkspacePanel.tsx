@@ -19,6 +19,30 @@ import { useCan } from "../workspace/workspaceContext";
 import { CaseRecordDownload } from "../reports/CaseRecordDownload";
 import { displayId } from "../../app/displayId";
 import { hasSavedResults, loadSavedResults } from "./savedResults";
+import { AiInterpretationNote } from "../shared/StatementKind";
+import { useAiBanner } from "../workspace/useAiStatus";
+import { aiNoticeOf, epistemicOf, type IntelligenceView } from "../workspace/intelligence";
+
+type AiBlock = "analysis" | "hypotheses" | "challenges" | "unknowns" | "failureChains" | "counterfactual" | "brief";
+type AiBlockLabel = { note: string | null; notice: { message: string; manual: string | null } | null };
+
+/**
+ * The label every block of AI output carries (an AI interpretation to review), the reason rules wrote it when AI
+ * could not, and the way to judge it where people record their judgements.
+ */
+function AiBlockNote({ label, onJudge }: { label?: AiBlockLabel; onJudge?: () => void }) {
+  return (
+    <>
+      <AiInterpretationNote note={label?.note} onJudge={onJudge} />
+      {label?.notice && (
+        <p className="ac-muted" role="note">
+          {label.notice.message}
+          {label.notice.manual ? ` ${label.notice.manual}` : ""}
+        </p>
+      )}
+    </>
+  );
+}
 
 export function InvestigationTabSummary({
   activeTab,
@@ -133,11 +157,14 @@ export function InvestigationWorkspacePanel({
   temporalMode: mode,
   asOf,
   onOpenDecision,
+  onOpenIntelligence,
 }: {
   investigationId: string;
   temporalMode: TemporalMode;
   asOf: string;
   onOpenDecision: () => void;
+  /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
+  onOpenIntelligence?: (view: IntelligenceView) => void;
 }) {
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
   const [analysis, setAnalysis] = useState<InvestigationAnalysis | null>(null);
@@ -171,6 +198,19 @@ export function InvestigationWorkspacePanel({
   const counterfactualRequested = useRef(false);
   // Viewers can read every result; only roles allowed to run AI see the run buttons (the server enforces it too).
   const canRun = useCan("ai.run");
+  // When AI is off, unavailable or over its allowance, say so and offer the manual way; otherwise nothing changes.
+  const aiBanner = useAiBanner();
+  const aiBlocked = Boolean(aiBanner);
+  const runTitle = aiBanner ? aiBanner.disabledReason : undefined;
+  const runDescribedBy = aiBanner ? "ai-status-banner" : undefined;
+  // What each AI response says it is (an AI interpretation) and, when rules wrote it, why.
+  const [labels, setLabels] = useState<Partial<Record<AiBlock, AiBlockLabel>>>({});
+  const remember = (block: AiBlock, payload: unknown) =>
+    setLabels((current) => ({
+      ...current,
+      [block]: { note: epistemicOf(payload)?.note ?? null, notice: aiNoticeOf(payload) },
+    }));
+  const judge = (view: IntelligenceView) => (onOpenIntelligence ? () => onOpenIntelligence(view) : undefined);
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
@@ -186,6 +226,7 @@ export function InvestigationWorkspacePanel({
     setCounterfactual(null);
     setCounterfactualStatus("Not run yet");
     counterfactualRequested.current = false;
+    setLabels({});
     setError("");
     setActionStatus("");
     setPendingAction(null);
@@ -252,6 +293,7 @@ export function InvestigationWorkspacePanel({
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setAnalysis(payload.analysis);
+        remember("analysis", payload);
         setActionStatus(
           payload.analysis?.observations?.length
             ? "SUCCESS: Analysis results are displayed below."
@@ -278,6 +320,7 @@ export function InvestigationWorkspacePanel({
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setHypothesisSet(payload.hypothesis_set);
+        remember("hypotheses", payload);
         const count = payload.hypothesis_set?.hypotheses?.length ?? 0;
         setActionStatus(
           count
@@ -305,12 +348,15 @@ export function InvestigationWorkspacePanel({
       });
       if (!current()) return;
       setChallengeSet(challenges.challenge_set);
+      remember("challenges", challenges);
       const unknowns = await ai<any>("unknowns", body);
       if (!current()) return;
       setUnknownSet(unknowns.unknown_set);
+      remember("unknowns", unknowns);
       const chains = await ai<any>("failure-chains", body);
       if (!current()) return;
       setFailureChains(chains.failure_chain_set);
+      remember("failureChains", chains);
       setActionStatus(
         chains.failure_chain_set?.chains?.length
           ? "SUCCESS: Unknowns and Failure Chain results are displayed below."
@@ -341,6 +387,7 @@ export function InvestigationWorkspacePanel({
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setCounterfactual(payload.result);
+        remember("counterfactual", payload);
         setCounterfactualStatus(payload.status ?? "SUCCESS");
       })
       .catch((err) => {
@@ -361,6 +408,7 @@ export function InvestigationWorkspacePanel({
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setBrief(payload);
+        remember("brief", payload);
         setActiveTab("brief");
         setActionStatus(`SUCCESS: Investigation Brief v${payload.brief_version} generated for review.`);
         setPendingAction(null);
@@ -405,19 +453,43 @@ export function InvestigationWorkspacePanel({
           </div>
           {canRun ? (
             <>
-              <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action"
+                onClick={runAnalysis}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
               </button>
-              <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action secondary"
+                onClick={runHypotheses}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
               </button>
-              <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action secondary"
+                onClick={runDay14}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
               </button>
-              <button className="primary-action" onClick={generateBrief} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action"
+                onClick={generateBrief}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {pendingAction === "Generate Investigation Brief"
                   ? "Generating Brief…"
                   : "Generate Investigation Brief"}
@@ -430,6 +502,28 @@ export function InvestigationWorkspacePanel({
           )}
         </div>
       </div>
+      {aiBanner && (
+        <div id="ai-status-banner" className="ac-message tone-warning ai-status-banner" role="status">
+          <div>
+            <strong>{aiBanner.title}.</strong> {aiBanner.message} The AI run buttons are off; you can do the same work
+            by hand.
+          </div>
+          {onOpenIntelligence && (
+            <div className="ai-status-manual">
+              {aiBanner.manual.map((path) => (
+                <button
+                  type="button"
+                  key={path.view}
+                  className="primary-action secondary"
+                  onClick={() => onOpenIntelligence(path.view)}
+                >
+                  {path.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="workflow-tabs" role="tablist" aria-label="Investigation workflow">
         {(
           [
@@ -545,17 +639,34 @@ export function InvestigationWorkspacePanel({
         <h3>Analysis</h3>
         <p>Grounded observations and possible explanations for the selected context.</p>
         {canRun && (
-          <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action"
+            onClick={runAnalysis}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
           </button>
         )}
       </section>
-      {analysis && <AnalysisVisual analysis={analysis} />}
+      {analysis && (
+        <>
+          <AiBlockNote label={labels.analysis} onJudge={judge("Observations")} />
+          <AnalysisVisual analysis={analysis} />
+        </>
+      )}
       <section id="workflow-hypotheses" className="workflow-action">
         <h3>Competing hypotheses</h3>
         <p>Preserves support, contradiction, gaps, and falsification conditions without choosing a winner.</p>
         {canRun && (
-          <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action secondary"
+            onClick={runHypotheses}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
           </button>
         )}
@@ -565,6 +676,7 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <GitBranch size={18} /> Competing Hypotheses
           </div>
+          <AiBlockNote label={labels.hypotheses} onJudge={judge("Hypotheses")} />
           <HypothesisBoard set={hypothesisSet} />
         </div>
       )}
@@ -572,7 +684,13 @@ export function InvestigationWorkspacePanel({
         <h3>Challenger, unknowns, and failure chain</h3>
         <p>Surfaces challenges and material unknowns. An unresolved failure chain is a valid controlled result.</p>
         {canRun && (
-          <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action secondary"
+            onClick={runDay14}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Run Unknowns & Chain"
               ? "Running controlled checks…"
               : "Run Challenger, Unknowns & Chain"}
@@ -584,16 +702,19 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <ShieldCheck size={18} /> Challenger review
           </div>
+          <AiBlockNote label={labels.challenges} onJudge={judge("Contradictions")} />
           <ChallengeBoard set={challengeSet} />
         </div>
       )}
       {unknownSet && (
         <div id="workflow-unknowns" className="analysis-grid">
           <Panel title="Unknowns Radar" icon={<AlertTriangle />}>
+            <AiBlockNote label={labels.unknowns} onJudge={judge("Unknowns")} />
             <UnknownsBoard set={unknownSet} />
           </Panel>
           <div id="workflow-failure-chain">
             <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
+              <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
               <div className="analysis-list">
                 {!failureChains?.chains.length && (
                   <p className="empty">
@@ -653,7 +774,9 @@ export function InvestigationWorkspacePanel({
             <button
               className="primary-action"
               onClick={runCounterfactual}
-              disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim()}
+              disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim() || aiBlocked}
+              title={runTitle}
+              aria-describedby={runDescribedBy}
             >
               {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
             </button>
@@ -664,6 +787,7 @@ export function InvestigationWorkspacePanel({
         </p>
         {counterfactual && (
           <div className="counterfactual-result">
+            <AiBlockNote label={labels.counterfactual} />
             <strong>{counterfactual.label}</strong>
             <h3>What stays the same</h3>
             <ul>
@@ -703,7 +827,13 @@ export function InvestigationWorkspacePanel({
           <>
             <p>Assemble a versioned, evidence-grounded package for human review.</p>
             {canRun && (
-              <button className="primary-action" onClick={generateBrief} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action"
+                onClick={generateBrief}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {pendingAction === "Generate Investigation Brief"
                   ? "Generating Brief…"
                   : "Generate Investigation Brief"}
@@ -713,6 +843,7 @@ export function InvestigationWorkspacePanel({
         ) : (
           <>
             <h2>{brief.title}</h2>
+            <AiBlockNote label={labels.brief} />
             <BriefVisual brief={brief} />
           </>
         )}

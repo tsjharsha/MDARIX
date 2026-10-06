@@ -117,9 +117,17 @@ def decision_advisory(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     try:
-        return service.advisory(db, ctx.tenant_id, investigation_id, request)
+        result = service.advisory(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
         raise error(exc) from exc
+    # Phase 4 (additive): when AI could not add its notes (switched off, allowance used up, no service), say why and
+    # what to do by hand. The stored advisory is unchanged.
+    from genai.epistemic import fallback_notice
+
+    advisory = result.get("advisory") if isinstance(result, dict) else None
+    ai_advisory = advisory.get("ai_advisory") if isinstance(advisory, dict) else None
+    notice = fallback_notice("decision_advisory", {"live_provider_advisory": ai_advisory})
+    return {**result, "ai_notice": notice.model_dump() if notice else None}
 
 
 @router.post("/{investigation_id}/decisions", dependencies=[Depends(require_permission(RECORDS_WRITE))])

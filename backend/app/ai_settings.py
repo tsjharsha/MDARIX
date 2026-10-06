@@ -23,6 +23,7 @@ from backend.app.access.authz import _admin_tenant, _require_platform_admin
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import change_diff, make_audit_event
+from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from genai import governance, pii
 from genai.policy import NO_MODEL, allowed
 
@@ -187,3 +188,58 @@ def update_platform_ai_settings(
     )
     db.commit()
     return _settings(db, tenant_id)
+
+
+# ------------------------------------------------------------------------------------------------- AI status
+# What every signed-in user's screens need to know: may AI be used for this organization now, and if not, why and
+# what still works by hand. No network call: "available" means a provider is configured and allowed here.
+
+AI_STATUS_MESSAGES = {
+    "AI_DISABLED": "AI processing is switched off for your organization. Every step still works by hand, and Ask "
+    "MDARIX answers from your records. An administrator can switch AI on under Security › AI processing.",
+    "PROVIDER_UNAVAILABLE": "No AI service is configured or allowed here. Every step still works by hand, and Ask "
+    "MDARIX answers from your records.",
+    "BUDGET_EXHAUSTED": "Your organization's monthly AI allowance is used up. Every step still works by hand, and Ask "
+    "MDARIX answers from your records. An administrator can raise the allowance.",
+    None: "AI assistance is available. AI results are interpretations: review them before relying on them.",
+}
+MANUAL_PATHS = {
+    "hypotheses": True,
+    "unknowns": True,
+    "failure_chain": True,
+    "observations": True,
+    "ask": "record-based answers",
+}
+
+
+def ai_status_for(state: dict | None, models: list[dict]) -> dict:
+    """The AI status of an organization from its usage state (``governance.usage``) and the usable models."""
+    enabled = bool(state and state.get("ai_processing_allowed"))
+    available = bool(models)
+    budget = None
+    if state is not None:
+        limit = int(state.get("monthly_token_budget") or 0)
+        used = int(state.get("tokens_used") or 0)
+        budget = {"used": used, "limit": limit, "remaining": max(0, limit - used)}
+    if not enabled:
+        reason = "AI_DISABLED"
+    elif not available:
+        reason = "PROVIDER_UNAVAILABLE"
+    elif budget is not None and budget["remaining"] <= 0:
+        reason = "BUDGET_EXHAUSTED"
+    else:
+        reason = None
+    return {
+        "enabled": enabled,
+        "available": available,
+        "budget": budget,
+        "reason_code": reason,
+        "message": AI_STATUS_MESSAGES[reason],
+        "manual_paths": dict(MANUAL_PATHS),
+    }
+
+
+@router.get("/ai/status")
+def ai_status(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """Whether AI may be used for the signed-in user's organization now, and why not (any signed-in user)."""
+    return ai_status_for(governance.usage(db, ctx.tenant_id), _models_in_use())

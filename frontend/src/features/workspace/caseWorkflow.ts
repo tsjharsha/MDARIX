@@ -5,6 +5,7 @@ import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { safeText } from "../../app/displayId";
 import type { WorkspaceSection } from "./workspaceContext";
 import { dueState, priorityRank, reasonProblem, type DueState } from "./tasks";
+import type { IntelligenceView } from "./intelligence";
 
 export const WORKFLOW_STATES = [
   "OPEN",
@@ -220,8 +221,11 @@ export type CaseReadiness = {
   checks?: ReadinessCheck[] | null;
 };
 
-/** Where a step opens: a section and tab, and for the workspace panel the part of it to scroll to. */
-export type StepDestination = { section: WorkspaceSection; tab?: string; anchor?: string };
+/**
+ * Where a step opens: a section and tab, for the workspace panel the part of it to scroll to, and for the Intelligence
+ * tab of Investigations the view to show.
+ */
+export type StepDestination = { section: WorkspaceSection; tab?: string; anchor?: string; view?: IntelligenceView };
 
 export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination: StepDestination }> = [
   {
@@ -236,15 +240,17 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
     label: "Analysis",
     destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-analysis" },
   },
+  // Hypotheses and gaps are judged in the Intelligence tab (AI and hand-made side by side); the AI workspace stays
+  // reachable from Analysis and from the Workspace tab.
   {
     key: "hypotheses",
     label: "Hypotheses",
-    destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-hypotheses" },
+    destination: { section: "Investigations", tab: "Intelligence", view: "Hypotheses" },
   },
   {
     key: "gaps",
     label: "Gaps",
-    destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-challenger" },
+    destination: { section: "Investigations", tab: "Intelligence", view: "Unknowns" },
   },
   {
     key: "risk_regulatory",

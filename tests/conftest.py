@@ -147,6 +147,10 @@ DB_MODULES = {
     "test_case_workflow",
     # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.
     "test_evidence_workflow",
+    # Phase 4: case intelligence (hypotheses judged and added by people, unknowns, failure chains, observations).
+    "test_case_intelligence",
+    # Phase 4: Ask MDARIX's structured answer (record-based with AI off, checked model sections) and the AI status.
+    "test_ask_structured",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

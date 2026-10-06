@@ -101,6 +101,8 @@ class SupplierEvidenceRequestPayload(BaseModel):
 
 # Ask MDARIX wraps the user's question with the same guardrails as the other advisory workflows, and asks for a
 # short, consistently structured Markdown answer that cites evidence identifiers. The stored prompt stays as typed.
+# Since Phase 4 the model is asked for the same sections as JSON (genai/structured_answer.py) and this Markdown form
+# is rendered from them; ASK_INSTRUCTIONS and ask_prompt are kept for anything that still uses the plain form.
 ASK_INSTRUCTIONS = (
     "You are MDARIX, an investigation assistant for medical-device quality teams. Answer the user's question using "
     "only the authorized context provided. Write at most 250 words of Markdown with exactly these sections: "
@@ -189,8 +191,15 @@ def create_interaction(
         "human_review_required": True,
     }
     from genai.provider import GenAIProvider, GenAIUnavailable
+    from genai.structured_answer import ASK_MAX_OUTPUT_TOKENS, read_model_reply, structured_ask_prompt
 
     provider = GenAIProvider()
+    # The structured answer (genai/structured_answer.py) is built after the model call, from what it gathered.
+    grounded: dict | None = None
+    search: dict | None = None
+    reading = None
+    ai_note: str | None = None
+    reason_code: str | None = None
     try:
         grounded = {
             "page_context": payload.page_context,
@@ -221,7 +230,8 @@ def create_interaction(
             as_of=payload.temporal_cutoff,
         )
         grounded = {**grounded, "retrieved_evidence": search["evidence"]}
-        prompt = ask_prompt(payload.prompt)
+        # The model is asked for the structured sections as JSON; its Markdown answer is rendered from them.
+        prompt = structured_ask_prompt(payload.prompt)
         # Fit the provider's input limit: keep the facts, drop internal detail (never fail on a large case).
         import json
 
@@ -231,10 +241,11 @@ def create_interaction(
         model_context = grounded
         if len(json.dumps(grounded, default=str)) > budget:
             model_context = compact_context(grounded, budget)
-        result = provider.complete(prompt, model_context)
+        result = provider.complete(prompt, model_context, max_output_tokens=ASK_MAX_OUTPUT_TOKENS)
         from genai.ask import normalize_answer
+        from genai.structured_answer import evidence_texts, render_markdown
 
-        response["provider_output"] = {**result.output, "answer": normalize_answer(result.output.get("answer"))}
+        raw_answer = normalize_answer(result.output.get("answer"))
         sources = list(search["sources"])
         if payload.investigation_id:
             from genai.grounding import source_provenance
@@ -247,7 +258,18 @@ def create_interaction(
             ]
         response["sources_provenance"] = sources
         known = {source["evidence_identifier"] for source in sources}
-        answer_check = check_answer(response["provider_output"]["answer"], known)
+        reading = read_model_reply(raw_answer, known, evidence_texts(search, grounded))
+        if reading.status == "OK":
+            # A valid structured reply: the answer is its checked sections in Ask's Markdown form; the checks below
+            # still see every citation the model made.
+            answer, checked_text = render_markdown(reading), reading.check_text
+        elif reading.status == "INVALID":
+            # JSON that is not the requested form is never shown as text; the record-based answer stands in.
+            answer, checked_text = None, raw_answer
+        else:
+            answer, checked_text = raw_answer, raw_answer
+        response["provider_output"] = {**result.output, "answer": answer}
+        answer_check = check_answer(checked_text, known)
         response["answer_check"] = answer_check
         response["search"] = {
             "status": search["status"],
@@ -264,6 +286,10 @@ def create_interaction(
             "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
         }
         response["limitations"] = result.output.get("limitations", []) + answer_check["notes"]
+        if reading.status == "INVALID":
+            from genai.structured_answer import AI_NOTE_INVALID
+
+            response["limitations"].append(AI_NOTE_INVALID)
         provenance = {
             "provider": result.provider,
             "model": result.model,
@@ -285,6 +311,32 @@ def create_interaction(
             "human_review_required": True,
             "hidden_chain_of_thought_persisted": False,
         }
+        from genai.epistemic import reason_code_for
+
+        ai_note = f"{refusal['user_message']} This answer comes from your records only."
+        reason_code = reason_code_for(refusal["code"])
+    # Phase 4: the structured answer - record-based sections always, the model's checked sections when it answered.
+    from genai import structured_answer as structured_module
+
+    if reading is not None and reading.status != "OK" and ai_note is None:
+        if (response.get("provider_output") or {}).get("status") == "PROVIDER_NOT_CONFIGURED":
+            ai_note, reason_code = structured_module.AI_NOTE_NOT_CONFIGURED, "PROVIDER_UNAVAILABLE"
+        else:
+            ai_note = {
+                "NOT_JSON": structured_module.AI_NOTE_NOT_SECTIONED,
+                "INVALID": structured_module.AI_NOTE_INVALID,
+            }.get(reading.status, structured_module.AI_NOTE_EMPTY)
+    response["structured"] = structured_module.structured_answer(
+        db,
+        tenant_id=uuid.UUID(ctx.tenant_id),
+        investigation_id=payload.investigation_id,
+        search=search,
+        grounded=grounded if payload.investigation_id else None,
+        reading=reading,
+        ai_note=ai_note or structured_module.AI_NOTE_UNAVAILABLE,
+        reason_code=reason_code,
+        temporal_mode=payload.temporal_mode,
+    )
     row = AIInteraction(
         id=uuid.uuid4(),
         tenant_id=ctx.tenant_id,
@@ -326,6 +378,8 @@ def create_interaction(
         "session_id": str(session.id),
         "status": "READY_FOR_REVIEW",
         "response": response,
+        # Phase 4 (additive): the structured answer, also stored in response["structured"].
+        "structured": response["structured"],
     }
     if provenance.get("refusal_code"):
         # The organization's AI switch, budget or provider policy refused the model (or no provider answered): say
@@ -383,6 +437,12 @@ def list_interactions(
             "response": r.response,
             "created_at": r.created_at,
             "investigation_id": r.investigation_id,
+            # Phase 4 (additive): the structured answer, for conversations that have one.
+            **(
+                {"structured": r.response["structured"]}
+                if isinstance(r.response, dict) and r.response.get("structured") is not None
+                else {}
+            ),
         }
         for r in rows
     ]

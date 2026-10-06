@@ -651,7 +651,9 @@ def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
         for hypothesis_id, relation in db.query(
             HypothesisEvidence.hypothesis_id, HypothesisEvidence.relation_type
         ).filter(
-            HypothesisEvidence.tenant_id == tenant_id, HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses])
+            HypothesisEvidence.tenant_id == tenant_id,
+            HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses]),
+            HypothesisEvidence.retracted_at.is_(None),  # withdrawn links no longer count
         ):
             relations[hypothesis_id][relation] += 1
     rows = [
@@ -976,7 +978,9 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
     relations = defaultdict(list)
     if hypotheses:
         for row in db.query(HypothesisEvidence).filter(
-            HypothesisEvidence.tenant_id == tenant, HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses])
+            HypothesisEvidence.tenant_id == tenant,
+            HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses]),
+            HypothesisEvidence.retracted_at.is_(None),  # withdrawn links no longer count
         ):
             linked = evidence_by_id.get(row.evidence_id)
             relations[row.hypothesis_id].append(

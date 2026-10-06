@@ -22,8 +22,11 @@ import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
+import { CaseIntelligencePanel } from "./CaseIntelligence";
+import { INTELLIGENCE_TAB, parseInvestigationsTab, type IntelligenceView } from "../intelligence";
 import {
   CASE_PRIORITIES,
+  caseState,
   caseStateLabel,
   caseStatusText,
   casePriorityLabel,
@@ -33,11 +36,14 @@ import {
 } from "../caseWorkflow";
 import { priorityRank } from "../tasks";
 
-const TABS = ["All investigations", "Workspace", "Scope", "Story", "CAPAs"] as const;
+const TABS = ["All investigations", "Workspace", "Intelligence", "Scope", "Story", "CAPAs"] as const;
 type Tab = (typeof TABS)[number];
 
-export function InvestigationsSection({ tab }: { tab?: string }) {
+export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const { work, open } = useWorkspace();
+  // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
+  const { tab, view: requestedView } = parseInvestigationsTab(requested);
+  const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
   const canOpen = useCan("records.write");
   // A complaint or signal asked to open an investigation for it (see useOpenInvestigation): open the form, ticked.
   const pending = work.openInvestigationRequest ?? null;
@@ -71,6 +77,11 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
   const goToStep = (destination: StepDestination) => {
     if (destination.section === "Investigations" && destination.tab === "Scope") {
       setActive("Scope");
+      return;
+    }
+    if (destination.section === "Investigations" && destination.tab === INTELLIGENCE_TAB) {
+      if (destination.view) setIntelView(destination.view);
+      setActive("Intelligence");
       return;
     }
     if (destination.section === "Investigations" && destination.anchor) {
@@ -208,6 +219,10 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
                   temporalMode={work.mode}
                   asOf={work.asOf}
                   onOpenDecision={() => open("Decisions")}
+                  onOpenIntelligence={(view) => {
+                    setIntelView(view);
+                    setActive("Intelligence");
+                  }}
                 />
               </Embedded>
             </>
@@ -216,6 +231,24 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
               <Empty
                 title="Choose an investigation"
                 detail="Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Intelligence" &&
+          (work.investigationId ? (
+            <CaseIntelligencePanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              view={intelView}
+              onView={setIntelView}
+              readOnly={caseIsClosed(selected)}
+            />
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="Hypotheses, unknowns and failure chains belong to one investigation. Pick one in the context bar above, or open one from the list."
               />
             </Panel>
           ))}
@@ -256,6 +289,13 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
       </Tabs>
     </>
   );
+}
+
+/** A closed or cancelled case: its intelligence is shown read-only (the server refuses changes with CASE_CLOSED). */
+function caseIsClosed(row: Record<string, unknown> | null | undefined): boolean {
+  const state = caseState(row);
+  if (state) return state === "CLOSED" || state === "CANCELLED";
+  return /^(closed|cancelled)$/i.test(String(row?.status ?? "").trim());
 }
 
 /** Corrective and preventive actions from the quality system, with the case they came from. */

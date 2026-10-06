@@ -84,11 +84,18 @@ class EvidenceIntelligenceService:
         if not evidence:
             raise ValueError(f"Evidence record {evidence_id} not found for tenant {tenant_id}")
 
+        # Observations a person recorded (origin HUMAN) are theirs: they neither count as processed nor are cleared.
+        extracted = EvidenceObservation.origin.is_distinct_from("HUMAN")
+
         # Idempotency check: if already processed and not forced reprocess, return existing summary
         if not reprocess:
             existing_obs = (
                 db.query(EvidenceObservation)
-                .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
+                .filter(
+                    EvidenceObservation.tenant_id == tenant_id,
+                    EvidenceObservation.evidence_id == evidence_id,
+                    extracted,
+                )
                 .count()
             )
             if existing_obs > 0:
@@ -101,7 +108,9 @@ class EvidenceIntelligenceService:
         obs_ids = [
             o.id
             for o in db.query(EvidenceObservation.id)
-            .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
+            .filter(
+                EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id, extracted
+            )
             .all()
         ]
         if obs_ids:
@@ -113,7 +122,7 @@ class EvidenceIntelligenceService:
             EvidenceEntityLink.tenant_id == tenant_id, EvidenceEntityLink.evidence_id == evidence_id
         ).delete(synchronize_session=False)
         db.query(EvidenceObservation).filter(
-            EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id
+            EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id, extracted
         ).delete(synchronize_session=False)
         db.flush()
 

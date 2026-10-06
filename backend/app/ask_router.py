@@ -454,6 +454,7 @@ def ask(
                 .filter(
                     HypothesisEvidence.tenant_id == UUID(context["tenant_id"]),
                     HypothesisEvidence.hypothesis_id.in_(hypothesis_ids) if hypothesis_ids else False,
+                    HypothesisEvidence.retracted_at.is_(None),  # a withdrawn link no longer counts
                 )
                 .all()
             )

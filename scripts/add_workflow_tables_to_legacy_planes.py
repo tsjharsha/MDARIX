@@ -1,5 +1,5 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals) and md29 (case scope and evidence review).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements) and md31 (intelligence values).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -44,6 +44,8 @@ class Step:
     function: str
     tables: tuple[str, ...]
     required: tuple[str, ...]
+    # For a step that creates no table: SQL answering "is this step already applied?" (true/false).
+    done_sql: str | None = None
 
 
 # In migration order: a later step may reference an earlier step's tables.
@@ -76,6 +78,24 @@ STEPS = (
             "supplier_evidence_requests",
         ),
     ),
+    Step(
+        "md30",
+        "md30_intelligence.py",
+        "apply_intelligence_changes",
+        ("intelligence_events",),
+        ("investigations", "hypotheses", "hypothesis_evidence", "unknowns", "failure_chains", "evidence_observations"),
+    ),
+    Step(
+        "md31",
+        "md31_intelligence_values.py",
+        "widen_intelligence_values",
+        (),
+        ("hypothesis_evidence", "failure_chain_edges", "evidence_observations"),
+        done_sql=(
+            "SELECT coalesce(bool_or(pg_get_constraintdef(oid) LIKE '%contextual%'), false) FROM pg_constraint "
+            "WHERE conname = 'ck_hypothesis_evidence_hypothesis_evidence_relation_allowed'"
+        ),
+    ),
 )
 
 
@@ -95,6 +115,16 @@ def state(url: str) -> tuple[bool, list[Step], list[str]]:
         todo: list[Step] = []
         problems: list[str] = []
         for step in STEPS:
+            if step.done_sql is not None:
+                with engine.connect() as connection:
+                    if connection.execute(text(step.done_sql)).scalar():
+                        continue
+                absent = [table for table in step.required if table not in tables and table not in _created_by(todo)]
+                if absent:
+                    problems.append(f"{step.name}: needs {', '.join(absent)} first")
+                else:
+                    todo.append(step)
+                continue
             missing = [table for table in step.tables if table not in tables]
             if not missing:
                 continue

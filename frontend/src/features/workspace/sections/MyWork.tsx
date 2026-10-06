@@ -19,6 +19,7 @@ import {
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
+import { conversationSummary } from "../../ask/structuredModel";
 import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
 import {
   REASON_MAX,
@@ -981,6 +982,18 @@ function Conversations() {
               key: "prompt",
               label: "Question",
               render: (row) => <span className="uw-clamp">{row.prompt ?? row.question ?? "—"}</span>,
+            },
+            {
+              key: "summary",
+              label: "Answer summary",
+              fields: ["structured"],
+              sortValue: (row) => conversationSummary(row) ?? "",
+              render: (row) =>
+                conversationSummary(row) ? (
+                  <span className="uw-clamp">{conversationSummary(row)}</span>
+                ) : (
+                  <span className="ac-muted">—</span>
+                ),
             },
             { key: "page", label: "Asked from", render: (row) => titleCase(String(row.page_context ?? "—")) },
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },

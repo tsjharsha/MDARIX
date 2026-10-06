@@ -291,11 +291,14 @@ type Person = { id: string; business_id?: string | null; display_name?: string |
 export function NewRequestDrawer({
   investigationId,
   unknownId,
+  unknownOption,
   onClose,
   onCreated,
 }: {
   investigationId: string;
   unknownId?: string;
+  /** The preselected unknown as the list shows it, offered even when the list below does not hold it. */
+  unknownOption?: { id: string; label: string };
   onClose: () => void;
   onCreated: (made: EvidenceRequest | null) => void;
 }) {
@@ -307,6 +310,8 @@ export function NewRequestDrawer({
   const suppliers = useResource<any>(form.kind === "SUPPLIER" ? "/api/v1/data-plane/suppliers" : null);
   const unknowns = useResource<unknown>(`/api/v1/investigations/${encodeURIComponent(investigationId)}/unknowns`);
   const unknownRows = unknownSetFrom(unknowns.data)?.unknowns ?? [];
+  const extraUnknown =
+    unknownOption && !unknownRows.some((row) => row.unknown_id === unknownOption.id) ? unknownOption : null;
   const problem = newRequestProblem(form, localDay());
   const set = (change: Partial<NewRequestForm>) => setForm((value) => ({ ...value, ...change }));
   const submit = async (event: React.FormEvent) => {
@@ -437,10 +442,11 @@ export function NewRequestDrawer({
             <option value="">
               {unknowns.state === "loading"
                 ? "Loading…"
-                : unknownRows.length
+                : unknownRows.length || extraUnknown
                   ? "Not tied to an unknown"
                   : "No unknowns recorded for this case"}
             </option>
+            {extraUnknown && <option value={extraUnknown.id}>{extraUnknown.label}</option>}
             {unknownRows.map((row) => (
               <option key={row.unknown_id} value={row.unknown_id}>
                 {safeText(row.business_id) ?? "Unknown"} · {row.statement}

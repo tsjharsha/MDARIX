@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from genai.epistemic import AIEpistemicLabel, AIFallbackNotice, ai_label_field, fallback_notice
 from investigator.schemas import SourceReference, TemporalMode, business_id_field
 
 
@@ -94,3 +95,13 @@ class HypothesisSetResponse(BaseModel):
     hypothesis_set: HypothesisSet
     persisted: bool
     ai_execution_id: uuid.UUID | None = None
+    # Phase 4 (additive): what this result is, and why AI did not contribute when rules produced it. On the response
+    # only - the result itself is the stored AI output and model context, which stay unchanged.
+    epistemic: AIEpistemicLabel = ai_label_field()
+    ai_notice: AIFallbackNotice | None = None
+
+    @model_validator(mode="after")
+    def _ai_notice(self):
+        if self.ai_notice is None:
+            self.ai_notice = fallback_notice("hypotheses", self.hypothesis_set.provenance)
+        return self

@@ -37,6 +37,7 @@ CHECKS = (
     ("evidence_reviewed", "Evidence is reviewed"),
     ("analysis_run", "Analysis has been run"),
     ("hypotheses_present", "Hypotheses are recorded"),
+    ("contradictions_documented", "Contradicting evidence is judged"),
     ("unknowns", "Open questions are answered"),
     ("no_blocking_request", "No urgent evidence request is open"),
     ("risk_review", "Risk review"),
@@ -53,8 +54,10 @@ UNREADABLE = "Could not be checked right now"
 REQUEST_FINISHED_STATUSES = frozenset({"REVIEWED", "CANNOT_PROVIDE", "CANCELLED"})
 REQUEST_ANSWERED_STATUSES = frozenset({"RECEIVED", "REPLIED"})
 BLOCKING_PRIORITIES = frozenset({"HIGH", "CRITICAL"})
-# Unknowns (open questions) that no longer need an answer.
-UNKNOWN_CLOSED_STATUSES = frozenset({"resolved", "not_applicable", "superseded", "closed"})
+# Unknowns (open questions) that no longer need an answer (accepted_limitation: the case accepts not knowing).
+UNKNOWN_CLOSED_STATUSES = frozenset({"resolved", "accepted_limitation", "not_applicable", "superseded", "closed"})
+# How many hypotheses a readiness rationale names before it says "and N more".
+NAMED_MAX = 5
 # A signed decision (approved or rejected by signature).
 SIGNED_DECISION_STATUSES = frozenset({"APPROVED", "REJECTED"})
 
@@ -89,6 +92,11 @@ def _plural(count: int, one: str, many: str | None = None) -> str:
     return f"{count} {one if count == 1 else (many or one + 's')}"
 
 
+def _named(names: list[str]) -> str:
+    shown = ", ".join(names[:NAMED_MAX])
+    return shown + (f" and {len(names) - NAMED_MAX} more" if len(names) > NAMED_MAX else "")
+
+
 def _step(key: str, label: str, status: str, detail: str) -> dict:
     return {"key": key, "label": label, "status": status, "detail": detail}
 
@@ -106,7 +114,10 @@ def evaluate(facts: dict) -> dict:
     requests = facts.get("requests")
     unknowns = facts.get("unknowns")
     analysis = facts.get("analysis_run")
+    # Observations and hypotheses people recorded themselves: AI is never required for the analysis.
+    people_analysis = int(facts.get("people_analysis") or 0)
     hypotheses = facts.get("hypotheses")
+    contradictions = facts.get("contradictions")
     brief = facts.get("brief")
     decision = facts.get("decision")
 
@@ -170,9 +181,17 @@ def evaluate(facts: dict) -> dict:
             result, rationale = "PASS", f"All {_plural(total, 'piece')} of evidence are reviewed"
         checks["evidence_reviewed"] = _check("evidence_reviewed", check_labels["evidence_reviewed"], result, rationale)
 
-    if analysis is None:
+    if analysis is None and not people_analysis:
         steps["analysis"] = _step("analysis", labels["analysis"], "NOT_STARTED", UNREADABLE)
         checks["analysis_run"] = _check("analysis_run", check_labels["analysis_run"], "PENDING", UNREADABLE)
+    elif not analysis and people_analysis:
+        steps["analysis"] = _step("analysis", labels["analysis"], "DONE", "People recorded their own analysis")
+        checks["analysis_run"] = _check(
+            "analysis_run",
+            check_labels["analysis_run"],
+            "PASS",
+            f"People recorded {_plural(people_analysis, 'observation or hypothesis', 'observations and hypotheses')}",
+        )
     else:
         steps["analysis"] = _step(
             "analysis",
@@ -184,7 +203,9 @@ def evaluate(facts: dict) -> dict:
             "analysis_run",
             check_labels["analysis_run"],
             "PASS" if analysis else "PENDING",
-            "An analysis has been run" if analysis else "Run an analysis of the case",
+            "An analysis has been run"
+            if analysis
+            else "Run an analysis of the case, or record observations and hypotheses yourself",
         )
 
     if hypotheses is None:
@@ -205,6 +226,28 @@ def evaluate(facts: dict) -> dict:
             check_labels["hypotheses_present"],
             "PASS" if count else "PENDING",
             f"{_plural(count, 'hypothesis', 'hypotheses')} recorded" if count else "Record the possible causes",
+        )
+
+    if contradictions is None:
+        checks["contradictions_documented"] = _check(
+            "contradictions_documented", check_labels["contradictions_documented"], "PENDING", UNREADABLE
+        )
+    else:
+        total = int(contradictions.get("total") or 0)
+        undocumented = [str(item) for item in contradictions.get("undocumented") or ()]
+        if undocumented:
+            result = "PENDING"
+            rationale = (
+                f"Judge {_plural(len(undocumented), 'hypothesis', 'hypotheses')} with contradicting evidence: "
+                + _named(undocumented)
+            )
+        elif total:
+            result = "PASS"
+            rationale = f"All {_plural(total, 'hypothesis', 'hypotheses')} with contradicting evidence are judged"
+        else:
+            result, rationale = "PASS", "No hypothesis has contradicting evidence"
+        checks["contradictions_documented"] = _check(
+            "contradictions_documented", check_labels["contradictions_documented"], result, rationale
         )
 
     if unknowns is None:
@@ -383,13 +426,70 @@ def _analysis_fact(db: Session, case) -> bool:
 
 
 def _hypotheses_fact(db: Session, case) -> int:
+    """The case's hypotheses (the AI's and people's) that are neither superseded by a newer AI run nor retired."""
+    from backend.app.case_intelligence.rules import counts_toward_case
     from backend.app.db.models.foundation import Hypothesis
 
-    return (
-        db.query(Hypothesis.id)
-        .filter(Hypothesis.tenant_id == case.tenant_id, Hypothesis.investigation_id == case.id)
+    return sum(
+        1
+        for status, human_status in db.query(Hypothesis.status, Hypothesis.human_status).filter(
+            Hypothesis.tenant_id == case.tenant_id, Hypothesis.investigation_id == case.id
+        )
+        if counts_toward_case(status, human_status)
+    )
+
+
+def _people_analysis_fact(db: Session, case) -> int:
+    """Observations people recorded in the case and hypotheses they added (not superseded or retired)."""
+    from backend.app.case_intelligence.rules import counts_toward_case
+    from backend.app.db.models.evidence_intelligence import EvidenceObservation
+    from backend.app.db.models.foundation import Hypothesis
+
+    hypotheses = sum(
+        1
+        for status, human_status in db.query(Hypothesis.status, Hypothesis.human_status).filter(
+            Hypothesis.tenant_id == case.tenant_id,
+            Hypothesis.investigation_id == case.id,
+            Hypothesis.origin == "human",
+        )
+        if counts_toward_case(status, human_status)
+    )
+    observations = (
+        db.query(EvidenceObservation.id)
+        .filter(
+            EvidenceObservation.tenant_id == case.tenant_id,
+            EvidenceObservation.investigation_id == case.id,
+            EvidenceObservation.origin == "HUMAN",
+        )
         .count()
     )
+    return hypotheses + observations
+
+
+def _contradictions_fact(db: Session, case) -> dict:
+    """``{"total", "undocumented"}``: how many current hypotheses of the case have contradicting evidence that is not
+    withdrawn, and the business ids of those no person has judged yet."""
+    from backend.app.db.models.foundation import Hypothesis, HypothesisEvidence
+
+    rows = (
+        db.query(Hypothesis.business_id, Hypothesis.human_status)
+        .join(
+            HypothesisEvidence,
+            (HypothesisEvidence.hypothesis_id == Hypothesis.id)
+            & (HypothesisEvidence.tenant_id == Hypothesis.tenant_id),
+        )
+        .filter(
+            Hypothesis.tenant_id == case.tenant_id,
+            Hypothesis.investigation_id == case.id,
+            Hypothesis.status != "superseded",
+            HypothesisEvidence.relation_type == "contradict",
+            HypothesisEvidence.retracted_at.is_(None),
+        )
+        .distinct()
+        .all()
+    )
+    undocumented = sorted({business_id for business_id, human_status in rows if not human_status})
+    return {"total": len({business_id for business_id, _ in rows}), "undocumented": undocumented}
 
 
 def _brief_fact(db: Session, case) -> dict:
@@ -443,7 +543,9 @@ def case_facts(db: Session, case) -> dict:
         "requests": {"open": request_counts[0], "blocking": request_counts[1]} if request_counts is not None else None,
         "unknowns": {"total": unknown_counts[0], "open": unknown_counts[1]} if unknown_counts is not None else None,
         "analysis_run": safely(db, "analysis", lambda session: _analysis_fact(session, case)),
+        "people_analysis": safely(db, "people's analysis", lambda session: _people_analysis_fact(session, case)),
         "hypotheses": safely(db, "hypotheses", lambda session: _hypotheses_fact(session, case)),
+        "contradictions": safely(db, "contradictions", lambda session: _contradictions_fact(session, case)),
         "brief": safely(db, "brief", lambda session: _brief_fact(session, case)),
         "decision": safely(db, "decision", lambda session: _decision_fact(session, case)),
     }

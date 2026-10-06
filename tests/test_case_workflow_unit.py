@@ -300,7 +300,9 @@ def _facts(**overrides) -> dict:
         "requests": {"open": 1, "blocking": 0},
         "unknowns": {"total": 2, "open": 0},
         "analysis_run": True,
+        "people_analysis": 0,
         "hypotheses": 2,
+        "contradictions": {"total": 0, "undocumented": []},
         "brief": {"latest_version": 1},
         "decision": {"count": 1, "signed": 1},
     }
@@ -330,6 +332,7 @@ def test_readiness_steps_and_checks_are_in_order():
         "evidence_reviewed",
         "analysis_run",
         "hypotheses_present",
+        "contradictions_documented",
         "unknowns",
         "no_blocking_request",
         "risk_review",
@@ -362,6 +365,7 @@ def test_a_case_with_everything_done():
         "evidence_reviewed": "PASS",
         "analysis_run": "PASS",
         "hypotheses_present": "PASS",
+        "contradictions_documented": "PASS",
         "unknowns": "PASS",
         "no_blocking_request": "PASS",
         "risk_review": "NOT_AVAILABLE",
@@ -427,6 +431,7 @@ def test_facts_that_could_not_be_read_are_pending():
             unknowns=None,
             analysis_run=None,
             hypotheses=None,
+            contradictions=None,
             brief=None,
             decision=None,
         )

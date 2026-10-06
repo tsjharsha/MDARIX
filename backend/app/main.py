@@ -69,6 +69,7 @@ from backend.app.workflow.router import router as workflow_tasks_router
 from backend.app.signals.router import router as signals_triage_router
 from backend.app.evidence_workflow.inventory import router as evidence_inventory_router
 from backend.app.evidence_workflow.requests import router as evidence_requests_router
+from backend.app.case_intelligence.router import router as case_intelligence_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -335,6 +336,7 @@ app.include_router(workflow_tasks_router)  # My Work: workflow tasks and role qu
 app.include_router(signals_triage_router)  # Signals and triage
 app.include_router(evidence_inventory_router)  # Case evidence: inventory, links, review, provenance
 app.include_router(evidence_requests_router)  # Evidence requests to colleagues, roles and suppliers
+app.include_router(case_intelligence_router)  # Case intelligence: hypotheses, unknowns, chains, observations
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 
