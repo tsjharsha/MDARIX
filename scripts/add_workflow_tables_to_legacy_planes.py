@@ -1,5 +1,5 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals), md29 (case scope and evidence review), md30 (intelligence judgements) and md31 (intelligence values).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values) and md32 (reviews and the Decision Brief).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -95,6 +95,13 @@ STEPS = (
             "SELECT coalesce(bool_or(pg_get_constraintdef(oid) LIKE '%contextual%'), false) FROM pg_constraint "
             "WHERE conname = 'ck_hypothesis_evidence_hypothesis_evidence_relation_allowed'"
         ),
+    ),
+    Step(
+        "md32",
+        "md32_reviews_and_brief.py",
+        "create_review_tables",
+        ("case_reviews", "decision_brief_versions", "brief_review_actions"),
+        ("tenants", "investigations", "business_id_counters"),
     ),
 )
 

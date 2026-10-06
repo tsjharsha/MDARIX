@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, CircleDot, ClipboardList, FileText, GitBranch, Network, ShieldCheck } from "lucide-react";
 import { Panel } from "../../app/ui";
 import { TemporalMode, DecisionContext } from "../../app/types";
@@ -47,10 +47,17 @@ export function DecisionCenterView({
   investigationId,
   temporalMode,
   asOf,
+  nextSteps,
 }: {
   investigationId: string;
   temporalMode: TemporalMode;
   asOf: string;
+  /**
+   * The case's next steps (Phase 5). When given, they replace the decision option picker: an investigator moves the
+   * case on with a next step and prepares a decision through the Decision Brief. The decision list, review and
+   * signing below stay as they are.
+   */
+  nextSteps?: ReactNode;
 }) {
   const [context, setContext] = useState<DecisionContext | null>(null);
   const [advisory, setAdvisory] = useState<any>(null);
@@ -234,70 +241,99 @@ export function DecisionCenterView({
           <Panel title="Failure Chain" icon={<Network />}>
             <DecisionItems items={context.failure_chains} empty="No supportable failure chain available." />
           </Panel>
-          <section className="panel">
-            <div className="section-title">
-              <ClipboardList size={18} /> Decision Options
-            </div>
-            <select
-              value={selectedAction}
-              onChange={(event) => setSelectedAction(event.target.value)}
-              aria-label="Decision option"
-            >
-              {context.decision_options.map((option) => (
-                <option key={option}>{option}</option>
-              ))}
-            </select>
-            <label className="required-field" htmlFor="decision-rationale">
-              Human rationale <span>(required)</span>
-            </label>
-            <textarea
-              id="decision-rationale"
-              ref={rationaleRef}
-              aria-required="true"
-              aria-invalid={Boolean(rationaleError)}
-              value={rationale}
-              onChange={(event) => {
-                setRationale(event.target.value);
-                setRationaleError("");
-                if (message.includes("rationale is required")) setMessage("");
-              }}
-              placeholder="Explain why this option is supportable or why no decision should be made."
-              rows={4}
-            />
-            {rationaleError && (
-              <p className="field-error" role="alert">
-                {rationaleError}
-              </p>
-            )}
-            <div className="toolbar">
-              {canRunAi && (
-                <button className="primary-action secondary" onClick={runAdvisory}>
-                  Generate AI Advisory
-                </button>
-              )}
-              {canWrite ? (
-                <button className="primary-action" onClick={recordDecision} disabled={recording}>
-                  Record Human Decision
-                </button>
-              ) : (
-                <span className="context-summary" role="note">
-                  View only: your role cannot record decisions.
-                </span>
-              )}
-            </div>
-            {advisory && (
-              <div className="advisory-box">
-                <strong>AI Advisory — not a human decision</strong>
-                <p>Recommended action: {advisory.advisory.recommended_action}</p>
-                <p>
-                  {advisory.advisory.additional_evidence_needed.join(" ") ||
-                    "No additional evidence need was identified by the controlled advisory."}
+          {nextSteps ? (
+            canRunAi ? (
+              <section className="panel">
+                <div className="section-title">
+                  <ClipboardList size={18} /> AI advisory (optional)
+                </div>
+                <p className="context-summary" role="note">
+                  An AI advisory is a suggestion to review, never a decision. Use the next steps to move the case on.
                 </p>
+                <div className="toolbar">
+                  <button className="primary-action secondary" onClick={runAdvisory}>
+                    Generate AI Advisory
+                  </button>
+                </div>
+                {advisory && (
+                  <div className="advisory-box">
+                    <strong>AI Advisory — not a human decision</strong>
+                    <p>Recommended action: {advisory.advisory.recommended_action}</p>
+                    <p>
+                      {advisory.advisory.additional_evidence_needed.join(" ") ||
+                        "No additional evidence need was identified by the controlled advisory."}
+                    </p>
+                  </div>
+                )}
+              </section>
+            ) : null
+          ) : (
+            <section className="panel">
+              <div className="section-title">
+                <ClipboardList size={18} /> Decision Options
               </div>
-            )}
-          </section>
+              <select
+                value={selectedAction}
+                onChange={(event) => setSelectedAction(event.target.value)}
+                aria-label="Decision option"
+              >
+                {context.decision_options.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+              <label className="required-field" htmlFor="decision-rationale">
+                Human rationale <span>(required)</span>
+              </label>
+              <textarea
+                id="decision-rationale"
+                ref={rationaleRef}
+                aria-required="true"
+                aria-invalid={Boolean(rationaleError)}
+                value={rationale}
+                onChange={(event) => {
+                  setRationale(event.target.value);
+                  setRationaleError("");
+                  if (message.includes("rationale is required")) setMessage("");
+                }}
+                placeholder="Explain why this option is supportable or why no decision should be made."
+                rows={4}
+              />
+              {rationaleError && (
+                <p className="field-error" role="alert">
+                  {rationaleError}
+                </p>
+              )}
+              <div className="toolbar">
+                {canRunAi && (
+                  <button className="primary-action secondary" onClick={runAdvisory}>
+                    Generate AI Advisory
+                  </button>
+                )}
+                {canWrite ? (
+                  <button className="primary-action" onClick={recordDecision} disabled={recording}>
+                    Record Human Decision
+                  </button>
+                ) : (
+                  <span className="context-summary" role="note">
+                    View only: your role cannot record decisions.
+                  </span>
+                )}
+              </div>
+              {advisory && (
+                <div className="advisory-box">
+                  <strong>AI Advisory — not a human decision</strong>
+                  <p>Recommended action: {advisory.advisory.recommended_action}</p>
+                  <p>
+                    {advisory.advisory.additional_evidence_needed.join(" ") ||
+                      "No additional evidence need was identified by the controlled advisory."}
+                  </p>
+                </div>
+              )}
+            </section>
+          )}
         </>
       )}
+      {nextSteps}
       <section className="panel">
         <div className="section-title">
           <ClipboardList size={18} /> Decisions on this investigation

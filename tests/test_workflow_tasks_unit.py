@@ -114,6 +114,17 @@ def test_nobody_claims_the_approval_of_their_own_decision():
     assert _actions(me, other)["can_claim"] is True
 
 
+def test_nobody_claims_the_review_or_decision_of_a_brief_they_wrote():
+    me = _actor("quality.review", "decision.sign")
+    wrote = {"brief_version": 2, "brief_author_refs": ["someone-else", me.user_id]}
+    review = _task(task_type="QUALITY_REVIEW", assigned_role="REVIEWER", details=wrote)
+    decide = _task(task_type="DECISION_APPROVAL", assigned_role="APPROVER", details=wrote)
+    assert _actions(me, review)["can_claim"] is False
+    assert _actions(me, decide)["can_claim"] is False
+    others = {"brief_version": 2, "brief_author_refs": ["someone-else"], "brief_author_ref": "someone-else"}
+    assert _actions(me, _task(task_type="QUALITY_REVIEW", assigned_role="REVIEWER", details=others))["can_claim"]
+
+
 def test_only_the_assignee_accepts_declines_releases_and_completes():
     me = _actor("investigation.work")
     mine = _task(status="ASSIGNED", assigned_user_id=me.user_uuid)

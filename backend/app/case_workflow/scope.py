@@ -294,6 +294,12 @@ def write_version(
     )
     db.add(row)
     db.flush()
+    if row.reviews_must_restart:
+        # The case's risk and regulatory reviews were of the earlier scope: they are superseded with this version
+        # (backend/app/case_reviews/service.py). Never fails the save.
+        from backend.app.case_reviews.service import restart_reviews
+
+        restart_reviews(db, case, version=row.version, actor_ref=actor_ref, actor_role=actor_role, now=now)
     return row
 
 

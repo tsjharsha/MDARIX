@@ -305,6 +305,15 @@ def _facts(**overrides) -> dict:
         "contradictions": {"total": 0, "undocumented": []},
         "brief": {"latest_version": 1},
         "decision": {"count": 1, "signed": 1},
+        # A required risk review completed; a regulatory review the policy does not require.
+        "reviews": {
+            "RISK": {
+                "required": True,
+                "reasons": ["The case priority is high"],
+                "latest": {"business_id": "REV000001", "status": "COMPLETED", "outcome": "NO_CHANGE_REQUIRED"},
+            },
+            "REGULATORY": {"required": False, "reasons": [], "latest": None},
+        },
     }
     return {**facts, **overrides}
 
@@ -355,7 +364,7 @@ def test_a_case_with_everything_done():
         "analysis": "DONE",
         "hypotheses": "DONE",
         "gaps": "DONE",
-        "risk_regulatory": "NOT_AVAILABLE",
+        "risk_regulatory": "DONE",
         "brief": "DONE",
         "human_review": "DONE",
     }
@@ -368,13 +377,17 @@ def test_a_case_with_everything_done():
         "contradictions_documented": "PASS",
         "unknowns": "PASS",
         "no_blocking_request": "PASS",
-        "risk_review": "NOT_AVAILABLE",
-        "regulatory_review": "NOT_AVAILABLE",
+        "risk_review": "PASS",
+        "regulatory_review": "NOT_REQUIRED",
         "brief_ready": "PENDING",
         "decision": "PASS",
     }
     rationale = _by_key(result["checks"], "rationale")
-    assert rationale["risk_review"] == "Recorded once risk and regulatory reviews are available"
+    assert rationale["risk_review"] == "Risk review REV000001 completed: No change to the risk file required"
+    assert rationale["regulatory_review"] == "Not required by policy"
+    assert (
+        _by_key(result["steps"], "detail")["risk_regulatory"] == "Risk review completed; regulatory review not required"
+    )
     assert rationale["brief_ready"] == "Brief version 1 waits for its review"
 
 
@@ -434,9 +447,10 @@ def test_facts_that_could_not_be_read_are_pending():
             contradictions=None,
             brief=None,
             decision=None,
+            reviews=None,
         )
     )
-    checks = [check for check in result["checks"] if check["key"] not in ("risk_review", "regulatory_review")]
+    checks = result["checks"]
     assert all(check["result"] == "PENDING" for check in checks)
     assert all(check["rationale"] == readiness.UNREADABLE for check in checks)
     # Words people understand: no internal stage names.

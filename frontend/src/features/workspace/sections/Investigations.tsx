@@ -23,6 +23,9 @@ import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
 import { CaseScopePanel } from "./CaseScope";
 import { CaseIntelligencePanel } from "./CaseIntelligence";
+import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
+import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
+import { parseReviewsTab } from "../reviews";
 import { INTELLIGENCE_TAB, parseInvestigationsTab, type IntelligenceView } from "../intelligence";
 import {
   CASE_PRIORITIES,
@@ -36,7 +39,16 @@ import {
 } from "../caseWorkflow";
 import { priorityRank } from "../tasks";
 
-const TABS = ["All investigations", "Workspace", "Intelligence", "Scope", "Story", "CAPAs"] as const;
+const TABS = [
+  "All investigations",
+  "Workspace",
+  "Intelligence",
+  "Scope",
+  "Reviews",
+  "Decision Brief",
+  "Story",
+  "CAPAs",
+] as const;
 type Tab = (typeof TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
@@ -44,6 +56,10 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
+  // "Reviews?review=<id>" opens the Reviews tab on that review (a review task, the dashboard).
+  const [requestedReview] = useState(() => parseReviewsTab(requested));
+  // The case the review was requested with; another case chosen later does not reopen it.
+  const [reviewCase] = useState(() => work.investigationId);
   const canOpen = useCan("records.write");
   // A complaint or signal asked to open an investigation for it (see useOpenInvestigation): open the form, ticked.
   const pending = work.openInvestigationRequest ?? null;
@@ -75,8 +91,11 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   };
   // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
   const goToStep = (destination: StepDestination) => {
-    if (destination.section === "Investigations" && destination.tab === "Scope") {
-      setActive("Scope");
+    if (
+      destination.section === "Investigations" &&
+      (destination.tab === "Scope" || destination.tab === "Reviews" || destination.tab === "Decision Brief")
+    ) {
+      setActive(destination.tab);
       return;
     }
     if (destination.section === "Investigations" && destination.tab === INTELLIGENCE_TAB) {
@@ -267,6 +286,43 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               />
             </Panel>
           ))}
+        {active === "Reviews" &&
+          (work.investigationId || requestedReview ? (
+            work.investigationId ? (
+              <CaseReviewsPanel
+                key={work.investigationId}
+                investigationId={work.investigationId}
+                caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+                initialReview={work.investigationId === reviewCase ? requestedReview : null}
+                readOnly={caseIsClosed(selected)}
+              />
+            ) : (
+              <ReviewOnly reviewId={requestedReview as string} />
+            )
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="Risk and regulatory reviews belong to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Decision Brief" &&
+          (work.investigationId ? (
+            <CaseDecisionBriefPanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              readOnly={caseIsClosed(selected)}
+            />
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The Decision Brief belongs to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
         {active === "Story" &&
           (work.investigationId ? (
             <Embedded>
@@ -287,6 +343,22 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
           </p>
         )}
       </Tabs>
+    </>
+  );
+}
+
+/** A review opened from a task or the dashboard before any case is chosen: the review alone, in its drawer. */
+function ReviewOnly({ reviewId }: { reviewId: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Panel title="No investigation selected">
+        <Empty
+          title="Choose an investigation"
+          detail="Pick the review's case in the context bar above to see all of its reviews."
+        />
+      </Panel>
+      {open && <ReviewDrawer reviewId={reviewId} onClose={() => setOpen(false)} onChanged={() => undefined} />}
     </>
   );
 }

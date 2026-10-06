@@ -151,6 +151,10 @@ DB_MODULES = {
     "test_case_intelligence",
     # Phase 4: Ask MDARIX's structured answer (record-based with AI off, checked model sections) and the AI status.
     "test_ask_structured",
+    # Phase 5: risk and regulatory reviews (policy, requests, reviewers, readiness, scope restart) and next steps.
+    "test_case_reviews",
+    # Phase 5: the controlled Decision Brief (versions, submission gate, quality review, return loops, dashboard).
+    "test_decision_brief",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

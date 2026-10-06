@@ -65,6 +65,12 @@ EXEMPT = {
         "POST",
         "/api/v1/investigations/{investigation_id}/transition",
     ): "checked in the route: investigation.work to start or hold a case, investigation.assign to cancel it",
+    # Case reviews (backend/app/case_reviews/router.py): who may act depends on the review (the permission of its
+    # type, its reviewer, its requester or investigation.assign), so each route checks it itself.
+    ("POST", "/api/v1/case-reviews/{review_id}/start"): "checked in the route: the review type's permission",
+    ("POST", "/api/v1/case-reviews/{review_id}/complete"): "checked in the route: only the review's reviewer",
+    ("POST", "/api/v1/case-reviews/{review_id}/recuse"): "checked in the route: only the review's reviewer",
+    ("POST", "/api/v1/case-reviews/{review_id}/cancel"): "checked in the route: requester or investigation.assign",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.

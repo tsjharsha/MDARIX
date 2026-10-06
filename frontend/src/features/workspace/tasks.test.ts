@@ -21,6 +21,7 @@ import {
   taskListPath,
   taskPath,
   taskRequest,
+  taskReview,
   taskSignal,
   taskSourceText,
   taskTypeLabel,
@@ -143,6 +144,48 @@ describe("where a task opens", () => {
     expect(
       taskDestination({ task_type: "INVESTIGATION", investigation, source: { type: "Investigation", id: UUID } }),
     ).toEqual({ section: "Investigations", tab: "Workspace" });
+  });
+
+  it("opens a risk or regulatory review task on that review in the case's Reviews tab", () => {
+    const source = { type: "CaseReview", id: UUID, business_id: "REV000003" };
+    for (const task_type of ["RISK_REVIEW", "REGULATORY_REVIEW"])
+      expect(taskDestination({ task_type, investigation, source })).toEqual({
+        section: "Investigations",
+        tab: `Reviews?review=${UUID}`,
+      });
+    expect(taskReview({ source })).toBe(UUID);
+    expect(taskReview({ source: { type: "CASE_REVIEW", business_id: "REV000003" } })).toBe("REV000003");
+    expect(taskReview({ source: { type: "EvidenceRequest", id: UUID } })).toBeNull();
+    expect(taskReview({})).toBeNull();
+  });
+
+  it("keeps opening Intelligence for review tasks from any other source", () => {
+    const source = { type: "Investigation", id: UUID, business_id: "INV000147" };
+    expect(taskDestination({ task_type: "RISK_REVIEW", investigation, source })).toEqual({
+      section: "Intelligence",
+      tab: "Risk & traceability",
+    });
+    expect(taskDestination({ task_type: "REGULATORY_REVIEW", investigation })).toEqual({
+      section: "Intelligence",
+      tab: "Regulatory copilot",
+    });
+  });
+
+  it("opens a Decision Brief's quality review on the case's brief, and its approval in the Decision center", () => {
+    const source = { type: "DecisionBriefVersion", id: UUID, business_id: "DBV000002" };
+    expect(taskDestination({ task_type: "QUALITY_REVIEW", investigation, source })).toEqual({
+      section: "Investigations",
+      tab: "Decision Brief",
+    });
+    expect(taskDestination({ task_type: "DECISION_APPROVAL", investigation, source })).toEqual({
+      section: "Decisions",
+      tab: "Decision center",
+    });
+    // A quality review task about anything else keeps opening the case's workspace.
+    expect(taskDestination({ task_type: "QUALITY_REVIEW", investigation })).toEqual({
+      section: "Investigations",
+      tab: "Workspace",
+    });
   });
 
   it("opens My Work on the tab a destination with a request names", () => {

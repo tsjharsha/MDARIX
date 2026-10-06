@@ -745,7 +745,8 @@ def test_the_readiness_of_a_case(org):
     results = _results(body)
     assert results["scope_complete"] == "PASS" and results["evidence_reviewed"] == "PENDING"
     assert results["no_blocking_request"] == "PASS" and results["unknowns"] == "PASS"
-    assert results["risk_review"] == results["regulatory_review"] == "NOT_AVAILABLE"
+    # A medium-priority case whose complaint reports no injury, death or malfunction: no review is required.
+    assert results["risk_review"] == results["regulatory_review"] == "NOT_REQUIRED"
     assert results["brief_ready"] == "PENDING" and results["decision"] == "PENDING"
 
     now = datetime.now(timezone.utc)

@@ -110,9 +110,15 @@ def _permitted_types(actor: Actor) -> list[str]:
 
 
 def _own_decision(actor: Actor, task: WorkflowTask) -> bool:
-    """Segregation of duties: nobody approves their own decision, so they cannot take its approval task."""
-    author = str((task.details or {}).get("decision_author_ref") or "").strip()
-    return task.task_type == "DECISION_APPROVAL" and bool(author) and author == actor.user_id
+    """Segregation of duties: nobody approves their own decision, so they cannot take its approval task; and nobody
+    quality-reviews (or decides on) a Decision Brief they wrote, so they cannot take that task either."""
+    details = task.details or {}
+    author = str(details.get("decision_author_ref") or "").strip()
+    if task.task_type == "DECISION_APPROVAL" and bool(author) and author == actor.user_id:
+        return True
+    brief_authors = {str(ref).strip() for ref in details.get("brief_author_refs") or [] if ref}
+    brief_authors |= {str(details.get("brief_author_ref") or "").strip()} - {""}
+    return task.task_type in ("QUALITY_REVIEW", "DECISION_APPROVAL") and actor.user_id in brief_authors
 
 
 # ------------------------------------------------------------------------------------------------------- reading
@@ -180,7 +186,23 @@ def _source_models() -> dict:
         "Signal": Signal,
         # Requests to a colleague or a role (Phase 3) live in the same table as supplier requests.
         "EvidenceRequest": SupplierEvidenceRequest,
+        # Quality review and decision tasks of a Decision Brief version (Phase 5).
+        "DecisionBriefVersion": _decision_brief_model(),
+        # Risk and regulatory reviews of a case (Phase 5).
+        "CaseReview": _case_review_model(),
     }
+
+
+def _decision_brief_model():
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    return DecisionBriefVersion
+
+
+def _case_review_model():
+    from backend.app.db.models.reviews import CaseReview
+
+    return CaseReview
 
 
 def _business_ids(db: Session, model, tenant_id, ids) -> dict[str, str]:

@@ -30,3 +30,4 @@ from backend.app.db.models.workflow import *
 from backend.app.db.models.signals import *
 from backend.app.db.models.case_scope import *
 from backend.app.db.models.intelligence import *
+from backend.app.db.models.reviews import *

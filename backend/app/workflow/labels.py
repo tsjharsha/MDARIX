@@ -56,6 +56,10 @@ SOURCE_LABELS: dict[str, str] = {
     "SupplierEvidenceRequest": "Supplier evidence request",
     "Signal": "Signal",
     "EvidenceRequest": "Evidence request",
+    # A version of a case's controlled Decision Brief (Phase 5): its quality review and decision tasks.
+    "DecisionBriefVersion": "Decision brief",
+    # A risk or regulatory review of a case (Phase 5): its reviewers' queue task and the owner's follow-up.
+    "CaseReview": "Case review",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

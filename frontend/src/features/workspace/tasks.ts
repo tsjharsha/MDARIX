@@ -6,6 +6,7 @@ import { roleLabel } from "../../app/roles";
 import { safeText } from "../../app/displayId";
 import type { WorkspaceSection } from "./workspaceContext";
 import { signalsTab } from "./signals";
+import { reviewsTab } from "./reviews";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -159,12 +160,39 @@ export function taskRequest(task: Partial<Pick<Task, "source">>): string | null 
   return REQUEST_REF.test(ref) ? ref : null;
 }
 
+/** The kind of record a task came from, as one word ("CaseReview" and "CASE_REVIEW" both read "CASEREVIEW"). */
+const sourceKind = (task: Partial<Pick<Task, "source">>) =>
+  String(task.source?.type ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+
+/**
+ * The case review a task is about (its source, of type CaseReview), by its id, else its business ID; null for any other
+ * source (a risk or regulatory review task recorded before Phase 5 keeps opening Intelligence).
+ */
+export function taskReview(task: Partial<Pick<Task, "source">>): string | null {
+  if (sourceKind(task) !== "CASEREVIEW") return null;
+  const ref = String(task.source?.id ?? "").trim() || String(task.source?.business_id ?? "").trim();
+  return REQUEST_REF.test(ref) ? ref : null;
+}
+
 /** Where "Open" takes a task: the section (and tab) where its work is done; a signal triage task opens its signal. */
 export function taskDestination(task: Pick<Task, "task_type" | "investigation"> & Partial<Pick<Task, "source">>): {
   section: WorkspaceSection;
   tab?: string;
 } {
   const type = String(task.task_type ?? "").toUpperCase();
+  // A risk or regulatory review task opens that review on its case (Investigations, Reviews tab).
+  if (type === "RISK_REVIEW" || type === "REGULATORY_REVIEW") {
+    const review = taskReview(task);
+    if (review) return { section: "Investigations", tab: reviewsTab(review) };
+  }
+  // A quality review of a Decision Brief opens the case's Decision Brief; its decision approval the Decision center.
+  if (sourceKind(task) === "DECISIONBRIEFVERSION") {
+    if (type === "QUALITY_REVIEW") return { section: "Investigations", tab: "Decision Brief" };
+    if (type === "DECISION_APPROVAL") return { section: "Decisions", tab: "Decision center" };
+  }
   // An evidence request task opens that request's detail in My Work (its Evidence requests tab).
   if (EVIDENCE_REQUEST_TASKS.includes(type)) {
     const request = taskRequest(task);

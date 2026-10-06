@@ -37,6 +37,12 @@ TRIAL_DATA_TABLES = (
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
     "evidence_review_events",
     "investigation_scope_versions",
+    # Reviews and Decision Brief versions (md32) with their quality-review actions: about the cases listed below.
+    "brief_review_actions",
+    "decision_brief_versions",
+    "case_reviews",
+    # The history of people's intelligence judgements (md30), about the cases listed below.
+    "intelligence_events",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",

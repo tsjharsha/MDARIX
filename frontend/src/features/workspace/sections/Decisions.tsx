@@ -5,6 +5,7 @@ import { DecisionCenterView } from "../../investigator/DecisionCenterView";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
 import { useWorkspace } from "../workspaceContext";
 import { Embedded } from "./common";
+import { NextStepsPanel } from "./NextSteps";
 
 const TABS = ["Decision center", "Verify a signature"] as const;
 type Tab = (typeof TABS)[number];
@@ -24,7 +25,12 @@ export function DecisionsSection({ tab }: { tab?: string }) {
         {active === "Decision center" &&
           (work.investigationId ? (
             <Embedded>
-              <DecisionCenterView investigationId={work.investigationId} temporalMode={work.mode} asOf={work.asOf} />
+              <DecisionCenterView
+                investigationId={work.investigationId}
+                temporalMode={work.mode}
+                asOf={work.asOf}
+                nextSteps={<NextStepsPanel key={work.investigationId} investigationId={work.investigationId} />}
+              />
             </Embedded>
           ) : (
             <Panel title="No investigation selected">

@@ -155,7 +155,8 @@ describe("the case stepper", () => {
     expect(at("analysis")).toEqual({ section: "Investigations", tab: "Workspace", anchor: "workflow-analysis" });
     expect(at("hypotheses")).toEqual({ section: "Investigations", tab: "Intelligence", view: "Hypotheses" });
     expect(at("gaps")).toEqual({ section: "Investigations", tab: "Intelligence", view: "Unknowns" });
-    expect(at("risk_regulatory")).toEqual({ section: "Intelligence", tab: "Risk & traceability" });
+    expect(at("risk_regulatory")).toEqual({ section: "Investigations", tab: "Reviews" });
+    expect(at("brief")).toEqual({ section: "Investigations", tab: "Decision Brief" });
     expect(at("human_review")).toEqual({ section: "Decisions", tab: "Decision center" });
   });
 

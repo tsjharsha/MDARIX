@@ -41,6 +41,7 @@ import {
 } from "../tasks";
 import { useOpenTask } from "./MyWork";
 import { SignalTriagePanel } from "./SignalInbox";
+import { QualityReviewDashboardPanel, ReviewsDashboardPanel } from "./ReviewDashboards";
 
 type Breakdown = Array<{ label: string; count: number }>;
 type Trends = {
@@ -133,6 +134,8 @@ export function DashboardSection() {
     <div className="ac-overview ac-dashboard">
       <MyWorkSummary />
       <MyInvestigationsPanel />
+      <ReviewsDashboardPanel />
+      <QualityReviewDashboardPanel />
       <SignalTriagePanel />
 
       <section className={`ac-hero tone-${tone}`} aria-live="polite">

@@ -252,15 +252,16 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
     label: "Gaps",
     destination: { section: "Investigations", tab: "Intelligence", view: "Unknowns" },
   },
+  // Risk and regulatory reviews are requested and recorded in the case's Reviews tab; the brief in its own tab.
   {
     key: "risk_regulatory",
     label: "Risk & Regulatory",
-    destination: { section: "Intelligence", tab: "Risk & traceability" },
+    destination: { section: "Investigations", tab: "Reviews" },
   },
   {
     key: "brief",
     label: "Decision Brief",
-    destination: { section: "Investigations", tab: "Workspace", anchor: "workflow-brief" },
+    destination: { section: "Investigations", tab: "Decision Brief" },
   },
   { key: "human_review", label: "Human review", destination: { section: "Decisions", tab: "Decision center" } },
 ];

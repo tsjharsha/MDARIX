@@ -5,7 +5,8 @@ Reading is defensive: a fact that cannot be read (a table missing on an older or
 shows as "could not be checked" instead of failing the page. Nothing here changes data.
 
 The rules for evidence, evidence requests and open questions are shared with the investigator's dashboard
-(``evidence_by_case``, ``requests_by_case``, ``unknowns_by_case``).
+(``evidence_by_case``, ``requests_by_case``, ``unknowns_by_case``). The risk and regulatory review checks follow the
+review policy and the case's latest reviews (backend/app/case_reviews/rules.py ``review_check``).
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ CHECKS = (
     ("brief_ready", "Investigation brief"),
     ("decision", "Decision"),
 )
+# Kept for callers of the earlier build; the review checks are evaluated from the case's reviews now.
 NOT_YET_AVAILABLE = "Recorded once risk and regulatory reviews are available"
 UNREADABLE = "Could not be checked right now"
 
@@ -269,7 +271,6 @@ def evaluate(facts: dict) -> dict:
             f"{_plural(open_count, 'open question')} still to answer" if open_count else "No open questions",
         )
 
-    steps["risk_regulatory"] = _step("risk_regulatory", labels["risk_regulatory"], "NOT_AVAILABLE", NOT_YET_AVAILABLE)
     if requests is None:
         checks["no_blocking_request"] = _check(
             "no_blocking_request", check_labels["no_blocking_request"], "PENDING", UNREADABLE
@@ -283,8 +284,7 @@ def evaluate(facts: dict) -> dict:
             if blocking
             else "No high or critical evidence request is open",
         )
-    for key in ("risk_review", "regulatory_review"):
-        checks[key] = _check(key, check_labels[key], "NOT_AVAILABLE", NOT_YET_AVAILABLE)
+    _review_checks(facts.get("reviews"), steps, checks, labels, check_labels)
 
     if brief is None:
         steps["brief"] = _step("brief", labels["brief"], "NOT_STARTED", UNREADABLE)
@@ -323,6 +323,30 @@ def evaluate(facts: dict) -> dict:
         "steps": [steps[key] for key, _ in STEPS],
         "checks": [checks[key] for key, _ in CHECKS],
     }
+
+
+def _review_checks(reviews, steps: dict, checks: dict, labels: dict, check_labels: dict) -> None:
+    """The risk and regulatory review checks and their step, from ``{"RISK": fact, "REGULATORY": fact}`` (see
+    ``case_reviews.rules.review_check``); None when the reviews could not be read."""
+    from backend.app.case_reviews.rules import REGULATORY, RISK, review_check, review_step
+
+    keys = {RISK: "risk_review", REGULATORY: "regulatory_review"}
+    if reviews is None:
+        steps["risk_regulatory"] = _step("risk_regulatory", labels["risk_regulatory"], "NOT_STARTED", UNREADABLE)
+        for key in keys.values():
+            checks[key] = _check(key, check_labels[key], "PENDING", UNREADABLE)
+        return
+    results = {}
+    for review_type, key in keys.items():
+        fact = reviews.get(review_type)
+        if fact is None:
+            result, rationale = "PENDING", UNREADABLE
+        else:
+            result, rationale = review_check(review_type, fact)
+        results[review_type] = result
+        checks[key] = _check(key, check_labels[key], result, rationale)
+    status, detail = review_step(results)
+    steps["risk_regulatory"] = _step("risk_regulatory", labels["risk_regulatory"], status, detail)
 
 
 # ---------------------------------------------------------------------------------------------------- reading
@@ -517,6 +541,12 @@ def _decision_fact(db: Session, case) -> dict:
     return {"count": len(statuses), "signed": sum(1 for item in statuses if item in SIGNED_DECISION_STATUSES)}
 
 
+def _reviews_fact(db: Session, case) -> dict:
+    from backend.app.case_reviews.service import review_facts
+
+    return review_facts(db, case)
+
+
 def case_facts(db: Session, case) -> dict:
     """The facts ``evaluate`` needs, each read on its own (None when it could not be read)."""
     from backend.app.case_workflow.states import case_state
@@ -548,4 +578,5 @@ def case_facts(db: Session, case) -> dict:
         "contradictions": safely(db, "contradictions", lambda session: _contradictions_fact(session, case)),
         "brief": safely(db, "brief", lambda session: _brief_fact(session, case)),
         "decision": safely(db, "decision", lambda session: _decision_fact(session, case)),
+        "reviews": safely(db, "reviews", lambda session: _reviews_fact(session, case)),
     }

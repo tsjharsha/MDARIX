@@ -1459,3 +1459,16 @@
   flex-wrap: wrap;
   gap: 4px;
 }
+
+/* Phase 5 reviews and Decision Brief: the review policy cards, count tiles that are not buttons. */
+.uw-review-policy {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+div.uw-task-count {
+  cursor: default;
+}
+div.uw-task-count:hover {
+  border-color: var(--ac-line);
+}
