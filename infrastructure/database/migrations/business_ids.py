@@ -90,6 +90,7 @@ OBJECTS: tuple[BusinessObject, ...] = (
 # migration that creates its table (named in the comment).
 LATER_OBJECTS: tuple[BusinessObject, ...] = (
     BusinessObject("workflow_tasks", "TASK", "Task", "tenant"),  # md27
+    BusinessObject("signals", "SIG", "Signal", "tenant"),  # md28
 )
 
 COUNTER_TABLE = "business_id_counters"

@@ -959,3 +959,77 @@
   color: var(--ac-muted);
   font-size: 12px;
 }
+
+/* Phase 2 signal triage: the inbox's status chips and filters, pick lists in forms, the signal's detail. */
+.uw-signal-chips {
+  margin-bottom: 12px;
+}
+.uw-signal-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.uw-signal-toolbar {
+  margin-bottom: 12px;
+}
+.uw-signal-toolbar select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.uw-signal-active {
+  margin-bottom: 12px;
+}
+.uw-signal-active li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.uw-pick-fieldset {
+  display: grid;
+  gap: 8px;
+}
+.uw-pick-list {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.uw-pick-list .ca-check {
+  align-items: flex-start;
+}
+.uw-pick-list .ca-check input {
+  margin-top: 3px;
+}
+.uw-signal {
+  display: grid;
+  gap: 16px;
+}
+.uw-signal .ac-message {
+  margin: 0;
+}
+.uw-signal-text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.uw-split li {
+  grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) 84px;
+}
+.uw-split .ac-barlist-value {
+  white-space: nowrap;
+}
+.uw-related {
+  display: grid;
+  gap: 4px;
+}
+.uw-related h4 {
+  margin: 4px 0 0;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}

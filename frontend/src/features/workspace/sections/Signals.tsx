@@ -4,21 +4,44 @@ import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/
 import { SearchBox, Table, Tabs, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { displayId } from "../../../app/displayId";
-import { investigationRequestFor, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
+import { SIGNALS_TABS, parseSignalsTab, type SignalsTab } from "../signals";
+import { SignalInbox } from "./SignalInbox";
+import { DetectionRules } from "./DetectionRules";
 
-const TABS = ["Product complaints", "Complaint list", "All signals", "Trends"] as const;
-type Tab = (typeof TABS)[number];
-
+/**
+ * Signals: the signal inbox (triage), the complaints behind signals, and their trends. `tab` may carry the inbox's
+ * filters or a signal to open (see signalsTab in ../signals.ts); a former tab name opens the tab that replaced it.
+ */
 export function SignalsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Product complaints",
+  const canTriage = useCan("signal.triage");
+  const tabs = SIGNALS_TABS.filter((item) => item !== "Detection rules" || canTriage);
+  const [target, setTarget] = useState(() => parseSignalsTab(tab));
+  // Each new target (from a link, a task, the rules' run result) opens the inbox afresh with it.
+  const [targetKey, setTargetKey] = useState(0);
+  const [active, setActive] = useState<SignalsTab>(() =>
+    (tabs as readonly string[]).includes(target.tab) ? target.tab : "Signal inbox",
   );
+  const openSignal = (signal: string) => {
+    setTarget({ ...parseSignalsTab("Signal inbox"), signal });
+    setTargetKey((value) => value + 1);
+    setActive("Signal inbox");
+  };
   return (
     <>
       <p className="ca-lede">Signals are recorded observations. They are not conclusions about cause.</p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Signal sections">
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Signal sections">
+        {active === "Signal inbox" && (
+          <SignalInbox
+            key={targetKey}
+            initialFilters={target.filters}
+            initialSignal={target.signal}
+            // Back on the list, the signal is not opened again when the person returns to this tab.
+            onSignalClosed={() => setTarget((current) => ({ ...current, signal: null }))}
+          />
+        )}
         {active === "Product complaints" && (
           <NeedsProduct>
             {(view) => (
@@ -37,13 +60,14 @@ export function SignalsSection({ tab }: { tab?: string }) {
             )}
           </NeedsProduct>
         )}
-        {active === "All signals" && (
+        {active === "Recent complaints" && (
           <Embedded>
             <Stage2Experience mode="signals" />
           </Embedded>
         )}
         {active === "Complaint list" && <ComplaintList />}
         {active === "Trends" && <Trends />}
+        {active === "Detection rules" && <DetectionRules onOpenSignal={openSignal} />}
       </Tabs>
     </>
   );

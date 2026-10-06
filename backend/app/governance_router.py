@@ -701,6 +701,10 @@ def sign(
     on_decision_signed(
         data, item, decision_value=payload.decision, actor_user_id=actor["user_id"], actor_role=signer_role
     )
+    # Signals the case was opened for record that its decision is signed. Never undoes the signature.
+    from backend.app.signals.hooks import on_case_decision_signed
+
+    on_case_decision_signed(data, item, actor_user_id=actor["user_id"], actor_role=signer_role)
     return {
         "signature_id": record.id,
         "business_id": record.business_id,

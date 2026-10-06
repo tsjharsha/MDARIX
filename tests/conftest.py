@@ -141,6 +141,8 @@ DB_MODULES = {
     "test_additional_roles",
     # Phase 1: workflow tasks (My Work): hooks of existing actions, the task API and the backfill.
     "test_workflow_tasks",
+    # Phase 2: signals and triage: the triage API, detection, cases from signals and their lifecycle.
+    "test_signals_triage",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

@@ -28,6 +28,12 @@ TRIAL_DATA_TABLES = (
     # Workflow tasks (md27) and their history: about cases, decisions, risks and supplier requests listed below.
     "workflow_task_events",
     "workflow_tasks",
+    # Signals (md28): their history, complaints and cases first, then the signals and the rule settings.
+    "signal_events",
+    "signal_complaints",
+    "investigation_signals",
+    "signals",
+    "signal_rules",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",

@@ -198,6 +198,11 @@ def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, d
         raise HTTPException(
             500, detail={"code": "TRIAL_IMPORT_FAILED", "message": "The import failed; nothing was saved"}
         ) from exc
+    from backend.app.signals import hooks as signal_hooks
+
+    if signal_hooks.imported_complaints(result):
+        # Signals from the new complaints (backend/app/signals/detection.py); never fails or undoes the import.
+        signal_hooks.after_complaints_saved(data, tenant_id, source="trial import")
     return result
 
 

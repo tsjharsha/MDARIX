@@ -27,3 +27,4 @@ from backend.app.db.models.reporting import *
 from backend.app.db.models.regulatory import *
 from backend.app.db.models.master import *
 from backend.app.db.models.workflow import *
+from backend.app.db.models.signals import *

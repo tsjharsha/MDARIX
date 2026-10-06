@@ -175,6 +175,11 @@ def sync_connector(
                     canonical_import = {"status": "BLOCKED", "reason": str(exc)}
                 if canonical_import.get("status") == "IMPORTED":
                     data.commit()
+                    from backend.app.signals import hooks as signal_hooks
+
+                    if signal_hooks.imported_complaints(canonical_import):
+                        # Signals from the synced complaints; never fails or undoes the sync.
+                        signal_hooks.after_complaints_saved(data, tenant_id, source=f"connector sync {row.code}")
                 else:
                     data.rollback()
     now = datetime.now(timezone.utc)

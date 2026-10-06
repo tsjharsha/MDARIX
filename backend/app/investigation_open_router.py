@@ -51,10 +51,60 @@ def open_investigation(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     tenant_id = uuid.UUID(ctx.tenant_id)
-    product = db.query(Product).filter(Product.id == payload.product_id, Product.tenant_id == tenant_id).first()
+    owner = None
+    if payload.assign_to_me:
+        user = control_db.query(AuthUser.username).filter(AuthUser.id == uuid.UUID(ctx.user_id)).first()
+        owner = user[0] if user else None
+    investigation, product, complaint_ids = open_case(
+        db,
+        tenant_id,
+        actor_ref=ctx.user_id,
+        product_id=payload.product_id,
+        investigation_question=payload.investigation_question,
+        complaint_ids=payload.complaint_ids,
+        investigation_identifier=payload.investigation_identifier,
+        owner_ref=owner,
+    )
+    db.commit()
+    result = {
+        "id": str(investigation.id),
+        "business_id": investigation.business_id,
+        "investigation_identifier": investigation.investigation_identifier,
+        "product_id": str(product.id),
+        "product_business_id": product.business_id,
+        "status": investigation.status,
+        "owner_ref": owner,
+        "complaints_linked": len(complaint_ids),
+    }
+    # The case's first task: the opener's (accepted) when they own it, else the investigators' queue. Saved after the
+    # case; a failure is logged and never undoes it (backend/app/workflow/hooks.py).
+    from backend.app.workflow.hooks import on_investigation_opened
+
+    on_investigation_opened(
+        db, control_db, investigation, actor_user_id=ctx.user_id, owner_user_id=ctx.user_id if owner else None
+    )
+    return result
+
+
+def open_case(
+    db: Session,
+    tenant_id: uuid.UUID,
+    *,
+    actor_ref: str,
+    product_id,
+    investigation_question: str,
+    complaint_ids,
+    investigation_identifier: str | None = None,
+    owner_ref: str | None = None,
+) -> tuple[Investigation, Product, list]:
+    """Open a case for one of the tenant's products: checks the product and the complaints (all of that product),
+    the identifier (generated when none is given; refused when taken), then writes the investigation, its complaint
+    links and the INVESTIGATION_OPENED audit event. Shared by ``POST /api/v1/investigations`` and opening a case from
+    a signal (backend/app/signals/router.py). Raises HTTPException when a check fails. Does not commit."""
+    product = db.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
     if product is None:
         raise HTTPException(404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Not found in your organization"})
-    complaint_ids = list(dict.fromkeys(payload.complaint_ids))
+    complaint_ids = list(dict.fromkeys(complaint_ids or []))
     if complaint_ids:
         found = {
             row[0]
@@ -73,7 +123,7 @@ def open_investigation(
                 },
             )
     now = datetime.now(timezone.utc)
-    identifier = payload.investigation_identifier or f"INV-{now:%Y%m%d}-{uuid.uuid4().hex[:6].upper()}"
+    identifier = investigation_identifier or f"INV-{now:%Y%m%d}-{uuid.uuid4().hex[:6].upper()}"
     taken = (
         db.query(Investigation.id)
         .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == identifier)
@@ -83,19 +133,15 @@ def open_investigation(
         raise HTTPException(
             409, detail={"code": "INVESTIGATION_EXISTS", "message": f"An investigation {identifier} already exists"}
         )
-    owner = None
-    if payload.assign_to_me:
-        user = control_db.query(AuthUser.username).filter(AuthUser.id == uuid.UUID(ctx.user_id)).first()
-        owner = user[0] if user else None
     investigation = Investigation(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
         product_id=product.id,
         investigation_identifier=identifier,
-        investigation_question=payload.investigation_question.strip(),
+        investigation_question=investigation_question.strip(),
         status="open",
         opened_at=now,
-        owner_ref=owner,
+        owner_ref=owner_ref,
         source_system="MDARIX",
         source_identifier=identifier,
         source_timestamp=now,
@@ -121,7 +167,7 @@ def open_investigation(
         AuditEvent(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
-            actor_ref=ctx.user_id,
+            actor_ref=actor_ref,
             action="INVESTIGATION_OPENED",
             entity_type="Investigation",
             entity_id=investigation.id,
@@ -129,25 +175,7 @@ def open_investigation(
             created_at=now,
         )
     )
-    db.commit()
-    result = {
-        "id": str(investigation.id),
-        "business_id": investigation.business_id,
-        "investigation_identifier": identifier,
-        "product_id": str(product.id),
-        "product_business_id": product.business_id,
-        "status": investigation.status,
-        "owner_ref": owner,
-        "complaints_linked": len(complaint_ids),
-    }
-    # The case's first task: the opener's (accepted) when they own it, else the investigators' queue. Saved after the
-    # case; a failure is logged and never undoes it (backend/app/workflow/hooks.py).
-    from backend.app.workflow.hooks import on_investigation_opened
-
-    on_investigation_opened(
-        db, control_db, investigation, actor_user_id=ctx.user_id, owner_user_id=ctx.user_id if owner else None
-    )
-    return result
+    return investigation, product, complaint_ids
 
 
 def _can_work_cases(db: Session, user: AuthUser) -> bool:
@@ -323,4 +351,9 @@ def manage_investigation(
         before_status=before["status"],
         assignee_user_id=payload.assignee_id,
     )
+    # Signals the case was opened for follow it: closed when all their cases are closed, open again when it reopens.
+    # Saved after the change; a failure is logged and never undoes it (backend/app/signals/hooks.py).
+    from backend.app.signals.hooks import on_investigation_status_changed
+
+    on_investigation_status_changed(db, control_db, case, actor_user_id=ctx.user_id, before_status=before["status"])
     return result

@@ -1,7 +1,7 @@
 """Row-level security defence in depth for the customer records, the organizations table and the master data.
 
 PREPARED, NOT APPLIED. The ``.pending`` suffix keeps Alembic from loading this file. To enable it, rename it to
-``md28_rls_defence.py`` (re-point ``down_revision`` at the head of the day if a newer migration landed first), after
+``md29_rls_defence.py`` (re-point ``down_revision`` at the head of the day if a newer migration landed first), after
 every writer listed in the data-governance report runs in system scope or in the scope the policy allows; otherwise
 those writes fail with "new row violates row-level security policy".
 
@@ -25,8 +25,8 @@ must bind system scope too.
 
 from alembic import op
 
-revision = "md28rlsdefence"
-down_revision = "md27workflow"
+revision = "md29rlsdefence"
+down_revision = "md28signals"
 branch_labels = None
 depends_on = None
 

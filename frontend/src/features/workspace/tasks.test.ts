@@ -20,6 +20,7 @@ import {
   taskEventText,
   taskListPath,
   taskPath,
+  taskSignal,
   taskSourceText,
   taskTypeLabel,
   taskViewForTab,
@@ -88,6 +89,26 @@ describe("where a task opens", () => {
     expect(at("RISK_REVIEW")).toEqual({ section: "Intelligence", tab: "Risk & traceability" });
     expect(at("REGULATORY_REVIEW")).toEqual({ section: "Intelligence", tab: "Regulatory copilot" });
     expect(taskDestination({ task_type: "SIGNAL_TRIAGE", investigation: null })).toEqual({ section: "Signals" });
+  });
+
+  it("opens a signal triage task on its signal, else on the signal inbox", () => {
+    const triage = (source: Parameters<typeof taskDestination>[0]["source"]) =>
+      taskDestination({ task_type: "SIGNAL_TRIAGE", investigation: null, source });
+    expect(triage({ type: "SIGNAL", id: UUID, business_id: "SIG000023" })).toEqual({
+      section: "Signals",
+      tab: "Signal inbox?signal=SIG000023",
+    });
+    expect(triage({ type: "signal", id: UUID, business_id: null })).toEqual({
+      section: "Signals",
+      tab: `Signal inbox?signal=${UUID}`,
+    });
+    expect(triage({ business_id: "SIG000007" })).toEqual({ section: "Signals", tab: "Signal inbox?signal=SIG000007" });
+    // A triage task about a complaint names no signal: the inbox opens.
+    expect(triage({ type: "COMPLAINT", id: UUID, business_id: "CMP000012" })).toEqual({ section: "Signals" });
+    expect(triage(null)).toEqual({ section: "Signals" });
+    expect(taskSignal({ source: { type: "SIGNAL", business_id: "SIG000023" } })).toBe("SIG000023");
+    expect(taskSignal({ source: { type: "INVESTIGATION", business_id: "INV000147" } })).toBeNull();
+    expect(taskSignal({})).toBeNull();
   });
 
   it("opens an unknown kind of task on its case, else stays in My Work", () => {

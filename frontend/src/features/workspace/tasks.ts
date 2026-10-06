@@ -5,6 +5,7 @@ import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { roleLabel } from "../../app/roles";
 import { safeText } from "../../app/displayId";
 import type { WorkspaceSection } from "./workspaceContext";
+import { signalsTab } from "./signals";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -123,14 +124,29 @@ export function tabCount(tab: string, summary: TaskSummary | null | undefined): 
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-/** Where "Open" takes a task: the section (and tab) where its work is done. */
-export function taskDestination(task: Pick<Task, "task_type" | "investigation">): {
+/** The signal a task is about (its source), by business ID (SIG000023) or else its id; null for any other source. */
+export function taskSignal(task: Partial<Pick<Task, "source">>): string | null {
+  const source = task.source;
+  if (!source) return null;
+  const type = String(source.type ?? "")
+    .trim()
+    .toUpperCase();
+  const business = safeText(source.business_id);
+  // A triage task that came from a complaint (or anything else) opens the inbox, not a signal it does not name.
+  if (type !== "SIGNAL" && !(business && /^SIG\d/i.test(business))) return null;
+  return business ?? (source.id ? String(source.id).trim() || null : null);
+}
+
+/** Where "Open" takes a task: the section (and tab) where its work is done; a signal triage task opens its signal. */
+export function taskDestination(task: Pick<Task, "task_type" | "investigation"> & Partial<Pick<Task, "source">>): {
   section: WorkspaceSection;
   tab?: string;
 } {
   switch (String(task.task_type ?? "").toUpperCase()) {
-    case "SIGNAL_TRIAGE":
-      return { section: "Signals" };
+    case "SIGNAL_TRIAGE": {
+      const signal = taskSignal(task);
+      return signal ? { section: "Signals", tab: signalsTab({ signal }) } : { section: "Signals" };
+    }
     case "DECISION_APPROVAL":
       return { section: "Decisions", tab: "Decision center" };
     case "RISK_REVIEW":

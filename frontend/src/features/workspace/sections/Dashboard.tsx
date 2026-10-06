@@ -39,6 +39,7 @@ import {
   type TaskSummary,
 } from "../tasks";
 import { useOpenTask } from "./MyWork";
+import { SignalTriagePanel } from "./SignalInbox";
 
 type Breakdown = Array<{ label: string; count: number }>;
 type Trends = {
@@ -130,6 +131,7 @@ export function DashboardSection() {
   return (
     <div className="ac-overview ac-dashboard">
       <MyWorkSummary />
+      <SignalTriagePanel />
 
       <section className={`ac-hero tone-${tone}`} aria-live="polite">
         <div className="ac-hero-status">
@@ -230,7 +232,7 @@ export function DashboardSection() {
           series={model.signals.map((point) => point.primary)}
           seriesLabel={`Signals per day, last ${days} days`}
           goodWhenUp={false}
-          onOpen={() => open("Signals", "All signals")}
+          onOpen={() => open("Signals", "Recent complaints")}
         />
         <KpiTile
           label="Investigations"
@@ -417,7 +419,7 @@ export function DashboardSection() {
           eyebrow="Signals"
           title="Latest signals"
           source={signals}
-          action={<OpenLink onClick={() => open("Signals", "All signals")} />}
+          action={<OpenLink onClick={() => open("Signals", "Recent complaints")} />}
         >
           {model.signalRows.length ? (
             <ol className="ac-timeline">

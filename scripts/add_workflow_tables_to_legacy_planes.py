@@ -1,14 +1,15 @@
-"""Give legacy dedicated organization databases the workflow tables of migration md27.
+"""Give legacy dedicated organization databases the workflow tables of migrations md27 (roles, tasks) and md28
+(signals).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
 
 A dedicated database built before migrations managed planes (scripts/migrate_data_planes.py reports it as LEGACY)
-cannot be upgraded with Alembic, so it would lack the workflow tables the application now writes when a case is
-opened or a decision recorded. This runs md27's own ``create_workflow_tables`` (the same steps, so the result is
-identical) on each such database that does not have them yet, in one transaction per database. It needs md26's
-business identifiers there first (scripts/add_business_ids_to_legacy_planes.py). Databases managed by migrations are
-left to scripts/migrate_data_planes.py.
+cannot be upgraded with Alembic, so it would lack the tables the application now writes when a case is opened, a
+decision recorded or a signal detected. This runs each migration's own table function (the same steps, so the result
+is identical) on each such database that does not have those tables yet, in order and in one transaction per
+database. It needs md26's business identifiers there first (scripts/add_business_ids_to_legacy_planes.py). Databases
+managed by migrations are left to scripts/migrate_data_planes.py.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import argparse
 import importlib.util
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,8 +35,34 @@ from backend.app.db.tenant_scope import bind_system  # noqa: E402
 from backend.app.db.tls import connect_args  # noqa: E402
 
 VERSIONS = ROOT / "infrastructure" / "database" / "migrations" / "versions"
-WORKFLOW_TABLES = ("user_additional_roles", "workflow_tasks", "workflow_task_events")
-REQUIRED = ("tenants", "auth_users", "investigations", "business_id_counters")
+
+
+@dataclass(frozen=True)
+class Step:
+    name: str
+    module_file: str
+    function: str
+    tables: tuple[str, ...]
+    required: tuple[str, ...]
+
+
+# In migration order: a later step may reference an earlier step's tables.
+STEPS = (
+    Step(
+        "md27",
+        "md27_workflow_foundation.py",
+        "create_workflow_tables",
+        ("user_additional_roles", "workflow_tasks", "workflow_task_events"),
+        ("tenants", "auth_users", "investigations", "business_id_counters"),
+    ),
+    Step(
+        "md28",
+        "md28_signals.py",
+        "create_signal_tables",
+        ("signals", "signal_complaints", "signal_events", "investigation_signals", "signal_rules"),
+        ("tenants", "products", "product_versions", "complaints", "investigations", "business_id_counters"),
+    ),
+)
 
 
 def _load(name: str, path: Path):
@@ -44,30 +72,48 @@ def _load(name: str, path: Path):
     return module
 
 
-def state(url: str) -> tuple[bool, list[str], list[str]]:
-    """(is legacy, workflow tables still missing, tables md27 needs that are absent)."""
+def state(url: str) -> tuple[bool, list[Step], list[str]]:
+    """(is legacy, the steps still to run, problems that stop a step: partly present tables or missing needs)."""
     engine = create_engine(url, connect_args=connect_args())
     try:
         tables = set(inspect(engine).get_table_names())
         legacy, _ = _load("migrate_data_planes", ROOT / "scripts" / "migrate_data_planes.py").plane_state(url)
-        missing = [table for table in WORKFLOW_TABLES if table not in tables]
-        absent = [table for table in REQUIRED if table not in tables]
-        return legacy == "LEGACY", missing, absent
+        todo: list[Step] = []
+        problems: list[str] = []
+        for step in STEPS:
+            missing = [table for table in step.tables if table not in tables]
+            if not missing:
+                continue
+            if len(missing) != len(step.tables):
+                problems.append(f"{step.name}: only some tables exist ({', '.join(missing)} missing); fix by hand")
+                continue
+            absent = [table for table in step.required if table not in tables and table not in _created_by(todo)]
+            if absent:
+                problems.append(f"{step.name}: needs {', '.join(absent)} first")
+                continue
+            todo.append(step)
+        return legacy == "LEGACY", todo, problems
     finally:
         engine.dispose()
 
 
-def apply(url: str, md27) -> None:
+def _created_by(steps: list[Step]) -> set[str]:
+    return {table for step in steps for table in step.tables}
+
+
+def apply(url: str, steps: list[Step]) -> None:
     engine = create_engine(url, connect_args=connect_args())
     try:
         with engine.begin() as connection:
             # Older databases isolate by organization only (no system scope function); match their other tables.
             system_scope = bool(connection.execute(text("SELECT to_regproc('public.mdarix_system_scope')")).scalar())
-            with Operations.context(MigrationContext.configure(connection)):
-                md27.create_workflow_tables(system_scope)
-            # The task numbering trigger calls md26's function; refuse to finish without it.
+            # The numbering triggers call md26's function; refuse to start without it.
             if not connection.execute(text("SELECT to_regproc('public.mdarix_assign_business_id')")).scalar():
                 raise RuntimeError("md26's numbering function is missing; run add_business_ids_to_legacy_planes.py")
+            with Operations.context(MigrationContext.configure(connection)):
+                for step in steps:
+                    module = _load(step.module_file.removesuffix(".py"), VERSIONS / step.module_file)
+                    getattr(module, step.function)(system_scope)
     finally:
         engine.dispose()
 
@@ -76,7 +122,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--apply", action="store_true", help="change the databases (default: dry run)")
     args = parser.parse_args()
-    md27 = _load("md27_workflow_foundation", VERSIONS / "md27_workflow_foundation.py")
     db = SessionLocal()
     try:
         bind_system(db, "add workflow tables to legacy organization databases")
@@ -94,22 +139,20 @@ def main() -> int:
         label = f"{plane.database_ref} (tenant {plane.tenant_id})"
         url = os.getenv(f"{plane.connection_secret_ref}_OWNER", "").strip() or _secret_url(plane.connection_secret_ref)
         try:
-            legacy, missing, absent = state(url)
+            legacy, todo, problems = state(url)
+            names = ", ".join(step.name for step in todo)
             if not legacy:
                 print(f"SKIP      {label}: managed by migrations (scripts/migrate_data_planes.py)")
-            elif not missing:
+            elif problems:
+                failures += 1
+                print(f"FAILED    {label}: {'; '.join(problems)}")
+            elif not todo:
                 print(f"OK        {label}: workflow tables present")
-            elif len(missing) != len(WORKFLOW_TABLES):
-                failures += 1
-                print(f"FAILED    {label}: only some workflow tables exist ({', '.join(missing)} missing); fix by hand")
-            elif absent:
-                failures += 1
-                print(f"FAILED    {label}: needs {', '.join(absent)} first")
             elif not args.apply:
-                print(f"PENDING   {label}: {', '.join(missing)} (dry run)")
+                print(f"PENDING   {label}: {names} (dry run)")
             else:
-                apply(url, md27)
-                print(f"DONE      {label}: {', '.join(missing)} created")
+                apply(url, todo)
+                print(f"DONE      {label}: {names} created")
         except Exception as exc:  # report every database, then fail
             failures += 1
             print(f"FAILED    {label}: {type(exc).__name__}: {exc}")

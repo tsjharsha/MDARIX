@@ -23,6 +23,12 @@ PASSWORD = "Trial password 2026!"
 # Business tables a trial workspace writes to, children first. Other tests count rows in some of these across the
 # whole test database, so trial workspaces created here must not leave business data behind.
 _TRIAL_BUSINESS_TABLES = (
+    # Signals detected from imported complaints (md28) reference complaints, products and cases.
+    "signal_events",
+    "signal_complaints",
+    "investigation_signals",
+    "signals",
+    "signal_rules",
     "retrieval_queries",  # Ask logs its evidence search against the investigation
     "evidence_entity_links",  # imported records are linked to their evidence for AI search
     "evidence_chunk_embeddings",

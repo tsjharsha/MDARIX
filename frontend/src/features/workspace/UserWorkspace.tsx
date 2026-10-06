@@ -56,13 +56,14 @@ import { ImportDataSection } from "./sections/ImportData";
 import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
+import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
   "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
   Dashboard: { icon: LayoutDashboard, description: "Live quality status", context: false },
   "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
   Products: { icon: Package, description: "Product 360 and versions", context: true },
-  Signals: { icon: Radio, description: "Complaints and trends", context: true },
+  Signals: { icon: Radio, description: "Triage, complaints and trends", context: true },
   Investigations: { icon: FileSearch, description: "Cases and workspace", context: true },
   Evidence: { icon: Search, description: "Library and provenance", context: true },
   Decisions: { icon: Gavel, description: "Review, sign and verify", context: true },
@@ -104,10 +105,12 @@ export function UserWorkspace({
 }) {
   // A link to a case (/app/investigations?case=INV000147) opens that case, on its product, in the view's section.
   const [caseLink] = useState(() => caseFromSearch(window.location.search));
+  // A link to a signal (/app/signals?signal=SIG000023) opens that signal in Signals (the case link wins over it).
+  const [signalLink] = useState(() => (caseLink ? null : signalFromSearch(window.location.search)));
   const work = useWorkContext(caseLink);
   const [start] = useState(() => {
     const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
-    return caseLink ? caseLinkStart(initialView, base) : base;
+    return caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
   });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
@@ -159,6 +162,14 @@ export function UserWorkspace({
     else if (caseLinkState === "failed")
       notify(`${caseLink} could not be opened right now. Choose it in the context bar above.`, "critical");
   }, [caseLinkState]);
+
+  // The signal link has been taken into the start screen: it leaves the address, so a reload starts on the inbox.
+  // Signals itself says when the signal cannot be found.
+  useEffect(() => {
+    if (!signalLink) return;
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutSignal(search)}${hash}`);
+  }, [signalLink]);
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {

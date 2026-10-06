@@ -1,5 +1,6 @@
 // Pure aggregation for the user workspace overview. Every figure comes from tenant-scoped API responses.
 import { titleCase, type Slice, type Tone } from "../admin/console/dashboardModel";
+import { signalsTab } from "./signals";
 
 const code = (value: unknown) =>
   String(value ?? "")
@@ -102,9 +103,9 @@ export function workspaceAttention(input: {
       key: "signals",
       tone: "serious",
       title: `${input.highSeveritySignals} high-severity ${input.highSeveritySignals === 1 ? "signal" : "signals"}`,
-      detail: "Review recent complaints",
+      detail: "Triage high and critical signals",
       section: "Signals",
-      tab: "All signals",
+      tab: signalsTab({ filters: { priorities: ["HIGH", "CRITICAL"] } }),
     });
   if (input.openInvestigations)
     items.push({

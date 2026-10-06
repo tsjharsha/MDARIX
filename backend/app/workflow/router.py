@@ -169,6 +169,7 @@ def _ordered(query):
 
 def _source_models() -> dict:
     from backend.app.db.models.foundation import Decision, Investigation, Risk
+    from backend.app.db.models.signals import Signal
     from backend.app.db.models.stage3 import SupplierEvidenceRequest
 
     return {
@@ -176,6 +177,7 @@ def _source_models() -> dict:
         "Decision": Decision,
         "Risk": Risk,
         "SupplierEvidenceRequest": SupplierEvidenceRequest,
+        "Signal": Signal,
     }
 
 

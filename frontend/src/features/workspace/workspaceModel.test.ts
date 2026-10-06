@@ -46,6 +46,8 @@ describe("user workspace model", () => {
       highSeveritySignals: 1,
     });
     expect(items.map((item) => item.section)).toEqual(["Signals", "Trust & Audit", "Investigations"]);
+    // High-severity signals open the signal inbox filtered to high and critical priority.
+    expect(items[0].tab).toBe("Signal inbox?priority=HIGH%2CCRITICAL");
     expect(
       workspaceAttention({ openInvestigations: 0, unreliableEvidence: 0, limitations: [], highSeveritySignals: 0 }),
     ).toEqual([]);

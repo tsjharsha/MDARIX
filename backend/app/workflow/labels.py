@@ -51,6 +51,7 @@ SOURCE_LABELS: dict[str, str] = {
     "Decision": "Decision",
     "Risk": "Risk",
     "SupplierEvidenceRequest": "Supplier evidence request",
+    "Signal": "Signal",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

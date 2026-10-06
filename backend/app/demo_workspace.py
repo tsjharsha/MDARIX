@@ -265,6 +265,7 @@ def setup_demo(db: Session, password: str) -> dict:
     )
     db.commit()
     _seed_workflow_tasks(db, tenant.id)
+    _seed_signals(db, tenant.id)
     return {"tenant_key": tenant.tenant_key, "created": created, "refreshed": refreshed, "moved": moved}
 
 
@@ -284,6 +285,7 @@ def reset_demo(db: Session) -> dict:
     _audit(db, tenant.id, "DEMO_WORKSPACE_RESET", {"deleted": deleted, "loaded": loaded, "indexed": indexed}, now)
     db.commit()
     _seed_workflow_tasks(db, tenant.id)
+    _seed_signals(db, tenant.id)
     return {"deleted": deleted, **status(db)}
 
 
@@ -303,6 +305,14 @@ def _seed_workflow_tasks(db: Session, tenant_id) -> None:
             session.commit()
     except Exception:
         logging.getLogger("mdarix.demo_workspace").exception("The demo workspace's workflow tasks were not seeded")
+
+
+def _seed_signals(db: Session, tenant_id) -> None:
+    """Signals from the story's complaints (the complaint threshold rule, backend/app/signals/detection.py), so the
+    demo shows triage work. Idempotent; a failure is logged and never fails the setup or the reset."""
+    from backend.app.signals.hooks import seed_demo_signals
+
+    seed_demo_signals(db, tenant_id)
 
 
 def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> dict:
