@@ -6,7 +6,15 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from backend.app.access.authz import _is_customer_admin, _is_platform_admin
-from backend.app.access.permissions import ALL, DATA_EXPORT, normalize_role, permissions_for_role
+from backend.app.access.permissions import (
+    ALL,
+    AI_RUN,
+    DATA_EXPORT,
+    RECORDS_WRITE,
+    REGULATORY_APPROVE,
+    normalize_role,
+    permissions_for_role,
+)
 from backend.app.db.models.foundation import AuthUser, Tenant
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
@@ -27,7 +35,9 @@ def test_platform_administrator_aliases_resolve_to_one_role(alias):
 def test_customer_administrator_aliases_resolve_to_one_role(alias):
     assert normalize_role(alias) == "CUSTOMER_ADMIN"
     assert canonical_stored_role(alias) == "CUSTOMER_ADMIN"
-    assert permissions_for_role(alias) == frozenset({DATA_EXPORT})
+    # Investigator-level workspace rights, never regulatory approval.
+    assert permissions_for_role(alias) == frozenset({RECORDS_WRITE, AI_RUN, DATA_EXPORT})
+    assert REGULATORY_APPROVE not in permissions_for_role(alias)
 
 
 def test_auth_user_model_persists_canonical_administrator_roles():

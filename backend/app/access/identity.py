@@ -1,10 +1,12 @@
 """Tenant identity administration: users, memberships, personas, roles and permission sets."""
 
+import logging
 import secrets
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -60,10 +62,12 @@ from backend.app.access.common import (
     _audit_configuration,
     _development_token,
     _enforce_invite_limits,
+    erasure_refused,
 )
 from backend.app.access.session import context
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/admin/identity/personas")
@@ -371,12 +375,54 @@ def erase_user_personal_data(
     _guard_user_administration(admin, target=user, changes_access=True)
     try:
         result = erase_person(db, user, str(admin.id), payload.reason.strip())
-    except PurgeFailed:
-        raise HTTPException(
-            409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
-        )
+    except PurgeFailed as exc:
+        raise erasure_refused(str(exc)) from exc
     db.commit()
     return {**result, "status": "ERASED"}
+
+
+DELIVERY_FAILED = "FAILED"
+DELIVERY_FAILED_MESSAGE = (
+    "The account was created, but the invitation email could not be delivered. Ask MDARIX support for an "
+    "activation link to pass on to the person."
+)
+
+
+def _send_invitation(user: AuthUser, token: str, organization: str | None) -> str:
+    """Email the activation link; the delivery result ("SENT", "NOT_CONFIGURED", or "FAILED").
+
+    The account and its link are already committed (``issue_invitation`` commits), so a mail outage must not turn
+    into an error that hides a created account: the failure is recorded (audit ``email_delivery``) and answered,
+    and MDARIX support can issue a fresh activation link (``POST /api/v1/platform-admin/users/{id}/activation-link``).
+    """
+    try:
+        return send_activation_email(user.username, token, organization or "")
+    except EmailDeliveryError as exc:
+        # No address in the log: the account id is enough to find the person.
+        logger.warning("Invitation email for user %s was not delivered: %s", user.id, exc)
+        return DELIVERY_FAILED
+
+
+def _invitation_response(body: dict, delivery: str, token: str):
+    """The answer to an invitation: 200 when the email went (or, locally, when there is no email server); 201 with
+    ``delivery: "FAILED"`` and what to do next when the account exists but the email did not go out."""
+    body = {
+        **body,
+        "email_delivery": delivery,
+        # Local development shows the link's token instead of an email that never arrives.
+        "development_token": _development_token(token) if delivery in {"NOT_CONFIGURED", DELIVERY_FAILED} else None,
+    }
+    if delivery != DELIVERY_FAILED:
+        return body
+    return JSONResponse(
+        status_code=201,
+        content={
+            **body,
+            "invitation_status": "NOT_SENT",
+            "delivery": DELIVERY_FAILED,
+            "message": DELIVERY_FAILED_MESSAGE,
+        },
+    )
 
 
 @router.post("/admin/identity/users/{user_id}/reactivate")
@@ -405,11 +451,7 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
         membership.status = "INVITED"
         membership.updated_at = now
     token = issue_invitation(db, user.id, user.tenant_id, admin.id)
-    try:
-        delivery = send_activation_email(user.username, token, user.company)
-    except EmailDeliveryError as exc:
-        db.rollback()
-        raise HTTPException(502, detail={"code": "SMTP_DELIVERY_FAILED", "message": str(exc)}) from exc
+    delivery = _send_invitation(user, token, user.company)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -423,14 +465,16 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
         )
     )
     db.commit()
-    return {
-        "user_id": str(user.id),
-        "email": user.username,
-        "status": user.status,
-        "invitation_status": "RESENT",
-        "email_delivery": delivery,
-        "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
-    }
+    return _invitation_response(
+        {
+            "user_id": str(user.id),
+            "email": user.username,
+            "status": user.status,
+            "invitation_status": "RESENT",
+        },
+        delivery,
+        token,
+    )
 
 
 @router.get("/admin/identity/users")
@@ -583,11 +627,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
             membership.status = "INVITED"
             membership.updated_at = now
     token = issue_invitation(db, row.id, row.tenant_id, admin.id)
-    try:
-        delivery = send_activation_email(row.username, token, payload.company.strip())
-    except EmailDeliveryError as exc:
-        db.rollback()
-        raise HTTPException(502, detail={"code": "SMTP_DELIVERY_FAILED", "message": str(exc)}) from exc
+    delivery = _send_invitation(row, token, payload.company.strip())
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -601,17 +641,19 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         )
     )
     db.commit()
-    return {
-        "id": str(row.id),
-        "email": row.username,
-        "display_name": row.display_name,
-        "tenant_id": str(row.tenant_id),
-        "role": row.role,
-        "status": row.status,
-        "invitation_status": "SENT",
-        "email_delivery": delivery,
-        "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
-    }
+    return _invitation_response(
+        {
+            "id": str(row.id),
+            "email": row.username,
+            "display_name": row.display_name,
+            "tenant_id": str(row.tenant_id),
+            "role": row.role,
+            "status": row.status,
+            "invitation_status": "SENT",
+        },
+        delivery,
+        token,
+    )
 
 
 @router.post("/admin/identity/users/password-reset")

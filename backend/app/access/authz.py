@@ -44,9 +44,7 @@ def _is_platform_admin(user: AuthUser) -> bool:
 
 def platform_account_clause():
     """SQL: the AuthUser row is a platform (MDARIX staff) account, with the same normalization as _is_platform_role."""
-    normalized = func.upper(
-        func.replace(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"), "-", "_")
-    )
+    normalized = func.upper(func.replace(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"), "-", "_"))
     return normalized.in_(sorted(PLATFORM_ROLE_CODES))
 
 

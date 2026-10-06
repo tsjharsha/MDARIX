@@ -23,6 +23,8 @@ from backend.app.role_codes import PLATFORM_ADMIN, role_code
 
 MAX_FAILURES = 5
 LOCK_MINUTES = 15
+
+
 def _normalize(role) -> str:
     return role_code(role)
 

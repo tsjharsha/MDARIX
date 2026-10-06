@@ -108,3 +108,60 @@ def test_reports_are_rate_limited_per_address(monkeypatch, cleanup):
     assert refused.status_code == 429 and refused.json()["detail"]["code"] == "RATE_LIMITED"
     assert int(refused.headers["Retry-After"]) > 0
     assert client.post(URL, json=_report(tag), headers={"X-Forwarded-For": "198.51.100.9"}).status_code == 202
+
+
+def test_every_value_is_cut_to_its_column(cleanup):
+    tag = uuid.uuid4().hex[:10]
+    cleanup.append(tag)
+    response = TestClient(app).post(
+        URL,
+        json={
+            "path": "/" + "p" * 511,
+            "message": f"[{tag}] " + "word " * 300,
+            "stack": "s" * client_errors.MAX_STACK_CHARS,
+            "component": "c" * 200,
+            "request_id": "r" * 100,  # plain, but longer than the column: dropped, not cut
+        },
+        headers={"User-Agent": "u" * 2000},
+    )
+    assert response.status_code == 202
+    row = _row(tag)
+    assert len(row.path) == 512 and len(row.message) <= 1000 and "  " not in row.message
+    assert len(row.stack) == client_errors.MAX_STACK_CHARS and len(row.component) == 200
+    assert len(row.user_agent) == 512 and row.request_id is None
+
+
+def test_nul_characters_are_dropped_not_a_reason_to_lose_the_report(cleanup):
+    tag = uuid.uuid4().hex[:10]
+    cleanup.append(tag)
+    response = TestClient(app).post(URL, json=_report(tag, stack="at x\u0000y", component="Pa\u0000ge"))
+    assert response.status_code == 202
+    row = _row(tag)
+    assert row is not None and row.stack == "at xy" and row.component == "Page"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"[]", b"null", b"42", b'"text"', b'{"path": 1, "message": []}', b"\xff\xfe\x00garbage", b"{", b""],
+)
+def test_malformed_bodies_are_refused_with_422(body):
+    response = TestClient(app).post(URL, content=body, headers={"Content-Type": "application/json"})
+    assert response.status_code == 422 and response.json()["detail"]["code"] == "REPORT_INVALID"
+
+
+def test_a_body_without_a_length_is_still_capped():
+    def chunks():
+        for _ in range(client_errors.MAX_BODY_BYTES // 1024 + 2):
+            yield b"x" * 1024
+
+    response = TestClient(app).post(URL, content=chunks(), headers={"Content-Type": "application/json"})
+    assert response.status_code == 413 and response.json()["detail"]["code"] == "REPORT_TOO_LARGE"
+
+
+def test_a_false_content_length_cannot_slip_a_large_body_past_the_cap():
+    oversized = b'{"path": "/", "message": "' + b"m" * client_errors.MAX_BODY_BYTES + b'"}'
+    response = TestClient(app).post(
+        URL, content=oversized, headers={"Content-Type": "application/json", "Content-Length": "10"}
+    )
+    # Either the server reads only what was declared (and the JSON is invalid) or it reads more and refuses it.
+    assert response.status_code in {413, 422}

@@ -35,12 +35,17 @@ router = APIRouter(prefix="/api/v1", tags=["Support"])
 STATUSES = ("OPEN", "CLOSED")
 EVENT_REPORTED = "SUPPORT_PROBLEM_REPORTED"
 LIST_LIMIT = 500
+# What one report may hold (the columns of support_problem_reports): longer input is refused with 422.
+MAX_SUMMARY_CHARS = 200
+MAX_DETAILS_CHARS = 5000
+MAX_PATH_CHARS = 512
+MAX_REQUEST_ID_CHARS = 64
 
 
 class ProblemIn(BaseModel):
-    summary: str = Field(min_length=1, max_length=200)
-    details: str = Field(min_length=1, max_length=5000)
-    path: str | None = Field(default=None, max_length=512)
+    summary: str = Field(min_length=1, max_length=MAX_SUMMARY_CHARS)
+    details: str = Field(min_length=1, max_length=MAX_DETAILS_CHARS)
+    path: str | None = Field(default=None, max_length=MAX_PATH_CHARS)
     request_id: str | None = Field(default=None, max_length=128)
 
 
@@ -52,8 +57,19 @@ def _error(status: int, code: str, message: str) -> HTTPException:
     return HTTPException(status, detail={"code": code, "message": message})
 
 
+def _text(value: str | None) -> str:
+    """Postgres text cannot hold NUL characters (a pasted error can carry one): they are dropped, not refused."""
+    return (value or "").replace("\x00", "")
+
+
 def _one_line(value: str | None) -> str | None:
-    return " ".join((value or "").split()) or None
+    return " ".join(_text(value).split()) or None
+
+
+def _request_id(value: str | None) -> str | None:
+    """A usable caller request id that fits its column (64); a longer one is dropped rather than cut."""
+    accepted = accept_request_id(value)
+    return accepted if accepted and len(accepted) <= MAX_REQUEST_ID_CHARS else None
 
 
 def _serialize(row: SupportProblemReport, *, tenant_name: str | None = None, reporter: str | None = None) -> dict:
@@ -88,7 +104,7 @@ def report_problem(
     tenant_id, user_id = uuid.UUID(str(ctx.tenant_id)), uuid.UUID(str(ctx.user_id))
     now = datetime.now(timezone.utc)
     summary = _one_line(payload.summary)
-    details = payload.details.strip()
+    details = _text(payload.details).strip()
     if not summary or not details:
         raise _error(422, "PROBLEM_REPORT_INVALID", "Describe the problem in a few words and in detail")
     row = SupportProblemReport(
@@ -96,10 +112,10 @@ def report_problem(
         tenant_id=tenant_id,
         user_id=user_id,
         reporter_ref=str(user_id),
-        summary=summary[:200],
-        details=details,
-        path=_one_line(payload.path)[:512] if _one_line(payload.path) else None,
-        request_id=accept_request_id(payload.request_id),
+        summary=summary[:MAX_SUMMARY_CHARS],
+        details=details[:MAX_DETAILS_CHARS],
+        path=(_one_line(payload.path) or "")[:MAX_PATH_CHARS] or None,
+        request_id=_request_id(payload.request_id),
         user_agent=(request.headers.get("user-agent") or "")[:512] or None,
         status="OPEN",
         created_at=now,

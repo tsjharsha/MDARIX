@@ -38,6 +38,23 @@ def _development_token(token: str | None) -> str | None:
     return token if is_development() else None
 
 
+def erasure_refused(reason: str) -> HTTPException:
+    """The answer when ``tenant_purge.erase_person`` refuses (``PurgeFailed``): a legal hold on the organization is
+    said as such, so an administrator is not told to offboard a person who already is."""
+    if reason == "LEGAL_HOLD":
+        return HTTPException(
+            409,
+            detail={
+                "code": "LEGAL_HOLD",
+                "message": "This organization is under a legal hold; personal data cannot be erased until the hold "
+                "is lifted.",
+            },
+        )
+    return HTTPException(
+        409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
+    )
+
+
 def _audit_configuration(
     db, admin, action, entity_type, entity_id, version, *, request=None, before=None, after=None, reason=None
 ):

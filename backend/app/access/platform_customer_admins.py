@@ -7,6 +7,9 @@ A platform administrator can list every Customer Administrator, add one to a ten
 resend an activation, send a password-reset email, and suspend or reactivate one. A tenant is never left
 without an active Customer Administrator: suspending the last one is refused (add or replace one first, or
 suspend the tenant instead). Every change is audited in the administrator's tenant with the reason given.
+
+When an invitation email does not arrive, MDARIX support issues a fresh activation link for any account still
+waiting to be activated (``POST /platform-admin/users/{id}/activation-link``) and hands it over.
 """
 
 from __future__ import annotations
@@ -15,15 +18,15 @@ import secrets
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from auth.durable import issue_invitation, issue_reset, revoke_user_sessions
-from auth.emailer import EmailDeliveryError, send_activation_email, send_password_reset_email
+from auth.durable import hash_token, issue_invitation, issue_reset, revoke_user_sessions
+from auth.emailer import EmailDeliveryError, company, send_activation_email, send_password_reset_email
 from auth.service import _hash
 from backend.app.access.authz import _require_platform_admin
-from backend.app.access.common import _development_token, _enforce_invite_limits
+from backend.app.access.common import _development_token, _enforce_invite_limits, erasure_refused
 from backend.app.access.schemas import (
     CustomerAdminActionRequest,
     CustomerAdminCreateRequest,
@@ -31,6 +34,7 @@ from backend.app.access.schemas import (
 )
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
+from backend.app.db.models.stage2 import UserInvitation
 from backend.app.db.session import get_db
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -357,6 +361,73 @@ def reset_customer_admin_password(
     }
 
 
+@router.post("/platform-admin/users/{user_id}/activation-link")
+def issue_activation_link(user_id: uuid.UUID, request: Request, response: Response, db: Session = Depends(get_db)):
+    """A fresh single-use activation link for a person who has not activated their account yet, for MDARIX support
+    to pass on when the invitation email did not arrive (or was deleted).
+
+    The link is the same kind an invitation emails (72 hours, single use) and replaces any earlier unused one, so
+    only the link handed over works. Whoever holds it sets the account's password, so it is issued only to a
+    platform administrator whose own session passed multi-factor authentication, and only for an account that is
+    still waiting to be activated: an active account recovers through a password reset, which reaches its owner's
+    mailbox, not a link in someone else's hands. Audited ``ACTIVATION_LINK_ISSUED`` in the person's organization,
+    naming the account only (never the link or the email address).
+    """
+    from backend.app import mfa
+    from backend.app.enterprise_audit import make_audit_event
+
+    platform_admin = _require_platform_admin(request, db)
+    # The request context already refuses a session that still owes its second factor; an administrator without
+    # an authenticator never passed one at all.
+    if not mfa.is_enrolled(platform_admin):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "MFA_REQUIRED",
+                "message": "Set up multi-factor authentication before issuing activation links",
+            },
+        )
+    user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if user is None:
+        raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
+    status = (user.status or "").upper()
+    if status == "ACTIVE":
+        raise HTTPException(
+            409,
+            detail={
+                "code": "ACCOUNT_ALREADY_ACTIVE",
+                "message": "This account is already active; send a password reset instead",
+            },
+        )
+    if status != "INVITED" or not user.username:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "ACCOUNT_NOT_INVITED",
+                "message": "Only an account waiting for activation can get an activation link; re-invite it first",
+            },
+        )
+    now = datetime.now(timezone.utc)
+    # Added before the link is issued: issue_invitation commits both together.
+    db.add(
+        make_audit_event(
+            tenant_id=user.tenant_id,
+            actor_ref=str(platform_admin.id),
+            action="ACTIVATION_LINK_ISSUED",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={"user_id": str(user.id), "source": "PLATFORM_ADMIN"},
+            request=request,
+            created_at=now,
+        )
+    )
+    token = issue_invitation(db, user.id, user.tenant_id, platform_admin.id)
+    expires_at = db.query(UserInvitation.expires_at).filter(UserInvitation.token_hash == hash_token(token)).scalar()
+    # The answer holds a credential: no cache may keep it.
+    response.headers["Cache-Control"] = "no-store"
+    return {"url": f"{company().app_url}/activate-account?token={token}", "expires_at": expires_at.isoformat()}
+
+
 @router.post("/platform-admin/users/{user_id}/erase")
 def erase_user_personal_data(
     user_id: uuid.UUID, payload: CustomerAdminActionRequest, request: Request, db: Session = Depends(get_db)
@@ -372,10 +443,8 @@ def erase_user_personal_data(
         raise HTTPException(409, detail={"code": "SELF_CHANGE_NOT_ALLOWED", "message": "You cannot erase yourself"})
     try:
         result = erase_person(db, user, str(platform_admin.id), payload.reason.strip())
-    except PurgeFailed:
-        raise HTTPException(
-            409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
-        )
+    except PurgeFailed as exc:
+        raise erasure_refused(str(exc)) from exc
     db.commit()
     return {**result, "status": "ERASED"}
 

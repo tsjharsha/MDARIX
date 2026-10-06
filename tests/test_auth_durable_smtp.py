@@ -1,4 +1,5 @@
 import os
+import ssl
 
 from auth.emailer import send_activation_email, smtp_configuration_status, EmailDeliveryError
 from auth.durable import hash_token
@@ -39,7 +40,9 @@ def test_smtp_delivery_uses_tls_auth_and_message(monkeypatch):
         def __exit__(self, *args):
             pass
 
-        def starttls(self):
+        def starttls(self, context=None):
+            # The connection must verify the server certificate (auth/emailer.py passes a default context).
+            assert context is not None and context.verify_mode == ssl.CERT_REQUIRED and context.check_hostname
             events.append(("starttls",))
 
         def login(self, username, password):

@@ -33,14 +33,16 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "LEADER": ALL,
     # Platform administrators (MDARIX staff) keep full access to their own tenant's records.
     PLATFORM_ADMIN: ALL,
-    # Customer administrators manage people and settings, not investigations.
-    CUSTOMER_ADMIN: frozenset({DATA_EXPORT}),
+    # Customer administrators manage people and settings and, in the same account (one per person), may switch into
+    # the workspace with an Investigator's rights: work on cases, evidence and Ask, and export. Never regulatory
+    # approval, and never a signature: signing needs an approval authority (Approver, Leader), which they lack.
+    CUSTOMER_ADMIN: _WORK,
 }
 
 
 def normalize_role(role: str | None) -> str:
-    """Normalize role comparisons and map legacy administrator aliases."""
-
+    """'Approver', 'APPROVER' and 'approver ' are the same role everywhere roles are compared; the administrator
+    aliases ('Administrator', 'Customer Admin', ...) resolve to their canonical role (backend/app/role_codes.py)."""
     return role_code(role)
 
 

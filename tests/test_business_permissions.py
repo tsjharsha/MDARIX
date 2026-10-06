@@ -14,6 +14,7 @@ from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, p
 from backend.app.db.models.foundation import AuthUser, Tenant, TenantMembership
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
+from backend.app.request_context import get_request_context
 from tests.route_inventory import api_routes
 
 ADMIN_PREFIXES = (
@@ -45,9 +46,16 @@ EXEMPT = {
     ("POST", "/api/v1/public/demo-requests"): "public website form; stores contact details only, rate limited",
     ("POST", "/api/v1/trial/feedback"): "the trial user's own feedback; trial workspaces only, checked in the route",
     ("POST", "/api/v1/trial/feedback/{feedback_id}/withdraw-consent"): "the user's own feedback only",
-    ("POST", "/api/v1/client-errors"): "public error-boundary telemetry; size bounded and rate limited by source",
-    ("POST", "/api/v1/support/problems"): "authenticated user's own tenant-scoped support report",
+    ("POST", "/api/v1/client-errors"): "public by design: the browser's error boundary reports from the sign-in page "
+    "and after a session ended; stores no business data, body capped, rate limited per address",
+    (
+        "POST",
+        "/api/v1/support/problems",
+    ): "any signed-in user may report a problem (session required, own organization)",
 }
+# Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
+# never from authentication.
+EXEMPT_BUT_SIGNED_IN = {("POST", "/api/v1/support/problems")}
 
 
 def _is_guarded(route) -> bool:
@@ -73,6 +81,23 @@ def test_every_business_write_ai_or_export_route_is_guarded_or_explicitly_exempt
         if not _is_guarded(route) and (method, path) not in EXEMPT
     ]
     assert unguarded == [], "Add require_permission(...) or a reviewed EXEMPT entry for: " + ", ".join(unguarded)
+
+
+def _requires_session(dependant) -> bool:
+    """True when the route (or any dependency it pulls in) resolves the signed-in request context."""
+    return any(
+        dep.call is get_request_context or _requires_session(dep) for dep in getattr(dependant, "dependencies", [])
+    )
+
+
+def test_exempt_routes_that_need_a_session_require_one():
+    routes = {(method, path): route for method, path, route in _business_actions()}
+    for key in EXEMPT_BUT_SIGNED_IN:
+        assert key in routes, f"{key} is no longer a route; update EXEMPT_BUT_SIGNED_IN"
+        assert _requires_session(routes[key].dependant), f"{key} must depend on get_request_context"
+        method, path = key
+        anonymous = TestClient(app).request(method, path, json={"summary": "s", "details": "d"})
+        assert anonymous.status_code == 401, f"{key} answered {anonymous.status_code} without a session"
 
 
 def _client_with_role(role: str) -> TestClient:
@@ -126,7 +151,9 @@ def _call(client: TestClient, method: str, path: str):
     [
         ("Viewer", set()),
         ("Investigator", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),
-        ("CUSTOMER_ADMIN", {DATA_EXPORT}),
+        # Investigator-level rights in the workspace; never regulatory approval (decision of 2026-10).
+        ("CUSTOMER_ADMIN", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),
+        ("Customer Administrator", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),
         ("Something custom", set()),
     ],
 )
