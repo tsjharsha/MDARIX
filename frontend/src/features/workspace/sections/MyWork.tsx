@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MessageSquareReply, Paperclip } from "lucide-react";
-import { requestJson } from "../../../app/apiClient";
+import { ApiError, requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import {
@@ -38,6 +38,7 @@ import {
   taskActionBody,
   taskAssignee,
   taskCase,
+  taskCompletedElsewhere,
   taskDestination,
   taskEventActor,
   taskEventText,
@@ -132,6 +133,7 @@ export function useOpenTask(): (task: Task) => (() => void) | null {
 /** Accept or claim at once; the other actions first ask for a reason (or a new holder) in the task drawer. */
 function useTaskAction(onDone: () => void) {
   const { notify } = useWorkspace();
+  const openTask = useOpenTask();
   const [busy, setBusy] = useState("");
   const run = async (task: Task, key: TaskActionKey, body?: unknown) => {
     const label = TASK_ACTIONS.find((action) => action.key === key)?.label ?? "Update";
@@ -142,6 +144,15 @@ function useTaskAction(onDone: () => void) {
       onDone();
       return true;
     } catch (reason) {
+      // An impact assessment is completed on the assessment itself (conclusion and rationale): open it there.
+      const go = reason instanceof ApiError && taskCompletedElsewhere(reason.code) ? openTask(task) : null;
+      if (go) {
+        go();
+        notify(
+          `${safeText(task.business_id) ?? "This task"} is completed by recording the impact assessment opened here.`,
+        );
+        return false;
+      }
       notify(errorText(reason, `The task could not be updated (${label.toLowerCase()}).`), "critical");
       return false;
     } finally {

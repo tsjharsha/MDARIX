@@ -60,6 +60,10 @@ SOURCE_LABELS: dict[str, str] = {
     "DecisionBriefVersion": "Decision brief",
     # A risk or regulatory review of a case (Phase 5): its reviewers' queue task and the owner's follow-up.
     "CaseReview": "Case review",
+    # Evidence that reached a case after its decision was signed (Phase 6): the owner's impact assessment task.
+    "ImpactAssessment": "Impact assessment",
+    # A follow-up action chosen while signing a decision (Phase 6): its owner's FOLLOW_UP task.
+    "DecisionFollowUp": "Decision follow-up",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

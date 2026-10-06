@@ -347,6 +347,20 @@ def link_evidence(
         )
         created.append(evidence_id)
     db.commit()
+    # Evidence reaching a decided case asks for an impact assessment; the signed decision never changes. Never blocks
+    # or undoes the link (backend/app/decision_followups/impact.py).
+    from backend.app.decision_followups.impact import after_late_evidence
+
+    after_late_evidence(
+        db,
+        control_db,
+        tenant_id,
+        investigation_id,
+        created,
+        trigger="EVIDENCE_LINKED",
+        actor_ref=person.user_id,
+        correlation_id=ctx.correlation_id,
+    )
     return {
         "linked": len(created),
         "already_linked": len(payload.evidence_ids) - len(created),
@@ -457,6 +471,20 @@ def review_evidence(
     from backend.app.evidence_workflow.hooks import on_evidence_reviewed
 
     on_evidence_reviewed(db, control_db, tenant_id, ev.id, actor_user_id=person.user_id)
+    # Evidence reviewed on a decided case asks for an impact assessment (once per decision and evidence). Never blocks
+    # or undoes the review (backend/app/decision_followups/impact.py).
+    from backend.app.decision_followups.impact import after_late_evidence
+
+    after_late_evidence(
+        db,
+        control_db,
+        tenant_id,
+        investigation_id,
+        [evidence_id],
+        trigger="EVIDENCE_REVIEWED",
+        actor_ref=person.user_id,
+        correlation_id=ctx.correlation_id,
+    )
     return inventory_items(db, control_db, tenant_id, case, evidence_ids=[ev.id])[0]
 
 

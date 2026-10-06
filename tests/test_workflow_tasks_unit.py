@@ -114,6 +114,26 @@ def test_nobody_claims_the_approval_of_their_own_decision():
     assert _actions(me, other)["can_claim"] is True
 
 
+def test_a_follow_up_sent_to_a_role_can_be_taken_by_that_roles_holders():
+    # Risk Reviewers hold no investigation.work, yet a decision maker may send them a risk reassessment follow-up.
+    user = uuid.uuid4()
+    risk_reviewer = Actor(
+        user_id=str(user),
+        user_uuid=user,
+        tenant_id=uuid.uuid4(),
+        permissions=frozenset({"risk.review"}),
+        roles=["RISK_REVIEWER"],
+    )
+    sent_to_risk = _task(task_type="FOLLOW_UP", assigned_role="RISK_REVIEWER")
+    sent_to_investigators = _task(task_type="FOLLOW_UP", assigned_role="INVESTIGATOR")
+    assert _actions(risk_reviewer, sent_to_risk)["can_claim"] is True
+    assert _actions(risk_reviewer, sent_to_investigators)["can_claim"] is False
+    # Any other task type still needs its permission.
+    assert (
+        _actions(risk_reviewer, _task(task_type="INVESTIGATION", assigned_role="RISK_REVIEWER"))["can_claim"] is False
+    )
+
+
 def test_nobody_claims_the_review_or_decision_of_a_brief_they_wrote():
     me = _actor("quality.review", "decision.sign")
     wrote = {"brief_version": 2, "brief_author_refs": ["someone-else", me.user_id]}

@@ -4,6 +4,8 @@ import { formatDateTime, formatUtc } from "../../app/dates";
 import { titleCase } from "../admin/console/dashboardModel";
 import { WorkspaceContext } from "../workspace/workspaceContext";
 import { displayId, safeText } from "../../app/displayId";
+import { isCaseDecision } from "../workspace/humanDecision";
+import { DecisionRecordDrawer } from "../workspace/sections/DecisionRecord";
 
 type Decision = {
   id: string;
@@ -84,6 +86,8 @@ export function SignatureVerificationWorkspace() {
   const [report, setReport] = useState<any>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  // The full signed record of a case decision (Phase 6), opened from here.
+  const [recordOpen, setRecordOpen] = useState(false);
 
   useEffect(() => setCaseId(contextCase), [contextCase]);
   useEffect(() => {
@@ -129,6 +133,8 @@ export function SignatureVerificationWorkspace() {
   };
 
   const summary = report ? verificationSummary(report.verification_status) : null;
+  const selected = decisions?.find((decision) => String(decision.id) === decisionId) ?? null;
+  const caseDecision = !!selected && isCaseDecision(selected as unknown as Record<string, unknown>, report);
 
   return (
     <div className="content governance-view signature-workspace">
@@ -138,7 +144,7 @@ export function SignatureVerificationWorkspace() {
           <h1>Signature verification</h1>
           <p>
             Check that every signature on a decision still matches the exact decision version that was signed. Signing
-            itself needs your password and authenticator code, and is done in the Decision center.
+            itself needs your password and authenticator code, and is done in Decisions.
           </p>
         </div>
         <span className="platform-admin-badge warning">Human approval only</span>
@@ -183,6 +189,11 @@ export function SignatureVerificationWorkspace() {
           <button className="primary-action" onClick={() => void verify()} disabled={!decisionId || busy}>
             {busy ? "Checking…" : "Check signatures"}
           </button>
+          {caseDecision && (
+            <button className="primary-action secondary" onClick={() => setRecordOpen(true)}>
+              Open the signed decision record
+            </button>
+          )}
         </div>
       </section>
       {message && (
@@ -221,6 +232,13 @@ export function SignatureVerificationWorkspace() {
             {!report.signatures?.length && <p className="muted">No signatures recorded for this decision yet.</p>}
           </div>
         </section>
+      )}
+      {recordOpen && selected && (
+        <DecisionRecordDrawer
+          key={String(selected.id)}
+          decisionId={String(selected.id)}
+          onClose={() => setRecordOpen(false)}
+        />
       )}
       <section className="panel advisory-box">
         <strong>What a signature records</strong>

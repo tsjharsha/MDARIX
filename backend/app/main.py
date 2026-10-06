@@ -73,6 +73,8 @@ from backend.app.case_intelligence.router import router as case_intelligence_rou
 from backend.app.case_reviews.next_steps import router as case_next_steps_router
 from backend.app.case_reviews.router import router as case_reviews_router
 from backend.app.decision_brief.router import router as decision_brief_router
+from backend.app.decision_followups.router import router as decision_followups_router
+from backend.app.human_decision.router import router as human_decision_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -343,6 +345,8 @@ app.include_router(case_intelligence_router)  # Case intelligence: hypotheses, u
 app.include_router(case_reviews_router)  # Risk and regulatory reviews: policy, requests, reviewers, dashboard
 app.include_router(case_next_steps_router)  # Next steps of a case (the old decision options as actions)
 app.include_router(decision_brief_router)  # Decision Brief: versions, submission gate, quality review, dashboard
+app.include_router(decision_followups_router)  # After the decision: follow-ups, impact assessments, closure check
+app.include_router(human_decision_router)  # Human decision: queue, decision screen, signing, record
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

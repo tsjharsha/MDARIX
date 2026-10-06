@@ -122,6 +122,7 @@ def evaluate(facts: dict) -> dict:
     contradictions = facts.get("contradictions")
     brief = facts.get("brief")
     decision = facts.get("decision")
+    brief_decision = facts.get("brief_decision")
 
     steps: dict[str, dict] = {}
     checks: dict[str, dict] = {}
@@ -304,7 +305,12 @@ def evaluate(facts: dict) -> dict:
             f"Brief version {latest} waits for its review" if latest else "No brief generated yet",
         )
 
-    if decision is None:
+    if brief_decision and int(brief_decision.get("briefs") or 0):
+        # A case with a Decision Brief is decided by a signed decision on an approved brief version (Phase 6).
+        status, result, text = _brief_decision_result(brief_decision)
+        steps["human_review"] = _step("human_review", labels["human_review"], status, text)
+        checks["decision"] = _check("decision", check_labels["decision"], result, text)
+    elif decision is None:
         steps["human_review"] = _step("human_review", labels["human_review"], "NOT_STARTED", UNREADABLE)
         checks["decision"] = _check("decision", check_labels["decision"], "PENDING", UNREADABLE)
     else:
@@ -323,6 +329,25 @@ def evaluate(facts: dict) -> dict:
         "steps": [steps[key] for key, _ in STEPS],
         "checks": [checks[key] for key, _ in CHECKS],
     }
+
+
+# Outcomes of a signed decision on a brief that decide the case (a rejection sends it back to work).
+DECIDING_OUTCOMES = frozenset({"ACCEPT_CONCLUSION", "ACCEPT_WITH_CONDITIONS", "CLOSE_NO_FURTHER_ACTION"})
+
+
+def _brief_decision_result(fact: dict) -> tuple[str, str, str]:
+    """``(step status, check result, text)`` of the decision on a case with a Decision Brief: PASS once its current
+    signed decision accepts the conclusion or closes the case; PENDING otherwise."""
+    outcome = str(fact.get("current_outcome") or "").upper()
+    if outcome in DECIDING_OUTCOMES:
+        from backend.app.human_decision.rules import outcome_label
+
+        return "DONE", "PASS", f"A decision is signed: {outcome_label(outcome)}"
+    if outcome == "REJECT_CONCLUSION":
+        return "IN_PROGRESS", "PENDING", "The decision maker rejected the proposed conclusion; a new brief is needed"
+    if fact.get("approved_waiting"):
+        return "IN_PROGRESS", "PENDING", "The approved brief waits for the decision maker's signature"
+    return "IN_PROGRESS", "PENDING", "No version of the brief is approved for decision yet"
 
 
 def _review_checks(reviews, steps: dict, checks: dict, labels: dict, check_labels: dict) -> None:
@@ -541,6 +566,41 @@ def _decision_fact(db: Session, case) -> dict:
     return {"count": len(statuses), "signed": sum(1 for item in statuses if item in SIGNED_DECISION_STATUSES)}
 
 
+def _brief_decision_fact(db: Session, case) -> dict:
+    """``{"briefs", "approved_waiting", "current_outcome"}``: how many Decision Brief versions the case has, whether
+    an approved version waits for a decision, and the outcome of its current signed decision on a brief (None)."""
+    from backend.app.db.models.foundation import Decision
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    versions = (
+        db.query(DecisionBriefVersion.id, DecisionBriefVersion.status)
+        .filter(DecisionBriefVersion.tenant_id == case.tenant_id, DecisionBriefVersion.investigation_id == case.id)
+        .all()
+    )
+    current = None
+    if versions:
+        current = (
+            db.query(Decision.outcome, Decision.brief_version_id)
+            .filter(
+                Decision.tenant_id == case.tenant_id,
+                Decision.investigation_id == case.id,
+                Decision.decision_kind == "BRIEF",
+                Decision.decision_status == "SIGNED",
+                Decision.superseded_by_decision_id.is_(None),
+            )
+            .order_by(Decision.decided_at.desc().nulls_last())
+            .first()
+        )
+    decided = current.brief_version_id if current is not None else None
+    return {
+        "briefs": len(versions),
+        "approved_waiting": any(
+            status == "APPROVED_FOR_DECISION" and version_id != decided for version_id, status in versions
+        ),
+        "current_outcome": current.outcome if current is not None else None,
+    }
+
+
 def _reviews_fact(db: Session, case) -> dict:
     from backend.app.case_reviews.service import review_facts
 
@@ -578,5 +638,6 @@ def case_facts(db: Session, case) -> dict:
         "contradictions": safely(db, "contradictions", lambda session: _contradictions_fact(session, case)),
         "brief": safely(db, "brief", lambda session: _brief_fact(session, case)),
         "decision": safely(db, "decision", lambda session: _decision_fact(session, case)),
+        "brief_decision": safely(db, "brief decision", lambda session: _brief_decision_fact(session, case)),
         "reviews": safely(db, "reviews", lambda session: _reviews_fact(session, case)),
     }

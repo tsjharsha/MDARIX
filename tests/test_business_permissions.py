@@ -71,10 +71,23 @@ EXEMPT = {
     ("POST", "/api/v1/case-reviews/{review_id}/complete"): "checked in the route: only the review's reviewer",
     ("POST", "/api/v1/case-reviews/{review_id}/recuse"): "checked in the route: only the review's reviewer",
     ("POST", "/api/v1/case-reviews/{review_id}/cancel"): "checked in the route: requester or investigation.assign",
+    # Decision follow-ups (backend/app/decision_followups/followups.py): the person a follow-up is assigned to (or,
+    # with nobody named, anyone holding its role) works on it, whatever their permissions, so the route checks it.
+    ("POST", "/api/v1/follow-ups/{follow_up_id}/start"): "checked in the route: the assignee or its role",
+    ("POST", "/api/v1/follow-ups/{follow_up_id}/complete"): "checked in the route: the assignee or its role",
+    # The human decision (backend/app/human_decision/router.py): signing is checked in the route as legacy signing is
+    # (no administrator, the signature entitlement, approval authority, segregation of duties, password and MFA).
+    (
+        "POST",
+        "/api/v1/investigations/{investigation_id}/decision/sign",
+    ): "approval authority + segregation of duties + re-authentication",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.
-EXEMPT_BUT_SIGNED_IN = {("POST", "/api/v1/support/problems")}
+EXEMPT_BUT_SIGNED_IN = {
+    ("POST", "/api/v1/support/problems"),
+    ("POST", "/api/v1/investigations/{investigation_id}/decision/sign"),
+}
 
 
 def _is_guarded(route) -> bool:

@@ -133,6 +133,17 @@ def approval_check(
 
 
 SELF_REVIEW_DENIED = ("SOD_DENIED", "You recorded this decision; another user must review it")
+# Decisions signed on a Decision Brief (Phase 6, backend/app/human_decision) are signed and verified there; the
+# legacy signature, review and material-change endpoints leave them alone.
+CASE_DECISION_TYPE = "CASE_DECISION"
+BRIEF_DECISION_LOCKED = (
+    "DECISION_SIGNED_ON_BRIEF",
+    "This decision was signed on its Decision Brief and is never changed; a new decision supersedes it",
+)
+
+
+def is_brief_decision(decision) -> bool:
+    return str(getattr(decision, "decision_kind", None) or "").upper() == "BRIEF"
 
 
 def is_decision_author(decision, user_id) -> bool:
@@ -509,7 +520,7 @@ def decision_actions(db, ctx: AuthenticatedRequestContext, decisions) -> dict:
     }
     result = {}
     for item in decisions:
-        locked = str(item.decision_status or "").upper() in SIGNED_STATUSES
+        locked = str(item.decision_status or "").upper() in SIGNED_STATUSES or is_brief_decision(item)
         own = is_decision_author(item, ctx.user_id)
         denial = approval_denial(db, t.id, actor["roles"], item, actor["user_id"])
         version_signed = item.updated_at is not None and (item.id, item.updated_at.isoformat()) in signed_versions
@@ -577,6 +588,8 @@ def sign(
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
         )
+    if is_brief_decision(item):
+        raise HTTPException(409, detail={"code": BRIEF_DECISION_LOCKED[0], "message": BRIEF_DECISION_LOCKED[1]})
     version = item.updated_at.isoformat()
     if not same_object_version(payload.object_version, item.updated_at):
         raise HTTPException(
@@ -732,6 +745,8 @@ def material_change(
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
         )
+    if is_brief_decision(item):
+        raise HTTPException(409, detail={"code": BRIEF_DECISION_LOCKED[0], "message": BRIEF_DECISION_LOCKED[1]})
     current = item.updated_at.isoformat()
     if not same_object_version(payload.expected_updated_at, item.updated_at):
         raise HTTPException(409, detail={"code": "STALE_OBJECT_VERSION", "message": "Record changed since review"})
@@ -846,26 +861,40 @@ def signature_verification(
     )
     result = []
     for r in rows:
-        material = {
-            "decision_id": str(item.id),
-            "version": r.object_version,
-            "type": r.decision_type,
-            "decision": r.decision,
-            "remarks": r.remarks,
-        }
-        fingerprint = hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
-        expected = hashlib.sha256((fingerprint + r.signer_user_id + r.object_version).encode()).hexdigest()
+        if r.decision_type == CASE_DECISION_TYPE:
+            # A decision signed on a Decision Brief (backend/app/human_decision): its material also binds the brief
+            # version, the evidence set, the context snapshot, the conditions and the follow-ups.
+            from backend.app.human_decision.service import signature_valid
+
+            valid = signature_valid(data, r, item)
+        else:
+            material = {
+                "decision_id": str(item.id),
+                "version": r.object_version,
+                "type": r.decision_type,
+                "decision": r.decision,
+                "remarks": r.remarks,
+            }
+            fingerprint = hashlib.sha256(json.dumps(material, sort_keys=True).encode()).hexdigest()
+            expected = hashlib.sha256((fingerprint + r.signer_user_id + r.object_version).encode()).hexdigest()
+            valid = fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED"
         result.append(
             {
                 "signature_id": str(r.id),
                 "business_id": r.business_id,
-                "valid": fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED",
+                "valid": valid,
                 "decision": r.decision,
                 "signer_user_id": r.signer_user_id,
                 "signer_role": r.signer_role,
                 "object_version": r.object_version,
                 "signed_at": r.signed_at,
                 "meaning": r.signature_meaning,
+                # A decision signed on a Decision Brief: the UI links its record (/api/v1/decisions/{id}/record).
+                **(
+                    {"kind": CASE_DECISION_TYPE, "decision_id": str(item.id)}
+                    if r.decision_type == CASE_DECISION_TYPE
+                    else {}
+                ),
             }
         )
     return {

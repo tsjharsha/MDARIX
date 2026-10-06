@@ -43,6 +43,9 @@ TRIAL_DATA_TABLES = (
     "case_reviews",
     # The history of people's intelligence judgements (md30), about the cases listed below.
     "intelligence_events",
+    # Decision follow-ups and late-evidence impact assessments (md33): about the decisions and cases listed below.
+    "decision_follow_ups",
+    "impact_assessments",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",

@@ -15,9 +15,12 @@ import {
   taskActionBody,
   taskAssignee,
   taskCase,
+  taskCompletedElsewhere,
   taskDestination,
   taskEventActor,
   taskEventText,
+  taskFollowUp,
+  taskImpactAssessment,
   taskListPath,
   taskPath,
   taskRequest,
@@ -171,13 +174,20 @@ describe("where a task opens", () => {
     });
   });
 
-  it("opens a Decision Brief's quality review on the case's brief, and its approval in the Decision center", () => {
+  it("opens a Decision Brief's quality review on the case's brief, and its approval in the case's Decision view", () => {
     const source = { type: "DecisionBriefVersion", id: UUID, business_id: "DBV000002" };
     expect(taskDestination({ task_type: "QUALITY_REVIEW", investigation, source })).toEqual({
       section: "Investigations",
       tab: "Decision Brief",
     });
     expect(taskDestination({ task_type: "DECISION_APPROVAL", investigation, source })).toEqual({
+      section: "Decisions",
+      tab: "Decision",
+    });
+    // A decision approval from any other source keeps opening the Decision center.
+    expect(
+      taskDestination({ task_type: "DECISION_APPROVAL", investigation, source: { type: "Decision", id: UUID } }),
+    ).toEqual({
       section: "Decisions",
       tab: "Decision center",
     });
@@ -186,6 +196,40 @@ describe("where a task opens", () => {
       section: "Investigations",
       tab: "Workspace",
     });
+  });
+
+  it("opens a follow-up task on that follow-up in the case's Decision tab", () => {
+    expect(taskDestination({ task_type: "FOLLOW_UP", investigation, details: { follow_up_id: UUID } })).toEqual({
+      section: "Investigations",
+      tab: `Decision?follow_up=${UUID}`,
+    });
+    const source = { type: "DecisionFollowUp", id: UUID, business_id: "FUP000003" };
+    expect(taskDestination({ task_type: "FOLLOW_UP", investigation, source })).toEqual({
+      section: "Investigations",
+      tab: `Decision?follow_up=${UUID}`,
+    });
+    expect(taskFollowUp({ details: { follow_up_id: "not a ref!" } })).toBeNull();
+    expect(taskFollowUp({ source: { type: "Investigation", id: UUID } })).toBeNull();
+    // A follow-up task without a follow-up keeps opening the case's workspace.
+    expect(taskDestination({ task_type: "FOLLOW_UP", investigation })).toEqual({
+      section: "Investigations",
+      tab: "Workspace",
+    });
+  });
+
+  it("opens an impact assessment task on that assessment, and sends a refused completion there", () => {
+    expect(
+      taskDestination({ task_type: "IMPACT_ASSESSMENT", investigation, details: { impact_assessment_id: UUID } }),
+    ).toEqual({ section: "Investigations", tab: `Decision?assessment=${UUID}` });
+    expect(taskImpactAssessment({ source: { type: "ImpactAssessment", business_id: "IMP000001" } })).toBe("IMP000001");
+    expect(taskImpactAssessment({ details: {} })).toBeNull();
+    expect(taskDestination({ task_type: "IMPACT_ASSESSMENT", investigation })).toEqual({
+      section: "Investigations",
+      tab: "Workspace",
+    });
+    expect(taskCompletedElsewhere("USE_IMPACT_ASSESSMENT")).toBe(true);
+    expect(taskCompletedElsewhere("CONFLICT")).toBe(false);
+    expect(taskCompletedElsewhere(undefined)).toBe(false);
   });
 
   it("opens My Work on the tab a destination with a request names", () => {

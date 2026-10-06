@@ -209,6 +209,15 @@ def signal_detection(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def late_evidence_sweep(db: Session, _state: dict) -> dict:
+    """Impact assessments for evidence ingested for a decided or closed case after its decision was signed, for every
+    active organization on the shared plane or its own database (backend/app/decision_followups/impact.py). Idempotent;
+    each organization is committed on its own."""
+    from backend.app.decision_followups.impact import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 JOBS: tuple[Job, ...] = (
     Job("tenant-lifecycle", timedelta(minutes=15), tenant_lifecycle, "Apply scheduled tenant status changes"),
     Job("subscription-lifecycle", timedelta(hours=1), subscription_lifecycle, "Expiry, grace and renewal reminders"),
@@ -220,6 +229,12 @@ JOBS: tuple[Job, ...] = (
     Job("connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule"),
     Job("purge-completion", timedelta(hours=24), purge_completion, "Finish organization deletions left incomplete"),
     Job("signal_detection", timedelta(minutes=60), signal_detection, "Raise and update signals from new complaints"),
+    Job(
+        "late_evidence_sweep",
+        timedelta(minutes=60),
+        late_evidence_sweep,
+        "Ask for an impact assessment of evidence that reached a decided case",
+    ),
     Job(
         "audit-chain-verification",
         timedelta(hours=24),

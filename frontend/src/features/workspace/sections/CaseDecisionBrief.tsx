@@ -847,7 +847,7 @@ function QualityReviewPanel({
           {action && problem && <p className="uw-hint">{problem}</p>}
           <p className="ac-muted">
             Accepting for decision confirms the brief is fit to decide on. It does not decide the case: authorized
-            approvers do, in the Decision center.
+            approvers do, in the case's Decision tab.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary" disabled={busy || !!problem}>

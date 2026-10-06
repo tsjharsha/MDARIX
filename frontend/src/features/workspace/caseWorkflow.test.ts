@@ -157,7 +157,7 @@ describe("the case stepper", () => {
     expect(at("gaps")).toEqual({ section: "Investigations", tab: "Intelligence", view: "Unknowns" });
     expect(at("risk_regulatory")).toEqual({ section: "Investigations", tab: "Reviews" });
     expect(at("brief")).toEqual({ section: "Investigations", tab: "Decision Brief" });
-    expect(at("human_review")).toEqual({ section: "Decisions", tab: "Decision center" });
+    expect(at("human_review")).toEqual({ section: "Investigations", tab: "Decision" });
   });
 
   it("keeps a step it does not know at the end, without a destination", () => {

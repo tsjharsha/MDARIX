@@ -303,8 +303,10 @@ class DecisionCenterService:
         decision = db.query(Decision).filter(Decision.tenant_id == tenant_id, Decision.id == decision_id).first()
         if not decision:
             raise DecisionCenterError("DECISION_NOT_FOUND", "Decision is not available for this tenant")
-        if str(decision.decision_status or "").upper() in SIGNED_STATUSES:
-            # A signed decision is a closed record: reopening it needs a new decision, never a review.
+        signed_on_brief = str(getattr(decision, "decision_kind", None) or "").upper() == "BRIEF"
+        if str(decision.decision_status or "").upper() in SIGNED_STATUSES or signed_on_brief:
+            # A signed decision is a closed record: reopening it needs a new decision, never a review. A decision
+            # signed on a Decision Brief (backend/app/human_decision) is superseded by a new one, never reviewed.
             raise DecisionCenterError("DECISION_LOCKED", "This decision is signed and can no longer be reviewed")
         review = HumanReview(
             id=uuid.uuid4(),

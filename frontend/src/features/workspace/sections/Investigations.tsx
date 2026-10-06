@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ApiError } from "../../../app/apiClient";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import {
@@ -25,7 +26,11 @@ import { CaseScopePanel } from "./CaseScope";
 import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
+import { CaseDecisionPanel } from "./CaseDecision";
+import { ClosureCriteria } from "./AfterDecision";
 import { parseReviewsTab } from "../reviews";
+import { parseDecisionTab } from "../decisionTabs";
+import { closureAllowed, closureCheckPath, type ClosureCheck } from "../afterDecision";
 import { INTELLIGENCE_TAB, parseInvestigationsTab, type IntelligenceView } from "../intelligence";
 import {
   CASE_PRIORITIES,
@@ -46,6 +51,7 @@ const TABS = [
   "Scope",
   "Reviews",
   "Decision Brief",
+  "Decision",
   "Story",
   "CAPAs",
 ] as const;
@@ -58,6 +64,8 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
   // "Reviews?review=<id>" opens the Reviews tab on that review (a review task, the dashboard).
   const [requestedReview] = useState(() => parseReviewsTab(requested));
+  // "Decision?follow_up=<id>" or "Decision?assessment=<id>" opens the Decision tab on that follow-up or assessment.
+  const [requestedDecision] = useState(() => parseDecisionTab(requested));
   // The case the review was requested with; another case chosen later does not reopen it.
   const [reviewCase] = useState(() => work.investigationId);
   const canOpen = useCan("records.write");
@@ -93,7 +101,10 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const goToStep = (destination: StepDestination) => {
     if (
       destination.section === "Investigations" &&
-      (destination.tab === "Scope" || destination.tab === "Reviews" || destination.tab === "Decision Brief")
+      (destination.tab === "Scope" ||
+        destination.tab === "Reviews" ||
+        destination.tab === "Decision Brief" ||
+        destination.tab === "Decision")
     ) {
       setActive(destination.tab);
       return;
@@ -320,6 +331,27 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               <Empty
                 title="Choose an investigation"
                 detail="The Decision Brief belongs to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Decision" &&
+          (work.investigationId ? (
+            <CaseDecisionPanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              initialFollowUp={work.investigationId === reviewCase ? requestedDecision.followUp : null}
+              initialAssessment={work.investigationId === reviewCase ? requestedDecision.assessment : null}
+              onCaseChanged={() => {
+                all.reload();
+                work.refreshInvestigations();
+              }}
+            />
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The decision belongs to one investigation. Pick one in the context bar above, or open one from the list."
               />
             </Panel>
           ))}
@@ -554,6 +586,10 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
   const { notify } = useWorkspace();
   const people = useResource<Array<{ id: string; display_name: string }>>("/api/v1/investigation-assignees");
   const closed = String(row.status ?? "").toLowerCase() === "closed";
+  // What must be in place before the case can be closed (a signed decision's follow-ups, impact assessments…).
+  const closure = useResource<ClosureCheck>(closed ? null : closureCheckPath(String(row.id)));
+  const closureCheck = closure.state === "ready" ? closure.data : null;
+  const canClose = closureAllowed(closureCheck);
   const [question, setQuestion] = useState(String(row.investigation_question ?? ""));
   const [assignee, setAssignee] = useState("");
   const [priority, setPriority] = useState(String(row.priority ?? ""));
@@ -571,7 +607,10 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
       notify(done);
       onSaved();
     } catch (failure) {
-      setError(errorText(failure, "The change was not saved."));
+      if (failure instanceof ApiError && failure.code === "CLOSURE_CRITERIA_NOT_MET") {
+        setError(`${failure.message} The criteria above show what still blocks closing.`);
+        closure.reload();
+      } else setError(errorText(failure, "The change was not saved."));
     } finally {
       setBusy(false);
     }
@@ -684,15 +723,17 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               Save priority and due date
             </button>
           </div>
+          <ClosureCriteria check={closureCheck} state={closure.state} />
           <div className="ca-action-row">
             <button
               type="button"
               className="ac-primary"
-              disabled={!reasonReady || busy}
+              disabled={!reasonReady || busy || !canClose}
               onClick={() => void save({ status: "closed" }, `${label} closed.`)}
             >
               Close investigation
             </button>
+            {!canClose && <span className="uw-hint">Closing is blocked until the criteria above pass.</span>}
           </div>
           <p className="ac-muted">A case with a decision still awaiting its human review cannot be closed.</p>
         </>

@@ -350,6 +350,11 @@ def manage_investigation(
                     "message": "A decision on this case still awaits its human review; finish it before closing",
                 },
             )
+        # A case in the Decision Brief flow closes only when its closure criteria are met (409
+        # CLOSURE_CRITERIA_NOT_MET); any other case closes as before (backend/app/decision_followups/closure.py).
+        from backend.app.decision_followups.closure import refuse_unmet_closure
+
+        refuse_unmet_closure(db, case, reason=payload.reason)
         case_states.set_state(case, "CLOSED", now)
     elif payload.status == "open" and closed:
         case_states.set_state(case, "IN_PROGRESS", now)
@@ -432,6 +437,11 @@ def manage_investigation(
     from backend.app.signals.hooks import on_investigation_status_changed
 
     on_investigation_status_changed(db, control_db, case, actor_user_id=ctx.user_id, before_status=before["status"])
+    if result["status"] == "closed" and before["status"] != "closed":
+        # Decision follow-ups outlive the case: those still open get their task back. Never undoes the closing.
+        from backend.app.decision_followups.followups import on_case_closed
+
+        on_case_closed(db, control_db, case, actor_user_id=ctx.user_id, correlation_id=ctx.correlation_id)
     return result
 
 

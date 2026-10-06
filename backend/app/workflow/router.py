@@ -109,6 +109,35 @@ def _permitted_types(actor: Actor) -> list[str]:
     return [code for code, definition in TASK_TYPES.items() if actor.holds(definition.permission)]
 
 
+def _role_codes(actor: Actor) -> list[str]:
+    return sorted({role_code(role) for role in actor.roles if role_code(role)})
+
+
+def _may_take(actor: Actor, task: WorkflowTask) -> bool:
+    """Whether the person may take a queue task: they hold its type's permission or, for a follow-up a decision maker
+    sent to a role (a risk reassessment to Risk Reviewers, say), they hold that role."""
+    if actor.holds(_permission(task)):
+        return True
+    return (
+        task.task_type == "FOLLOW_UP"
+        and bool(task.assigned_role)
+        and role_code(task.assigned_role) in _role_codes(actor)
+    )
+
+
+def _queue_filter(actor: Actor):
+    """Queue tasks the person may see: types their permissions allow, plus follow-ups sent to a role they hold."""
+    types = _permitted_types(actor)
+    by_type = WorkflowTask.task_type.in_(types) if types else false()
+    roles = _role_codes(actor)
+    by_role = (
+        (WorkflowTask.task_type == "FOLLOW_UP") & func.upper(WorkflowTask.assigned_role).in_(roles)
+        if roles
+        else false()
+    )
+    return or_(by_type, by_role)
+
+
 def _own_decision(actor: Actor, task: WorkflowTask) -> bool:
     """Segregation of duties: nobody approves their own decision, so they cannot take its approval task; and nobody
     quality-reviews (or decides on) a Decision Brief they wrote, so they cannot take that task either."""
@@ -131,11 +160,10 @@ def _view_query(db: Session, actor: Actor, view: str, now: datetime):
     if view == "assigned":
         return query.filter(mine, is_open, WorkflowTask.status != "WAITING")
     if view == "queue":
-        types = _permitted_types(actor)
         return query.filter(
             WorkflowTask.assigned_user_id.is_(None),
             WorkflowTask.status.in_(service.QUEUE_STATUSES),
-            WorkflowTask.task_type.in_(types) if types else false(),
+            _queue_filter(actor),
         )
     if view == "waiting":
         return query.filter(mine, WorkflowTask.status == "WAITING")
@@ -190,6 +218,10 @@ def _source_models() -> dict:
         "DecisionBriefVersion": _decision_brief_model(),
         # Risk and regulatory reviews of a case (Phase 5).
         "CaseReview": _case_review_model(),
+        # Impact assessments of evidence that reached a case after its decision was signed (Phase 6).
+        "ImpactAssessment": _impact_assessment_model(),
+        # Follow-up actions chosen while signing a decision (Phase 6).
+        "DecisionFollowUp": _decision_follow_up_model(),
     }
 
 
@@ -203,6 +235,18 @@ def _case_review_model():
     from backend.app.db.models.reviews import CaseReview
 
     return CaseReview
+
+
+def _impact_assessment_model():
+    from backend.app.db.models.decision_outcomes import ImpactAssessment
+
+    return ImpactAssessment
+
+
+def _decision_follow_up_model():
+    from backend.app.db.models.decision_outcomes import DecisionFollowUp
+
+    return DecisionFollowUp
 
 
 def _business_ids(db: Session, model, tenant_id, ids) -> dict[str, str]:
@@ -225,12 +269,20 @@ def _actions(actor: Actor, task: WorkflowTask) -> dict:
         "can_decline": mine and status in WORKING_STATUSES,
         "can_claim": task.assigned_user_id is None
         and status in service.QUEUE_STATUSES
-        and actor.holds(_permission(task))
+        and _may_take(actor, task)
         and not _own_decision(actor, task),
         "can_release": mine and bool(task.assigned_role) and status in WORKING_STATUSES,
         "can_reassign": status in OPEN_TASK_STATUSES and actor.holds(INVESTIGATION_ASSIGN_PERMISSION),
-        "can_complete": mine and task.task_type in MANUAL_COMPLETION_TYPES and status in (*WORKING_STATUSES, "WAITING"),
+        "can_complete": mine
+        and task.task_type in MANUAL_COMPLETION_TYPES
+        and status in (*WORKING_STATUSES, "WAITING")
+        and not _needs_impact_conclusion(task),
     }
+
+
+def _needs_impact_conclusion(task: WorkflowTask) -> bool:
+    """An impact assessment's task completes with the assessment's conclusion, not by hand (Phase 6)."""
+    return task.task_type == "IMPACT_ASSESSMENT" and bool((task.details or {}).get("impact_assessment_id"))
 
 
 def serialize_tasks(db: Session, control_db: Session, actor: Actor, rows: list[WorkflowTask]) -> list[dict]:
@@ -339,15 +391,14 @@ def task_summary(
     now = service.now_utc()
     counts = {view: _view_query(db, actor, view, now).count() for view in SUMMARY_VIEWS}
     queues = []
-    types = _permitted_types(actor)
-    if types:
+    if _permitted_types(actor) or _role_codes(actor):
         rows = (
             db.query(WorkflowTask.assigned_role, WorkflowTask.task_type, func.count(WorkflowTask.id))
             .filter(
                 WorkflowTask.tenant_id == actor.tenant_id,
                 WorkflowTask.assigned_user_id.is_(None),
                 WorkflowTask.status.in_(service.QUEUE_STATUSES),
-                WorkflowTask.task_type.in_(types),
+                _queue_filter(actor),
             )
             .group_by(WorkflowTask.assigned_role, WorkflowTask.task_type)
             .order_by(WorkflowTask.assigned_role, WorkflowTask.task_type)
@@ -616,8 +667,10 @@ def claim_task(
     actor = _actor(control_db, ctx)
     task = _task(db, actor, task_id, lock=True)
     permission = _permission(task)
-    if not actor.holds(permission):
+    if not _may_take(actor, task):
         raise _error(403, "PERMISSION_DENIED", "Your roles do not allow you to take this task")
+    if not actor.holds(permission):
+        permission = None  # taken through the role a follow-up was sent to; the role is recorded instead
     if _own_decision(actor, task):
         raise _error(403, "PERMISSION_DENIED", "You cannot approve a decision you recorded")
     if actor.user_uuid is None or task.assigned_user_id is not None or task.status not in service.QUEUE_STATUSES:
@@ -761,6 +814,11 @@ def complete_task(
         raise _error(
             409, "TASK_COMPLETES_AUTOMATICALLY", "This task is completed by the action it asks for, not by hand"
         )
+    if _needs_impact_conclusion(task):
+        # An impact assessment of late evidence needs its conclusion (backend/app/decision_followups/impact.py).
+        raise _error(
+            409, "USE_IMPACT_ASSESSMENT", "Record the impact assessment's conclusion; that completes this task"
+        )
     _require_assignee(actor, task)
     if task.status not in (*WORKING_STATUSES, "WAITING"):
         raise _conflict("This task cannot be completed in its current state")
@@ -768,7 +826,7 @@ def complete_task(
     task.completed_at = now
     task.completion_outcome = service.shorten(payload.outcome, service.OUTCOME_LENGTH) or "COMPLETED"
     reason = " ".join(str(payload.reason or "").split()) or None
-    return _change(
+    result = _change(
         db,
         control_db,
         actor,
@@ -780,3 +838,16 @@ def complete_task(
         details={"outcome": task.completion_outcome},
         correlation_id=ctx.correlation_id,
     )
+    if task.task_type == "FOLLOW_UP" and (task.details or {}).get("follow_up_id"):
+        # The decision follow-up of this task is done too. Never blocks or undoes the task change.
+        from backend.app.decision_followups.followups import on_follow_up_task_completed
+
+        on_follow_up_task_completed(
+            db,
+            task,
+            actor_ref=actor.user_id,
+            actor_role=actor.role_for(_permission(task)),
+            note=reason,
+            correlation_id=ctx.correlation_id,
+        )
+    return result

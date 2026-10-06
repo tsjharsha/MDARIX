@@ -1472,3 +1472,16 @@ div.uw-task-count {
 div.uw-task-count:hover {
   border-color: var(--ac-line);
 }
+
+/* Phase 6 human decision: the outcome and follow-up choices, each with its details below it. */
+.uw-pick-list.uw-decision-options {
+  max-height: none;
+  overflow: visible;
+}
+.uw-decision-options > li {
+  display: grid;
+  gap: 6px;
+}
+.uw-decision-follow-up {
+  margin: 0 0 6px 26px;
+}

@@ -155,6 +155,10 @@ DB_MODULES = {
     "test_case_reviews",
     # Phase 5: the controlled Decision Brief (versions, submission gate, quality review, return loops, dashboard).
     "test_decision_brief",
+    # Phase 6: the human decision (queue, decision screen, signing, verification, superseding, return, legacy).
+    "test_human_decision",
+    # Phase 6: follow-ups, late-evidence impact assessments (hooks and the sweep) and the closure criteria of a case.
+    "test_decision_followups",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

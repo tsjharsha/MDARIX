@@ -194,6 +194,7 @@ describe("second-factor refusals", () => {
       "/api/v1/platform-admin/tenants/abc/legal-hold",
       "/api/v1/platform-admin/users/abc/activation-link",
       "/api/v1/governance/decisions/abc/sign",
+      "/api/v1/investigations/abc/decision/sign",
     ]) {
       expect(mfaRedirectFor(path, 403, "MFA_REQUIRED")).toBeNull();
       expect(mfaRedirectFor(path, 403, "MFA_ENROLLMENT_REQUIRED")).toBeNull();

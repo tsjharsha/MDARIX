@@ -93,6 +93,8 @@ LATER_OBJECTS: tuple[BusinessObject, ...] = (
     BusinessObject("signals", "SIG", "Signal", "tenant"),  # md28
     BusinessObject("case_reviews", "REV", "Case Review", "tenant"),  # md32
     BusinessObject("decision_brief_versions", "DBV", "Decision Brief Version", "tenant"),  # md32
+    BusinessObject("decision_follow_ups", "FUP", "Decision Follow-up", "tenant"),  # md33
+    BusinessObject("impact_assessments", "IMP", "Impact Assessment", "tenant"),  # md33
 )
 
 COUNTER_TABLE = "business_id_counters"

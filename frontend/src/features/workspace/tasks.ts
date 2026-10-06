@@ -7,6 +7,7 @@ import { safeText } from "../../app/displayId";
 import type { WorkspaceSection } from "./workspaceContext";
 import { signalsTab } from "./signals";
 import { reviewsTab } from "./reviews";
+import { decisionTab } from "./decisionTabs";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -41,6 +42,8 @@ export type Task = {
   accepted_at?: string | null;
   completed_at?: string | null;
   completion_outcome?: string | null;
+  /** Extra references some tasks carry (a follow-up action's follow_up_id, an impact assessment's id). */
+  details?: Record<string, unknown> | null;
   actions?: TaskActions | null;
 };
 
@@ -177,8 +180,34 @@ export function taskReview(task: Partial<Pick<Task, "source">>): string | null {
   return REQUEST_REF.test(ref) ? ref : null;
 }
 
+/** A reference a task carries in its details (or, for the record it came from, its source), or null. */
+function taskDetailRef(task: Partial<Pick<Task, "details" | "source">>, key: string, sourceKinds: string[]) {
+  const detail = task.details?.[key];
+  const fromDetails = typeof detail === "string" || typeof detail === "number" ? String(detail).trim() : "";
+  if (REQUEST_REF.test(fromDetails)) return fromDetails;
+  if (!sourceKinds.includes(sourceKind(task))) return null;
+  const ref = String(task.source?.id ?? "").trim() || String(task.source?.business_id ?? "").trim();
+  return REQUEST_REF.test(ref) ? ref : null;
+}
+
+/** The follow-up action a FOLLOW_UP task is about (details.follow_up_id, or its DecisionFollowUp source), or null. */
+export const taskFollowUp = (task: Partial<Pick<Task, "details" | "source">>) =>
+  taskDetailRef(task, "follow_up_id", ["DECISIONFOLLOWUP", "FOLLOWUP"]);
+
+/** The impact assessment an IMPACT_ASSESSMENT task is about (details.impact_assessment_id, or its source), or null. */
+export const taskImpactAssessment = (task: Partial<Pick<Task, "details" | "source">>) =>
+  taskDetailRef(task, "impact_assessment_id", ["IMPACTASSESSMENT"]);
+
+/**
+ * Whether the server refused to complete a task from the inbox because its work is recorded on its own screen (an
+ * impact assessment is completed with a conclusion and rationale): then the task opens there instead.
+ */
+export const taskCompletedElsewhere = (code: string | undefined | null) => code === "USE_IMPACT_ASSESSMENT";
+
 /** Where "Open" takes a task: the section (and tab) where its work is done; a signal triage task opens its signal. */
-export function taskDestination(task: Pick<Task, "task_type" | "investigation"> & Partial<Pick<Task, "source">>): {
+export function taskDestination(
+  task: Pick<Task, "task_type" | "investigation"> & Partial<Pick<Task, "source" | "details">>,
+): {
   section: WorkspaceSection;
   tab?: string;
 } {
@@ -188,10 +217,19 @@ export function taskDestination(task: Pick<Task, "task_type" | "investigation"> 
     const review = taskReview(task);
     if (review) return { section: "Investigations", tab: reviewsTab(review) };
   }
-  // A quality review of a Decision Brief opens the case's Decision Brief; its decision approval the Decision center.
+  // A quality review of a Decision Brief opens the case's Decision Brief; its decision approval the case's Decision.
   if (sourceKind(task) === "DECISIONBRIEFVERSION") {
     if (type === "QUALITY_REVIEW") return { section: "Investigations", tab: "Decision Brief" };
-    if (type === "DECISION_APPROVAL") return { section: "Decisions", tab: "Decision center" };
+    if (type === "DECISION_APPROVAL") return { section: "Decisions", tab: decisionTab() };
+  }
+  // A follow-up action of a signed decision, or an impact assessment, opens it in the case's Decision tab.
+  if (type === "FOLLOW_UP") {
+    const followUp = taskFollowUp(task);
+    if (followUp) return { section: "Investigations", tab: decisionTab({ followUp }) };
+  }
+  if (type === "IMPACT_ASSESSMENT") {
+    const assessment = taskImpactAssessment(task);
+    if (assessment) return { section: "Investigations", tab: decisionTab({ assessment }) };
   }
   // An evidence request task opens that request's detail in My Work (its Evidence requests tab).
   if (EVIDENCE_REQUEST_TASKS.includes(type)) {

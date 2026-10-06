@@ -94,7 +94,13 @@ export function signInPath(reason: "idle" | "expired" | undefined, location: { p
 
 // Calls whose MFA refusal is about the action itself (a signature's code, an operator without an authenticator) and is
 // shown in that action's own dialog, not a sign-in that still owes its second factor. The server enforces MFA either way.
-const ACTION_MFA_CALLS = ["/governance/", "/regulatory/documents/", "/legal-hold", "/activation-link"];
+const ACTION_MFA_CALLS = [
+  "/governance/",
+  "/regulatory/documents/",
+  "/legal-hold",
+  "/activation-link",
+  "/decision/sign",
+];
 
 /** Where an MFA refusal sends the browser: the second-factor page for an unfinished sign-in, nowhere for an action. */
 export function mfaRedirectFor(path: string, status: number, code: string | undefined): string | null {

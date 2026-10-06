@@ -552,10 +552,38 @@ class Decision(Base):
     decision_timestamp = tz(False)
     authorized_by_ref: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = tz(False)
+    # md33: the signed human decision on an approved Decision Brief version (decision_kind BRIEF; earlier decisions
+    # are LEGACY). The outcome and follow-ups are chosen while signing; the decision is bound to the brief version's
+    # content hash, the evidence set and a context snapshot, and is never edited: a correction is a new decision that
+    # supersedes it.
+    decision_kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="LEGACY")
+    brief_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    outcome: Mapped[str | None] = mapped_column(String(40))
+    conditions: Mapped[str | None] = mapped_column(Text)
+    follow_up_actions: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    residual_unknowns: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_under_role: Mapped[str | None] = mapped_column(String(60))
+    approval_authority_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_at = tz()
+    brief_content_hash: Mapped[str | None] = mapped_column(String(64))
+    evidence_set_hash: Mapped[str | None] = mapped_column(String(64))
+    context_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    ai_execution_refs: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    supersedes_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    superseded_by_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    superseded_at = tz()
+    supersede_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "decision_identifier", name="uq_decisions_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_decisions_tenant_id_id"),
+        CheckConstraint("decision_kind IN ('LEGACY', 'BRIEF')", name="decision_kind_known"),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN ('ACCEPT_CONCLUSION', 'ACCEPT_WITH_CONDITIONS', 'REJECT_CONCLUSION', "
+            "'CLOSE_NO_FURTHER_ACTION')",
+            name="outcome_known",
+        ),
     )
 
 

@@ -1104,6 +1104,21 @@ def review_evidence_request(
     )
     db.commit()
     hooks.on_request_reviewed(db, control_db, row, actor_user_id=person.user_id, accepted=bool(payload.accept))
+    if ev is not None:
+        # An answer accepted as evidence of a decided case asks for an impact assessment. Never blocks or undoes the
+        # review (backend/app/decision_followups/impact.py).
+        from backend.app.decision_followups.impact import after_late_evidence
+
+        after_late_evidence(
+            db,
+            control_db,
+            tenant_id,
+            row.investigation_id,
+            [ev.id],
+            trigger="EVIDENCE_REQUEST_ACCEPTED",
+            actor_ref=person.user_id,
+            correlation_id=ctx.correlation_id,
+        )
     result = _one(db, control_db, tenant_id, person, row)
     if ev is not None:
         case = load_case(db, tenant_id, row.investigation_id)

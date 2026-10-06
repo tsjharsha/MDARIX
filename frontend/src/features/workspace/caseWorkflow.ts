@@ -263,7 +263,8 @@ export const CASE_STEPS: ReadonlyArray<{ key: string; label: string; destination
     label: "Decision Brief",
     destination: { section: "Investigations", tab: "Decision Brief" },
   },
-  { key: "human_review", label: "Human review", destination: { section: "Decisions", tab: "Decision center" } },
+  // The human decision (Phase 6) is reviewed and signed in the case's Decision tab.
+  { key: "human_review", label: "Human review", destination: { section: "Investigations", tab: "Decision" } },
 ];
 
 export const STEP_STATUS: Record<StepStatus, { label: string; tone: Tone }> = {
