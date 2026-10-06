@@ -53,6 +53,7 @@ import {
 } from "../humanDecision";
 import { DecisionRecordDrawer, Fingerprint } from "./DecisionRecord";
 import { FollowUpsPanel, ImpactAssessmentsPanel } from "./AfterDecision";
+import { CaseStoryLink } from "./CaseStoryLink";
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -164,6 +165,13 @@ export function CaseDecisionPanel({
             {message.text}
           </p>
         )}
+        <div className="ca-action-row">
+          <CaseStoryLink
+            investigationId={investigationId}
+            caseLabel={safeText(data?.investigation?.business_id) ?? caseLabel}
+            className="ac-link"
+          />
+        </div>
       </Panel>
       {data && brief && <BriefForDecision brief={brief} reviewers={listOf(data.reviewers) as DecisionReviewer[]} />}
       {data && brief && actions.can_sign === true && (

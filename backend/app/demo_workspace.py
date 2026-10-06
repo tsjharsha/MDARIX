@@ -8,7 +8,12 @@
 - reset: deletes every record of the demo tenant (decisions, AI runs, uploads...) and reloads the story, dated
   relative to today, so each demo starts from the same state. Users, plan and the audit trail are kept; the reset
   itself is audited. The golden evaluation tenant is never touched.
-- status: what the workspace holds and who can sign in.
+- status: what the workspace holds, who can sign in (name, address and role) and the golden path by business id.
+
+Setup and reset also write the golden path (backend/app/demo_golden_path.py): case ACD-INV-401 taken from its signal
+through triage, scope, evidence, intelligence, reviews and the Decision Brief to a signed decision with its follow-up
+and late evidence, so every workflow screen has a worked example; ACD-INV-101, -201 and -301 stay mid-investigation
+for live demos, and detection leaves new signals awaiting triage.
 
 The story itself is in backend/app/demo_story.py (synthetic data only). The demo team uses example addresses on the
 reserved .invalid domain, so no email is ever delivered to them.
@@ -48,9 +53,14 @@ DEMO_TENANT_NAME = "AcmeCare Instruments (Demo)"
 # Earlier versions ran the demo inside the golden evaluation tenant; its demo users are moved out on setup.
 LEGACY_DEMO_TENANT_KEY = "ACME_CARE_SYNTHETIC"
 DEMO_FEATURES = ("ASK_MDARIX", "DECISION_CENTER_SIGNATURES")
-# (role, email, display name)
+# (role, email, display name). One person per workflow role (backend/app/role_codes.py WORKFLOW_ROLES): the PMS /
+# Signal Triage Lead, the Quality Investigator, the Risk and Regulatory Reviewers, the Quality Reviewer, the Authorized
+# Decision Maker (Approver) and the Leader, plus a read-only Viewer and the Customer Administrator.
 DEMO_TEAM = (
+    ("TRIAGE_LEAD", "triage@acmecare-demo.invalid", "Tara Triage"),
     ("Investigator", "investigator@acmecare-demo.invalid", "Ines Investigator"),
+    ("RISK_REVIEWER", "risk@acmecare-demo.invalid", "Rita Risk"),
+    ("REGULATORY_REVIEWER", "regulatory@acmecare-demo.invalid", "Rory Regulatory"),
     ("Reviewer", "reviewer@acmecare-demo.invalid", "Ravi Reviewer"),
     ("Approver", "approver@acmecare-demo.invalid", "Ana Approver"),
     ("Leader", "leader@acmecare-demo.invalid", "Lena Leader"),
@@ -88,7 +98,7 @@ def _audit(db: Session, tenant_id, action: str, details: dict, now: datetime) ->
 
 def _ensure_tenant(db: Session, now: datetime) -> Tenant:
     """The demo tenant with its data location, plan and approval rules; created when missing."""
-    from backend.app.governance_router import bootstrap
+    from backend.app.governance_router import bootstrap, ensure_governance_defaults
 
     tenant = db.query(Tenant).filter(Tenant.tenant_key == DEMO_TENANT_KEY).first()
     if tenant is None:
@@ -149,6 +159,9 @@ def _ensure_tenant(db: Session, now: datetime) -> Tenant:
         raise DemoWorkspaceError("The demo tenant is registered to another data plane; refusing to change it.")
     db.flush()
     bootstrap(db, tenant)  # plan with Ask and signatures, approval authority, segregation of duties (commits)
+    # Every tenant's decision rules: Approvers and Leaders may approve and sign, nobody approves their own decision.
+    # Only what is missing is added (commits when it adds anything).
+    ensure_governance_defaults(db, tenant)
 
     assignment = (
         db.query(TenantPlanAssignment)
@@ -264,9 +277,17 @@ def setup_demo(db: Session, password: str) -> dict:
         now,
     )
     db.commit()
+    # Dated from today when the story was loaded now, else from the day it was loaded; idempotent.
+    golden = _seed_golden_path(db, tenant.id, now if loaded else None)
     _seed_workflow_tasks(db, tenant.id)
     _seed_signals(db, tenant.id)
-    return {"tenant_key": tenant.tenant_key, "created": created, "refreshed": refreshed, "moved": moved}
+    return {
+        "tenant_key": tenant.tenant_key,
+        "created": created,
+        "refreshed": refreshed,
+        "moved": moved,
+        "golden_path": golden,
+    }
 
 
 def reset_demo(db: Session) -> dict:
@@ -284,9 +305,20 @@ def reset_demo(db: Session) -> dict:
     indexed = _index(db, tenant.id)
     _audit(db, tenant.id, "DEMO_WORKSPACE_RESET", {"deleted": deleted, "loaded": loaded, "indexed": indexed}, now)
     db.commit()
+    golden = _seed_golden_path(db, tenant.id, now)
     _seed_workflow_tasks(db, tenant.id)
     _seed_signals(db, tenant.id)
-    return {"deleted": deleted, **status(db)}
+    return {"deleted": deleted, "golden_path_seeded": golden, **status(db)}
+
+
+def _seed_golden_path(db: Session, tenant_id, now: datetime | None) -> dict:
+    """The golden path of the story (backend/app/demo_golden_path.py): case ACD-INV-401 from its signal to a signed
+    decision, written once the team exists and before the other tasks and signals are derived from the story. In a
+    session of its own bound to the demo tenant, in one transaction; idempotent. A failure is logged and reported,
+    never failing the setup or the reset."""
+    from backend.app.demo_golden_path import seed_golden_path
+
+    return seed_golden_path(db, tenant_id, now)
 
 
 def _seed_workflow_tasks(db: Session, tenant_id) -> None:
@@ -503,7 +535,10 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
         for code, product_code, _, state, _, _ in story.INVESTIGATIONS
         if state == "open"
     }
-    for index, (product_code, revision, lot_code, days, description) in enumerate(story.COMPLAINTS, 1):
+    for index, record in enumerate(story.COMPLAINTS, 1):
+        # (product, version, lot, days ago, description[, problem code])
+        product_code, revision, lot_code, days, description = record[:5]
+        problem_code = record[5] if len(record) > 5 else None
         complaint = add(
             Complaint(
                 id=uuid.uuid4(),
@@ -514,6 +549,7 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
                 event_timestamp=ago(days),
                 complaint_timestamp=ago(max(days - 1, 0)),
                 description=description,
+                problem_code=problem_code,
                 source_identifier=f"ACD-CMP-{index:04d}",
                 **stamp(days),
             )
@@ -538,11 +574,13 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
         investigation = investigations[investigation_code]
         product_code = product_of_case[investigation_code]
         for code, kind, title, days, reliability, text in records:
+            # Evidence that reaches the golden case later in its story is attached by the golden path, at its moment.
+            deferred = code in story.GOLDEN_DEFERRED_EVIDENCE
             evidence = add(
                 Evidence(
                     id=uuid.uuid4(),
                     evidence_identifier=code,
-                    investigation_id=investigation.id,
+                    investigation_id=None if deferred else investigation.id,
                     evidence_type=kind,
                     title=title,
                     source_reference=story.SYNTHETIC,
@@ -554,16 +592,17 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
                 )
             )
             db.flush()
-            add(
-                InvestigationEvidence(
-                    id=uuid.uuid4(),
-                    tenant_id=tenant_id,
-                    investigation_id=investigation.id,
-                    evidence_id=evidence.id,
-                    relevance="Part of the curated demo story.",
-                    created_at=now,
+            if not deferred:
+                add(
+                    InvestigationEvidence(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        investigation_id=investigation.id,
+                        evidence_id=evidence.id,
+                        relevance="Part of the curated demo story.",
+                        created_at=now,
+                    )
                 )
-            )
             # Link the record to its product and versions, as ingestion does, so case search finds it.
             for entity_type, entity_id, reference in [("Product", products[product_code].id, product_code)] + [
                 ("ProductVersion", version.id, version.version_identifier) for version in versions_of[product_code]
@@ -596,10 +635,23 @@ def status(db: Session) -> dict:
         return int(db.query(func.count(model.id)).filter(model.tenant_id == tenant.id).scalar() or 0)
 
     plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant.id).first()
+    from backend.app.demo_golden_path import golden_path_status
+    from backend.app.role_codes import role_code, role_label
+
     team = []
-    for role, email, _ in DEMO_TEAM:
+    for role, email, name in DEMO_TEAM:
         user = db.query(AuthUser).filter(AuthUser.username == email, AuthUser.tenant_id == tenant.id).first()
-        team.append({"role": role, "email": email, "active": bool(user and user.status == "ACTIVE")})
+        # Who can sign in, as whom, under which role (the password is MDARIX_DEMO_PASSWORD and is never shown).
+        team.append(
+            {
+                "role": role,
+                "role_code": role_code(role),
+                "role_label": role_label(role),
+                "name": name,
+                "email": email,
+                "active": bool(user and user.status == "ACTIVE"),
+            }
+        )
     plan = (
         db.query(PlanDefinition.code)
         .join(TenantPlanAssignment, TenantPlanAssignment.plan_id == PlanDefinition.id)
@@ -620,4 +672,5 @@ def status(db: Session) -> dict:
             "suppliers": count(Supplier),
         },
         "team": team,
+        "golden_path": golden_path_status(db, tenant.id),
     }

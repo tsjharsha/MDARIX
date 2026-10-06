@@ -159,6 +159,10 @@ DB_MODULES = {
     "test_human_decision",
     # Phase 6: follow-ups, late-evidence impact assessments (hooks and the sweep) and the closure criteria of a case.
     "test_decision_followups",
+    # Phase 7: trust and audit of a case (timeline, replay, AI runs, integrity, audited export).
+    "test_case_audit",
+    # Phase 7: the 25 workflow scenarios end to end through the API (fresh organizations, six workflow roles).
+    "test_e2e_workflow_scenarios",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

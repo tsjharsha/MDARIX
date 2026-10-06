@@ -1,4 +1,7 @@
-"""The curated AcmeCare demo story: three devices, four investigations, realistic synthetic evidence.
+"""The curated AcmeCare demo story: four devices, five investigations, realistic synthetic evidence.
+
+FlowSure 300 and its case ACD-INV-401 carry the golden path (signal, triage, scope, evidence review, intelligence,
+reviews, Decision Brief, signed decision, follow-up and late evidence), written by backend/app/demo_golden_path.py.
 
 Everything here is invented for demonstrations (no real company, device, patient or person). Dates are days before the
 day the story is loaded, so the workspace always looks current. Each open investigation carries real tension for the
@@ -29,6 +32,7 @@ SUPPLIERS = [
     ("ACD-SUP-VOLTAIC", "Voltaic Cells"),
     ("ACD-SUP-LINQ", "LinQ Cable Systems"),
     ("ACD-SUP-NORDWIRE", "Nordwire Harness"),
+    ("ACD-SUP-ORBIS", "Orbis Polymer Moulding"),
 ]
 
 PRODUCTS: list[ProductSpec] = [
@@ -74,6 +78,19 @@ PRODUCTS: list[ProductSpec] = [
         ],
         "lots": [("ACD-BZ-L1901", 680), ("ACD-BZ-L2101", 520), ("ACD-BZ-L2301", 300), ("ACD-BZ-L2401", 180)],
     },
+    # The golden path (backend/app/demo_golden_path.py): a case taken from signal to signed decision.
+    {
+        "id": "ACD-FLOWSURE-300",
+        "name": "FlowSure 300 Ambulatory Infusion Pump",
+        "family": "Infusion therapy",
+        "versions": [("Rev 1", 380), ("Rev 2", 140)],
+        "components": [
+            ("ACD-F3-CAS", "Pumping cassette with anti-free-flow valve", "CS-5", "ACD-SUP-ORBIS"),
+            ("ACD-F3-FLS", "Downstream flow sensor", "FS-2", "ACD-SUP-KESTREL"),
+            ("ACD-F3-MB", "Pump drive board", "PD-4", None),
+        ],
+        "lots": [("ACD-F3-L2501", 130), ("ACD-F3-L2502", 100), ("ACD-F3-L2503", 75)],
+    },
 ]
 
 # identifier, type, description, days ago
@@ -89,6 +106,13 @@ CHANGES = [
     ("ACD-CHG-417", "manufacturing_change", "Crimp tooling replaced on the cable assembly line at LinQ.", 95),
     ("ACD-CHG-505", "firmware_change", "Breeza 50 power management firmware 4.1 (new low-battery estimate).", 200),
     ("ACD-CHG-521", "design_change", "Breeza 50 alarm speaker SP-2 replaced the SP-1 part.", 260),
+    (
+        "ACD-CHG-611",
+        "supplier_change",
+        "Orbis Polymer Moulding moved FlowSure 300 cassette valve moulding to a new tool (cavity set T-4).",
+        150,
+    ),
+    ("ACD-CHG-612", "design_change", "FlowSure 300 Rev 2 released with pumping cassette CS-5.", 140),
 ]
 
 # identifier, product, description
@@ -97,6 +121,7 @@ RISKS = [
     ("ACD-RSK-FS-08", "ACD-FLOWSURE-200", "Missed true occlusion leads to under-infusion."),
     ("ACD-RSK-PV-03", "ACD-PULSEVIEW-12", "Loss of SpO2 signal delays detection of desaturation."),
     ("ACD-RSK-BZ-11", "ACD-BREEZA-50", "Battery runtime shorter than displayed estimate during power outage."),
+    ("ACD-RSK-F3-04", "ACD-FLOWSURE-300", "Interruption of infusion delays therapy (under-infusion)."),
 ]
 
 # identifier, type, description
@@ -123,7 +148,9 @@ CONTROLS = [
 _FS = "ACD-FLOWSURE-200"
 _PV = "ACD-PULSEVIEW-12"
 _BZ = "ACD-BREEZA-50"
-COMPLAINTS = [
+_F3 = "ACD-FLOWSURE-300"
+_FI = "FLOW_INTERRUPTION"
+COMPLAINTS: list[tuple] = [
     (_FS, "Rev A", "ACD-FS-L2401", 190, "Occlusion alarm during infusion; line found clear, infusion restarted."),
     (_FS, "Rev A", "ACD-FS-L2402", 172, "Occlusion alarm at start of night infusion in ward 4; no kink found."),
     (_FS, "Rev B", "ACD-FS-L2403", 104, "Repeated occlusion alarms within 10 minutes; pump swapped."),
@@ -156,6 +183,30 @@ COMPLAINTS = [
     (_BZ, "Rev 4", "ACD-BZ-L2301", 22, "Standby battery drain, unit two months old."),
     (_BZ, "Rev 4", "ACD-BZ-L2401", 9, "Low-battery alarm after 4 hours; unit is new."),
     (_BZ, "Rev 4", "ACD-BZ-L2101", 2, "Alarm speaker sounded quieter than the old unit."),
+    # The golden path: flow interruptions on FlowSure 300 Rev 2 (problem code FLOW_INTERRUPTION, the sixth field).
+    (_F3, "Rev 2", "ACD-F3-L2501", 78, "Infusion stopped with a no-flow alarm 40 minutes into a home infusion.", _FI),
+    (_F3, "Rev 2", "ACD-F3-L2501", 71, "Flow interruption alarm on ward 7; cassette valve found closed, no kink.", _FI),
+    (
+        _F3,
+        "Rev 2",
+        "ACD-F3-L2502",
+        64,
+        "Pump reported flow interruption three times during an overnight infusion.",
+        _FI,
+    ),
+    (_F3, "Rev 2", "ACD-F3-L2502", 57, "No-flow alarm after a cassette change; delivery resumed after reseating.", _FI),
+    (
+        _F3,
+        "Rev 2",
+        "ACD-F3-L2502",
+        50,
+        "Flow interruption during ambulance transfer; dose delayed about 15 minutes.",
+        _FI,
+    ),
+    (_F3, "Rev 2", "ACD-F3-L2503", 44, "Infusion found stopped at handover; extension-set clamp was closed.", _FI),
+    (_F3, "Rev 2", "ACD-F3-L2503", 37, "Repeated flow interruption alarms with a cassette from the newest lot.", _FI),
+    # Received after the decision was signed (the late complaint of the golden path).
+    (_F3, "Rev 2", "ACD-F3-L2503", 2, "Flow interruption alarm on a newly delivered pump at an infusion clinic.", _FI),
 ]
 
 # Investigations: identifier, product, question, status, opened days ago, closed days ago
@@ -164,7 +215,12 @@ INVESTIGATIONS = [
     ("ACD-INV-201", _PV, "Are PulseView 12 SpO2 signal dropouts linked to the new cable supplier?", "open", 30, None),
     ("ACD-INV-301", _BZ, "Do Breeza 50 battery runtime complaints point to a cell supplier problem?", "open", 25, None),
     ("ACD-INV-302", _BZ, "Was the quieter alarm report caused by the SP-2 speaker change?", "closed", 60, 20),
+    # The golden path: opened from signal triage, decided and signed (backend/app/demo_golden_path.py).
+    ("ACD-INV-401", _F3, "Why do FlowSure 300 Rev 2 pumps interrupt flow after cassette loading?", "open", 61, None),
 ]
+GOLDEN_CASE = "ACD-INV-401"
+GOLDEN_PRODUCT = _F3
+GOLDEN_PROBLEM = _FI
 
 # Evidence per investigation: identifier, type, title, days ago (event), review state, text.
 # Review state: verified (confirmed source record) or unreviewed (field notes and observations awaiting review).
@@ -391,4 +447,78 @@ EVIDENCE = {
             "Investigation closed by the quality lead.",
         ),
     ],
+    "ACD-INV-401": [
+        (
+            "ACD-EV-4011",
+            "supplier_change_notice",
+            "Orbis change notice OCN-219: cassette valve moulding tool T-4",
+            150,
+            "verified",
+            "Orbis Polymer Moulding moved the moulding of the anti-free-flow valve of cassette CS-5 to a new tool "
+            "(cavity set T-4) because the old tool reached its end of life. Orbis states the parts are dimensionally "
+            "equivalent. First-article data cover wall thickness but not the membrane thickness at the gate.",
+        ),
+        (
+            "ACD-EV-4012",
+            "complaint_trend",
+            "Flow interruption complaints by cassette lot",
+            33,
+            "verified",
+            "Seven flow interruption complaints on FlowSure 300 Rev 2 in about six weeks, against fewer than one a "
+            "month on Rev 1. All seven come from pump lots ACD-F3-L2501 to L2503, built with cassettes from tool T-4. "
+            "One complaint describes a closed extension-set clamp.",
+        ),
+        (
+            "ACD-EV-4013",
+            "test_report",
+            "Bench test of returned cassettes RMA-9120 and RMA-9127",
+            30,
+            "unreviewed",
+            "Two returned cassettes were loaded twenty times each at 23 C. One (RMA-9127) gave a no-flow alarm on "
+            "three loads: its valve membrane stayed closed until the cassette was reseated. Its membrane measured "
+            "0.42 mm at the gate (drawing: 0.35 +/- 0.04 mm). The other cassette behaved normally.",
+        ),
+        (
+            "ACD-EV-4014",
+            "verification_report",
+            "Design verification DV-305: flow continuity of cassette CS-5",
+            135,
+            "verified",
+            "Flow continuity passed all acceptance criteria for Rev 2 (1,000 loads, no interruption). The test used "
+            "cassettes moulded on the previous tool; no cassette from tool T-4 was tested.",
+        ),
+        (
+            "ACD-EV-4015",
+            "field_note",
+            "Distributor remark: cassettes stored in a hot warehouse",
+            40,
+            "unreviewed",
+            "A distributor mentions that cassettes may have been stored in a hot warehouse during the summer. No "
+            "dates, lots or temperatures are given and the remark cannot be traced to any complaint.",
+        ),
+        (
+            "ACD-EV-4016",
+            "inspection_record",
+            "Incoming inspection of cassette lots C-301 to C-303 (answer to an evidence request)",
+            19,
+            "verified",
+            "Incoming inspection sampled 32 cassettes per lot. Membrane thickness at the gate: lot C-301 0.36-0.41 mm, "
+            "lot C-302 0.37-0.43 mm, lot C-303 0.35-0.40 mm. Thickness was recorded but, by an error in the "
+            "inspection plan, not checked against the drawing tolerance, so out-of-tolerance parts were accepted.",
+        ),
+        (
+            "ACD-EV-4017",
+            "service_report",
+            "Field service report after the decision: flow interruption at an infusion clinic",
+            1,
+            "unreviewed",
+            "Field service visited the infusion clinic that reported a flow interruption on a newly delivered pump "
+            "(complaint received after the decision). The cassette came from lot C-304, moulded after the "
+            "containment action; the alarm did not repeat during the visit.",
+        ),
+    ],
 }
+
+# Evidence of the golden case that reaches it later in the story (backend/app/demo_golden_path.py attaches it to
+# the case at its moment): the answer to an evidence request, and evidence received after the decision was signed.
+GOLDEN_DEFERRED_EVIDENCE = frozenset({"ACD-EV-4016", "ACD-EV-4017"})

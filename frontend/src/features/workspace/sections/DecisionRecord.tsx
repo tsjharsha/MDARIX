@@ -21,6 +21,7 @@ import {
   followUpTypeLabel,
   type FollowUp,
 } from "../afterDecision";
+import { CaseStoryLink } from "./CaseStoryLink";
 
 const record = (value: unknown): Record<string, any> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
@@ -41,8 +42,17 @@ export function Fingerprint({ value }: { value: unknown }) {
  * The signed record of a decision (GET /api/v1/decisions/{id}/record): its outcome, conditions and follow-ups, who
  * signed it with which role and when, the meaning of the signature, the fingerprints, the verification checks (Valid,
  * or Invalid with the checks that failed), the evidence snapshot, and the decisions it supersedes or that superseded it.
+ * Inside the workspace it links to the case's full story in Trust & Audit (`showCaseStory`, on by default).
  */
-export function DecisionRecordDrawer({ decisionId, onClose }: { decisionId: string; onClose: () => void }) {
+export function DecisionRecordDrawer({
+  decisionId,
+  onClose,
+  showCaseStory = true,
+}: {
+  decisionId: string;
+  onClose: () => void;
+  showCaseStory?: boolean;
+}) {
   // A supersede link opens that decision's record in the same drawer.
   const [shown, setShown] = useState(decisionId);
   const data = useResource<Record<string, unknown>>(decisionRecordPath(shown));
@@ -273,6 +283,14 @@ export function DecisionRecordDrawer({ decisionId, onClose }: { decisionId: stri
               <button type="button" className="ac-secondary" onClick={() => setShown(decisionId)}>
                 Back to the first record
               </button>
+            </div>
+          )}
+          {showCaseStory && typeof decision.investigation_id === "string" && (
+            <div className="ca-action-row">
+              <CaseStoryLink
+                investigationId={decision.investigation_id}
+                caseLabel={safeText(decision.investigation_business_id)}
+              />
             </div>
           )}
         </>

@@ -1,23 +1,69 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, Ban, CheckCircle2 } from "lucide-react";
-import { Panel } from "../../admin/console/charts";
+import { Empty, Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { displayId } from "../../../app/displayId";
+import { useWorkspace } from "../workspaceContext";
+import { CASE_TRUST_TABS, TRUST_TABS, initialTrustTab, parseTrustTab, type TrustTab } from "../caseAudit";
 import { NeedsProduct, RecordTable } from "./common";
 import { Limitations } from "./Products";
 import { AuditTab } from "./AuditTab";
 import { TrustEvaluation } from "./TrustEvaluation";
+import { CaseAiRuns, CaseIntegrity, CaseReplay, CaseTimeline } from "./CaseAudit";
+import { DecisionRecordDrawer } from "./DecisionRecord";
 
-const TABS = ["AI assurance", "Audit trail", "Data limitations"] as const;
-type Tab = (typeof TABS)[number];
+type Tab = TrustTab;
 
 export function TrustSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "AI assurance",
+  const { work } = useWorkspace();
+  const [requested] = useState(() => parseTrustTab(tab));
+  // A case opened from a decision, which the context bar may not hold (another product).
+  const [opened, setOpened] = useState<{ id: string; label: string | null } | null>(() =>
+    requested.caseId ? { id: requested.caseId, label: requested.caseLabel } : null,
   );
+  // Choosing another case in the context bar shows that case.
+  const previous = useRef(work.investigationId);
+  useEffect(() => {
+    if (previous.current === work.investigationId) return;
+    previous.current = work.investigationId;
+    if (work.investigationId) setOpened((current) => (current && current.id !== work.investigationId ? null : current));
+  }, [work.investigationId]);
+  const caseId = opened?.id ?? work.investigationId;
+  const selected = work.investigations.find((item) => String(item.id) === caseId);
+  const caseLabel =
+    (selected ? displayId(selected, "investigation_identifier", "") : "") || opened?.label || "Selected investigation";
+  // Without a tab asked for, a chosen case opens on its timeline; otherwise AI assurance as before.
+  const [chosen, setChosen] = useState<Tab | null>(null);
+  const active = chosen ?? initialTrustTab(requested.tab, !!caseId);
+  const [recordId, setRecordId] = useState<string | null>(null);
+  const caseTab = CASE_TRUST_TABS.includes(active);
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Trust and audit sections">
+      <Tabs tabs={TRUST_TABS} active={active} onChange={setChosen} label="Trust and audit sections">
+        {caseTab && opened && opened.id !== work.investigationId && (
+          <p className="ac-note" role="status">
+            Opened from a decision. The context bar above still shows another case.
+          </p>
+        )}
+        {caseTab && !caseId && (
+          <Panel title="No investigation selected">
+            <Empty
+              title="Choose an investigation"
+              detail="The case timeline, replay, AI runs and integrity checks belong to an investigation. Pick one in the context bar above."
+            />
+          </Panel>
+        )}
+        {active === "Case timeline" && caseId && (
+          <CaseTimeline key={caseId} investigationId={caseId} caseLabel={caseLabel} onOpenDecision={setRecordId} />
+        )}
+        {active === "Replay" && caseId && (
+          <CaseReplay key={caseId} investigationId={caseId} caseLabel={caseLabel} onOpenDecision={setRecordId} />
+        )}
+        {active === "AI runs" && caseId && <CaseAiRuns key={caseId} investigationId={caseId} caseLabel={caseLabel} />}
+        {active === "Integrity" && caseId && (
+          <CaseIntegrity key={caseId} investigationId={caseId} caseLabel={caseLabel} onOpenDecision={setRecordId} />
+        )}
         {active === "AI assurance" && <Assurance />}
         {active === "Audit trail" && <AuditTab />}
         {active === "Data limitations" && (
@@ -38,6 +84,14 @@ export function TrustSection({ tab }: { tab?: string }) {
           </NeedsProduct>
         )}
       </Tabs>
+      {recordId && (
+        <DecisionRecordDrawer
+          key={recordId}
+          decisionId={recordId}
+          onClose={() => setRecordId(null)}
+          showCaseStory={false}
+        />
+      )}
     </>
   );
 }

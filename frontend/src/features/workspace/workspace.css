@@ -1485,3 +1485,209 @@ div.uw-task-count:hover {
 .uw-decision-follow-up {
   margin: 0 0 6px 26px;
 }
+
+/* Phase 7 trust and audit: the case timeline (category badges, who made each event), the replay columns, the AI
+   run badges. A category always shows its label; an AI event uses the dashed violet statement-kind style. */
+.ta-chips {
+  margin-bottom: 12px;
+}
+.ta-chips button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ta-toolbar {
+  margin-bottom: 12px;
+}
+.ta-toolbar select,
+.ta-toolbar input[type="date"] {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.ta-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ta-export > span {
+  color: var(--ac-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ta-export p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.ta-timeline {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ta-event {
+  display: grid;
+  grid-template-columns: minmax(120px, 170px) 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ac-grid);
+}
+.ta-event:first-child {
+  border-top: 0;
+}
+.ta-event-time {
+  color: var(--ac-ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.ta-event-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ta-event-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.ta-event-reason {
+  margin: 2px 0 0;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}
+.ta-origin-row-ai .ta-event-body {
+  padding-left: 8px;
+  border-left: 2px dashed #6b3fb5;
+}
+@media (max-width: 640px) {
+  .ta-event {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+.ta-category {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: #f4f6f8;
+  color: #4a5d6e;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.ta-cat-signal,
+.ta-cat-case,
+.ta-cat-scope,
+.ta-cat-task {
+  background: #e4eefb;
+  color: #1d4378;
+}
+.ta-cat-evidence,
+.ta-cat-request {
+  background: #e3f2f1;
+  color: #065a58;
+}
+.ta-cat-intelligence,
+.ta-cat-ai {
+  border-style: dashed;
+  background: #f1eafb;
+  color: #4c2a86;
+}
+.ta-cat-review,
+.ta-cat-brief {
+  background: #fdf4dc;
+  color: #6e4700;
+}
+.ta-cat-decision,
+.ta-cat-signature {
+  background: #e3f3ea;
+  color: #14502f;
+}
+.ta-cat-follow-up,
+.ta-cat-impact {
+  background: #fdeee6;
+  color: #8a3b14;
+}
+.ta-cat-audit,
+.ta-cat-other {
+  background: #f4f6f8;
+  color: #4a5d6e;
+}
+.ta-origin-person {
+  border-color: #2a5fa8;
+}
+.ta-origin-person .sk-kind {
+  background: #e4eefb;
+  color: #1d4378;
+}
+.ta-origin-system,
+.ta-origin-unknown {
+  border-color: #8a97a3;
+}
+.ta-origin-system .sk-kind,
+.ta-origin-unknown .sk-kind {
+  background: #f4f6f8;
+  color: #4a5d6e;
+}
+.ta-replay-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+.ta-replay-mode input[type="datetime-local"],
+.ta-replay-mode select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.ta-replay-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px 20px;
+}
+.ta-replay-columns h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.ta-integrity-banner {
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ta-integrity-banner > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ta-used-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border: 1px solid #14502f;
+  border-radius: 6px;
+  background: #e3f3ea;
+  color: #14502f;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ta-hash-full {
+  word-break: break-all;
+}
