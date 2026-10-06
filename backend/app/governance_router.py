@@ -24,6 +24,7 @@ from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import change_diff
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.role_codes import is_administrator_role
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 
 router = APIRouter(prefix="/api/v1/governance", tags=["Enterprise Governance"])
@@ -72,6 +73,12 @@ DEFAULT_APPROVER_ROLE = "Approver"
 DEFAULT_APPROVAL_ROLES = ("APPROVER", "LEADER")
 
 
+ADMINISTRATOR_CANNOT_SIGN = (
+    "ADMINISTRATOR_CANNOT_SIGN",
+    "Administrators do not approve or sign; an approver of your organization must do this",
+)
+
+
 def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tuple[str, str] | None:
     """Why this user may not approve this decision, or None when they may.
 
@@ -80,6 +87,10 @@ def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tu
     """
     from backend.app.access.permissions import normalize_role
 
+    # Administrators (customer or platform) never approve or sign, whatever authority rules say: an administrator
+    # can write those rules, so an authority naming their own role would let them sign around segregation of duties.
+    if is_administrator_role(role_name):
+        return ADMINISTRATOR_CANNOT_SIGN
     # Role names are compared the way permissions are ('Approver' == 'APPROVER'), so a rule written in any case
     # matches the role stored on the account.
     wanted = normalize_role(role_name)
@@ -337,6 +348,79 @@ def session_actor(db, ctx: AuthenticatedRequestContext):
     }
 
 
+def verify_signing_credentials(
+    db, ctx: AuthenticatedRequestContext, *, password: str | None, mfa_code: str | None, record_refusal
+) -> AuthUser | None:
+    """Re-authenticate the signed-in person before an electronic signature or a controlled approval.
+
+    The one check behind every signature-grade action (decision signing here, regulatory document approval in
+    regulatory_router.py): the current password, then - when signatures require MFA (``mfa.signatures_require_mfa``)
+    - a current authenticator code from an enrolled account. Wrong passwords and wrong codes count together on the
+    "sign" throttle (5 lock signing for 15 minutes); sign-in has its own lock, so signing cannot be used to guess
+    passwords around it. Each refusal calls ``record_refusal(action)`` (the caller's audit event), is committed, and
+    raises 403. Returns the signer (None for a legacy in-process session that has no account).
+    """
+    from backend.app import mfa
+
+    signer = _signer(db, ctx)
+    if signer is not None:
+        mfa.ensure_not_locked(db, signer, scope="sign")
+    password_ok = (
+        signer is not None and bool(signer.password_hash) and bool(password) and _verify(password, signer.password_hash)
+    )
+    if not password_ok:
+        record_refusal("SIGNATURE_REAUTHENTICATION_FAILED")
+        if signer is not None:
+            mfa.record_failure(db, signer, scope="sign")
+        db.commit()
+        raise HTTPException(
+            403, detail={"code": "INVALID_REAUTHENTICATION", "message": "Current password was not verified"}
+        )
+    if mfa.signatures_require_mfa():
+        if signer is None or not mfa.is_enrolled(signer):
+            record_refusal("MFA_REQUIRED_FOR_SIGNATURE")
+            db.commit()
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "MFA_ENROLLMENT_REQUIRED",
+                    "message": "Set up an authenticator app (My Account > Security) before signing decisions",
+                },
+            )
+        if not mfa_code or not mfa.check_code(signer, mfa_code, allow_recovery=False):
+            record_refusal("SIGNATURE_MFA_FAILED")
+            mfa.record_failure(db, signer, scope="sign")
+            db.commit()
+            raise HTTPException(
+                403,
+                detail={"code": "MFA_REQUIRED", "message": "Enter the current code from your authenticator app"},
+            )
+    if signer is not None:
+        mfa.record_success(db, signer, scope="sign")
+    return signer
+
+
+def _notify(helper: str, db, **details) -> bool:
+    """Queue a decision notification through backend/app/notifications.py (emails go out from the outbox worker).
+
+    The helpers are optional so a notification can never block a signature: when one is missing (an older build)
+    or fails to queue, the caller's audit trail still records the event and the failure is logged."""
+    import logging
+
+    from backend.app import notifications
+
+    send = getattr(notifications, helper, None)
+    if send is None:
+        logging.getLogger("mdarix.governance").warning("Notification helper %s is not available", helper)
+        return False
+    try:
+        send(db, **details)
+        return True
+    except Exception:
+        logging.getLogger("mdarix.governance").exception("Notification %s could not be queued", helper)
+        return False
+
+
 @router.get("/effective-access")
 def effective_access(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     actor = session_actor(db, ctx)
@@ -361,6 +445,12 @@ def sign(
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
     audit(db, t, actor["user_id"], "APPROVAL_REQUESTED", decision_id)
+    if is_administrator_role(actor["active_role"]):
+        # Administrators never sign, whatever the plan or any authority says: refuse with that reason first.
+        code, message = ADMINISTRATOR_CANNOT_SIGN
+        audit(db, t, actor["user_id"], code, decision_id)
+        db.commit()
+        raise HTTPException(403, detail={"code": code, "message": message})
     if not entitled(db, t):
         audit(db, t, actor["user_id"], "ENTITLEMENT_ACCESS_DENIED", decision_id)
         db.commit()
@@ -385,51 +475,13 @@ def sign(
         raise HTTPException(403, detail={"code": code, "message": message})
     if not payload.remarks.strip():
         raise HTTPException(400, detail={"code": "REMARKS_REQUIRED", "message": "Remarks are required"})
-    from backend.app import mfa
-
-    signer = _signer(db, ctx)
-    if signer is not None:
-        # Wrong passwords and wrong codes at signing count together; 5 lock signing for 15 minutes. Sign-in has its
-        # own lock, so signing cannot be used to guess passwords around it.
-        mfa.ensure_not_locked(db, signer, scope="sign")
-    try:
-        user = (
-            db.query(AuthUser)
-            .filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id)
-            .first()
-        )
-        password_ok = user is not None and bool(user.password_hash) and _verify(payload.password, user.password_hash)
-    except (ValueError, TypeError):
-        password_ok = False
-    if not password_ok:
-        audit(db, t, actor["user_id"], "SIGNATURE_REAUTHENTICATION_FAILED", decision_id)
-        if signer is not None:
-            mfa.record_failure(db, signer, scope="sign")
-        db.commit()
-        raise HTTPException(
-            403, detail={"code": "INVALID_REAUTHENTICATION", "message": "Current password was not verified"}
-        )
-    if mfa.signatures_require_mfa():
-        if signer is None or not mfa.is_enrolled(signer):
-            audit(db, t, actor["user_id"], "MFA_REQUIRED_FOR_SIGNATURE", decision_id)
-            db.commit()
-            raise HTTPException(
-                403,
-                detail={
-                    "code": "MFA_ENROLLMENT_REQUIRED",
-                    "message": "Set up an authenticator app (My Account > Security) before signing decisions",
-                },
-            )
-        if not payload.mfa_code or not mfa.check_code(signer, payload.mfa_code, allow_recovery=False):
-            audit(db, t, actor["user_id"], "SIGNATURE_MFA_FAILED", decision_id)
-            mfa.record_failure(db, signer, scope="sign")
-            db.commit()
-            raise HTTPException(
-                403,
-                detail={"code": "MFA_REQUIRED", "message": "Enter the current code from your authenticator app"},
-            )
-    if signer is not None:
-        mfa.record_success(db, signer, scope="sign")
+    verify_signing_credentials(
+        db,
+        ctx,
+        password=payload.password,
+        mfa_code=payload.mfa_code,
+        record_refusal=lambda action: audit(db, t, actor["user_id"], action, decision_id),
+    )
     material = {
         "decision_id": str(item.id),
         "version": version,
@@ -513,6 +565,19 @@ def sign(
     db.commit()
     item.decision_status = signed_status
     data.commit()
+    owner = _case_owner(data, t.id, item.investigation_id)
+    if _notify(
+        "notify_signoff_completed",
+        db,
+        tenant_id=t.id,
+        decision_id=item.id,
+        investigation_id=item.investigation_id,
+        decision=payload.decision,
+        signer_user_id=actor["user_id"],
+        owner_ref=owner,
+        reference=item.decision_identifier,
+    ):
+        db.commit()
     return {
         "signature_id": record.id,
         "status": item.decision_status,
@@ -564,7 +629,31 @@ def material_change(
     audit(db, t, actor["user_id"], "RE_SIGNATURE_REQUIRED", item.id)
     db.commit()
     data.commit()
+    if _notify(
+        "notify_review_pending",
+        db,
+        tenant_id=t.id,
+        decision_id=item.id,
+        investigation_id=item.investigation_id,
+        requested_by=actor["user_id"],
+        reference=item.decision_identifier,
+    ):
+        db.commit()
     return {"status": "RE_REVIEW_REQUIRED", "previous_version": current, "current_version": item.updated_at}
+
+
+def _case_owner(data, tenant_id, investigation_id) -> str | None:
+    """The owner recorded on the decision's case (an account email), to tell them their case was signed off."""
+    from backend.app.db.models.foundation import Investigation
+
+    if investigation_id is None:
+        return None
+    case = (
+        data.query(Investigation.owner_ref)
+        .filter(Investigation.tenant_id == tenant_id, Investigation.id == investigation_id)
+        .first()
+    )
+    return case.owner_ref if case else None
 
 
 @router.get("/decisions/{decision_id}/signature-history")

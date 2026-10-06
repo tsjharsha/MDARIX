@@ -12,6 +12,8 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.db.models.regulatory import RegulatoryDocument, RegulatoryDocumentVersion
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.mfa import signatures_require_mfa
+from backend.app.role_codes import is_administrator_role
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from regulatory_intelligence.service import RegulatoryDraftService
 from regulatory_intelligence.estar import generate_estar_package
@@ -36,12 +38,19 @@ class RegulatoryDraftRequest(BaseModel):
     document_identifier: str | None = Field(default=None, min_length=1, max_length=120)
     title: str | None = Field(default=None, max_length=255)
     change_reason: str = Field(default="Initial regulatory draft", min_length=1, max_length=1000)
+    # The organization's records the model may draft from: one case (its authorized context) and/or a version.
+    investigation_id: uuid.UUID | None = None
+    product_version_id: uuid.UUID | None = None
 
 
 class RegulatoryStatusRequest(BaseModel):
     status: str = Field(pattern="^(DRAFT|IN_REVIEW|APPROVED|ARCHIVED)$")
     expected_lock_version: int = Field(ge=1)
     reason: str = Field(min_length=1, max_length=1000)
+    # Approval is a controlled, signature-grade action: the approver re-authenticates exactly as for signing a
+    # decision (password, and an authenticator code when signatures require MFA).
+    password: str | None = Field(default=None, max_length=128)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=12)
 
 
 def _hash_content(content: dict, citations: list[dict]) -> str:
@@ -56,12 +65,40 @@ def generate_regulatory_draft(
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Generate a bounded, citation-checked draft for the authenticated tenant.
+    """Draft a regulatory document for the authenticated tenant: the citation-checked rules draft, with section text
+    written by the language model from the organization's authorized records (regulatory_intelligence/copilot.py).
 
-    This endpoint organizes authorized client-supplied context. It does not infer
-    regulatory compliance, make a submission decision, or replace human approval.
+    The model's text is advisory (``authoritative: false``) and every section needs human review; citations and
+    causal wording are checked per section. When AI is switched off, over budget, not allowed or unavailable, the
+    layout-only draft is returned with ``status: RULES_ONLY`` and a ``reason_code``. Nothing here infers regulatory
+    compliance, makes a submission decision, or replaces human approval.
     """
-    draft = RegulatoryDraftService().generate(payload.document_type, payload.model_dump())
+    from backend.app.db.models.foundation import Investigation, ProductVersion
+    from regulatory_intelligence.copilot import draft_with_model, grounded_context
+
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    for model, value, code in (
+        (Investigation, payload.investigation_id, "INVESTIGATION_NOT_FOUND"),
+        (ProductVersion, payload.product_version_id, "PRODUCT_VERSION_NOT_FOUND"),
+    ):
+        if value is not None and (
+            data_db.query(model.id).filter(model.id == value, model.tenant_id == tenant_id).first() is None
+        ):
+            raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
+    request = payload.model_dump(mode="json")
+    draft = RegulatoryDraftService().generate(payload.document_type, request)
+    context = grounded_context(
+        data_db,
+        tenant_id=tenant_id,
+        document_type=draft.document_type,
+        request=request,
+        rules_draft=draft,
+        investigation_id=payload.investigation_id,
+        product_version_id=payload.product_version_id,
+    )
+    sections, assistance = draft_with_model(
+        document_type=draft.document_type, title=payload.title, rules_draft=draft, context=context
+    )
     now = datetime.now(timezone.utc)
     identifier = payload.document_identifier or f"REG-{uuid.uuid4().hex[:12].upper()}"
     document = (
@@ -114,7 +151,12 @@ def generate_regulatory_draft(
     document.status = "DRAFT"
     document.title = payload.title or document.title
     document.updated_at = now
-    content = {"sections": draft.sections, "limitations": draft.limitations, "human_review_required": True}
+    content = {
+        "sections": sections,
+        "limitations": draft.limitations,
+        "human_review_required": True,
+        "ai_assistance": assistance,
+    }
     version = RegulatoryDocumentVersion(
         id=uuid.uuid4(),
         tenant_id=ctx.tenant_id,
@@ -122,7 +164,12 @@ def generate_regulatory_draft(
         version=next_version,
         content=content,
         citations=draft.citations,
-        source_context={"document_type": draft.document_type},
+        source_context={
+            "document_type": draft.document_type,
+            "investigation_id": str(payload.investigation_id) if payload.investigation_id else None,
+            "product_version_id": str(payload.product_version_id) if payload.product_version_id else None,
+            "evidence_available": (assistance.get("checks") or {}).get("evidence_available", []),
+        },
         content_hash=_hash_content(content, draft.citations),
         status="DRAFT",
         change_reason=payload.change_reason,
@@ -137,13 +184,26 @@ def generate_regulatory_draft(
             action="REGULATORY_DOCUMENT_VERSION_CREATED",
             entity_type="RegulatoryDocument",
             entity_id=document.id,
-            details={"document_identifier": identifier, "version": next_version},
+            details={
+                "document_identifier": identifier,
+                "version": next_version,
+                "ai_status": assistance["status"],
+                "reason_code": assistance["reason_code"],
+                "provider": assistance.get("provider"),
+                "model": assistance.get("model"),
+                "sections_drafted": assistance["sections_drafted"],
+            },
             created_at=now,
         )
     )
     data_db.commit()
     db.commit()
     return {
+        "status": assistance["status"],
+        "reason_code": assistance["reason_code"],
+        "user_message": assistance["user_message"],
+        "human_review_required": True,
+        "authoritative": False,
         "tenant_id": str(ctx.tenant_id),
         "document_id": str(document.id),
         "document_identifier": identifier,
@@ -151,10 +211,11 @@ def generate_regulatory_draft(
         "draft": {
             "document_type": draft.document_type,
             "title": draft.title,
-            "sections": draft.sections,
+            "sections": sections,
             "citations": draft.citations,
             "limitations": draft.limitations,
             "human_review_required": draft.human_review_required,
+            "ai_assistance": assistance,
         },
     }
 
@@ -274,8 +335,15 @@ def update_regulatory_status(
         )
     # Approval needs the regulatory-approval permission and a different person from the author (segregation of
     # duties); every other transition needs permission to change records.
-    granted = permissions_for_role(effective_role(db, ctx))
+    role = effective_role(db, ctx)
+    granted = permissions_for_role(role)
     needed = REGULATORY_APPROVE if payload.status == "APPROVED" else RECORDS_WRITE
+    if payload.status == "APPROVED" and is_administrator_role(role):
+        # Administrators never approve controlled records, whatever their permissions (they can write the rules).
+        from backend.app.governance_router import ADMINISTRATOR_CANNOT_SIGN
+
+        code, message = ADMINISTRATOR_CANNOT_SIGN
+        raise HTTPException(403, detail={"code": code, "message": message})
     if needed not in granted:
         raise HTTPException(
             403,
@@ -299,6 +367,31 @@ def update_regulatory_status(
                 403,
                 detail={"code": "SOD_DENIED", "message": "An author of a regulatory document cannot also approve it"},
             )
+        if not payload.password:
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "REAUTHENTICATION_REQUIRED",
+                    "message": "Enter your password (and authenticator code) to approve this document",
+                },
+            )
+        from backend.app.governance_router import verify_signing_credentials
+
+        def refused(action: str) -> None:
+            db.add(
+                make_audit_event(
+                    tenant_id=ctx.tenant_id,
+                    actor_ref=str(ctx.user_id),
+                    action=action,
+                    entity_type="RegulatoryDocument",
+                    entity_id=document.id,
+                    details={"attempted": "APPROVED", "document_identifier": document.document_identifier},
+                )
+            )
+
+        verify_signing_credentials(
+            db, ctx, password=payload.password, mfa_code=payload.mfa_code, record_refusal=refused
+        )
     now = datetime.now(timezone.utc)
     previous = document.status
     document.status = payload.status
@@ -320,6 +413,34 @@ def update_regulatory_status(
             created_at=now,
         )
     )
+    if payload.status == "APPROVED":
+        current = (
+            data_db.query(RegulatoryDocumentVersion)
+            .filter(
+                RegulatoryDocumentVersion.document_id == document.id,
+                RegulatoryDocumentVersion.tenant_id == ctx.tenant_id,
+                RegulatoryDocumentVersion.version == document.current_version,
+            )
+            .first()
+        )
+        db.add(
+            make_audit_event(
+                tenant_id=ctx.tenant_id,
+                actor_ref=str(ctx.user_id),
+                action="REGULATORY_DOCUMENT_APPROVED",
+                entity_type="RegulatoryDocument",
+                entity_id=document.id,
+                reason=payload.reason,
+                details={
+                    "document_identifier": document.document_identifier,
+                    "version": document.current_version,
+                    "content_hash": current.content_hash if current else None,
+                    "reauthenticated": True,
+                    "mfa_checked": signatures_require_mfa(),
+                },
+                created_at=now,
+            )
+        )
     data_db.commit()
     db.commit()
     return {"id": str(document.id), "status": document.status, "lock_version": document.lock_version}
@@ -367,13 +488,20 @@ def download_estar_preparation(
             },
         )
     sections = version.content.get("sections", [])
-    package = generate_estar_package(
-        tenant_id=str(ctx.tenant_id),
-        title=document.title,
-        sections=sections,
-        citations=version.citations,
-        document_version=version.version,
-    )
+    try:
+        package = generate_estar_package(
+            tenant_id=str(ctx.tenant_id),
+            title=document.title,
+            sections=sections,
+            citations=version.citations,
+            document_version=version.version,
+        )
+    except ValueError as exc:
+        # A section without text cannot go into the package: complete the document first.
+        raise HTTPException(
+            422,
+            detail={"code": "ESTAR_PREPARATION_INVALID", "message": "Complete every section before preparing eSTAR"},
+        ) from exc
     return Response(
         content=package["content"],
         media_type=package["content_type"],

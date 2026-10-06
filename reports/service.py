@@ -8,29 +8,74 @@ deployments should call ``run_pending_jobs`` from the outbox/worker process.
 from __future__ import annotations
 
 import csv
+import html
 import io
 import json
 import os
 import tempfile
 import threading
 import uuid
-import html
 from datetime import datetime, timezone
 from pathlib import Path
 
+from backend.app.csv_safe import safe_cell
+
+# The twelve governed reports. Their content comes from the organization's records (reports/content.py); this module
+# renders it. The catalog endpoint lists exactly these, so a report cannot be offered without a renderer.
 REPORTS = {
     "PRODUCT_INTELLIGENCE": "Product Intelligence Report",
+    "PRODUCT_VERSION_IMPACT": "ProductVersion Impact Report",
     "COMPLAINT_TREND": "Complaint Trend Report",
     "SIGNAL_ASSESSMENT": "Signal Assessment Report",
     "INVESTIGATION": "Investigation Report",
     "EVIDENCE_PROVENANCE": "Evidence & Provenance Report",
+    "RISK_IMPACT": "Risk Impact Report",
+    "SCENARIO_COMPARISON": "Scenario Comparison Report",
     "DECISION_BRIEF": "Decision Brief",
     "AI_ASSURANCE": "AI Assurance Report",
     "AUDIT_APPROVAL": "Audit & Approval Report",
+    "EXECUTIVE_QUALITY_REVIEW": "Executive Quality Review",
 }
-REPORT_VERSION = "1.0"
+# 2.0: reports carry the organization's records (1.0 rendered only a header and the request context).
+REPORT_VERSION = "2.0"
+FORMATS = {"JSON", "CSV", "PDF", "WORD", "DOC", "ESTAR_XML"}
+HUMAN_REVIEW_NOTICE = (
+    "Human review required: this report summarizes records; it does not establish causality or replace approval."
+)
 _jobs: dict[str, dict] = {}
 _lock = threading.RLock()
+
+# Keys that the PDF prints in its title block (or not at all) rather than as body sections.
+_PDF_HEADER_KEYS = frozenset(
+    {
+        "title",
+        "tenant_id",
+        "tenant",
+        "report_type",
+        "report_version",
+        "generated_at",
+        "data_cut_off",
+        "watermark",
+        "human_review_required",
+        "status",
+        "format",
+        "content",
+        "content_type",
+    }
+)
+# Report metadata rows at the top of a CSV, in this order.
+_CSV_META_KEYS = (
+    "report_type",
+    "title",
+    "tenant_id",
+    "tenant_name",
+    "report_version",
+    "status",
+    "generated_at",
+    "data_cut_off",
+    "human_review_required",
+    "watermark",
+)
 
 
 def _safe_data(value, hidden: set[str]):
@@ -41,23 +86,92 @@ def _safe_data(value, hidden: set[str]):
     return value
 
 
-def _pdf_escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("(", "[").replace(")", "]")
+def _heading(key: str) -> str:
+    return str(key).replace("_", " ").strip().capitalize()
 
 
 def _render_pdf(data: dict, watermark: str) -> bytes:
-    lines = [
-        f"MDARIX {data['title']}",
-        f"Report version: {data['report_version']}",
-        f"Tenant: {data['tenant_id']}",
-        f"Generated: {data['generated_at']}",
-        f"WATERMARK: {watermark}",
-    ]
-    lines.extend(f"{key}: {value}" for key, value in data.items() if key not in {"context", "tenant_id"})
-    stream = "BT /F1 9 Tf 40 760 Td " + " ".join(f"({_pdf_escape(line)}) Tj 0 -14 Td" for line in lines) + " ET"
-    return (
-        f"%PDF-1.4\n1 0 obj<< /Type /Catalog /Pages 2 0 R>>endobj\n2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1>>endobj\n3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources<< /Font<< /F1 4 0 R>>>> /Contents 5 0 R>>endobj\n4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica>>endobj\n5 0 obj<< /Length {len(stream.encode())}>>stream\n{stream}\nendstream endobj\ntrailer<< /Root 1 0 R>>\n%%EOF"
-    ).encode("latin-1")
+    """Every part of ``data`` as a paginated PDF (reports/pdf.py): the title block, then one section per key.
+
+    ``context`` (the report content: audit events, signatures, tables) is expanded section by section, so an
+    evidence package lists every event and signature, not just a header. Also used by the eSTAR preparation package
+    (regulatory_intelligence/estar.py), whose ``data`` has its own keys (sections, citation_verification, ...).
+    """
+    from reports import pdf
+
+    tenant = data.get("tenant") if isinstance(data.get("tenant"), dict) else {}
+    organization = tenant.get("name") or data.get("tenant_id") or "-"
+    header = [f"Organization: {organization}" + (f" ({data['tenant_id']})" if tenant.get("name") else "")]
+    if data.get("report_type"):
+        header.append(f"Report: {data['report_type']}  version {data.get('report_version', '-')}")
+    elif data.get("report_version"):
+        header.append(f"Version: {data['report_version']}")
+    header.append(f"Generated: {data.get('generated_at', '-')}")
+    if data.get("data_cut_off"):
+        header.append(f"Data cut-off: {data['data_cut_off']}")
+    header.append(HUMAN_REVIEW_NOTICE)
+    body: list = []
+    for key, value in data.items():
+        if key in _PDF_HEADER_KEYS:
+            continue
+        sections = value.items() if key == "context" and isinstance(value, dict) else [(key, value)]
+        for name, item in sections:
+            if name == "data_cut_off":
+                continue
+            body.append((_heading(name), "heading"))
+            body.extend(pdf.flatten(item))
+            body.append(("", "body"))
+    footer = f"{organization} - {data.get('report_type') or data.get('title', '')} - generated {data.get('generated_at', '')}"
+    return pdf.render(f"MDARIX {data.get('title', 'report')}", header, body, watermark=watermark, footer=footer)
+
+
+def _csv_value(value):
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str, sort_keys=True)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
+def _render_csv(data: dict) -> str:
+    """The report as stacked CSV tables: metadata rows first, then one block per content section.
+
+    A section that is a list of records becomes a table (one column per field); a mapping becomes field/value rows.
+    Every cell goes through ``csv_safe.safe_cell`` so no value is run as a spreadsheet formula.
+    """
+    out = io.StringIO()
+    writer = csv.writer(out)
+
+    def row(*cells):
+        writer.writerow([safe_cell(_csv_value(cell)) for cell in cells])
+
+    row("field", "value")
+    tenant = data.get("tenant") if isinstance(data.get("tenant"), dict) else {}
+    meta = {**data, "tenant_name": tenant.get("name")}
+    for key in _CSV_META_KEYS:
+        if meta.get(key) is not None:
+            row(key, meta[key])
+    row("limitations", data.get("limitations", []))
+    context = data.get("context") if isinstance(data.get("context"), dict) else {}
+    for section, value in context.items():
+        if section == "data_cut_off":
+            continue
+        writer.writerow([])
+        row(f"[{section}]")
+        if isinstance(value, list) and value and all(isinstance(item, dict) for item in value):
+            fields = list(dict.fromkeys(key for item in value for key in item))
+            row(*fields)
+            for item in value:
+                row(*[item.get(field) for field in fields])
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                row(key, item)
+        elif isinstance(value, list):
+            for item in value:
+                row(item)
+        else:
+            row(value)
+    return out.getvalue()
 
 
 def _render_word(data: dict) -> bytes:
@@ -111,32 +225,37 @@ def generate_report(
     output_format: str = "JSON",
     hidden_fields: set[str] | None = None,
     watermark: str | None = None,
+    tenant_name: str | None = None,
 ) -> dict:
+    """Render report ``code`` for one organization. ``context`` is its content (reports/content.py builds it from the
+    organization's records); its ``data_cut_off`` is the instant those records were read."""
     if code not in REPORTS:
         raise ValueError("REPORT_TYPE_NOT_SUPPORTED")
     fmt = output_format.upper()
-    if fmt not in {"JSON", "CSV", "PDF", "WORD", "DOC", "ESTAR_XML"}:
+    if fmt not in FORMATS:
         raise ValueError("REPORT_FORMAT_NOT_SUPPORTED")
     generated = datetime.now(timezone.utc).isoformat()
+    content = _safe_data(context or {}, hidden_fields or set())
     data = {
         "report_type": code,
         "title": REPORTS[code],
         "tenant_id": str(tenant_id),
+        "tenant": {"id": str(tenant_id), "name": tenant_name},
         "report_version": REPORT_VERSION,
         "status": "READY_FOR_REVIEW",
         "generated_at": generated,
-        "context": _safe_data(context or {}, hidden_fields or set()),
+        "data_cut_off": content.get("data_cut_off"),
+        "context": content,
         "limitations": ["Report is a governed summary; it does not establish causality or replace human approval."],
         "human_review_required": True,
     }
-    data["watermark"] = watermark or f"MDARIX CONTROLLED COPY · {tenant_id} · v{REPORT_VERSION}"
+    data["watermark"] = watermark or f"MDARIX CONTROLLED COPY · {tenant_name or tenant_id} · v{REPORT_VERSION}"
+    return _render(data, fmt)
+
+
+def _render(data: dict, fmt: str) -> dict:
     if fmt == "CSV":
-        out = io.StringIO()
-        writer = csv.writer(out)
-        writer.writerow(["field", "value"])
-        for key, value in data.items():
-            writer.writerow([key, json.dumps(value, default=str) if isinstance(value, (dict, list)) else str(value)])
-        data["content_type"], data["content"] = "text/csv", out.getvalue()
+        data["content_type"], data["content"] = "text/csv", _render_csv(data)
     elif fmt == "PDF":
         data["content_type"], data["content"] = "application/pdf", _render_pdf(data, data["watermark"])
     elif fmt in {"WORD", "DOC"}:
@@ -145,6 +264,31 @@ def generate_report(
         data["content_type"], data["content"] = "application/xml", _render_estar_xml(data)
     data["format"] = fmt
     return data
+
+
+def render_investigation_record(record: dict, tenant_id: str, *, output_format: str, tenant_name: str | None = None):
+    """The investigation record (reports/content.py:investigation_record) as JSON, CSV or PDF, with the same title
+    block, watermark and human-review notice as the governed reports."""
+    fmt = output_format.upper()
+    if fmt not in {"JSON", "CSV", "PDF"}:
+        raise ValueError("REPORT_FORMAT_NOT_SUPPORTED")
+    case = record.get("investigation") or {}
+    generated = datetime.now(timezone.utc).isoformat()
+    data = {
+        "report_type": "INVESTIGATION_RECORD",
+        "title": f"Investigation Record {case.get('investigation_identifier') or case.get('id')}",
+        "tenant_id": str(tenant_id),
+        "tenant": {"id": str(tenant_id), "name": tenant_name},
+        "report_version": REPORT_VERSION,
+        "status": "READY_FOR_REVIEW",
+        "generated_at": generated,
+        "data_cut_off": generated,
+        "context": record,
+        "limitations": ["The record lists what is stored; it does not establish causality or replace human approval."],
+        "human_review_required": True,
+        "watermark": f"MDARIX CONTROLLED COPY · {tenant_name or tenant_id} · v{REPORT_VERSION}",
+    }
+    return _render(data, fmt)
 
 
 # A report stored in object storage records its key with this prefix; older reports hold a file path.
@@ -190,7 +334,16 @@ def submit_report_job(
     context: dict | None = None,
     hidden_fields: set[str] | None = None,
     db=None,
+    control_db=None,
+    tenant_name: str | None = None,
 ) -> dict:
+    """Queue report ``code`` and render it now. With ``db`` (the organization's data plane) the job is a durable
+    ``ReportJob`` and the content is read from that plane when it renders; ``control_db`` adds the signatures and the
+    audit trail, which live in the control plane (a job the worker renders later has no control-plane session)."""
+    if code not in REPORTS:
+        raise ValueError("REPORT_TYPE_NOT_SUPPORTED")
+    if output_format.upper() not in FORMATS:
+        raise ValueError("REPORT_FORMAT_NOT_SUPPORTED")
     job_id = str(uuid.uuid4())
     if db is not None:
         from backend.app.db.models.reporting import ReportJob
@@ -212,7 +365,7 @@ def submit_report_job(
         )
         db.add(job)
         db.commit()
-        return run_report_job(job_id, db=db)
+        return run_report_job(job_id, db=db, control_db=control_db, tenant_name=tenant_name)
     with _lock:
         _jobs[job_id] = {
             "id": job_id,
@@ -229,8 +382,10 @@ def submit_report_job(
     return run_report_job(job_id)
 
 
-def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
+def run_report_job(job_id: str, *, max_attempts: int = 3, db=None, control_db=None, tenant_name=None) -> dict:
     if db is not None:
+        from reports.content import BUILDERS, build_report_context
+
         from backend.app.db.models.reporting import ReportJob
 
         job = db.query(ReportJob).filter(ReportJob.id == uuid.UUID(str(job_id))).with_for_update().one_or_none()
@@ -243,12 +398,17 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
         db.commit()
         for attempt in range(job.attempts + 1, max_attempts + 1):
             try:
+                # The content is read when the job renders, so the data cut-off is the moment of rendering.
+                context = dict(job.context or {})
+                if job.report_code in BUILDERS:
+                    context.update(build_report_context(db, job.tenant_id, job.report_code, control_db=control_db))
                 result = generate_report(
                     job.report_code,
                     str(job.tenant_id),
-                    context=job.context or {},
+                    context=context,
                     output_format=job.output_format,
                     hidden_fields=set(job.hidden_fields or []),
+                    tenant_name=tenant_name,
                 )
                 suffix = {
                     "PDF": ".pdf",
@@ -282,6 +442,9 @@ def run_report_job(job_id: str, *, max_attempts: int = 3, db=None) -> dict:
                 db.commit()
                 return _job_dict(job)
             except Exception as exc:
+                # A failed query leaves the transaction aborted: roll back before recording the attempt.
+                db.rollback()
+                job = db.query(ReportJob).filter(ReportJob.id == uuid.UUID(str(job_id))).one()
                 job.attempts = attempt
                 job.last_error = type(exc).__name__
                 db.commit()

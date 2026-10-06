@@ -2,7 +2,6 @@ from types import SimpleNamespace
 
 from backend.app.stage3_router import (
     agent_catalog,
-    assurance_summary,
     product_version_story,
     reports_catalog,
     signal_detail,
@@ -18,12 +17,12 @@ def test_stage3_catalogs_are_governed_and_tenant_scoped():
     ctx = _ctx()
     reports = reports_catalog(ctx)
     agents = agent_catalog(ctx)
-    assurance = assurance_summary(ctx)
     assert reports["tenant_id"] == "tenant-a"
-    assert len(reports["reports"]) >= 10
+    # Exactly the twelve reports the renderer supports (reports/service.py:REPORTS), each in JSON, CSV and PDF.
+    assert len(reports["reports"]) == 12
+    assert all(item["formats"] == ["JSON", "CSV", "PDF"] for item in reports["reports"])
     assert agents["human_authority_required"] is True
     assert all("DECLARE_ROOT_CAUSE" in item["forbidden"] for item in agents["agents"])
-    assert assurance["guardrails"]["tenant_scope"] == "ENFORCED"
 
 
 def test_story_not_found_is_non_disclosing():
@@ -34,7 +33,7 @@ def test_story_not_found_is_non_disclosing():
         def first(self):
             return None
 
-    result = story_view("foreign-investigation", EmptyDB(), _ctx())
+    result = story_view("foreign-investigation", EmptyDB(), EmptyDB(), _ctx())
     assert result["status"] == "NOT_FOUND"
     assert "tenant-a" == result["tenant_id"]
     assert "foreign" not in result["message"].lower()

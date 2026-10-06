@@ -111,6 +111,7 @@ def create_decision(
     investigation_id: uuid.UUID,
     request: DecisionCreateRequest,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     if request.selected_action not in OPTIONS:
@@ -120,9 +121,23 @@ def create_decision(
     # The author is the signed-in user; a name in the request body is never trusted.
     request = request.model_copy(update={"authorized_by_ref": ctx.user_id})
     try:
-        return _decision_payload(service.create_decision(db, ctx.tenant_id, investigation_id, request))
+        decision = service.create_decision(db, ctx.tenant_id, investigation_id, request)
     except DecisionCenterError as exc:
         raise error(exc) from exc
+    # A new decision awaits an approver: tell them (every approver but its author). Queued on the control database
+    # after the decision is saved; a queueing failure is logged and never undoes the decision.
+    from backend.app.governance_router import _notify
+
+    if _notify(
+        "notify_review_pending",
+        control_db,
+        tenant_id=ctx.tenant_id,
+        decision_id=decision.id,
+        submitted_by_user_id=str(ctx.user_id),
+        reference=decision.decision_identifier,
+    ):
+        control_db.commit()
+    return _decision_payload(decision)
 
 
 @router.get("/{investigation_id}/decisions")

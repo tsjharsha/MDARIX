@@ -119,15 +119,30 @@ def _residual_state(controls: list[dict]) -> dict:
     }
 
 
-def register(db: Session, tenant_id, *, product_id: uuid.UUID | None = None, status: str | None = None) -> dict:
-    """Every risk of the organization with its product, linked failure modes, controls (and their verification
-    evidence), requirements and open complaints on the product. ``items`` is ordered by risk identifier."""
+def risk_query(db: Session, tenant_id, *, product_id: uuid.UUID | None = None, status: str | None = None):
+    """The organization's risks (optionally of one product / in one status), ordered by risk identifier."""
     query = db.query(Risk).filter(Risk.tenant_id == tenant_id)
     if product_id is not None:
         query = query.filter(Risk.product_id == product_id)
     if status:
         query = query.filter(func.lower(Risk.status) == status.lower())
-    risks = query.order_by(Risk.risk_identifier).all()
+    return query.order_by(Risk.risk_identifier)
+
+
+def register(
+    db: Session,
+    tenant_id,
+    *,
+    product_id: uuid.UUID | None = None,
+    status: str | None = None,
+    risks: list | None = None,
+) -> dict:
+    """Every risk of the organization with its product, linked failure modes, controls (and their verification
+    evidence), requirements and open complaints on the product. ``items`` is ordered by risk identifier.
+
+    ``risks`` (rows from ``risk_query``, for example one page of it) limits the register to those risks."""
+    if risks is None:
+        risks = risk_query(db, tenant_id, product_id=product_id, status=status).all()
     products = _by_id(db.query(Product).filter(Product.tenant_id == tenant_id).all())
     versions = _by_id(db.query(ProductVersion).filter(ProductVersion.tenant_id == tenant_id).all())
     failure_modes = _by_id(db.query(FailureMode).filter(FailureMode.tenant_id == tenant_id).all())
@@ -160,7 +175,11 @@ def register(db: Session, tenant_id, *, product_id: uuid.UUID | None = None, sta
                 "risk_identifier": risk.risk_identifier,
                 "description": risk.description,
                 "status": risk.status,
-                "product": {"id": str(product.id), "product_identifier": product.product_identifier, "name": product.name}
+                "product": {
+                    "id": str(product.id),
+                    "product_identifier": product.product_identifier,
+                    "name": product.name,
+                }
                 if product
                 else None,
                 "product_version": {"id": str(version.id), "version_identifier": version.version_identifier}
@@ -221,8 +240,18 @@ def traceability(db: Session, tenant_id) -> dict:
     linked_failure_modes = {fid for ids in links["FailureMode"].values() for fid in ids}
     linked_controls = {cid for ids in links["Control"].values() for cid in ids}
     verification = _verification_evidence(db, tenant_id)
-    requirements = db.query(Requirement).filter(Requirement.tenant_id == tenant_id).order_by(Requirement.requirement_identifier).all()
-    failure_modes = db.query(FailureMode).filter(FailureMode.tenant_id == tenant_id).order_by(FailureMode.failure_mode_identifier).all()
+    requirements = (
+        db.query(Requirement)
+        .filter(Requirement.tenant_id == tenant_id)
+        .order_by(Requirement.requirement_identifier)
+        .all()
+    )
+    failure_modes = (
+        db.query(FailureMode)
+        .filter(FailureMode.tenant_id == tenant_id)
+        .order_by(FailureMode.failure_mode_identifier)
+        .all()
+    )
     controls = db.query(Control).filter(Control.tenant_id == tenant_id).order_by(Control.control_identifier).all()
     chains = [
         {
@@ -311,7 +340,9 @@ def register_csv_rows(items: list[dict]) -> list[list]:
                 ";".join(row["control_identifier"] for row in item["controls"]),
                 ";".join(row["requirement_identifier"] for row in item["requirements"]),
                 ";".join(
-                    evidence["evidence_identifier"] for row in item["controls"] for evidence in row["verification_evidence"]
+                    evidence["evidence_identifier"]
+                    for row in item["controls"]
+                    for evidence in row["verification_evidence"]
                 ),
                 item["open_complaints_on_product"],
             ]

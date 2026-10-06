@@ -1,16 +1,33 @@
 """Customer notifications delivered by the background worker from outbox events.
 
-Each event names what happened; the worker calls ``handle_event``, which emails the right people and raises when an
+Producers call one ``notify_*`` function in the same transaction as the change it reports (the caller commits). It
+adds an outbox event that holds identifiers only: never an email address, a password, a token or customer text.
+People are looked up when the email is sent, so an account that was deactivated or erased meanwhile gets nothing and
+the queue holds no personal data. The worker calls ``handle_event``, which emails the right people and raises when an
 email could not be sent, so the outbox retries (and finally dead-letters and alerts). Events:
 
-* ``SUBSCRIPTION_REMINDER`` (scheduler, subscription lifecycle): the organization's customer administrators.
+* ``SUBSCRIPTION_REMINDER`` (scheduler, subscription lifecycle): the customer administrators and the contacts the
+  organization's notification settings name, in the organization's own wording when a reminder email is saved.
 * ``TENANT_LIFECYCLE_NOTIFICATION`` (scheduled tenant status change): the organization's customer administrators.
 * ``TRIAL_REMINDER`` (scheduler, trial reminders): the person who requested the trial.
+* ``TRIAL_REQUEST_DECLINED`` (``notify_trial_request_declined``): the person who requested the trial.
+* ``INVESTIGATION_ASSIGNED`` (``notify_assignment``): the new assignee.
+* ``DECISION_REVIEW_PENDING`` (``notify_review_pending``): the named approver, else every approver but the submitter.
+* ``SIGNOFF_COMPLETED`` (``notify_signoff_completed``): the case owner.
+* ``RISK_REVIEW_REQUESTED`` (``notify_risk_review_requested``): the named reviewer, else every approver.
+* ``CONNECTOR_SYNC_FAILED`` (``notify_connector_sync_failed``): the organization's customer administrators.
+* ``AI_BUDGET_THRESHOLD`` (``notify_ai_budget_threshold``): the customer administrators, once per month at 80% and at 100%.
+* ``FEEDBACK_SUBMITTED`` (``notify_feedback_submitted``): the MDARIX team (``MDARIX_TRIAL_ALERT_EMAIL``, else
+  ``MDARIX_SUPPORT_EMAIL``).
+* ``SECURITY_NOTICE`` (``notify_security_notice``): the account's owner (auth/security_notices.py builds it).
+* ``SUPPORT_PROBLEM_REPORTED`` (backend/app/support_api.py): the support team.
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -19,10 +36,35 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuthUser, Tenant
 from backend.app.db.models.stage2 import OutboxEvent, SubscriptionLifecycle
-from backend.app.role_codes import CUSTOMER_ADMIN_ALIASES
+from backend.app.role_codes import CUSTOMER_ADMIN_ALIASES, role_code
 
 logger = logging.getLogger("mdarix.notifications")
 TRIAL_STAGES = ("7_DAY", "1_DAY", "ENDED")
+
+INVESTIGATION_ASSIGNED = "INVESTIGATION_ASSIGNED"
+DECISION_REVIEW_PENDING = "DECISION_REVIEW_PENDING"
+SIGNOFF_COMPLETED = "SIGNOFF_COMPLETED"
+RISK_REVIEW_REQUESTED = "RISK_REVIEW_REQUESTED"
+CONNECTOR_SYNC_FAILED = "CONNECTOR_SYNC_FAILED"
+AI_BUDGET_THRESHOLD = "AI_BUDGET_THRESHOLD"
+FEEDBACK_SUBMITTED = "FEEDBACK_SUBMITTED"
+TRIAL_REQUEST_DECLINED = "TRIAL_REQUEST_DECLINED"
+AI_BUDGET_THRESHOLDS = (80, 100)
+# Roles whose holders approve decisions and review risks (backend/app/access/permissions.py).
+APPROVER_ROLES = frozenset({"APPROVER", "LEADER"})
+# The values a saved reminder email may use (Platform Admin > Plans & Licensing > Reminders).
+TEMPLATE_VARIABLES = ("customer_name", "expiry_date", "days_remaining", "activation_link")
+_TEMPLATE_VARIABLE = re.compile(r"\{\{\s*([a-zA-Z_]+)\s*\}\}")
+# What a failed connector run means, for the administrator who reads the email.
+SYNC_FAILURES = {
+    "PROVIDER_READ_FAILED": "The system did not answer, or answered with an error.",
+    "PROVIDER_RESPONSE_TOO_LARGE": "The system returned more data than one sync may read.",
+    "PROVIDER_TENANT_SCOPE_INVALID": "The system returned records for a different organization.",
+    "PROVIDER_NEXT_LINK_REFUSED": "The system's paging pointed to another address.",
+    "PROVIDER_TOO_MANY_PAGES": "The system returned more pages than one sync may read.",
+    "MAPPING_NOT_USABLE": "The released field mapping no longer fits the records.",
+    "IMPORT_BLOCKED": "The records did not pass the import checks.",
+}
 
 
 class NotificationFailed(RuntimeError):
@@ -38,6 +80,17 @@ def _organization(db: Session, tenant_id) -> str:
     return (tenant.display_name or tenant.name) if tenant else "your organization"
 
 
+def _uuid(value) -> uuid.UUID | None:
+    if value is None or value == "":
+        return None
+    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
+def _id(value) -> str | None:
+    parsed = _uuid(value)
+    return str(parsed) if parsed else None
+
+
 def customer_admin_emails(db: Session, tenant_id) -> list[str]:
     normalized = func.upper(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"))
     rows = (
@@ -50,6 +103,83 @@ def customer_admin_emails(db: Session, tenant_id) -> list[str]:
         .all()
     )
     return sorted({row.username for row in rows if row.username})
+
+
+def subscription_reminder_emails(db: Session, tenant_id) -> list[str]:
+    """Who gets the organization's renewal reminders, as its notification settings say.
+
+    The newest active reminder policy names the recipient types (Customer Administration > Notifications); the
+    customer administrators are included when CUSTOMER_ADMIN is one of them, and every active contact saved with one
+    of those types is added. An organization without a policy, or whose settings resolve to nobody, still reaches
+    its customer administrators: a renewal reminder must never go to no one.
+    """
+    from backend.app.db.models.customer_lifecycle import CustomerContact, ReminderPolicyRecipient
+    from backend.app.db.models.stage2 import ReminderPolicy
+
+    policy = (
+        db.query(ReminderPolicy)
+        .filter(ReminderPolicy.tenant_id == tenant_id, func.upper(ReminderPolicy.status) == "ACTIVE")
+        .order_by(ReminderPolicy.updated_at.desc())
+        .first()
+    )
+    types = {str(value).upper() for value in ((policy.recipient_types if policy else None) or ["CUSTOMER_ADMIN"])}
+    emails: set[str] = set()
+    if "CUSTOMER_ADMIN" in types:
+        emails.update(customer_admin_emails(db, tenant_id))
+    contacts = (
+        db.query(CustomerContact.email)
+        .join(ReminderPolicyRecipient, ReminderPolicyRecipient.contact_id == CustomerContact.id)
+        .filter(
+            ReminderPolicyRecipient.tenant_id == tenant_id,
+            func.upper(ReminderPolicyRecipient.status) == "ACTIVE",
+            func.upper(ReminderPolicyRecipient.recipient_type).in_(sorted(types)),
+            func.upper(CustomerContact.status) == "ACTIVE",
+        )
+        .all()
+    )
+    emails.update(row.email.strip().lower() for row in contacts if row.email and "@" in row.email)
+    return sorted(emails) or customer_admin_emails(db, tenant_id)
+
+
+def _fill(text: str, values: dict[str, str]) -> str | None:
+    """A saved template with its values filled in; None when it uses a value MDARIX does not know."""
+    if any(name not in values for name in _TEMPLATE_VARIABLE.findall(text)):
+        return None
+    return _TEMPLATE_VARIABLE.sub(lambda match: values[match.group(1)], text)
+
+
+def reminder_template(
+    db: Session, row: SubscriptionLifecycle, stage: str | None, values: dict[str, str]
+) -> tuple[str, str] | None:
+    """The organization's own reminder email for this reminder, filled in, or None for the standard wording.
+
+    The newest saved email for the reminder's exact stage (for example ``30_DAY``) wins, then the one for the
+    subscription's phase: EXPIRING before the end date, GRACE and EXPIRED after it. Superseded and retired versions
+    are never used. A template that names a value MDARIX cannot fill falls back to the standard wording rather than
+    sending a customer a raw ``{{placeholder}}``.
+    """
+    from backend.app.db.models.stage2 import EmailTemplate
+
+    phase = {"GRACE": "GRACE", "EXPIRED": "EXPIRED"}.get(str(row.status or "").upper(), "EXPIRING")
+    for wanted in [value for value in (stage, phase) if value]:
+        template = (
+            db.query(EmailTemplate)
+            .filter(
+                EmailTemplate.tenant_id == row.tenant_id,
+                EmailTemplate.stage == wanted,
+                func.upper(EmailTemplate.status).in_(["ACTIVE", "DRAFT"]),
+            )
+            .order_by(EmailTemplate.created_at.desc())
+            .first()
+        )
+        if template is None:
+            continue
+        subject, body = _fill(template.subject or "", values), _fill(template.body or "", values)
+        if subject and body and subject.strip() and body.strip():
+            return " ".join(subject.split())[:200], body.strip()
+        logger.warning("Reminder template %s uses an unknown value; the standard wording is used", template.id)
+        return None
+    return None
 
 
 def _deliver(send, recipients: list[str], **details) -> None:
@@ -68,22 +198,455 @@ def _deliver(send, recipients: list[str], **details) -> None:
         raise NotificationFailed(f"{failures} of {len(recipients)} emails could not be delivered")
 
 
+# ------------------------------------------------------------------------------------------- queueing (producers)
+#
+# Every producer takes ``(db, tenant_id, **ids)`` and adds one outbox event to ``db`` (the control-plane session; the
+# caller commits). People may be given as an account id or, where a record only stores it, as the account's email
+# (for example a case's ``owner_ref``): it is resolved to the account id here, inside the organization, so the
+# queue never holds an address. Identifiers a producer does not need (for example ``investigation_id`` on a
+# decision) are accepted and ignored, so callers can pass what they have.
+
+
+def _queue(db: Session, tenant_id, event_name: str, aggregate_type: str, aggregate_id, payload: dict) -> OutboxEvent:
+    tenant = _uuid(tenant_id)
+    event = OutboxEvent(
+        id=uuid.uuid4(),
+        tenant_id=tenant,
+        event_name=event_name,
+        aggregate_type=aggregate_type,
+        aggregate_id=_uuid(aggregate_id),
+        payload={"tenant_id": str(tenant), **payload},
+        occurred_at=datetime.now(timezone.utc),
+    )
+    db.add(event)
+    return event
+
+
+def _user_id(db: Session, tenant_id, value) -> str | None:
+    """An account of the organization given by id or by email, as an id (None when there is no such account)."""
+    if value is None or str(value).strip() == "":
+        return None
+    text = str(value).strip()
+    try:
+        candidate = AuthUser.id == uuid.UUID(text)
+    except ValueError:
+        candidate = func.lower(AuthUser.username) == text.lower()
+    row = db.query(AuthUser.id).filter(AuthUser.tenant_id == _uuid(tenant_id), candidate).first()
+    return str(row[0]) if row else None
+
+
+def _first(refs: dict, *names: str):
+    return next((refs[name] for name in names if refs.get(name) not in (None, "")), None)
+
+
+def _label(value) -> str | None:
+    """A record's human reference (case or risk number) for the email; never longer than a reference is."""
+    text = " ".join(str(value or "").split())
+    return text[:120] or None
+
+
+def notify_assignment(db: Session, tenant_id, *, investigation_id, **refs) -> OutboxEvent | None:
+    """Tell a person an investigation was assigned to them (nothing when they assigned it to themselves).
+
+    ``assignee_user_id`` (or ``assignee_ref``/``assignee``: id or email), optional ``assigned_by_user_id`` (or
+    ``assigned_by``) and ``reference`` (the case number shown in the email).
+    """
+    assignee = _user_id(db, tenant_id, _first(refs, "assignee_user_id", "assignee_ref", "assignee"))
+    actor = _user_id(db, tenant_id, _first(refs, "assigned_by_user_id", "assigned_by", "actor_user_id"))
+    if assignee is None or assignee == actor:
+        return None
+    return _queue(
+        db,
+        tenant_id,
+        INVESTIGATION_ASSIGNED,
+        "Investigation",
+        investigation_id,
+        {
+            "investigation_id": _id(investigation_id),
+            "assignee_user_id": assignee,
+            "assigned_by_user_id": actor,
+            "reference": _label(_first(refs, "reference", "investigation_identifier")),
+        },
+    )
+
+
+def notify_review_pending(db: Session, tenant_id, *, decision_id, **refs) -> OutboxEvent:
+    """Tell the approver (``approver_user_id``) or, when none is named, every approver except the person who asked
+    (``submitted_by_user_id`` or ``requested_by``) that a decision awaits their approval."""
+    return _queue(
+        db,
+        tenant_id,
+        DECISION_REVIEW_PENDING,
+        "Decision",
+        decision_id,
+        {
+            "decision_id": _id(decision_id),
+            "submitted_by_user_id": _user_id(db, tenant_id, _first(refs, "submitted_by_user_id", "requested_by")),
+            "approver_user_id": _user_id(db, tenant_id, _first(refs, "approver_user_id", "approver_ref")),
+            "reference": _label(_first(refs, "reference", "investigation_identifier")),
+        },
+    )
+
+
+def notify_signoff_completed(db: Session, tenant_id, *, decision_id, **refs) -> OutboxEvent | None:
+    """Tell the case owner (``owner_user_id``, or ``owner_ref``: id or email) that the decision on their case was
+    signed (``decision``: APPROVE or REJECT), unless they signed it themselves (``signed_by_user_id``/
+    ``signer_user_id``)."""
+    owner = _user_id(db, tenant_id, _first(refs, "owner_user_id", "owner_ref", "owner"))
+    signer = _user_id(db, tenant_id, _first(refs, "signed_by_user_id", "signer_user_id", "signed_by"))
+    if owner is None or owner == signer:
+        return None
+    outcome = str(refs.get("decision") or "").upper()
+    return _queue(
+        db,
+        tenant_id,
+        SIGNOFF_COMPLETED,
+        "Decision",
+        decision_id,
+        {
+            "decision_id": _id(decision_id),
+            "owner_user_id": owner,
+            "signed_by_user_id": signer,
+            "decision": outcome if outcome in {"APPROVE", "REJECT"} else None,
+            "reference": _label(_first(refs, "reference", "investigation_identifier")),
+        },
+    )
+
+
+def notify_risk_review_requested(db: Session, tenant_id, *, risk_id, **refs) -> OutboxEvent:
+    """Tell the named reviewer (``reviewer_user_id``) or, when none is named, every approver except the requester
+    (``requested_by_user_id``/``requested_by``) that a risk (``risk_identifier`` or ``reference``) needs review.
+    The requester's free-text reason stays in the audit trail; it is not copied into the queue."""
+    return _queue(
+        db,
+        tenant_id,
+        RISK_REVIEW_REQUESTED,
+        "Risk",
+        risk_id,
+        {
+            "risk_id": _id(risk_id),
+            "requested_by_user_id": _user_id(db, tenant_id, _first(refs, "requested_by_user_id", "requested_by")),
+            "reviewer_user_id": _user_id(db, tenant_id, _first(refs, "reviewer_user_id", "reviewer_ref")),
+            "reference": _label(_first(refs, "reference", "risk_identifier")),
+        },
+    )
+
+
+def notify_connector_sync_failed(db: Session, tenant_id, *, connector_id, failure: str, **_refs) -> OutboxEvent:
+    """Tell the customer administrators a scheduled connector sync failed (``failure`` is a code, never a message
+    from the customer's system)."""
+    return _queue(
+        db,
+        tenant_id,
+        CONNECTOR_SYNC_FAILED,
+        "ConnectorConfiguration",
+        connector_id,
+        {"connector_id": _id(connector_id), "failure": re.sub(r"[^A-Z0-9_]", "", str(failure).upper())[:80]},
+    )
+
+
+def notify_ai_budget_threshold(
+    db: Session, tenant_id, *, percent: int, month: str | None = None, tokens_used=None, budget=None, **_refs
+) -> OutboxEvent | None:
+    """Tell the customer administrators the organization reached 80% or 100% of its monthly AI budget.
+
+    Idempotent: one email per organization, month (``YYYY-MM``, default the current one) and threshold, however
+    often the caller reports the same crossing. Returns None when it was already queued.
+    """
+    percent = int(percent)
+    if percent not in AI_BUDGET_THRESHOLDS:
+        raise ValueError(f"AI budget alerts are sent at {AI_BUDGET_THRESHOLDS} percent")
+    month = month or datetime.now(timezone.utc).strftime("%Y-%m")
+    if not re.fullmatch(r"\d{4}-\d{2}", month):
+        raise ValueError("month must be YYYY-MM")
+    already = (
+        db.query(OutboxEvent.id)
+        .filter(
+            OutboxEvent.tenant_id == _uuid(tenant_id),
+            OutboxEvent.event_name == AI_BUDGET_THRESHOLD,
+            OutboxEvent.payload["month"].as_string() == month,
+            OutboxEvent.payload["percent"].as_integer() == percent,
+        )
+        .first()
+    )
+    if already:
+        return None
+    return _queue(
+        db,
+        tenant_id,
+        AI_BUDGET_THRESHOLD,
+        "Tenant",
+        tenant_id,
+        {
+            "percent": percent,
+            "month": month,
+            "tokens_used": int(tokens_used) if tokens_used is not None else None,
+            "budget": int(budget) if budget is not None else None,
+        },
+    )
+
+
+notify_ai_budget = notify_ai_budget_threshold  # shorter name, same function
+
+
+def notify_feedback_submitted(db: Session, tenant_id, *, feedback_id, **_refs) -> OutboxEvent:
+    """Tell the MDARIX team a customer sent feedback (the worker reads the response itself)."""
+    return _queue(db, tenant_id, FEEDBACK_SUBMITTED, "TrialFeedback", feedback_id, {"feedback_id": _id(feedback_id)})
+
+
+def notify_trial_request_declined(db: Session, tenant_id, *, request_id, **_refs) -> OutboxEvent:
+    """Tell a trial requester, politely, that the request was declined (``tenant_id``: the reviewing admin's)."""
+    return _queue(
+        db, tenant_id, TRIAL_REQUEST_DECLINED, "OnboardingRequest", request_id, {"request_id": _id(request_id)}
+    )
+
+
+def notify_security_notice(db: Session, tenant_id, *, user_id, kind: str, **_refs) -> OutboxEvent | None:
+    """Tell a person the way they sign in changed (auth/security_notices.py: kinds, wording, delivery)."""
+    from auth.security_notices import queue_security_notice
+
+    user = db.query(AuthUser).filter(AuthUser.id == _uuid(user_id), AuthUser.tenant_id == _uuid(tenant_id)).first()
+    if user is None:
+        return None
+    return queue_security_notice(db, user, kind)
+
+
+# ------------------------------------------------------------------------------------------- delivery (worker)
+
+
+def _active_user(db: Session, tenant_id, user_id) -> AuthUser | None:
+    if not user_id:
+        return None
+    return (
+        db.query(AuthUser)
+        .filter(
+            AuthUser.id == _uuid(user_id),
+            AuthUser.tenant_id == _uuid(tenant_id),
+            func.upper(AuthUser.status) == "ACTIVE",
+        )
+        .first()
+    )
+
+
+def _name(db: Session, tenant_id, user_id) -> str | None:
+    """A colleague's display name (never their address) for the email body."""
+    if not user_id:
+        return None
+    user = db.query(AuthUser).filter(AuthUser.id == _uuid(user_id), AuthUser.tenant_id == _uuid(tenant_id)).first()
+    if user is None:
+        return None
+    return (user.display_name or "").strip() or None
+
+
+def approver_emails(db: Session, tenant_id, *, exclude_user_id=None) -> list[str]:
+    """Active approvers and leaders of the organization (their role assignment, else their account role)."""
+    from backend.app.access.permissions import role_of_user
+
+    users = (
+        db.query(AuthUser).filter(AuthUser.tenant_id == _uuid(tenant_id), func.upper(AuthUser.status) == "ACTIVE").all()
+    )
+    excluded = _id(exclude_user_id)
+    return sorted(
+        {
+            user.username
+            for user in users
+            if user.username and str(user.id) != excluded and role_code(role_of_user(db, user)) in APPROVER_ROLES
+        }
+    )
+
+
+def _one_or_approvers(db: Session, tenant_id, named_user_id, actor_user_id) -> list[str]:
+    if named_user_id:
+        user = _active_user(db, tenant_id, named_user_id)
+        return [user.username] if user and user.username else []
+    return approver_emails(db, tenant_id, exclude_user_id=actor_user_id)
+
+
+def _reference(payload: dict, key: str) -> str:
+    return payload.get("reference") or f"#{str(payload.get(key) or '')[:8]}"
+
+
+def _staff_alert_address() -> str:
+    return (os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or os.getenv("MDARIX_SUPPORT_EMAIL") or "").strip()
+
+
+def _subscription_reminder(db: Session, payload: dict, emailer) -> None:
+    row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
+    if row is None:
+        return
+    organization = _organization(db, row.tenant_id)
+    days_left = max(0, (row.expires_at - datetime.now(timezone.utc)).days)
+    expires_on = _long_date(row.expires_at)
+    from auth.emailer import company
+
+    template = reminder_template(
+        db,
+        row,
+        payload.get("stage"),
+        {
+            "customer_name": organization,
+            "expiry_date": expires_on,
+            "days_remaining": str(days_left),
+            "activation_link": f"{company().app_url}/app",
+        },
+    )
+    _deliver(
+        lambda recipient, **kw: emailer.send_subscription_reminder(recipient, **kw),
+        subscription_reminder_emails(db, row.tenant_id),
+        organization=organization,
+        expires_on=expires_on,
+        days_left=days_left,
+        template=template,
+    )
+
+
+def _trial_reminder(db: Session, payload: dict, emailer) -> None:
+    from backend.app.trial.team import trial_request
+
+    row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
+    request = trial_request(db, row.tenant_id) if row is not None else None
+    if row is None or request is None:
+        return
+    organization = _organization(db, row.tenant_id)
+    delete_on = _long_date(row.expires_at + timedelta(days=30))
+    if payload.get("stage") == "ENDED":
+        _deliver(
+            lambda recipient, **kw: emailer.send_trial_ended(recipient, **kw),
+            [request.email],
+            organization=organization,
+            delete_on=delete_on,
+        )
+        return
+    _deliver(
+        lambda recipient, **kw: emailer.send_trial_reminder(recipient, **kw),
+        [request.email],
+        organization=organization,
+        days_left=max(0, (row.expires_at - datetime.now(timezone.utc)).days),
+        ends_on=_long_date(row.expires_at),
+        delete_on=delete_on,
+    )
+
+
+def _trial_declined(db: Session, payload: dict, emailer) -> None:
+    from backend.app.db.models.stage2 import OnboardingRequest
+
+    row = db.get(OnboardingRequest, uuid.UUID(str(payload["request_id"])))
+    if row is None or row.status != "DECLINED":  # withdrawn or reconsidered meanwhile
+        return
+    _deliver(
+        lambda recipient, **kw: emailer.send_trial_request_declined(recipient, **kw),
+        [row.email],
+        display_name=row.display_name,
+        organization=row.organization,
+    )
+
+
+def _feedback(db: Session, payload: dict, emailer) -> None:
+    from backend.app.db.models.stage2 import TrialFeedback
+
+    recipient = _staff_alert_address()
+    row = db.get(TrialFeedback, uuid.UUID(str(payload["feedback_id"])))
+    if row is None:
+        return
+    if not recipient:
+        logger.warning(
+            "No MDARIX_TRIAL_ALERT_EMAIL or MDARIX_SUPPORT_EMAIL; feedback %s was stored unannounced", row.id
+        )
+        return
+    _deliver(
+        lambda to, **kw: emailer.send_feedback_alert(to, **kw),
+        [recipient],
+        organization=row.organization_name,
+        rating=row.rating_overall,
+        recommend_score=row.recommend_score,
+        consent=row.publish_consent,
+        contact_ok=bool(row.contact_ok),
+    )
+
+
+def _connector_failed(db: Session, payload: dict, emailer) -> None:
+    from backend.app.db.models.foundation import ConnectorConfiguration
+
+    tenant_id = _uuid(payload["tenant_id"])
+    row = (
+        db.query(ConnectorConfiguration)
+        .filter(
+            ConnectorConfiguration.id == _uuid(payload["connector_id"]), ConnectorConfiguration.tenant_id == tenant_id
+        )
+        .first()
+    )
+    if row is None:
+        return
+    code = str(payload.get("failure") or "")
+    _deliver(
+        lambda recipient, **kw: emailer.send_connector_sync_failed_notice(recipient, **kw),
+        customer_admin_emails(db, tenant_id),
+        organization=_organization(db, tenant_id),
+        connection=row.code,
+        failure=SYNC_FAILURES.get(code, f"The sync stopped ({code or 'unknown reason'})."),
+    )
+
+
+def _ai_budget(db: Session, payload: dict, emailer) -> None:
+    tenant_id = _uuid(payload["tenant_id"])
+    month = datetime.strptime(str(payload["month"]), "%Y-%m")
+    _deliver(
+        lambda recipient, **kw: emailer.send_ai_budget_notice(recipient, **kw),
+        customer_admin_emails(db, tenant_id),
+        organization=_organization(db, tenant_id),
+        percent=int(payload["percent"]),
+        month=f"{month:%B %Y}",
+        tokens_used=payload.get("tokens_used"),
+        budget=payload.get("budget"),
+    )
+
+
+def _personal(db: Session, tenant_id, user_id) -> list[str]:
+    user = _active_user(db, tenant_id, user_id)
+    return [user.username] if user and user.username else []
+
+
+def _work_notice(db: Session, event_name: str, payload: dict, emailer) -> None:
+    """Assignment, review, sign-off and risk-review emails: who gets them and what they say about whom."""
+    tenant_id = _uuid(payload["tenant_id"])
+    get = payload.get
+    if event_name == INVESTIGATION_ASSIGNED:
+        recipients = _personal(db, tenant_id, get("assignee_user_id"))
+        send = emailer.send_assignment_notice
+        details = {"reference": _reference(payload, "investigation_id"), "assigned_by": get("assigned_by_user_id")}
+    elif event_name == DECISION_REVIEW_PENDING:
+        recipients = _one_or_approvers(db, tenant_id, get("approver_user_id"), get("submitted_by_user_id"))
+        send = emailer.send_review_pending_notice
+        details = {"reference": _reference(payload, "decision_id"), "submitted_by": get("submitted_by_user_id")}
+    elif event_name == SIGNOFF_COMPLETED:
+        recipients = _personal(db, tenant_id, get("owner_user_id"))
+        send = emailer.send_signoff_completed_notice
+        details = {"reference": _reference(payload, "decision_id"), "signed_by": get("signed_by_user_id")}
+        details["decision"] = get("decision")
+    else:  # RISK_REVIEW_REQUESTED
+        recipients = _one_or_approvers(db, tenant_id, get("reviewer_user_id"), get("requested_by_user_id"))
+        send = emailer.send_risk_review_requested_notice
+        details = {"reference": _reference(payload, "risk_id"), "requested_by": get("requested_by_user_id")}
+    # The colleague who acted is named by display name, looked up now (the payload has their id only).
+    names = {"assigned_by", "submitted_by", "signed_by", "requested_by"}
+    details = {key: (_name(db, tenant_id, value) if key in names else value) for key, value in details.items()}
+    _deliver(
+        lambda recipient, **kw: send(recipient, **kw),
+        recipients,
+        organization=_organization(db, tenant_id),
+        **details,
+    )
+
+
+WORK_EVENTS = (INVESTIGATION_ASSIGNED, DECISION_REVIEW_PENDING, SIGNOFF_COMPLETED, RISK_REVIEW_REQUESTED)
+
+
 def handle_event(db: Session, event_name: str, payload: dict) -> bool:
     """Send the notification for one outbox event. False when the event is not a notification."""
     from auth import emailer
 
     if event_name == "SUBSCRIPTION_REMINDER":
-        row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
-        if row is None:
-            return True
-        days_left = max(0, (row.expires_at - datetime.now(timezone.utc)).days)
-        _deliver(
-            lambda recipient, **kw: emailer.send_subscription_reminder(recipient, **kw),
-            customer_admin_emails(db, row.tenant_id),
-            organization=_organization(db, row.tenant_id),
-            expires_on=_long_date(row.expires_at),
-            days_left=days_left,
-        )
+        _subscription_reminder(db, payload, emailer)
         return True
     if event_name == "TENANT_LIFECYCLE_NOTIFICATION":
         tenant_id = uuid.UUID(str(payload["tenant_id"]))
@@ -96,30 +659,35 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         )
         return True
     if event_name == "TRIAL_REMINDER":
-        from backend.app.trial.team import trial_request
+        _trial_reminder(db, payload, emailer)
+        return True
+    if event_name == TRIAL_REQUEST_DECLINED:
+        _trial_declined(db, payload, emailer)
+        return True
+    if event_name in WORK_EVENTS:
+        _work_notice(db, event_name, payload, emailer)
+        return True
+    if event_name == CONNECTOR_SYNC_FAILED:
+        _connector_failed(db, payload, emailer)
+        return True
+    if event_name == AI_BUDGET_THRESHOLD:
+        _ai_budget(db, payload, emailer)
+        return True
+    if event_name == FEEDBACK_SUBMITTED:
+        _feedback(db, payload, emailer)
+        return True
+    from auth.security_notices import handle_security_notice
 
-        row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
-        request = trial_request(db, row.tenant_id) if row is not None else None
-        if row is None or request is None:
-            return True
-        organization = _organization(db, row.tenant_id)
-        delete_on = _long_date(row.expires_at + timedelta(days=30))
-        if payload.get("stage") == "ENDED":
-            _deliver(
-                lambda recipient, **kw: emailer.send_trial_ended(recipient, **kw),
-                [request.email],
-                organization=organization,
-                delete_on=delete_on,
-            )
-        else:
-            _deliver(
-                lambda recipient, **kw: emailer.send_trial_reminder(recipient, **kw),
-                [request.email],
-                organization=organization,
-                days_left=max(0, (row.expires_at - datetime.now(timezone.utc)).days),
-                ends_on=_long_date(row.expires_at),
-                delete_on=delete_on,
-            )
+    if handle_security_notice(db, event_name, payload):
+        return True
+    if event_name == "SUPPORT_PROBLEM_REPORTED":
+        # scripts/run_outbox_worker.py hands this event to support_api directly; any other worker path ends here.
+        from backend.app.support_api import deliver_problem_report
+
+        try:
+            deliver_problem_report(db, payload)
+        except emailer.EmailDeliveryError as exc:
+            raise NotificationFailed("problem report could not be delivered") from exc
         return True
     return False
 

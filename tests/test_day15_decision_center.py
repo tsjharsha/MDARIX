@@ -113,43 +113,49 @@ def _role_may_approve(tenant_id, role_name: str):
 
 
 def test_human_decision_requires_rationale_and_review():
-    investigation, _, _ = primary_investigation()
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.session import SessionLocal
+
+    investigation, tenant_id, _ = primary_investigation()
     missing = client.post(
         f"/api/v1/investigations/{investigation}/decisions",
         json={"selected_action": "NO_DECISION_YET", "authorized_by_ref": "reviewer", "temporal_mode": "current"},
     )
     assert missing.status_code == 422
-    created = client.post(
-        f"/api/v1/investigations/{investigation}/decisions",
-        json={
-            "selected_action": "NO_DECISION_YET",
-            "rationale": "Material unknowns remain; additional evidence is required.",
-            "authorized_by_ref": "reviewer",
-            "temporal_mode": "current",
-        },
-    )
-    assert created.status_code == 200
-    decision_id = created.json()["id"]
-    assert created.json()["decision_status"] == "REQUIRES_REVIEW"
-    # The author cannot approve their own decision (segregation of duties), even when their role may approve.
-    with _role_may_approve(primary_investigation()[1], "Administrator"):
-        own = client.post(
-            f"/api/v1/investigations/decisions/{decision_id}/reviews",
-            json={"disposition": "APPROVED", "reviewer_ref": "reviewer", "comments": "Human review completed."},
-        )
-    assert own.status_code == 403
-    assert own.json()["detail"]["code"] == "SOD_DENIED"
-    # ...a different user holding approval authority can.
-    from backend.app.db.models.foundation import Tenant
-    from backend.app.db.session import SessionLocal
-
     db = SessionLocal()
     try:
-        tenant = db.query(Tenant).filter(Tenant.id == primary_investigation()[1]).one()
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).one()
+        author = _client_for(db, _user(db, tenant, "Approver", "day15-author"))
         approver = _client_for(db, _user(db, tenant, "Approver", "day15-approver"))
         db.commit()
     finally:
         db.close()
+    created = author.post(
+        f"/api/v1/investigations/{investigation}/decisions",
+        json={
+            "selected_action": "NO_DECISION_YET",
+            "rationale": "Material unknowns remain; additional evidence is required.",
+            "temporal_mode": "current",
+        },
+    )
+    assert created.status_code == 200, created.text
+    decision_id = created.json()["id"]
+    assert created.json()["decision_status"] == "REQUIRES_REVIEW"
+    # The author cannot approve their own decision (segregation of duties), although their role may approve...
+    own = author.post(
+        f"/api/v1/investigations/decisions/{decision_id}/reviews",
+        json={"disposition": "APPROVED", "comments": "Human review completed."},
+    )
+    assert own.status_code == 403
+    assert own.json()["detail"]["code"] == "SOD_DENIED"
+    # ...an administrator never signs, even with an approval authority naming their role...
+    with _role_may_approve(tenant_id, "Administrator"):
+        admin = client.post(
+            f"/api/v1/investigations/decisions/{decision_id}/reviews",
+            json={"disposition": "APPROVED", "comments": "Human review completed."},
+        )
+    assert admin.status_code == 403 and admin.json()["detail"]["code"] == "ADMINISTRATOR_CANNOT_SIGN"
+    # ...and a different user holding approval authority can.
     review = approver.post(
         f"/api/v1/investigations/decisions/{decision_id}/reviews",
         json={"disposition": "APPROVED", "comments": "Human review completed."},
@@ -161,3 +167,33 @@ def test_human_decision_requires_rationale_and_review():
 def test_invalid_investigation_and_tenant_scoping():
     invalid = client.get(f"/api/v1/investigations/{uuid.uuid4()}/decision-context")
     assert invalid.status_code == 404
+
+
+def test_a_new_decision_tells_the_approvers_it_awaits_them():
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.notifications import DECISION_REVIEW_PENDING
+
+    investigation, _, _ = primary_investigation()
+    created = client.post(
+        f"/api/v1/investigations/{investigation}/decisions",
+        json={
+            "selected_action": "NO_DECISION_YET",
+            "rationale": "Comparative testing is still missing; approvers must review.",
+            "temporal_mode": "current",
+        },
+    )
+    assert created.status_code == 200, created.text
+    decision_id = uuid.UUID(created.json()["id"])
+    with SessionLocal() as db:
+        bind_system(db, "test: the review-pending notification")
+        events = (
+            db.query(OutboxEvent)
+            .filter(OutboxEvent.event_name == DECISION_REVIEW_PENDING, OutboxEvent.aggregate_id == decision_id)
+            .all()
+        )
+        assert len(events) == 1 and "@" not in str(events[0].payload)
+        for event in events:
+            db.delete(event)
+        db.commit()

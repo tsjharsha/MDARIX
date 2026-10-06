@@ -99,6 +99,19 @@ def _alert(display_name: str, email: str, phone: str) -> None:
         logging.getLogger(__name__).warning("Demo request alert failed: %s", type(exc).__name__)
 
 
+def _acknowledge(display_name: str, email: str) -> None:
+    """Confirm to the visitor that the request arrived. Runs after the response; failures are only logged.
+
+    Sent once per stored request: a repeat while the request is open, and an automated submission, get none.
+    """
+    from auth.emailer import send_demo_request_acknowledgement
+
+    try:
+        send_demo_request_acknowledgement(email, display_name=display_name)
+    except Exception as exc:  # the request is already saved; the visitor has had their answer
+        logging.getLogger(__name__).warning("Demo request acknowledgement failed: %s", type(exc).__name__)
+
+
 @router.post("/public/demo-requests")
 def submit_demo_request(
     payload: DemoRequestIn, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)
@@ -150,6 +163,7 @@ def submit_demo_request(
     )
     db.commit()
     background.add_task(_alert, name, email, phone)
+    background.add_task(_acknowledge, name, email)
     return _accepted()
 
 

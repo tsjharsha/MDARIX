@@ -228,7 +228,10 @@ def test_support_access_and_operations_are_readable(platform, customer):
     operations = platform.get("/api/v1/platform-admin/console/operations").json()
     assert operations["database"] == "OK"
     assert {"pending", "dead_lettered", "pending_by_event"} <= set(operations["queue"])
-    assert operations["email"]["reminder_delivery"] == "NOT_CONNECTED"
+    # Reminders are delivered by the outbox worker; the console says so only when email can actually be sent.
+    expected = "CONNECTED" if operations["email"]["configured"] else "EMAIL_NOT_CONFIGURED"
+    assert operations["email"]["reminder_delivery"] == expected
+    assert isinstance(operations["email"]["reminders_dead_lettered"], int)
 
 
 @pytest.mark.parametrize(

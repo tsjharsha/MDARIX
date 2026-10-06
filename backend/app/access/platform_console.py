@@ -584,8 +584,12 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
             "present": smtp.get("present", {}),
             "sender_domain_verified": bool(smtp.get("sender_domain_verified")),
             "reminders_pending": pending.filter(OutboxEvent.event_name == "SUBSCRIPTION_REMINDER").count(),
-            # Nothing consumes queued subscription reminders yet, so none are delivered.
-            "reminder_delivery": "NOT_CONNECTED",
+            "reminders_dead_lettered": outbox.filter(
+                OutboxEvent.event_name == "SUBSCRIPTION_REMINDER", OutboxEvent.dead_lettered_at.is_not(None)
+            ).count(),
+            # The outbox worker emails queued reminders (backend/app/notifications.py); without SMTP it acknowledges
+            # them without sending, so delivery is only CONNECTED when email is configured.
+            "reminder_delivery": "CONNECTED" if smtp.get("configured") else "EMAIL_NOT_CONFIGURED",
         },
     }
 

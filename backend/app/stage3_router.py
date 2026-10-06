@@ -5,15 +5,17 @@ not invent conclusions or move business data into the browser; all results
 are scoped by the authenticated request context.
 """
 
+import uuid
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.access.trends import daily, window
 from backend.app.db.models.foundation import AIExecution
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1", tags=["Stage 3 Experience"])
@@ -341,77 +343,170 @@ def persona_dashboard(
     }
 
 
+STORY_STAGES = (
+    ("product", "Product"),
+    ("product_version", "ProductVersion"),
+    ("signal", "Signal"),
+    ("investigation", "Investigation"),
+    ("evidence", "Evidence"),
+    ("analysis", "Analysis"),
+    ("hypotheses", "Hypotheses"),
+    ("unknowns", "Unknowns"),
+    ("failure_chain", "Failure Chain"),
+    ("scenario", "Scenario"),
+    ("decision", "Decision"),
+    ("assurance", "AI Assurance"),
+    ("audit", "Audit"),
+)
+
+
+def _story_counts(db: Session, control_db: Session, tenant_id: uuid.UUID, case) -> dict[str, int]:
+    """How many records of each story stage the case has, read from the tenant's own data (signed decisions and the
+    audit trail from the control plane)."""
+    from backend.app.db.models.foundation import (
+        AssuranceResult,
+        AuditEvent,
+        Complaint,
+        Decision,
+        Evidence,
+        FailureChain,
+        Hypothesis,
+        InvestigationComplaint,
+        InvestigationEvidence,
+        Product,
+        Scenario,
+        SignedApprovalRecord,
+        Unknown,
+    )
+
+    complaint_ids = db.query(InvestigationComplaint.complaint_id).filter(
+        InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.investigation_id == case.id
+    )
+    linked_evidence = db.query(InvestigationEvidence.evidence_id).filter(
+        InvestigationEvidence.tenant_id == tenant_id, InvestigationEvidence.investigation_id == case.id
+    )
+    executions = db.query(AIExecution.id).filter(
+        AIExecution.tenant_id == tenant_id, AIExecution.investigation_id == case.id, AIExecution.error_state.is_(None)
+    )
+    decision_ids = [
+        row.id
+        for row in db.query(Decision.id).filter(Decision.tenant_id == tenant_id, Decision.investigation_id == case.id)
+    ]
+    signed = (
+        control_db.query(func.count(func.distinct(SignedApprovalRecord.object_id)))
+        .filter(
+            SignedApprovalRecord.tenant_id == tenant_id,
+            SignedApprovalRecord.object_id.in_(decision_ids),
+            SignedApprovalRecord.status == "SIGNED",
+        )
+        .scalar()
+        if decision_ids
+        else 0
+    )
+    product = (
+        db.query(Product.id).filter(Product.tenant_id == tenant_id, Product.id == case.product_id).count()
+        if case.product_id
+        else 0
+    )
+    return {
+        "product": product,
+        "product_version": db.query(func.count(func.distinct(Complaint.product_version_id)))
+        .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(complaint_ids))
+        .scalar()
+        or 0,
+        "signal": complaint_ids.count(),
+        "investigation": 1,
+        "evidence": db.query(Evidence.id)
+        .filter(
+            Evidence.tenant_id == tenant_id, or_(Evidence.investigation_id == case.id, Evidence.id.in_(linked_evidence))
+        )
+        .count(),
+        "analysis": executions.count(),
+        "hypotheses": db.query(Hypothesis.id)
+        .filter(Hypothesis.tenant_id == tenant_id, Hypothesis.investigation_id == case.id)
+        .count(),
+        "unknowns": db.query(Unknown.id)
+        .filter(Unknown.tenant_id == tenant_id, Unknown.investigation_id == case.id)
+        .count(),
+        "failure_chain": db.query(FailureChain.id)
+        .filter(FailureChain.tenant_id == tenant_id, FailureChain.investigation_id == case.id)
+        .count(),
+        "scenario": db.query(Scenario.id)
+        .filter(Scenario.tenant_id == tenant_id, Scenario.investigation_id == case.id)
+        .count(),
+        "decision": len(decision_ids),
+        "decision_signed": int(signed or 0),
+        "assurance": db.query(AssuranceResult.id)
+        .filter(AssuranceResult.tenant_id == tenant_id, AssuranceResult.ai_execution_id.in_(executions))
+        .count(),
+        "audit": control_db.query(AuditEvent.id)
+        .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.entity_id.in_([case.id, *decision_ids]))
+        .count(),
+    }
+
+
+def _stage_status(key: str, counts: dict[str, int]) -> str:
+    """COMPLETE only for a decision with a valid signature; AVAILABLE when the stage has records; PENDING otherwise."""
+    if key == "decision" and counts.get("decision_signed"):
+        return "COMPLETE"
+    return "AVAILABLE" if counts.get(key) else "PENDING"
+
+
 @router.get("/story/{investigation_id}")
 def story_view(
     investigation_id: str,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    exists = db.execute(
-        text("SELECT 1 FROM investigations WHERE id = :id AND tenant_id = :tenant_id"),
-        {"id": investigation_id, "tenant_id": ctx.tenant_id},
-    ).first()
-    if not exists:
+    """The case's story, stage by stage, with each stage's status computed from the case's records: AVAILABLE when
+    it has records (evidence, an analysis, hypotheses, ...), COMPLETE for a signed decision, PENDING otherwise."""
+    from backend.app.db.models.foundation import Investigation
+
+    try:
+        case_id = uuid.UUID(str(investigation_id))
+    except ValueError:
+        case_id = None  # not an id at all: the same answer as an unknown or foreign case
+    tenant_id = uuid.UUID(str(ctx.tenant_id)) if case_id else None
+    case = (
+        db.query(Investigation).filter(Investigation.id == case_id, Investigation.tenant_id == tenant_id).first()
+        if case_id
+        else None
+    )
+    if case is None:
         return {
             "status": "NOT_FOUND",
             "investigation_id": investigation_id,
             "tenant_id": ctx.tenant_id,
             "message": "Investigation is not available for this tenant.",
         }
+    counts = _story_counts(db, control_db, tenant_id, case)
     return {
         "status": "READY_FOR_REVIEW",
         "investigation_id": investigation_id,
         "tenant_id": ctx.tenant_id,
         "stages": [
-            {
-                "key": key,
-                "label": label,
-                "status": "AVAILABLE"
-                if key in {"product", "investigation", "evidence", "analysis"}
-                else "REVIEW_REQUIRED",
-            }
-            for key, label in [
-                ("product", "Product"),
-                ("product_version", "ProductVersion"),
-                ("signal", "Signal"),
-                ("investigation", "Investigation"),
-                ("evidence", "Evidence"),
-                ("analysis", "Analysis"),
-                ("hypotheses", "Hypotheses"),
-                ("unknowns", "Unknowns"),
-                ("failure_chain", "Failure Chain"),
-                ("scenario", "Scenario"),
-                ("decision", "Decision"),
-                ("assurance", "AI Assurance"),
-                ("audit", "Audit"),
-            ]
+            {"key": key, "label": label, "status": _stage_status(key, counts), "count": counts.get(key, 0)}
+            for key, label in STORY_STAGES
         ],
         "human_review_required": True,
         "causality_state": "NOT_ESTABLISHED",
-        "limitations": ["The story view is a traceability view; relationships are not causal conclusions."],
+        "limitations": [
+            "The story view is a traceability view; relationships are not causal conclusions.",
+            "A stage is AVAILABLE when the case has records for it; only a signed decision is COMPLETE.",
+        ],
     }
 
 
 @router.get("/reports/catalog")
 def reports_catalog(ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """The twelve governed reports (reports/service.py:REPORTS), each with the organization's own records."""
+    from reports.service import REPORTS
+
     return {
         "tenant_id": ctx.tenant_id,
         "reports": [
-            {"code": code, "label": label, "formats": ["JSON", "CSV", "PDF"]}
-            for code, label in [
-                ("PRODUCT_INTELLIGENCE", "Product Intelligence Report"),
-                ("PRODUCT_VERSION_IMPACT", "ProductVersion Impact Report"),
-                ("COMPLAINT_TREND", "Complaint Trend Report"),
-                ("SIGNAL_ASSESSMENT", "Signal Assessment Report"),
-                ("INVESTIGATION", "Investigation Report"),
-                ("EVIDENCE_PROVENANCE", "Evidence & Provenance Report"),
-                ("RISK_IMPACT", "Risk Impact Report"),
-                ("SCENARIO_COMPARISON", "Scenario Comparison Report"),
-                ("DECISION_BRIEF", "Decision Brief"),
-                ("AI_ASSURANCE", "AI Assurance Report"),
-                ("AUDIT_APPROVAL", "Audit & Approval Report"),
-                ("EXECUTIVE_QUALITY_REVIEW", "Executive Quality Review"),
-            ]
+            {"code": code, "label": label, "formats": ["JSON", "CSV", "PDF"]} for code, label in REPORTS.items()
         ],
         "human_review_required": True,
     }
@@ -444,12 +539,33 @@ def agent_catalog(ctx: AuthenticatedRequestContext = Depends(get_request_context
 
 
 @router.get("/ai/assurance/summary")
-def assurance_summary(ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def assurance_summary(
+    db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+):
+    """The organization's AI executions and how MDARIX's assurance checks judged them (AssuranceResult records)."""
+    from backend.app.db.models.foundation import AssuranceResult
+
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    by_status = dict(
+        db.query(AssuranceResult.status, func.count())
+        .filter(AssuranceResult.tenant_id == tenant_id)
+        .group_by(AssuranceResult.status)
+        .all()
+    )
     return {
         "tenant_id": ctx.tenant_id,
-        "metrics": {"total_executions": 0, "pass": 0, "pass_with_limitations": 0, "blocked": 0},
+        "metrics": {
+            "total_executions": db.query(AIExecution.id).filter(AIExecution.tenant_id == tenant_id).count(),
+            "assessed": sum(int(count) for count in by_status.values()),
+            "pass": int(by_status.get("PASS", 0)),
+            "pass_with_limitations": int(by_status.get("PASS_WITH_LIMITATIONS", 0)),
+            "blocked": int(by_status.get("BLOCKED", 0)),
+        },
         "guardrails": {"tenant_scope": "ENFORCED", "causality_restraint": "ENFORCED", "human_review": "REQUIRED"},
-        "limitations": ["Execution metrics are populated from persisted AIExecution records when present."],
+        "limitations": [
+            "Metrics count the organization's persisted AI executions and their assurance results; an execution "
+            "without an assurance result is not counted as passed."
+        ],
     }
 
 

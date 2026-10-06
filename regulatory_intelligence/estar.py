@@ -67,8 +67,11 @@ def generate_estar_package(
     ET.SubElement(root, f"{{{NS}}}documentVersion").text = str(document_version)
     sections_node = ET.SubElement(root, f"{{{NS}}}sections")
     for item in sections:
-        node = ET.SubElement(sections_node, f"{{{NS}}}section", {"id": str(item.get("claim_id", "UNSPECIFIED"))})
-        ET.SubElement(node, f"{{{NS}}}text").text = str(item.get("text", ""))
+        # Claims carry claim_id/text; authoring sections carry section_id/content (and the model's ai_draft).
+        identifier = item.get("claim_id") or item.get("section_id") or "UNSPECIFIED"
+        text = item.get("text") or item.get("content") or item.get("ai_draft") or ""
+        node = ET.SubElement(sections_node, f"{{{NS}}}section", {"id": str(identifier)})
+        ET.SubElement(node, f"{{{NS}}}text").text = str(text)
         ET.SubElement(node, f"{{{NS}}}confidence").text = str(item.get("confidence", "UNKNOWN"))
         citation_node = ET.SubElement(node, f"{{{NS}}}citations")
         for citation_id in item.get("citation_ids", []):

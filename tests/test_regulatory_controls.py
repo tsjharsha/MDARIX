@@ -15,10 +15,11 @@ def _document(author):
 def _status(client, document_id, status):
     lock = client.get(f"/api/v1/regulatory/documents/{document_id}").json()
     lock = (lock.get("document") or lock).get("lock_version", 1)
-    return client.post(
-        f"/api/v1/regulatory/documents/{document_id}/status",
-        json={"status": status, "expected_lock_version": lock, "reason": "Test"},
-    )
+    body = {"status": status, "expected_lock_version": lock, "reason": "Test"}
+    if status == "APPROVED":
+        # Approval re-authenticates like a signature (tests/test_regulatory_copilot.py covers the refusals).
+        body["password"] = "Permission test 2026!"
+    return client.post(f"/api/v1/regulatory/documents/{document_id}/status", json=body)
 
 
 def test_an_approved_document_cannot_be_rewritten():

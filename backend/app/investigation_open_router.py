@@ -275,6 +275,21 @@ def manage_investigation(
         )
     )
     db.commit()
+    if case.owner_ref and case.owner_ref != before["owner"]:
+        # Tell the new owner (not someone who assigned themselves). Queued after the change is saved, on the control
+        # database where the outbox lives; a queueing failure is logged and never undoes the assignment.
+        from backend.app.governance_router import _notify
+
+        if _notify(
+            "notify_assignment",
+            control_db,
+            tenant_id=case.tenant_id,
+            investigation_id=case.id,
+            assignee_ref=case.owner_ref,
+            assigned_by_user_id=str(ctx.user_id),
+            reference=case.investigation_identifier,
+        ):
+            control_db.commit()
     return {
         "id": str(case.id),
         "investigation_identifier": case.investigation_identifier,

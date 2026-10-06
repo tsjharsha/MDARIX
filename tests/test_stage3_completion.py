@@ -1,4 +1,4 @@
-from reports.service import generate_report, submit_report_job, get_report_job
+from reports.service import REPORT_VERSION, generate_report, get_report_job, submit_report_job
 from communication.email.resend_provider import ResendProvider
 from object_storage.service import ObjectStorageService
 
@@ -56,7 +56,7 @@ def test_report_renderer_supports_csv_and_pdf():
 def test_report_job_is_tenant_scoped_and_versioned(tmp_path, monkeypatch):
     monkeypatch.setenv("MDARIX_REPORT_TEMP_ROOT", str(tmp_path))
     job = submit_report_job("DECISION_BRIEF", "tenant-a", actor_id="user-a", output_format="PDF")
-    assert job["status"] == "READY" and job["report_version"] == "1.0"
+    assert job["status"] == "READY" and job["report_version"] == REPORT_VERSION
     assert get_report_job(job["id"], "tenant-a")["path"].startswith(str(tmp_path))
     try:
         get_report_job(job["id"], "tenant-b")

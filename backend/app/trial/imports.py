@@ -4,6 +4,12 @@ Every batch is checked in full before anything is written: only template columns
 resolve inside the tenant, and text that looks like personal data (emails, phone numbers, dates of birth, patient
 or record numbers, named people) is rejected. A batch with any problem imports nothing. An ImportPolicy sets the
 source label recorded on each row and any row or file limits (free trials have both).
+
+Files arrive as bytes (a raw ``text/csv`` body or a multipart upload, ``read_upload``) and are decoded strictly as
+UTF-8, with or without a byte-order mark: a file in another encoding is refused with instructions rather than read
+with replaced characters. The delimiter is detected from the header line (comma, semicolon or tab, as spreadsheets
+in different countries save them). Dates are YYYY-MM-DD; DD/MM/YYYY or MM/DD/YYYY is read only when the uploader
+says which one (``date_format`` DMY or MDY), because 03/04/2026 is a different day in each and is never guessed.
 """
 
 from __future__ import annotations
@@ -15,7 +21,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -171,6 +177,113 @@ def _date(value: str) -> datetime | None:
     return datetime.combine(date.fromisoformat(value), time(12, 0), tzinfo=timezone.utc)
 
 
+DATE_FORMATS = {"ISO": "YYYY-MM-DD", "DMY": "DD/MM/YYYY", "MDY": "MM/DD/YYYY"}
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_DAY_MONTH_YEAR = re.compile(r"^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$")
+_DELIMITERS = ",;\t"
+# A multipart upload carries a little framing around the file; allowed on top of the file limit.
+MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
+
+def date_format_or_422(value: str | None) -> str:
+    """The ``date_format`` query parameter: ISO (default), DMY or MDY; anything else is refused, never guessed."""
+    chosen = (value or "ISO").strip().upper()
+    if chosen not in DATE_FORMATS:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "DATE_FORMAT_INVALID",
+                "message": "date_format must be ISO (YYYY-MM-DD), DMY (DD/MM/YYYY) or MDY (MM/DD/YYYY)",
+            },
+        )
+    return chosen
+
+
+def iso_date(value: str, date_format: str = "ISO") -> str | None:
+    """``value`` as YYYY-MM-DD, or None when it is not a real date in ``date_format``.
+
+    YYYY-MM-DD is accepted in every format (it cannot be misread); day and month in another order only when the
+    uploader declared that order.
+    """
+    value = value.strip()
+    try:
+        if _ISO_DATE.match(value):
+            return date.fromisoformat(value).isoformat()
+        match = _DAY_MONTH_YEAR.match(value)
+        if match and date_format in ("DMY", "MDY"):
+            first, second, year = (int(part) for part in match.groups())
+            day, month = (first, second) if date_format == "DMY" else (second, first)
+            return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+    return None
+
+
+def _decode(raw: bytes, report: "_Report") -> str | None:
+    """The file as text: UTF-8, with or without a byte-order mark. Nothing is ever silently replaced."""
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        report.add(None, None, "The file is saved as UTF-16 text. Save it as 'CSV UTF-8' and try again.")
+        return None
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        line = raw[: exc.start].count(b"\n") + 1
+        report.add(
+            line,
+            None,
+            "The file is not UTF-8 text (for example it was saved as plain 'CSV' in Windows-1252). Save it as "
+            "'CSV UTF-8' and try again, so that accented letters and symbols are kept exactly.",
+        )
+        return None
+
+
+def _delimiter(text: str) -> str:
+    """Comma, semicolon or tab, whichever the header line uses (comma when it cannot tell, e.g. one column)."""
+    header = text.split("\n", 1)[0]
+    try:
+        return csv.Sniffer().sniff(header, delimiters=_DELIMITERS).delimiter
+    except csv.Error:
+        return ","
+
+
+async def read_upload(request: Request, limit: int, message: str) -> bytes:
+    """The uploaded file's bytes, from a raw body (``text/csv``) or a multipart form (its ``file`` field).
+
+    The body is read with a hard limit before anything is parsed; a multipart file over ``limit`` is refused too.
+    """
+    from starlette.datastructures import UploadFile
+    from starlette.formparsers import MultiPartParser
+
+    from backend.app.request_body import read_limited
+
+    multipart = request.headers.get("content-type", "").lower().startswith("multipart/form-data")
+    raw = await read_limited(request, limit + (MULTIPART_OVERHEAD_BYTES if multipart else 0), message=message)
+    if not multipart:
+        return raw
+
+    async def body():
+        yield raw
+
+    try:
+        form = await MultiPartParser(request.headers, body(), max_files=1, max_fields=5).parse()
+    except Exception as exc:  # starlette raises its own MultiPartException for a malformed form
+        raise HTTPException(
+            422, detail={"code": "UPLOAD_INVALID", "message": "The upload could not be read; send one CSV file"}
+        ) from exc
+    try:
+        upload = form.get("file")
+        if not isinstance(upload, UploadFile):
+            raise HTTPException(
+                422, detail={"code": "UPLOAD_INVALID", "message": "Send the CSV file in a form field named 'file'"}
+            )
+        content = await upload.read()
+    finally:
+        await form.close()
+    if len(content) > limit:
+        raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": message})
+    return content
+
+
 class _Report:
     def __init__(self) -> None:
         self.issues: list[dict] = []
@@ -182,17 +295,17 @@ class _Report:
             self.issues.append({"row": row, "column": column, "message": message})
 
 
-def _parse(entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIAL_POLICY) -> list[tuple[int, dict]]:
+def _parse(
+    entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
+) -> list[tuple[int, dict]]:
     if entity not in TEMPLATES:
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     if len(raw) > policy.file_limit_bytes:
         raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        report.add(None, None, "The file is not UTF-8 text. Save it as 'CSV UTF-8' and try again.")
+    text = _decode(raw, report)
+    if text is None:
         return []
-    reader = csv.reader(io.StringIO(text))
+    reader = csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text))
     header = next(reader, None)
     if not header:
         report.add(None, None, "The file is empty.")
@@ -219,15 +332,19 @@ def _parse(entity: str, raw: bytes, report: _Report, policy: ImportPolicy = TRIA
         if len(cells) > len(columns):
             report.add(line_number, None, "This row has more values than the header has columns.")
             continue
-        rows.append(
-            (line_number, {column: (cells[i].strip() if i < len(cells) else "") for i, column in enumerate(columns)})
-        )
+        row = {column: (cells[i].strip() if i < len(cells) else "") for i, column in enumerate(columns)}
+        for column, value in row.items():
+            # Dates in the declared order become YYYY-MM-DD here; a value that is not one is left as typed and
+            # reported by _check_values with the expected format.
+            if column.endswith("_date") and value:
+                row[column] = iso_date(value, date_format) or value
+        rows.append((line_number, row))
     if not rows:
         report.add(None, None, "The file has a header but no data rows.")
     return rows
 
 
-def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) -> None:
+def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report, date_format: str = "ISO") -> None:
     spec = TEMPLATES[entity]
     key = spec["required"][0]
     identity_columns = spec.get("identity")
@@ -249,10 +366,9 @@ def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report) ->
                 if value.lower() not in FLAG_VALUES:
                     report.add(line, column, "Use Y or N.")
             elif column.endswith("_date"):
-                try:
-                    date.fromisoformat(value)
-                except ValueError:
-                    report.add(line, column, f"'{value}' is not a date in YYYY-MM-DD format.")
+                if iso_date(value) is None:
+                    expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
+                    report.add(line, column, f"'{value}' is not a date in {expected} format.")
             else:
                 limit = LONG_TEXT.get(column, 255)
                 if len(value) > limit:
@@ -407,10 +523,12 @@ def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
     return int(total)
 
 
-def check_file(db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY) -> dict:
+def check_file(
+    db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
+) -> dict:
     report = _Report()
-    rows = _parse(entity, raw, report, policy)
-    return _check_rows(db, tenant_id, entity, rows, report, policy)
+    rows = _parse(entity, raw, report, policy, date_format)
+    return _check_rows(db, tenant_id, entity, rows, report, policy, date_format)
 
 
 def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
@@ -419,7 +537,9 @@ def check_records(db: Session, tenant_id, entity: str, records: list[dict], poli
     return _check_rows(db, tenant_id, entity, rows, report, policy)
 
 
-def _check_rows(db: Session, tenant_id, entity: str, rows, report: _Report, policy: ImportPolicy) -> dict:
+def _check_rows(
+    db: Session, tenant_id, entity: str, rows, report: _Report, policy: ImportPolicy, date_format: str = "ISO"
+) -> dict:
     new_rows = 0
     oversized = len(rows) > MAX_ROWS_PER_FILE
     if oversized:
@@ -429,7 +549,7 @@ def _check_rows(db: Session, tenant_id, entity: str, rows, report: _Report, poli
             f"This file has {len(rows):,} rows; one file can have up to {MAX_ROWS_PER_FILE:,}. Split it into smaller files.",
         )
     if rows and not oversized:
-        _check_values(entity, rows, report)
+        _check_values(entity, rows, report, date_format)
         if not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report)
     used = uploaded_rows(db, tenant_id, policy.source)
@@ -467,13 +587,15 @@ def _stamp(now: datetime, row_date: datetime | None = None, source: str = UPLOAD
     }
 
 
-def import_file(db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY) -> dict:
-    report = check_file(db, tenant_id, entity, raw, policy)
+def import_file(
+    db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
+) -> dict:
+    report = check_file(db, tenant_id, entity, raw, policy, date_format)
     if not report["ready"]:
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
-    return _write_rows(db, tenant_id, entity, _parse(entity, raw, _Report(), policy), policy)
+    return _write_rows(db, tenant_id, entity, _parse(entity, raw, _Report(), policy, date_format), policy)
 
 
 def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
