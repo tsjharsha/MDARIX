@@ -54,6 +54,8 @@ import {
   type TaskView,
 } from "../tasks";
 import { StatusBadge } from "./common";
+import { parseRequestTab } from "../evidenceWorkflow";
+import { EvidenceRequestsPanel } from "./EvidenceRequests";
 
 const PAGE_SIZE = 50;
 
@@ -84,6 +86,11 @@ const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
 
 export function MyWorkSection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<MyWorkTab>(() => initialMyWorkTab(tab));
+  // A task or link may name an evidence request to open ("Evidence requests?request=…", see taskDestination).
+  const [request] = useState(() => {
+    const target = parseRequestTab(tab);
+    return target.tab === "Evidence requests" ? target.request : null;
+  });
   const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
   const tabs = myWorkTabs(summary.data, active);
   const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
@@ -92,7 +99,12 @@ export function MyWorkSection({ tab }: { tab?: string }) {
     <>
       <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections" counts={counts}>
         {view && <TaskInbox key={view} view={view} summary={summary} />}
-        {active === "Evidence requests" && <EvidenceRequests />}
+        {active === "Evidence requests" && (
+          <>
+            <EvidenceRequestsPanel investigationId={null} initialRequest={request} />
+            <EvidenceRequests />
+          </>
+        )}
         {active === "My AI conversations" && <Conversations />}
       </Tabs>
     </>

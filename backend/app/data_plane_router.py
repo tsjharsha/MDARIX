@@ -41,9 +41,19 @@ def products(limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)):
 
 
 @router.get("/investigations")
-def investigations(limit: int = Query(100, ge=1, le=500), deps=Depends(_deps)):
+def investigations(limit: int = Query(100, ge=1, le=500), deps=Depends(_deps), control_db=Depends(get_db)):
     ctx, db = deps
-    return {"tenant_id": ctx.tenant_id, "records": _rows(db, "investigations", ctx.tenant_id, limit)}
+    from backend.app.case_workflow.states import effective_state, state_label, with_owner_names
+
+    records = _rows(db, "investigations", ctx.tenant_id, limit)
+    # Each case's workflow state as people read it (the columns themselves come with every row).
+    for row in records:
+        if "workflow_state" in row:
+            row["workflow_state"] = effective_state(row["workflow_state"], row.get("status"))
+            row["workflow_state_label"] = state_label(row["workflow_state"])
+    # The owner's name (display name, else sign-in name) next to owner_ref.
+    with_owner_names(control_db, ctx.tenant_id, records)
+    return {"tenant_id": ctx.tenant_id, "records": records}
 
 
 @router.get("/evidence")

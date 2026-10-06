@@ -791,6 +791,10 @@ def create_investigation(
         complaint_ids=complaint_ids,
         investigation_identifier=payload.investigation_identifier,
         owner_ref=person.username if person is not None else None,
+        # The case takes the signal's priority; it starts in progress only when the person opening it takes it.
+        priority=logic.effective_priority(signal.confirmed_priority, signal.suggested_priority),
+        assigned_to_opener=person is not None and str(person.id) == str(ctx.user_id),
+        actor_role=actor.role_for(INVESTIGATION_CREATE),
     )
     role = actor.role_for(INVESTIGATION_CREATE)
     now = service.now_utc()

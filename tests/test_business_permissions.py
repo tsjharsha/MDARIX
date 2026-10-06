@@ -60,6 +60,11 @@ EXEMPT = {
     ("POST", "/api/v1/tasks/{task_id}/release"): "checked in the route: only the task's assignee",
     ("POST", "/api/v1/tasks/{task_id}/reassign"): "checked in the route: investigation.assign",
     ("POST", "/api/v1/tasks/{task_id}/complete"): "checked in the route: only the task's assignee",
+    # Case workflow (backend/app/case_workflow/router.py): the permission depends on the state asked for.
+    (
+        "POST",
+        "/api/v1/investigations/{investigation_id}/transition",
+    ): "checked in the route: investigation.work to start or hold a case, investigation.assign to cancel it",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.

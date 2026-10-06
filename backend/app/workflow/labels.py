@@ -22,6 +22,7 @@ class TaskType(NamedTuple):
 SIGNAL_TRIAGE_PERMISSION = "signal.triage"
 INVESTIGATION_WORK_PERMISSION = "investigation.work"
 EVIDENCE_REVIEW_PERMISSION = "evidence.review"
+EVIDENCE_REQUEST_PERMISSION = "evidence.request"
 RISK_REVIEW_PERMISSION = "risk.review"
 REGULATORY_REVIEW_PERMISSION = "regulatory.review"
 QUALITY_REVIEW_PERMISSION = "quality.review"
@@ -39,6 +40,8 @@ TASK_TYPES: dict[str, TaskType] = {
     "DECISION_APPROVAL": TaskType("Decision approval", DECISION_SIGN_PERMISSION, "APPROVER"),
     "IMPACT_ASSESSMENT": TaskType("Impact assessment", INVESTIGATION_WORK_PERMISSION, "INVESTIGATOR"),
     "FOLLOW_UP": TaskType("Follow-up", INVESTIGATION_WORK_PERMISSION, "INVESTIGATOR"),
+    # A colleague (or anyone holding the role) asked for evidence on a case (Phase 3); finished by answering.
+    "EVIDENCE_RESPONSE": TaskType("Provide evidence", EVIDENCE_REQUEST_PERMISSION, "INVESTIGATOR"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the
@@ -52,6 +55,7 @@ SOURCE_LABELS: dict[str, str] = {
     "Risk": "Risk",
     "SupplierEvidenceRequest": "Supplier evidence request",
     "Signal": "Signal",
+    "EvidenceRequest": "Evidence request",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

@@ -20,8 +20,20 @@ import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { useCan, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
 import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
+import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
+import { CaseScopePanel } from "./CaseScope";
+import {
+  CASE_PRIORITIES,
+  caseStateLabel,
+  caseStatusText,
+  casePriorityLabel,
+  dayFromDueAt,
+  planningChange,
+  type StepDestination,
+} from "../caseWorkflow";
+import { priorityRank } from "../tasks";
 
-const TABS = ["All investigations", "Workspace", "Story", "CAPAs"] as const;
+const TABS = ["All investigations", "Workspace", "Scope", "Story", "CAPAs"] as const;
 type Tab = (typeof TABS)[number];
 
 export function InvestigationsSection({ tab }: { tab?: string }) {
@@ -54,6 +66,18 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
       work.setInvestigationId(id);
       setActive("Workspace");
     }
+  };
+  // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
+  const goToStep = (destination: StepDestination) => {
+    if (destination.section === "Investigations" && destination.tab === "Scope") {
+      setActive("Scope");
+      return;
+    }
+    if (destination.section === "Investigations" && destination.anchor) {
+      document.getElementById(destination.anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    open(destination.section, destination.tab);
   };
   return (
     <>
@@ -102,7 +126,26 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
                 idColumn("Investigation ID", "investigation_identifier"),
                 sourceIdColumn("investigation_identifier"),
                 { key: "question", label: "Question", render: (row) => row.investigation_question ?? "—" },
-                { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
+                {
+                  key: "status",
+                  label: "Status",
+                  fields: ["status", "workflow_state", "workflow_state_label"],
+                  sortValue: (row) => caseStatusText(row),
+                  render: (row) => <CaseStateBadge row={row} />,
+                },
+                {
+                  key: "priority",
+                  label: "Priority",
+                  sortValue: (row) => priorityRank(row.priority),
+                  render: (row) => <CasePriority priority={row.priority} />,
+                },
+                {
+                  key: "due_at",
+                  label: "Due",
+                  fields: ["due_at", "overdue"],
+                  sortValue: (row) => row.due_at ?? "",
+                  render: (row) => <CaseDue row={row} />,
+                },
                 ...(canOpen
                   ? [
                       {
@@ -147,19 +190,47 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
         )}
         {active === "Workspace" &&
           (work.investigationId ? (
-            <Embedded>
-              <InvestigationWorkspacePanel
+            <>
+              <CaseHeader
+                key={work.investigationId}
                 investigationId={work.investigationId}
-                temporalMode={work.mode}
-                asOf={work.asOf}
-                onOpenDecision={() => open("Decisions")}
+                row={selected}
+                onManage={canOpen && selected ? () => setManaging(selected) : undefined}
+                onStep={goToStep}
+                onChanged={() => {
+                  all.reload();
+                  work.refreshInvestigations();
+                }}
               />
-            </Embedded>
+              <Embedded>
+                <InvestigationWorkspacePanel
+                  investigationId={work.investigationId}
+                  temporalMode={work.mode}
+                  asOf={work.asOf}
+                  onOpenDecision={() => open("Decisions")}
+                />
+              </Embedded>
+            </>
           ) : (
             <Panel title="No investigation selected">
               <Empty
                 title="Choose an investigation"
                 detail="Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Scope" &&
+          (work.investigationId ? (
+            <CaseScopePanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseQuestion={selected?.investigation_question ?? undefined}
+            />
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The scope belongs to one investigation. Pick one in the context bar above, or open one from the list."
               />
             </Panel>
           ))}
@@ -179,7 +250,7 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
         {active === "CAPAs" && <Capas />}
         {selected && active !== "All investigations" && active !== "CAPAs" && (
           <p className="ac-note">
-            Showing {displayId(selected, "investigation_identifier")} · {selected.status}
+            Showing {displayId(selected, "investigation_identifier")} · {caseStateLabel(selected) ?? selected.status}
           </p>
         )}
       </Tabs>
@@ -373,6 +444,9 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
   const closed = String(row.status ?? "").toLowerCase() === "closed";
   const [question, setQuestion] = useState(String(row.investigation_question ?? ""));
   const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState(String(row.priority ?? ""));
+  const [dueDay, setDueDay] = useState(() => dayFromDueAt(row.due_at));
+  const planning = planningChange(row, { priority, dueDay });
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -469,6 +543,33 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               onClick={() => void save({ unassign: true }, `${label} has no owner now.`)}
             >
               Remove owner
+            </button>
+          </div>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Priority
+              <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+                {!row.priority && <option value="">Not set</option>}
+                {CASE_PRIORITIES.map((item) => (
+                  <option key={item} value={item}>
+                    {casePriorityLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              Due date
+              <input type="date" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
+            </label>
+          </div>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={!reasonReady || busy || !planning}
+              onClick={() => planning && void save(planning, "Priority and due date updated.")}
+            >
+              Save priority and due date
             </button>
           </div>
           <div className="ca-action-row">

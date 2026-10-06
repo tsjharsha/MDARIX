@@ -370,7 +370,41 @@ class Product360Service:
             if not product:
                 raise Product360Error("PRODUCT_NOT_FOUND", "Product not found")
             rows = self.investigations(conn, tenant_id, product_id)
-        return [rowdict(row) for row in rows]
+            workflow = self.investigation_workflow(conn, tenant_id, product_id)
+        return [{**rowdict(row), **workflow.get(str(row["id"]), {})} for row in rows]
+
+    def investigation_workflow(self, conn, tenant_id: str, product_id: str) -> dict[str, dict[str, Any]]:
+        """Each case's workflow state (with its label), priority, due date and owner, for the product's case list. Read
+        apart from ``investigations`` so the Product 360 snapshot stays as it is; empty when the organization database
+        has no such columns yet."""
+        from backend.app.case_workflow.states import effective_state, state_label
+
+        try:
+            rows = (
+                conn.execute(
+                    text(
+                        "SELECT id, status, workflow_state, priority, due_at, owner_ref FROM investigations "
+                        "WHERE tenant_id=:tenant_id AND product_id=:product_id"
+                    ),
+                    {"tenant_id": tenant_id, "product_id": product_id},
+                )
+                .mappings()
+                .all()
+            )
+        except Exception:
+            # Read last, after the case list itself, so a failure here leaves that list intact.
+            return {}
+        result = {}
+        for row in rows:
+            state = effective_state(row["workflow_state"], row["status"])
+            result[str(row["id"])] = {
+                "workflow_state": state,
+                "workflow_state_label": state_label(state),
+                "priority": row["priority"],
+                "due_at": row["due_at"].isoformat() if row["due_at"] is not None else None,
+                "owner_ref": row["owner_ref"],
+            }
+        return result
 
     def evidence(self, conn, tenant_id: str, investigations, as_of: datetime | None, mode: str):
         ids = [str(row["id"]) for row in investigations]

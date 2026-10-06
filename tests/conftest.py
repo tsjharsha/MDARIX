@@ -143,6 +143,10 @@ DB_MODULES = {
     "test_workflow_tasks",
     # Phase 2: signals and triage: the triage API, detection, cases from signals and their lifecycle.
     "test_signals_triage",
+    # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
+    "test_case_workflow",
+    # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.
+    "test_evidence_workflow",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

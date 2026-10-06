@@ -20,6 +20,7 @@ import {
   taskEventText,
   taskListPath,
   taskPath,
+  taskRequest,
   taskSignal,
   taskSourceText,
   taskTypeLabel,
@@ -109,6 +110,44 @@ describe("where a task opens", () => {
     expect(taskSignal({ source: { type: "SIGNAL", business_id: "SIG000023" } })).toBe("SIG000023");
     expect(taskSignal({ source: { type: "INVESTIGATION", business_id: "INV000147" } })).toBeNull();
     expect(taskSignal({})).toBeNull();
+  });
+
+  it("opens an evidence request task on that request in My Work", () => {
+    const source = { type: "EvidenceRequest", id: UUID, business_id: "EVR000004" };
+    for (const task_type of ["EVIDENCE_RESPONSE", "EVIDENCE_REQUEST", "EVIDENCE_REVIEW"])
+      expect(taskDestination({ task_type, investigation, source })).toEqual({
+        section: "My Work",
+        tab: `Evidence requests?request=${UUID}`,
+      });
+    expect(taskRequest({ source })).toBe(UUID);
+    expect(taskRequest({ source: { type: "EVIDENCE_REQUEST", business_id: "EVR000004" } })).toBe("EVR000004");
+    expect(taskRequest({ source: { type: "SupplierEvidenceRequest", id: UUID } })).toBeNull();
+    expect(taskRequest({ source: { type: "Investigation", id: UUID } })).toBeNull();
+    expect(taskRequest({})).toBeNull();
+  });
+
+  it("keeps opening the case for evidence tasks about anything else", () => {
+    const supplier = { type: "SupplierEvidenceRequest", id: UUID, business_id: "SER000002" };
+    expect(taskDestination({ task_type: "EVIDENCE_REQUEST", investigation, source: supplier })).toEqual({
+      section: "Investigations",
+      tab: "Workspace",
+    });
+    expect(taskDestination({ task_type: "EVIDENCE_RESPONSE", investigation })).toEqual({
+      section: "Investigations",
+      tab: "Workspace",
+    });
+    expect(taskDestination({ task_type: "EVIDENCE_RESPONSE", investigation: null })).toEqual({
+      section: "My Work",
+      tab: "Evidence requests",
+    });
+    expect(
+      taskDestination({ task_type: "INVESTIGATION", investigation, source: { type: "Investigation", id: UUID } }),
+    ).toEqual({ section: "Investigations", tab: "Workspace" });
+  });
+
+  it("opens My Work on the tab a destination with a request names", () => {
+    expect(initialMyWorkTab(`Evidence requests?request=${UUID}`)).toBe("Evidence requests");
+    expect(initialMyWorkTab("Nothing?request=x")).toBe("Assigned to me");
   });
 
   it("opens an unknown kind of task on its case, else stays in My Work", () => {

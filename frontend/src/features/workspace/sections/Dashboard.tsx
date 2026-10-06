@@ -25,7 +25,8 @@ import {
   isVerified,
   workspaceAttention,
 } from "../workspaceModel";
-import { StatusBadge } from "./common";
+import { CaseStateBadge } from "./CaseHeader";
+import { MyInvestigationsPanel } from "./MyInvestigations";
 import { displayId, safeText } from "../../../app/displayId";
 import { roleLabels } from "../../../app/roles";
 import {
@@ -131,6 +132,7 @@ export function DashboardSection() {
   return (
     <div className="ac-overview ac-dashboard">
       <MyWorkSummary />
+      <MyInvestigationsPanel />
       <SignalTriagePanel />
 
       <section className={`ac-hero tone-${tone}`} aria-live="polite">
@@ -404,7 +406,7 @@ export function DashboardSection() {
                     <strong>{displayId(row, "investigation_identifier")}</strong>
                     <small>{row.investigation_question ?? "No question recorded"}</small>
                   </span>
-                  <StatusBadge value={row.status} />
+                  <CaseStateBadge row={row} />
                 </li>
               ))}
             </ul>

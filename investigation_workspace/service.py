@@ -44,12 +44,42 @@ def with_business_ids(db: Session, workspace: InvestigationWorkspaceResponse) ->
         **header,
         "business_id": investigation_ids.get(str(header.get("id"))),
         "product_business_id": product_ids.get(str(header.get("product_id"))),
+        **_workflow_fields(db, header.get("id")),
     }
     evidence = [
         {"id": item.get("id"), "business_id": evidence_ids.get(str(item.get("id"))), **item}
         for item in workspace.evidence_context
     ]
     return workspace.model_copy(update={"investigation": investigation, "evidence_context": evidence})
+
+
+def _workflow_fields(db: Session, investigation_id) -> dict[str, Any]:
+    """The case's workflow state (with its label), priority and due date for the workspace header (API only). Empty
+    when they cannot be read: the header never fails because of them."""
+    from sqlalchemy import select
+
+    from backend.app.business_ids import as_uuid
+    from backend.app.case_workflow.states import effective_state, state_label
+
+    key = as_uuid(investigation_id)
+    if key is None:
+        return {}
+    try:
+        rows = db.execute(
+            select(
+                Investigation.status, Investigation.workflow_state, Investigation.priority, Investigation.due_at
+            ).where(Investigation.id == key)
+        ).all()
+        status, workflow_state, priority, due_at = rows[0]
+    except Exception:
+        return {}
+    state = effective_state(workflow_state, status)
+    return {
+        "workflow_state": state,
+        "workflow_state_label": state_label(state),
+        "priority": priority,
+        "due_at": due_at.isoformat() if isinstance(due_at, datetime) else None,
+    }
 
 
 class InvestigationWorkspaceService:

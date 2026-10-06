@@ -90,10 +90,12 @@ const ALL_TABS: readonly string[] = [...TASK_TABS.map((item) => item.tab), ...OT
 // Former tab names still open the list that replaced them (links, bookmarks, the dashboard).
 const LEGACY_TABS: Record<string, MyWorkTab> = { "Needs an owner": "Role queues" };
 
-/** The tab My Work opens on for a requested tab name; "Assigned to me" when the name is unknown. */
+/** The tab My Work opens on for a requested tab name; "Assigned to me" when the name is unknown. A name may carry
+ * a request to open ("Evidence requests?request=…", see taskDestination); only the tab part chooses the tab. */
 export function initialMyWorkTab(tab?: string | null): MyWorkTab {
-  if (tab && ALL_TABS.includes(tab)) return tab as MyWorkTab;
-  return (tab && LEGACY_TABS[tab]) || "Assigned to me";
+  const name = tab && tab.includes("?") ? tab.slice(0, tab.indexOf("?")) : tab;
+  if (name && ALL_TABS.includes(name)) return name as MyWorkTab;
+  return (name && LEGACY_TABS[name]) || "Assigned to me";
 }
 
 /** The server view a task tab reads, or null for a tab that is not a task list. */
@@ -137,12 +139,42 @@ export function taskSignal(task: Partial<Pick<Task, "source">>): string | null {
   return business ?? (source.id ? String(source.id).trim() || null : null);
 }
 
+/** Task types whose source can be an evidence request (Phase 3): asked to provide evidence, waiting, or reviewing it. */
+const EVIDENCE_REQUEST_TASKS = ["EVIDENCE_RESPONSE", "EVIDENCE_REQUEST", "EVIDENCE_REVIEW"];
+// A request reference as it may travel in a tab name; anything else is ignored.
+const REQUEST_REF = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/**
+ * The evidence request a task is about (its source, of type EvidenceRequest), by its id; null for any other source
+ * (a supplier request recorded before Phase 3 keeps opening the case).
+ */
+export function taskRequest(task: Partial<Pick<Task, "source">>): string | null {
+  const source = task.source;
+  const type = String(source?.type ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]+/g, "");
+  if (type !== "EVIDENCEREQUEST") return null;
+  const ref = String(source?.id ?? "").trim() || String(source?.business_id ?? "").trim();
+  return REQUEST_REF.test(ref) ? ref : null;
+}
+
 /** Where "Open" takes a task: the section (and tab) where its work is done; a signal triage task opens its signal. */
 export function taskDestination(task: Pick<Task, "task_type" | "investigation"> & Partial<Pick<Task, "source">>): {
   section: WorkspaceSection;
   tab?: string;
 } {
-  switch (String(task.task_type ?? "").toUpperCase()) {
+  const type = String(task.task_type ?? "").toUpperCase();
+  // An evidence request task opens that request's detail in My Work (its Evidence requests tab).
+  if (EVIDENCE_REQUEST_TASKS.includes(type)) {
+    const request = taskRequest(task);
+    if (request) return { section: "My Work", tab: `Evidence requests?${new URLSearchParams({ request })}` };
+    if (type === "EVIDENCE_RESPONSE")
+      return task.investigation
+        ? { section: "Investigations", tab: "Workspace" }
+        : { section: "My Work", tab: "Evidence requests" };
+  }
+  switch (type) {
     case "SIGNAL_TRIAGE": {
       const signal = taskSignal(task);
       return signal ? { section: "Signals", tab: signalsTab({ signal }) } : { section: "Signals" };

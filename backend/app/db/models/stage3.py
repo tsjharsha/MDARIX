@@ -98,13 +98,29 @@ class SupplierEvidenceRequest(Base):
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     supplier_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     requested_by: Mapped[str] = mapped_column(String(255), nullable=False)
-    recipient: Mapped[str] = mapped_column(String(254), nullable=False)
+    # A supplier's email address; empty for a request to a colleague or a role (md29).
+    recipient: Mapped[str | None] = mapped_column(String(254))
     title: Mapped[str] = mapped_column(String(240), nullable=False)
     requested_items: Mapped[dict] = mapped_column(JSONB, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="PENDING_DELIVERY")
     provider_message_id: Mapped[str | None] = mapped_column(String(255))
     created_at = tz(False)
     updated_at = tz(False)
+    # md29: requests to colleagues as well as suppliers, tied to the unknown they should resolve, with a due date,
+    # the answer, and the evidence the requester accepted from it.
+    request_kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="SUPPLIER")
+    recipient_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    recipient_role: Mapped[str | None] = mapped_column(String(60))
+    unknown_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, server_default="MEDIUM")
+    due_at = tz()
+    acknowledged_at = tz()
+    responded_at = tz()
+    response_note: Mapped[str | None] = mapped_column(Text)
+    cannot_provide_reason: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at = tz()
+    resolved_evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
 
 class EvidenceAttachment(Base):

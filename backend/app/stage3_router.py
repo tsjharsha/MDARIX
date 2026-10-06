@@ -295,17 +295,39 @@ def product_version_story(
 
 @router.get("/analytics/investigations")
 def investigations_summary(
-    db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    control_db: Session = Depends(get_db),
 ):
+    from backend.app.case_workflow.states import effective_state, state_label, with_owner_names
+
     rows = _rows(
         db,
         """
-        SELECT id, business_id, investigation_identifier, status, investigation_question
+        SELECT id, business_id, investigation_identifier, status, investigation_question,
+               workflow_state, priority, due_at, owner_ref
         FROM investigations WHERE tenant_id = :tenant_id
         ORDER BY created_at DESC NULLS LAST LIMIT 100
     """,
         {"tenant_id": ctx.tenant_id},
     )
+    if not rows:
+        # An organization database without the case workflow columns yet still lists its cases.
+        rows = _rows(
+            db,
+            """
+            SELECT id, business_id, investigation_identifier, status, investigation_question
+            FROM investigations WHERE tenant_id = :tenant_id
+            ORDER BY created_at DESC NULLS LAST LIMIT 100
+        """,
+            {"tenant_id": ctx.tenant_id},
+        )
+    for row in rows:
+        if "workflow_state" in row:
+            row["workflow_state"] = effective_state(row["workflow_state"], row.get("status"))
+            row["workflow_state_label"] = state_label(row["workflow_state"])
+    if rows and "owner_ref" in rows[0]:
+        with_owner_names(control_db, ctx.tenant_id, rows)
     return {
         "tenant_id": ctx.tenant_id,
         "investigations": rows,

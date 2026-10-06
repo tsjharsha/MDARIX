@@ -35,6 +35,8 @@ CONTRACT = {
     "DECISION_APPROVAL": ("decision.sign", "APPROVER"),
     "IMPACT_ASSESSMENT": ("investigation.work", "INVESTIGATOR"),
     "FOLLOW_UP": ("investigation.work", "INVESTIGATOR"),
+    # Phase 3: a colleague or a role asked for evidence answers it.
+    "EVIDENCE_RESPONSE": ("evidence.request", "INVESTIGATOR"),
 }
 
 

@@ -1033,3 +1033,157 @@
   color: var(--ac-ink-2);
   font-size: 13px;
 }
+
+/* Phase 3 case workflow: the case header, its stepper and readiness checklist, scope, evidence and requests. */
+.uw-case-question {
+  margin: 0 0 12px;
+  font-size: 15px;
+  white-space: pre-wrap;
+}
+.uw-stepper {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.uw-step {
+  display: grid;
+  gap: 4px;
+}
+.uw-step button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ac-line);
+  border-left-width: 4px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+.uw-step button:hover:not(:disabled) {
+  border-color: var(--ac-teal);
+}
+.uw-step button:disabled {
+  cursor: default;
+}
+.uw-step.tone-good button {
+  border-left-color: var(--ac-good);
+}
+.uw-step.tone-warning button {
+  border-left-color: var(--ac-warning);
+}
+.uw-step.tone-critical button {
+  border-left-color: var(--ac-critical);
+}
+.uw-step.tone-neutral button {
+  border-left-color: var(--ac-neutral);
+}
+.uw-step-number {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--ac-teal-wash);
+  font-size: 12px;
+  font-weight: 700;
+}
+.uw-step-text {
+  display: grid;
+  min-width: 0;
+}
+.uw-step-text small,
+.uw-step-detail {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-checklist {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.uw-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.uw-checklist li > span {
+  display: grid;
+  gap: 2px;
+}
+.uw-checklist small {
+  color: var(--ac-muted);
+}
+.uw-wide {
+  grid-column: 1 / -1;
+}
+.uw-scope-facts {
+  margin-bottom: 12px;
+}
+.uw-scope-complaint {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: center;
+}
+.uw-scope-complaint input {
+  grid-column: 1 / -1;
+}
+.uw-scope-complaint select,
+.uw-scope-complaint input {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.uw-problems {
+  margin: 0;
+  padding-left: 18px;
+}
+.uw-compare-row {
+  align-items: center;
+  margin-top: 12px;
+}
+.uw-compare th[scope="row"] {
+  text-align: left;
+  vertical-align: top;
+}
+.uw-compare td {
+  vertical-align: top;
+}
+.uw-added {
+  color: var(--ac-good);
+  font-weight: 600;
+}
+.uw-removed {
+  color: var(--ac-critical);
+  text-decoration: line-through;
+}
+.uw-evidence-chips {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.uw-evidence-chips .ca-chips {
+  align-items: center;
+}
+.uw-case-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.ac-message.tone-warning {
+  border-color: var(--ac-warning);
+}

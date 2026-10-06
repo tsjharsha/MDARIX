@@ -34,6 +34,9 @@ TRIAL_DATA_TABLES = (
     "investigation_signals",
     "signals",
     "signal_rules",
+    # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
+    "evidence_review_events",
+    "investigation_scope_versions",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",

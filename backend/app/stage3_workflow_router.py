@@ -58,6 +58,9 @@ class FeedbackRequest(BaseModel):
     comment: str | None = Field(default=None, max_length=4000)
 
 
+# Requests to colleagues and roles (md29, backend/app/evidence_workflow) share supplier_evidence_requests; the
+# supplier endpoints below see only supplier requests (every request made before md29 is one).
+SUPPLIER_KIND = "SUPPLIER"
 _EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,63}$")
 _LINK = re.compile(r"(?i)(https?://|www\.|\]\(|<a\s)")
 
@@ -391,7 +394,10 @@ def _limit_supplier_requests(db: Session, ctx: AuthenticatedRequestContext, now)
 
     per_day = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_DAY", "50"))
     per_hour = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_HOUR", "10"))
-    recent = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+    # Requests to colleagues (md29) share the table but send no email; they do not count against these limits.
+    recent = db.query(SupplierEvidenceRequest).filter(
+        SupplierEvidenceRequest.tenant_id == ctx.tenant_id, SupplierEvidenceRequest.request_kind == SUPPLIER_KIND
+    )
     if recent.filter(SupplierEvidenceRequest.created_at >= now - timedelta(days=1)).count() >= per_day:
         raise HTTPException(
             429, detail={"code": "SUPPLIER_REQUEST_LIMIT", "message": f"Your organization can send {per_day} a day"}
@@ -503,7 +509,9 @@ def list_supplier_evidence_requests(
 
     rows = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id, SupplierEvidenceRequest.request_kind == SUPPLIER_KIND
+        )
         .order_by(SupplierEvidenceRequest.created_at.desc())
         .limit(100)
         .all()
@@ -593,7 +601,11 @@ def upload_supplier_attachment(
     so FastAPI runs it in its thread pool instead of on the event loop."""
     row = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
         .first()
     )
     if not row:
@@ -712,7 +724,11 @@ def record_supplier_reply(
 
     row = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
         .with_for_update()
         .first()
     )
@@ -795,7 +811,11 @@ def list_supplier_attachments(
 ):
     row = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
         .first()
     )
     if not row:
@@ -834,6 +854,18 @@ def download_supplier_attachment(
         )
         .first()
     )
+    # Files of requests to colleagues are opened through /api/v1/evidence-requests, which checks who may see them.
+    if attachment and (
+        db.query(SupplierEvidenceRequest.id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
+        .first()
+        is None
+    ):
+        attachment = None
     if not attachment:
         raise HTTPException(404, detail={"code": "ATTACHMENT_NOT_FOUND", "message": "Attachment is not available"})
     try:

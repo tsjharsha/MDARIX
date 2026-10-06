@@ -60,12 +60,15 @@ from backend.app.tenant_export_api import router as tenant_export_router
 from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
+from backend.app.case_workflow.router import router as case_workflow_router
 from backend.app.complaints_router import router as complaints_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
 from backend.app.risk_router import router as risk_router
 from backend.app.workflow.router import router as workflow_tasks_router
 from backend.app.signals.router import router as signals_triage_router
+from backend.app.evidence_workflow.inventory import router as evidence_inventory_router
+from backend.app.evidence_workflow.requests import router as evidence_requests_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -290,6 +293,8 @@ async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"detail": body}, headers={"X-Request-ID": request_id})
 
 
+# First, so its fixed path /api/v1/investigations/mine/summary is matched before any /{investigation_id} route.
+app.include_router(case_workflow_router)  # Case workflow: states, scope, readiness, my cases
 app.include_router(evidence_router)
 app.include_router(investigations_router)
 app.include_router(retrieval_router)
@@ -328,6 +333,8 @@ app.include_router(support_router)
 app.include_router(risk_router)  # Risk & Traceability
 app.include_router(workflow_tasks_router)  # My Work: workflow tasks and role queues
 app.include_router(signals_triage_router)  # Signals and triage
+app.include_router(evidence_inventory_router)  # Case evidence: inventory, links, review, provenance
+app.include_router(evidence_requests_router)  # Evidence requests to colleagues, roles and suppliers
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 
@@ -485,11 +492,16 @@ def list_product_investigations(
     product_id: str,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     data_db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
 ) -> list[dict]:
+    from backend.app.case_workflow.states import with_owner_names
+
     try:
-        return product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=scoped_bind(data_db))
+        rows = product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=scoped_bind(data_db))
     except Product360Error as exc:
         raise product_error(exc) from exc
+    # Each case's owner by name, next to its workflow state (backend/app/case_workflow/states.py).
+    return with_owner_names(control_db, ctx.tenant_id, rows)
 
 
 def _product360_audit(

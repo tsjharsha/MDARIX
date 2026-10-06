@@ -306,10 +306,21 @@ class Investigation(TenantOwned, Base):
     opened_at = tz()
     closed_at = tz()
     owner_ref: Mapped[str | None] = mapped_column(String(255))
+    # Where the case is in the workflow (md29). ``status`` stays "open"/"closed" for everything that reads it today;
+    # CLOSED and CANCELLED keep it "closed", every other state "open".
+    workflow_state: Mapped[str] = mapped_column(String(30), nullable=False, server_default="OPEN")
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, server_default="MEDIUM")
+    due_at = tz()
+    state_changed_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         UniqueConstraint("tenant_id", "investigation_identifier", name="uq_investigations_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_investigations_tenant_id_id"),
+        CheckConstraint(
+            "workflow_state IN ('OPEN', 'IN_PROGRESS', 'ON_HOLD', 'BRIEF_IN_REVIEW', 'READY_FOR_DECISION', 'DECIDED', 'CLOSED', 'CANCELLED')",
+            name="workflow_state_known",
+        ),
+        CheckConstraint("priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')", name="priority_known"),
     )
 
 
@@ -1036,10 +1047,28 @@ class InvestigationEvidence(Base):
     evidence_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     relevance: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
+    # The case's review of this evidence (md29): its quality (review_status) and what it means for the case
+    # (relationship) are separate judgements. Every change is kept in evidence_review_events.
+    review_status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="UNREVIEWED")
+    relationship: Mapped[str] = mapped_column(String(30), nullable=False, server_default="UNREVIEWED")
+    review_reason: Mapped[str | None] = mapped_column(Text)
+    limitation: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at = tz()
+    linked_by: Mapped[str | None] = mapped_column(String(255))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
         UniqueConstraint("tenant_id", "investigation_id", "evidence_id", name="uq_investigation_evidence_pair"),
+        CheckConstraint(
+            "review_status IN ('UNREVIEWED', 'ACCEPTED', 'ACCEPTED_WITH_LIMITATION', 'REJECTED', 'QUARANTINED', "
+            "'SUPERSEDED')",
+            name="review_status_known",
+        ),
+        CheckConstraint(
+            "relationship IN ('SUPPORTING', 'CONTRADICTING', 'CONTEXTUAL', 'UNRESOLVED', 'UNRELATED', 'UNREVIEWED')",
+            name="relationship_known",
+        ),
     )
 
 

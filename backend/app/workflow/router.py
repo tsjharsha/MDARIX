@@ -178,6 +178,8 @@ def _source_models() -> dict:
         "Risk": Risk,
         "SupplierEvidenceRequest": SupplierEvidenceRequest,
         "Signal": Signal,
+        # Requests to a colleague or a role (Phase 3) live in the same table as supplier requests.
+        "EvidenceRequest": SupplierEvidenceRequest,
     }
 
 
@@ -508,6 +510,14 @@ def _sync_case_owner(
     )
 
 
+def _start_case(db: Session, actor: Actor, task: WorkflowTask, how: str, correlation_id: str | None) -> None:
+    """Taking a case's INVESTIGATION task starts work on the case when it is still OPEN (IN_PROGRESS, audited).
+    Committed with the task change; a failure never blocks it (backend/app/case_workflow/states.py)."""
+    from backend.app.case_workflow.states import on_task_taken
+
+    on_task_taken(db, task, actor_ref=actor.user_id, how=how, correlation_id=correlation_id)
+
+
 def _require_assignee(actor: Actor, task: WorkflowTask) -> None:
     if not actor.owns(task):
         raise _error(403, "TASK_NOT_YOURS", "Only the person this task is assigned to can do this")
@@ -526,6 +536,7 @@ def accept_task(
     if task.status != "ASSIGNED":
         raise _conflict("Only a task assigned to you and not yet accepted can be accepted")
     task.accepted_at = service.now_utc()
+    _start_case(db, actor, task, "accepted", ctx.correlation_id)
     return _change(
         db,
         control_db,
@@ -599,6 +610,7 @@ def claim_task(
         find_user(control_db, actor.tenant_id, actor.user_id),
         "Taken from the investigation queue",
     )
+    _start_case(db, actor, task, "taken from the queue", ctx.correlation_id)
     return _change(
         db,
         control_db,

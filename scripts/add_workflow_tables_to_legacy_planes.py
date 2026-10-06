@@ -1,5 +1,5 @@
-"""Give legacy dedicated organization databases the workflow tables of migrations md27 (roles, tasks) and md28
-(signals).
+"""Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
+(signals) and md29 (case scope and evidence review).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -61,6 +61,20 @@ STEPS = (
         "create_signal_tables",
         ("signals", "signal_complaints", "signal_events", "investigation_signals", "signal_rules"),
         ("tenants", "products", "product_versions", "complaints", "investigations", "business_id_counters"),
+    ),
+    Step(
+        "md29",
+        "md29_case_scope_evidence.py",
+        "apply_case_scope_changes",
+        ("investigation_scope_versions", "evidence_review_events"),
+        (
+            "investigations",
+            "investigation_complaints",
+            "complaints",
+            "investigation_evidence",
+            "evidence",
+            "supplier_evidence_requests",
+        ),
     ),
 )
 
