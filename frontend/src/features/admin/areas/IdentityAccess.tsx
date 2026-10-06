@@ -1,6 +1,16 @@
 import { useState } from "react";
 import { Panel } from "../console/charts";
-import { SearchBox, Table, listOf, matches, useResource } from "../../customer-admin/shared";
+import {
+  ConfirmDialog,
+  SearchBox,
+  Table,
+  listOf,
+  matches,
+  send,
+  useResource,
+  type Confirmation,
+} from "../../customer-admin/shared";
+import { isPlatformAdminRole } from "../../../app/navigationPolicy";
 import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager } from "./common";
@@ -22,6 +32,10 @@ const size = (value: unknown) =>
 
 const name = (user: User) => user.display_name || user.email;
 
+/** MFA of another platform administrator can be reset here; one's own never (another administrator must do it). */
+export const canResetMfa = (user: User, currentUserId: string | undefined) =>
+  !!currentUserId && user.id !== currentUserId && isPlatformAdminRole(user.role);
+
 export function IdentityAccess({ section }: { section: string }) {
   if (section === "Roles & permissions") return <RolesAndPermissions />;
   if (section === "Effective access") return <EffectiveAccess />;
@@ -31,6 +45,9 @@ export function IdentityAccess({ section }: { section: string }) {
 /** The people who work in the MDARIX platform tenant (customer users are managed by each Customer Administrator). */
 function PlatformUsers() {
   const users = useResource<User[]>("/api/v1/admin/identity/users");
+  const me = useResource<{ user_id?: string }>("/api/v1/auth/session");
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -41,7 +58,7 @@ function PlatformUsers() {
   const pages = Math.max(1, Math.ceil(filtered.length / 25));
   const shown = filtered.slice((Math.min(page, pages) - 1) * 25, Math.min(page, pages) * 25);
   return (
-    <Panel eyebrow="MDARIX platform tenant" title="Platform users" state={users.state} error={users.error}>
+    <Panel eyebrow="MDARIX platform tenant" title="Platform users" source={users}>
       <Intro>
         People with an account in the MDARIX platform tenant. Customer users are managed by each customer&apos;s own
         administrators; Customer Administrators are under Customers &amp; Tenants.
@@ -89,9 +106,47 @@ function PlatformUsers() {
           },
           { key: "role", label: "Role", render: (row) => titleCase(row.role ?? "—") },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+          {
+            key: "mfa",
+            label: "",
+            render: (row) =>
+              canResetMfa(row, me.data?.user_id) ? (
+                <button
+                  type="button"
+                  className="ac-link"
+                  onClick={() =>
+                    setConfirm({
+                      title: `Reset multi-factor authentication for ${name(row)}?`,
+                      body: "Their authenticator and recovery codes stop working and they are signed out everywhere. At their next sign-in they set up a new authenticator. Do this only after confirming who is asking, for example by a call to a known number.",
+                      confirmLabel: "Reset MFA",
+                      danger: true,
+                      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+                      run: (reason) => send(`/api/v1/platform-admin/users/${row.id}/mfa-reset`, "POST", { reason }),
+                      done: `MFA reset for ${name(row)}. They set up a new authenticator at their next sign-in.`,
+                    })
+                  }
+                >
+                  Reset MFA
+                </button>
+              ) : null,
+          },
         ]}
       />
       <Pager page={Math.min(page, pages)} pages={pages} total={filtered.length} noun="user" onPage={setPage} />
+      {notice && (
+        <p className="ac-message tone-good" role="status">
+          {notice}
+        </p>
+      )}
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(text) => {
+          setConfirm(null);
+          setNotice(text);
+          users.reload();
+        }}
+      />
     </Panel>
   );
 }
@@ -116,7 +171,7 @@ function RolesAndPermissions() {
   ];
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Who can do what" title="Roles" state={roles.state} error={roles.error}>
+      <Panel eyebrow="Who can do what" title="Roles" source={roles}>
         <Intro>A role groups permission sets. Choose a role to see what it grants.</Intro>
         <Table
           caption="Roles"
@@ -182,7 +237,7 @@ function EffectiveAccess() {
   const rows = listOf(users.data) as User[];
   return (
     <div className="ac-grid">
-      <Panel eyebrow="Check one person" title="Effective access" state={users.state} error={users.error}>
+      <Panel eyebrow="Check one person" title="Effective access" source={users}>
         <Intro>Choose a person to see the roles and personas that decide what they can do.</Intro>
         <label className="ca-field ar-picker">
           Person
@@ -200,7 +255,7 @@ function EffectiveAccess() {
       </Panel>
       {userId && (
         <div className="ac-grid two">
-          <Panel eyebrow="Granted" title="Roles" state={access.state} error={access.error}>
+          <Panel eyebrow="Granted" title="Roles" source={access}>
             <Table
               caption="Roles"
               rows={access.data?.roles ?? []}
@@ -212,7 +267,7 @@ function EffectiveAccess() {
               ]}
             />
           </Panel>
-          <Panel eyebrow="Working as" title="Personas" state={access.state} error={access.error}>
+          <Panel eyebrow="Working as" title="Personas" source={access}>
             <Table
               caption="Personas"
               rows={access.data?.personas ?? []}

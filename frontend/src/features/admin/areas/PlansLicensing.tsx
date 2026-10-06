@@ -478,8 +478,10 @@ function Reminders({ onMessage }: { onMessage: Notify }) {
         </Intro>
         <TenantPicker value={tenantId} onChange={setTenantId} />
         <p className="ar-notice" role="note">
-          <Mail size={16} aria-hidden="true" /> Reminders are queued on the chosen days, but sending them by email is
-          not connected yet, so customers do not receive them today.
+          <Mail size={16} aria-hidden="true" /> Reminders are emailed on the chosen days to the tenant&apos;s Customer
+          Administrators and the contacts in its notification settings. The newest saved email for each stage is the one
+          sent; without one, the standard wording is used. Operations, Email &amp; notifications shows whether email is
+          configured.
         </p>
       </Panel>
       {tenantId && (
@@ -592,7 +594,7 @@ function TemplateEditor({
         body: form.body.trim(),
         allowed_variables: used,
       });
-      onMessage("Reminder email saved as a draft.");
+      onMessage("Reminder email saved. It is used for the next reminders at this stage.");
       settings.reload();
     } catch (reason) {
       setError(errorText(reason, "The email was not saved."));
@@ -651,7 +653,7 @@ function TemplateEditor({
           </p>
         )}
         <button type="submit" className="ac-primary" disabled={busy}>
-          {busy ? "Saving…" : "Save as draft"}
+          {busy ? "Saving…" : "Save email"}
         </button>
       </form>
       {templates.length > 0 && (

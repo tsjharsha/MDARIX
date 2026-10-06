@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { MessageSquareReply, Paperclip } from "lucide-react";
+import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
-import { Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
-import { useWorkspace } from "../workspaceContext";
+import { Drawer, Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
+import { useCan, useWorkspace } from "../workspaceContext";
 import { isOpenInvestigation } from "../workspaceModel";
 import { StatusBadge } from "./common";
 
@@ -15,10 +17,11 @@ export function MyWorkSection({ tab }: { tab?: string }) {
   );
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="My work sections" />
-      {(active === "Assigned to me" || active === "Needs an owner") && <Cases mine={active === "Assigned to me"} />}
-      {active === "Evidence requests" && <EvidenceRequests />}
-      {active === "My AI conversations" && <Conversations />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="My work sections">
+        {(active === "Assigned to me" || active === "Needs an owner") && <Cases mine={active === "Assigned to me"} />}
+        {active === "Evidence requests" && <EvidenceRequests />}
+        {active === "My AI conversations" && <Conversations />}
+      </Tabs>
     </>
   );
 }
@@ -44,8 +47,7 @@ function Cases({ mine }: { mine: boolean }) {
     <Panel
       eyebrow="My work"
       title={mine ? "Investigations assigned to you" : "Open investigations without an owner"}
-      state={cases.state}
-      error={cases.error}
+      source={cases}
     >
       <Table
         caption={mine ? "Assigned investigations" : "Unassigned investigations"}
@@ -201,15 +203,56 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
   );
 }
 
+/** Supplier attachments the server accepts (stage3_workflow_router.ALLOWED_ATTACHMENT_TYPES, MAX_ATTACHMENT_BYTES). */
+export const ATTACHMENT_TYPES = ["application/pdf", "text/plain", "text/csv", "image/png", "image/jpeg"];
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+/** Why a file cannot be attached to a supplier reply, or null when it can (the server checks it again). */
+export function attachmentProblem(file: { type: string; size: number } | null): string | null {
+  if (!file) return null;
+  if (!ATTACHMENT_TYPES.includes(file.type.toLowerCase()))
+    return "Attach a PDF, a text or CSV file, or a PNG or JPEG image.";
+  if (file.size > MAX_ATTACHMENT_BYTES) return "The file is larger than 10 MB.";
+  return null;
+}
+
+/** The body of POST /api/v1/stage3/supplier-requests/{id}/reply: the note, and the uploaded file when there is one. */
+export function replyBody(note: string, attachmentId?: string | null) {
+  return { note: note.trim(), ...(attachmentId ? { attachment_id: attachmentId } : {}) };
+}
+
+export type SupplierReply = {
+  id: string;
+  note: string;
+  attachment_id?: string | null;
+  recorded_by?: string;
+  recorded_at?: string;
+};
+
+/** "2 replies, latest 3 Oct 2026" for the request list (or "No reply yet"). */
+export function repliesSummary(replies: SupplierReply[] | undefined, format: (value: unknown) => string): string {
+  const list = replies ?? [];
+  if (!list.length) return "No reply yet";
+  const latest = list[list.length - 1];
+  return `${list.length === 1 ? "1 reply" : `${list.length} replies`}, latest ${format(latest.recorded_at)}`;
+}
+
+export const REVIEW_NOTICE =
+  "Replies are recorded for review. Supplier material is never accepted as evidence automatically: review it and add it to the investigation's evidence yourself.";
+
 function EvidenceRequests() {
   const requests = useResource<any>("/api/v1/stage3/supplier-evidence-requests");
+  const canWrite = useCan("records.write");
+  const [replying, setReplying] = useState<any | null>(null);
+  const rows = listOf(requests.data?.requests ?? requests.data);
   return (
     <>
-      <NewEvidenceRequest onSent={requests.reload} />
-      <Panel eyebrow="My work" title="Supplier evidence requests" state={requests.state} error={requests.error}>
+      {canWrite && <NewEvidenceRequest onSent={requests.reload} />}
+      <Panel eyebrow="My work" title="Supplier evidence requests" source={requests}>
+        <p className="ac-note">{REVIEW_NOTICE}</p>
         <Table
           caption="Evidence requests"
-          rows={listOf(requests.data?.requests ?? requests.data)}
+          rows={rows}
           rowKey={(row, index) => String(row.id ?? index)}
           empty={{ title: "No evidence requests", detail: "Requests sent to suppliers for evidence appear here." }}
           columns={[
@@ -221,10 +264,158 @@ function EvidenceRequests() {
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
             { key: "recipient", label: "To", render: (row) => row.recipient ?? "—" },
             { key: "created", label: "Sent", render: (row) => formatDate(row.created_at) },
+            { key: "replies", label: "Replies", render: (row) => repliesSummary(row.replies, formatDate) },
+            {
+              key: "reply",
+              label: "",
+              render: (row) => (
+                <button type="button" className="ac-link" onClick={() => setReplying(row)}>
+                  <MessageSquareReply size={14} aria-hidden="true" /> {canWrite ? "Record reply" : "View replies"}
+                </button>
+              ),
+            },
           ]}
         />
       </Panel>
+      {replying && (
+        <SupplierReplies
+          request={replying}
+          canWrite={canWrite}
+          onClose={() => setReplying(null)}
+          onSaved={(updated) => {
+            setReplying({ ...replying, ...updated });
+            requests.reload();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** The exchange with the supplier on one request, and the form to record what they answered. */
+function SupplierReplies({
+  request,
+  canWrite,
+  onClose,
+  onSaved,
+}: {
+  request: any;
+  canWrite: boolean;
+  onClose: () => void;
+  onSaved: (updated: { status: string; replies: SupplierReply[] }) => void;
+}) {
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const base = `/api/v1/stage3/supplier-evidence-requests/${encodeURIComponent(String(request.id))}`;
+  const replies: SupplierReply[] = listOf(request.replies);
+  const fileProblem = attachmentProblem(file);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (fileProblem) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      let attachmentId: string | null = null;
+      if (file) {
+        // The file is stored (and scanned) first; the reply then names it.
+        const form = new FormData();
+        form.append("file", file);
+        const stored = await requestJson<{ id: string }>(`${base}/attachments`, {
+          method: "POST",
+          body: form,
+          timeoutMs: 120_000,
+        });
+        attachmentId = stored.id;
+      }
+      const result = await send<{ status: string; replies: SupplierReply[] }>(
+        `/api/v1/stage3/supplier-requests/${encodeURIComponent(String(request.id))}/reply`,
+        "POST",
+        replyBody(note, attachmentId),
+      );
+      setNote("");
+      setFile(null);
+      setMessage({ tone: "ok", text: "Reply recorded for review." });
+      onSaved({ status: result.status, replies: result.replies });
+    } catch (reason) {
+      setMessage({ tone: "error", text: errorText(reason, "The reply was not recorded.") });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Drawer title={`Replies: ${request.title ?? "Evidence request"}`} onClose={onClose}>
+      <p className="ac-note">{REVIEW_NOTICE}</p>
+      <section className="ca-drawer-section">
+        <h3>Recorded replies</h3>
+        {replies.length ? (
+          <ul>
+            {replies.map((reply) => (
+              <li key={reply.id}>
+                <p>{reply.note}</p>
+                <small className="ac-muted">
+                  Recorded {formatDate(reply.recorded_at)}
+                  {reply.attachment_id && (
+                    <>
+                      {" · "}
+                      <a
+                        className="ac-link"
+                        href={`${base}/attachments/${encodeURIComponent(reply.attachment_id)}`}
+                        download
+                      >
+                        <Paperclip size={12} aria-hidden="true" /> Attached file
+                      </a>
+                    </>
+                  )}
+                </small>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="ac-muted">No reply recorded yet.</p>
+        )}
+      </section>
+      {canWrite && (
+        <form className="ca-form ca-drawer-section" onSubmit={submit}>
+          <h3>Record a reply</h3>
+          <label className="ca-field">
+            What the supplier answered
+            <textarea
+              required
+              rows={4}
+              maxLength={4000}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="e.g. Certificate of conformance for lot KS-5521 received by email on 3 Oct"
+            />
+          </label>
+          <label className="ca-field">
+            File they sent (optional: PDF, text, CSV, PNG or JPEG, up to 10 MB)
+            <input
+              type="file"
+              accept={ATTACHMENT_TYPES.join(",")}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          {fileProblem && (
+            <p className="ca-inline-error" role="alert">
+              {fileProblem}
+            </p>
+          )}
+          {message && (
+            <p className={message.tone === "ok" ? "ca-inline-ok" : "ca-inline-error"} role="status">
+              {message.text}
+            </p>
+          )}
+          <div className="ca-action-row">
+            <button type="submit" className="ac-primary" disabled={busy || !note.trim() || !!fileProblem}>
+              {busy ? "Recording…" : "Record reply"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Drawer>
   );
 }
 
@@ -232,12 +423,7 @@ function Conversations() {
   const interactions = useResource<any>("/api/v1/stage3/interactions");
   const rows = listOf(interactions.data?.interactions ?? interactions.data);
   return (
-    <Panel
-      eyebrow="My work"
-      title="Your Ask MDARIX conversations"
-      state={interactions.state}
-      error={interactions.error}
-    >
+    <Panel eyebrow="My work" title="Your Ask MDARIX conversations" source={interactions}>
       {rows.length ? (
         <Table
           caption="AI conversations"

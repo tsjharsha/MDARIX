@@ -5,7 +5,16 @@ import { Stage2AdminControlPlane } from "../features/stage2/Stage2AdminControlPl
 import { MappingStudio } from "../features/stage2/MappingStudio";
 import { SubscriptionAdministration } from "../features/stage2/SubscriptionAdministration";
 import { allowedViewsForRole, isCustomerAdminRole, isPlatformAdminRole } from "./navigationPolicy";
-import { ApiError, requestJson } from "./apiClient";
+import { ApiError, requestJson, signInPath } from "./apiClient";
+import { SectionErrorBoundary } from "./ErrorBoundary";
+import {
+  canSwitchToWorkspace,
+  customerAdminDestination,
+  rememberMode,
+  rememberedMode,
+  type CustomerAdminMode,
+} from "./consoleChoice";
+import { SessionTimeoutWatch } from "../features/shared/SessionTimeout";
 import { signOut } from "../features/shared/session";
 import { api } from "./api";
 import { PlatformProductConfiguration } from "../features/stage2/PlatformProductConfiguration";
@@ -19,12 +28,14 @@ import { UserWorkspace } from "../features/workspace/UserWorkspace";
 import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministrationAudit";
 import { AuthPage } from "../features/auth/AuthPage";
 import { RequestDemoPage } from "../features/auth/RequestDemoPage";
+import { PilotGuidePage } from "../features/help/PilotGuidePage";
 
 export function App() {
   const publicPath = window.location.pathname;
   if (["/signin", "/signup", "/forgot-password", "/activate-account", "/reset-password", "/mfa"].includes(publicPath))
     return <AuthPage mode={publicPath.slice(1)} />;
   if (publicPath === "/request-demo") return <RequestDemoPage />;
+  if (publicPath === "/help/pilot-guide") return <PilotGuidePage />;
   // The signed-in application lives under /app and /platform-admin (router.ts). Match whole path segments, so a
   // website page such as /platform is never mistaken for /platform-admin.
   if (["/app", "/platform-admin"].some((root) => publicPath === root || publicPath.startsWith(`${root}/`)))
@@ -72,64 +83,106 @@ const CUSTOMER_CONSOLE_VIEWS: Partial<Record<AppView, string>> = {
   "admin-transformation-library": "Data & Configuration:Rules & reference data",
 };
 
+/** The session check failed for a reason that is not "signed out": the server could not be reached or failed. */
+const isOutage = (error: unknown) => error instanceof ApiError && (error.status === 0 || error.status >= 500);
+// Retry an unreachable server after 2, 4, 8 … seconds, at most every 30 seconds.
+const retryDelay = (attempt: number) => Math.min(30_000, 2000 * 2 ** attempt);
+
 export function PrivateApplicationGate() {
-  const [state, setState] = useState<"CHECKING" | "AUTHORIZED" | "DENIED">("CHECKING");
+  const [state, setState] = useState<"CHECKING" | "AUTHORIZED" | "UNREACHABLE">("CHECKING");
   useEffect(() => {
-    requestJson<{ mfa_state?: string | null }>("/api/v1/auth/session", { retries: 0, timeoutMs: 10000 })
-      .then((session) => {
-        // Password checked but the second factor is still due (or must be set up first).
-        if (session.mfa_state === "VERIFY") window.location.replace("/mfa");
-        else if (session.mfa_state === "ENROLL") window.location.replace("/mfa?setup=1");
-        else setState("AUTHORIZED");
+    let attempt = 0;
+    let timer: number | undefined;
+    let active = true;
+    const check = () =>
+      requestJson<{ mfa_state?: string | null }>("/api/v1/auth/session", {
+        retries: 0,
+        timeoutMs: 10000,
+        // This check decides where to go itself: never signed in is not "your session expired".
+        redirectOnUnauthorized: false,
       })
-      .catch(() => setState("DENIED"));
+        .then((session) => {
+          if (!active) return;
+          // Password checked but the second factor is still due (or must be set up first).
+          if (session.mfa_state === "VERIFY") window.location.replace("/mfa");
+          else if (session.mfa_state === "ENROLL") window.location.replace("/mfa?setup=1");
+          else setState("AUTHORIZED");
+        })
+        .catch((error) => {
+          if (!active) return;
+          // A server that is down or restarting is not a sign-out: say so and keep trying.
+          if (isOutage(error)) {
+            setState("UNREACHABLE");
+            timer = window.setTimeout(check, retryDelay(attempt++));
+            return;
+          }
+          const idle = error instanceof ApiError && error.code === "SESSION_IDLE_TIMEOUT";
+          window.location.replace(signInPath(idle ? "idle" : undefined, window.location));
+        });
+    void check();
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, []);
-  useEffect(() => {
-    if (state === "DENIED") window.location.replace(`/signin?returnTo=${encodeURIComponent(window.location.pathname)}`);
-  }, [state]);
   if (state !== "AUTHORIZED")
     return (
       <div className="auth-shell">
-        <div className="auth-card">
+        <div className="auth-card" role={state === "UNREACHABLE" ? "status" : undefined}>
           <span className="eyebrow">MDARIX secure application</span>
-          <h1>{state === "CHECKING" ? "Checking your session…" : "Sign in required"}</h1>
-          <p>Customer application routes require an authenticated session.</p>
+          <h1>{state === "CHECKING" ? "Checking your session…" : "MDARIX is not reachable, retrying"}</h1>
+          <p>
+            {state === "CHECKING"
+              ? "Customer application routes require an authenticated session."
+              : "You are still signed in. MDARIX opens as soon as the connection is back; you do not need to sign in again."}
+          </p>
         </div>
       </div>
     );
   return <PrivateApplication />;
 }
 
+type SecurityContext = {
+  display_name: string;
+  active_role: string | null;
+  tenant_id?: string;
+  personas?: Array<{ code: string; label: string }>;
+  allowed_menu?: string[];
+  environment?: string;
+  memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
+  current_tenant?: { tenant_id: string; tenant_name?: string };
+  entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
+};
+
 export function PrivateApplication() {
-  const [securityContext, setSecurityContext] = useState<{
-    display_name: string;
-    active_role: string | null;
-    tenant_id?: string;
-    personas?: Array<{ code: string; label: string }>;
-    allowed_menu?: string[];
-    environment?: string;
-    memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
-    current_tenant?: { tenant_id: string; tenant_name?: string };
-    entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
-  } | null>(null);
-  const [contextState, setContextState] = useState<"LOADING" | "READY" | "ERROR" | "TRIAL_ENDED">("LOADING");
+  const [securityContext, setSecurityContext] = useState<SecurityContext | null>(null);
+  const [contextState, setContextState] = useState<"LOADING" | "READY" | "ERROR" | "UNREACHABLE" | "TRIAL_ENDED">(
+    "LOADING",
+  );
+  const [contextError, setContextError] = useState<ApiError | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [trialEndedMessage, setTrialEndedMessage] = useState("");
   const [activeView, setActiveView] = useState<AppView>(() => viewFromPath(window.location.pathname));
+  const [adminMode, setAdminMode] = useState<CustomerAdminMode>(() => rememberedMode());
 
   useEffect(() => {
+    let timer: number | undefined;
+    let active = true;
     api<any>("/api/v1/session/context")
       .then((value) => {
+        if (!active) return;
         const role = String(value.active_role ?? "")
           .trim()
           .toUpperCase();
         const current = viewFromPath(window.location.pathname);
         const allowed = allowedViewsForRole(role);
-        const target: AppView =
-          isPlatformAdminRole(role) && !allowed?.includes(current)
-            ? "admin"
-            : isCustomerAdminRole(role) && current !== "customer-admin"
-              ? "customer-admin"
-              : current;
+        let target: AppView = current;
+        if (isPlatformAdminRole(role) && !allowed?.includes(current)) target = "admin";
+        else if (isCustomerAdminRole(role)) {
+          const destination = customerAdminDestination(current, rememberedMode(), allowed);
+          target = destination.view;
+          setAdminMode(destination.mode);
+        }
         setSecurityContext(value);
         setActiveView(target);
         if (target !== current) navigateTo(target);
@@ -139,13 +192,26 @@ export function PrivateApplication() {
         setContextState("READY");
       })
       .catch((error) => {
+        if (!active) return;
         setSecurityContext(null);
         if (error instanceof ApiError && error.code === "TRIAL_ENDED") {
           setTrialEndedMessage(error.message);
           setContextState("TRIAL_ENDED");
-        } else setContextState("ERROR");
+        } else if (isOutage(error)) {
+          // Not a sign-out: keep the page and try again shortly.
+          setContextError(error);
+          setContextState("UNREACHABLE");
+          timer = window.setTimeout(() => setLoadKey((key) => key + 1), retryDelay(Math.min(loadKey, 4)));
+        } else {
+          setContextError(error instanceof ApiError ? error : null);
+          setContextState("ERROR");
+        }
       });
-  }, []);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [loadKey]);
   useEffect(() => {
     const onPopState = () => setActiveView(viewFromPath(window.location.pathname));
     window.addEventListener("popstate", onPopState);
@@ -159,38 +225,73 @@ export function PrivateApplication() {
   const activeRole = securityContext?.active_role?.trim().toUpperCase();
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
+  const allowedViews = allowedViewsForRole(activeRole);
 
   useEffect(() => {
-    if (isPlatformAdmin && !allowedViewsForRole(activeRole)?.includes(activeView)) changeView("admin");
-    if (isCustomerAdmin && activeView !== "customer-admin") changeView("customer-admin");
-  }, [isPlatformAdmin, isCustomerAdmin]);
+    if (isPlatformAdmin && !allowedViews?.includes(activeView)) changeView("admin");
+    if (isCustomerAdmin) {
+      // Back and forward between the console and the workspace follow the address.
+      const destination = customerAdminDestination(activeView, adminMode, allowedViews);
+      if (destination.mode !== adminMode) setAdminMode(destination.mode);
+      if (destination.view !== activeView) changeView(destination.view);
+    }
+  }, [isPlatformAdmin, isCustomerAdmin, activeView]);
+
+  const switchTo = (mode: CustomerAdminMode) => {
+    rememberMode(mode);
+    setAdminMode(mode);
+    changeView(mode === "workspace" ? "home" : "customer-admin");
+  };
 
   if (contextState === "TRIAL_ENDED") return <TrialEnded message={trialEndedMessage} />;
   if (contextState !== "READY")
     return (
       <div className="auth-shell">
-        <div className="auth-card">
+        <div className="auth-card" role={contextState === "LOADING" ? undefined : "status"}>
           <span className="eyebrow">MDARIX secure application</span>
-          <h1>{contextState === "LOADING" ? "Loading your workspace…" : "Workspace unavailable"}</h1>
+          <h1>
+            {contextState === "LOADING"
+              ? "Loading your workspace…"
+              : contextState === "UNREACHABLE"
+                ? "MDARIX is not reachable, retrying"
+                : "Workspace unavailable"}
+          </h1>
           <p>
             {contextState === "LOADING"
               ? "Applying your tenant, role, and permission context."
-              : "Your authorized tenant context could not be loaded. Please sign in again."}
+              : contextState === "UNREACHABLE"
+                ? "You are still signed in. Your workspace opens as soon as MDARIX answers again."
+                : (contextError?.message ?? "Your organization's workspace could not be loaded.")}
           </p>
+          {contextError?.requestId && contextState !== "LOADING" && (
+            <p className="auth-links">
+              Reference for support: <code>{contextError.requestId}</code>
+            </p>
+          )}
           {contextState === "ERROR" && (
-            <a className="primary-action" href="/signin">
-              Return to sign in
-            </a>
+            <p className="auth-links">
+              <button type="button" className="primary-action" onClick={() => setLoadKey((key) => key + 1)}>
+                Try again
+              </button>{" "}
+              <a href="/signin">Return to sign in</a>
+            </p>
           )}
         </div>
       </div>
     );
 
-  // Non-admin users: the user workspace owns navigation, product context and sign-out.
-  if (!isPlatformAdmin && !isCustomerAdmin)
+  // Business users, and a customer administrator who switched into the workspace: the user workspace owns
+  // navigation, product context and sign-out.
+  if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && adminMode === "workspace"))
     return (
       <>
-        <UserWorkspace session={securityContext} initialView={activeView} />
+        <SectionErrorBoundary name="The workspace">
+          <UserWorkspace
+            session={securityContext}
+            initialView={activeView}
+            onAdminConsole={isCustomerAdmin ? () => switchTo("console") : undefined}
+          />
+        </SectionErrorBoundary>
         <ConsentBanner />
       </>
     );
@@ -203,6 +304,8 @@ export function PrivateApplication() {
     <div
       className={`app-shell ${isPlatformAdmin ? "platform-admin-shell" : ""} ${isCustomerAdmin ? "customer-admin-shell" : "quality-shell"}`}
     >
+      {/* The customer-admin console runs its own idle sign-out; every other screen here uses this one. */}
+      {activeView !== "customer-admin" && <SessionTimeoutWatch />}
       <div className="app-main" role={ownsMain ? undefined : "main"}>
         {isPlatformAdmin &&
           activeView !== "admin" &&
@@ -222,27 +325,33 @@ export function PrivateApplication() {
               <span>Controlled workspace</span>
             </div>
           )}
-        {activeView === "customer-admin" && (
-          <CustomerAdminControlPlane securityContext={securityContext} onNavigate={changeView} />
-        )}
-        {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
-        {activeView === "risk-traceability" && <RiskTraceabilityWorkspace />}
-        {activeView === "signature-verification" && <SignatureVerificationWorkspace />}
-        {isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS) && (
-          <SimplifiedPlatformAdminScreen
-            key={activeView}
-            securityContext={securityContext}
-            onNavigate={changeView}
-            initialSection={CUSTOMER_CONSOLE_VIEWS[activeView] ?? "Overview"}
-          />
-        )}
-        {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
-        {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
-        {activeView === "admin-subscriptions" && <SubscriptionAdministration />}
-        {activeView === "admin-mapping" && <MappingStudio />}
-        {activeView === "admin-audit" && <PlatformAdministrationAudit />}
-        {isPlatformAdmin && activeView === "platform-licenses" && <SubscriptionAdministration />}
-        {isPlatformAdmin && activeView === "platform-tenant-audit" && <PlatformAdministrationAudit />}
+        <SectionErrorBoundary name="This screen" resetKey={activeView}>
+          {activeView === "customer-admin" && (
+            <CustomerAdminControlPlane
+              securityContext={securityContext}
+              onNavigate={changeView}
+              onOpenWorkspace={canSwitchToWorkspace(allowedViews) ? () => switchTo("workspace") : undefined}
+            />
+          )}
+          {activeView === "regulatory-copilot" && <RegulatoryCopilot />}
+          {activeView === "risk-traceability" && <RiskTraceabilityWorkspace />}
+          {activeView === "signature-verification" && <SignatureVerificationWorkspace />}
+          {isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS) && (
+            <SimplifiedPlatformAdminScreen
+              key={activeView}
+              securityContext={securityContext}
+              onNavigate={changeView}
+              initialSection={CUSTOMER_CONSOLE_VIEWS[activeView] ?? "Overview"}
+            />
+          )}
+          {activeView === "admin-stage2" && <Stage2AdminControlPlane />}
+          {isPlatformAdmin && activeView === "admin-product-configuration" && <PlatformProductConfiguration />}
+          {activeView === "admin-subscriptions" && <SubscriptionAdministration />}
+          {activeView === "admin-mapping" && <MappingStudio />}
+          {activeView === "admin-audit" && <PlatformAdministrationAudit />}
+          {isPlatformAdmin && activeView === "platform-licenses" && <SubscriptionAdministration />}
+          {isPlatformAdmin && activeView === "platform-tenant-audit" && <PlatformAdministrationAudit />}
+        </SectionErrorBoundary>
       </div>
       <ConsentBanner />
     </div>

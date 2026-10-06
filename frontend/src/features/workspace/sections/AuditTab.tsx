@@ -24,12 +24,7 @@ export function AuditTab() {
   const rows = listOf(decisions.data?.decisions ?? decisions.data);
   return (
     <>
-      <Panel
-        eyebrow="Decision record"
-        title="Decisions in this investigation"
-        state={decisions.state}
-        error={decisions.error}
-      >
+      <Panel eyebrow="Decision record" title="Decisions in this investigation" source={decisions}>
         <p className="ac-muted">
           Every decision keeps who decided, when, and the exact version signed. Your organization's full audit trail is
           available to its administrators.
@@ -72,8 +67,7 @@ function Signatures({ decisionId }: { decisionId: string }) {
     <Panel
       eyebrow="Signatures"
       title="Signature verification"
-      state={verification.state}
-      error={verification.error}
+      source={verification}
       action={
         verification.data ? (
           <ToneBadge

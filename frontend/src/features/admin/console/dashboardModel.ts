@@ -100,9 +100,10 @@ export function planMix(customers: CustomerRow[]): Slice[] {
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
-const dayKey = (date: Date) => date.toISOString().slice(0, 10);
+// The calendar day where the person is: an event late in the evening belongs to that day, not to tomorrow in UTC.
+const pad = (value: number) => String(value).padStart(2, "0");
+const dayKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
-/** Counts per calendar day (UTC) for the `days` days ending on `today`, oldest first; empty days are zero. */
 /** The day a daily chart should end on: today, or the latest event when nothing happened in the window
  * (an older data set would otherwise show an empty chart). Without valid dates it is today. */
 export function chartWindowEnd(
@@ -119,19 +120,21 @@ export function chartWindowEnd(
   return latest < windowStart ? { end: new Date(latest), shifted: true } : { end: today, shifted: false };
 }
 
+/** Counts per calendar day (the browser's time zone) for the `days` days ending on `today`, oldest first; empty days
+ * are zero. */
 export function dailyCounts(
   timestamps: Array<string | null | undefined>,
   days: number,
   today = new Date(),
 ): DayCount[] {
-  const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
   const series: DayCount[] = [];
   const index = new Map<string, DayCount>();
   for (let offset = days - 1; offset >= 0; offset -= 1) {
-    const date = new Date(end.getTime() - offset * 86_400_000);
+    // Calendar arithmetic (not 24-hour steps), so a daylight-saving change never skips or repeats a day.
+    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset, 12);
     const entry = {
       date: dayKey(date),
-      label: date.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }),
+      label: date.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
       count: 0,
     };
     series.push(entry);

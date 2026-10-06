@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { Table } from "../customer-admin/shared";
@@ -271,6 +272,7 @@ export function TrialRequestsWorkspace() {
 
       {confirming && (
         <div className="trial-queue-dialog" role="dialog" aria-modal="true" aria-labelledby="trial-approve-title">
+          <DialogBehaviour onClose={() => setConfirming(null)} />
           <div>
             <h4 id="trial-approve-title">Approve a free trial for {confirming.organization}?</h4>
             <p>This creates, in one step:</p>
@@ -298,6 +300,7 @@ export function TrialRequestsWorkspace() {
 
       {retention && (
         <div className="trial-queue-dialog" role="dialog" aria-modal="true" aria-labelledby="trial-retention-title">
+          <DialogBehaviour onClose={() => setRetention(null)} />
           <div>
             <h4 id="trial-retention-title">Delete expired trial data</h4>
             {retention.length === 0 ? (
@@ -333,6 +336,7 @@ export function TrialRequestsWorkspace() {
 
       {declining && (
         <div className="trial-queue-dialog" role="dialog" aria-modal="true" aria-labelledby="trial-decline-title">
+          <DialogBehaviour onClose={() => setDeclining(null)} />
           <form
             onSubmit={(event) => {
               event.preventDefault();

@@ -30,8 +30,9 @@ export function DataMappingSection({ tab }: { tab?: string }) {
         Your mappings translate your systems' fields into MDARIX. They stay separate from the platform's master
         mappings, and every release is approved and audited.
       </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Data mapping sections" />
-      {active === "Mappings" ? <Mappings /> : <FieldMappings />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Data mapping sections">
+        {active === "Mappings" ? <Mappings /> : <FieldMappings />}
+      </Tabs>
     </>
   );
 }
@@ -46,8 +47,7 @@ function Mappings() {
       <Panel
         eyebrow="Data mapping"
         title="Mappings"
-        state={mappings.state}
-        error={mappings.error}
+        source={mappings}
         action={
           <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
             <Plus size={16} aria-hidden="true" /> New mapping
@@ -214,7 +214,7 @@ function FieldMappings() {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => listOf(fields.data).filter((row) => matches(row, query)), [fields.data, query]);
   return (
-    <Panel eyebrow="Data mapping" title="Field mappings" state={fields.state} error={fields.error}>
+    <Panel eyebrow="Data mapping" title="Field mappings" source={fields}>
       <div className="ca-toolbar">
         <SearchBox value={query} onChange={setQuery} label="Search source or MDARIX field" />
         <span className="ac-muted">{rows.length} fields</span>

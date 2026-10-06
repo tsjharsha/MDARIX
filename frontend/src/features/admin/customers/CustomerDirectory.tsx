@@ -38,8 +38,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
     <Panel
       eyebrow="Customers"
       title="Customer directory"
-      state={customers.state}
-      error={customers.error}
+      source={customers}
       action={
         <span className="cc-actions">
           <a

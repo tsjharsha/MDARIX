@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileText, Info, Search } from "lucide-react";
 import { Inline, Markdown } from "../shared/Markdown";
 import { useCan } from "../workspace/workspaceContext";
+import { refusalOf, scopeLabel } from "./refusal";
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -133,6 +134,8 @@ function AskAnswer({ result }: { result: any }) {
     ([, items]) => items.length > 0,
   );
   const notes = listOf(response.limitations).map(asText);
+  // Why no model answered (AI switched off, allowance used up, ...), with what the user can do about it.
+  const refusal = refusalOf(response);
   return (
     <section className="panel ask-answer" aria-labelledby="ask-answer-title">
       <header className="ask-answer-head">
@@ -157,6 +160,10 @@ function AskAnswer({ result }: { result: any }) {
 
       {answer ? (
         <Markdown source={answer} citations={citations} />
+      ) : refusal ? (
+        <p className="ask-unavailable" role="status" data-refusal-code={refusal.code}>
+          <AlertTriangle size={16} aria-hidden="true" /> {refusal.message}
+        </p>
       ) : (
         <p className="ask-unavailable">
           <AlertTriangle size={16} aria-hidden="true" /> The AI answer is not available right now.{" "}
@@ -232,8 +239,8 @@ function AskAnswer({ result }: { result: any }) {
           <dd>{result.interaction_id ?? "—"}</dd>
           <dt>Context policy</dt>
           <dd>{response.grounding?.policy_version ?? "—"}</dd>
-          <dt>Tenant scope enforced</dt>
-          <dd>{grounded ? "Yes" : "No"}</dd>
+          <dt>Scoped to investigation</dt>
+          <dd>{scopeLabel(grounded)}</dd>
           <dt>Field policy</dt>
           <dd>{response.grounding?.field_policy ?? "—"}</dd>
         </dl>

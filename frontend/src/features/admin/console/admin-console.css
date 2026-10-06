@@ -1000,11 +1000,12 @@ button.ac-stat:hover {
   padding: 0;
 }
 
-/* Create customer dialog */
+/* Create customer dialog (and every other modal): above the privacy notice (z-index 50), so it never covers a
+   dialog's buttons. */
 .ac-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 60;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -1014,6 +1015,9 @@ button.ac-stat:hover {
   display: grid;
   gap: 12px;
   width: min(460px, 100%);
+  /* A long dialog scrolls inside itself on a short screen instead of running off it. */
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
   padding: 22px;
   border-radius: var(--ac-radius);
   background: var(--ac-surface);
@@ -1539,4 +1543,28 @@ button.ac-kpi:focus-visible {
   .ac-kpis {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* A failed load: the reference the server logged it under, for a problem report. */
+.ac-request-id {
+  color: var(--ac-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.ac-request-id code {
+  font-size: 12px;
+  user-select: all;
+}
+.ac-empty .ac-secondary {
+  margin-top: 6px;
+}
+
+/* The selected tab's content (shared.tsx Tabs): it keeps the spacing of the page it sits in. */
+.ac-tabpanel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.ac-tabpanel:empty {
+  display: none;
 }

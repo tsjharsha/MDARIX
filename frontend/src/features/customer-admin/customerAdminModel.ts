@@ -119,3 +119,25 @@ export function customerAttention(input: {
   const rank: Record<Tone, number> = { critical: 4, serious: 3, warning: 2, neutral: 1, good: 0 };
   return items.sort((a, b) => rank[b.tone] - rank[a.tone]);
 }
+
+/**
+ * When the organization's subscription ends, and how many whole days are left: from the lifecycle answer
+ * (`subscription.expires_at`, or `expires_at`) or, during a free trial, the trial status. Null when the subscription
+ * has no end date the console can read.
+ */
+export function subscriptionEnd(
+  lifecycle: { expires_at?: string | null; subscription?: { expires_at?: string | null } | null } | null,
+  trial: { is_trial?: boolean; expires_at?: string | null; days_left?: number } | null,
+  now = new Date(),
+): { endsAt: string; daysLeft: number; trial: boolean } | null {
+  const fromLifecycle = lifecycle?.subscription?.expires_at ?? lifecycle?.expires_at ?? null;
+  const fromTrial = trial?.is_trial ? (trial.expires_at ?? null) : null;
+  const endsAt = fromLifecycle ?? fromTrial;
+  const time = endsAt ? Date.parse(endsAt) : Number.NaN;
+  if (!endsAt || Number.isNaN(time)) return null;
+  const daysLeft =
+    !fromLifecycle && typeof trial?.days_left === "number"
+      ? trial.days_left
+      : Math.max(0, Math.ceil((time - now.getTime()) / 86_400_000));
+  return { endsAt, daysLeft, trial: !fromLifecycle && !!fromTrial };
+}

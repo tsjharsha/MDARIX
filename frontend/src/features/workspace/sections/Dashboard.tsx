@@ -9,14 +9,22 @@ import {
   Gavel,
   Layers,
   Package,
+  RefreshCw,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import { BarList, Empty, Panel, RingMeter, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { titleCase, worstTone, type Slice, type Tone } from "../../admin/console/dashboardModel";
 import { KpiTile, TrendChart, toPoints, type DailyRow } from "../../admin/console/trendCharts";
 import { formatDate, listOf, useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { isHighSeverity, isOpenInvestigation, isVerified, workspaceAttention } from "../workspaceModel";
+import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import {
+  dashboardStatus,
+  isHighSeverity,
+  isOpenInvestigation,
+  isVerified,
+  workspaceAttention,
+} from "../workspaceModel";
 import { StatusBadge } from "./common";
 
 type Breakdown = Array<{ label: string; count: number }>;
@@ -84,8 +92,21 @@ export function DashboardSection() {
     };
   }, [signals.data, investigations.data, evidence.data, trends.data, work.view]);
 
-  const loading = [counts, signals, investigations, evidence].some((resource) => resource.state === "loading");
-  const tone: Tone = loading ? "neutral" : worstTone(model.attention.map((item) => item.tone));
+  const sources = [counts, signals, investigations, evidence];
+  const loading = sources.some((resource) => resource.state === "loading");
+  const status = dashboardStatus({
+    states: sources.map((resource) => resource.state),
+    counts: counts.state === "ready" ? (counts.data?.counts ?? {}) : null,
+    attention: model.attention.length,
+  });
+  const failed = sources.find((resource) => resource.state === "error");
+  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
+  const tone: Tone =
+    status === "loading" || status === "empty"
+      ? "neutral"
+      : status === "error"
+        ? "critical"
+        : worstTone(model.attention.map((item) => item.tone));
   const c = counts.data?.counts ?? {};
   const countsReady = counts.state === "ready";
   const trendsReady = trends.state === "ready";
@@ -103,18 +124,32 @@ export function DashboardSection() {
           <div>
             <p className="ac-eyebrow">Hello {firstName}</p>
             <h2>
-              {loading
+              {status === "loading"
                 ? "Checking your workspace…"
-                : model.attention.length
-                  ? `${model.attention.length} ${model.attention.length === 1 ? "thing needs" : "things need"} your attention`
-                  : "Nothing needs your attention"}
+                : status === "error"
+                  ? "Some of your data could not be loaded"
+                  : status === "empty"
+                    ? "Your workspace has no records yet"
+                    : status === "attention"
+                      ? `${model.attention.length} ${model.attention.length === 1 ? "thing needs" : "things need"} your attention`
+                      : "Nothing needs your attention"}
             </h2>
             <p>
-              {work.view?.product.name ? `Working on ${work.view.product.name}` : "No product selected"}
-              {work.view?.selected_version?.version_identifier
-                ? ` · version ${work.view.selected_version.version_identifier}`
-                : ""}
+              {status === "error"
+                ? `${failed?.error ?? "A source did not respond."} What is shown below may be incomplete.`
+                : status === "empty"
+                  ? "Bring in your products, lots and complaints to start. Signals, investigations and evidence appear here as they arrive."
+                  : `${work.view?.product.name ? `Working on ${work.view.product.name}` : "No product selected"}${
+                      work.view?.selected_version?.version_identifier
+                        ? ` · version ${work.view.selected_version.version_identifier}`
+                        : ""
+                    }`}
             </p>
+            {status === "error" && failed?.requestId && (
+              <p className="ac-request-id">
+                Reference for support: <code>{failed.requestId}</code>
+              </p>
+            )}
           </div>
         </div>
         <div className="ac-hero-meters">
@@ -127,7 +162,28 @@ export function DashboardSection() {
           />
         </div>
         <div className="ac-hero-actions">
-          <button type="button" className="ac-primary" onClick={() => open("Investigations")}>
+          {status === "error" && (
+            <button
+              type="button"
+              className="ac-primary"
+              onClick={() => sources.forEach((resource) => resource.reload())}
+            >
+              <RefreshCw size={16} aria-hidden="true" /> Retry
+            </button>
+          )}
+          {status === "empty" &&
+            (canImport ? (
+              <button type="button" className="ac-primary" onClick={() => open("Import data")}>
+                <Upload size={16} aria-hidden="true" /> Import CSV data
+              </button>
+            ) : (
+              <p className="ac-note">Ask your administrator to connect your systems or import your data.</p>
+            ))}
+          <button
+            type="button"
+            className={status === "error" || status === "empty" ? "ac-secondary" : "ac-primary"}
+            onClick={() => open("Investigations")}
+          >
             <FileSearch size={16} /> Investigations
           </button>
           <button type="button" className="ac-secondary" onClick={() => open("Intelligence", "Ask MDARIX")}>
@@ -214,8 +270,7 @@ export function DashboardSection() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Signals"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Signals", "Trends")} />}
         >
           <TrendChart data={model.signals} primaryLabel="signals" unit="signals" />
@@ -223,8 +278,7 @@ export function DashboardSection() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Investigations opened"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Investigations")} />}
         >
           <TrendChart data={model.opened} primaryLabel="opened" unit="investigations opened" />
@@ -232,8 +286,7 @@ export function DashboardSection() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Evidence added"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Evidence")} />}
         >
           <TrendChart data={model.evidence} primaryLabel="records" unit="evidence records" />
@@ -241,7 +294,7 @@ export function DashboardSection() {
       </section>
 
       <section className="ac-grid three" aria-label="Where the work stands">
-        <Panel eyebrow="Investigations" title="By status" state={trends.state} error={trends.error}>
+        <Panel eyebrow="Investigations" title="By status" source={trends}>
           {model.caseStatus.length ? (
             <BarList items={model.caseStatus} colour="series" />
           ) : (
@@ -251,8 +304,7 @@ export function DashboardSection() {
         <Panel
           eyebrow="Evidence"
           title="Evidence by reliability"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Evidence")} />}
         >
           {model.reliability.length ? (
@@ -264,8 +316,7 @@ export function DashboardSection() {
         <Panel
           eyebrow="Decisions"
           title="Decisions by status"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Decisions")} />}
         >
           {model.decisionStatus.length ? (
@@ -280,7 +331,10 @@ export function DashboardSection() {
         <Panel
           eyebrow="Needs attention"
           title="What to do next"
-          state={loading ? "loading" : "ready"}
+          state={loading ? "loading" : status === "error" ? "error" : "ready"}
+          error={failed ? "What needs attention cannot be worked out while a source is unavailable." : undefined}
+          requestId={failed?.requestId}
+          onRetry={failed ? () => sources.forEach((resource) => resource.reload()) : undefined}
           action={
             model.attention.length ? (
               <ToneBadge tone={tone} label={`${model.attention.length} open`} />
@@ -309,14 +363,20 @@ export function DashboardSection() {
               ))}
             </ul>
           ) : (
-            <Empty title="You're all caught up" detail="New signals, open cases and evidence gaps will appear here." />
+            <Empty
+              title={status === "empty" ? "No records yet" : "You're all caught up"}
+              detail={
+                status === "empty"
+                  ? "Import your data or connect your systems; new signals, open cases and evidence gaps will appear here."
+                  : "New signals, open cases and evidence gaps will appear here."
+              }
+            />
           )}
         </Panel>
         <Panel
           eyebrow="Investigations"
           title="Open cases"
-          state={investigations.state}
-          error={investigations.error}
+          source={investigations}
           action={<OpenLink onClick={() => open("Investigations")} />}
         >
           {model.openCases.length ? (
@@ -341,8 +401,7 @@ export function DashboardSection() {
         <Panel
           eyebrow="Signals"
           title="Latest signals"
-          state={signals.state}
-          error={signals.error}
+          source={signals}
           action={<OpenLink onClick={() => open("Signals", "All signals")} />}
         >
           {model.signalRows.length ? (
@@ -365,8 +424,7 @@ export function DashboardSection() {
         <Panel
           eyebrow="Signals"
           title="Signals by status"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Signals", "Trends")} />}
         >
           {model.signalStatus.length ? (

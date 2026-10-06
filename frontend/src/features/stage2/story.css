@@ -1,0 +1,9 @@
+/* The investigation story: one row per stage with its state and record count. */
+.story-stages {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.story-stages article {
+  justify-items: start;
+}

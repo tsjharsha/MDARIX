@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { describeError, postJson, requestJson } from "../../app/apiClient";
 
 export function CreateCustomer({ onCreated }: { onCreated: () => void }) {
   const [form, setForm] = useState({
@@ -39,9 +40,8 @@ export function CreateCustomer({ onCreated }: { onCreated: () => void }) {
   const update = (key: string, value: string | number) => setForm((current) => ({ ...current, [key]: value }));
   const saveDraft = async (nextStep = step) => {
     try {
-      await fetch(`/api/v1/platform-admin/onboarding/drafts/${encodeURIComponent(draftKey)}`, {
+      await requestJson(`/api/v1/platform-admin/onboarding/drafts/${encodeURIComponent(draftKey)}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idempotency_key: draftKey, current_step: nextStep, draft_data: form }),
       });
     } catch {
@@ -49,8 +49,7 @@ export function CreateCustomer({ onCreated }: { onCreated: () => void }) {
     }
   };
   useEffect(() => {
-    fetch(`/api/v1/platform-admin/onboarding/drafts/${encodeURIComponent(draftKey)}`)
-      .then((response) => (response.ok ? response.json() : null))
+    requestJson<any>(`/api/v1/platform-admin/onboarding/drafts/${encodeURIComponent(draftKey)}`)
       .then((draft) => {
         if (draft?.draft_data) setForm((current) => ({ ...current, ...draft.draft_data }));
         if (draft?.current_step) setStep(draft.current_step);
@@ -74,28 +73,14 @@ export function CreateCustomer({ onCreated }: { onCreated: () => void }) {
       invitation_required: true,
     };
     try {
-      const validationResponse = await fetch("/api/v1/platform-admin/onboarding/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const validation = await validationResponse.json();
-      if (!validationResponse.ok) throw new Error(validation.detail?.message ?? "Onboarding validation failed");
-      const response = await fetch("/api/v1/platform/tenants/provision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.detail?.message ?? "Provisioning failed");
+      await postJson("/api/v1/platform-admin/onboarding/validate", payload);
+      const result = await postJson<any>("/api/v1/platform/tenants/provision", payload, { timeoutMs: 60_000 });
       setJob({ ...result, steps: [] });
       setMessage(`Provisioning ${result.status}.`);
       if (result.job_id) {
         const poll = async () => {
           try {
-            const statusResponse = await fetch(`/api/v1/platform-admin/provisioning-jobs/${result.job_id}`);
-            const status = await statusResponse.json();
-            if (!statusResponse.ok) throw new Error(status.detail?.message ?? "Provisioning status unavailable");
+            const status = await requestJson<any>(`/api/v1/platform-admin/provisioning-jobs/${result.job_id}`);
             setJob((current: any) => ({ ...current, ...status }));
           } catch {
             /* keep the last server state */
@@ -106,7 +91,7 @@ export function CreateCustomer({ onCreated }: { onCreated: () => void }) {
         window.setTimeout(() => window.clearInterval(timer), 18000);
       }
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Provisioning failed");
+      setMessage(describeError(error, "Provisioning failed"));
     } finally {
       setBusy(false);
     }

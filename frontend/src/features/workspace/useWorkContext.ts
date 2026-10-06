@@ -17,6 +17,7 @@ export function useWorkContext(): WorkContext {
   const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
   const [investigationId, setInvestigationId] = useState("");
   const [investigationsVersion, setInvestigationsVersion] = useState(0);
+  const [productsVersion, setProductsVersion] = useState(0);
   const [pendingSelection, setPendingSelection] = useState("");
   const [view, setView] = useState<Product360 | null>(null);
   const [state, setState] = useState<WorkContext["state"]>("loading");
@@ -27,13 +28,14 @@ export function useWorkContext(): WorkContext {
       .then((items) => {
         setProducts(items);
         if (!items.length) setState("empty");
-        setProductId(items[0]?.id ?? "");
+        // A reload (after an import) keeps the product the person was working on when it is still there.
+        setProductId((selected) => (items.some((item) => item.id === selected) ? selected : (items[0]?.id ?? "")));
       })
       .catch((reason) => {
         setState("error");
         setError(reason instanceof Error ? reason.message : "Products could not be loaded");
       });
-  }, []);
+  }, [productsVersion]);
 
   // Keep the selected version one the product actually has, so the selector and the data always agree.
   useEffect(() => {
@@ -102,6 +104,7 @@ export function useWorkContext(): WorkContext {
       if (select) setPendingSelection(select);
       setInvestigationsVersion((value) => value + 1);
     },
+    refreshProducts: () => setProductsVersion((value) => value + 1),
     view,
     state,
     error,

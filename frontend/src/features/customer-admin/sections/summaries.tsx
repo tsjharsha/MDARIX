@@ -173,7 +173,7 @@ function UsersSummary() {
             state={users.state}
             empty="Roles appear once people are invited."
           />
-          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" source={trends}>
             <TrendChart data={signIns} primaryLabel="sign-ins" unit="sign-ins" />
           </Panel>
         </>
@@ -300,7 +300,7 @@ function IntegrationsSummary() {
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Sync runs" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sync runs" source={trends}>
             <TrendChart data={daily} primaryLabel="runs" secondaryLabel="failed" unit="sync runs" />
           </Panel>
           <Bars
@@ -511,10 +511,10 @@ function SecuritySummary() {
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" source={trends}>
             <TrendChart data={signIns} primaryLabel="sign-ins" unit="sign-ins" />
           </Panel>
-          <Panel eyebrow={`Last ${days} days`} title="Audit events" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Audit events" source={trends}>
             <TrendChart data={events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
           </Panel>
           <Bars
@@ -635,7 +635,7 @@ function AuditSummary() {
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Audit events" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Audit events" source={trends}>
             <TrendChart data={events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
           </Panel>
           <Bars

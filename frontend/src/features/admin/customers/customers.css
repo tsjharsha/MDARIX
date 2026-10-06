@@ -224,3 +224,21 @@
     gap: 2px;
   }
 }
+
+/* A result that is not a failure but still needs attention (a deletion that is still removing files). */
+.ac-message.tone-warning {
+  border-left-color: var(--ac-warning);
+  margin-bottom: 12px;
+}
+.cc-link-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cc-link-box input {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}

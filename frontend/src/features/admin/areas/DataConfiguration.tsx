@@ -180,8 +180,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
     <Panel
       eyebrow="Source system → MDARIX"
       title="Mappings"
-      state={mappings.state}
-      error={mappings.error}
+      source={mappings}
       action={
         <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
           <Plus size={16} aria-hidden="true" /> New mapping
@@ -452,7 +451,7 @@ function Releases({ onMessage }: { onMessage: Notify }) {
           </button>
         ))}
       </section>
-      <Panel eyebrow="Configuration releases" title="Releases" state={mappings.state} error={mappings.error}>
+      <Panel eyebrow="Configuration releases" title="Releases" source={mappings}>
         <Intro>
           A mapping goes live only after someone requests approval and a different administrator approves it. Releasing
           replaces nothing silently: a released version can be rolled back.
@@ -807,12 +806,7 @@ function RulesAndReferenceData() {
     }
   })();
   return (
-    <Panel
-      eyebrow="Master data · read-only"
-      title="Rules & reference data"
-      state={reference.state}
-      error={reference.error}
-    >
+    <Panel eyebrow="Master data · read-only" title="Rules & reference data" source={reference}>
       <Intro>
         The rules and controlled values that mappings and data checks use. They change only through a controlled
         release, so they are shown here without edit buttons.
@@ -896,8 +890,7 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
           <Panel
             eyebrow={data?.tenant.name ?? "Tenant"}
             title="Products"
-            state={config.state}
-            error={config.error}
+            source={config}
             action={
               <button type="button" className="ac-primary" onClick={() => setDialog({ kind: "product" })}>
                 <Plus size={16} aria-hidden="true" /> Add product
@@ -958,7 +951,7 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
             />
           </Panel>
           <div className="ac-grid two">
-            <Panel eyebrow="Source systems" title="Connections" state={config.state} error={config.error}>
+            <Panel eyebrow="Source systems" title="Connections" source={config}>
               <Table
                 caption="Connections"
                 rows={data?.connectors ?? []}
@@ -981,7 +974,7 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
                 ]}
               />
             </Panel>
-            <Panel eyebrow="Tenant-specific" title="Mapping versions" state={config.state} error={config.error}>
+            <Panel eyebrow="Tenant-specific" title="Mapping versions" source={config}>
               <Table
                 caption="Mapping versions"
                 rows={data?.mapping_versions ?? []}

@@ -57,6 +57,7 @@ type Ops = {
     present: Record<string, boolean>;
     sender_domain_verified: boolean;
     reminders_pending: number;
+    reminders_dead_lettered?: number;
     reminder_delivery: string;
   };
 };
@@ -68,22 +69,41 @@ export function Operations({ section }: { section: string }) {
   return <Health />;
 }
 
+/**
+ * The Application tile from /health/status: ok and degraded answer 200, down answers 503 (which arrives as a failed
+ * request). A request that fails for another reason is "Unknown", not "Down".
+ */
+export function applicationHealth(
+  state: "loading" | "ready" | "error" | "forbidden",
+  status: string | undefined,
+): { value: string | null; detail: string; tone?: "good" | "warning" | "critical" } {
+  if (state === "loading") return { value: null, detail: "Checking" };
+  const word = String(status ?? "").toLowerCase();
+  if (state === "ready" && word === "ok") return { value: "OK", detail: "Accepting requests", tone: "good" };
+  if (state === "ready" && word === "degraded")
+    return { value: "Degraded", detail: "Serving requests; a supporting service needs attention", tone: "warning" };
+  if (state === "error") return { value: "Down", detail: "Not accepting requests", tone: "critical" };
+  return { value: "Unknown", detail: "The status could not be read", tone: "warning" };
+}
+
 const useOps = () => useResource<Ops>("/api/v1/platform-admin/console/operations");
 
 /** Is the platform up: database, background work and email, at a glance. */
 function Health() {
   const ops = useOps();
-  const ready = useResource<{ status: string; database?: string }>("/health/ready");
+  // The public status word (/health/ready is for the deployment's own probes and is not served to browsers).
+  const health = useResource<{ status: string }>("/health/status");
+  const application = applicationHealth(health.state, health.data?.status);
   const data = ops.data;
   return (
     <div className="ac-grid">
       <section className="ac-stats ar-stats-4" aria-label="System health">
         <StatTile
           label="Application"
-          value={ready.data ? titleCase(ready.data.status) : ready.state === "error" ? "Not ready" : null}
-          detail="Accepting requests"
+          value={application.value}
+          detail={application.detail}
           icon={<ServerCog size={18} />}
-          tone={ready.data?.status === "ready" ? "good" : ready.state === "error" ? "critical" : undefined}
+          tone={application.tone}
         />
         <StatTile
           label="Database"
@@ -272,7 +292,8 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
         rowKey={(row) => row.key}
         empty={{
           title: "Nothing gave up",
-          detail: "Background work that fails five times appears here for a decision.",
+          detail:
+            "Background work that still fails after repeated retries over several hours appears here for a decision.",
         }}
         columns={[
           { key: "kind", label: "Kind", render: (row) => titleCase(row.event_name), fields: ["event_name"] },
@@ -426,9 +447,18 @@ function Email() {
           <strong>{email?.reminders_pending ?? 0}</strong> reminders are queued.
         </p>
         <p className="ar-notice" role="note">
-          <Mail size={16} aria-hidden="true" /> Sending queued renewal reminders is not connected yet, so customers do
-          not receive them. Schedules and wording are set per tenant under Plans &amp; Licensing, Reminders.
+          <Mail size={16} aria-hidden="true" />{" "}
+          {email?.reminder_delivery === "CONNECTED"
+            ? "The background worker emails queued reminders to each tenant's Customer Administrators and the contacts in its notification settings."
+            : "Email is not configured, so queued reminders are not sent."}{" "}
+          Schedules and wording are set per tenant under Plans &amp; Licensing, Reminders.
         </p>
+        {Boolean(email?.reminders_dead_lettered) && (
+          <p className="ca-inline-error" role="alert">
+            {email?.reminders_dead_lettered} reminders could not be delivered after every retry. See Queues &amp; jobs,
+            Gave up after retries.
+          </p>
+        )}
       </Panel>
     </div>
   );

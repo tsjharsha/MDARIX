@@ -2,12 +2,15 @@ import type { ReactNode } from "react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase, type Tone } from "../../admin/console/dashboardModel";
 import { Table, formatDate } from "../../customer-admin/shared";
+import { formatDay } from "../../../app/dates";
 import type { Product360 } from "../../../app/types";
-import { useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useWorkspace } from "../workspaceContext";
+import { Upload } from "lucide-react";
 
 /** Render children only once the shared Product 360 context is available; otherwise say why not. */
 export function NeedsProduct({ children }: { children: (view: Product360) => ReactNode }) {
-  const { work } = useWorkspace();
+  const { work, session, open } = useWorkspace();
+  const canImport = sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions);
   if (work.view) return <>{children(work.view)}</>;
   if (work.state === "loading")
     return (
@@ -18,11 +21,25 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
   if (work.state === "empty")
     return (
       <Panel title="No products yet">
-        <Empty title="No products are connected" detail="Products appear once your organization's data is connected." />
+        <Empty
+          title="No products are connected"
+          detail={
+            canImport
+              ? "Import your products, lots and complaints as CSV files, or ask your administrator to connect your systems."
+              : "Products appear once your administrator connects your systems or imports your data."
+          }
+        />
+        {canImport && (
+          <div className="ca-action-row">
+            <button type="button" className="ac-primary" onClick={() => open("Import data")}>
+              <Upload size={16} aria-hidden="true" /> Import data
+            </button>
+          </div>
+        )}
       </Panel>
     );
   return (
-    <Panel title="Product data unavailable" state="error" error={work.error}>
+    <Panel title="Product data unavailable" state="error" error={work.error} onRetry={work.refreshProducts}>
       {null}
     </Panel>
   );
@@ -54,7 +71,9 @@ export function StatusBadge({ value }: { value: unknown }) {
   return <ToneBadge tone={STATUS_TONE[key] ?? "neutral"} label={titleCase(key)} />;
 }
 
-const DATE_KEY = /(_at|_time|timestamp|_date)$/;
+const DATE_KEY = /(_at|_time|timestamp)$/;
+// Calendar dates (received_date, due_date …): a day, never a time of day the record does not have.
+const DAY_KEY = /_date$/;
 const STATUS_KEY = /(status|severity)$/;
 
 /** A readable table for record lists whose columns are chosen by the caller. */
@@ -82,6 +101,8 @@ export function RecordTable({
         render: (row: Record<string, unknown>) =>
           STATUS_KEY.test(key) ? (
             <StatusBadge value={row[key]} />
+          ) : DAY_KEY.test(key) ? (
+            formatDay(row[key] as string, String(row[key]))
           ) : DATE_KEY.test(key) ? (
             formatDate(row[key])
           ) : row[key] === null || row[key] === undefined || row[key] === "" ? (

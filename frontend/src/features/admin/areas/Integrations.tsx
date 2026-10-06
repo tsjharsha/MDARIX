@@ -37,7 +37,7 @@ function Catalog() {
   const chosen = rows.find((row) => row.application_id === selected);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Source systems" title="Connector catalog" state={applications.state} error={applications.error}>
+      <Panel eyebrow="Source systems" title="Connector catalog" source={applications}>
         <Intro>Systems a customer can connect (QMS, ERP, PLM and others). Choose one to see its connectors.</Intro>
         <Table
           caption="Source systems"
@@ -225,7 +225,7 @@ function Runs() {
           onOpen={() => filter(() => setStatus("completed"))}
         />
       </section>
-      <Panel eyebrow="All tenants" title="Integration runs" state={runs.state} error={runs.error}>
+      <Panel eyebrow="All tenants" title="Integration runs" source={runs}>
         <div className="cc-toolbar">
           <SearchBox value={query} onChange={(value) => filter(() => setQuery(value))} label="Search source system" />
           <select aria-label="Result" value={status} onChange={(event) => filter(() => setStatus(event.target.value))}>
@@ -273,7 +273,7 @@ function Reconciliation() {
   const { runs, page, setPage } = useRuns({ reconciled: "true" });
   return (
     <div className="ac-grid two ar-wide-right">
-      <Panel eyebrow="Last 30 days" title="Reconciliation results" state={runs.state} error={runs.error}>
+      <Panel eyebrow="Last 30 days" title="Reconciliation results" source={runs}>
         <Intro>After a run, the records kept are checked against the source system. A mismatch needs a look.</Intro>
         {runs.data && Object.keys(runs.data.last_30_days.by_reconciliation).length ? (
           <BarList items={slices(runs.data.last_30_days.by_reconciliation)} />
@@ -281,7 +281,7 @@ function Reconciliation() {
           <p className="ac-muted">No run was reconciled in the last 30 days.</p>
         )}
       </Panel>
-      <Panel eyebrow="All tenants" title="Reconciled runs" state={runs.state} error={runs.error}>
+      <Panel eyebrow="All tenants" title="Reconciled runs" source={runs}>
         <Table
           caption="Reconciled runs"
           rows={runs.data?.items ?? []}
@@ -308,12 +308,7 @@ function Credentials() {
   const rows = listOf(credentials.data);
   const missing = rows.filter((row) => !row.credential_configured).length;
   return (
-    <Panel
-      eyebrow="MDARIX platform tenant"
-      title="Connection credentials"
-      state={credentials.state}
-      error={credentials.error}
-    >
+    <Panel eyebrow="MDARIX platform tenant" title="Connection credentials" source={credentials}>
       <Intro>
         Secrets live in the secret store; MDARIX keeps only a reference to them and never shows their value.{" "}
         {rows.length > 0 &&
@@ -374,7 +369,7 @@ function Schemas() {
   const objectRows = listOf(objects.data);
   return (
     <div className="ac-grid">
-      <Panel eyebrow="Source schemas" title="Records and fields" state={applications.state} error={applications.error}>
+      <Panel eyebrow="Source schemas" title="Records and fields" source={applications}>
         <Intro>
           Choose a source system to see the records it offers, then a record to see its fields. The platform API itself
           is under Operations, Developer API.
@@ -399,7 +394,7 @@ function Schemas() {
       </Panel>
       {applicationId && (
         <div className="ac-grid two ar-wide-right">
-          <Panel eyebrow="Records" title="Source records" state={objects.state} error={objects.error}>
+          <Panel eyebrow="Records" title="Source records" source={objects}>
             <Table
               caption="Source records"
               rows={objectRows}

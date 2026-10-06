@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
-import { SearchBox, Table, Tabs, formatDate, listOf, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { formatDay } from "../../../app/dates";
 import { useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
@@ -16,28 +17,32 @@ export function SignalsSection({ tab }: { tab?: string }) {
   return (
     <>
       <p className="ca-lede">Signals are recorded observations. They are not conclusions about cause.</p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Signal sections" />
-      {active === "Product complaints" && (
-        <NeedsProduct>
-          {(view) => (
-            <Panel eyebrow={view.product.name ?? "Product"} title="Complaints for the selected version">
-              <RecordTable
-                caption="Complaints"
-                rows={view.complaints}
-                columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
-                empty={{ title: "No complaints recorded", detail: "Complaints for this product version appear here." }}
-              />
-            </Panel>
-          )}
-        </NeedsProduct>
-      )}
-      {active === "All signals" && (
-        <Embedded>
-          <Stage2Experience mode="signals" />
-        </Embedded>
-      )}
-      {active === "Complaint list" && <ComplaintList />}
-      {active === "Trends" && <Trends />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Signal sections">
+        {active === "Product complaints" && (
+          <NeedsProduct>
+            {(view) => (
+              <Panel eyebrow={view.product.name ?? "Product"} title="Complaints for the selected version">
+                <RecordTable
+                  caption="Complaints"
+                  rows={view.complaints}
+                  columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
+                  empty={{
+                    title: "No complaints recorded",
+                    detail: "Complaints for this product version appear here.",
+                  }}
+                />
+              </Panel>
+            )}
+          </NeedsProduct>
+        )}
+        {active === "All signals" && (
+          <Embedded>
+            <Stage2Experience mode="signals" />
+          </Embedded>
+        )}
+        {active === "Complaint list" && <ComplaintList />}
+        {active === "Trends" && <Trends />}
+      </Tabs>
     </>
   );
 }
@@ -72,10 +77,10 @@ function Trends() {
   }, [signals.data]);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Signals" title={model.title} state={signals.state} error={signals.error}>
+      <Panel eyebrow="Signals" title={model.title} source={signals}>
         <ColumnChart data={model.trend} unit="signals" caption="latest 100 recorded signals" />
       </Panel>
-      <Panel eyebrow="Signals" title="By recorded severity" state={signals.state} error={signals.error}>
+      <Panel eyebrow="Signals" title="By recorded severity" source={signals}>
         {model.severity.length ? (
           <BarList items={model.severity} colour="series" />
         ) : (
@@ -108,8 +113,7 @@ function ComplaintList() {
     <Panel
       eyebrow="Signals"
       title={`Complaints in your organization${list.data ? ` · ${list.data.total}` : ""}`}
-      state={list.state}
-      error={list.error}
+      source={list}
     >
       <div className="cc-toolbar">
         <SearchBox
@@ -157,7 +161,7 @@ function ComplaintList() {
             key: "received",
             label: "Received",
             fields: ["received_date"],
-            render: (row) => formatDate(row.received_date ?? row.event_date),
+            render: (row) => formatDay(row.received_date ?? row.event_date),
           },
           {
             key: "severity",

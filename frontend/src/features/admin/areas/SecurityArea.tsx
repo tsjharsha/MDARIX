@@ -172,8 +172,7 @@ function AuditTrail() {
     <Panel
       eyebrow="All tenants"
       title="Audit trail"
-      state={audit.state}
-      error={audit.error}
+      source={audit}
       action={
         <span className="cc-actions">
           <a
@@ -283,8 +282,7 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
     <Panel
       eyebrow="Customer support"
       title="Support access"
-      state={grants.state}
-      error={grants.error}
+      source={grants}
       action={
         <button type="button" className="ac-primary" onClick={() => setRequesting(true)}>
           <LifeBuoy size={16} aria-hidden="true" /> Request access

@@ -1,6 +1,15 @@
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { AlertTriangle, Search, X } from "lucide-react";
-import { ApiError, requestJson } from "../../app/apiClient";
+import { ApiError, describeError, requestJson } from "../../app/apiClient";
 import { Empty, Panel, type PanelState } from "../admin/console/charts";
 import { ColumnChooser, ColumnScope } from "../tables/ColumnChooser";
 import {
@@ -12,12 +21,22 @@ import {
   saveSelection,
 } from "../tables/columnModel";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
-import { formatDateTime } from "../../app/dates";
+import { nextTabIndex } from "../shared/focus";
+import { formatDateTime, formatDay, isDateOnly } from "../../app/dates";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
 
-export type Resource<T> = { state: PanelState; data: T | null; error?: string; reload: () => void };
+export type Resource<T> = {
+  state: PanelState;
+  data: T | null;
+  error?: string;
+  /** The server's error code, e.g. TRIAL_ENDED (a 403 that is not about the person's role). */
+  code?: string;
+  /** The id the server logged a failure under, shown with the error for a problem report. */
+  requestId?: string;
+  reload: () => void;
+};
 
 export function useResource<T>(path: string | null): Resource<T> {
   const [version, setVersion] = useState(0);
@@ -35,6 +54,8 @@ export function useResource<T>(path: string | null): Resource<T> {
             state: reason instanceof ApiError && reason.status === 403 ? "forbidden" : "error",
             data: null,
             error: reason instanceof Error ? reason.message : undefined,
+            code: reason instanceof ApiError ? reason.code : undefined,
+            requestId: reason instanceof ApiError ? reason.requestId : undefined,
           }),
       );
     return () => {
@@ -52,7 +73,8 @@ export async function send<T = any>(path: string, method: "POST" | "PUT" | "PATC
   return requestJson<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export const errorText = (reason: unknown, fallback: string) => (reason instanceof Error ? reason.message : fallback);
+/** The server's message for a failed change, with the reference to quote to support when there is one. */
+export const errorText = (reason: unknown, fallback: string) => describeError(reason, fallback);
 
 export const humanize = (value: unknown) =>
   value === null || value === undefined || value === ""
@@ -62,10 +84,11 @@ export const humanize = (value: unknown) =>
         .replace(/_/g, " ")
         .replace(/^\w/, (letter) => letter.toUpperCase());
 
-/** A date and time with its time zone (app/dates.ts); an unreadable value is shown as it is. */
+/** A date and time with its time zone (app/dates.ts); a calendar date alone ("2026-03-04") as a day, without an
+ * invented midnight; an unreadable value is shown as it is. */
 export const formatDate = (value: unknown) => {
   if (!value) return "—";
-  return formatDateTime(String(value), String(value));
+  return isDateOnly(value) ? formatDay(String(value), String(value)) : formatDateTime(String(value), String(value));
 };
 
 /** Section card bound to one resource: shows loading / error / forbidden, then the content. */
@@ -83,7 +106,7 @@ export function ResourcePanel<T>({
   children: (data: T) => ReactNode;
 }) {
   return (
-    <Panel title={title} eyebrow={eyebrow} state={resource.state} error={resource.error} action={action}>
+    <Panel title={title} eyebrow={eyebrow} source={resource} action={action}>
       {resource.data !== null && children(resource.data)}
     </Panel>
   );
@@ -227,7 +250,9 @@ export type Confirmation = {
   reason?: { label: string; min: number };
   /** Ask the signed-in administrator to re-enter their password (the server verifies it). */
   password?: boolean;
-  run: (reason: string, password: string) => Promise<unknown>;
+  /** A statement the administrator must tick before the change is allowed (sent to the server as acknowledged). */
+  acknowledge?: string;
+  run: (reason: string, password: string, acknowledged: boolean) => Promise<unknown>;
   done: string;
 };
 
@@ -245,18 +270,20 @@ export function ConfirmDialog({
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
   useEffect(() => {
     setBusy(false);
     setError("");
     setReason("");
     setPassword("");
+    setAcknowledged(false);
   }, [request]);
   if (!request) return null;
   const confirm = async () => {
     setBusy(true);
     setError("");
     try {
-      await request.run(reason.trim(), password);
+      await request.run(reason.trim(), password, acknowledged);
       onDone(request.done);
     } catch (reason) {
       setError(errorText(reason, "The change was not applied."));
@@ -293,6 +320,12 @@ export function ConfirmDialog({
             />
           </label>
         )}
+        {request.acknowledge && (
+          <label className="ca-check ca-acknowledge">
+            <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+            {request.acknowledge}
+          </label>
+        )}
         {error && (
           <p className="ca-inline-error" role="alert">
             <AlertTriangle size={15} aria-hidden="true" /> {error}
@@ -309,7 +342,8 @@ export function ConfirmDialog({
             disabled={
               busy ||
               (!!request.reason && reason.trim().length < request.reason.min) ||
-              (!!request.password && !password)
+              (!!request.password && !password) ||
+              (!!request.acknowledge && !acknowledged)
             }
           >
             {busy ? "Working…" : request.confirmLabel}
@@ -341,31 +375,64 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
   );
 }
 
+const slug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/**
+ * Tabs that follow the WAI-ARIA pattern: the arrow keys (and Home, End) move between tabs and open them, only the
+ * selected tab is in the Tab order, and the content below is the selected tab's labelled tabpanel.
+ */
 export function Tabs<T extends string>({
   tabs,
   active,
   onChange,
   label,
+  children,
 }: {
   tabs: readonly T[];
   active: T;
   onChange: (tab: T) => void;
   label: string;
+  /** The selected tab's content, rendered as its tabpanel. */
+  children?: ReactNode;
 }) {
+  const base = `tabs-${slug(label)}`;
+  const tabId = (tab: T) => `${base}-${slug(tab)}`;
+  const list = useRef<HTMLDivElement>(null);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const next = nextTabIndex(event.key, Math.max(0, tabs.indexOf(active)), tabs.length);
+    if (next === null) return;
+    event.preventDefault();
+    onChange(tabs[next]);
+    list.current?.querySelector<HTMLButtonElement>(`#${CSS.escape(tabId(tabs[next]))}`)?.focus();
+  };
   return (
-    <div className="ac-tabs" role="tablist" aria-label={label}>
-      {tabs.map((tab) => (
-        <button
-          type="button"
-          role="tab"
-          key={tab}
-          aria-selected={active === tab}
-          className={active === tab ? "selected" : ""}
-          onClick={() => onChange(tab)}
-        >
-          {tab}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="ac-tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKeyDown}>
+        {tabs.map((tab) => (
+          <button
+            type="button"
+            role="tab"
+            key={tab}
+            id={tabId(tab)}
+            aria-selected={active === tab}
+            aria-controls={`${base}-panel`}
+            tabIndex={active === tab ? 0 : -1}
+            className={active === tab ? "selected" : ""}
+            onClick={() => onChange(tab)}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+      {children !== undefined && (
+        <div role="tabpanel" id={`${base}-panel`} aria-labelledby={tabId(active)} className="ac-tabpanel">
+          {children}
+        </div>
+      )}
+    </>
   );
 }

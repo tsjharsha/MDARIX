@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Bug, CircleHelp, LifeBuoy, ShieldCheck } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, LifeBuoy, NotebookText, ShieldCheck } from "lucide-react";
 import { useSiteInfo } from "../../site/legal";
+import { ReportProblemDialog } from "./ReportProblem";
 
 /**
- * Help in every signed-in screen: getting started (during a trial), the support address, a "report a problem" email
- * that carries the page and time (no personal data), and the security and privacy pages. The support address comes
- * from the server configuration (backend/app/site_info.py).
+ * Help in every signed-in screen: getting started (during a trial), the pilot guide, the support address, a
+ * "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and privacy pages.
+ * The support address comes from the server configuration (backend/app/site_info.py).
  */
 export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [reporting, setReporting] = useState(false);
   const info = useSiteInfo();
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -25,11 +27,6 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
     };
   }, [open]);
   const support = info?.support_email;
-  const report = support
-    ? `mailto:${support}?subject=${encodeURIComponent("MDARIX problem report")}&body=${encodeURIComponent(
-        `What happened:\n\nWhat you expected:\n\nPage: ${window.location.pathname}\nTime: ${new Date().toISOString()}\n`,
-      )}`
-    : "/contact";
   return (
     <div className="help-menu" ref={root}>
       <button
@@ -58,14 +55,25 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
             </li>
           )}
           <li>
+            <a href="/help/pilot-guide" target="_blank" rel="noopener">
+              <NotebookText size={15} aria-hidden="true" /> Pilot guide
+            </a>
+          </li>
+          <li>
             <a href={support ? `mailto:${support}` : "/contact"} target={support ? undefined : "_blank"} rel="noopener">
               <LifeBuoy size={15} aria-hidden="true" /> Contact support{support ? ` (${support})` : ""}
             </a>
           </li>
           <li>
-            <a href={report} target={support ? undefined : "_blank"} rel="noopener">
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setReporting(true);
+              }}
+            >
               <Bug size={15} aria-hidden="true" /> Report a problem
-            </a>
+            </button>
           </li>
           <li>
             <a href="/security" target="_blank" rel="noopener">
@@ -74,6 +82,7 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
           </li>
         </ul>
       )}
+      {reporting && <ReportProblemDialog supportEmail={support ?? undefined} onClose={() => setReporting(false)} />}
     </div>
   );
 }

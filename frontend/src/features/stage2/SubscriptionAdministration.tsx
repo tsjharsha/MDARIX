@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { describeError, postJson, requestJson } from "../../app/apiClient";
 
 type Customer = { id: string; name: string; tenant_key: string };
 type Plan = { id: string; code?: string; name?: string; version?: string; status?: string };
@@ -22,36 +23,22 @@ export function SubscriptionAdministration() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [customersResponse, plansResponse, expiryResponse] = await Promise.all([
-          fetch("/api/v1/platform/customers", { credentials: "include" }),
-          fetch("/api/v1/platform-admin/plans", { credentials: "include" }),
-          fetch("/api/v1/platform/subscriptions/expiring", { credentials: "include" }),
+        const [customerRows, planRows, expiryRows] = await Promise.all([
+          requestJson<any>("/api/v1/platform/customers"),
+          requestJson<any>("/api/v1/platform-admin/plans"),
+          requestJson<any>("/api/v1/platform/subscriptions/expiring"),
         ]);
-        if (!customersResponse.ok || !plansResponse.ok || !expiryResponse.ok)
-          throw new Error("Subscription data is unavailable");
-        const customerRows = await customersResponse.json();
-        const planRows = await plansResponse.json();
         setCustomers(customerRows);
         setPlans(planRows.items ?? planRows);
-        setExpiring(await expiryResponse.json());
+        setExpiring(expiryRows);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Subscription data is unavailable");
+        setError(describeError(e, "Subscription data is unavailable"));
       }
     };
     load();
   }, []);
 
-  const post = async (url: string, body: unknown) => {
-    const response = await fetch(url, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail?.message ?? "Request failed");
-    return data;
-  };
+  const post = (url: string, body: unknown) => postJson<any>(url, body);
   const savePolicy = async () => {
     if (!tenantId) return setError("Select a customer tenant first.");
     try {
@@ -65,7 +52,7 @@ export function SubscriptionAdministration() {
       setMessage(`Reminder policy ${result.version} saved.`);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeError(e, "The request could not be completed."));
     }
   };
   const saveTemplate = async () => {
@@ -78,7 +65,7 @@ export function SubscriptionAdministration() {
       setMessage(`Email template ${result.stage} ${result.version} saved as ${result.status}.`);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeError(e, "The request could not be completed."));
     }
   };
   const runLifecycle = async () => {
@@ -87,7 +74,7 @@ export function SubscriptionAdministration() {
       setMessage(`Lifecycle run complete: ${result.queued} reminder(s) queued, ${result.transitioned} transition(s).`);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeError(e, "The request could not be completed."));
     }
   };
   const changePlan = async () => {
@@ -98,7 +85,7 @@ export function SubscriptionAdministration() {
       setMessage(`Subscription changed successfully. Expiry version: ${result.expiry_version}.`);
       setError("");
     } catch (e) {
-      setError((e as Error).message);
+      setError(describeError(e, "The request could not be completed."));
     }
   };
 

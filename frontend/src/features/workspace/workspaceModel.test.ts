@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  dashboardStatus,
   defaultTimeContext,
+  localDay,
   preferredInvestigationId,
   countBy,
   investigationStatusSlices,
@@ -54,6 +56,46 @@ describe("user workspace model", () => {
     expect(sectionAllowed("My Account", undefined)).toBe(true);
     expect(sectionAllowed("Products", ["products"])).toBe(true);
     expect(sectionAllowed("Decisions", ["products"])).toBe(false);
+  });
+
+  it("shows Import data only to roles the server lets change records", () => {
+    expect(sectionAllowed("Import data", ["products"], ["records.write"])).toBe(true);
+    expect(sectionAllowed("Import data", ["products"], ["ai.run"])).toBe(false);
+    expect(sectionAllowed("Import data", ["products"], undefined)).toBe(false);
+    expect(sectionAllowed("Share feedback", undefined)).toBe(true);
+  });
+});
+
+describe("dashboard headline", () => {
+  const ready = ["ready", "ready", "ready", "ready"] as const;
+  const counts = { products: 2, complaints: 10, investigations: 1, evidence: 4 };
+  it("says nothing needs attention only after the data was read and the organization has records", () => {
+    expect(dashboardStatus({ states: [...ready], counts, attention: 0 })).toBe("clear");
+    expect(dashboardStatus({ states: [...ready], counts, attention: 2 })).toBe("attention");
+  });
+  it("reports a failed source as an error, not as all clear", () => {
+    expect(dashboardStatus({ states: ["ready", "error", "ready", "ready"], counts, attention: 0 })).toBe("error");
+    expect(dashboardStatus({ states: ["loading", "error"], counts: null, attention: 0 })).toBe("loading");
+  });
+  it("recognises an organization with no records yet", () => {
+    expect(
+      dashboardStatus({
+        states: [...ready],
+        counts: { products: 0, complaints: 0, investigations: 0, evidence: 0 },
+        attention: 0,
+      }),
+    ).toBe("empty");
+  });
+  it("does not count a source the role may not read as a failure", () => {
+    expect(dashboardStatus({ states: ["ready", "forbidden", "ready", "ready"], counts, attention: 0 })).toBe("clear");
+  });
+});
+
+describe("localDay", () => {
+  it("uses the person's calendar day, not the UTC one", () => {
+    // 23:30 local time on 4 October is 5 October in UTC for anyone west of Greenwich.
+    expect(localDay(new Date(2026, 9, 4, 23, 30))).toBe("2026-10-04");
+    expect(localDay(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
   });
 });
 

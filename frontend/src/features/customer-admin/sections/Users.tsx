@@ -1,10 +1,46 @@
 import { useMemo, useState } from "react";
-import { KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
+import { Download, KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { userTone, type TenantUser } from "../customerAdminModel";
 import { ASSIGNABLE_ROLES, useConsole } from "../context";
-import { Drawer, SearchBox, Table, Tabs, errorText, listOf, matches, send, useResource } from "../shared";
+import {
+  Drawer,
+  SearchBox,
+  Table,
+  Tabs,
+  errorText,
+  listOf,
+  matches,
+  send,
+  useResource,
+  type Confirmation,
+} from "../shared";
+import { downloadFile } from "../../reports/download";
+
+/** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
+ * the email could not be delivered (201, delivery FAILED), MDARIX support issues an activation link to pass on. */
+export function invitationNotice(
+  result: { email_delivery?: string; delivery?: string; invitation_status?: string; message?: string } | null,
+  email: string,
+): { text: string; tone: "good" | "critical" } {
+  if (result?.delivery === "FAILED" || result?.invitation_status === "NOT_SENT")
+    return {
+      tone: "critical",
+      text:
+        result.message ||
+        "The account was created, but the invitation email could not be delivered. Ask MDARIX support for an activation link to pass on to the person.",
+    };
+  if (result?.email_delivery === "SENT")
+    return { tone: "good", text: `Invitation sent to ${email}. They will create their own password.` };
+  return {
+    tone: "good",
+    text: `Invitation created. Email delivery: ${titleCase(result?.email_delivery ?? "not configured")}.`,
+  };
+}
+
+/** The file a person's data export is saved as when the server does not name it. */
+export const personExportName = (userId: string) => `mdarix-person-${userId.slice(0, 8)}.json`;
 
 const FILTERS = ["All", "Active", "Invited", "Suspended", "Offboarded"] as const;
 // Same role spellings the server treats as MDARIX platform roles; those accounts are managed by MDARIX only.
@@ -25,17 +61,18 @@ export function UsersSection({ tab = "People" }: { tab?: string }) {
   const users = useResource<TenantUser[]>("/api/v1/admin/identity/users");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Users sections" />
-      {active === "People" ? (
-        <People users={users} />
-      ) : (
-        <InviteForm
-          onInvited={() => {
-            users.reload();
-            setActive("People");
-          }}
-        />
-      )}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Users sections">
+        {active === "People" ? (
+          <People users={users} />
+        ) : (
+          <InviteForm
+            onInvited={() => {
+              users.reload();
+              setActive("People");
+            }}
+          />
+        )}
+      </Tabs>
     </>
   );
 }
@@ -53,7 +90,7 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
     [users.data, filter, query],
   );
   return (
-    <Panel eyebrow="People" title="Users in your organization" state={users.state} error={users.error}>
+    <Panel eyebrow="People" title="Users in your organization" source={users}>
       <div className="ca-toolbar">
         <SearchBox value={query} onChange={setQuery} label="Search name, email or role" />
         <div className="ca-chips" role="group" aria-label="Filter by status">
@@ -178,6 +215,18 @@ function UserDrawer({
       );
     } catch (reason) {
       notify(errorText(reason, "Password reset could not be requested."), "critical");
+    }
+  };
+
+  // Answers a person's access request: their account, memberships, sign-in history, audit events and feedback.
+  const exportPerson = async () => {
+    try {
+      const file = await downloadFile(`/api/v1/admin/people/${user.id}/export`, {
+        fallbackName: personExportName(String(user.id)),
+      });
+      notify(`${name}'s data was exported as ${file}. The export is recorded in the audit trail.`);
+    } catch (reason) {
+      notify(errorText(reason, "The export could not be prepared."), "critical");
     }
   };
 
@@ -397,6 +446,11 @@ function UserDrawer({
           <section className="ca-drawer-section">
             <h3>Account actions</h3>
             <div className="ca-action-row">
+              {status !== "ERASED" && (
+                <button type="button" className="ac-secondary" onClick={() => void exportPerson()}>
+                  <Download size={15} /> Export this person&apos;s data
+                </button>
+              )}
               {user.email && (status === "ACTIVE" || status === "SUSPENDED") && (
                 <button type="button" className="ac-secondary" onClick={() => void resetPassword()}>
                   <KeyRound size={15} /> Send password reset
@@ -466,18 +520,22 @@ function UserDrawer({
                 <button
                   type="button"
                   className="ac-secondary"
-                  onClick={() =>
-                    confirm({
+                  onClick={() => {
+                    const request: Confirmation = {
                       title: `Re-invite ${name}?`,
                       body: "A new activation email is sent. They set a new password; the old one no longer works.",
                       confirmLabel: "Re-invite",
                       done: `${name} has been re-invited.`,
                       run: async () => {
-                        await send(`/api/v1/admin/identity/users/${user.id}/reactivate`, "POST");
+                        const result = await send<any>(`/api/v1/admin/identity/users/${user.id}/reactivate`, "POST");
+                        // The dialog reports `done` once this returns: say so when the email did not go out.
+                        const notice = invitationNotice(result, user.email ?? name);
+                        if (notice.tone === "critical") request.done = `${name} has been re-invited. ${notice.text}`;
                         onChanged();
                       },
-                    })
-                  }
+                    };
+                    confirm(request);
+                  }}
                 >
                   <Mail size={15} /> Re-invite
                 </button>
@@ -536,11 +594,8 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
         company: invite.company.trim(),
         role: invite.role,
       });
-      notify(
-        result?.email_delivery === "SENT"
-          ? `Invitation sent to ${invite.email}. They will create their own password.`
-          : `Invitation created. Email delivery: ${titleCase(result?.email_delivery ?? "not configured")}.`,
-      );
+      const notice = invitationNotice(result, invite.email);
+      notify(notice.text, notice.tone);
       onInvited();
     } catch (reason) {
       setError(errorText(reason, "The invitation could not be sent."));

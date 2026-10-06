@@ -116,15 +116,15 @@ function Overview() {
         />
       </section>
       <div className="ac-grid two">
-        <Panel eyebrow="Last 30 days" title="AI runs by tenant" state={activity.state} error={activity.error}>
+        <Panel eyebrow="Last 30 days" title="AI runs by tenant" source={activity}>
           {byTenant.length ? <BarList items={byTenant} colour="series" /> : <p className="ac-muted">No AI runs yet.</p>}
         </Panel>
-        <Panel eyebrow="Last 30 days" title="Answer checks" state={activity.state} error={activity.error}>
+        <Panel eyebrow="Last 30 days" title="Answer checks" source={activity}>
           <Intro>Every AI answer is checked against its evidence before it is shown.</Intro>
           {byValidation.length ? <BarList items={byValidation} /> : <p className="ac-muted">No AI runs yet.</p>}
         </Panel>
       </div>
-      <Panel eyebrow="Configuration" title="Model in use" state={models.state} error={models.error}>
+      <Panel eyebrow="Configuration" title="Model in use" source={models}>
         {model ? (
           <dl className="cc-details">
             <div>
@@ -156,12 +156,7 @@ function Overview() {
           <p className="ac-muted">No model is configured.</p>
         )}
       </Panel>
-      <Panel
-        eyebrow="When the model is limited or down"
-        title="Fallback providers"
-        state={models.state}
-        error={models.error}
-      >
+      <Panel eyebrow="When the model is limited or down" title="Fallback providers" source={models}>
         <Intro>
           If the model in use hits its limit or does not answer, the next provider below answers instead, in this order;
           if none can, MDARIX gives its rule-based answer. Free tiers suit demonstrations on synthetic data only.
@@ -216,7 +211,7 @@ function Executions() {
   const pages = Math.max(1, Math.ceil(all.length / 15));
   const rows = all.slice((Math.min(page, pages) - 1) * 15, Math.min(page, pages) * 15);
   return (
-    <Panel eyebrow="Latest 50 across all tenants" title="AI runs" state={activity.state} error={activity.error}>
+    <Panel eyebrow="Latest 50 across all tenants" title="AI runs" source={activity}>
       <Intro>
         What ran, for which tenant, and how it went. The questions asked and the answers given stay with the tenant and
         are not shown here.
@@ -304,7 +299,7 @@ function Agents() {
   const catalog = useResource<{ agents: Agent[]; human_authority_required?: boolean }>("/api/v1/ai/agents/catalog");
   const agents = catalog.data?.agents ?? [];
   return (
-    <Panel eyebrow="Agents and their limits" title="Agents & guardrails" state={catalog.state} error={catalog.error}>
+    <Panel eyebrow="Agents and their limits" title="Agents & guardrails" source={catalog}>
       <p className="ar-notice" role="note">
         <ShieldCheck size={16} aria-hidden="true" /> AI suggests; people decide. No agent can approve, reject or declare
         a root cause{catalog.data?.human_authority_required ? ": a person with authority always does" : ""}.

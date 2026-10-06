@@ -14,7 +14,9 @@ import {
   ChallengeSet,
 } from "../../app/types";
 import { api } from "../../app/api";
+import { AI_TIMEOUT_MS, describeError, postJson } from "../../app/apiClient";
 import { useCan } from "../workspace/workspaceContext";
+import { CaseRecordDownload } from "../reports/CaseRecordDownload";
 
 export function InvestigationTabSummary({
   activeTab,
@@ -156,9 +158,9 @@ export function InvestigationWorkspacePanel({
   >("overview");
   const [brief, setBrief] = useState<InvestigationBrief | null>(null);
   const [counterfactual, setCounterfactual] = useState<any>(null);
-  const [counterfactualTarget, setCounterfactualTarget] = useState("Component Rev B");
+  const [counterfactualTarget, setCounterfactualTarget] = useState("");
   const [counterfactualType, setCounterfactualType] = useState("REMOVE_CHANGE");
-  const [counterfactualStatus, setCounterfactualStatus] = useState("IDLE");
+  const [counterfactualStatus, setCounterfactualStatus] = useState("Not run yet");
   const [error, setError] = useState("");
   const [actionStatus, setActionStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -185,34 +187,36 @@ export function InvestigationWorkspacePanel({
       })
       .catch((err) => {
         if (sequence === requestSequence.current) {
-          setError(err.message);
+          setError(describeError(err, "The investigation could not be loaded."));
           setActionStatus("BACKEND ERROR: Investigation context could not be loaded.");
           setPendingAction(null);
         }
       });
   }, [investigationId, mode, asOf]);
 
+  // AI actions can take a while; each waits up to a minute, then says so instead of spinning forever.
+  const ai = <T,>(path: string, body: unknown) =>
+    postJson<T>(`/api/v1/investigations/${investigationId}/${path}`, body, { timeoutMs: AI_TIMEOUT_MS });
+  const failed = (sequence: number, what: string, err: unknown) => {
+    if (sequence !== requestSequence.current) return;
+    const text = describeError(err, `${what} could not be completed.`);
+    setError(text);
+    setActionStatus(`BACKEND ERROR: ${what} could not be completed. ${text}`);
+    setPendingAction(null);
+  };
+  const temporal = () => ({ temporal_mode: mode, as_of: mode === "current" ? null : `${asOf}T00:00:00Z` });
+
   const runAnalysis = () => {
     const sequence = requestSequence.current;
     setPendingAction("Run Analysis");
     setActionStatus("RUNNING: AI Investigator analysis...");
     setError("");
-    const body = {
+    ai<any>("analysis", {
       investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
+      ...temporal(),
       analysis_mode: "standard",
       retrieval_top_k: 8,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/analysis`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setAnalysis(payload.analysis);
@@ -224,13 +228,7 @@ export function InvestigationWorkspacePanel({
         setPendingAction(null);
         setError("");
       })
-      .catch((err) => {
-        if (sequence === requestSequence.current) {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Analysis could not be completed (${err.message}).`);
-          setPendingAction(null);
-        }
-      });
+      .catch((err) => failed(sequence, "Analysis", err));
   };
 
   const runHypotheses = () => {
@@ -238,23 +236,13 @@ export function InvestigationWorkspacePanel({
     setPendingAction("Generate Hypotheses");
     setActionStatus("RUNNING: Generating competing hypotheses...");
     setError("");
-    const body = {
+    ai<any>("hypotheses", {
       investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
+      ...temporal(),
       investigator_question: "Generate competing hypotheses from the validated investigation analysis.",
       // Build on the analysis on screen instead of running it again.
       source_analysis_id: analysis?.analysis_id ?? null,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/hypotheses`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setHypothesisSet(payload.hypothesis_set);
@@ -267,100 +255,56 @@ export function InvestigationWorkspacePanel({
         setPendingAction(null);
         setError("");
       })
-      .catch((err) => {
-        if (sequence === requestSequence.current) {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Hypotheses could not be generated (${err.message}).`);
-          setPendingAction(null);
-        }
-      });
+      .catch((err) => failed(sequence, "Hypothesis generation", err));
   };
 
-  const runDay14 = () => {
+  const runDay14 = async () => {
     const sequence = requestSequence.current;
+    const current = () => sequence === requestSequence.current;
     setPendingAction("Run Unknowns & Chain");
     setActionStatus("RUNNING: Evaluating Unknowns Radar and Failure Chain...");
     setError("");
-    const body = {
-      investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/challenges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const body = { investigation_id: investigationId, ...temporal() };
+    try {
       // Challenge the hypotheses on screen instead of regenerating them.
-      body: JSON.stringify({ ...body, hypothesis_set_id: hypothesisSet?.hypothesis_set_id ?? null }),
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return Promise.reject(new Error("STALE_CONTEXT"));
-        setChallengeSet(payload.challenge_set);
-        return fetch(`/api/v1/investigations/${investigationId}/unknowns`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return Promise.reject(new Error("STALE_CONTEXT"));
-        setUnknownSet(payload.unknown_set);
-        return fetch(`/api/v1/investigations/${investigationId}/failure-chains`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return;
-        setFailureChains(payload.failure_chain_set);
-        setActionStatus(
-          payload.failure_chain_set?.chains?.length
-            ? "SUCCESS: Unknowns and Failure Chain results are displayed below."
-            : "INSUFFICIENT EVIDENCE: No supportable failure chain is available; the controlled result remains unresolved.",
-        );
-        setPendingAction(null);
-        setError("");
-      })
-      .catch((err) => {
-        if (sequence === requestSequence.current && err.message !== "STALE_CONTEXT") {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Unknowns and Failure Chain could not be completed (${err.message}).`);
-          setPendingAction(null);
-        }
+      const challenges = await ai<any>("challenges", {
+        ...body,
+        hypothesis_set_id: hypothesisSet?.hypothesis_set_id ?? null,
       });
+      if (!current()) return;
+      setChallengeSet(challenges.challenge_set);
+      const unknowns = await ai<any>("unknowns", body);
+      if (!current()) return;
+      setUnknownSet(unknowns.unknown_set);
+      const chains = await ai<any>("failure-chains", body);
+      if (!current()) return;
+      setFailureChains(chains.failure_chain_set);
+      setActionStatus(
+        chains.failure_chain_set?.chains?.length
+          ? "SUCCESS: Unknowns and Failure Chain results are displayed below."
+          : "INSUFFICIENT EVIDENCE: No supportable failure chain is available; the controlled result remains unresolved.",
+      );
+      setPendingAction(null);
+      setError("");
+    } catch (err) {
+      failed(sequence, "Unknowns and Failure Chain", err);
+    }
   };
   const runCounterfactual = () => {
     const sequence = requestSequence.current;
+    const target = counterfactualTarget.trim();
+    if (!target) {
+      setCounterfactualStatus("Name the change, component or link to take away first.");
+      return;
+    }
     setCounterfactualStatus("VALIDATING");
     setCounterfactual(null);
-    fetch(`/api/v1/investigations/${investigationId}/counterfactuals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        temporal_mode: mode,
-        as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
-        intervention_type: counterfactualType,
-        intervention_target: counterfactualTarget,
-        intervention_description: `Explore the constrained alternative condition where ${counterfactualTarget} is removed from the candidate explanation.`,
-      }),
+    ai<any>("counterfactuals", {
+      ...temporal(),
+      intervention_type: counterfactualType,
+      intervention_target: target,
+      intervention_description: `Explore the constrained alternative condition where ${target} is removed from the candidate explanation.`,
     })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail?.message ?? response.statusText);
-        return payload;
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setCounterfactual(payload.result);
@@ -369,28 +313,23 @@ export function InvestigationWorkspacePanel({
       .catch((err) => {
         if (sequence === requestSequence.current)
           setCounterfactualStatus(
-            err.message.includes("INSUFFICIENT") ? "INSUFFICIENT EVIDENCE" : `ERROR: ${err.message}`,
+            err instanceof Error && err.message.includes("INSUFFICIENT")
+              ? "INSUFFICIENT EVIDENCE"
+              : `ERROR: ${describeError(err, "The scenario could not be run.")}`,
           );
       });
   };
   const generateBrief = () => {
     setActionStatus("RUNNING: Generating Investigation Brief...");
-    fetch(`/api/v1/investigations/${investigationId}/briefs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ temporal_mode: mode, as_of: mode === "current" ? null : `${asOf}T00:00:00Z` }),
-    })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail?.message ?? response.statusText);
-        return payload;
-      })
+    ai<InvestigationBrief>("briefs", temporal())
       .then((payload) => {
         setBrief(payload);
         setActiveTab("brief");
         setActionStatus(`SUCCESS: Investigation Brief v${payload.brief_version} generated for review.`);
       })
-      .catch((err) => setActionStatus(`BACKEND ERROR: Brief could not be generated (${err.message}).`));
+      .catch((err) =>
+        setActionStatus(`BACKEND ERROR: Brief could not be generated. ${describeError(err, "Try again.")}`),
+      );
   };
 
   return (
@@ -401,7 +340,11 @@ export function InvestigationWorkspacePanel({
             <ClipboardList size={18} /> Investigation Workspace
           </div>
           <h2>{workspace?.investigation.investigation_identifier ?? "Investigation context"}</h2>
-          <p>{workspace?.investigation.investigation_question ?? "Loading deterministic investigation context."}</p>
+          <p>{workspace?.investigation.investigation_question ?? "Loading this investigation…"}</p>
+          <CaseRecordDownload
+            investigationId={investigationId}
+            label={workspace?.investigation.investigation_identifier ?? undefined}
+          />
         </div>
         <div className="toolbar compact">
           <span className="context-summary">
@@ -656,13 +599,13 @@ export function InvestigationWorkspacePanel({
             value={counterfactualTarget}
             onChange={(event) => setCounterfactualTarget(event.target.value)}
             aria-label="Counterfactual target"
-            placeholder="Readable target, e.g. Component Rev B"
+            placeholder="What to take away, e.g. a component revision or supplier change"
           />
           {canRun && (
             <button
               className="primary-action"
               onClick={runCounterfactual}
-              disabled={counterfactualStatus === "VALIDATING"}
+              disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim()}
             >
               {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
             </button>

@@ -25,8 +25,7 @@ function DataExports() {
     <Panel
       eyebrow="Your data"
       title="Export all your data"
-      state={exports.state}
-      error={exports.error}
+      source={exports}
       action={
         <span className="ca-row-actions">
           <button type="button" className="ac-secondary" onClick={() => exports.reload()}>
@@ -148,7 +147,8 @@ export function OrganizationSection() {
               "Invite, suspend, restore and offboard users",
               "Create roles and permission sets and assign them",
               "Configure connections, mappings and their releases",
-              "Set single sign-on, reminders and contacts",
+              "Turn AI processing on or off, and set reminders and contacts",
+              "Work in the investigation workspace with an Investigator's rights",
               "Review and export the audit trail",
             ].map((item) => (
               <li key={item}>
@@ -168,7 +168,7 @@ export function OrganizationSection() {
           </ul>
         </Panel>
       </div>
-      <Panel eyebrow="Organization" title="Products" state={products.state} error={products.error}>
+      <Panel eyebrow="Organization" title="Products" source={products}>
         <Table
           caption="Products"
           rows={listOf(products.data)}

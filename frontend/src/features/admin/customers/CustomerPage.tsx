@@ -111,44 +111,45 @@ export function CustomerPage({
           {record.error ?? "The customer could not be loaded."}
         </p>
       )}
-      <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Customer sections" />
-      {customer && section === "Overview" && (
-        <Overview
-          customer={customer}
-          tenants={tenants}
-          onOpenTenant={onOpenTenant}
-          onAddTenant={next === "SUSPENDED" ? () => setAddingTenant(true) : undefined}
-        />
-      )}
-      {customer && section === "Administrators" && (
-        <CustomerAdmins customerId={customerId} tenants={tenants} onMessage={onMessage} />
-      )}
-      {customer && section === "Subscription" && (
-        <Subscription customerId={customerId} tenants={tenants} onMessage={onMessage} />
-      )}
-      {customer && section === "Usage" && <Usage customerId={customerId} tenants={tenants} />}
-      {customer && section === "Activity" && <Activity customerId={customerId} />}
-      <ConfirmDialog
-        request={confirm}
-        onClose={() => setConfirm(null)}
-        onDone={(message) => {
-          setConfirm(null);
-          onMessage(message);
-          record.reload();
-        }}
-      />
-      {addingTenant && (
-        <AddTenant
-          customerId={customerId}
-          customerName={name}
-          onClose={() => setAddingTenant(false)}
-          onAdded={(message) => {
-            setAddingTenant(false);
+      <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Customer sections">
+        {customer && section === "Overview" && (
+          <Overview
+            customer={customer}
+            tenants={tenants}
+            onOpenTenant={onOpenTenant}
+            onAddTenant={next === "SUSPENDED" ? () => setAddingTenant(true) : undefined}
+          />
+        )}
+        {customer && section === "Administrators" && (
+          <CustomerAdmins customerId={customerId} tenants={tenants} onMessage={onMessage} />
+        )}
+        {customer && section === "Subscription" && (
+          <Subscription customerId={customerId} tenants={tenants} onMessage={onMessage} />
+        )}
+        {customer && section === "Usage" && <Usage customerId={customerId} tenants={tenants} />}
+        {customer && section === "Activity" && <Activity customerId={customerId} />}
+        <ConfirmDialog
+          request={confirm}
+          onClose={() => setConfirm(null)}
+          onDone={(message) => {
+            setConfirm(null);
             onMessage(message);
             record.reload();
           }}
         />
-      )}
+        {addingTenant && (
+          <AddTenant
+            customerId={customerId}
+            customerName={name}
+            onClose={() => setAddingTenant(false)}
+            onAdded={(message) => {
+              setAddingTenant(false);
+              onMessage(message);
+              record.reload();
+            }}
+          />
+        )}
+      </Tabs>
     </div>
   );
 }

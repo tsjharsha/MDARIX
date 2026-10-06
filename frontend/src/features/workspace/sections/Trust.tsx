@@ -17,26 +17,27 @@ export function TrustSection({ tab }: { tab?: string }) {
   );
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Trust and audit sections" />
-      {active === "AI assurance" && <Assurance />}
-      {active === "Audit trail" && <AuditTab />}
-      {active === "Data limitations" && (
-        <NeedsProduct>
-          {(view) => (
-            <>
-              <Limitations items={view.limitations} />
-              <Panel eyebrow="Traceability" title="Source resolution">
-                <RecordTable
-                  caption="Provenance"
-                  rows={view.provenance}
-                  columns={["canonical_entity_type", "source_value", "resolution_rule", "resolution_status"]}
-                  empty={{ title: "No provenance records", detail: "Source-to-MDARIX resolution appears here." }}
-                />
-              </Panel>
-            </>
-          )}
-        </NeedsProduct>
-      )}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Trust and audit sections">
+        {active === "AI assurance" && <Assurance />}
+        {active === "Audit trail" && <AuditTab />}
+        {active === "Data limitations" && (
+          <NeedsProduct>
+            {(view) => (
+              <>
+                <Limitations items={view.limitations} />
+                <Panel eyebrow="Traceability" title="Source resolution">
+                  <RecordTable
+                    caption="Provenance"
+                    rows={view.provenance}
+                    columns={["canonical_entity_type", "source_value", "resolution_rule", "resolution_status"]}
+                    empty={{ title: "No provenance records", detail: "Source-to-MDARIX resolution appears here." }}
+                  />
+                </Panel>
+              </>
+            )}
+          </NeedsProduct>
+        )}
+      </Tabs>
     </>
   );
 }
@@ -48,12 +49,7 @@ function Assurance() {
   return (
     <>
       <TrustEvaluation />
-      <Panel
-        eyebrow="Declared by the AI service"
-        title="Guardrails on every AI answer"
-        state={summary.state}
-        error={summary.error}
-      >
+      <Panel eyebrow="Declared by the AI service" title="Guardrails on every AI answer" source={summary}>
         <ul className="ac-posture-list">
           {guardrails.map(([name, value]) => (
             <li key={name}>
@@ -65,12 +61,7 @@ function Assurance() {
           These are the rules the AI service declares it enforces. They describe behavior; they are not a test result.
         </p>
       </Panel>
-      <Panel
-        eyebrow="AI agents"
-        title="What each assistant may and may not do"
-        state={agents.state}
-        error={agents.error}
-      >
+      <Panel eyebrow="AI agents" title="What each assistant may and may not do" source={agents}>
         <Table
           caption="AI agents"
           rows={listOf(agents.data?.agents)}

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bell,
+  Briefcase,
   Building2,
   Database,
   FileClock,
@@ -16,7 +17,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { signOut, useIdleSignOut } from "../shared/session";
+import { signOut } from "../shared/session";
+import { useFocusOnChange } from "../shared/focus";
+import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import "../admin/console/admin-console.css";
 import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
@@ -41,7 +45,7 @@ const NAV: Record<Section, { icon: typeof Users; description: string }> = {
   Integrations: { icon: Plug, description: "Connections and syncs" },
   "Data Mapping": { icon: Database, description: "Mappings and releases" },
   "Plan & Subscription": { icon: WalletCards, description: "Plan, seats, renewal" },
-  Security: { icon: ShieldCheck, description: "MFA, single sign-on, events" },
+  Security: { icon: ShieldCheck, description: "MFA, AI processing, events" },
   Notifications: { icon: Bell, description: "Reminders and contacts" },
   Audit: { icon: FileClock, description: "Audit trail and exports" },
   Organization: { icon: Building2, description: "Profile and products" },
@@ -49,11 +53,14 @@ const NAV: Record<Section, { icon: typeof Users; description: string }> = {
 
 export function CustomerAdminControlPlane({
   securityContext,
+  onOpenWorkspace,
 }: {
   securityContext: TenantContext | null;
   products?: unknown[];
   investigations?: unknown[];
   onNavigate?: (view: any) => void;
+  /** Switch into the investigation workspace with an Investigator's rights (same account, App.tsx decides). */
+  onOpenWorkspace?: () => void;
 }) {
   const [location, setLocation] = useState<{ section: Section; tab?: string; key: number }>({
     section: "Dashboard",
@@ -62,7 +69,9 @@ export function CustomerAdminControlPlane({
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
-  useIdleSignOut();
+  const idle = useIdleSignOut();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useFocusOnChange(heading, location.key);
 
   const open = useCallback((section: Section, tab?: string) => {
     setLocation((current) => ({ section, tab, key: current.key + 1 }));
@@ -111,6 +120,17 @@ export function CustomerAdminControlPlane({
               <strong>{securityContext?.display_name ?? "Customer Administrator"}</strong>
               <small>Customer Administrator</small>
             </span>
+            {onOpenWorkspace && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={onOpenWorkspace}
+                aria-label="Open workspace"
+                title="Work on investigations with an Investigator's rights"
+              >
+                <Briefcase size={16} aria-hidden="true" /> <span className="ac-hide-sm">Open workspace</span>
+              </button>
+            )}
             <SwitchOrganization />
             <HelpMenu />
             <button
@@ -154,7 +174,9 @@ export function CustomerAdminControlPlane({
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">Customer administration</p>
-                <h1>{section}</h1>
+                <h1 ref={heading} tabIndex={-1}>
+                  {section}
+                </h1>
                 <p>{NAV[section].description}</p>
               </div>
             </div>
@@ -168,23 +190,26 @@ export function CustomerAdminControlPlane({
             )}
             {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
             <ColumnScopeProvider key={location.key} scope={`customer-admin:${section}`}>
-              <div className="ca-section">
-                <SectionSummary section={section} />
-                {section === "Dashboard" && <Dashboard />}
-                {section === "Users" && <UsersSection tab={tab} />}
-                {section === "Roles & Access" && <AccessSection tab={tab} />}
-                {section === "Integrations" && <IntegrationsSection tab={tab} />}
-                {section === "Data Mapping" && <DataMappingSection tab={tab} />}
-                {section === "Plan & Subscription" && <SubscriptionSection />}
-                {section === "Security" && <SecuritySection tab={tab} />}
-                {section === "Notifications" && <NotificationsSection />}
-                {section === "Audit" && <AuditSection />}
-                {section === "Organization" && <OrganizationSection />}
-              </div>
+              <SectionErrorBoundary name={section} resetKey={location.key}>
+                <div className="ca-section">
+                  <SectionSummary section={section} />
+                  {section === "Dashboard" && <Dashboard />}
+                  {section === "Users" && <UsersSection tab={tab} />}
+                  {section === "Roles & Access" && <AccessSection tab={tab} />}
+                  {section === "Integrations" && <IntegrationsSection tab={tab} />}
+                  {section === "Data Mapping" && <DataMappingSection tab={tab} />}
+                  {section === "Plan & Subscription" && <SubscriptionSection />}
+                  {section === "Security" && <SecuritySection tab={tab} />}
+                  {section === "Notifications" && <NotificationsSection />}
+                  {section === "Audit" && <AuditSection />}
+                  {section === "Organization" && <OrganizationSection />}
+                </div>
+              </SectionErrorBoundary>
             </ColumnScopeProvider>
           </main>
         </div>
 
+        <SessionTimeoutWarning session={idle} />
         <ConfirmDialog
           request={confirmation}
           onClose={() => setConfirmation(null)}

@@ -1,0 +1,79 @@
+/* Reports, case-record downloads and the risk register: small additions to the workspace panels. */
+.rp-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+}
+.rp-actions .ac-link {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+.rp-record {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  margin: 8px 0;
+}
+.rp-record > span {
+  font-weight: 600;
+}
+.rp-record .ca-inline-error,
+.rp-record .ca-inline-ok {
+  flex-basis: 100%;
+}
+
+/* Risk & Traceability */
+.rk-workspace {
+  display: grid;
+  gap: 16px;
+}
+.rk-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+.rk-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--ac-muted);
+  font-size: 13px;
+}
+.rk-pager > span:first-child {
+  margin-right: auto;
+}
+.rk-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+.rk-gaps {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.rk-gaps > li {
+  display: grid;
+  gap: 4px;
+}
+.rk-gaps small {
+  color: var(--ac-muted);
+}
+.rk-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  overflow-wrap: anywhere;
+}

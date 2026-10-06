@@ -207,8 +207,7 @@ export function Dashboard() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Sign-ins"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Security")} />}
         >
           <TrendChart data={model.signIns} primaryLabel="sign-ins" unit="sign-ins" />
@@ -216,8 +215,7 @@ export function Dashboard() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Sync runs"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Integrations", "Sync activity")} />}
         >
           <TrendChart data={model.runs} primaryLabel="runs" secondaryLabel="failed" unit="sync runs" />
@@ -225,8 +223,7 @@ export function Dashboard() {
         <Panel
           eyebrow={`Last ${days} days`}
           title="Audit events"
-          state={trends.state}
-          error={trends.error}
+          source={trends}
           action={<OpenLink onClick={() => open("Audit")} />}
         >
           <TrendChart data={model.events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
@@ -237,8 +234,7 @@ export function Dashboard() {
         <Panel
           eyebrow="People"
           title="Users by status"
-          state={users.state}
-          error={users.error}
+          source={users}
           action={<OpenLink onClick={() => open("Users")} />}
         >
           {model.people.length ? (
@@ -250,8 +246,7 @@ export function Dashboard() {
         <Panel
           eyebrow="People"
           title="Users by base role"
-          state={users.state}
-          error={users.error}
+          source={users}
           action={<OpenLink onClick={() => open("Roles & Access")} />}
         >
           {model.people.length ? (
@@ -260,7 +255,7 @@ export function Dashboard() {
             <Empty title="No users yet" detail="Roles appear once people are invited." />
           )}
         </Panel>
-        <Panel eyebrow="Quality work" title="Investigations by status" state={trends.state} error={trends.error}>
+        <Panel eyebrow="Quality work" title="Investigations by status" source={trends}>
           {model.investigations.length ? (
             <BarList items={model.investigations} colour="series" />
           ) : (
@@ -304,8 +299,7 @@ export function Dashboard() {
         <Panel
           eyebrow="Audit"
           title="Recent activity"
-          state={audit.state}
-          error={audit.error}
+          source={audit}
           action={<OpenLink onClick={() => open("Audit")} />}
         >
           {recent.length ? (

@@ -1,18 +1,16 @@
 import { useEffect, useState } from "react";
+import { describeError, requestJson } from "../../app/apiClient";
 export function Stage2AdminControlPlane() {
   const [data, setData] = useState<any>({ plans: [], customers: [], model: {}, impact: {} });
   const [error, setError] = useState("");
   useEffect(() => {
     Promise.all(
       ["plans", "customers", "canonical-model", "mapping-impact"].map((x) =>
-        fetch(`/api/v1/platform-admin/${x}`).then((r) => {
-          if (!r.ok) throw Error("Stage 2 administration data unavailable");
-          return r.json();
-        }),
+        requestJson<any>(`/api/v1/platform-admin/${x}`),
       ),
     )
       .then(([plans, customers, model, impact]) => setData({ plans, customers, model, impact }))
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(describeError(e, "Stage 2 administration data unavailable")));
   }, []);
   return (
     <div className="content governance-view admin-page">

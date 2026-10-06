@@ -370,4 +370,81 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.getByLabel("Six digit authentication code")).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-mfa.png`, fullPage: true });
   });
+
+  test("an ended session sends the person to sign-in and back to the same page", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/signals");
+    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    await expect(navigation).toBeAttached({ timeout: 20_000 });
+    // The session ends on the server's side (as after a sign-out elsewhere or the idle timeout): drop the cookie.
+    await page.context().clearCookies();
+    const toggle = page.getByRole("button", { name: "Open navigation" });
+    if (await toggle.isVisible()) await toggle.click();
+    // Any API call now answers 401, and the app goes to sign-in with the reason and the page to return to.
+    await navigation.getByRole("button", { name: /^Investigations/ }).click();
+    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Fsignals/, { timeout: 20_000 });
+    await expect(page.getByRole("status")).toContainText(/session has ended/i);
+    await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
+    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL(/\/app\/signals$/, { timeout: 20_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Signals" })).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("Help menu: Report a problem opens a form that reaches the MDARIX team", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
+    await page.goto("/app");
+    await page.getByRole("button", { name: "Open help menu" }).click();
+    await page.getByRole("button", { name: "Report a problem" }).click();
+    const dialog = page.getByRole("dialog", { name: "Report a problem" });
+    await expect(dialog).toBeVisible();
+    // Focus starts inside the form and Tab stays inside the dialog.
+    await expect(dialog.getByLabel(/what went wrong/i)).toBeFocused();
+    for (let index = 0; index < 6; index += 1) await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    await dialog.getByLabel(/what went wrong/i).fill("Browser evidence: test report");
+    await dialog.getByLabel(/details/i).fill("Automated browser test of the problem report form. No action needed.");
+    const response = page.waitForResponse(
+      (item) => item.url().endsWith("/api/v1/support/problems") && item.request().method() === "POST",
+    );
+    await dialog.getByRole("button", { name: "Send report" }).click();
+    expect((await response).status()).toBe(201);
+    await expect(dialog.getByRole("status")).toContainText(/reached the MDARIX team/i);
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("a customer administrator opens the workspace and sees Import data", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/customer-admin");
+    await page.getByRole("button", { name: "Open workspace" }).click();
+    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    await expect(navigation).toBeAttached({ timeout: 20_000 });
+    const toggle = page.getByRole("button", { name: "Open navigation" });
+    if (await toggle.isVisible()) await toggle.click();
+    await navigation.getByRole("button", { name: /^Import data/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Import data" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Upload a CSV file" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel("Dates in the file")).toBeVisible();
+    await expect(page.getByRole("link", { name: /download products\.csv/i })).toBeVisible();
+    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-import-data.png`, fullPage: true });
+    // And back to the console from the workspace.
+    await page.getByRole("button", { name: "Admin console" }).click();
+    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+  });
+
+  test("the platform admin console has no sideways scrolling", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/admin");
+    await expect(page.locator(".admin-console main.ac-main")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("body")).not.toContainText("Checking your session");
+    const sidewaysOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(sidewaysOverflow).toBe(0);
+  });
 });

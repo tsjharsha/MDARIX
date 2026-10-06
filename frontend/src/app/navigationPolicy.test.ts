@@ -8,6 +8,8 @@ import {
   isCustomerAdminRole,
   isPlatformAdminRole,
   MOBILE_FOCUS_ORDER,
+  PLATFORM_ADMIN_VIEWS,
+  WORKSPACE_VIEWS,
 } from "./navigationPolicy";
 
 describe("authentication and role navigation", () => {
@@ -35,6 +37,17 @@ describe("authentication and role navigation", () => {
 
   it("keeps every declared admin route addressable", () => {
     for (const [view, path] of Object.entries(APP_ROUTES)) expect(viewFromPath(path)).toBe(view);
+  });
+
+  it("lets a customer administrator switch into the Investigator workspace but not the platform console", () => {
+    const allowed = allowedViewsForRole("CUSTOMER_ADMIN") ?? [];
+    expect(allowed).toContain("customer-admin");
+    for (const view of WORKSPACE_VIEWS) expect(allowed).toContain(view);
+    for (const view of ["investigations", "evidence", "ask", "my-work"] as const) expect(allowed).toContain(view);
+    for (const view of PLATFORM_ADMIN_VIEWS.filter((item) => !WORKSPACE_VIEWS.includes(item)))
+      expect(allowed).not.toContain(view);
+    expect(allowedViewsForRole("Customer Admin")).toEqual(allowed);
+    expect(new Set(allowed).size).toBe(allowed.length);
   });
 
   it("exposes the regulatory co-pilot only to governed admin roles", () => {

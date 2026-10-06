@@ -1,0 +1,24 @@
+import { describe, expect, it } from "vitest";
+import { decisionLabel, signerLabel } from "./SignatureVerificationWorkspace";
+
+const people = [{ id: "u-2", display_name: "Asha Rao" }];
+
+describe("signature verification labels", () => {
+  it("names the signer: you, a colleague by name, or the role when the name is not available", () => {
+    expect(signerLabel("u-1", "APPROVER", people, "u-1")).toBe("You (Approver)");
+    expect(signerLabel("u-2", "APPROVER", people, "u-1")).toBe("Asha Rao (Approver)");
+    expect(signerLabel("u-9", "LEADER", people, "u-1")).toBe("A colleague with the Leader role");
+    expect(signerLabel("u-9", undefined, [], undefined)).toBe("A colleague in your organization");
+  });
+
+  it("describes a decision so it can be chosen without its id", () => {
+    const label = decisionLabel({
+      id: "0d3c1a2b-0000-0000-0000-000000000000",
+      decision_identifier: "DEC-0004",
+      selected_action: "NO_DECISION_YET",
+      decision_status: "REQUIRES_REVIEW",
+    });
+    expect(label).toBe("DEC-0004 · No Decision Yet · Requires Review");
+    expect(decisionLabel({ id: "0d3c1a2b-0000" })).toBe("0d3c1a2b");
+  });
+});

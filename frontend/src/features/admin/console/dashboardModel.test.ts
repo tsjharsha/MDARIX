@@ -39,11 +39,13 @@ describe("platform admin dashboard model", () => {
     expect(buckets.map((bucket) => bucket.count)).toEqual([1, 1, 1, 1, 1]);
   });
 
-  it("counts events per UTC day and keeps empty days at zero", () => {
+  it("counts events per local calendar day and keeps empty days at zero", () => {
+    const local = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hour, minute).toISOString();
     const series = dailyCounts(
-      ["2026-09-30T10:00:00Z", "2026-09-30T23:59:00Z", "2026-09-28T01:00:00Z", "2026-08-01T00:00:00Z", null, "bad"],
+      // 23:59 local time stays on the 30th wherever the browser is (in UTC it can already be 1 October).
+      [local(30, 10), local(30, 23, 59), local(28, 0, 30), "2026-08-01T00:00:00Z", null, "bad"],
       3,
-      new Date("2026-09-30T12:00:00Z"),
+      new Date(2026, 8, 30, 12),
     );
     expect(series.map((day) => [day.date, day.count])).toEqual([
       ["2026-09-28", 1],

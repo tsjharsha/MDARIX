@@ -52,12 +52,29 @@ export const PLATFORM_ADMIN_VIEWS: readonly AppView[] = [
   "signature-verification",
 ];
 
-export const CUSTOMER_ADMIN_VIEWS: readonly AppView[] = [
-  "customer-admin",
+/** The investigation workspace an Investigator works in (UserWorkspace and the screens it opens). */
+export const WORKSPACE_VIEWS: readonly AppView[] = [
+  "home",
+  "my-work",
+  "products",
+  "signals",
+  "story",
+  "persona",
+  "ask",
+  "investigations",
+  "evidence",
+  "decision",
+  "assurance",
+  "audit",
   "regulatory-copilot",
   "risk-traceability",
   "signature-verification",
 ];
+
+/** A customer administrator manages their organization and, in the same account, may switch into the workspace
+ * with an Investigator's rights. The server still decides every action: no signatures, no regulatory approval and
+ * no platform administration for this role. */
+export const CUSTOMER_ADMIN_VIEWS: readonly AppView[] = ["customer-admin", ...WORKSPACE_VIEWS];
 
 export function isPlatformAdminRole(role?: string | null) {
   return ["ADMIN", "ADMINISTRATOR", "MDARIX ADMINISTRATOR", "PLATFORM ADMIN", "PLATFORM_ADMIN"].includes(

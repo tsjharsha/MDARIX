@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { customerAttention, roleMix, seatUsage, userStatusSlices } from "./customerAdminModel";
+import { customerAttention, roleMix, seatUsage, subscriptionEnd, userStatusSlices } from "./customerAdminModel";
 
 describe("customer admin overview model", () => {
   it("groups users by status in lifecycle order", () => {
@@ -50,5 +50,29 @@ describe("customer admin overview model", () => {
       ["serious", "Plan & Subscription"],
       ["warning", "Data Mapping"],
     ]);
+  });
+});
+
+describe("subscription end", () => {
+  const now = new Date("2026-10-05T12:00:00Z");
+  it("reads the subscription's end date and counts whole days left", () => {
+    expect(subscriptionEnd({ subscription: { expires_at: "2026-10-15T12:00:00Z" } }, null, now)).toEqual({
+      endsAt: "2026-10-15T12:00:00Z",
+      daysLeft: 10,
+      trial: false,
+    });
+    expect(subscriptionEnd({ expires_at: "2026-10-01T00:00:00Z" }, null, now)?.daysLeft).toBe(0);
+  });
+  it("uses the trial's own end date and days left during a free trial", () => {
+    expect(subscriptionEnd({}, { is_trial: true, expires_at: "2026-10-20T00:00:00Z", days_left: 14 }, now)).toEqual({
+      endsAt: "2026-10-20T00:00:00Z",
+      daysLeft: 14,
+      trial: true,
+    });
+  });
+  it("shows nothing when there is no end date to read", () => {
+    expect(subscriptionEnd({}, { is_trial: false }, now)).toBeNull();
+    expect(subscriptionEnd(null, null, now)).toBeNull();
+    expect(subscriptionEnd({ expires_at: "not a date" }, null, now)).toBeNull();
   });
 });

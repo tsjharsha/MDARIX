@@ -13,13 +13,14 @@ export const WORKSPACE_SECTIONS = [
   "Decisions",
   "Intelligence",
   "Trust & Audit",
+  // Shown to roles that may change records (see SECTION_PERMISSIONS).
+  "Import data",
   "My Account",
-  // Shown only in free-trial workspaces (see UserWorkspace).
   "Share feedback",
 ] as const;
 
 /** Sections that exist only in a free-trial workspace. */
-export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Share feedback"];
+export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started"];
 
 export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
@@ -35,6 +36,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Decisions: ["decision-center"],
   Intelligence: ["home"],
   "Trust & Audit": ["assurance", "audit"],
+  "Import data": ["products"],
   "My Account": [],
   "Share feedback": [],
 };
@@ -72,6 +74,8 @@ export type WorkContext = {
   setInvestigationId: (id: string) => void;
   /** Reload the selected product's investigations (after one is opened); `select` makes that one current. */
   refreshInvestigations: (select?: string) => void;
+  /** Reload the organization's products (after an import added some). */
+  refreshProducts: () => void;
   view: Product360 | null;
   state: "loading" | "ready" | "empty" | "error";
   error: string;
@@ -103,8 +107,20 @@ export function useCan(permission: BusinessPermission): boolean {
   return !Array.isArray(granted) || granted.includes(permission);
 }
 
-export function sectionAllowed(section: WorkspaceSection, allowedMenu: string[] | undefined) {
+/** Sections that also need a business permission (the server enforces it on every call as well). */
+export const SECTION_PERMISSIONS: Partial<Record<WorkspaceSection, BusinessPermission>> = {
+  "Import data": "records.write",
+};
+
+export function sectionAllowed(
+  section: WorkspaceSection,
+  allowedMenu: string[] | undefined,
+  businessPermissions?: string[],
+) {
   const keys = SECTION_MENU_KEYS[section];
+  const permission = SECTION_PERMISSIONS[section];
+  // A section that changes data is shown only when the server listed the permission (fail closed).
+  if (permission && !(Array.isArray(businessPermissions) && businessPermissions.includes(permission))) return false;
   // Fail closed: without a server-issued menu only My Account is shown. The server still authorizes every call.
   return !keys.length || (!!allowedMenu && keys.some((key) => allowedMenu.includes(key)));
 }

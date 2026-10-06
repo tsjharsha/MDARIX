@@ -13,10 +13,11 @@ export function AccountSection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<Tab>((TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections" />
-      {active === "Profile" && <Profile />}
-      {active === "Security" && <Security />}
-      {active === "Access" && <Access />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections">
+        {active === "Profile" && <Profile />}
+        {active === "Security" && <Security />}
+        {active === "Access" && <Access />}
+      </Tabs>
     </>
   );
 }
@@ -208,7 +209,7 @@ function Access() {
           {WORKSPACE_SECTIONS.filter(
             (section) => section !== "My Account" && !TRIAL_ONLY_SECTIONS.includes(section),
           ).map((section) => {
-            const allowed = sectionAllowed(section, session?.allowed_menu);
+            const allowed = sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
             return (
               <li key={section} className={allowed ? "" : "ac-muted"}>
                 <CheckCircle2
@@ -222,7 +223,7 @@ function Access() {
           })}
         </ul>
       </Panel>
-      <Panel eyebrow="Access" title="Your role and personas" state={me.state} error={me.error}>
+      <Panel eyebrow="Access" title="Your role and personas" source={me}>
         <dl className="ca-facts">
           <div>
             <dt>Active role</dt>

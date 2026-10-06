@@ -5,6 +5,8 @@ import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-reac
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
 import { AdminArea, isAreaDomain } from "./areas/AdminArea";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
+import { nextTabIndex } from "../shared/focus";
 import { LEGACY_SECTIONS } from "./areas/sections";
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
@@ -202,12 +204,14 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                   </button>
                 </div>
               </div>
-              <AdminOverview
-                refreshKey={refreshKey}
-                onOpen={open}
-                onCreateCustomer={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Onboarding" })}
-                onUpdated={setUpdatedAt}
-              />
+              <SectionErrorBoundary name="The dashboard" resetKey={refreshKey}>
+                <AdminOverview
+                  refreshKey={refreshKey}
+                  onOpen={open}
+                  onCreateCustomer={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Onboarding" })}
+                  onUpdated={setUpdatedAt}
+                />
+              </SectionErrorBoundary>
               <section className="ac-areas" aria-label="Administration areas">
                 <h2>Administration areas</h2>
                 <div>
@@ -231,12 +235,27 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                     <h1>{activeDomain[0]}</h1>
                   </div>
                 </div>
-                <div className="ac-tabs" role="tablist" aria-label={`${activeDomain[0]} sections`}>
+                <div
+                  className="ac-tabs"
+                  role="tablist"
+                  aria-label={`${activeDomain[0]} sections`}
+                  onKeyDown={(event) => {
+                    // Arrow keys, Home and End move between the sections (WAI-ARIA tabs pattern).
+                    const items = activeDomain[3] as readonly string[];
+                    const next = nextTabIndex(event.key, Math.max(0, items.indexOf(location.item)), items.length);
+                    if (next === null) return;
+                    event.preventDefault();
+                    setLocation({ domain: activeDomain[0], item: items[next] });
+                    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                    buttons[next]?.focus();
+                  }}
+                >
                   {(activeDomain[3] as readonly string[]).map((item) => (
                     <button
                       type="button"
                       role="tab"
                       key={item}
+                      tabIndex={location.item === item ? 0 : -1}
                       aria-selected={location.item === item}
                       className={location.item === item ? "selected" : ""}
                       onClick={() => setLocation({ domain: activeDomain[0], item })}
@@ -246,30 +265,35 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                   ))}
                 </div>
                 <div className="ac-workspace" role="tabpanel" aria-label={location.item}>
-                  {location.domain === CUSTOMERS_AND_TENANTS ? (
-                    <CustomersAndTenants
-                      section={location.item as CustomerTenantSection}
-                      onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
-                    />
-                  ) : isAreaDomain(location.domain) ? (
-                    <AdminArea
-                      key={`${location.domain}:${location.item}`}
-                      domain={location.domain}
-                      section={location.item}
-                    />
-                  ) : (
-                    <PlatformAdminScreen
-                      embedded
-                      securityContext={securityContext}
-                      onNavigate={onNavigate}
-                      initialDomain={location.domain}
-                      initialItem={location.item}
-                      onLocationChange={(domain, item) => {
-                        if (domain === "Platform Overview") open(OVERVIEW);
-                        else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
-                      }}
-                    />
-                  )}
+                  <SectionErrorBoundary
+                    name={`${activeDomain[0]} · ${location.item}`}
+                    resetKey={`${location.domain}:${location.item}`}
+                  >
+                    {location.domain === CUSTOMERS_AND_TENANTS ? (
+                      <CustomersAndTenants
+                        section={location.item as CustomerTenantSection}
+                        onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
+                      />
+                    ) : isAreaDomain(location.domain) ? (
+                      <AdminArea
+                        key={`${location.domain}:${location.item}`}
+                        domain={location.domain}
+                        section={location.item}
+                      />
+                    ) : (
+                      <PlatformAdminScreen
+                        embedded
+                        securityContext={securityContext}
+                        onNavigate={onNavigate}
+                        initialDomain={location.domain}
+                        initialItem={location.item}
+                        onLocationChange={(domain, item) => {
+                          if (domain === "Platform Overview") open(OVERVIEW);
+                          else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
+                        }}
+                      />
+                    )}
+                  </SectionErrorBoundary>
                 </div>
               </>
             )

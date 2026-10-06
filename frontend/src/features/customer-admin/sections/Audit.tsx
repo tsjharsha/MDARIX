@@ -48,8 +48,7 @@ export function AuditSection() {
     <Panel
       eyebrow="Audit"
       title="Administrative audit trail"
-      state={audit.state}
-      error={audit.error}
+      source={audit}
       action={
         <span className="ca-row-actions">
           <a className="ac-secondary" href={`/api/v1/admin/audit-history/export?output_format=CSV${scope}`} download>

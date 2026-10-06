@@ -71,10 +71,11 @@ export function AccessSection({ tab }: { tab?: string }) {
       <p className="ca-lede">
         Deny wins. Access is the base role plus any active roles below; every check happens on the server.
       </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Roles and access sections" />
-      {active === "Roles" && <Roles />}
-      {active === "Permission sets" && <PermissionSets />}
-      {active === "Approval rules" && <ApprovalRules />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Roles and access sections">
+        {active === "Roles" && <Roles />}
+        {active === "Permission sets" && <PermissionSets />}
+        {active === "Approval rules" && <ApprovalRules />}
+      </Tabs>
     </>
   );
 }
@@ -115,7 +116,7 @@ function Roles() {
   };
   return (
     <>
-      <Panel eyebrow="Roles & access" title="Roles" state={roles.state} error={roles.error}>
+      <Panel eyebrow="Roles & access" title="Roles" source={roles}>
         <Table
           caption="Roles"
           rows={listOf(roles.data)}
@@ -272,7 +273,7 @@ function PermissionSets() {
   };
   return (
     <>
-      <Panel eyebrow="Roles & access" title="Permission sets" state={sets.state} error={sets.error}>
+      <Panel eyebrow="Roles & access" title="Permission sets" source={sets}>
         <Table
           caption="Permission sets"
           rows={listOf(sets.data)}
@@ -394,7 +395,7 @@ function ApprovalRules() {
   };
   return (
     <>
-      <Panel eyebrow="Governance" title="Who may approve what" state={policies.state} error={policies.error}>
+      <Panel eyebrow="Governance" title="Who may approve what" source={policies}>
         <Table
           caption="Approval authorities"
           rows={listOf(policies.data?.approval_authorities)}

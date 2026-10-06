@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import {
@@ -15,14 +15,19 @@ import {
   Radio,
   Rocket,
   Search,
+  Settings2,
   ShieldCheck,
+  Upload,
   UserRound,
   X,
 } from "lucide-react";
 import "../admin/console/admin-console.css";
 import "../customer-admin/customer-admin.css";
 import "./workspace.css";
-import { signOut, useIdleSignOut } from "../shared/session";
+import { signOut } from "../shared/session";
+import { useFocusOnChange } from "../shared/focus";
+import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import {
   TRIAL_ONLY_SECTIONS,
   WORKSPACE_SECTIONS,
@@ -47,6 +52,7 @@ import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
+import { ImportDataSection } from "./sections/ImportData";
 import { requestJson } from "../../app/apiClient";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
@@ -60,8 +66,9 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   Decisions: { icon: Gavel, description: "Review, sign and verify", context: true },
   Intelligence: { icon: Bot, description: "Ask, regulatory, risk", context: true },
   "Trust & Audit": { icon: ShieldCheck, description: "AI assurance and records", context: true },
+  "Import data": { icon: Upload, description: "CSV files into your records", context: false },
   "My Account": { icon: UserRound, description: "Profile, security, access", context: false },
-  "Share feedback": { icon: MessageSquareText, description: "Tell us about your trial", context: false },
+  "Share feedback": { icon: MessageSquareText, description: "Tell us what works and what to improve", context: false },
 };
 
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
@@ -83,7 +90,16 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   "signature-verification": ["Decisions", "Verify a signature"],
 };
 
-export function UserWorkspace({ session, initialView }: { session: SessionContext | null; initialView?: string }) {
+export function UserWorkspace({
+  session,
+  initialView,
+  onAdminConsole,
+}: {
+  session: SessionContext | null;
+  initialView?: string;
+  /** A customer administrator working here returns to their console (App.tsx). */
+  onAdminConsole?: () => void;
+}) {
   const work = useWorkContext();
   const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"]);
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
@@ -94,7 +110,9 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
-  useIdleSignOut();
+  const idle = useIdleSignOut();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useFocusOnChange(heading, location.key);
 
   useEffect(() => {
     requestJson<TrialStatus>("/api/v1/trial/status")
@@ -106,9 +124,10 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     () =>
       WORKSPACE_SECTIONS.filter(
         (section) =>
-          (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) && sectionAllowed(section, session?.allowed_menu),
+          (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
+          sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
       ),
-    [session?.allowed_menu, trial?.is_trial],
+    [session?.allowed_menu, session?.business_permissions, trial?.is_trial],
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
@@ -158,8 +177,18 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             <span>{tenantName}</span>
           </div>
           {trial?.is_trial && (
-            <button type="button" className="uw-trial-badge" onClick={() => open("Getting started")}>
-              Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+            <button
+              type="button"
+              className="uw-trial-badge"
+              onClick={() => open("Getting started")}
+              aria-label={`Free trial, ${trial.days_left} ${trial.days_left === 1 ? "day" : "days"} left`}
+            >
+              <span className="uw-trial-badge-long" aria-hidden="true">
+                Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+              </span>
+              <span className="uw-trial-badge-short" aria-hidden="true">
+                Trial · {trial.days_left}d
+              </span>
             </button>
           )}
           <div className="ac-user">
@@ -167,6 +196,17 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
               <strong>{session?.display_name ?? "User"}</strong>
               <small>{session?.active_role ?? "No active role"}</small>
             </span>
+            {onAdminConsole && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={onAdminConsole}
+                aria-label="Admin console"
+                title="Back to customer administration"
+              >
+                <Settings2 size={16} aria-hidden="true" /> <span className="ac-hide-sm">Admin console</span>
+              </button>
+            )}
             <SwitchOrganization />
             <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started") : undefined} />
             <button
@@ -210,7 +250,9 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">{tenantName}</p>
-                <h1>{section}</h1>
+                <h1 ref={heading} tabIndex={-1}>
+                  {section}
+                </h1>
                 <p>{NAV[section].description}</p>
               </div>
             </div>
@@ -228,23 +270,27 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             )}
             {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
             <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
-              <div className="ca-section">
-                {section === "Getting started" && <GettingStartedSection />}
-                {section === "Dashboard" && <DashboardSection />}
-                {section === "My Work" && <MyWorkSection tab={tab} />}
-                {section === "Products" && <ProductsSection tab={tab} />}
-                {section === "Signals" && <SignalsSection tab={tab} />}
-                {section === "Investigations" && <InvestigationsSection tab={tab} />}
-                {section === "Evidence" && <EvidenceSection tab={tab} />}
-                {section === "Decisions" && <DecisionsSection tab={tab} />}
-                {section === "Intelligence" && <IntelligenceSection tab={tab} />}
-                {section === "Trust & Audit" && <TrustSection tab={tab} />}
-                {section === "My Account" && <AccountSection tab={tab} />}
-                {section === "Share feedback" && <FeedbackSection />}
-              </div>
+              <SectionErrorBoundary name={section} resetKey={location.key}>
+                <div className="ca-section">
+                  {section === "Getting started" && <GettingStartedSection />}
+                  {section === "Dashboard" && <DashboardSection />}
+                  {section === "My Work" && <MyWorkSection tab={tab} />}
+                  {section === "Products" && <ProductsSection tab={tab} />}
+                  {section === "Signals" && <SignalsSection tab={tab} />}
+                  {section === "Investigations" && <InvestigationsSection tab={tab} />}
+                  {section === "Evidence" && <EvidenceSection tab={tab} />}
+                  {section === "Decisions" && <DecisionsSection tab={tab} />}
+                  {section === "Intelligence" && <IntelligenceSection tab={tab} />}
+                  {section === "Trust & Audit" && <TrustSection tab={tab} />}
+                  {section === "My Account" && <AccountSection tab={tab} />}
+                  {section === "Import data" && <ImportDataSection />}
+                  {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+                </div>
+              </SectionErrorBoundary>
             </ColumnScopeProvider>
           </main>
         </div>
+        <SessionTimeoutWarning session={idle} />
       </div>
     </WorkspaceContext.Provider>
   );

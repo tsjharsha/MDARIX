@@ -221,10 +221,11 @@ export function IntegrationsSection({ tab }: { tab?: string }) {
         Each connection reads one record type from a source system with that system's API key. Keys are encrypted and
         never shown again; a connection can instead name a credential reference held in your secret manager.
       </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Integration sections" />
-      {active === "Connections" && <Connections />}
-      {active === "Sync activity" && <SyncActivity />}
-      {active === "Reconciliation" && <Reconciliation />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Integration sections">
+        {active === "Connections" && <Connections />}
+        {active === "Sync activity" && <SyncActivity />}
+        {active === "Reconciliation" && <Reconciliation />}
+      </Tabs>
     </>
   );
 }
@@ -292,7 +293,7 @@ function Connections() {
 
   return (
     <>
-      <Panel eyebrow="Integrations" title="Connections" state={connectors.state} error={connectors.error}>
+      <Panel eyebrow="Integrations" title="Connections" source={connectors}>
         <Table
           caption="Connections"
           rows={listOf(connectors.data)}
@@ -558,7 +559,7 @@ function SyncActivity() {
   const outcomes = runOutcomes(rows);
   return (
     <>
-      <Panel eyebrow="Integrations" title="Sync runs · last 14 days" state={runs.state} error={runs.error}>
+      <Panel eyebrow="Integrations" title="Sync runs · last 14 days" source={runs}>
         <ColumnChart data={trend} unit="runs" caption="by start date" />
         <div className="ac-inline-stats">
           <span>{outcomes.succeeded} succeeded</span>
@@ -566,7 +567,7 @@ function SyncActivity() {
           <span>{outcomes.inProgress} other / in progress</span>
         </div>
       </Panel>
-      <Panel eyebrow="Integrations" title="Run history" state={runs.state} error={runs.error}>
+      <Panel eyebrow="Integrations" title="Run history" source={runs}>
         <Table
           caption="Sync runs"
           rows={rows.slice(0, 50)}
@@ -595,7 +596,7 @@ function SyncActivity() {
 function Reconciliation() {
   const records = useResource<any[]>("/api/v1/admin/integrations/reconciliation");
   return (
-    <Panel eyebrow="Integrations" title="Reconciliation" state={records.state} error={records.error}>
+    <Panel eyebrow="Integrations" title="Reconciliation" source={records}>
       <p className="ac-muted">
         Every sync is checked: records expected versus received, accepted, rejected and unresolved.
       </p>

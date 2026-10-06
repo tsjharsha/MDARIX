@@ -20,25 +20,26 @@ export function DecisionsSection({ tab }: { tab?: string }) {
         Only people with approval authority can sign. Signing asks you to confirm your identity and is recorded with the
         exact content you approved.
       </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Decision sections" />
-      {active === "Decision center" &&
-        (work.investigationId ? (
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Decision sections">
+        {active === "Decision center" &&
+          (work.investigationId ? (
+            <Embedded>
+              <DecisionCenterView investigationId={work.investigationId} temporalMode={work.mode} asOf={work.asOf} />
+            </Embedded>
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation first"
+                detail="Decisions belong to an investigation. Pick one in the context bar above."
+              />
+            </Panel>
+          ))}
+        {active === "Verify a signature" && (
           <Embedded>
-            <DecisionCenterView investigationId={work.investigationId} temporalMode={work.mode} asOf={work.asOf} />
+            <SignatureVerificationWorkspace />
           </Embedded>
-        ) : (
-          <Panel title="No investigation selected">
-            <Empty
-              title="Choose an investigation first"
-              detail="Decisions belong to an investigation. Pick one in the context bar above."
-            />
-          </Panel>
-        ))}
-      {active === "Verify a signature" && (
-        <Embedded>
-          <SignatureVerificationWorkspace />
-        </Embedded>
-      )}
+        )}
+      </Tabs>
     </>
   );
 }

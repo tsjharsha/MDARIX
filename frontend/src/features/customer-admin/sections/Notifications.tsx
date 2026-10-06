@@ -31,7 +31,7 @@ export function NotificationsSection() {
 
   return (
     <>
-      <Panel eyebrow="Notifications" title="Subscription reminders" state={preferences.state} error={preferences.error}>
+      <Panel eyebrow="Notifications" title="Subscription reminders" source={preferences}>
         <form
           className="ca-form"
           onSubmit={(event) => {
@@ -96,7 +96,7 @@ export function NotificationsSection() {
         </form>
       </Panel>
 
-      <Panel eyebrow="Notifications" title="Contacts" state={preferences.state} error={preferences.error}>
+      <Panel eyebrow="Notifications" title="Contacts" source={preferences}>
         <Table
           caption="Notification contacts"
           rows={listOf(preferences.data?.recipients)}

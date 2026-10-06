@@ -1,7 +1,8 @@
 import { CalendarClock } from "lucide-react";
 import { Empty, Panel, RingMeter, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
-import { seatUsage } from "../customerAdminModel";
+import { seatUsage, subscriptionEnd } from "../customerAdminModel";
+import { formatDay } from "../../../app/dates";
 import { licensedSeatLimit, useConsole } from "../context";
 import { Table, listOf, send, useResource } from "../shared";
 
@@ -18,6 +19,9 @@ export function SubscriptionSection() {
   const entitlements = useResource<any[]>("/api/v1/admin/governance/entitlements");
   const lifecycle = useResource<any>("/api/v1/admin/tenant/lifecycle");
   const users = useResource<any[]>("/api/v1/admin/identity/users");
+  // A free trial's end date comes from the trial status; other plans from the lifecycle answer when it has one.
+  const trial = useResource<any>("/api/v1/trial/status");
+  const ends = subscriptionEnd(lifecycle.data, trial.data);
   const used = listOf(users.data).filter((user) => SEAT_STATUSES.includes(String(user.status).toUpperCase())).length;
   const seats = seatUsage(used, licensedSeatLimit(context));
   const customerAdmins = listOf(users.data).filter(
@@ -47,6 +51,23 @@ export function SubscriptionSection() {
                 />
               </dd>
             </div>
+            {ends && (
+              <>
+                <div>
+                  <dt>{ends.trial ? "Free trial ends" : "Subscription ends"}</dt>
+                  <dd>{formatDay(ends.endsAt)}</dd>
+                </div>
+                <div>
+                  <dt>Days left</dt>
+                  <dd>
+                    <ToneBadge
+                      tone={ends.daysLeft <= 7 ? "serious" : ends.daysLeft <= 30 ? "warning" : "good"}
+                      label={`${ends.daysLeft} ${ends.daysLeft === 1 ? "day" : "days"}`}
+                    />
+                  </dd>
+                </div>
+              </>
+            )}
             <div>
               <dt>Organization status</dt>
               <dd>{lifecycle.data ? titleCase(lifecycle.data.lifecycle_status ?? lifecycle.data.status) : "—"}</dd>
@@ -56,7 +77,7 @@ export function SubscriptionSection() {
             Plan limits are set in your contract. Only MDARIX can change them; you can request a renewal below.
           </p>
         </Panel>
-        <Panel eyebrow="Usage" title="Seats" state={users.state} error={users.error}>
+        <Panel eyebrow="Usage" title="Seats" source={users}>
           <div className="ca-meter-row">
             {seats.limit !== null ? (
               <RingMeter value={seats.used} total={seats.limit} label="Seats used" />
@@ -87,7 +108,7 @@ export function SubscriptionSection() {
         </Panel>
       </div>
 
-      <Panel eyebrow="Plan" title="What your plan includes" state={entitlements.state} error={entitlements.error}>
+      <Panel eyebrow="Plan" title="What your plan includes" source={entitlements}>
         <Table
           caption="Entitlements"
           rows={listOf(entitlements.data)}
@@ -105,7 +126,7 @@ export function SubscriptionSection() {
         />
       </Panel>
 
-      <Panel eyebrow="Subscription" title="Renewal" state={lifecycle.state} error={lifecycle.error}>
+      <Panel eyebrow="Subscription" title="Renewal" source={lifecycle}>
         {lifecycle.data?.customer_admin_actions?.includes("REQUEST_RENEWAL") ? (
           <div className="ca-action-row">
             <p className="ac-muted">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDateTime, formatDay, formatUtc } from "./dates";
+import { formatDateTime, formatDay, formatUtc, isDateOnly } from "./dates";
 
 describe("dates", () => {
   it("names the month so day and month cannot be confused", () => {
@@ -17,5 +17,13 @@ describe("dates", () => {
   it("shows a dash for a missing or unreadable date", () => {
     expect(formatDay(null)).toBe("—");
     expect(formatDateTime("not a date")).toBe("—");
+  });
+
+  it("shows a calendar date as that day wherever the reader is, never the day before", () => {
+    expect(isDateOnly("2026-03-04")).toBe(true);
+    expect(isDateOnly("2026-03-04T00:00:00Z")).toBe(false);
+    expect(formatDay("2026-03-04")).toBe(
+      new Date(2026, 2, 4).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+    );
   });
 });

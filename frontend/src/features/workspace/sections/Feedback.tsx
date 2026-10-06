@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CheckCircle2, MessageSquareText, Star, X } from "lucide-react";
-import { requestJson } from "../../../app/apiClient";
+import { ApiError, describeError, requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
 import { useWorkspace } from "../workspaceContext";
 import { formatDay } from "../../../app/dates";
@@ -193,7 +193,8 @@ const EMPTY: Answers = {
   contact_ok: false,
 };
 
-export function FeedbackSection() {
+/** The feedback questionnaire: open to every organization (the routes keep their original "trial" names). */
+export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
   const { notify } = useWorkspace();
   const [form, setForm] = useState<FeedbackForm | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -201,6 +202,7 @@ export function FeedbackSection() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [writing, setWriting] = useState(false);
+  const [loadError, setLoadError] = useState<{ message: string; requestId?: string }>({ message: "" });
 
   const load = () =>
     requestJson<FeedbackForm>("/api/v1/trial/feedback")
@@ -208,7 +210,13 @@ export function FeedbackSection() {
         setForm(data);
         setState("ready");
       })
-      .catch(() => setState("error"));
+      .catch((failure) => {
+        setLoadError({
+          message: failure instanceof Error ? failure.message : "Feedback is not available.",
+          requestId: failure instanceof ApiError ? failure.requestId : undefined,
+        });
+        setState("error");
+      });
   useEffect(() => {
     void load();
   }, []);
@@ -249,7 +257,7 @@ export function FeedbackSection() {
       await load();
       window.scrollTo({ top: 0 });
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Your feedback could not be sent. Please try again.");
+      setError(describeError(failure, "Your feedback could not be sent. Please try again."));
     } finally {
       setSending(false);
     }
@@ -261,13 +269,22 @@ export function FeedbackSection() {
       notify("Consent withdrawn. Your feedback is now private to the MDARIX team and is not shown anywhere.");
       await load();
     } catch (failure) {
-      notify(failure instanceof Error ? failure.message : "Consent could not be withdrawn.", "critical");
+      notify(describeError(failure, "Consent could not be withdrawn."), "critical");
     }
   };
 
   if (state !== "ready" || !form)
     return (
-      <Panel title="Share feedback" state={state === "error" ? "error" : "loading"} error="Feedback is not available.">
+      <Panel
+        title="Share feedback"
+        state={state === "error" ? "error" : "loading"}
+        error={loadError.message || "Feedback is not available."}
+        requestId={loadError.requestId}
+        onRetry={() => {
+          setState("loading");
+          void load();
+        }}
+      >
         <span />
       </Panel>
     );
@@ -315,7 +332,7 @@ export function FeedbackSection() {
 
   return (
     <form className="uw-fb" onSubmit={submit} noValidate>
-      <Panel eyebrow="Your trial" title="Tell us about MDARIX">
+      <Panel eyebrow={isTrial ? "Your trial" : "Your experience"} title="Tell us about MDARIX">
         <p className="uw-fb-lead">
           About three minutes. Only the overall rating and the last question are required; answer whatever else you
           like. Your answers go to the MDARIX team.
@@ -401,7 +418,9 @@ export function FeedbackSection() {
           ))}
         </fieldset>
         <fieldset className="uw-fb-checks">
-          <legend>Would your team use MDARIX after the trial?</legend>
+          <legend>
+            {isTrial ? "Would your team use MDARIX after the trial?" : "Would your team keep using MDARIX?"}
+          </legend>
           {ADOPTION.map(([value, label]) => (
             <label key={value}>
               <input

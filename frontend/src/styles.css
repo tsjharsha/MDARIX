@@ -6427,11 +6427,16 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   border-radius: 8px;
   padding: 10px 15px;
 }
-@media (max-width: 700px) {
+/* Below 900 px the side navigation folds into the menu button (admin-console.css), so the notice spans the width. */
+@media (max-width: 900px) {
   .consent-banner {
     left: 12px;
     right: 12px;
     bottom: 12px;
+  }
+}
+@media (max-width: 700px) {
+  .consent-banner {
     display: block;
   }
   .consent-actions {
@@ -10789,4 +10794,70 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 }
 .app-skip:focus {
   top: 10px;
+}
+
+/* Auth pages: the skip link's target wraps the form card and keeps its width. */
+.auth-page-main {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+}
+.auth-page-main:focus {
+  outline: none;
+}
+
+/* Help pages (the pilot guide): a readable single column with the application's brand bar. */
+.help-page {
+  min-height: 100vh;
+  background: #f6f9fb;
+  color: #183249;
+}
+.help-page-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px clamp(16px, 4vw, 40px);
+  background: #ffffff;
+  border-bottom: 1px solid #dbe5ec;
+}
+.help-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #087b73;
+  font-weight: 600;
+  text-decoration: none;
+}
+.help-page-body {
+  width: min(820px, 100%);
+  margin: 0 auto;
+  padding: 28px 16px 64px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.help-page-body:focus {
+  outline: none;
+}
+.help-page-body h1 {
+  margin: 4px 0 16px;
+  font-size: clamp(26px, 4vw, 34px);
+}
+.help-page-body h2 {
+  margin: 32px 0 8px;
+  font-size: 21px;
+}
+.help-page-body li {
+  margin: 6px 0;
+}
+.help-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: #087b73;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
 }

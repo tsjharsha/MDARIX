@@ -161,6 +161,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.uw-trial-badge-short {
+  display: none;
+}
 .uw-trial-head {
   display: flex;
   flex-wrap: wrap;
@@ -299,8 +302,17 @@
     grid-column: 2;
     justify-self: start;
   }
+  /* On a phone the badge stays, in its short form ("Trial · 12d"), so the days left are never hidden. */
   .uw-trial-badge {
+    margin-left: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  .uw-trial-badge-long {
     display: none;
+  }
+  .uw-trial-badge-short {
+    display: inline;
   }
 }
 
@@ -858,4 +870,17 @@
   color: var(--ac-muted);
   font-size: 12px;
   font-weight: 400;
+}
+
+/* Import data: the date-order choice sits beside the file picker. */
+.uw-import-dates {
+  min-width: 220px;
+}
+.uw-import-templates {
+  flex-wrap: wrap;
+}
+/* A rule a form still waits for (for example the minimum length of a reason). */
+.uw-hint {
+  color: #8a5a00;
+  font-size: 12px;
 }

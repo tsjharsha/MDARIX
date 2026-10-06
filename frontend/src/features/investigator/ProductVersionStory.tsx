@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { describeError, requestJson } from "../../app/apiClient";
 
 type Props = { productId?: string; versionId?: string };
 
@@ -7,12 +8,11 @@ export function ProductVersionStory({ productId, versionId }: Props) {
   const [error, setError] = useState("");
   useEffect(() => {
     if (!productId || !versionId) return;
-    fetch(`/api/v1/products/${encodeURIComponent(productId)}/versions/${encodeURIComponent(versionId)}/story`)
-      .then((response) =>
-        response.ok ? response.json() : Promise.reject(new Error(`${response.status} ${response.statusText}`)),
-      )
+    requestJson<any>(
+      `/api/v1/products/${encodeURIComponent(productId)}/versions/${encodeURIComponent(versionId)}/story`,
+    )
       .then(setData)
-      .catch((reason) => setError(reason.message));
+      .catch((reason) => setError(describeError(reason, "The version story could not be loaded.")));
   }, [productId, versionId]);
   if (!productId || !versionId) return null;
   if (error)

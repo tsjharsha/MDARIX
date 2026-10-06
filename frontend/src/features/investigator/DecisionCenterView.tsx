@@ -3,6 +3,8 @@ import { AlertTriangle, CircleDot, ClipboardList, FileText, GitBranch, Network, 
 import { Panel } from "../../app/ui";
 import { TemporalMode, DecisionContext } from "../../app/types";
 import { api } from "../../app/api";
+import { AI_TIMEOUT_MS, ApiError, describeError, isUnreachable, postJson, requestJson } from "../../app/apiClient";
+import { formatDateTime } from "../../app/dates";
 import { useCan } from "../workspace/workspaceContext";
 
 export function DecisionCenterView({
@@ -39,7 +41,7 @@ export function DecisionCenterView({
         }
       })
       .catch((err) => {
-        if (active) setMessage(`Decision context unavailable: ${err.message}`);
+        if (active) setMessage(`Decision context unavailable: ${describeError(err, "try again.")}`);
       });
     return () => {
       active = false;
@@ -50,17 +52,11 @@ export function DecisionCenterView({
     as_of: temporalMode === "current" ? null : `${asOf}T00:00:00Z`,
   });
   const runAdvisory = () =>
-    fetch(`/api/v1/investigations/${investigationId}/decision-advisory`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: temporalBody,
+    postJson<any>(`/api/v1/investigations/${investigationId}/decision-advisory`, JSON.parse(temporalBody), {
+      timeoutMs: AI_TIMEOUT_MS,
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then(setAdvisory)
-      .catch((err) => setMessage(err.message));
+      .catch((err) => setMessage(describeError(err, "The AI advisory could not be generated.")));
   const [recording, setRecording] = useState(false);
   const recordDecision = () => {
     if (recording) return; // one click, one decision
@@ -71,42 +67,26 @@ export function DecisionCenterView({
       return;
     }
     setRecording(true);
-    fetch(`/api/v1/investigations/${investigationId}/decisions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        selected_action: selectedAction,
-        rationale,
-        authorized_by_ref: "CONTROLLED_DEVELOPMENT_REVIEWER",
-        temporal_mode: temporalMode,
-        as_of: temporalMode === "current" ? null : `${asOf}T00:00:00Z`,
-      }),
+    postJson<any>(`/api/v1/investigations/${investigationId}/decisions`, {
+      selected_action: selectedAction,
+      rationale,
+      authorized_by_ref: "CONTROLLED_DEVELOPMENT_REVIEWER",
+      temporal_mode: temporalMode,
+      as_of: temporalMode === "current" ? null : `${asOf}T00:00:00Z`,
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then((payload) => {
         setDecision(payload);
         setMessage("Decision recorded as REQUIRES_REVIEW. Complete Human Review below.");
       })
-      .catch((err) => setMessage(err.message))
+      .catch((err) => setMessage(describeError(err, "The decision could not be recorded.")))
       .finally(() => setRecording(false));
   };
   const submitReview = () =>
-    fetch(`/api/v1/investigations/decisions/${decision.id}/reviews`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        disposition: reviewDisposition,
-        reviewer_ref: "CONTROLLED_DEVELOPMENT_REVIEWER",
-        comments: reviewComments,
-      }),
+    postJson(`/api/v1/investigations/decisions/${decision.id}/reviews`, {
+      disposition: reviewDisposition,
+      reviewer_ref: "CONTROLLED_DEVELOPMENT_REVIEWER",
+      comments: reviewComments,
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then(() => {
         setDecision({
           ...decision,
@@ -115,7 +95,7 @@ export function DecisionCenterView({
         setReviewSubmitted(true);
         setMessage(`Human review recorded: ${reviewDisposition}.`);
       })
-      .catch((err) => setMessage(`Human review could not be submitted: ${err.message}`));
+      .catch((err) => setMessage(`Human review could not be submitted: ${describeError(err, "try again.")}`));
   return (
     <div className="content">
       <section className="product-header">
@@ -313,72 +293,57 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
     setOpen(false);
   };
   const begin = () => {
-    fetch("/api/v1/auth/session")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+    requestJson<any>("/api/v1/auth/session", { retries: 0 })
       .then((x) => {
         setSession(x);
         setOpen(true);
       })
-      .catch(() => setMessage("Sign in is required before a controlled signature can be recorded."));
+      .catch((err) =>
+        setMessage(
+          isUnreachable(err)
+            ? describeError(err, "MDARIX could not be reached.")
+            : "Sign in is required before a controlled signature can be recorded.",
+        ),
+      );
   };
   const sign = () => {
     if (!remarks.trim() || !password) {
       setMessage("Decision remarks and current password are required.");
       return;
     }
-    fetch(`/api/v1/governance/decisions/${decision.id}/sign`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        decision: choice,
-        remarks,
-        password,
-        object_version: decision.updated_at,
-        ...(mfaCode ? { mfa_code: mfaCode } : {}),
-      }),
+    postJson<any>(`/api/v1/governance/decisions/${decision.id}/sign`, {
+      decision: choice,
+      remarks,
+      password,
+      object_version: decision.updated_at,
+      ...(mfaCode ? { mfa_code: mfaCode } : {}),
     })
-      .then(async (r) => ({
-        ok: r.ok,
-        status: r.status,
-        data: await r.json().catch(() => ({
-          detail: {
-            code: "INVALID_SERVER_RESPONSE",
-            message: `Server returned HTTP ${r.status} without a valid response.`,
-          },
-        })),
-      }))
-      .then(({ ok, data }) => {
+      .then((data) => {
         setPassword("");
         setMfaCode("");
-        if (!ok) {
-          const code = data.detail?.code;
-          const messages: Record<string, string> = {
-            INVALID_REAUTHENTICATION: "The entered password is incorrect.",
-            APPROVAL_AUTHORITY_DENIED:
-              "This role is not authorized to sign decisions. Ask an authorized approver to sign.",
-            DENIED_NOT_ENTITLED: "Controlled signatures are not enabled for this tenant.",
-            STALE_OBJECT_VERSION:
-              "This decision changed while you were reviewing it. Reload the current version and review again.",
-            DUPLICATE_SIGNATURE: "This decision version has already been signed.",
-            SOD_DENIED: "The decision creator cannot sign their own decision. Use a different authorized approver.",
-            MFA_REQUIRED: "Enter the current 6-digit code from your authenticator app.",
-            MFA_ENROLLMENT_REQUIRED:
-              "Signing needs multi-factor authentication. Set up your authenticator app under My Account first.",
-            SIGNATURE_TEMPORARILY_LOCKED:
-              "Too many failed attempts. Signing is locked for 15 minutes for your account.",
-          };
-          setMessage(
-            messages[code] ?? data.detail?.message ?? `Signature could not be recorded${code ? ` (${code})` : ""}.`,
-          );
-          return;
-        }
         setSigned(data);
         onSigned(data);
         close();
       })
-      .catch(() => {
+      .catch((err) => {
         setPassword("");
-        setMessage("Signature request failed. Check that the backend is running and try again.");
+        setMfaCode("");
+        const code = err instanceof ApiError ? err.code : undefined;
+        const messages: Record<string, string> = {
+          INVALID_REAUTHENTICATION: "The entered password is incorrect.",
+          APPROVAL_AUTHORITY_DENIED:
+            "This role is not authorized to sign decisions. Ask an authorized approver to sign.",
+          DENIED_NOT_ENTITLED: "Controlled signatures are not enabled for this tenant.",
+          STALE_OBJECT_VERSION:
+            "This decision changed while you were reviewing it. Reload the current version and review again.",
+          DUPLICATE_SIGNATURE: "This decision version has already been signed.",
+          SOD_DENIED: "The decision creator cannot sign their own decision. Use a different authorized approver.",
+          MFA_REQUIRED: "Enter the current 6-digit code from your authenticator app.",
+          MFA_ENROLLMENT_REQUIRED:
+            "Signing needs multi-factor authentication. Set up your authenticator app under My Account first.",
+          SIGNATURE_TEMPORARILY_LOCKED: "Too many failed attempts. Signing is locked for 15 minutes for your account.",
+        };
+        setMessage((code && messages[code]) || describeError(err, "The signature could not be recorded."));
       });
   };
   const meaning =
@@ -407,7 +372,7 @@ export function ControlledSignature({ decision, onSigned }: { decision: any; onS
           <p>User: {session?.display_name} (read only)</p>
           <p>Active role: {session?.active_role} (read only)</p>
           <p>
-            Record: {decision.decision_identifier} · Version: {decision.updated_at} (read only)
+            Record: {decision.decision_identifier} · Version of {formatDateTime(decision.updated_at)} (read only)
           </p>
           <select value={choice} onChange={(e) => setChoice(e.target.value)} aria-label="Signature decision">
             <option>APPROVE</option>
