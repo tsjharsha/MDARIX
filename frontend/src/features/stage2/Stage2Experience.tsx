@@ -4,6 +4,8 @@ import { formatDateTime } from "../../app/dates";
 import { ToneBadge } from "../admin/console/charts";
 import { storyStage, storySummary, type StoryStage } from "./storyModel";
 import "./story.css";
+import { displayId, referenceId } from "../../app/displayId";
+import { investigationRequestFor, useOpenInvestigation } from "../workspace/workspaceContext";
 
 type Stage2Mode = "signals" | "story" | "evidence" | "persona";
 
@@ -105,7 +107,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
                       window.dispatchEvent(new PopStateEvent("popstate"));
                     }}
                   >
-                    <strong>{item.signal_id ?? "Complaint"}</strong>
+                    <strong>{displayId(item, "signal_id", "Complaint")}</strong>
                     <span>{item.description ?? "Description not recorded"}</span>
                     <small>
                       {item.severity ?? "Severity not recorded"} · {item.status ?? "Status not recorded"}
@@ -118,7 +120,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
               <div className="evidence-list">
                 {(data.evidence ?? []).map((item: any) => (
                   <article key={item.id}>
-                    <strong>{item.evidence_identifier}</strong>
+                    <strong>{displayId(item, "evidence_identifier")}</strong>
                     <span>{item.title ?? "Title not recorded"}</span>
                     <small>
                       {item.evidence_type} · {item.reliability_status ?? "Reliability not recorded"}
@@ -185,6 +187,9 @@ function StoryStages({ stages }: { stages: StoryStage[] }) {
 
 function SignalDetail({ data }: { data: any }) {
   const signal = data.signal ?? {};
+  // Only inside the workspace, for a role that may change records (null otherwise, so no button).
+  const openInvestigation = useOpenInvestigation();
+  const request = investigationRequestFor(signal);
   return (
     <section className="panel stage2-results signal-detail">
       <button
@@ -196,12 +201,12 @@ function SignalDetail({ data }: { data: any }) {
       >
         ← Back to signals
       </button>
-      <div className="section-title">Signal detail · {signal.signal_id}</div>
+      <div className="section-title">Signal detail · {displayId(signal, "signal_id")}</div>
       <div className="home-insight-grid">
         <article>
           <span className="eyebrow">Product</span>
           <strong>{signal.product_name ?? "Not recorded"}</strong>
-          <p>{signal.product_identifier ?? "Product identifier unavailable"}</p>
+          <p>{referenceId(signal, "product", signal.product_identifier, "Product ID unavailable")}</p>
         </article>
         <article>
           <span className="eyebrow">Product version</span>
@@ -215,11 +220,17 @@ function SignalDetail({ data }: { data: any }) {
         </article>
       </div>
       <p>{signal.description ?? "No source description recorded."}</p>
+      <p className="muted">Recorded severity · {signal.severity ?? "Not recorded"}</p>
+      {openInvestigation && request && (
+        <button type="button" className="text-button" onClick={() => openInvestigation(request)}>
+          Open investigation for this signal
+        </button>
+      )}
       <h3>Related investigations</h3>
       <div className="evidence-list">
         {(data.related_investigations ?? []).map((item: any) => (
-          <article key={item.investigation_identifier}>
-            <strong>{item.investigation_identifier}</strong>
+          <article key={item.id ?? item.investigation_identifier}>
+            <strong>{displayId(item, "investigation_identifier")}</strong>
             <span>{item.investigation_question ?? "Question not recorded"}</span>
             <small>{item.status ?? "Status not recorded"}</small>
           </article>

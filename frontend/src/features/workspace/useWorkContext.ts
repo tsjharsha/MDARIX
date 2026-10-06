@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../app/api";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
-import type { WorkContext } from "./workspaceContext";
+import type { OpenInvestigationRequest, WorkContext } from "./workspaceContext";
 import { defaultTimeContext, preferredInvestigationId } from "./workspaceModel";
 
 /**
@@ -19,6 +19,7 @@ export function useWorkContext(): WorkContext {
   const [investigationsVersion, setInvestigationsVersion] = useState(0);
   const [productsVersion, setProductsVersion] = useState(0);
   const [pendingSelection, setPendingSelection] = useState("");
+  const [openInvestigationRequest, setOpenInvestigationRequest] = useState<OpenInvestigationRequest | null>(null);
   const [view, setView] = useState<Product360 | null>(null);
   const [state, setState] = useState<WorkContext["state"]>("loading");
   const [error, setError] = useState("");
@@ -105,6 +106,14 @@ export function useWorkContext(): WorkContext {
       setInvestigationsVersion((value) => value + 1);
     },
     refreshProducts: () => setProductsVersion((value) => value + 1),
+    openInvestigationRequest,
+    requestOpenInvestigation: (request: OpenInvestigationRequest) => {
+      // The version effect above keeps the version when the product has it, else picks the product's latest.
+      setProductId(request.productId);
+      if (request.version) setVersion(request.version);
+      setOpenInvestigationRequest(request);
+    },
+    clearOpenInvestigationRequest: () => setOpenInvestigationRequest(null),
     view,
     state,
     error,

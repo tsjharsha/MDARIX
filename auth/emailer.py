@@ -586,7 +586,8 @@ def send_review_pending_notice(recipient: str, *, organization: str, reference: 
                 + f" a decision on {reference} for approval in MDARIX for {organization}.",
                 "Approving or rejecting it needs your password and authenticator code.",
             ),
-            button=("Open My work", f"{company().app_url}/app/my-work"),
+            # The Decisions screen, where the decision is reviewed and signed (frontend route /app/decision).
+            button=("Open Decisions", f"{company().app_url}/app/decision"),
             reason=_work_reason(organization),
         ),
     )

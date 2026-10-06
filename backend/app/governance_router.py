@@ -120,6 +120,36 @@ def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tu
     return None
 
 
+SELF_REVIEW_DENIED = ("SOD_DENIED", "You recorded this decision; another user must review it")
+
+
+def is_decision_author(decision, user_id) -> bool:
+    """True when this user recorded the decision (its author is the signed-in user who created it)."""
+    return str(decision.authorized_by_ref) == str(user_id)
+
+
+def same_object_version(sent: str | None, current: datetime) -> bool:
+    """True when the version a client sent is the decision's current version (its ``updated_at``).
+
+    The server writes the version as ``updated_at.isoformat()``; a client may send that text back, or the same moment
+    written another way ('Z' for UTC, another offset). Both are compared as exact instants, to the microsecond, so any
+    other moment is still stale. A naive value is read as UTC.
+    """
+    if not sent:
+        return False
+    if sent == current.isoformat():
+        return True
+    try:
+        parsed = datetime.fromisoformat(sent.strip().replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    return parsed == current
+
+
 def ensure_governance_defaults(db, tenant) -> None:
     """Every tenant's starting rules for decisions: Approvers and Leaders may approve and sign, and nobody may
     approve their own decision. Only what is missing is added, so a tenant's own changes are kept."""
@@ -421,6 +451,74 @@ def _notify(helper: str, db, **details) -> bool:
         return False
 
 
+def decision_actions(db, ctx: AuthenticatedRequestContext, decisions) -> dict:
+    """What the signed-in user may do with each decision: ``{decision id: {can_review, can_approve, can_sign,
+    reason}}``, ``reason`` saying why something is not offered (None when everything is).
+
+    The rules are those of the review and sign endpoints: a review needs permission to change records, may not be of
+    the user's own decision and not of a signed decision; approving through a review also needs ``approval_denial``
+    to pass (approval authority, segregation of duties, no administrators); signing needs that, the
+    DECISION_CENTER_SIGNATURES entitlement and a current version that is not signed yet. Read-only: unlike the
+    endpoints it writes no audit event and counts no failed attempt. A screen uses it to offer only what the server
+    would accept; the endpoints stay the authority.
+    """
+    from backend.app.access.permissions import effective_role, permissions_for_role
+    from decision_center.service import SIGNED_STATUSES
+
+    decisions = list(decisions)
+    if not decisions:
+        return {}
+    may_write = RECORDS_WRITE in permissions_for_role(effective_role(db, ctx))
+    try:
+        actor = session_actor(db, ctx)
+        t = tenant(db, actor)  # the same tenant check and default decision rules as the endpoints
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {}
+        reason = detail.get("message") or "Decisions cannot be reviewed or signed in this organization"
+        return {
+            item.id: {"can_review": False, "can_approve": False, "can_sign": False, "reason": reason}
+            for item in decisions
+        }
+    administrator = is_administrator_role(actor["active_role"])
+    signatures_enabled = entitled(db, t)
+    signed_versions = {
+        (row.object_id, row.object_version)
+        for row in db.query(SignedApprovalRecord.object_id, SignedApprovalRecord.object_version).filter(
+            SignedApprovalRecord.tenant_id == t.id,
+            SignedApprovalRecord.object_type == "Decision",
+            SignedApprovalRecord.decision_type == "INVESTIGATION_REVIEW",
+            SignedApprovalRecord.object_id.in_([item.id for item in decisions]),
+        )
+    }
+    result = {}
+    for item in decisions:
+        locked = str(item.decision_status or "").upper() in SIGNED_STATUSES
+        own = is_decision_author(item, ctx.user_id)
+        denial = approval_denial(db, t.id, actor["active_role"], item, actor["user_id"])
+        version_signed = item.updated_at is not None and (item.id, item.updated_at.isoformat()) in signed_versions
+        can_review = may_write and not own and not locked
+        can_approve = can_review and denial is None
+        can_sign = not locked and not version_signed and not administrator and signatures_enabled and denial is None
+        reasons = [
+            "This decision is signed and closed; record a new decision to change it" if locked else None,
+            "This version of the decision is already signed" if version_signed else None,
+            SELF_REVIEW_DENIED[1] if own else None,
+            ADMINISTRATOR_CANNOT_SIGN[1] if administrator else None,
+            None if may_write else "Your role does not allow reviewing decisions",
+            denial[1] if denial else None,
+            None if signatures_enabled else "Your organization's plan does not include controlled signatures",
+        ]
+        result[item.id] = {
+            "can_review": can_review,
+            "can_approve": can_approve,
+            "can_sign": can_sign,
+            "reason": None
+            if can_review and can_approve and can_sign
+            else next((text for text in reasons if text), None),
+        }
+    return result
+
+
 @router.get("/effective-access")
 def effective_access(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
     actor = session_actor(db, ctx)
@@ -463,7 +561,7 @@ def sign(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
         )
     version = item.updated_at.isoformat()
-    if payload.object_version != version:
+    if not same_object_version(payload.object_version, item.updated_at):
         raise HTTPException(
             409, detail={"code": "STALE_OBJECT_VERSION", "message": "Decision changed; re-review the current version"}
         )
@@ -575,11 +673,13 @@ def sign(
         decision=payload.decision,
         signer_user_id=actor["user_id"],
         owner_ref=owner,
-        reference=item.decision_identifier,
+        reference=item.business_id,
     ):
         db.commit()
     return {
         "signature_id": record.id,
+        "business_id": record.business_id,
+        "decision_business_id": item.business_id,
         "status": item.decision_status,
         "fingerprint": fingerprint,
         "signer": actor["display_name"],
@@ -604,7 +704,7 @@ def material_change(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
         )
     current = item.updated_at.isoformat()
-    if payload.expected_updated_at != current:
+    if not same_object_version(payload.expected_updated_at, item.updated_at):
         raise HTTPException(409, detail={"code": "STALE_OBJECT_VERSION", "message": "Record changed since review"})
     previous = {"decision_status": item.decision_status, "updated_at": current}
     item.updated_at = NOW()
@@ -636,7 +736,7 @@ def material_change(
         decision_id=item.id,
         investigation_id=item.investigation_id,
         requested_by=actor["user_id"],
-        reference=item.decision_identifier,
+        reference=item.business_id,
     ):
         db.commit()
     return {"status": "RE_REVIEW_REQUIRED", "previous_version": current, "current_version": item.updated_at}
@@ -673,6 +773,7 @@ def signature_history(
     return [
         {
             "signature_id": r.id,
+            "business_id": r.business_id,
             "object_version": r.object_version,
             "decision": r.decision,
             "status": r.status,
@@ -721,6 +822,7 @@ def signature_verification(
         result.append(
             {
                 "signature_id": str(r.id),
+                "business_id": r.business_id,
                 "valid": fingerprint == r.content_fingerprint and expected == r.signature_hash and r.status == "SIGNED",
                 "decision": r.decision,
                 "signer_user_id": r.signer_user_id,
@@ -732,7 +834,16 @@ def signature_verification(
         )
     return {
         "decision_id": str(decision_id),
+        "decision_business_id": item.business_id,
         "tenant_id": str(t.id),
-        "verification_status": "VALID" if all(x["valid"] for x in result) and result else "NOT_SIGNED",
+        "verification_status": verification_status(result),
         "signatures": result,
     }
+
+
+def verification_status(signatures: list[dict]) -> str:
+    """The overall result: NOT_SIGNED without signatures, INVALID when any signature no longer matches what was
+    signed (a changed record must show as a problem, never as merely unsigned), else VALID."""
+    if not signatures:
+        return "NOT_SIGNED"
+    return "VALID" if all(item["valid"] for item in signatures) else "INVALID"

@@ -49,3 +49,24 @@ def test_assurance_metrics_count_real_executions(cases):
     metrics = role_client("VIEWER")[0].get("/api/v1/ai/assurance/summary").json()["metrics"]
     assert metrics["total_executions"] >= 1 and metrics["pass"] >= 1
     assert metrics["assessed"] >= metrics["pass"] + metrics["pass_with_limitations"] + metrics["blocked"]
+
+
+def test_version_story_lists_the_cases_linked_to_its_complaints_and_their_evidence(cases):
+    full, _ = cases
+    client = role_client("INVESTIGATOR")[0]
+    body = client.get(f"/api/v1/products/{full['product_id']}/versions/{full['version_id']}/story").json()
+    assert body["status"] == "READY_FOR_REVIEW", body
+    # The seeded complaint is on this version and linked to the case; the case holds one direct and one linked record.
+    assert body["counts"] == {"complaints": 1, "investigations": 1, "evidence": 2}
+    assert [row["investigation_identifier"] for row in body["investigations"]] == [f"INV-{full['tag']}"]
+    assert sorted(row["evidence_identifier"] for row in body["evidence"]) == [
+        f"EV-{full['tag']}-1",
+        f"EV-{full['tag']}-2",
+    ]
+
+
+def test_signal_detail_carries_the_recorded_severity(cases):
+    full, _ = cases
+    detail = role_client("INVESTIGATOR")[0].get(f"/api/v1/signals/C-{full['tag']}").json()
+    assert detail["status"] == "READY_FOR_REVIEW", detail
+    assert detail["signal"]["severity"] == "high"

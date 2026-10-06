@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_of
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -37,7 +38,7 @@ def get_decision(
         raise HTTPException(
             404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
         )
-    return _decision_payload(item)
+    return _decision_payload(item, _investigation_business_id(db, item))
 
 
 @router.post("/decisions/{decision_id}/reviews", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -49,18 +50,27 @@ def review_decision(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     from backend.app.db.models.foundation import Decision
-    from backend.app.governance_router import approval_denial, session_actor, tenant
+    from backend.app.governance_router import (
+        SELF_REVIEW_DENIED,
+        approval_denial,
+        is_decision_author,
+        session_actor,
+        tenant,
+    )
 
     # The reviewer is the signed-in user; a name in the request body is never trusted.
     request = request.model_copy(update={"reviewer_ref": ctx.user_id})
+    decision = db.query(Decision).filter(Decision.tenant_id == ctx.tenant_id, Decision.id == decision_id).first()
+    if decision is None:
+        raise HTTPException(
+            404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
+        )
+    if is_decision_author(decision, ctx.user_id):
+        # Segregation of duties: nobody reviews their own decision, whatever the disposition.
+        raise HTTPException(403, detail={"code": SELF_REVIEW_DENIED[0], "message": SELF_REVIEW_DENIED[1]})
     if request.disposition.strip().upper() == "APPROVED":
         # Approving through a review decides the case, so it needs the same authority and separation of
         # duties as a signature.
-        decision = db.query(Decision).filter(Decision.tenant_id == ctx.tenant_id, Decision.id == decision_id).first()
-        if decision is None:
-            raise HTTPException(
-                404, detail={"code": "DECISION_NOT_FOUND", "message": "Decision is not available for this tenant"}
-            )
         actor = session_actor(control_db, ctx)
         organization = tenant(control_db, actor)  # same tenant check and policy setup as signing
         denial = approval_denial(control_db, organization.id, actor["active_role"], decision, ctx.user_id)
@@ -134,37 +144,82 @@ def create_decision(
         tenant_id=ctx.tenant_id,
         decision_id=decision.id,
         submitted_by_user_id=str(ctx.user_id),
-        reference=decision.decision_identifier,
+        reference=decision.business_id,
     ):
         control_db.commit()
-    return _decision_payload(decision)
+    return _decision_payload(decision, _investigation_business_id(db, decision))
 
 
 @router.get("/{investigation_id}/decisions")
 def list_decisions(
     investigation_id: uuid.UUID,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     from backend.app.db.models.foundation import Decision
+    from backend.app.governance_router import decision_actions
 
     tenant_id = ctx.tenant_id
     try:
-        service._investigation(db, tenant_id, investigation_id)
+        investigation = service._investigation(db, tenant_id, investigation_id)
     except DecisionCenterError as exc:
         raise error(exc) from exc
-    return [
-        _decision_payload(item)
-        for item in db.query(Decision)
+    rows = (
+        db.query(Decision)
         .filter(Decision.tenant_id == tenant_id, Decision.investigation_id == investigation_id)
         .order_by(Decision.decision_timestamp.desc())
         .all()
+    )
+    # What the signed-in user may do with each decision (review, approve, sign), by the endpoints' own rules, so the
+    # Decision center offers only those; and each author's name, so nobody reads an account UUID.
+    actions = decision_actions(control_db, ctx, rows)
+    authors = _author_names(control_db, ctx.tenant_id, rows)
+    return [
+        {
+            **_decision_payload(item, investigation.business_id),
+            "authorized_by_name": authors.get(str(item.authorized_by_ref or "")),
+            "actions": actions.get(item.id),
+        }
+        for item in rows
     ]
 
 
-def _decision_payload(item):
+def _author_names(control_db: Session, tenant_id, decisions) -> dict[str, str]:
+    """Each decision author's name (display name, else sign-in name) by their reference. An author recorded by
+    name rather than by account (older decisions) keeps that name; an account reference that matches nobody has no
+    name."""
+    from backend.app.db.models.foundation import AuthUser
+
+    names: dict[str, str] = {}
+    accounts: dict[uuid.UUID, str] = {}
+    for item in decisions:
+        ref = str(item.authorized_by_ref or "")
+        if not ref.strip():
+            continue
+        try:
+            accounts[uuid.UUID(ref.strip())] = ref
+        except ValueError:
+            names[ref] = ref.strip()
+    if accounts:
+        for user in control_db.query(AuthUser).filter(AuthUser.tenant_id == tenant_id, AuthUser.id.in_(list(accounts))):
+            name = (user.display_name or "").strip() or (user.username or "").strip()
+            if name:
+                names[accounts[user.id]] = name
+    return names
+
+
+def _investigation_business_id(db: Session, decision) -> str | None:
+    from backend.app.db.models.foundation import Investigation
+
+    return business_id_of(db, Investigation, decision.investigation_id)
+
+
+def _decision_payload(item, investigation_business_id: str | None = None):
     return {
         "id": item.id,
+        "business_id": item.business_id,
+        "investigation_business_id": investigation_business_id,
         "decision_identifier": item.decision_identifier,
         "decision_type": item.decision_type,
         "decision_status": item.decision_status,

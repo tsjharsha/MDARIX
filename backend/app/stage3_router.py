@@ -149,7 +149,7 @@ def signals_summary(
     rows = _rows(
         db,
         """
-        SELECT complaint_identifier AS signal_id, description, NULL AS severity, status, event_timestamp
+        SELECT complaint_identifier AS signal_id, business_id, description, severity, status, event_timestamp
         FROM complaints WHERE tenant_id = :tenant_id
         ORDER BY event_timestamp DESC NULLS LAST LIMIT 100
     """,
@@ -176,14 +176,15 @@ def signal_detail(
     complaint = _rows(
         db,
         """
-        SELECT c.id, c.complaint_identifier AS signal_id, c.description, c.status,
+        SELECT c.id, c.business_id, c.complaint_identifier AS signal_id, c.description, c.severity, c.status,
                c.event_timestamp, c.complaint_timestamp, c.product_id, c.product_version_id,
-               p.product_identifier, p.name AS product_name,
-               pv.version_identifier
+               p.business_id AS product_business_id, p.product_identifier, p.name AS product_name,
+               pv.business_id AS product_version_business_id, pv.version_identifier
         FROM complaints c
         LEFT JOIN products p ON p.tenant_id = c.tenant_id AND p.id = c.product_id
         LEFT JOIN product_versions pv ON pv.tenant_id = c.tenant_id AND pv.id = c.product_version_id
-        WHERE c.tenant_id = :tenant_id AND (c.id::text = :signal_id OR c.complaint_identifier = :signal_id)
+        WHERE c.tenant_id = :tenant_id
+          AND (c.id::text = :signal_id OR c.complaint_identifier = :signal_id OR c.business_id = upper(:signal_id))
         LIMIT 1
     """,
         {"tenant_id": ctx.tenant_id, "signal_id": signal_id},
@@ -199,7 +200,7 @@ def signal_detail(
     related = _rows(
         db,
         """
-        SELECT investigation_identifier, status, investigation_question
+        SELECT business_id, investigation_identifier, status, investigation_question
         FROM investigations WHERE tenant_id = :tenant_id
           AND (product_id = :product_id OR (:product_id IS NULL AND false))
         ORDER BY created_at DESC NULLS LAST LIMIT 20
@@ -221,6 +222,23 @@ def signal_detail(
     }
 
 
+# Investigations and evidence carry no product version of their own. A version's investigations are those linked
+# (investigation_complaints) to complaints on that version; its evidence is what those investigations hold, directly
+# (evidence.investigation_id) or linked (investigation_evidence), as the case story counts it (_story_counts). Fixed SQL:
+# the tenant and the version are always parameters, and every subquery is scoped to the same tenant.
+_VERSION_INVESTIGATIONS = (
+    "SELECT ic.investigation_id FROM investigation_complaints ic "
+    "JOIN complaints c ON c.tenant_id = ic.tenant_id AND c.id = ic.complaint_id "
+    "WHERE ic.tenant_id = :tenant_id AND c.product_version_id = :version_id"
+)
+_VERSION_INVESTIGATION_CLAUSE = f"id IN ({_VERSION_INVESTIGATIONS})"
+_VERSION_EVIDENCE_CLAUSE = (
+    f"(investigation_id IN ({_VERSION_INVESTIGATIONS}) OR id IN ("
+    "SELECT ie.evidence_id FROM investigation_evidence ie "
+    f"WHERE ie.tenant_id = :tenant_id AND ie.investigation_id IN ({_VERSION_INVESTIGATIONS})))"
+)
+
+
 @router.get("/products/{product_id}/versions/{version_id}/story")
 def product_version_story(
     product_id: str,
@@ -232,8 +250,8 @@ def product_version_story(
     version = _rows(
         db,
         """
-        SELECT pv.id, pv.product_id, pv.version_identifier, pv.description, pv.lifecycle_status, pv.release_timestamp,
-               p.product_identifier, p.name AS product_name
+        SELECT pv.id, pv.business_id, pv.product_id, pv.version_identifier, pv.description, pv.lifecycle_status,
+               pv.release_timestamp, p.business_id AS product_business_id, p.product_identifier, p.name AS product_name
         FROM product_versions pv JOIN products p ON p.tenant_id = pv.tenant_id AND p.id = pv.product_id
         WHERE pv.tenant_id = :tenant_id AND pv.id = :version_id AND pv.product_id = :product_id LIMIT 1
     """,
@@ -248,22 +266,24 @@ def product_version_story(
         "version": version[0],
         "counts": {
             "complaints": _tenant_count_where(db, "complaints", "product_version_id = :version_id", params),
-            "investigations": _tenant_count_where(db, "investigations", "product_version_id = :version_id", params),
-            "evidence": _tenant_count_where(db, "evidence", "product_version_id = :version_id", params),
+            "investigations": _tenant_count_where(db, "investigations", _VERSION_INVESTIGATION_CLAUSE, params),
+            "evidence": _tenant_count_where(db, "evidence", _VERSION_EVIDENCE_CLAUSE, params),
         },
         "complaints": _rows(
             db,
-            "SELECT complaint_identifier, description, status, event_timestamp FROM complaints WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY event_timestamp DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, complaint_identifier, description, status, event_timestamp FROM complaints WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY event_timestamp DESC NULLS LAST LIMIT 50",
             params,
         ),
         "investigations": _rows(
             db,
-            "SELECT investigation_identifier, status, investigation_question FROM investigations WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, investigation_identifier, status, investigation_question FROM investigations "
+            f"WHERE tenant_id=:tenant_id AND {_VERSION_INVESTIGATION_CLAUSE} ORDER BY created_at DESC NULLS LAST LIMIT 50",
             params,
         ),
         "evidence": _rows(
             db,
-            "SELECT evidence_identifier, title, evidence_type, reliability_status FROM evidence WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, evidence_identifier, title, evidence_type, reliability_status FROM evidence "
+            f"WHERE tenant_id=:tenant_id AND {_VERSION_EVIDENCE_CLAUSE} ORDER BY created_at DESC NULLS LAST LIMIT 50",
             params,
         ),
         "limitations": [
@@ -280,7 +300,7 @@ def investigations_summary(
     rows = _rows(
         db,
         """
-        SELECT id, investigation_identifier, status, investigation_question
+        SELECT id, business_id, investigation_identifier, status, investigation_question
         FROM investigations WHERE tenant_id = :tenant_id
         ORDER BY created_at DESC NULLS LAST LIMIT 100
     """,
@@ -300,7 +320,7 @@ def evidence_summary(
     rows = _rows(
         db,
         """
-        SELECT id, evidence_identifier, evidence_type, title, reliability_status, source_system
+        SELECT id, business_id, evidence_identifier, evidence_type, title, reliability_status, source_system
         FROM evidence WHERE tenant_id = :tenant_id ORDER BY created_at DESC NULLS LAST LIMIT 100
     """,
         {"tenant_id": ctx.tenant_id},
@@ -484,6 +504,7 @@ def story_view(
     return {
         "status": "READY_FOR_REVIEW",
         "investigation_id": investigation_id,
+        "investigation_business_id": case.business_id,
         "tenant_id": ctx.tenant_id,
         "stages": [
             {"key": key, "label": label, "status": _stage_status(key, counts), "count": counts.get(key, 0)}

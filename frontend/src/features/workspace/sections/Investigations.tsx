@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
 import {
@@ -8,13 +8,16 @@ import {
   Tabs,
   errorText,
   formatDate,
+  idColumn,
   listOf,
   send,
+  sourceIdColumn,
   useResource,
 } from "../../customer-admin/shared";
+import { displayId, referenceId } from "../../../app/displayId";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
 import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 
@@ -22,12 +25,27 @@ const TABS = ["All investigations", "Workspace", "Story", "CAPAs"] as const;
 type Tab = (typeof TABS)[number];
 
 export function InvestigationsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "All investigations",
-  );
   const { work, open } = useWorkspace();
   const canOpen = useCan("records.write");
-  const [starting, setStarting] = useState(false);
+  // A complaint or signal asked to open an investigation for it (see useOpenInvestigation): open the form, ticked.
+  const pending = work.openInvestigationRequest ?? null;
+  const [prefill, setPrefill] = useState<OpenInvestigationRequest | null>(() => (canOpen ? pending : null));
+  const [active, setActive] = useState<Tab>(() =>
+    prefill
+      ? "All investigations"
+      : (TABS as readonly string[]).includes(tab ?? "")
+        ? (tab as Tab)
+        : "All investigations",
+  );
+  const [starting, setStarting] = useState(() => prefill !== null);
+  useEffect(() => {
+    if (!pending) return;
+    work.clearOpenInvestigationRequest();
+    if (!canOpen || pending === prefill) return;
+    setPrefill(pending);
+    setActive("All investigations");
+    setStarting(true);
+  }, [pending]);
   const [managing, setManaging] = useState<any | null>(null);
   const all = useResource<any>("/api/v1/analytics/investigations");
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
@@ -45,15 +63,25 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections">
         {active === "All investigations" && canOpen && (
           <div className="ca-action-row">
-            <button type="button" className="ac-primary" onClick={() => setStarting((value) => !value)}>
+            <button
+              type="button"
+              className="ac-primary"
+              onClick={() => {
+                setStarting((value) => !value);
+                setPrefill(null);
+              }}
+            >
               <FilePlus2 size={16} /> {starting ? "Close" : "Open an investigation"}
             </button>
           </div>
         )}
         {active === "All investigations" && starting && (
           <OpenInvestigation
+            key={prefill?.complaint.id ?? "new"}
+            prefill={prefill}
             onOpened={(id) => {
               setStarting(false);
+              setPrefill(null);
               all.reload();
               work.refreshInvestigations(id);
               setActive("Workspace");
@@ -71,7 +99,8 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
                 detail: "Investigations opened in your organization appear here.",
               }}
               columns={[
-                { key: "id", label: "Investigation", render: (row) => <strong>{row.investigation_identifier}</strong> },
+                idColumn("Investigation ID", "investigation_identifier"),
+                sourceIdColumn("investigation_identifier"),
                 { key: "question", label: "Question", render: (row) => row.investigation_question ?? "—" },
                 { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
                 ...(canOpen
@@ -150,7 +179,7 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
         {active === "CAPAs" && <Capas />}
         {selected && active !== "All investigations" && active !== "CAPAs" && (
           <p className="ac-note">
-            Showing {selected.investigation_identifier} · {selected.status}
+            Showing {displayId(selected, "investigation_identifier")} · {selected.status}
           </p>
         )}
       </Tabs>
@@ -163,7 +192,7 @@ function Capas() {
   const capas = useResource<any>("/api/v1/data-plane/capas");
   const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
   const caseName = new Map(
-    listOf(cases.data?.records).map((row) => [String(row.id), String(row.investigation_identifier)] as const),
+    listOf(cases.data?.records).map((row) => [String(row.id), displayId(row, "investigation_identifier")] as const),
   );
   const today = localDay();
   return (
@@ -174,14 +203,15 @@ function Capas() {
         rowKey={(row) => String(row.id)}
         empty={{ title: "No CAPAs yet", detail: "CAPAs arrive from your quality system through its connection." }}
         columns={[
+          idColumn("CAPA ID", "capa_identifier"),
           {
             key: "capa",
             label: "CAPA",
-            fields: ["capa_identifier", "title"],
+            fields: ["title", "capa_identifier"],
             render: (row) => (
               <span className="ca-person">
-                <strong>{row.capa_identifier}</strong>
-                <small>{row.title}</small>
+                <strong>{row.title ?? "—"}</strong>
+                {row.business_id && row.capa_identifier && <small>Source ID {row.capa_identifier}</small>}
               </span>
             ),
           },
@@ -189,8 +219,9 @@ function Capas() {
           {
             key: "case",
             label: "From",
-            fields: ["investigation_id", "source_reference"],
-            render: (row) => caseName.get(String(row.investigation_id)) ?? row.source_reference ?? "—",
+            fields: ["investigation_business_id", "source_reference"],
+            render: (row) =>
+              referenceId(row, "investigation", caseName.get(String(row.investigation_id)), row.source_reference),
           },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
           {
@@ -213,15 +244,29 @@ function Capas() {
   );
 }
 
-/** Open a case for one of the organization's products: the question it must answer and the complaints behind it. */
-function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
+/**
+ * Open a case for one of the organization's products: the question it must answer and the complaints behind it.
+ * `prefill` (from a complaint or signal) starts with that complaint ticked and offered, even when the selected
+ * version's list does not hold it.
+ */
+function OpenInvestigation({
+  onOpened,
+  prefill = null,
+}: {
+  onOpened: (id: string) => void;
+  prefill?: OpenInvestigationRequest | null;
+}) {
   const { work, notify } = useWorkspace();
   const [question, setQuestion] = useState("");
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string[]>(() => (prefill ? [prefill.complaint.id] : []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const complaints = (work.view?.complaints ?? []) as Array<Record<string, string | null>>;
+  const complaints = withRequestedComplaint(
+    (work.view?.complaints ?? []) as Array<Record<string, string | null>>,
+    // Only while the context is still on the complaint's product: a case links complaints of its own product only.
+    prefill && prefill.productId === work.productId ? prefill.complaint : null,
+  );
   const found = matchingComplaints(complaints, search, chosen);
   const product = work.products.find((item) => item.id === work.productId);
   const submit = async (event: React.FormEvent) => {
@@ -230,12 +275,16 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
     setBusy(true);
     setError("");
     try {
-      const made = await send<{ id: string; investigation_identifier: string }>("/api/v1/investigations", "POST", {
-        product_id: work.productId,
-        investigation_question: question.trim(),
-        complaint_ids: chosen,
-      });
-      notify(`Investigation ${made.investigation_identifier} opened and assigned to you.`);
+      const made = await send<{ id: string; business_id?: string | null; investigation_identifier: string }>(
+        "/api/v1/investigations",
+        "POST",
+        {
+          product_id: work.productId,
+          investigation_question: question.trim(),
+          complaint_ids: chosen,
+        },
+      );
+      notify(`Investigation ${displayId(made, "investigation_identifier")} opened and assigned to you.`);
       onOpened(made.id);
     } catch (reason) {
       setError(errorText(reason, "The investigation could not be opened."));
@@ -267,7 +316,7 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
           <fieldset className="ca-fieldset">
             <legend>Complaints that prompted it (optional)</legend>
             {complaints.length > 0 && (
-              <SearchBox value={search} onChange={setSearch} label="Search complaints by identifier or description" />
+              <SearchBox value={search} onChange={setSearch} label="Search complaints by ID or description" />
             )}
             {complaints.length > 0 && (
               <p className="ac-note" role="status">
@@ -280,7 +329,7 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
               found.shown.map((row) => {
                 const id = String(row.id ?? "");
                 return (
-                  <label className="ca-check" key={id || String(row.complaint_identifier)}>
+                  <label className="ca-check" key={id || displayId(row, "complaint_identifier")}>
                     <input
                       type="checkbox"
                       disabled={!id}
@@ -291,7 +340,9 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
                         )
                       }
                     />
-                    {row.complaint_identifier ?? id} · {row.description ?? "No description"}
+                    {displayId(row, "complaint_identifier")}
+                    {row.business_id && row.complaint_identifier ? ` (source ${row.complaint_identifier})` : ""} ·{" "}
+                    {row.description ?? "No description"}
                   </label>
                 );
               })
@@ -340,8 +391,9 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
     }
   };
   const reasonReady = reason.trim().length >= REASON_MIN;
+  const label = displayId(row, "investigation_identifier");
   return (
-    <Drawer title={`Manage ${row.investigation_identifier}`} onClose={onClose}>
+    <Drawer title={`Manage ${label}`} onClose={onClose}>
       <label className="ca-field">
         Reason for the change (kept in the audit trail)
         <textarea
@@ -361,7 +413,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
             type="button"
             className="ac-primary"
             disabled={!reasonReady || busy}
-            onClick={() => void save({ status: "open" }, `${row.investigation_identifier} reopened.`)}
+            onClick={() => void save({ status: "open" }, `${label} reopened.`)}
           >
             Reopen investigation
           </button>
@@ -406,7 +458,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               type="button"
               className="ac-secondary"
               disabled={!reasonReady || busy || !assignee}
-              onClick={() => void save({ assignee_id: assignee }, `${row.investigation_identifier} assigned.`)}
+              onClick={() => void save({ assignee_id: assignee }, `${label} assigned.`)}
             >
               Assign
             </button>
@@ -414,7 +466,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               type="button"
               className="ac-secondary"
               disabled={!reasonReady || busy}
-              onClick={() => void save({ unassign: true }, `${row.investigation_identifier} has no owner now.`)}
+              onClick={() => void save({ unassign: true }, `${label} has no owner now.`)}
             >
               Remove owner
             </button>
@@ -424,7 +476,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               type="button"
               className="ac-primary"
               disabled={!reasonReady || busy}
-              onClick={() => void save({ status: "closed" }, `${row.investigation_identifier} closed.`)}
+              onClick={() => void save({ status: "closed" }, `${label} closed.`)}
             >
               Close investigation
             </button>
@@ -455,7 +507,20 @@ export function reasonHint(reason: string): string {
 const COMPLAINT_PAGE = 50;
 
 /**
- * The complaints offered in the open-investigation form: those matching the search (identifier or description),
+ * The complaints the open-investigation form offers, with the one an investigation was requested for (from the
+ * complaint list or a signal) first when the selected version's list does not already hold it.
+ */
+export function withRequestedComplaint(
+  complaints: Array<Record<string, string | null>>,
+  requested: OpenInvestigationRequest["complaint"] | null | undefined,
+): Array<Record<string, string | null>> {
+  if (!requested?.id || complaints.some((row) => String(row.id ?? "") === requested.id)) return complaints;
+  return [{ ...requested }, ...complaints];
+}
+
+/**
+ * The complaints offered in the open-investigation form: those matching the search (MDARIX ID, source number or
+ * description),
  * at most 50 at a time, with the ones already ticked always kept in view.
  */
 export function matchingComplaints(
@@ -466,7 +531,7 @@ export function matchingComplaints(
   const query = search.trim().toLowerCase();
   const matches = query
     ? complaints.filter((row) =>
-        [row.complaint_identifier, row.description, row.id].some((value) =>
+        [row.business_id, row.complaint_identifier, row.description].some((value) =>
           String(value ?? "")
             .toLowerCase()
             .includes(query),

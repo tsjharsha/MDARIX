@@ -28,6 +28,24 @@ def test_signals_are_tenant_scoped_and_limited_when_optional_data_is_missing():
     assert result["limitations"]
 
 
+def test_signals_return_the_recorded_severity():
+    class RowsDB(EmptyDB):
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, statement, *args, **kwargs):
+            self.statements.append(str(statement))
+            return self
+
+        def __iter__(self):
+            return iter([SimpleNamespace(_mapping={"business_id": "CMP000001", "severity": "high", "status": "open"})])
+
+    db = RowsDB()
+    result = signals_summary(db, _ctx())
+    assert result["signals"][0]["severity"] == "high"
+    assert "NULL AS severity" not in db.statements[0] and "severity" in db.statements[0]
+
+
 def test_persona_dashboard_preserves_tenant_and_human_review():
     result = persona_dashboard("executive", EmptyDB(), _ctx())
     assert result["status"] == "READY_FOR_REVIEW"

@@ -112,3 +112,27 @@ def test_controlled_signatures_are_part_of_every_active_plan_unless_switched_off
         assert plan_includes(db, tenant.id, "DECISION_CENTER_SIGNATURES") is True
         assert plan_includes(db, tenant.id, "ASK_MDARIX") is True
         assert plan_includes(db, uuid.uuid4(), "DECISION_CENTER_SIGNATURES") is False  # no plan, no features
+
+
+def test_a_signature_accepts_the_current_version_however_it_is_written_and_nothing_else():
+    from datetime import timedelta
+
+    from backend.app.governance_router import same_object_version
+
+    current = datetime(2026, 10, 6, 9, 30, 15, 123456, tzinfo=timezone.utc)
+    assert same_object_version(current.isoformat(), current)
+    assert same_object_version("2026-10-06T09:30:15.123456Z", current)
+    assert same_object_version("2026-10-06T11:30:15.123456+02:00", current)
+    # Any other moment, even a microsecond apart, is stale; so is text that is not a time.
+    assert not same_object_version((current + timedelta(microseconds=1)).isoformat(), current)
+    assert not same_object_version("2026-10-06T09:30:15.123Z", current)
+    assert not same_object_version("x", current)
+    assert not same_object_version("", current)
+
+
+def test_verification_status_is_invalid_when_any_signature_fails():
+    from backend.app.governance_router import verification_status
+
+    assert verification_status([]) == "NOT_SIGNED"
+    assert verification_status([{"valid": True}, {"valid": True}]) == "VALID"
+    assert verification_status([{"valid": True}, {"valid": False}]) == "INVALID"

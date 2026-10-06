@@ -17,6 +17,8 @@ import { api } from "../../app/api";
 import { AI_TIMEOUT_MS, describeError, postJson } from "../../app/apiClient";
 import { useCan } from "../workspace/workspaceContext";
 import { CaseRecordDownload } from "../reports/CaseRecordDownload";
+import { displayId } from "../../app/displayId";
+import { hasSavedResults, loadSavedResults } from "./savedResults";
 
 export function InvestigationTabSummary({
   activeTab,
@@ -165,33 +167,63 @@ export function InvestigationWorkspacePanel({
   const [actionStatus, setActionStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const requestSequence = useRef(0);
+  // Set once a scenario is run for this case, so a saved scenario arriving later never replaces it.
+  const counterfactualRequested = useRef(false);
   // Viewers can read every result; only roles allowed to run AI see the run buttons (the server enforces it too).
   const canRun = useCan("ai.run");
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
+    const current = () => sequence === requestSequence.current;
+    // A different case or point in time starts clean: nothing from the previous one stays on screen.
+    setWorkspace(null);
+    setAnalysis(null);
+    setHypothesisSet(null);
+    setUnknownSet(null);
+    setFailureChains(null);
+    setChallengeSet(null);
+    setBrief(null);
+    setCounterfactual(null);
+    setCounterfactualStatus("Not run yet");
+    counterfactualRequested.current = false;
+    setError("");
+    setActionStatus("");
+    setPendingAction(null);
     const params = new URLSearchParams({ temporal_mode: mode, retrieval_top_k: "8" });
     if (mode !== "current") params.set("as_of", `${asOf}T00:00:00Z`);
     api<InvestigationWorkspace>(`/api/v1/investigations/${investigationId}/workspace?${params}`)
       .then((item) => {
-        if (sequence !== requestSequence.current) return;
+        if (!current()) return;
         setWorkspace(item);
-        setAnalysis(null);
-        setHypothesisSet(null);
-        setUnknownSet(null);
-        setFailureChains(null);
-        setChallengeSet(null);
-        setError("");
-        setActionStatus("");
-        setPendingAction(null);
       })
       .catch((err) => {
-        if (sequence === requestSequence.current) {
+        if (current()) {
           setError(describeError(err, "The investigation could not be loaded."));
           setActionStatus("BACKEND ERROR: Investigation context could not be loaded.");
           setPendingAction(null);
         }
       });
+    // Show the latest saved AI results instead of making people pay for the same runs again. A result produced by
+    // an action started meanwhile is newer, so it is kept (each setter only fills what is still empty).
+    loadSavedResults(investigationId, api).then((saved) => {
+      if (!current()) return;
+      setAnalysis((shown) => shown ?? saved.analysis);
+      setHypothesisSet((shown) => shown ?? saved.hypothesisSet);
+      setChallengeSet((shown) => shown ?? saved.challengeSet);
+      setUnknownSet((shown) => shown ?? saved.unknownSet);
+      setFailureChains((shown) => shown ?? saved.failureChains);
+      setBrief((shown) => shown ?? saved.brief);
+      if (saved.counterfactual && !counterfactualRequested.current) {
+        setCounterfactual(saved.counterfactual.result);
+        setCounterfactualStatus(saved.counterfactual.status);
+      }
+      if (hasSavedResults(saved))
+        setActionStatus(
+          (status) =>
+            status ||
+            "SAVED RESULTS: Showing the latest saved AI results for this investigation. Run a step again to refresh it.",
+        );
+    });
   }, [investigationId, mode, asOf]);
 
   // AI actions can take a while; each waits up to a minute, then says so instead of spinning forever.
@@ -297,6 +329,7 @@ export function InvestigationWorkspacePanel({
       setCounterfactualStatus("Name the change, component or link to take away first.");
       return;
     }
+    counterfactualRequested.current = true;
     setCounterfactualStatus("VALIDATING");
     setCounterfactual(null);
     ai<any>("counterfactuals", {
@@ -320,16 +353,23 @@ export function InvestigationWorkspacePanel({
       });
   };
   const generateBrief = () => {
+    const sequence = requestSequence.current;
+    setPendingAction("Generate Investigation Brief");
     setActionStatus("RUNNING: Generating Investigation Brief...");
+    setError("");
     ai<InvestigationBrief>("briefs", temporal())
       .then((payload) => {
+        if (sequence !== requestSequence.current) return;
         setBrief(payload);
         setActiveTab("brief");
         setActionStatus(`SUCCESS: Investigation Brief v${payload.brief_version} generated for review.`);
+        setPendingAction(null);
       })
-      .catch((err) =>
-        setActionStatus(`BACKEND ERROR: Brief could not be generated. ${describeError(err, "Try again.")}`),
-      );
+      .catch((err) => {
+        if (sequence !== requestSequence.current) return;
+        setActionStatus(`BACKEND ERROR: Brief could not be generated. ${describeError(err, "Try again.")}`);
+        setPendingAction(null);
+      });
   };
 
   return (
@@ -339,11 +379,17 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <ClipboardList size={18} /> Investigation Workspace
           </div>
-          <h2>{workspace?.investigation.investigation_identifier ?? "Investigation context"}</h2>
+          <h2>
+            {workspace
+              ? displayId(workspace.investigation, "investigation_identifier", "Investigation context")
+              : "Investigation context"}
+          </h2>
           <p>{workspace?.investigation.investigation_question ?? "Loading this investigation…"}</p>
           <CaseRecordDownload
             investigationId={investigationId}
-            label={workspace?.investigation.investigation_identifier ?? undefined}
+            label={
+              workspace ? displayId(workspace.investigation, "investigation_identifier", "") || undefined : undefined
+            }
           />
         </div>
         <div className="toolbar compact">
@@ -371,8 +417,10 @@ export function InvestigationWorkspacePanel({
                 {" "}
                 {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
               </button>
-              <button className="primary-action" onClick={generateBrief}>
-                Generate Investigation Brief
+              <button className="primary-action" onClick={generateBrief} disabled={Boolean(pendingAction)}>
+                {pendingAction === "Generate Investigation Brief"
+                  ? "Generating Brief…"
+                  : "Generate Investigation Brief"}
               </button>
             </>
           ) : (
@@ -462,7 +510,7 @@ export function InvestigationWorkspacePanel({
             <div className="evidence-list">
               {workspace.evidence_context.slice(0, 6).map((item) => (
                 <article key={item.evidence_identifier}>
-                  <strong>{item.evidence_identifier}</strong>
+                  <strong>{displayId(item, "evidence_identifier")}</strong>
                   <span>{item.title}</span>
                   <small>
                     {item.evidence_type} | {item.reliability_status} | anchors{" "}
@@ -655,8 +703,10 @@ export function InvestigationWorkspacePanel({
           <>
             <p>Assemble a versioned, evidence-grounded package for human review.</p>
             {canRun && (
-              <button className="primary-action" onClick={generateBrief}>
-                Generate Investigation Brief
+              <button className="primary-action" onClick={generateBrief} disabled={Boolean(pendingAction)}>
+                {pendingAction === "Generate Investigation Brief"
+                  ? "Generating Brief…"
+                  : "Generate Investigation Brief"}
               </button>
             )}
           </>

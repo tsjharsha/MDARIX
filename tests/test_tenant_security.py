@@ -269,6 +269,98 @@ def test_requesting_more_evidence_needs_permission_to_change_records_but_not_app
     assert response.json()["reviewer_ref"] == org["ids"]["second_approver"]
 
 
+def test_nobody_reviews_their_own_decision_with_any_disposition(org):
+    decision_id = _decision(org, created_by=org["ids"]["approver"])
+    path = f"/api/v1/investigations/decisions/{decision_id}/reviews"
+    for disposition in ("REJECTED", "REQUIRES_ADDITIONAL_EVIDENCE", "APPROVED"):
+        own = org["clients"]["approver"].post(path, json={"disposition": disposition, "comments": "My own decision"})
+        assert own.status_code == 403, own.text
+        assert own.json()["detail"]["code"] == "SOD_DENIED"
+    db = SessionLocal()
+    try:
+        assert db.query(Decision).filter(Decision.id == decision_id).one().decision_status == "REQUIRES_REVIEW"
+    finally:
+        db.close()
+
+
+def _listed(client, world, decision_id):
+    response = client.get(f"/api/v1/investigations/{world['investigation']}/decisions")
+    assert response.status_code == 200, response.text
+    return next(item for item in response.json() if item["id"] == str(decision_id))
+
+
+def test_the_decision_list_says_what_each_user_may_do_without_auditing_or_counting_attempts(org):
+    from backend.app.db.models.foundation import AuditEvent
+
+    decision_id = _decision(org, created_by=org["ids"]["approver"])
+
+    def governance_events():
+        db = SessionLocal()
+        try:
+            return db.query(AuditEvent).filter(AuditEvent.entity_id == decision_id).count()
+        finally:
+            db.close()
+
+    before = governance_events()
+    # The author may neither review nor sign their own decision, and is told why; their name is shown, not an id.
+    author = _listed(org["clients"]["approver"], org, decision_id)
+    assert author["actions"]["can_review"] is False
+    assert author["actions"]["can_approve"] is False
+    assert author["actions"]["can_sign"] is False
+    assert author["actions"]["reason"]
+    assert author["authorized_by_name"] == "sec-approver"
+    # Another approver may do everything.
+    other = _listed(org["clients"]["second_approver"], org, decision_id)["actions"]
+    assert other == {"can_review": True, "can_approve": True, "can_sign": True, "reason": None}
+    # A read-only Viewer may do nothing.
+    viewer = _listed(org["clients"]["viewer"], org, decision_id)["actions"]
+    assert not viewer["can_review"] and not viewer["can_approve"] and not viewer["can_sign"] and viewer["reason"]
+    # Working this out is read-only: no APPROVAL_REQUESTED or refusal events, unlike a real attempt.
+    assert governance_events() == before
+
+
+def test_an_approver_signs_the_listed_version_after_a_review_and_a_changed_signature_shows_invalid(org):
+    from backend.app.db.models.foundation import SignedApprovalRecord
+
+    decision_id = _decision(org, created_by=org["ids"]["approver"])
+    approver = org["clients"]["second_approver"]
+    reviewed = approver.post(
+        f"/api/v1/investigations/decisions/{decision_id}/reviews",
+        json={"disposition": "APPROVED", "comments": "Reviewed"},
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    # The review changed the decision's version; the list gives the current one, which signing accepts.
+    listed = _listed(approver, org, decision_id)
+    assert listed["decision_status"] == "DECIDED" and listed["actions"]["can_sign"] is True
+    signed = approver.post(
+        f"/api/v1/governance/decisions/{decision_id}/sign",
+        json={
+            "decision": "APPROVE",
+            "remarks": "Signed after review",
+            "password": PASSWORD,
+            "object_version": listed["updated_at"],
+        },
+    )
+    assert signed.status_code == 200, signed.text
+    closed = _listed(approver, org, decision_id)
+    assert closed["decision_status"] == "APPROVED"
+    assert closed["actions"]["can_review"] is False and closed["actions"]["can_sign"] is False
+    verification = f"/api/v1/governance/decisions/{decision_id}/signature-verification"
+    assert approver.get(verification).json()["verification_status"] == "VALID"
+    # A signature that no longer matches what was signed is a problem, never "not signed".
+    db = SessionLocal()
+    try:
+        db.query(SignedApprovalRecord).filter(SignedApprovalRecord.object_id == decision_id).update(
+            {SignedApprovalRecord.remarks: "Changed after signing"}
+        )
+        db.commit()
+    finally:
+        db.close()
+    report = approver.get(verification).json()
+    assert report["verification_status"] == "INVALID"
+    assert report["signatures"] and report["signatures"][0]["valid"] is False
+
+
 # --- Audit export and entitlements ---------------------------------------------------------------------------
 
 

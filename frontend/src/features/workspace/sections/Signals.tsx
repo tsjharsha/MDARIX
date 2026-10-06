@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
-import { SearchBox, Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, Tabs, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
-import { useWorkspace } from "../workspaceContext";
+import { displayId } from "../../../app/displayId";
+import { investigationRequestFor, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
 
@@ -24,6 +25,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
               <Panel eyebrow={view.product.name ?? "Product"} title="Complaints for the selected version">
                 <RecordTable
                   caption="Complaints"
+                  idLabel="Complaint ID"
                   rows={view.complaints}
                   columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
                   empty={{
@@ -95,6 +97,7 @@ function Trends() {
 /** Every complaint in the organization, across products: search, filter by product and status, page through. */
 function ComplaintList() {
   const { work } = useWorkspace();
+  const openInvestigation = useOpenInvestigation();
   const [query, setQuery] = useState("");
   const [product, setProduct] = useState("");
   const [status, setStatus] = useState("");
@@ -144,12 +147,8 @@ function ComplaintList() {
         rowKey={(row) => String(row.id)}
         empty={{ title: "No complaints found", detail: "Complaints arrive through connectors and imports." }}
         columns={[
-          {
-            key: "id",
-            label: "Complaint",
-            fields: ["complaint_identifier"],
-            render: (row) => <strong>{row.complaint_identifier}</strong>,
-          },
+          idColumn("Complaint ID", "complaint_identifier"),
+          sourceIdColumn("complaint_identifier"),
           {
             key: "product",
             label: "Product",
@@ -185,6 +184,27 @@ function ComplaintList() {
             fields: ["investigations"],
             render: (row) => row.investigations,
           },
+          ...(openInvestigation
+            ? [
+                {
+                  key: "open-investigation",
+                  label: "",
+                  render: (row: any) => {
+                    const request = investigationRequestFor(row);
+                    return request ? (
+                      <button
+                        type="button"
+                        className="ac-link"
+                        aria-label={`Open an investigation for ${displayId(row, "complaint_identifier", "this complaint")}`}
+                        onClick={() => openInvestigation(request)}
+                      >
+                        Open investigation
+                      </button>
+                    ) : null;
+                  },
+                },
+              ]
+            : []),
         ]}
       />
       {pages > 1 && (

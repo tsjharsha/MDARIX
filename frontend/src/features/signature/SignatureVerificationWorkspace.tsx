@@ -3,9 +3,11 @@ import { describeError, requestJson } from "../../app/apiClient";
 import { formatDateTime, formatUtc } from "../../app/dates";
 import { titleCase } from "../admin/console/dashboardModel";
 import { WorkspaceContext } from "../workspace/workspaceContext";
+import { displayId, safeText } from "../../app/displayId";
 
 type Decision = {
   id: string;
+  business_id?: string | null;
   decision_identifier?: string;
   decision_status?: string;
   selected_action?: string;
@@ -31,10 +33,10 @@ export function signerLabel(
   return roleText ? `A colleague with the ${roleText} role` : "A colleague in your organization";
 }
 
-/** One line to choose a decision by: its identifier, the option chosen, its status and when it was made. */
+/** One line to choose a decision by: its Decision ID, the option chosen, its status and when it was made. */
 export function decisionLabel(decision: Decision): string {
   return [
-    decision.decision_identifier ?? decision.id.slice(0, 8),
+    displayId(decision, "decision_identifier", "Decision"),
     decision.selected_action ? titleCase(decision.selected_action) : null,
     decision.decision_status ? titleCase(decision.decision_status) : null,
     decision.decision_timestamp ? formatDateTime(decision.decision_timestamp) : null,
@@ -43,11 +45,37 @@ export function decisionLabel(decision: Decision): string {
     .join(" · ");
 }
 
+/**
+ * The overall result of a verification report in words: every signature valid, at least one that no longer matches
+ * what was signed (a problem, never shown as merely unsigned), or no signature yet.
+ */
+export function verificationSummary(status: unknown): { label: string; tone: "good" | "neutral" | "problem" } {
+  switch (String(status ?? "").toUpperCase()) {
+    case "VALID":
+      return { label: "All signatures valid", tone: "good" };
+    case "INVALID":
+      return { label: "Invalid — at least one signature does not match the signed version", tone: "problem" };
+    case "NOT_SIGNED":
+    case "":
+      return { label: "Not signed", tone: "neutral" };
+    default:
+      return { label: titleCase(String(status)), tone: "problem" };
+  }
+}
+
+const SUMMARY_BADGE = {
+  good: "platform-admin-badge success",
+  neutral: "platform-admin-badge",
+  problem: "platform-admin-badge warning",
+};
+
 export function SignatureVerificationWorkspace() {
   // Inside the workspace the case chosen in the context bar is used; on its own the person chooses a case here.
   const workspace = useContext(WorkspaceContext);
   const contextCase = workspace?.work.investigationId ?? "";
-  const [cases, setCases] = useState<Array<{ id: string; investigation_identifier?: string }>>([]);
+  const [cases, setCases] = useState<
+    Array<{ id: string; business_id?: string | null; investigation_identifier?: string }>
+  >([]);
   const [caseId, setCaseId] = useState(contextCase);
   const [decisions, setDecisions] = useState<Decision[] | null>(null);
   const [decisionId, setDecisionId] = useState("");
@@ -100,6 +128,8 @@ export function SignatureVerificationWorkspace() {
     }
   };
 
+  const summary = report ? verificationSummary(report.verification_status) : null;
+
   return (
     <div className="content governance-view signature-workspace">
       <section className="governance-hero">
@@ -121,7 +151,7 @@ export function SignatureVerificationWorkspace() {
               <option value="">Choose an investigation</option>
               {cases.map((item) => (
                 <option key={item.id} value={String(item.id)}>
-                  {item.investigation_identifier ?? item.id}
+                  {displayId(item, "investigation_identifier", "Investigation")}
                 </option>
               ))}
             </select>
@@ -163,11 +193,11 @@ export function SignatureVerificationWorkspace() {
       {report && (
         <section className="panel">
           <div className="section-title">Verification report</div>
-          <div className="platform-admin-badge">
-            {report.verification_status === "VALID"
-              ? "All signatures valid"
-              : titleCase(String(report.verification_status ?? "Not signed"))}
-          </div>
+          {summary && (
+            <div className={SUMMARY_BADGE[summary.tone]} role={summary.tone === "problem" ? "alert" : undefined}>
+              {summary.label}
+            </div>
+          )}
           <div className="signature-report-grid">
             {(report.signatures ?? []).map((item: any) => (
               <article key={String(item.signature_id)}>
@@ -175,6 +205,9 @@ export function SignatureVerificationWorkspace() {
                   {titleCase(String(item.decision ?? "Signature"))} ·{" "}
                   {item.valid ? "Valid" : "Does not match the signed version"}
                 </strong>
+                {safeText(item.business_id ?? item.signature_business_id) && (
+                  <span>Signature ID: {safeText(item.business_id ?? item.signature_business_id)}</span>
+                )}
                 <span>Signed by: {signerLabel(String(item.signer_user_id), item.signer_role, people, me)}</span>
                 <span>
                   Decision version of {formatDateTime(item.object_version, String(item.object_version ?? "—"))}
