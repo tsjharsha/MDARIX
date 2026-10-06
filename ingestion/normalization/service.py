@@ -132,6 +132,36 @@ def json_param(value: Any) -> str:
     return json.dumps(value, sort_keys=True, default=str)
 
 
+# The identity of one source record, used to keep only its latest staged revision. source_record_id is not unique
+# per record: it is the first identifier column a row has, so a lot or an investigation row carrying product_id gets the
+# product's id. Grouping on it merged every lot of a product into one. Each known record type is grouped on its own
+# identifier; an unknown type is not merged at all (each staged row stands alone, as before revisions were collapsed).
+REVISION_KEYS = {
+    "product": "product_id",
+    "product_version": "product_version_id",
+    "product_component": "product_component_id",
+    "supplier": "supplier_id",
+    "manufacturing_site": "site_id",
+    "component": "component_id",
+    "lot": "lot_id",
+    "requirement": "requirement_id",
+    "change": "change_id",
+    "risk": "risk_id",
+    "failure_mode": "failure_mode_id",
+    "control": "control_id",
+    "investigation": "investigation_id",
+    "complaint": "complaint_id",
+    "evidence_metadata": "evidence_id",
+    "evidence_file": "filename",
+}
+REVISION_KEY_SQL = (
+    "CASE record_type "
+    + " ".join(f"WHEN '{record_type}' THEN raw_payload->>'{key}'" for record_type, key in REVISION_KEYS.items())
+    + " END"
+)
+REVISION_KEY_SQL = f"COALESCE({REVISION_KEY_SQL}, id::text)"
+
+
 class NormalizationService:
     def normalize_all(self) -> dict[str, Any]:
         tenant_id = self.tenant_id()
@@ -159,9 +189,7 @@ class NormalizationService:
                         "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
                         "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version, "
                         "source_row_index, row_number() OVER ("
-                        "PARTITION BY source_system, record_type, "
-                        "CASE WHEN record_type='evidence_metadata' "
-                        "THEN COALESCE(raw_payload->>'evidence_id', source_record_id) ELSE source_record_id END "
+                        "PARTITION BY source_system, record_type, " + REVISION_KEY_SQL + " "
                         "ORDER BY ingestion_timestamp DESC, created_at DESC, id DESC"
                         ") AS source_revision_rank "
                         "FROM staged_source_records WHERE tenant_id=:tenant_id) "

@@ -21,6 +21,7 @@ from backend.app.demo_workspace import (
     status,
 )
 from backend.app.main import app
+from backend.app.role_codes import canonical_stored_role
 
 PASSWORD = "Demo workspace test 2026!"
 STORY = {
@@ -70,7 +71,8 @@ def test_setup_creates_its_own_tenant_and_is_idempotent(demo):
         assert db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant.id).one().status == "ACTIVE"
         for role, email, _ in DEMO_TEAM:
             user = db.query(AuthUser).filter(AuthUser.username == email).one()
-            assert (user.tenant_id, user.role, user.status) == (tenant.id, role, "ACTIVE")
+            # Built-in roles are stored as canonical codes (backend/app/role_codes.py), e.g. INVESTIGATOR.
+            assert (user.tenant_id, user.role, user.status) == (tenant.id, canonical_stored_role(role), "ACTIVE")
         assert status(db)["plan"] == "R1_GOVERNANCE_DEMO"
     finally:
         db.close()

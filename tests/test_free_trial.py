@@ -130,7 +130,7 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     try:
         tenant_id = uuid.UUID(approval["tenant_id"])
         account = db.query(AuthUser).filter(AuthUser.username == email).one()
-        assert account.tenant_id == tenant_id and account.role == "Leader" and account.status == "ACTIVE"
+        assert account.tenant_id == tenant_id and account.role == "LEADER" and account.status == "ACTIVE"
         subscription = trial_subscription(db, tenant_id)
         assert 29 <= (subscription.expires_at - datetime.now(timezone.utc)).days <= 30
         plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()
