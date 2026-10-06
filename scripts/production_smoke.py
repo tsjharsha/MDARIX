@@ -1,11 +1,15 @@
-"""Check a running API started with MDARIX_ENV=production behaves as production must (CI job "Production mode").
+"""Check a running API started with MDARIX_ENV=production behaves as production must (CI jobs "Production mode" and
+"Production stack").
 
-    python scripts/production_smoke.py --base http://127.0.0.1:8000 --origin https://app.example.test \\
-        --email admin@example.test --token <activation token>
+    python scripts/production_smoke.py --base http://127.0.0.1:8000 --origin https://app.mdarix-ci.test \\
+        --email admin@mdarix-ci.test --token <activation token>
+    python scripts/production_smoke.py --front-door --base https://localhost --origin https://localhost ...
 
-Checks: health; API documentation is off; security headers (HSTS, CSP, frame denial); a sign-in from another site is
-refused (CSRF); an invited platform administrator activates, signs in, gets a __Host- session cookie that is Secure,
-HttpOnly and SameSite, and must set up MFA before anything else; a weak or breached password is refused. Exits 1
+Checks: health (a readiness or status answer of 503 fails: the server is up but not fit for traffic); API documentation
+is off; security headers (HSTS, CSP, frame denial); a sign-in from another site is refused (CSRF); an invited platform
+administrator activates, signs in, gets a __Host- session cookie that is Secure, HttpOnly and SameSite, and must set up
+MFA before anything else; a weak or breached password is refused. With ``--front-door`` the base is Caddy
+(docker-compose.prod.yml): readiness detail must then be hidden (404) and API responses must not be cacheable. Exits 1
 listing every failed check.
 """
 
@@ -37,13 +41,23 @@ def call(base: str, method: str, path: str, *, origin: str | None = None, body: 
         return exc.code, exc.headers, exc.read()
 
 
-def main() -> int:
+def api_docs_served(status: int, body: bytes) -> bool:
+    """True when the response is interactive API documentation or the OpenAPI schema. Behind Caddy, /docs is a page
+    of the web app (200 with the app's index.html), which is fine; the API's own documentation is not."""
+    lowered = (body or b"")[:20000].lower()
+    return status == 200 and (b"swagger-ui" in lowered or b'"openapi"' in lowered or b"redoc.standalone" in lowered)
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base", required=True)
     parser.add_argument("--origin", required=True)
     parser.add_argument("--email", required=True)
     parser.add_argument("--token", required=True)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--front-door", action="store_true", help="the base is the Caddy front door, not the API container"
+    )
+    args = parser.parse_args(argv)
     failures: list[str] = []
 
     def check(name: str, ok: bool, detail: object = "") -> None:
@@ -54,15 +68,25 @@ def main() -> int:
     status, _, body = call(args.base, "GET", "/health/live")
     check("liveness answers", status == 200, status)
     status, _, body = call(args.base, "GET", "/health/ready")
-    check("readiness answers without a server error", status in (200, 503), status)
+    if args.front_door:
+        check("readiness detail is not public", status == 404, status)
+    else:
+        check("readiness: the database answers and the schema is current", status == 200, body[:300])
+    status, headers, body = call(args.base, "GET", "/health/status")
+    word = (json.loads(body or b"{}") if status in (200, 503) else {}).get("status")
+    check("the public status is ok or degraded", status == 200 and word in ("ok", "degraded"), f"{status} {word}")
+    check("the public status is never cached", "no-store" in (headers.get("Cache-Control") or ""))
     for path in ("/docs", "/openapi.json", "/redoc"):
-        status, _, _ = call(args.base, "GET", path)
-        check(f"{path} is not served", status == 404, status)
+        status, _, body = call(args.base, "GET", path)
+        check(f"{path} is not served", status == 404 or not api_docs_served(status, body), status)
 
     status, headers, _ = call(args.base, "GET", "/health/live")
     check("HSTS is sent", "max-age=" in (headers.get("Strict-Transport-Security") or ""))
     check("CSP is sent", "frame-ancestors 'none'" in (headers.get("Content-Security-Policy") or ""))
     check("framing is denied", headers.get("X-Frame-Options") == "DENY")
+    if args.front_door:
+        status, headers, _ = call(args.base, "GET", "/api/v1/auth/session")
+        check("API responses are not cacheable", "no-store" in (headers.get("Cache-Control") or ""), status)
 
     status, _, body = call(
         args.base,

@@ -21,6 +21,23 @@ from backend.app.db.session import engine  # noqa: E402
 ROLE = os.getenv("MDARIX_DB_RUNTIME_USER", "mdarix_runtime")
 
 
+def _removals(current) -> str:
+    """The attributes to take away, named only when the role has them.
+
+    PostgreSQL 16 lets only a superuser even name SUPERUSER or BYPASSRLS in ALTER ROLE (and only a CREATEDB account
+    name CREATEDB), so repeating "NOSUPERUSER NOBYPASSRLS ..." on every run would fail on a managed database whose
+    owner is not a superuser, although nothing needs changing. A role that does hold one of them still fails here,
+    loudly, unless a superuser runs this.
+    """
+    flags = (
+        ("NOSUPERUSER", current.rolsuper),
+        ("NOBYPASSRLS", current.rolbypassrls),
+        ("NOCREATEDB", current.rolcreatedb),
+        ("NOCREATEROLE", current.rolcreaterole),
+    )
+    return "".join(f"{name} " for name, held in flags if held)
+
+
 def main() -> None:
     password = os.getenv("MDARIX_DB_RUNTIME_PASSWORD", "")
     if len(password) < 24:
@@ -32,13 +49,17 @@ def main() -> None:
         if exists is None:
             raise SystemExit(f"Role {ROLE} does not exist; apply the database migrations first.")
         quoted = connection.execute(text("SELECT quote_literal(:password)"), {"password": password}).scalar_one()
-        connection.execute(
-            text(f'ALTER ROLE "{ROLE}" WITH LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE PASSWORD {quoted}')
-        )
+        current = connection.execute(
+            text("SELECT rolsuper, rolbypassrls, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname = :role"),
+            {"role": ROLE},
+        ).one()
+        connection.execute(text(f'ALTER ROLE "{ROLE}" WITH {_removals(current)}LOGIN PASSWORD {quoted}'))
         flags = connection.execute(
             text("SELECT rolsuper, rolbypassrls, rolcanlogin FROM pg_roles WHERE rolname = :role"), {"role": ROLE}
         ).one()
     print(f"{ROLE}: login={flags.rolcanlogin} superuser={flags.rolsuper} bypass_rls={flags.rolbypassrls}")
+    if flags.rolsuper or flags.rolbypassrls:
+        raise SystemExit(f"{ROLE} must have neither SUPERUSER nor BYPASSRLS: row-level security would not apply.")
 
 
 if __name__ == "__main__":

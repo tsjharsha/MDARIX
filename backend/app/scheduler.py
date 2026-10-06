@@ -162,6 +162,27 @@ def export_expiry(db: Session, _state: dict) -> dict:
     return {"expired": expire_exports(db)}
 
 
+def purge_completion(db: Session, state: dict) -> dict:
+    """Finish organization deletions left PURGING (files or a dedicated database that could not be deleted at the
+    time; backend/app/tenant_purge.py). An organization under a legal hold is skipped, never forced. An operator is
+    alerted once while a deletion stays incomplete, and again only if the list of incomplete deletions changes."""
+    from backend.app.tenant_purge import complete_pending_purges
+
+    summary = complete_pending_purges(db, "system:scheduler")
+    stuck = sorted(
+        str(item.get("tenant_id") or item) for item in summary.get("incomplete", []) + summary.get("failed", [])
+    )
+    if stuck and stuck != state.get("reported_incomplete"):
+        send_alert(
+            "Organization deletion still incomplete",
+            f"{len(stuck)} organization deletion(s) could not be finished: {', '.join(stuck)}. "
+            "Check object storage and dedicated databases, then run scripts/complete_tenant_purge.py "
+            "(docs/runbooks/DATA_REQUESTS.md).",
+        )
+    state["reported_incomplete"] = stuck
+    return {key: len(value) for key, value in summary.items() if isinstance(value, list)}
+
+
 def audit_chain_verification(db: Session, state: dict) -> dict:
     """Recompute every organization's audit hash chain from its last verified anchor; alert on any break."""
     from backend.app.audit_chain import verify_all
@@ -189,6 +210,7 @@ JOBS: tuple[Job, ...] = (
     Job("operations-alerts", timedelta(minutes=5), operations_alerts, "Alert on dead letters and a stopped worker"),
     Job("export-expiry", timedelta(hours=1), export_expiry, "Delete data exports after their download period"),
     Job("connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule"),
+    Job("purge-completion", timedelta(hours=24), purge_completion, "Finish organization deletions left incomplete"),
     Job(
         "audit-chain-verification",
         timedelta(hours=24),

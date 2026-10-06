@@ -32,3 +32,11 @@ docker-compose*.yml
 Caddyfile*
 STATUS.md
 requirements-dev.txt
+# Keys, certificates and backups (the database CA is mounted at run time, never built in).
+**/*.pem
+**/*.key
+**/*.p12
+**/*.age
+.env.migrate
+certs
+.logs

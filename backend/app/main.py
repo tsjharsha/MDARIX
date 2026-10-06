@@ -19,6 +19,7 @@ from backend.app.logging_setup import (
     current_request_id,
     request_id_var,
 )
+from backend.app.version import APP_VERSION
 from backend.app.access_router import router as access_router
 from backend.app.ask_router import router as ask_router
 from backend.app.auth_router import router as auth_router
@@ -62,6 +63,7 @@ from backend.app.investigation_open_router import router as investigation_open_r
 from backend.app.complaints_router import router as complaints_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
+from backend.app.risk_router import router as risk_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -90,7 +92,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     lifespan=lifespan,
     title="MDARIX R1 API",
-    version="0.8.0",
+    version=APP_VERSION,
     description=(
         "Tenant-scoped medical-device product lifecycle, investigation, evidence, "
         "and governed decision APIs. Authentication and tenant authorization are "
@@ -321,6 +323,7 @@ app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
 app.include_router(client_errors_router)
 app.include_router(support_router)
+app.include_router(risk_router)  # Risk & Traceability
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

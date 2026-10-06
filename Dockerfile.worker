@@ -1,12 +1,26 @@
-FROM python:3.13-slim
+# Local development only (docker-compose.yml, service mdarix-outbox-worker): the outbox worker against the local
+# databases. Production runs the worker from the API image (Dockerfile.api, docker-compose.prod.yml).
+# Base image pinned by digest (the same as Dockerfile.api); dependencies installed from the hashed lock.
+FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/app
+
+RUN groupadd --system --gid 10001 mdarix \
+    && useradd --system --uid 10001 --gid mdarix --home-dir /app --shell /usr/sbin/nologin mdarix
+
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --require-hashes -r /app/requirements.txt
 COPY auth /app/auth
 COPY backend /app/backend
 COPY outbox /app/outbox
 COPY integration /app/integration
 COPY reports /app/reports
 COPY scripts /app/scripts
-ENV PYTHONUNBUFFERED=1
+
+USER mdarix
 CMD ["python", "scripts/run_outbox_worker.py"]

@@ -33,8 +33,9 @@ def mailbox(monkeypatch):
     monkeypatch.setattr(
         emailer,
         "_send_email",
-        lambda to, subject, text, html=None, reply_to=None: sent.append({"to": to, "subject": subject, "text": text})
-        or "SENT",
+        lambda to, subject, text, html=None, reply_to=None: (
+            sent.append({"to": to, "subject": subject, "text": text}) or "SENT"
+        ),
     )
     return sent
 

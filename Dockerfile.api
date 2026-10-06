@@ -12,6 +12,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MDARIX_EMBEDDING_CACHE_DIR=/opt/mdarix/embeddings \
     HF_HUB_OFFLINE=0
 
+# The pinned base keeps Python fixed; its Debian packages take the security fixes published since the base was built
+# (CI scans the result with Trivy and fails on a fixable HIGH or CRITICAL finding).
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 10001 mdarix \
     && useradd --system --uid 10001 --gid mdarix --home-dir /app --shell /usr/sbin/nologin mdarix
 
@@ -19,9 +25,33 @@ WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --require-hashes -r /app/requirements.txt
 
-# The embedding model is part of the image, so a production server never downloads it at runtime.
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5', cache_dir='/opt/mdarix/embeddings')" \
-    && chmod -R a+rX /opt/mdarix
+# The embedding model is part of the image, so a production server never downloads it at runtime. It is pinned to one
+# commit of the ONNX repository fastembed loads for BAAI/bge-small-en-v1.5, so a rebuild cannot silently change the
+# vectors evidence search compares. To update: read the new commit with
+#   curl -s https://huggingface.co/api/models/Qdrant/bge-small-en-v1.5-onnx-Q | python -c "import json,sys; print(json.load(sys.stdin)['sha'])"
+# set EMBEDDING_REVISION to it, and re-index evidence (scripts/index_evidence.py) if the model weights changed.
+ARG EMBEDDING_REPO=Qdrant/bge-small-en-v1.5-onnx-Q
+ARG EMBEDDING_REVISION=aa8f8b060edb00e03bfdd08813a2949946c8ba55
+RUN <<PY python
+import os
+from pathlib import Path
+
+from huggingface_hub import snapshot_download
+
+cache = os.environ["MDARIX_EMBEDDING_CACHE_DIR"]
+repo, revision = os.environ["EMBEDDING_REPO"], os.environ["EMBEDDING_REVISION"]
+snapshot_download(repo_id=repo, revision=revision, cache_dir=cache, allow_patterns=["*.json", "*.onnx", "*.txt"])
+# fastembed loads the cache offline through the "main" ref; point it at the pinned commit.
+refs = Path(cache) / f"models--{repo.replace('/', '--')}" / "refs"
+refs.mkdir(parents=True, exist_ok=True)
+(refs / "main").write_text(revision)
+
+from fastembed import TextEmbedding
+
+vector = next(iter(TextEmbedding("BAAI/bge-small-en-v1.5", cache_dir=cache, local_files_only=True).embed(["pinned"])))
+assert len(vector) == 384, len(vector)
+PY
+RUN chmod -R a+rX /opt/mdarix
 ENV HF_HUB_OFFLINE=1
 
 COPY --chown=root:root . /app

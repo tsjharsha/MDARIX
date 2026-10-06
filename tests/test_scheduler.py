@@ -142,7 +142,9 @@ def test_a_job_silent_for_twice_its_interval_is_alerted_once_and_its_return_once
     scheduler._missed_reported.clear()
     now = datetime.now(timezone.utc)
     job = Job("missed-test", timedelta(minutes=5), lambda db, state: {}, "Missed test job")
-    stale = SchedulerRun(job=job.name, last_started_at=now - timedelta(minutes=12), last_finished_at=now - timedelta(minutes=11))
+    stale = SchedulerRun(
+        job=job.name, last_started_at=now - timedelta(minutes=12), last_finished_at=now - timedelta(minutes=11)
+    )
     assert scheduler.check_missed_jobs(now, jobs=(job,), rows={job.name: stale}) == ["missed-test"]
     assert scheduler.check_missed_jobs(now, jobs=(job,), rows={job.name: stale}) == ["missed-test"]
     assert [subject for subject, _ in alerts] == ["Scheduled job missed: missed-test"]
@@ -156,7 +158,9 @@ def test_a_job_silent_for_twice_its_interval_is_alerted_once_and_its_return_once
 def test_a_long_running_job_and_a_job_that_never_ran_are_not_missed():
     now = datetime.now(timezone.utc)
     job = Job("long", timedelta(minutes=5), lambda db, state: {}, "Long job")
-    running = SchedulerRun(job="long", last_started_at=now - timedelta(minutes=3), last_finished_at=now - timedelta(hours=2))
+    running = SchedulerRun(
+        job="long", last_started_at=now - timedelta(minutes=3), last_finished_at=now - timedelta(hours=2)
+    )
     assert scheduler.missed_jobs({"long": running}, now, (job,)) == []
     assert scheduler.missed_jobs({}, now, (job,)) == []
     assert scheduler.missed_jobs({"long": SchedulerRun(job="long")}, now, (job,)) == []
@@ -204,7 +208,9 @@ def test_the_operations_job_alerts_only_when_the_dead_letter_count_rises(alerts,
         state = {"worker": worker}
         result = scheduler.operations_alerts(db, state)
         assert result["dead_letters"] == total and state["dead_letters"] == total
-        assert [subject for subject, _ in alerts] == ["Dead-letter queue grew"] and f"({total} in total)" in alerts[0][1]
+        assert [subject for subject, _ in alerts] == ["Dead-letter queue grew"] and f"({total} in total)" in alerts[0][
+            1
+        ]
         # Same count: silence.
         scheduler.operations_alerts(db, state)
         assert len(alerts) == 1

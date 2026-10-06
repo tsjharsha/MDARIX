@@ -6,8 +6,8 @@ therefore never re-sends what it already sent, and a shutdown request is honoure
 one is finished.
 
 Retries back off exponentially from ``MDARIX_OUTBOX_BASE_DELAY_SECONDS`` (30 s) doubling to
-``MDARIX_OUTBOX_MAX_DELAY_SECONDS`` (1 hour), for ``MDARIX_OUTBOX_MAX_ATTEMPTS`` (12) attempts in all, about five and
-a half hours, long enough to ride out a mail provider outage. After the last attempt the event is dead-lettered and
+``MDARIX_OUTBOX_MAX_DELAY_SECONDS`` (1 hour), for ``MDARIX_OUTBOX_MAX_ATTEMPTS`` (12) attempts in all, about five
+hours, long enough to ride out a mail provider outage. After the last attempt the event is dead-lettered and
 alerted once (backend/app/alerts.py); platform administrators retry or discard dead letters from the console.
 """
 

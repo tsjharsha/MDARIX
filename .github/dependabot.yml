@@ -1,0 +1,39 @@
+# Weekly update proposals for every pinned dependency: Python (hashed lock requirements.txt), the frontend's npm lock,
+# base images (Dockerfile.api, Dockerfile.web, Dockerfile.worker, the backup image, the compose files) and the
+# SHA-pinned GitHub Actions.
+# Each proposal runs the full CI, including the image scans, before anyone merges it.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: {interval: weekly, day: monday}
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    labels: [dependencies]
+  # The ClamAV image pinned by digest in docker-compose.prod.yml.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    labels: [dependencies]
+  - package-ecosystem: docker
+    directory: /infrastructure/docker/backup
+    schedule: {interval: weekly, day: monday}
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly, day: monday}
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ["*"]

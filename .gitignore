@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 !.env.production.example
+!.env.migrate.example
 frontend/vite.zz-*.config.ts
 .venv/
 __pycache__/
@@ -43,3 +44,14 @@ artifacts/compliance/audit-archives/
 artifacts/audit-archives/
 artifacts/data-plane-backups/
 artifacts/automated-release-gate.md
+
+# Keys, certificates, database dumps and encrypted backups never belong in the repository; the filled production
+# settings (.env.production, .env.migrate) are covered by .env.* above.
+*.pem
+*.key
+*.p12
+*.dump
+*.age
+.env.migrate
+/certs/
+.logs/

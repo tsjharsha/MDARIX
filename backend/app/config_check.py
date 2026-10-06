@@ -180,8 +180,8 @@ def _owner_credentials_problems() -> list[str]:
     """Owner credentials belong to the one-shot migrate and backup jobs (.env.migrate), never to a running service.
 
     A long-running service holding the owner password could bypass row-level security if any part of it were
-    compromised, so the API refuses to start with it in reach. The same applies to the owner connection strings of
-    dedicated customer databases.
+    compromised, so the API refuses to start with it in reach. The same applies to the backup login and to the owner
+    connection strings of dedicated customer databases.
     """
     found = []
     if _get("MDARIX_DB_OWNER_PASSWORD"):
@@ -189,7 +189,15 @@ def _owner_credentials_problems() -> list[str]:
             "MDARIX_DB_OWNER_PASSWORD must not be in a long-running service's environment: keep the owner "
             "credentials in .env.migrate, which only the migrate and backup jobs load"
         )
-    owner_urls = sorted(name for name in os.environ if name.startswith("MDARIX_DATA_PLANE_") and name.endswith("_OWNER"))
+    if _get("MDARIX_BACKUP_DB_PASSWORD"):
+        # The backup login reads every organization's rows (BYPASSRLS): it is no safer in reach than the owner's.
+        found.append(
+            "MDARIX_BACKUP_DB_PASSWORD must not be in a long-running service's environment: keep the backup "
+            "credentials in .env.migrate, which only the migrate and backup jobs load"
+        )
+    owner_urls = sorted(
+        name for name in os.environ if name.startswith("MDARIX_DATA_PLANE_") and name.endswith("_OWNER")
+    )
     if owner_urls:
         found.append(f"{', '.join(owner_urls)} must not be in a long-running service's environment (.env.migrate)")
     runtime_user = _get("MDARIX_DB_RUNTIME_USER")
@@ -292,7 +300,9 @@ def _runtime_role_problem() -> str | None:
 
         with runtime_engine.connect() as connection:
             row = connection.execute(
-                text("SELECT rolname, rolsuper OR rolbypassrls AS unrestricted FROM pg_roles WHERE rolname = current_user")
+                text(
+                    "SELECT rolname, rolsuper OR rolbypassrls AS unrestricted FROM pg_roles WHERE rolname = current_user"
+                )
             ).one()
     except Exception as exc:
         return f"Could not check the database role the server runs as ({type(exc).__name__})"
