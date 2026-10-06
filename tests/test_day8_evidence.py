@@ -208,9 +208,13 @@ def test_ai_execution_provenance_recording(db_session, setup_test_data):
         if (row.evidence_refs or {}).get("evidence_id") == evidence_id
     ]
     assert len(ai_logs) > 0
-    assert ai_logs[0].provider == "google"
-    assert ai_logs[0].model_name is not None
-    assert ai_logs[0].structured_output is not None
+    # The record names who really wrote the observations. Tests run without a model (controlled mode), so the
+    # newest execution must say the rules wrote them, never a provider that was not asked (ai/extractor.py).
+    latest = max(ai_logs, key=lambda row: row.execution_timestamp)
+    from ai.extractor import RULES_PROVENANCE
+
+    assert latest.provider == "RULES" and latest.model_name == RULES_PROVENANCE["model"]
+    assert latest.structured_output is not None
 
 
 def test_idempotent_extraction_reprocessing(db_session, setup_test_data):

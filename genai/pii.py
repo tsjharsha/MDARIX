@@ -16,9 +16,12 @@ person is replaced with a typed placeholder (``[EMAIL]``, ``[PHONE]``, ``[PERSON
 * the values of dictionary keys that hold personal data (snake_case or camelCase: ``patient_name``,
   ``reporterEmail``, ``name``, ``assigned_to``, ``assignee``, ``user``, any ``*_by`` key).
 
-Device serials and lot numbers are kept, because the investigation is about them. The exception is a serial or lot
-in the same sentence as a masked person: there the pair could identify the patient, so it is masked too
-(``MDARIX_GENAI_MASK_SERIALS_NEAR_PII=false`` keeps them). Masking runs on every model request
+Device serials, lot numbers, product names, standards and ordinary event dates are kept, because the investigation is
+about them. The exception is a serial or lot in the same sentence as a *patient-side* identifier (a patient,
+complainant, caller or reporter, a date of birth, a record number, an address, an age with a sex): there the pair
+could lead back to the patient through device registries, so it is masked too. A staff member beside a lot ("Dr. Alan
+Grant reviewed lot L24-0815") does not identify a patient, so that lot stays
+(``MDARIX_GENAI_MASK_SERIALS_NEAR_PII=false`` keeps them all). Masking runs on every model request
 (``genai/provider.py``); it can be switched off only for local work on synthetic data
 (``MDARIX_GENAI_PII_MASKING=false``), never in staging or production.
 """
@@ -161,7 +164,16 @@ SERIAL_NEAR_PERSON = re.compile(
     r"udi(?:-di|-pi)?|gtin|device\s+(?:id|identifier|serial))\s*[:#=]?\s*)((?=[\w-]*\d)[A-Z0-9][\w-]{3,})"
     r"|\b((?:lot|batch|sn|udi)-)([\w-]{2,})"
 )
-PERSON_PLACEHOLDERS = ("[PERSON]", "[EMAIL]", "[PHONE]", "[DATE_OF_BIRTH]", "[ID_NUMBER]", "[ADDRESS]", "[AGE_SEX]")
+# Placeholders that always point at the patient side of a record; a lot or serial beside one is masked.
+PATIENT_PLACEHOLDERS = ("[DATE_OF_BIRTH]", "[ID_NUMBER]", "[ADDRESS]", "[AGE_SEX]", "[POSTCODE]")
+# A masked name is patient-side when a patient-side label or role word (or "reported by", "complaint from") stands
+# just before it: "Patient: [PERSON]", "Complainant [PERSON]", "reported by nurse [PERSON]". A name after a title or
+# a staff role ("Dr. [PERSON] reviewed", "Engineer [PERSON]") is not.
+PATIENT_PERSON = re.compile(
+    r"(?i)\b(?:patient(?:\s+name)?|complainant|caller|reporter(?:\s+name)?|user|customer|carer|caregiver|relative|"
+    r"guardian|parent|mother|father|wife|husband|spouse|witness|contact(?:\s+name)?|full\s+name|reported\s+by|"
+    r"called\s+by|submitted\s+by|complaint\s+from|call\s+from)\b[^\[\n]{0,16}\[PERSON\]"
+)
 SENTENCE = re.compile(r"(?<=[.!?;])\s+|\n+")
 
 _ID_LABELS = {"mrn", "medical record", "medical record number", "medical record no", "nhs number", "hospital number"}
@@ -316,13 +328,18 @@ def _serial(match: re.Match) -> str:
     return f"{match.group(1) or match.group(3)}{placeholder}"
 
 
+def _names_a_patient(sentence: str) -> bool:
+    """True when a masked sentence carries a patient-side identifier (module doc): only then is its lot masked."""
+    return any(token in sentence for token in PATIENT_PLACEHOLDERS) or bool(PATIENT_PERSON.search(sentence))
+
+
 def _serials_near_people(text: str) -> str:
-    """Serial, lot and batch identifiers in sentences that also contain a masked person token."""
+    """Serial, lot and batch identifiers in sentences that also identify a patient."""
     parts = SENTENCE.split(text)
     separators = SENTENCE.findall(text)
     out = []
     for index, part in enumerate(parts):
-        if any(token in part for token in PERSON_PLACEHOLDERS):
+        if _names_a_patient(part):
             part = SERIAL_NEAR_PERSON.sub(_serial, part)
         out.append(part)
         if index < len(separators):

@@ -1,7 +1,15 @@
 name: AI evaluation gate
-# Runs the golden evaluation (VS001-VS012) against the contracted model before a release. It needs the model's API key,
-# so it is started by hand (Actions > AI evaluation gate > Run workflow) rather than on every pull request. A release
-# is promoted only after this passes (docs/runbooks/DEPLOYMENT.md).
+# Runs the golden evaluation (every scenario in evaluation/scenarios/scenario_index.json, including the adversarial
+# VS013-VS015) against the contracted model. A release is promoted only after this passes
+# (docs/runbooks/DEPLOYMENT.md, docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md).
+#
+# When: by hand (Actions > AI evaluation gate > Run workflow), every Monday, and on pull requests that change the AI
+# code or the golden dataset. It needs the model's API key (repository secret MDARIX_EVALUATION_API_KEY); without
+# it (forks, or before the secret is set) the run is skipped with a notice instead of failing.
+#
+# The evaluation step runs under a production-like provider policy (MDARIX_ENV=staging): only the contracted
+# provider may be called, personal-data masking cannot be switched off, and every model request needs its
+# organization's scope, AI switch and budget, exactly as in production. The data is the synthetic golden dataset.
 on:
   workflow_dispatch:
     inputs:
@@ -13,11 +21,26 @@ on:
         description: Model name (empty for the provider's default)
         required: false
         default: ''
+  schedule:
+    - cron: '17 5 * * 1'
+  pull_request:
+    paths:
+      - 'genai/**'
+      - 'investigator/**'
+      - 'hypothesis_engine/**'
+      - 'challenger/**'
+      - 'evaluation/**'
+      - 'data/golden/**'
+      - '.github/workflows/ai-evaluation.yml'
 permissions:
   contents: read
+concurrency:
+  group: ai-evaluation-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   evaluate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -25,9 +48,11 @@ jobs:
       POSTGRES_PORT: '5432'
       POSTGRES_DB: mdarix_r1
       MDARIX_DB_HARDENING_APPLY: '1'
+      # Setup steps (migrations, loading and indexing the dataset) run with development conveniences; the
+      # evaluation step itself switches to the production-like policy below.
       MDARIX_ENV: development
-      MDARIX_GENAI_PROVIDER: ${{ inputs.provider }}
-      MDARIX_GENAI_MODEL: ${{ inputs.model }}
+      MDARIX_GENAI_PROVIDER: ${{ inputs.provider || 'anthropic' }}
+      MDARIX_GENAI_MODEL: ${{ inputs.model || '' }}
       MDARIX_GENAI_API_KEY: ${{ secrets.MDARIX_EVALUATION_API_KEY }}
       MDARIX_GENAI_FALLBACKS: ''
     services:
@@ -42,30 +67,55 @@ jobs:
           --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check for the model key
+        id: key
+        run: |
+          if [ -z "$MDARIX_GENAI_API_KEY" ]; then
+            echo "::notice title=AI evaluation skipped::The MDARIX_EVALUATION_API_KEY secret is not available to this run (fork or secret not set), so the golden evaluation did not run. Run it by hand before promoting a release."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.key.outputs.skip != 'true'
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        if: steps.key.outputs.skip != 'true'
         with:
           python-version: '3.13'
-      - name: Require the model key
-        run: test -n "$MDARIX_GENAI_API_KEY" || { echo "Set the MDARIX_EVALUATION_API_KEY repository secret."; exit 1; }
-      - run: python -m pip install --require-hashes -r requirements.txt
+      - if: steps.key.outputs.skip != 'true'
+        run: python -m pip install --require-hashes -r requirements.txt
       - name: Verify the qualified golden dataset before model execution
+        if: steps.key.outputs.skip != 'true'
         run: python scripts/qualify_ai_golden_dataset.py
-      - run: alembic upgrade head
+      - if: steps.key.outputs.skip != 'true'
+        run: alembic upgrade head
       - name: Load the synthetic golden dataset
+        if: steps.key.outputs.skip != 'true'
         run: >-
           python -c "from ingestion.services.ingestion_service import GOLDEN_SOURCE, IngestionService;
           from ingestion.normalization.service import NormalizationService;
           IngestionService(GOLDEN_SOURCE).ingest_all(); NormalizationService().normalize_all()"
       - name: Index the evidence for search
+        if: steps.key.outputs.skip != 'true'
         run: python scripts/index_evidence.py --tenant ACME_CARE_SYNTHETIC
-      - name: Golden evaluation (release gate)
-        run: python scripts/run_real_evaluation.py --pause 5 --gate --require-model
+      - name: Golden evaluation (release gate, production-like provider policy)
+        if: steps.key.outputs.skip != 'true'
+        env:
+          MDARIX_ENV: staging
+          # The contracted allowlist is on: only this provider may be called.
+          MDARIX_GENAI_CONTRACTED_PROVIDERS: ${{ inputs.provider || 'anthropic' }}
+          # The golden dataset is synthetic, so the provider's standard retention is accepted for this run only.
+          # Production clears each provider with MDARIX_GENAI_<NAME>_ZDR (docs/compliance/AI_PROVIDER_REGISTER.md).
+          MDARIX_GENAI_ACCEPT_RETENTION: 'true'
+        # --switch-ai-on: the synthetic organization starts with AI off like every new organization; the script
+        # switches it on with an audited acknowledgement before the run.
+        run: python scripts/run_real_evaluation.py --pause 5 --gate --require-model --switch-ai-on
       - name: Upload the evaluation report
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: always() && steps.key.outputs.skip != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mdarix-ai-evaluation
           path: |
             artifacts/ai-golden-dataset-qualification.json
             artifacts/real-golden-evaluation.json
+          if-no-files-found: warn

@@ -145,7 +145,7 @@ class EvidenceIntelligenceService:
                 chunk_id=matching_chunk.id if matching_chunk else None,
                 statement=obs_schema.statement,
                 observation_type=obs_schema.observation_type,
-                extraction_method="GENAI",
+                extraction_method=validated_result.extraction_method,  # GENAI, or DETERMINISTIC for the rules
                 source_anchor=anchor_dict,
                 quality_status="VALIDATED" if not validated_result.warnings else "LIMITATIONS",
                 limitations=[l.model_dump() for l in validated_result.limitations]

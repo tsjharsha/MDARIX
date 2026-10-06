@@ -40,10 +40,9 @@ def test_personal_information_is_masked_and_investigation_facts_are_kept():
         "192.168.1.20",
     ):
         assert secret not in masked
-    # A product lot is normally investigation context, but this one appears in the same
-    # sentence as a named reviewer.  The approved privacy policy therefore masks the
-    # potentially identifying person/lot pair while retaining the event date.
-    assert "L24-0815" not in masked and "[LOT]" in masked and "2026-10-03" in masked
+    # The lot and the event date are investigation facts. The reviewer beside them is staff, not a patient, so the
+    # lot stays (a lot beside a patient-side identifier is masked: tests/test_pii_corpus.py).
+    assert "L24-0815" in masked and "2026-10-03" in masked and "[LOT]" not in masked
 
 
 def test_clinical_and_product_wording_is_not_mistaken_for_personal_data():
@@ -108,21 +107,29 @@ def groq(monkeypatch):
 
 @pytest.fixture
 def tenant():
-    """An explicitly AI-enabled tenant whose original policy is restored afterwards.
+    """The synthetic tenant with AI switched on explicitly, its original policy restored afterwards.
 
-    The shared fixture is deliberately conservative and may have AI disabled.  Provider,
-    usage and budget tests must opt in rather than depending on whichever policy another
-    test or seed script left behind.
+    AI processing is off for new organizations (md23), so tests that need a model opt in the way an administrator
+    does: the platform administrator's AI settings endpoint, with the acknowledgement and a reason. Nothing depends
+    on whichever policy another test or seed script left behind.
     """
     db = SessionLocal()
     bind_system(db, "test")
     row = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
     tenant_id = row.id
     saved = (row.ai_processing_allowed, row.ai_monthly_token_budget)
-    row.ai_processing_allowed = True
-    row.ai_monthly_token_budget = None
-    db.commit()
     db.close()
+    _set(tenant_id, ai_processing_allowed=False)  # so the switch below is a real "on" that needs the acknowledgement
+    switched = authenticated_client().put(
+        f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
+        json={
+            "ai_processing_allowed": True,
+            "use_default_budget": True,
+            "acknowledgement": True,
+            "reason": "Tests switch AI on for the synthetic organization",
+        },
+    )
+    assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
     try:
         yield tenant_id
     finally:
@@ -189,6 +196,7 @@ def test_the_monthly_budget_stops_model_calls(groq, tenant):
 def test_production_refuses_a_model_call_without_an_organization(groq, monkeypatch):
     monkeypatch.setenv("MDARIX_ENV", "production")
     monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "groq")
+    monkeypatch.setenv("MDARIX_GENAI_GROQ_ZDR", "true")
     with pytest.raises(GenAIUnavailable, match="GENAI_NO_TENANT_SCOPE"):
         GenAIProvider().complete("Summarize the record.", {})
     assert groq == []
@@ -278,29 +286,80 @@ def test_a_long_document_is_cut_to_the_models_limit_and_the_cut_is_reported():
 # ------------------------------------------------------------------------------------------------ settings API
 
 
-def test_a_customer_administrator_switches_ai_off_for_their_organization_with_a_reason(tenant):
+def _latest_setting_event(tenant_id):
     from backend.app.db.models.foundation import AuditEvent
+
+    db = SessionLocal()
+    bind_system(db, "test")
+    try:
+        return (
+            db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "AI_PROCESSING_SETTING_CHANGED")
+            .order_by(AuditEvent.chain_seq.desc())
+            .first()
+        )
+    finally:
+        db.close()
+
+
+def test_a_customer_administrator_switches_ai_off_for_their_organization_with_a_reason(tenant):
+    """The audit diff holds only what changed. (Before md23 the tenant was already off, so this "off" changed
+    nothing and the diff was rightly empty: the stale part was the test, which now switches AI on first.)"""
     from tests.test_business_permissions import _client_with_role
 
     admin = _client_with_role("CUSTOMER_ADMIN")
     shown = admin.get("/api/v1/admin/ai-settings")
     assert shown.status_code == 200, shown.text
     assert {"ai_processing_allowed", "monthly_token_budget", "tokens_used", "models"} <= set(shown.json())
+    assert {"provider_name", "masking"} <= set(shown.json()) and shown.json()["masking"] is True
     assert admin.put("/api/v1/admin/ai-settings", json={"ai_processing_allowed": False}).status_code == 422
     changed = admin.put(
         "/api/v1/admin/ai-settings", json={"ai_processing_allowed": False, "reason": "Pilot uses real complaints"}
     )
     assert changed.status_code == 200 and changed.json()["ai_processing_allowed"] is False
-    db = SessionLocal()
-    bind_system(db, "test")
-    event = (
-        db.query(AuditEvent)
-        .filter(AuditEvent.tenant_id == tenant, AuditEvent.action == "AI_PROCESSING_SETTING_CHANGED")
-        .order_by(AuditEvent.created_at.desc())
-        .first()
-    )
-    db.close()
+    event = _latest_setting_event(tenant)
     assert event is not None and event.new_values == {"ai_processing_allowed": False}
+    assert "acknowledgement" not in (event.details or {})  # switching off needs no acknowledgement
+
+
+def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
+    from tests.test_business_permissions import _client_with_role
+
+    _set(tenant, ai_processing_allowed=False)
+    admin = _client_with_role("CUSTOMER_ADMIN")
+    body = {"ai_processing_allowed": True, "reason": "Pilot agreed to AI processing"}
+    refused = admin.put("/api/v1/admin/ai-settings", json=body)
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
+    assert _usage(tenant)["ai_processing_allowed"] is False
+    switched = admin.put("/api/v1/admin/ai-settings", json={**body, "acknowledgement": True})
+    assert switched.status_code == 200, switched.text
+    answer = switched.json()
+    assert answer["ai_processing_allowed"] is True and answer["masking"] is True and "provider_name" in answer
+    event = _latest_setting_event(tenant)
+    assert event.new_values == {"ai_processing_allowed": True} and event.reason == body["reason"]
+    assert event.details["acknowledgement"] is True and event.details["provider_name"] == (
+        answer["provider_name"] or "none configured"
+    )
+
+
+def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement():
+    platform = authenticated_client()
+    code = f"AIOFF{uuid.uuid4().hex[:6].upper()}"
+    created = platform.post(
+        "/api/v1/platform-admin/customers",
+        json={"company_name": f"AI Default {code}", "tenant_code": code, "plan_code": "STARTER"},
+    )
+    assert created.status_code == 200, created.text
+    url = f"/api/v1/platform-admin/tenants/{created.json()['id']}/ai-settings"
+    assert platform.get(url).json()["ai_processing_allowed"] is False
+    body = {"ai_processing_allowed": True, "reason": "Customer signed the AI addendum"}
+    refused = platform.put(url, json=body)
+    assert refused.status_code == 422 and refused.json()["detail"]["code"] == "AI_ACKNOWLEDGEMENT_REQUIRED"
+    assert platform.put(url, json={"monthly_token_budget": 1000, "reason": "Budget only"}).status_code == 200
+    switched = platform.put(url, json={**body, "acknowledgement": True})
+    assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True
+    event = _latest_setting_event(uuid.UUID(created.json()["id"]))
+    assert event.details["source"] == "PLATFORM_ADMIN" and event.details["acknowledgement"] is True
 
 
 def test_only_administrators_change_ai_settings(tenant):
@@ -338,3 +397,85 @@ def test_the_release_gate_requires_every_scenario_and_the_model():
     missed = {**good, "passed_with_specific_expectations": 0, "model_written": 12}
     assert any("specific expectations" in problem for problem in gate_problems(missed, None, False))
     assert any("written by the model" in problem for problem in gate_problems({**good, "model_written": 3}, None, True))
+
+
+# ------------------------------------------------------------------------------------------------ budget alerts
+
+
+def test_budget_alerts_fire_once_per_month_at_80_and_100_percent(tenant, monkeypatch):
+    """Administrators hear at 80% and 100%, operators at 100%, each once a month (the marker is an audit event)."""
+    import random
+    from datetime import date, datetime, timezone
+
+    import backend.app.alerts as alerts
+    import backend.app.notifications as notifications
+
+    notices, operator_alerts = [], []
+    monkeypatch.setattr(
+        notifications,
+        "notify_ai_budget_threshold",
+        lambda db, tenant_id, percent: notices.append((tenant_id, percent)),
+        raising=False,
+    )
+    monkeypatch.setattr(alerts, "send_alert", lambda subject, body: operator_alerts.append(subject))
+    # A month of its own (far future), so a re-run of the suite starts with no markers.
+    month = date(random.randint(2200, 9000), random.randint(1, 12), 1)
+    now = datetime(month.year, month.month, 15, tzinfo=timezone.utc)
+    _set(tenant, ai_monthly_token_budget=1000)
+
+    def use(tokens):
+        db = SessionLocal()
+        bind_system(db, "test")
+        row = db.get(AiUsageMonthly, (tenant, month))
+        if row is None:
+            db.add(
+                AiUsageMonthly(
+                    tenant_id=tenant,
+                    month=month,
+                    requests=1,
+                    refused=0,
+                    input_tokens=tokens,
+                    output_tokens=0,
+                    estimated_cost=0,
+                    updated_at=now,
+                )
+            )
+        else:
+            row.input_tokens = tokens
+        db.commit()
+        db.close()
+
+    try:
+        use(700)
+        assert governance.check_budget_thresholds(str(tenant), now=now) == []
+        use(850)
+        assert governance.check_budget_thresholds(str(tenant), now=now) == [80]
+        assert governance.check_budget_thresholds(str(tenant), now=now) == []  # once a month
+        assert notices == [(tenant, 80)] and operator_alerts == []
+        use(990)  # a request refused for the budget counts as the allowance being used up
+        assert governance.check_budget_thresholds(str(tenant), budget_refused=True, now=now) == [100]
+        use(1200)
+        assert governance.check_budget_thresholds(str(tenant), now=now) == []
+        assert notices == [(tenant, 80), (tenant, 100)] and operator_alerts == ["AI monthly allowance used up"]
+    finally:
+        db = SessionLocal()
+        bind_system(db, "test")
+        db.query(AiUsageMonthly).filter(AiUsageMonthly.tenant_id == tenant, AiUsageMonthly.month == month).delete()
+        db.commit()
+        db.close()
+
+
+def test_a_model_call_past_80_percent_tells_the_administrators(groq, tenant, monkeypatch):
+    import backend.app.notifications as notifications
+
+    notices = []
+    monkeypatch.setattr(
+        notifications,
+        "notify_ai_budget_threshold",
+        lambda db, tenant_id, percent: notices.append(percent),
+        raising=False,
+    )
+    monkeypatch.setattr(governance, "_record_thresholds", lambda tenant_id, refused, now: [(80, {})])
+    with governance.tenant_scope(tenant):
+        GenAIProvider().complete("Summarize the record.", {})
+    assert notices == [80]

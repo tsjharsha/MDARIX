@@ -1,19 +1,19 @@
 {
-  "change_control": "MVP-AI-GOLDEN-001",
+  "change_control": "MVP-AI-GOLDEN-002 adversarial VS013-VS015",
   "hashes": {
-    "canonical_sha256": "89ee28b95e6c533a929acd6cc7a6f49425e4c03941644379726737febae0c2ca",
-    "ground_truth_bundle_sha256": "4c17d82dd45f57a91ec081ee887897aa3544794c98721635e67a890b190fabef",
-    "scenario_index_sha256": "764559f26b0661e793356e79e64b47fe7df9dbd77d091cb405d0522741438bb6",
-    "source_bundle_sha256": "97e96dffb2c7097d28db18cb5cc7129108e94a49973cf1883389d105eac738fc"
+    "canonical_sha256": "888887e62899eef84c1f6be60b6a3c5136783253e9d066f51e7d27347b7760aa",
+    "ground_truth_bundle_sha256": "44650837cca448dfe00923113629a094790cf3deda7a0d43b08c6df38032f63a",
+    "scenario_index_sha256": "bd66a99486ef7db59d7b5987192798f3af64a74199cb45f11fbd084c75ce11da",
+    "source_bundle_sha256": "280c3fd6980eb8eee8060dbeb9afd5400f7554fc5670789c3610940ff4c2bdc3"
   },
   "qualification_version": "MDARIX_AI_GOLDEN_QUALIFICATION_V1",
-  "qualified_at": "2026-10-05T08:45:29.620531+00:00",
+  "qualified_at": "2026-10-05T18:34:35.800283+00:00",
   "release_policy": {
     "allowed_dataset_errors": 0,
     "live_model_gate_required_for_model_promotion": true,
-    "required_scenarios": 12
+    "required_scenarios": 15
   },
-  "reviewer": "MDARIX Engineering",
+  "reviewer": "ai-governance agent (human review pending)",
   "scope": "Synthetic internal MVP AI assurance; not clinical, regulatory, or production certification.",
   "status": "QUALIFIED_FOR_INTERNAL_MVP"
 }

@@ -19,7 +19,12 @@ SCENARIOS = ROOT / "evaluation" / "scenarios" / "scenario_index.json"
 GROUND = ROOT / "evaluation" / "ground_truth"
 LOCK = ROOT / "evaluation" / "GOLDEN_DATASET_QUALIFICATION.json"
 DEFAULT_REPORT = ROOT / "artifacts" / "ai-golden-dataset-qualification.json"
-EXPECTED_IDS = {f"VS{number:03d}" for number in range(1, 13)}
+# VS001-VS012 test investigation reasoning; VS013-VS015 are adversarial (prompt injection inside evidence, personal
+# data inside evidence, a leading question).
+EXPECTED_IDS = {f"VS{number:03d}" for number in range(1, 16)}
+# Optional scenario fields that carry specific expectations of their own; the ground truth must agree on them too.
+OPTIONAL_EXPECTATIONS = ("forbidden_output_text", "personal_data", "investigator_question")
+GENERIC_PROHIBITION = "do not claim certainty without evidence."
 SYNTHETIC_NOTICE = "SYNTHETIC TEST DATA ONLY"
 SECRET_PATTERNS = (re.compile(r"\bgsk_[A-Za-z0-9]{20,}"), re.compile(r"\bgh[oprsu]_[A-Za-z0-9]{20,}"))
 
@@ -50,6 +55,18 @@ def hashes() -> dict[str, str]:
     }
 
 
+def specific_expectations(scenario: dict[str, Any]) -> int:
+    """How many expectations test something specific (the same count as evaluation/real_pipeline.py's score)."""
+    return (
+        len(scenario.get("expected_contradictions") or [])
+        + len(scenario.get("expected_unknowns") or [])
+        + len(scenario.get("expected_evidence") or [])
+        + sum(1 for item in scenario.get("prohibited_conclusions") or [] if item.strip().lower() != GENERIC_PROHIBITION)
+        + len(scenario.get("forbidden_output_text") or [])
+        + len(scenario.get("personal_data") or [])
+    )
+
+
 def qualify() -> dict[str, Any]:
     errors: list[str] = []
     for path in (CANONICAL, MANIFEST, SCENARIOS):
@@ -63,8 +80,8 @@ def qualify() -> dict[str, Any]:
     index = read_json(SCENARIOS)
     scenarios = index.get("scenarios") or []
     scenario_ids = {item.get("scenario_id") for item in scenarios}
-    if scenario_ids != EXPECTED_IDS or len(scenarios) != 12:
-        errors.append(f"Scenario set must be exactly VS001-VS012; found {sorted(scenario_ids)}")
+    if scenario_ids != EXPECTED_IDS or len(scenarios) != len(EXPECTED_IDS):
+        errors.append(f"Scenario set must be exactly VS001-VS{len(EXPECTED_IDS):03d}; found {sorted(scenario_ids)}")
     if SYNTHETIC_NOTICE not in str(canonical.get("notice", "")):
         errors.append("Canonical dataset is missing the synthetic-data notice")
 
@@ -73,6 +90,20 @@ def qualify() -> dict[str, Any]:
         errors.append("Canonical dataset hash does not match the manifest")
 
     evidence = {item["evidence_id"]: item for item in canonical.get("evidence", [])}
+    # Integrity: identifiers are unique, and every reference resolves.
+    for collection, key in (("evidence", "evidence_id"), ("investigations", "investigation_id")):
+        values = [item.get(key) for item in canonical.get(collection, [])]
+        duplicates = sorted({value for value in values if values.count(value) > 1})
+        if duplicates:
+            errors.append(f"Duplicate {collection} identifiers: {duplicates}")
+    investigations = {item.get("investigation_id") for item in canonical.get("investigations", [])}
+    for row in canonical.get("evidence", []):
+        if row.get("investigation_id") not in investigations:
+            errors.append(f"{row.get('evidence_id')}: investigation {row.get('investigation_id')} does not exist")
+        document = DATA_ROOT / str(row.get("document_path") or "")
+        if not row.get("document_path") or not document.is_file():
+            errors.append(f"{row.get('evidence_id')}: evidence document {row.get('document_path')} is missing")
+    canonical_scenarios = {item.get("scenario_id"): item for item in canonical.get("scenarios", [])}
     anomaly_ids = {item["anomaly_id"] for item in canonical.get("intentional_anomalies", [])}
     forbidden_application_keys = {
         "hidden_ground_truth",
@@ -113,6 +144,13 @@ def qualify() -> dict[str, Any]:
             errors.append(f"{sid}: at least four acceptance criteria are required")
         if not (scenario.get("expected_contradictions") or scenario.get("expected_unknowns")):
             errors.append(f"{sid}: must test at least one contradiction or unknown")
+        if specific_expectations(scenario) < 1:
+            errors.append(f"{sid}: needs at least one specific expectation")
+        if scenario.get("investigation_id") not in investigations:
+            errors.append(f"{sid}: investigation {scenario.get('investigation_id')} does not exist")
+        listed = canonical_scenarios.get(sid) or {}
+        if listed.get("investigation_id") != scenario.get("investigation_id"):
+            errors.append(f"{sid}: the canonical dataset lists it on a different investigation (or not at all)")
         for evidence_id in scenario.get("expected_evidence") or []:
             row = evidence.get(evidence_id)
             if not row:
@@ -139,6 +177,7 @@ def qualify() -> dict[str, Any]:
             "prohibited_conclusions",
             "acceptance_criteria",
             "intentional_anomalies",
+            *OPTIONAL_EXPECTATIONS,
         ):
             if ground_truth.get(field) != scenario.get(field):
                 errors.append(f"{sid}: ground truth {field} differs from the scenario index")
@@ -194,7 +233,7 @@ def main() -> int:
             "hashes": temporary["hashes"],
             "scope": temporary["scope"],
             "release_policy": {
-                "required_scenarios": 12,
+                "required_scenarios": len(EXPECTED_IDS),
                 "allowed_dataset_errors": 0,
                 "live_model_gate_required_for_model_promotion": True,
             },

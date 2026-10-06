@@ -1,6 +1,7 @@
 # AI providers: free fallbacks for demos, paid for production
 
-MDARIX calls one AI model through an OpenAI-compatible chat API (`genai/provider.py`). When that provider is
+MDARIX calls one AI model through an OpenAI-compatible chat API, or Anthropic's own Messages API for
+`anthropic` (`genai/provider.py`). When that provider is
 rate-limited or down, MDARIX tries the **fallback providers** in order. If none answers, the investigator uses its
 **rule-based answer**, so a page never fails because of the AI.
 
@@ -66,10 +67,47 @@ use a paid provider under a contract that covers:
 - a data processing agreement, and a BAA where health data is involved;
 - the region you need.
 
-Options include:
-- Anthropic Claude: directly, or through AWS Bedrock or Google Vertex AI.
-- Azure OpenAI.
-- Google Vertex AI (Gemini).
-- Groq or Cerebras paid tiers.
+Record each one in `docs/compliance/AI_PROVIDER_REGISTER.md` (contract reference, training opt-out, retention,
+region, review date) before naming it in `MDARIX_GENAI_CONTRACTED_PROVIDERS`.
 
-Keep a second paid provider as the fallback in production, configured the same way.
+In staging and production the API refuses to start, and every model request skips the provider, unless:
+1. the provider is named in `MDARIX_GENAI_CONTRACTED_PROVIDERS` (or is `ollama` on your own server), and
+2. its retention is cleared: `MDARIX_GENAI_<NAME>_ZDR=true` once the contract or account setting confirms zero data
+   retention, or `MDARIX_GENAI_ACCEPT_RETENTION=true` when the data processing agreement accepts the provider's
+   limited retention (for example 30 days for abuse monitoring). Leave both unset until one is true.
+
+Supported provider names:
+
+| Provider | Setting name | Endpoint used | Default model |
+|---|---|---|---|
+| **Anthropic Claude** (direct API) | `anthropic` | `https://api.anthropic.com/v1/messages` (Messages API: `x-api-key` and `anthropic-version: 2023-06-01` headers, system prompt as its own field, no temperature) | `claude-sonnet-5-5` |
+| Groq (paid tier) | `groq` | `https://api.groq.com/openai/v1/chat/completions` | `openai/gpt-oss-20b` |
+| Cerebras (paid tier) | `cerebras` | `https://api.cerebras.ai/v1/chat/completions` | `gpt-oss-120b` |
+| Mistral (paid plan, EU) | `mistral` | `https://api.mistral.ai/v1/chat/completions` | `mistral-small-latest` |
+| Google Gemini API (paid tier) | `gemini` | Gemini's OpenAI-compatible endpoint | `gemini-flash-latest` |
+| Ollama (self-hosted) | `ollama` | `http://127.0.0.1:11434/v1/chat/completions` | `llama3.2` |
+
+Anthropic example (`.env` on the server):
+
+```dotenv
+MDARIX_GENAI_PROVIDER=anthropic
+MDARIX_GENAI_API_KEY=<anthropic key>
+MDARIX_GENAI_MODEL=claude-sonnet-5-5
+MDARIX_GENAI_CONTRACTED_PROVIDERS=anthropic
+MDARIX_GENAI_ANTHROPIC_ZDR=true   # only once zero data retention is confirmed for the account
+```
+
+Claude through AWS Bedrock or Google Vertex AI, and Azure OpenAI, need their own request signing and are not
+supported by `genai/provider.py` today.
+
+Keep a second paid provider as the fallback in production, configured the same way (its own
+`MDARIX_GENAI_<NAME>_ZDR`).
+
+## Refusals people see
+
+When no model may answer, MDARIX answers from rules and says why with a stable code
+(`genai/provider.py` `REFUSAL_MESSAGES`): `GENAI_DISABLED_FOR_ORGANIZATION` (AI switched off for the organization),
+`GENAI_MONTHLY_BUDGET_REACHED` (monthly allowance used up), `GENAI_PROVIDER_NOT_ALLOWED` (no provider cleared for
+customer data here) and `GENAI_UNAVAILABLE` (provider down, rate-limited or the request too large). Customer
+administrators are told when their organization reaches 80% and 100% of its monthly allowance; operators get an
+alert (`MDARIX_ALERT_WEBHOOK` / `MDARIX_ALERT_EMAIL`) at 100%.

@@ -134,6 +134,8 @@ def check_allowed(estimated_tokens: int) -> str | None:
     finally:
         db.close()
     logger.info("Model request refused for an organization: %s", refusal)
+    if refusal == "GENAI_MONTHLY_BUDGET_REACHED":
+        check_budget_thresholds(tenant_id, budget_refused=True)
     raise GenAIUnavailable(refusal)
 
 
@@ -150,6 +152,124 @@ def record_usage(tenant_id: str | None, input_tokens: int, output_tokens: int, c
             db.close()
     except Exception:
         logger.exception("AI usage could not be recorded")
+        return
+    check_budget_thresholds(tenant_id)
+
+
+# ------------------------------------------------------------------------------------------------ budget alerts
+
+BUDGET_THRESHOLDS = (80, 100)
+BUDGET_ALERT_ACTION = "AI_BUDGET_THRESHOLD_REACHED"
+
+
+def _thresholds_due(tokens_used: int, budget: int, budget_refused: bool) -> list[int]:
+    """Thresholds this month's use has reached. A request refused for the budget counts as 100% reached, even when
+    the tokens already used are a little under it (the request would have gone over)."""
+    if budget <= 0:
+        return [100]
+    due = [percent for percent in BUDGET_THRESHOLDS if tokens_used * 100 >= percent * budget]
+    if budget_refused and 100 not in due:
+        due.append(100)
+    return due
+
+
+def check_budget_thresholds(tenant_id: str, *, budget_refused: bool = False, now: datetime | None = None) -> list[int]:
+    """Tell the organization's administrators (and, at 100%, the operators) once per month per threshold that its
+    AI allowance is 80% or 100% used. Returns the thresholds announced now (empty when nothing new was reached).
+
+    The "already announced" marker is an audit event (``AI_BUDGET_THRESHOLD_REACHED`` with the month and percent),
+    so the announcement is part of the organization's record and no schema change is needed; an advisory lock per
+    organization, month and threshold makes two concurrent requests announce it once. Never fails the request."""
+    try:
+        announced = _record_thresholds(tenant_id, budget_refused, now)
+    except Exception:
+        logger.exception("AI budget thresholds could not be checked")
+        return []
+    for percent, state in announced:
+        _notify_threshold(tenant_id, percent, state)
+    return [percent for percent, _ in announced]
+
+
+def _record_thresholds(tenant_id: str, budget_refused: bool, now: datetime | None) -> list[tuple[int, dict]]:
+    from sqlalchemy import text
+
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.enterprise_audit import make_audit_event
+
+    db = _session(tenant_id)
+    try:
+        state = usage(db, tenant_id, now)
+        due = _thresholds_due(state["tokens_used"], state["monthly_token_budget"], budget_refused)
+        announced = []
+        organization = uuid.UUID(tenant_id)
+        for percent in due:
+            marker = {"month": state["month"], "percent": percent}
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:key))"),
+                {"key": f"ai-budget:{tenant_id}:{state['month']}:{percent}"},
+            )
+            seen = (
+                db.query(AuditEvent.id)
+                .filter(
+                    AuditEvent.tenant_id == organization,
+                    AuditEvent.action == BUDGET_ALERT_ACTION,
+                    AuditEvent.details.contains(marker),
+                )
+                .first()
+            )
+            if seen is not None:
+                continue
+            db.add(
+                make_audit_event(
+                    tenant_id=organization,
+                    actor_ref="system:ai-governance",
+                    action=BUDGET_ALERT_ACTION,
+                    entity_type="Tenant",
+                    entity_id=organization,
+                    details={
+                        **marker,
+                        "tokens_used": state["tokens_used"],
+                        "monthly_token_budget": state["monthly_token_budget"],
+                    },
+                )
+            )
+            announced.append((percent, state))
+        db.commit()
+        return announced
+    finally:
+        db.close()
+
+
+def _notify_threshold(tenant_id: str, percent: int, state: dict) -> None:
+    """The customer administrators' notice (backend/app/notifications.py) and, at 100%, an operator alert."""
+    try:
+        from backend.app.notifications import notify_ai_budget_threshold
+    except ImportError:
+        notify_ai_budget_threshold = None
+        logger.warning("AI budget notice for administrators is not available (notifications helper missing)")
+    if notify_ai_budget_threshold is not None:
+        db = _session(tenant_id)
+        try:
+            notify_ai_budget_threshold(db, uuid.UUID(tenant_id), percent=percent)
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("AI budget notice for administrators could not be queued")
+        finally:
+            db.close()
+    if percent >= 100:
+        try:
+            from backend.app.alerts import send_alert
+
+            # Counts only: alerts never carry customer records.
+            send_alert(
+                "AI monthly allowance used up",
+                f"Organization {tenant_id} has used {state['tokens_used']} of {state['monthly_token_budget']} AI "
+                f"tokens for {state['month']}; its model requests are refused until the allowance is raised or the "
+                "month ends.",
+            )
+        except Exception:
+            logger.exception("AI budget operator alert could not be sent")
 
 
 def _add_usage(db, tenant_id, *, requests=0, refused=0, input_tokens=0, output_tokens=0, cost=0.0) -> None:
