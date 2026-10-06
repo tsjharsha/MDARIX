@@ -54,6 +54,8 @@ import { GettingStartedSection, type TrialStatus } from "./sections/GettingStart
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
 import { ImportDataSection } from "./sections/ImportData";
 import { requestJson } from "../../app/apiClient";
+import { rolesSummary } from "../../app/roles";
+import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
   "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
@@ -100,8 +102,13 @@ export function UserWorkspace({
   /** A customer administrator working here returns to their console (App.tsx). */
   onAdminConsole?: () => void;
 }) {
-  const work = useWorkContext();
-  const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"]);
+  // A link to a case (/app/investigations?case=INV000147) opens that case, on its product, in the view's section.
+  const [caseLink] = useState(() => caseFromSearch(window.location.search));
+  const work = useWorkContext(caseLink);
+  const [start] = useState(() => {
+    const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
+    return caseLink ? caseLinkStart(initialView, base) : base;
+  });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
     tab: start[1],
@@ -139,6 +146,19 @@ export function UserWorkspace({
     [setLocation],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+
+  // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
+  // that could not be opened is said so.
+  const caseLinkState = work.caseLink?.state;
+  useEffect(() => {
+    if (!caseLink || !caseLinkState || caseLinkState === "resolving") return;
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    if (caseLinkState === "not-found")
+      notify(`${caseLink} was not found in your organization, or your role cannot open it.`, "critical");
+    else if (caseLinkState === "failed")
+      notify(`${caseLink} could not be opened right now. Choose it in the context bar above.`, "critical");
+  }, [caseLinkState]);
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {
@@ -194,7 +214,7 @@ export function UserWorkspace({
           <div className="ac-user">
             <span>
               <strong>{session?.display_name ?? "User"}</strong>
-              <small>{session?.active_role ?? "No active role"}</small>
+              <small>{rolesSummary(session)}</small>
             </span>
             {onAdminConsole && (
               <button

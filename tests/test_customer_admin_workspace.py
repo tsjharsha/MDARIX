@@ -42,7 +42,9 @@ def admins():
 
 
 def test_the_role_has_investigator_rights_and_no_approval():
-    assert permissions_for_role("CUSTOMER_ADMIN") == permissions_for_role("Investigator")
+    # The Investigator's work rights (the Investigator also holds the workflow permissions of Phase 1, which an
+    # administrator does not get).
+    assert permissions_for_role("CUSTOMER_ADMIN") <= permissions_for_role("Investigator")
     assert permissions_for_role("CUSTOMER_ADMIN") == {RECORDS_WRITE, AI_RUN, DATA_EXPORT}
     assert REGULATORY_APPROVE not in permissions_for_role("CUSTOMER_ADMIN")
 

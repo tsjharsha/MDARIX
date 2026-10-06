@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { Confirmation } from "./shared";
+import { ROLE_LABELS } from "../../app/roles";
 
 export const SECTIONS = [
   "Dashboard",
@@ -56,12 +57,15 @@ export const useConsole = () => useContext(ConsoleContext);
 
 /** Roles a Customer Administrator may give. Platform roles are never offered and are rejected by the server. */
 export const ASSIGNABLE_ROLES = [
-  { value: "VIEWER", label: "Viewer" },
-  { value: "INVESTIGATOR", label: "Investigator" },
-  { value: "REVIEWER", label: "Reviewer" },
-  { value: "APPROVER", label: "Approver" },
-  { value: "LEADER", label: "Leader" },
-  { value: "CUSTOMER_ADMIN", label: "Customer Administrator" },
+  { value: "VIEWER", label: ROLE_LABELS.VIEWER },
+  { value: "TRIAGE_LEAD", label: ROLE_LABELS.TRIAGE_LEAD },
+  { value: "INVESTIGATOR", label: ROLE_LABELS.INVESTIGATOR },
+  { value: "RISK_REVIEWER", label: ROLE_LABELS.RISK_REVIEWER },
+  { value: "REGULATORY_REVIEWER", label: ROLE_LABELS.REGULATORY_REVIEWER },
+  { value: "REVIEWER", label: ROLE_LABELS.REVIEWER },
+  { value: "APPROVER", label: ROLE_LABELS.APPROVER },
+  { value: "LEADER", label: ROLE_LABELS.LEADER },
+  { value: "CUSTOMER_ADMIN", label: ROLE_LABELS.CUSTOMER_ADMIN },
 ] as const;
 
 /** Seat limit declared by the active plan, if any (same keys the server enforces). */

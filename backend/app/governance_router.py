@@ -1,6 +1,7 @@
 import hashlib
 import json
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -79,45 +80,56 @@ ADMINISTRATOR_CANNOT_SIGN = (
 )
 
 
-def approval_denial(db, tenant_id, role_name: str, decision, user_id: str) -> tuple[str, str] | None:
+def approval_denial(db, tenant_id, role_name: str | Sequence[str], decision, user_id: str) -> tuple[str, str] | None:
     """Why this user may not approve this decision, or None when they may.
 
     Shared by signing and by review approval so both enforce the same rules:
     an ACTIVE approval authority for the user's role, and segregation of duties (no self-approval).
+    ``role_name`` may also be every role the person holds (``session_actor(...)["roles"]``); see ``approval_check``.
+    """
+    return approval_check(db, tenant_id, role_name, decision, user_id)[0]
+
+
+def approval_check(
+    db, tenant_id, roles: str | Sequence[str] | None, decision, user_id: str
+) -> tuple[tuple[str, str] | None, str | None]:
+    """``(denial, role used)``: why this user may not approve this decision (None when they may), and the role whose
+    approval authority they approve under (None when they may not).
+
+    A person holding several roles may approve when ANY of them has an ACTIVE approval authority and segregation of
+    duties passes; the first such role (the account role before additional roles) is the one used. An administrator
+    role among any of them still refuses. With one role this is exactly the single-role rule.
     """
     from backend.app.access.permissions import normalize_role
 
+    held = [roles] if roles is None or isinstance(roles, str) else list(roles)
     # Administrators (customer or platform) never approve or sign, whatever authority rules say: an administrator
     # can write those rules, so an authority naming their own role would let them sign around segregation of duties.
-    if is_administrator_role(role_name):
-        return ADMINISTRATOR_CANNOT_SIGN
+    if any(is_administrator_role(role) for role in held):
+        return ADMINISTRATOR_CANNOT_SIGN, None
     # Role names are compared the way permissions are ('Approver' == 'APPROVER'), so a rule written in any case
     # matches the role stored on the account.
-    wanted = normalize_role(role_name)
-    authority = next(
-        (
-            row
-            for row in db.query(ApprovalAuthority).filter_by(
-                tenant_id=tenant_id,
-                object_type="Decision",
-                decision_type="INVESTIGATION_REVIEW",
-                authority="AUTHORIZED",
-                status="ACTIVE",
-            )
-            if wanted and normalize_role(row.role_name) == wanted
-        ),
-        None,
-    )
-    if not authority:
-        return "APPROVAL_AUTHORITY_DENIED", "Active role lacks approval authority"
+    authorized = {
+        normalize_role(row.role_name)
+        for row in db.query(ApprovalAuthority).filter_by(
+            tenant_id=tenant_id,
+            object_type="Decision",
+            decision_type="INVESTIGATION_REVIEW",
+            authority="AUTHORIZED",
+            status="ACTIVE",
+        )
+    }
+    role_used = next((role for role in held if normalize_role(role) and normalize_role(role) in authorized), None)
+    if role_used is None:
+        return ("APPROVAL_AUTHORITY_DENIED", "Active role lacks approval authority"), None
     sod = (
         db.query(SegregationOfDutiesPolicy)
         .filter_by(tenant_id=tenant_id, object_type="Decision", decision_type="INVESTIGATION_REVIEW", status="ACTIVE")
         .first()
     )
     if sod and sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
-        return "SOD_DENIED", "Approval by another authorized user is required"
-    return None
+        return ("SOD_DENIED", "Approval by another authorized user is required"), None
+    return None, role_used
 
 
 SELF_REVIEW_DENIED = ("SOD_DENIED", "You recorded this decision; another user must review it")
@@ -364,15 +376,20 @@ def session_actor(db, ctx: AuthenticatedRequestContext):
             "tenant_id": ctx.tenant_id,
             "user_id": ctx.user_id,
             "active_role": ctx.active_role_id or "Viewer",
+            "roles": [ctx.active_role_id or "Viewer"],
             "display_name": ctx.user_id,
             "session_id": ctx.session_id,
         }
-    from backend.app.access.permissions import role_of_user
+    from backend.app.access.permissions import role_of_user, roles_of_user
 
+    active_role = role_of_user(db, user) or "Viewer"
     return {
         "tenant_id": ctx.tenant_id,
         "user_id": ctx.user_id,
-        "active_role": role_of_user(db, user) or "Viewer",
+        "active_role": active_role,
+        # Every role the person holds (account role first, then additional workflow roles): approval and signing
+        # accept any of them (approval_check).
+        "roles": roles_of_user(db, user) or [active_role],
         "display_name": user.display_name or ctx.user_id,
         "session_id": ctx.session_id,
     }
@@ -462,13 +479,13 @@ def decision_actions(db, ctx: AuthenticatedRequestContext, decisions) -> dict:
     endpoints it writes no audit event and counts no failed attempt. A screen uses it to offer only what the server
     would accept; the endpoints stay the authority.
     """
-    from backend.app.access.permissions import effective_role, permissions_for_role
+    from backend.app.access.permissions import effective_permissions
     from decision_center.service import SIGNED_STATUSES
 
     decisions = list(decisions)
     if not decisions:
         return {}
-    may_write = RECORDS_WRITE in permissions_for_role(effective_role(db, ctx))
+    may_write = RECORDS_WRITE in effective_permissions(db, ctx)
     try:
         actor = session_actor(db, ctx)
         t = tenant(db, actor)  # the same tenant check and default decision rules as the endpoints
@@ -479,7 +496,7 @@ def decision_actions(db, ctx: AuthenticatedRequestContext, decisions) -> dict:
             item.id: {"can_review": False, "can_approve": False, "can_sign": False, "reason": reason}
             for item in decisions
         }
-    administrator = is_administrator_role(actor["active_role"])
+    administrator = any(is_administrator_role(role) for role in actor["roles"])
     signatures_enabled = entitled(db, t)
     signed_versions = {
         (row.object_id, row.object_version)
@@ -494,7 +511,7 @@ def decision_actions(db, ctx: AuthenticatedRequestContext, decisions) -> dict:
     for item in decisions:
         locked = str(item.decision_status or "").upper() in SIGNED_STATUSES
         own = is_decision_author(item, ctx.user_id)
-        denial = approval_denial(db, t.id, actor["active_role"], item, actor["user_id"])
+        denial = approval_denial(db, t.id, actor["roles"], item, actor["user_id"])
         version_signed = item.updated_at is not None and (item.id, item.updated_at.isoformat()) in signed_versions
         can_review = may_write and not own and not locked
         can_approve = can_review and denial is None
@@ -543,7 +560,7 @@ def sign(
     actor = session_actor(db, ctx)
     t = tenant(db, actor)
     audit(db, t, actor["user_id"], "APPROVAL_REQUESTED", decision_id)
-    if is_administrator_role(actor["active_role"]):
+    if any(is_administrator_role(role) for role in actor["roles"]):
         # Administrators never sign, whatever the plan or any authority says: refuse with that reason first.
         code, message = ADMINISTRATOR_CANNOT_SIGN
         audit(db, t, actor["user_id"], code, decision_id)
@@ -565,7 +582,8 @@ def sign(
         raise HTTPException(
             409, detail={"code": "STALE_OBJECT_VERSION", "message": "Decision changed; re-review the current version"}
         )
-    denial = approval_denial(db, t.id, actor["active_role"], item, actor["user_id"])
+    # Any of the person's roles may carry the approval authority; the one used is recorded as the signer's role.
+    denial, signer_role = approval_check(db, t.id, actor["roles"], item, actor["user_id"])
     if denial:
         code, message = denial
         audit(db, t, actor["user_id"], code, decision_id)
@@ -619,7 +637,7 @@ def sign(
         decision=payload.decision,
         remarks=payload.remarks.strip(),
         signer_user_id=actor["user_id"],
-        signer_role=actor["active_role"],
+        signer_role=signer_role,
         signature_meaning=meaning,
         content_fingerprint=fingerprint,
         signature_hash=hashlib.sha256((fingerprint + actor["user_id"] + version).encode()).hexdigest(),
@@ -664,6 +682,8 @@ def sign(
     item.decision_status = signed_status
     data.commit()
     owner = _case_owner(data, t.id, item.investigation_id)
+    from backend.app.workflow.hooks import case_business_id, on_decision_signed
+
     if _notify(
         "notify_signoff_completed",
         db,
@@ -674,8 +694,13 @@ def sign(
         signer_user_id=actor["user_id"],
         owner_ref=owner,
         reference=item.business_id,
+        investigation_business_id=case_business_id(data, t.id, item.investigation_id),
     ):
         db.commit()
+    # The signature completes the decision's approval task. Saved after the signature; never undoes it.
+    on_decision_signed(
+        data, item, decision_value=payload.decision, actor_user_id=actor["user_id"], actor_role=signer_role
+    )
     return {
         "signature_id": record.id,
         "business_id": record.business_id,
@@ -683,7 +708,7 @@ def sign(
         "status": item.decision_status,
         "fingerprint": fingerprint,
         "signer": actor["display_name"],
-        "role": actor["active_role"],
+        "role": signer_role,
         "signed_at": record.signed_at,
     }
 
@@ -729,6 +754,8 @@ def material_change(
     audit(db, t, actor["user_id"], "RE_SIGNATURE_REQUIRED", item.id)
     db.commit()
     data.commit()
+    from backend.app.workflow.hooks import case_business_id, on_decision_material_change
+
     if _notify(
         "notify_review_pending",
         db,
@@ -737,9 +764,14 @@ def material_change(
         investigation_id=item.investigation_id,
         requested_by=actor["user_id"],
         reference=item.business_id,
+        investigation_business_id=case_business_id(data, t.id, item.investigation_id),
     ):
         db.commit()
-    return {"status": "RE_REVIEW_REQUIRED", "previous_version": current, "current_version": item.updated_at}
+    result = {"status": "RE_REVIEW_REQUIRED", "previous_version": current, "current_version": item.updated_at}
+    # The changed decision needs a new approval: its approval task is replaced. Saved after the change; never
+    # undoes it.
+    on_decision_material_change(data, item, actor_user_id=actor["user_id"], actor_role=actor.get("active_role"))
+    return result
 
 
 def _case_owner(data, tenant_id, investigation_id) -> str | None:

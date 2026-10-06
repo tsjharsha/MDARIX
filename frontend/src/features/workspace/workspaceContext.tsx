@@ -50,6 +50,8 @@ export type SessionContext = {
   email?: string;
   display_name?: string;
   active_role?: string | null;
+  /** Every role the person holds: the account role and any additional workflow roles, with their labels. */
+  roles?: Array<{ code: string; label?: string | null; source?: "account" | "additional" | string }>;
   tenant_id?: string;
   environment?: string;
   personas?: Array<{ code: string; label: string }>;
@@ -75,7 +77,8 @@ export type WorkContext = {
   setMode: (mode: TemporalMode) => void;
   investigations: InvestigationSummary[];
   investigationId: string;
-  setInvestigationId: (id: string) => void;
+  /** Choose a case; with its product (from a task or a link), the context switches to that product as well. */
+  setInvestigationId: (id: string, productId?: string | null) => void;
   /** Reload the selected product's investigations (after one is opened); `select` makes that one current. */
   refreshInvestigations: (select?: string) => void;
   /** Reload the organization's products (after an import added some). */
@@ -85,10 +88,14 @@ export type WorkContext = {
   /** Switch the context to the complaint's product (and version) and leave the request for Investigations. */
   requestOpenInvestigation: (request: OpenInvestigationRequest) => void;
   clearOpenInvestigationRequest: () => void;
+  /** The case named by the address (?case=INV000147) and whether it was found; null without one. */
+  caseLink?: CaseLinkState | null;
   view: Product360 | null;
   state: "loading" | "ready" | "empty" | "error";
   error: string;
 };
+
+export type CaseLinkState = { id: string; state: "resolving" | "applied" | "not-found" | "failed" };
 
 /** The complaint an investigation is to be opened for, with its product (and version identifier, when recorded). */
 export type OpenInvestigationRequest = {
@@ -117,7 +124,21 @@ export function useWorkspace(): WorkspaceApi {
   return value;
 }
 
-export type BusinessPermission = "records.write" | "ai.run" | "data.export" | "regulatory.approve";
+export type BusinessPermission =
+  | "records.write"
+  | "ai.run"
+  | "data.export"
+  | "regulatory.approve"
+  | "signal.triage"
+  | "investigation.create"
+  | "investigation.assign"
+  | "investigation.work"
+  | "evidence.review"
+  | "evidence.request"
+  | "risk.review"
+  | "regulatory.review"
+  | "quality.review"
+  | "decision.sign";
 
 /** Whether the signed-in role may perform a business action, from the server's own rule (session context).
  * Only hides controls the server would refuse; when permissions are unknown (outside the workspace, older

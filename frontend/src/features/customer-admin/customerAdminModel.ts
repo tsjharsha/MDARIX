@@ -8,6 +8,8 @@ export type TenantUser = {
   email?: string;
   display_name?: string;
   role?: string;
+  /** The role as people read it ("Quality Investigator"), sent next to the code. */
+  role_label?: string | null;
   status?: string;
 };
 
@@ -50,7 +52,7 @@ export function roleMix(users: TenantUser[]): Slice[] {
   const counts = new Map<string, number>();
   for (const user of users) {
     if (code(user.status) === "OFFBOARDED") continue;
-    const label = user.role ? titleCase(user.role) : "No role";
+    const label = user.role_label?.trim() || (user.role ? titleCase(user.role) : "No role");
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return [...counts.entries()]

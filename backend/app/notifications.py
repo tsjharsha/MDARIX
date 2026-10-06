@@ -245,6 +245,16 @@ def _label(value) -> str | None:
     return text[:120] or None
 
 
+_CASE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}")
+
+
+def _case(refs: dict) -> dict:
+    """``{"investigation_business_id": ...}`` when the producer named the case (INV000147), so the email can open
+    it (/app/<view>?case=...); otherwise nothing, and the event is queued exactly as before."""
+    value = str(refs.get("investigation_business_id") or "").strip()
+    return {"investigation_business_id": value} if _CASE_ID.fullmatch(value) else {}
+
+
 def notify_assignment(db: Session, tenant_id, *, investigation_id, **refs) -> OutboxEvent | None:
     """Tell a person an investigation was assigned to them (nothing when they assigned it to themselves).
 
@@ -266,6 +276,7 @@ def notify_assignment(db: Session, tenant_id, *, investigation_id, **refs) -> Ou
             "assignee_user_id": assignee,
             "assigned_by_user_id": actor,
             "reference": _label(_first(refs, "reference", "investigation_identifier")),
+            **_case(refs),
         },
     )
 
@@ -284,6 +295,7 @@ def notify_review_pending(db: Session, tenant_id, *, decision_id, **refs) -> Out
             "submitted_by_user_id": _user_id(db, tenant_id, _first(refs, "submitted_by_user_id", "requested_by")),
             "approver_user_id": _user_id(db, tenant_id, _first(refs, "approver_user_id", "approver_ref")),
             "reference": _label(_first(refs, "reference", "investigation_identifier")),
+            **_case(refs),
         },
     )
 
@@ -309,6 +321,7 @@ def notify_signoff_completed(db: Session, tenant_id, *, decision_id, **refs) -> 
             "signed_by_user_id": signer,
             "decision": outcome if outcome in {"APPROVE", "REJECT"} else None,
             "reference": _label(_first(refs, "reference", "investigation_identifier")),
+            **_case(refs),
         },
     )
 
@@ -439,8 +452,9 @@ def _name(db: Session, tenant_id, user_id) -> str | None:
 
 
 def approver_emails(db: Session, tenant_id, *, exclude_user_id=None) -> list[str]:
-    """Active approvers and leaders of the organization (their role assignment, else their account role)."""
-    from backend.app.access.permissions import role_of_user
+    """Active approvers and leaders of the organization: any of their roles (the role assignment, else the account
+    role, and their additional workflow roles) is Approver or Leader."""
+    from backend.app.access.permissions import roles_of_user
 
     users = (
         db.query(AuthUser).filter(AuthUser.tenant_id == _uuid(tenant_id), func.upper(AuthUser.status) == "ACTIVE").all()
@@ -450,7 +464,9 @@ def approver_emails(db: Session, tenant_id, *, exclude_user_id=None) -> list[str
         {
             user.username
             for user in users
-            if user.username and str(user.id) != excluded and role_code(role_of_user(db, user)) in APPROVER_ROLES
+            if user.username
+            and str(user.id) != excluded
+            and any(role_code(role) in APPROVER_ROLES for role in roles_of_user(db, user))
         }
     )
 
@@ -633,6 +649,9 @@ def _work_notice(db: Session, event_name: str, payload: dict, emailer) -> None:
     # The colleague who acted is named by display name, looked up now (the payload has their id only).
     names = {"assigned_by", "submitted_by", "signed_by", "requested_by"}
     details = {key: (_name(db, tenant_id, value) if key in names else value) for key, value in details.items()}
+    if get("investigation_business_id") and event_name != RISK_REVIEW_REQUESTED:
+        # The case the email is about: its button opens it (/app/investigations or /app/decision ?case=INV000147).
+        details["case"] = get("investigation_business_id")
     _deliver(
         lambda recipient, **kw: send(recipient, **kw),
         recipients,

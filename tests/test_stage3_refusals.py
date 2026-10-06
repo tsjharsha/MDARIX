@@ -79,6 +79,8 @@ def test_a_signature_notifies_the_case_owner(monkeypatch, decision):
     assert signed.status_code == 200, signed.text
     assert sent and sent[0]["decision_id"] == row.id and sent[0]["owner_ref"] == owner
     assert sent[0]["decision"] == "APPROVE"
+    # The case's business id travels with the notification so the email can link to the case.
+    assert sent[0]["investigation_business_id"] == _case_business_id(row)
 
 
 def test_a_material_change_notifies_the_approvers(monkeypatch, decision):
@@ -91,6 +93,12 @@ def test_a_material_change_notifies_the_approvers(monkeypatch, decision):
     )
     assert changed.status_code == 200, changed.text
     assert sent and sent[0]["decision_id"] == row.id
+    assert sent[0]["investigation_business_id"] == _case_business_id(row)
+
+
+def _case_business_id(row) -> str:
+    with SessionLocal() as db:
+        return db.query(Investigation.business_id).filter(Investigation.id == row.investigation_id).one()[0]
 
 
 def test_a_missing_or_failing_notification_never_blocks_the_action(monkeypatch):

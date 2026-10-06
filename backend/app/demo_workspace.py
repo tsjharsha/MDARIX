@@ -264,6 +264,7 @@ def setup_demo(db: Session, password: str) -> dict:
         now,
     )
     db.commit()
+    _seed_workflow_tasks(db, tenant.id)
     return {"tenant_key": tenant.tenant_key, "created": created, "refreshed": refreshed, "moved": moved}
 
 
@@ -282,7 +283,26 @@ def reset_demo(db: Session) -> dict:
     indexed = _index(db, tenant.id)
     _audit(db, tenant.id, "DEMO_WORKSPACE_RESET", {"deleted": deleted, "loaded": loaded, "indexed": indexed}, now)
     db.commit()
+    _seed_workflow_tasks(db, tenant.id)
     return {"deleted": deleted, **status(db)}
+
+
+def _seed_workflow_tasks(db: Session, tenant_id) -> None:
+    """The story's open work as My Work tasks (backend/app/workflow/backfill.py): each open case's task for its owner,
+    decisions awaiting approval in the approvers' queue. Run once the team exists, in a session of its own bound to
+    the demo tenant (same database); idempotent. A failure is logged and never fails the setup or the reset."""
+    import logging
+
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.workflow.backfill import backfill_tenant
+
+    try:
+        with Session(bind=db.get_bind(), autoflush=False) as session:
+            bind_tenant(session, tenant_id)
+            backfill_tenant(session, session, tenant_id, apply=True)
+            session.commit()
+    except Exception:
+        logging.getLogger("mdarix.demo_workspace").exception("The demo workspace's workflow tasks were not seeded")
 
 
 def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -> dict:

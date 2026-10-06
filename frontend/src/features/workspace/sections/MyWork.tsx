@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageSquareReply, Paperclip } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
-import { Empty, Panel } from "../../admin/console/charts";
+import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import {
   Drawer,
+  SearchBox,
   Table,
   Tabs,
   errorText,
@@ -13,23 +14,84 @@ import {
   listOf,
   send,
   useResource,
+  type Column,
+  type Resource,
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
-import { useCan, useWorkspace } from "../workspaceContext";
-import { isOpenInvestigation } from "../workspaceModel";
+import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
+import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
+import {
+  REASON_MAX,
+  TASK_ACTIONS,
+  availableTaskActions,
+  dueState,
+  dueText,
+  initialMyWorkTab,
+  myWorkTabs,
+  pageText,
+  priorityLabel,
+  priorityRank,
+  priorityTone,
+  reasonProblem,
+  tabCount,
+  taskActionBody,
+  taskAssignee,
+  taskCase,
+  taskDestination,
+  taskEventActor,
+  taskEventText,
+  taskListPath,
+  taskPath,
+  taskSourceText,
+  taskTypeLabel,
+  taskViewForTab,
+  type MyWorkTab,
+  type Task,
+  type TaskActionKey,
+  type TaskDetail,
+  type TaskList,
+  type TaskSummary,
+  type TaskView,
+} from "../tasks";
 import { StatusBadge } from "./common";
 
-const TABS = ["Assigned to me", "Needs an owner", "Evidence requests", "My AI conversations"] as const;
-type Tab = (typeof TABS)[number];
+const PAGE_SIZE = 50;
+
+const LIST_TITLES: Record<TaskView, string> = {
+  assigned: "Tasks assigned to you",
+  queue: "Tasks waiting in your role queues",
+  waiting: "Tasks you are waiting on",
+  returned: "Tasks returned to you",
+  due_soon: "Tasks due soon",
+  overdue: "Overdue tasks",
+  completed: "Tasks you completed",
+  created: "Tasks you created",
+};
+
+const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
+  assigned: { title: "Nothing is assigned to you", detail: "Tasks routed to you appear here." },
+  queue: {
+    title: "Your role queues are empty",
+    detail: "Work waiting for anyone in your roles (cases without an owner, reviews) appears here.",
+  },
+  waiting: { title: "Nothing to wait for", detail: "Tasks you handed to others and are waiting on appear here." },
+  returned: { title: "Nothing was returned to you", detail: "Tasks sent back to you for more work appear here." },
+  due_soon: { title: "Nothing is due soon", detail: "Tasks due within the next two days appear here." },
+  overdue: { title: "Nothing is overdue", detail: "Tasks past their due date appear here." },
+  completed: { title: "No completed tasks yet", detail: "Tasks you complete are listed here." },
+  created: { title: "No tasks created", detail: "Tasks you created appear here." },
+};
 
 export function MyWorkSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Assigned to me",
-  );
+  const [active, setActive] = useState<MyWorkTab>(() => initialMyWorkTab(tab));
+  const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
+  const tabs = myWorkTabs(summary.data, active);
+  const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
+  const view = taskViewForTab(active);
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="My work sections">
-        {(active === "Assigned to me" || active === "Needs an owner") && <Cases mine={active === "Assigned to me"} />}
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections" counts={counts}>
+        {view && <TaskInbox key={view} view={view} summary={summary} />}
         {active === "Evidence requests" && <EvidenceRequests />}
         {active === "My AI conversations" && <Conversations />}
       </Tabs>
@@ -37,67 +99,523 @@ export function MyWorkSection({ tab }: { tab?: string }) {
   );
 }
 
-function Cases({ mine }: { mine: boolean }) {
+/**
+ * Open a task where its work is done: its case (and that case's product) becomes the working context, then the
+ * section for its kind of work opens. Null for a task whose section the person's menu does not hold.
+ */
+export function useOpenTask(): (task: Task) => (() => void) | null {
   const { session, work, open } = useWorkspace();
-  const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
-  const me = [session?.user_id, session?.email].filter(Boolean).map((value) => String(value).toLowerCase());
-  const rows = useMemo(
-    () =>
-      listOf(cases.data?.records).filter((row) => {
-        const owner = String(row.owner_ref ?? "").toLowerCase();
-        return mine ? owner && me.includes(owner) : !owner && isOpenInvestigation(row.status);
-      }),
-    [cases.data, mine, me.join()],
-  );
-  const openCase = (row: any) => {
-    if (row.product_id && row.product_id !== work.productId) work.setProductId(String(row.product_id));
-    work.setInvestigationId(String(row.id));
-    open("Investigations", "Workspace");
+  return (task) => {
+    const target = taskDestination(task);
+    if (!sectionAllowed(target.section, session?.allowed_menu, session?.business_permissions)) return null;
+    return () => {
+      const kase = taskCase(task);
+      if (kase) work.setInvestigationId(kase.investigationId, kase.productId);
+      open(target.section, target.tab);
+    };
+  };
+}
+
+/** Accept or claim at once; the other actions first ask for a reason (or a new holder) in the task drawer. */
+function useTaskAction(onDone: () => void) {
+  const { notify } = useWorkspace();
+  const [busy, setBusy] = useState("");
+  const run = async (task: Task, key: TaskActionKey, body?: unknown) => {
+    const label = TASK_ACTIONS.find((action) => action.key === key)?.label ?? "Update";
+    setBusy(`${task.id}:${key}`);
+    try {
+      await send(taskPath(task.id, key), "POST", body);
+      notify(`${safeText(task.business_id) ?? "Task"}: ${label.toLowerCase()} recorded.`);
+      onDone();
+      return true;
+    } catch (reason) {
+      notify(errorText(reason, `The task could not be updated (${label.toLowerCase()}).`), "critical");
+      return false;
+    } finally {
+      setBusy("");
+    }
+  };
+  return { run, busy };
+}
+
+type DrawerState = { task: Task; mode: "details" | TaskActionKey };
+
+function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSummary> }) {
+  const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [drawer, setDrawer] = useState<DrawerState | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(query.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const list = useResource<TaskList>(taskListPath(view, page, PAGE_SIZE, search));
+  const reload = () => {
+    list.reload();
+    summary.reload();
+  };
+  const action = useTaskAction(reload);
+  const openTask = useOpenTask();
+  const rows = listOf(list.data?.items) as Task[];
+  const total = list.data?.total ?? rows.length;
+  const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
+  const choose = (task: Task, key: TaskActionKey) => {
+    if (TASK_ACTIONS.find((item) => item.key === key)?.needsInput) setDrawer({ task, mode: key });
+    else void action.run(task, key);
   };
   return (
-    <Panel
-      eyebrow="My work"
-      title={mine ? "Investigations assigned to you" : "Open investigations without an owner"}
-      source={cases}
-    >
-      <Table
-        caption={mine ? "Assigned investigations" : "Unassigned investigations"}
-        rows={rows}
-        rowKey={(row) => String(row.id)}
-        empty={
-          mine
-            ? { title: "Nothing is assigned to you", detail: "Investigations you own will appear here." }
-            : { title: "Every open investigation has an owner", detail: "Unowned open cases would appear here." }
-        }
-        columns={[
-          idColumn("Investigation ID", "investigation_identifier"),
+    <>
+      <Panel eyebrow="My work" title={LIST_TITLES[view]} source={list}>
+        {view === "queue" && <QueueSummary summary={summary.data} />}
+        <div className="ca-toolbar">
+          <SearchBox value={query} onChange={setQuery} label="Search task ID, title or source" />
+        </div>
+        <Table
+          caption={LIST_TITLES[view]}
+          rows={rows}
+          rowKey={(row) => String(row.id)}
+          empty={search ? { title: "No matching tasks", detail: "Change the search to see more." } : LIST_EMPTY[view]}
+          columns={taskColumns(view, {
+            busy: action.busy,
+            openTask,
+            onAction: choose,
+            onDetails: (task) => setDrawer({ task, mode: "details" }),
+          })}
+        />
+        {pages > 1 && (
+          <div className="ca-action-row uw-pager">
+            <span className="ac-muted">{pageText(list.data, rows.length)}</span>
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={page <= 1 || list.state === "loading"}
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={page >= pages || list.state === "loading"}
+              onClick={() => setPage((value) => value + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </Panel>
+      {drawer && (
+        <TaskDrawer
+          task={drawer.task}
+          mode={drawer.mode}
+          onMode={(mode) => setDrawer({ ...drawer, mode })}
+          onClose={() => setDrawer(null)}
+          onDone={() => {
+            setDrawer(null);
+            reload();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** The queues the person works, with how many tasks wait in each. */
+function QueueSummary({ summary }: { summary: TaskSummary | null }) {
+  const queues = (summary?.queues ?? []).filter((queue) => queue.count > 0);
+  if (!queues.length) return null;
+  return (
+    <ul className="ca-pill-list uw-queue-list" aria-label="Your role queues">
+      {queues.map((queue) => (
+        <li key={`${queue.role}:${queue.task_type}`}>
+          {roleLabel(queue.role, queue.role_label)} · {safeText(queue.task_type_label) ?? titleCase(queue.task_type)}:{" "}
+          <strong>{queue.count}</strong>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DueCell({ task }: { task: Task }) {
+  const state = dueState(task);
+  const text = dueText(task, formatDate);
+  if (state === "overdue") return <span className="uw-flag-critical">{text}</span>;
+  if (state === "due_soon") return <span className="uw-flag-warning">{text}</span>;
+  return <>{text}</>;
+}
+
+function taskColumns(
+  view: TaskView,
+  handlers: {
+    busy: string;
+    openTask: (task: Task) => (() => void) | null;
+    onAction: (task: Task, key: TaskActionKey) => void;
+    onDetails: (task: Task) => void;
+  },
+): Column<Task>[] {
+  return [
+    idColumn<Task>("Task ID"),
+    {
+      key: "title",
+      label: "Task",
+      fields: ["title", "task_type", "task_type_label"],
+      sortValue: (row) => row.title ?? taskTypeLabel(row),
+      render: (row) => (
+        <span className="ca-person">
+          <strong>{safeText(row.title) ?? taskTypeLabel(row)}</strong>
+          <small>{taskTypeLabel(row)}</small>
+        </span>
+      ),
+    },
+    {
+      key: "source",
+      label: "Source",
+      fields: ["source"],
+      sortValue: (row) => taskSourceText(row),
+      render: (row) => {
+        const source = taskSourceText(row);
+        const kase = safeText(row.investigation?.business_id);
+        return (
+          <span className="ca-person">
+            <span>{source}</span>
+            {kase && kase !== source && <small>Case {kase}</small>}
+          </span>
+        );
+      },
+    },
+    {
+      key: "priority",
+      label: "Priority",
+      sortValue: (row) => priorityRank(row.priority),
+      render: (row) =>
+        row.priority ? <ToneBadge tone={priorityTone(row.priority)} label={priorityLabel(row.priority)} /> : "—",
+    },
+    {
+      key: "status",
+      label: "Status",
+      fields: ["status", "is_return"],
+      render: (row) => (
+        <span className="ca-person">
+          <StatusBadge value={row.status} />
+          {row.is_return && <small>Returned</small>}
+        </span>
+      ),
+    },
+    {
+      key: "due_at",
+      label: "Due",
+      fields: ["due_at", "overdue"],
+      sortValue: (row) => row.due_at ?? "",
+      render: (row) => <DueCell task={row} />,
+    },
+    {
+      key: "assigned",
+      label: "Assigned",
+      fields: ["assigned_role", "assigned_role_label", "assigned_user"],
+      sortValue: (row) => taskAssignee(row).primary,
+      render: (row) => {
+        const who = taskAssignee(row);
+        return (
+          <span className="ca-person">
+            <span>{who.primary}</span>
+            {who.secondary && <small>{who.secondary}</small>}
+          </span>
+        );
+      },
+    },
+    ...(view === "completed"
+      ? [
           {
-            key: "case",
-            label: "Question",
-            fields: ["investigation_question", "investigation_identifier"],
-            render: (row) => (
+            key: "completed_at",
+            label: "Completed",
+            fields: ["completed_at", "completion_outcome"],
+            render: (row: Task) => (
               <span className="ca-person">
-                <span>{row.investigation_question ?? "No question recorded"}</span>
-                {safeText(row.business_id) && safeText(row.investigation_identifier) && (
-                  <small>Source ID {row.investigation_identifier}</small>
-                )}
+                <span>{formatDate(row.completed_at)}</span>
+                {row.completion_outcome && <small>{titleCase(String(row.completion_outcome))}</small>}
               </span>
             ),
           },
-          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
-          { key: "opened", label: "Opened", render: (row) => formatDate(row.opened_at ?? row.created_at) },
-          {
-            key: "open",
-            label: "",
-            render: (row) => (
-              <button type="button" className="ac-link" onClick={() => openCase(row)}>
-                Open workspace
+        ]
+      : []),
+    {
+      key: "actions",
+      label: "",
+      render: (row) => {
+        const open = handlers.openTask(row);
+        return (
+          <span className="uw-task-actions">
+            {open && (
+              <button type="button" className="ac-link" onClick={open}>
+                Open
               </button>
-            ),
-          },
-        ]}
-      />
-    </Panel>
+            )}
+            {availableTaskActions(row).map((key) => (
+              <button
+                type="button"
+                key={key}
+                className="ac-link"
+                disabled={handlers.busy === `${row.id}:${key}`}
+                onClick={() => handlers.onAction(row, key)}
+              >
+                {TASK_ACTIONS.find((item) => item.key === key)?.label}
+              </button>
+            ))}
+            <button type="button" className="ac-link" onClick={() => handlers.onDetails(row)}>
+              Details
+            </button>
+          </span>
+        );
+      },
+    },
+  ];
+}
+
+/** One task: its facts and history, and the form for an action that needs a reason or a new holder. */
+function TaskDrawer({
+  task,
+  mode,
+  onMode,
+  onClose,
+  onDone,
+}: {
+  task: Task;
+  mode: DrawerState["mode"];
+  onMode: (mode: DrawerState["mode"]) => void;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const detail = useResource<TaskDetail>(taskPath(task.id));
+  const current: TaskDetail = { ...task, ...(detail.data ?? {}) };
+  const action = useTaskAction(onDone);
+  const openTask = useOpenTask();
+  const open = openTask(current);
+  const events = listOf(detail.data?.events);
+  const who = taskAssignee(current);
+  const name = safeText(current.business_id) ?? "Task";
+  return (
+    <Drawer title={`${name}: ${safeText(current.title) ?? taskTypeLabel(current)}`} onClose={onClose}>
+      <dl className="ca-facts">
+        <div>
+          <dt>Task ID</dt>
+          <dd>{name}</dd>
+        </div>
+        <div>
+          <dt>Type</dt>
+          <dd>{taskTypeLabel(current)}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>
+            <StatusBadge value={current.status} />
+          </dd>
+        </div>
+        <div>
+          <dt>Priority</dt>
+          <dd>{priorityLabel(current.priority)}</dd>
+        </div>
+        <div>
+          <dt>Due</dt>
+          <dd>
+            <DueCell task={current} />
+          </dd>
+        </div>
+        <div>
+          <dt>Source</dt>
+          <dd>{taskSourceText(current)}</dd>
+        </div>
+        {safeText(current.investigation?.business_id) && (
+          <div>
+            <dt>Case</dt>
+            <dd>{current.investigation?.business_id}</dd>
+          </div>
+        )}
+        <div>
+          <dt>Assigned</dt>
+          <dd>
+            {who.primary}
+            {who.secondary ? ` · ${who.secondary}` : ""}
+          </dd>
+        </div>
+      </dl>
+
+      {mode === "details" ? (
+        <section className="ca-drawer-section">
+          <h3>Actions</h3>
+          <div className="ca-action-row">
+            {open && (
+              <button type="button" className="ac-primary" onClick={open}>
+                Open
+              </button>
+            )}
+            {availableTaskActions(current).map((key) => {
+              const item = TASK_ACTIONS.find((entry) => entry.key === key);
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  className="ac-secondary"
+                  disabled={!!action.busy}
+                  onClick={() => (item?.needsInput ? onMode(key) : void action.run(current, key))}
+                >
+                  {item?.label}
+                </button>
+              );
+            })}
+            {!open && !availableTaskActions(current).length && (
+              <p className="ac-muted">Nothing for you to do on this task right now.</p>
+            )}
+          </div>
+        </section>
+      ) : (
+        <TaskActionForm
+          task={current}
+          action={mode}
+          onCancel={() => onMode("details")}
+          onSubmit={(body) => action.run(current, mode, body)}
+        />
+      )}
+
+      <section className="ca-drawer-section">
+        <h3>History</h3>
+        {detail.state === "loading" && !detail.data ? (
+          <p className="ac-muted">Loading…</p>
+        ) : detail.state !== "ready" ? (
+          <p className="ac-muted">{detail.error ?? "The task's history is unavailable."}</p>
+        ) : events.length ? (
+          <ol className="ca-timeline uw-task-history">
+            {events.map((event, index) => (
+              <li key={`${event.created_at ?? ""}:${index}`}>
+                <strong>{taskEventText(event)}</strong>
+                <small className="ac-muted">
+                  {taskEventActor(event)} · {formatDate(event.created_at)}
+                </small>
+                {safeText(event.reason) && <p>{event.reason}</p>}
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p className="ac-muted">No history recorded yet.</p>
+        )}
+      </section>
+    </Drawer>
+  );
+}
+
+const ACTION_COPY: Partial<Record<TaskActionKey, { title: string; reason: string; submit: string }>> = {
+  decline: { title: "Decline this task", reason: "Why are you declining it?", submit: "Decline task" },
+  release: { title: "Release this task", reason: "Why are you releasing it?", submit: "Release to the queue" },
+  reassign: { title: "Reassign this task", reason: "Why is it being reassigned?", submit: "Reassign task" },
+  complete: { title: "Complete this task", reason: "Note (optional)", submit: "Complete task" },
+};
+
+function TaskActionForm({
+  task,
+  action,
+  onCancel,
+  onSubmit,
+}: {
+  task: Task;
+  action: TaskActionKey;
+  onCancel: () => void;
+  onSubmit: (body: unknown) => Promise<boolean>;
+}) {
+  const copy = ACTION_COPY[action] ?? { title: "Update this task", reason: "Reason", submit: "Save" };
+  const [reason, setReason] = useState("");
+  const [target, setTarget] = useState<"person" | "role">("person");
+  const [assignee, setAssignee] = useState("");
+  const [role, setRole] = useState(task.assigned_role ?? "");
+  const [busy, setBusy] = useState(false);
+  const people = useResource<Array<{ id: string; business_id?: string | null; display_name?: string | null }>>(
+    action === "reassign" ? "/api/v1/investigation-assignees" : null,
+  );
+  const required = action !== "complete";
+  const problem = reasonProblem(reason, required);
+  const missingTarget = action === "reassign" && (target === "person" ? !assignee : !role);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (problem || missingTarget) return;
+    setBusy(true);
+    const body = taskActionBody(action, {
+      reason,
+      assigneeUserId: action === "reassign" && target === "person" ? assignee : undefined,
+      assignedRole: action === "reassign" && target === "role" ? role : undefined,
+    });
+    const done = await onSubmit(body);
+    if (!done) setBusy(false);
+  };
+  return (
+    <form className="ca-form ca-drawer-section" onSubmit={submit}>
+      <h3>{copy.title}</h3>
+      {action === "reassign" && (
+        <>
+          <div className="ca-chips" role="radiogroup" aria-label="Reassign to">
+            {(["person", "role"] as const).map((option) => (
+              <button
+                type="button"
+                role="radio"
+                key={option}
+                aria-checked={target === option}
+                className={target === option ? "selected" : ""}
+                onClick={() => setTarget(option)}
+              >
+                {option === "person" ? "A person" : "A role queue"}
+              </button>
+            ))}
+          </div>
+          {target === "person" ? (
+            <label className="ca-field">
+              Person
+              <select required value={assignee} onChange={(event) => setAssignee(event.target.value)}>
+                <option value="">{people.state === "loading" ? "Loading…" : "Choose a person"}</option>
+                {listOf(people.data).map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {safeText(person.display_name) ?? "Person"}
+                    {safeText(person.business_id) ? ` (${person.business_id})` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <label className="ca-field">
+              Role queue
+              <select required value={role} onChange={(event) => setRole(event.target.value)}>
+                <option value="">Choose a role</option>
+                {WORKFLOW_ROLE_CODES.map((code) => (
+                  <option key={code} value={code}>
+                    {roleLabel(code)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </>
+      )}
+      <label className="ca-field">
+        {copy.reason}
+        <textarea
+          required={required}
+          rows={3}
+          maxLength={REASON_MAX}
+          value={reason}
+          placeholder={required ? "At least 10 characters" : "At least 10 characters, if you add one"}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </label>
+      {reason.trim() && problem && <p className="ac-muted">{problem}</p>}
+      <p className="ac-muted">Recorded in the task's history and the audit trail.</p>
+      <div className="ca-action-row">
+        <button type="button" className="ac-secondary" onClick={onCancel} disabled={busy}>
+          Back
+        </button>
+        <button type="submit" className="ac-primary" disabled={busy || !!problem || missingTarget}>
+          {busy ? "Saving…" : copy.submit}
+        </button>
+      </div>
+    </form>
   );
 }
 

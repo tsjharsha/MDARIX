@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { invitationNotice, personExportName } from "./Users";
+import {
+  accountRoleText,
+  invitationNotice,
+  personExportName,
+  workflowRoleChoices,
+  workflowRolesBody,
+  workflowRolesChanged,
+  workflowRolesProblem,
+} from "./Users";
 
 describe("invitation results", () => {
   it("says plainly when the email was not delivered and what to do next", () => {
@@ -30,5 +38,55 @@ describe("invitation results", () => {
   it("names a person's export after their User ID, never the UUID", () => {
     expect(personExportName({ business_id: "USR000042" })).toBe("mdarix-person-USR000042.json");
     expect(personExportName({ business_id: null })).toBe("mdarix-person-export.json");
+  });
+});
+
+describe("roles shown to the administrator", () => {
+  it("shows the account role's label, never its code", () => {
+    expect(accountRoleText({ role: "APPROVER", role_label: "Authorized Decision Maker" })).toBe(
+      "Authorized Decision Maker",
+    );
+    expect(accountRoleText({ role: "TRIAGE_LEAD" })).toBe("PMS / Signal Triage Lead");
+    expect(accountRoleText({ role: "RISK_REVIEWER", role_label: null })).toBe("Risk Reviewer");
+    expect(accountRoleText({})).toBe("—");
+  });
+});
+
+describe("workflow roles", () => {
+  const data = {
+    user_id: "u1",
+    account_role: { code: "INVESTIGATOR", label: "Quality Investigator" },
+    additional_roles: [{ code: "RISK_REVIEWER", label: "Risk Reviewer" }],
+    available_roles: [
+      { code: "INVESTIGATOR", label: "Quality Investigator" },
+      { code: "RISK_REVIEWER", label: "Risk Reviewer" },
+      { code: "REGULATORY_REVIEWER", label: "Regulatory Reviewer" },
+    ],
+  };
+
+  it("never offers the account role again", () => {
+    expect(workflowRoleChoices(data).map((role) => role.code)).toEqual(["RISK_REVIEWER", "REGULATORY_REVIEWER"]);
+    expect(workflowRoleChoices(null)).toEqual([]);
+  });
+
+  it("asks for a change and a reason of 10 to 500 characters", () => {
+    expect(workflowRolesChanged(["A", "B"], ["B", "A"])).toBe(false);
+    expect(workflowRolesChanged(["A"], ["A", "B"])).toBe(true);
+    expect(workflowRolesChanged(["A"], [])).toBe(true);
+    expect(workflowRolesProblem(["A"], ["A"], "A long enough reason")).toMatch(/Change at least one role/);
+    expect(workflowRolesProblem(["A"], [], "too short")).toMatch(/at least 10/);
+    expect(workflowRolesProblem(["A"], [], "x".repeat(501))).toMatch(/500/);
+    expect(workflowRolesProblem(["A"], ["A", "B"], "Covers risk reviews this quarter")).toBeNull();
+  });
+
+  it("sends the complete list of additional roles with the reason", () => {
+    expect(workflowRolesBody(["RISK_REVIEWER", "RISK_REVIEWER", "REVIEWER"], "  Covers reviews  ")).toEqual({
+      additional_roles: ["RISK_REVIEWER", "REVIEWER"],
+      reason: "Covers reviews",
+    });
+    expect(workflowRolesBody([], "Role no longer needed")).toEqual({
+      additional_roles: [],
+      reason: "Role no longer needed",
+    });
   });
 });

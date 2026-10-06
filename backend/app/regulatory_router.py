@@ -22,8 +22,8 @@ from backend.app.access.permissions import (
     DATA_EXPORT,
     RECORDS_WRITE,
     REGULATORY_APPROVE,
+    effective_permissions,
     effective_role,
-    permissions_for_role,
     require_permission,
 )
 
@@ -339,7 +339,9 @@ def update_regulatory_status(
     # Approval needs the regulatory-approval permission and a different person from the author (segregation of
     # duties); every other transition needs permission to change records.
     role = effective_role(db, ctx)
-    granted = permissions_for_role(role)
+    # The union over the person's roles (an additional Regulatory Reviewer role grants approval); the administrator
+    # check below stays on the account role, the only place an administrator role can be held.
+    granted = effective_permissions(db, ctx)
     needed = REGULATORY_APPROVE if payload.status == "APPROVED" else RECORDS_WRITE
     if payload.status == "APPROVED" and is_administrator_role(role):
         # Administrators never approve controlled records, whatever their permissions (they can write the rules).

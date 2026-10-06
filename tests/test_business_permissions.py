@@ -52,6 +52,14 @@ EXEMPT = {
         "POST",
         "/api/v1/support/problems",
     ): "any signed-in user may report a problem (session required, own organization)",
+    # My Work (backend/app/workflow/router.py): who may act on a task depends on the task (its assignee, the
+    # permission of its type, investigation.assign to reassign), so each route checks it itself.
+    ("POST", "/api/v1/tasks/{task_id}/accept"): "checked in the route: only the task's assignee",
+    ("POST", "/api/v1/tasks/{task_id}/decline"): "checked in the route: only the task's assignee",
+    ("POST", "/api/v1/tasks/{task_id}/claim"): "checked in the route: the task type's permission",
+    ("POST", "/api/v1/tasks/{task_id}/release"): "checked in the route: only the task's assignee",
+    ("POST", "/api/v1/tasks/{task_id}/reassign"): "checked in the route: investigation.assign",
+    ("POST", "/api/v1/tasks/{task_id}/complete"): "checked in the route: only the task's assignee",
 }
 # Exempt routes that must still refuse anyone without a session: the exemption is from the business permission,
 # never from authentication.
@@ -150,7 +158,19 @@ def _call(client: TestClient, method: str, path: str):
     ("role", "allowed"),
     [
         ("Viewer", set()),
-        ("Investigator", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),
+        # Phase 1 workflow permissions are added to the Investigator's original three; none is taken away.
+        (
+            "Investigator",
+            {
+                RECORDS_WRITE,
+                AI_RUN,
+                DATA_EXPORT,
+                "investigation.create",
+                "investigation.work",
+                "evidence.review",
+                "evidence.request",
+            },
+        ),
         # Investigator-level rights in the workspace; never regulatory approval (decision of 2026-10).
         ("CUSTOMER_ADMIN", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),
         ("Customer Administrator", {RECORDS_WRITE, AI_RUN, DATA_EXPORT}),

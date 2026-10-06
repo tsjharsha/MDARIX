@@ -156,7 +156,7 @@ def request_risk_review(
     )
     control_db.add(event)
     control_db.commit()
-    return {
+    result = {
         "risk_id": str(risk.id),
         "risk_business_id": risk.business_id,
         "risk_identifier": risk.risk_identifier,
@@ -164,3 +164,8 @@ def request_risk_review(
         "approvers_notified": notified,
         "audit_event_id": str(event.id),
     }
+    # The request waits in the risk reviewers' queue as a task. Saved after the request; never undoes it.
+    from backend.app.workflow.hooks import on_risk_review_requested
+
+    on_risk_review_requested(db, control_db, risk, actor_user_id=ctx.user_id)
+    return result

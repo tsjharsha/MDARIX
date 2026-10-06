@@ -10,6 +10,7 @@ import {
   Table,
   Tabs,
   errorText,
+  formatDate,
   idColumn,
   listOf,
   matches,
@@ -19,6 +20,7 @@ import {
 } from "../shared";
 import { downloadFile } from "../../reports/download";
 import { safeText } from "../../../app/displayId";
+import { roleLabel } from "../../../app/roles";
 
 /** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
  * the email could not be delivered (201, delivery FAILED), MDARIX support issues an activation link to pass on. */
@@ -44,6 +46,55 @@ export function invitationNotice(
 /** The file a person's data export is saved as when the server does not name it: after their User ID, never the UUID. */
 export const personExportName = (user: { business_id?: string | null }) =>
   `mdarix-person-${safeText(user.business_id) ?? "export"}.json`;
+
+/** A person's account role as people read it: the server's label, else the known label for the code. */
+export const accountRoleText = (user: { role?: string | null; role_label?: string | null }) =>
+  user.role || user.role_label ? roleLabel(user.role, user.role_label) : "—";
+
+/** GET/PUT /api/v1/admin/identity/users/{id}/roles: the account role and the additional workflow roles. */
+export type UserWorkflowRoles = {
+  user_id: string;
+  business_id?: string | null;
+  account_role?: { code: string; label?: string | null } | null;
+  additional_roles?: Array<{
+    code: string;
+    label?: string | null;
+    granted_at?: string | null;
+    granted_by_name?: string | null;
+  }>;
+  available_roles?: Array<{ code: string; label?: string | null }>;
+};
+
+export const WORKFLOW_REASON_MIN = 10;
+export const WORKFLOW_REASON_MAX = 500;
+
+/** The roles that can be added on top of the account role (the account role itself is never offered twice). */
+export function workflowRoleChoices(data: UserWorkflowRoles | null | undefined) {
+  const account = data?.account_role?.code;
+  return (data?.available_roles ?? []).filter((role) => role.code && role.code !== account);
+}
+
+/** Whether the chosen workflow roles differ from the ones the person holds now (order does not matter). */
+export function workflowRolesChanged(current: string[], chosen: string[]) {
+  const a = [...new Set(current)].sort();
+  const b = [...new Set(chosen)].sort();
+  return a.length !== b.length || a.some((code, index) => code !== b[index]);
+}
+
+/** Why the change cannot be saved yet, or null; the server checks the same rules (and which roles are allowed). */
+export function workflowRolesProblem(current: string[], chosen: string[], reason: string): string | null {
+  if (!workflowRolesChanged(current, chosen)) return "Change at least one role.";
+  const text = reason.trim();
+  if (text.length < WORKFLOW_REASON_MIN) return `Give a reason of at least ${WORKFLOW_REASON_MIN} characters.`;
+  if (text.length > WORKFLOW_REASON_MAX) return `Keep the reason to ${WORKFLOW_REASON_MAX} characters.`;
+  return null;
+}
+
+/** The body of PUT .../roles: the complete list of additional roles (without repeats) and the reason. */
+export const workflowRolesBody = (chosen: string[], reason: string) => ({
+  additional_roles: [...new Set(chosen)],
+  reason: reason.trim(),
+});
 
 const FILTERS = ["All", "Active", "Invited", "Suspended", "Offboarded"] as const;
 // Same role spellings the server treats as MDARIX platform roles; those accounts are managed by MDARIX only.
@@ -127,7 +178,13 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
               </span>
             ),
           },
-          { key: "role", label: "Base role", render: (row) => (row.role ? titleCase(row.role) : "—") },
+          {
+            key: "role",
+            label: "Base role",
+            fields: ["role", "role_label"],
+            sortValue: (row) => accountRoleText(row),
+            render: (row) => accountRoleText(row),
+          },
           {
             key: "status",
             label: "Status",
@@ -249,7 +306,7 @@ function UserDrawer({
         </div>
         <div>
           <dt>Base role</dt>
-          <dd>{user.role ? titleCase(user.role) : "—"}</dd>
+          <dd>{accountRoleText(user)}</dd>
         </div>
       </dl>
 
@@ -302,9 +359,9 @@ function UserDrawer({
               onClick={() =>
                 confirm({
                   title: `Change ${name}'s base role?`,
-                  body: `The base role becomes ${titleCase(baseRole)}. It applies at their next request.`,
+                  body: `The base role becomes ${roleLabel(baseRole)}. It applies at their next request.`,
                   confirmLabel: "Change role",
-                  done: `${name} now has the ${titleCase(baseRole)} base role.`,
+                  done: `${name} now has the ${roleLabel(baseRole)} base role.`,
                   run: async () => {
                     await send(`/api/v1/admin/control-plane/users/${user.id}`, "PATCH", { values: { role: baseRole } });
                     onChanged();
@@ -317,6 +374,8 @@ function UserDrawer({
           </div>
         </section>
       )}
+
+      {!managedByMdarix && <WorkflowRoles user={user} name={name} />}
 
       {!managedByMdarix && (
         <>
@@ -571,6 +630,121 @@ function UserDrawer({
         </>
       )}
     </Drawer>
+  );
+}
+
+/** The additional workflow roles a person holds on top of their account role, and the editor to change them. */
+function WorkflowRoles({ user, name }: { user: TenantUser; name: string }) {
+  const { notify } = useConsole();
+  const path = `/api/v1/admin/identity/users/${encodeURIComponent(user.id)}/roles`;
+  const roles = useResource<UserWorkflowRoles>(path);
+  const [editing, setEditing] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const held = roles.data?.additional_roles ?? [];
+  const current = held.map((role) => role.code);
+  const choices = workflowRoleChoices(roles.data);
+  const problem = workflowRolesProblem(current, chosen, reason);
+  const account = roles.data?.account_role;
+  const toggle = (code: string) =>
+    setChosen((list) => (list.includes(code) ? list.filter((item) => item !== code) : [...list, code]));
+  const startEditing = () => {
+    setChosen(current);
+    setReason("");
+    setError("");
+    setEditing(true);
+  };
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (problem) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send(path, "PUT", workflowRolesBody(chosen, reason));
+      notify(`${name}: workflow roles updated. They apply at their next request.`);
+      setEditing(false);
+      roles.reload();
+    } catch (failure) {
+      setError(errorText(failure, "The workflow roles could not be changed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="ca-drawer-section">
+      <h3>Workflow roles</h3>
+      <p className="ac-muted">
+        Additional roles route work (triage, investigations, reviews and decisions) to this person on top of their base
+        role{account ? ` (${roleLabel(account.code, account.label)})` : ""}.
+      </p>
+      {roles.state === "ready" ? (
+        <ul className="ca-assignment-list">
+          {held.map((role) => (
+            <li key={role.code}>
+              <span className="ca-person">
+                <strong>{roleLabel(role.code, role.label)}</strong>
+                <small>
+                  Granted {formatDate(role.granted_at)}
+                  {safeText(role.granted_by_name) ? ` by ${role.granted_by_name}` : ""}
+                </small>
+              </span>
+            </li>
+          ))}
+          {!held.length && <li className="ac-muted">No additional roles.</li>}
+        </ul>
+      ) : (
+        <p className="ac-muted">
+          {roles.state === "loading" ? "Loading…" : (roles.error ?? "Workflow roles are unavailable.")}
+        </p>
+      )}
+      {roles.state === "ready" && !editing && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" onClick={startEditing} disabled={!choices.length}>
+            Change workflow roles
+          </button>
+        </div>
+      )}
+      {roles.state === "ready" && editing && (
+        <form className="ca-form" onSubmit={save}>
+          <fieldset className="ca-fieldset">
+            <legend>Additional roles</legend>
+            {choices.map((role) => (
+              <label key={role.code} className="ca-check">
+                <input type="checkbox" checked={chosen.includes(role.code)} onChange={() => toggle(role.code)} />
+                {roleLabel(role.code, role.label)}
+              </label>
+            ))}
+          </fieldset>
+          <label className="ca-field">
+            Why are the roles changing?
+            <textarea
+              required
+              rows={3}
+              minLength={WORKFLOW_REASON_MIN}
+              maxLength={WORKFLOW_REASON_MAX}
+              value={reason}
+              placeholder={`At least ${WORKFLOW_REASON_MIN} characters, recorded in the audit trail`}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+          {error && (
+            <p className="ca-inline-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="ca-action-row">
+            <button type="button" className="ac-secondary" onClick={() => setEditing(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+              {busy ? "Saving…" : "Save workflow roles"}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 

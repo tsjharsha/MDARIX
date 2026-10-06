@@ -884,3 +884,78 @@
   color: #8a5a00;
   font-size: 12px;
 }
+
+/* Phase 1 task inbox: counts on tabs, due-soon flag, row actions, and the dashboard's "My work". */
+.ac-tab-count {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-left: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+.ac-tabs button.selected .ac-tab-count {
+  background: rgb(255 255 255 / 25%);
+  color: #fff;
+}
+.uw-flag-warning {
+  color: #8a5a00;
+  font-weight: 600;
+}
+.uw-task-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.uw-queue-list {
+  margin-bottom: 12px;
+}
+.uw-pager {
+  align-items: center;
+  margin-top: 12px;
+}
+.uw-task-history li {
+  display: grid;
+  gap: 2px;
+}
+.uw-task-history p {
+  margin: 2px 0 0;
+}
+.uw-role-chips {
+  margin-bottom: 12px;
+}
+.uw-task-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.uw-task-count {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+.uw-task-count:hover {
+  border-color: var(--ac-teal);
+}
+.uw-task-count strong {
+  font-size: 22px;
+}
+.uw-task-count.urgent strong {
+  color: var(--ca-danger, #b42318);
+}
+.uw-task-count span {
+  color: var(--ac-muted);
+  font-size: 12px;
+}

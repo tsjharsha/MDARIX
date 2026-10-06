@@ -86,5 +86,11 @@ OBJECTS: tuple[BusinessObject, ...] = (
     BusinessObject("evaluation_runs", "EVAL", "Evaluation Run", "tenant"),
 )
 
+# Objects whose tables were created after md26. md26 numbers only OBJECTS; each of these is numbered by the
+# migration that creates its table (named in the comment).
+LATER_OBJECTS: tuple[BusinessObject, ...] = (
+    BusinessObject("workflow_tasks", "TASK", "Task", "tenant"),  # md27
+)
+
 COUNTER_TABLE = "business_id_counters"
-INDEX_NAMES = frozenset(item.index_name for item in OBJECTS)
+INDEX_NAMES = frozenset(item.index_name for item in OBJECTS + LATER_OBJECTS)

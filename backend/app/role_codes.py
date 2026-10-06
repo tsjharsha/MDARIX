@@ -12,7 +12,43 @@ CUSTOMER_ADMIN = "CUSTOMER_ADMIN"
 PLATFORM_ADMIN_ALIASES = frozenset({PLATFORM_ADMIN, "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"})
 CUSTOMER_ADMIN_ALIASES = frozenset({CUSTOMER_ADMIN, "CUSTOMER_ADMINISTRATOR"})
 CANONICAL_SYSTEM_ROLES = frozenset(
-    {"VIEWER", "INVESTIGATOR", "REVIEWER", "APPROVER", "LEADER", PLATFORM_ADMIN, CUSTOMER_ADMIN}
+    {
+        "VIEWER",
+        "TRIAGE_LEAD",
+        "INVESTIGATOR",
+        "RISK_REVIEWER",
+        "REGULATORY_REVIEWER",
+        "REVIEWER",
+        "APPROVER",
+        "LEADER",
+        PLATFORM_ADMIN,
+        CUSTOMER_ADMIN,
+    }
+)
+
+# What people see for each standard role (the codes above never change).
+ROLE_LABELS: dict[str, str] = {
+    "TRIAGE_LEAD": "PMS / Signal Triage Lead",
+    "INVESTIGATOR": "Quality Investigator",
+    "RISK_REVIEWER": "Risk Reviewer",
+    "REGULATORY_REVIEWER": "Regulatory Reviewer",
+    "REVIEWER": "Quality Reviewer",
+    "APPROVER": "Authorized Decision Maker",
+    "LEADER": "Leader (Quality Manager)",
+    "VIEWER": "Viewer",
+    CUSTOMER_ADMIN: "Customer Administrator",
+    PLATFORM_ADMIN: "Platform Administrator",
+}
+
+# Roles a person may hold in addition to their account role (never an administrator role), in workflow order.
+WORKFLOW_ROLES = (
+    "TRIAGE_LEAD",
+    "INVESTIGATOR",
+    "RISK_REVIEWER",
+    "REGULATORY_REVIEWER",
+    "REVIEWER",
+    "APPROVER",
+    "LEADER",
 )
 
 
@@ -47,3 +83,8 @@ def is_customer_admin_role(role: str | None) -> bool:
 
 def is_administrator_role(role: str | None) -> bool:
     return role_code(role) in {PLATFORM_ADMIN, CUSTOMER_ADMIN}
+
+
+def role_label(role: str | None) -> str:
+    """The name people see for a role: the standard label, else the role as the organization wrote it."""
+    return ROLE_LABELS.get(role_code(role)) or str(role or "").strip()

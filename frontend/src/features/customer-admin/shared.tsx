@@ -460,12 +460,15 @@ export function Tabs<T extends string>({
   active,
   onChange,
   label,
+  counts,
   children,
 }: {
   tabs: readonly T[];
   active: T;
   onChange: (tab: T) => void;
   label: string;
+  /** A number to show on a tab (how many items it holds); tabs without one show none. */
+  counts?: Partial<Record<string, number | null>>;
   /** The selected tab's content, rendered as its tabpanel. */
   children?: ReactNode;
 }) {
@@ -495,6 +498,12 @@ export function Tabs<T extends string>({
             onClick={() => onChange(tab)}
           >
             {tab}
+            {typeof counts?.[tab] === "number" && (
+              <>
+                {" "}
+                <span className="ac-tab-count">{counts[tab]}</span>
+              </>
+            )}
           </button>
         ))}
       </div>

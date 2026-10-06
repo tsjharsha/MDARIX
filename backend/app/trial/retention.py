@@ -25,6 +25,9 @@ RETENTION_DAYS = 30
 
 # Records the trial created or uploaded. Identity, plan, subscription and audit tables are deliberately absent.
 TRIAL_DATA_TABLES = (
+    # Workflow tasks (md27) and their history: about cases, decisions, risks and supplier requests listed below.
+    "workflow_task_events",
+    "workflow_tasks",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",

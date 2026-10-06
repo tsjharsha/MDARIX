@@ -24,10 +24,24 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import RoleSwitch
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
-from backend.app.access.permissions import permissions_for_role, role_of_user
+from backend.app.access.permissions import normalize_role, permissions_for_roles, role_of_user, roles_of_user
+from backend.app.role_codes import role_label
 from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+
+def role_entries(db: Session, user) -> list[dict]:
+    """Every role the person holds, as the screens show them: the account role first, then additional roles."""
+    account = normalize_role(role_of_user(db, user))
+    return [
+        {
+            "code": normalize_role(role),
+            "label": role_label(role),
+            "source": "account" if normalize_role(role) == account else "additional",
+        }
+        for role in roles_of_user(db, user)
+    ]
 
 
 def organization_business_ids(db: Session, tenant_id) -> dict:
@@ -145,6 +159,9 @@ def context(request: Request, db: Session = Depends(get_db)):
         **organization_business_ids(db, user.tenant_id),
         "active_role": role.name,
         "role_version": role.version,
+        # All the roles the person holds (account role and additional workflow roles); active_role stays the
+        # account role so existing screens behave as before.
+        "roles": role_entries(db, user),
         "personas": personas,
         "permissions": permissions,
     }
@@ -257,9 +274,10 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "feature_toggles": {item["feature_code"]: item["enabled"] for item in entitlements},
         "allowed_menu": allowed_menu,
         "allowed_actions": base.get("permissions", {}),
-        # The business permissions the API enforces (records.write, ai.run, data.export, regulatory.approve), from
-        # the same rule as require_permission, so the interface can hide what the server would refuse.
-        "business_permissions": sorted(permissions_for_role(role_of_user(db, user))),
+        # The business permissions the API enforces (records.write, ai.run, data.export, regulatory.approve, and the
+        # workflow permissions), from the same rule as require_permission (the union over all the person's roles),
+        # so the interface can hide what the server would refuse.
+        "business_permissions": sorted(permissions_for_roles(roles_of_user(db, user))),
         "policy_version": base.get("role_version", "legacy"),
         "environment": environment(),
     }

@@ -43,6 +43,13 @@ class RolePermissionRequest(BaseModel):
     permission_set_id: uuid.UUID
 
 
+class AdditionalRolesRequest(BaseModel):
+    # The complete set of workflow roles the person holds besides their account role (role codes).
+    additional_roles: list[str] = Field(default_factory=list, max_length=20)
+    # Why the roles change; kept in the audit trail.
+    reason: str = Field(min_length=10, max_length=500)
+
+
 class MfaResetRequest(BaseModel):
     # Why the authenticator is being removed; kept in the audit trail.
     reason: str = Field(min_length=5, max_length=500)

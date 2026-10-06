@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from backend.app.access.permissions import RECORDS_WRITE, permissions_for_role, require_permission, role_of_user
+from backend.app.access.permissions import RECORDS_WRITE, permissions_for_roles, require_permission, roles_of_user
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import (
     AuditEvent,
@@ -130,7 +130,7 @@ def open_investigation(
         )
     )
     db.commit()
-    return {
+    result = {
         "id": str(investigation.id),
         "business_id": investigation.business_id,
         "investigation_identifier": identifier,
@@ -140,10 +140,18 @@ def open_investigation(
         "owner_ref": owner,
         "complaints_linked": len(complaint_ids),
     }
+    # The case's first task: the opener's (accepted) when they own it, else the investigators' queue. Saved after the
+    # case; a failure is logged and never undoes it (backend/app/workflow/hooks.py).
+    from backend.app.workflow.hooks import on_investigation_opened
+
+    on_investigation_opened(
+        db, control_db, investigation, actor_user_id=ctx.user_id, owner_user_id=ctx.user_id if owner else None
+    )
+    return result
 
 
 def _can_work_cases(db: Session, user: AuthUser) -> bool:
-    return RECORDS_WRITE in permissions_for_role(role_of_user(db, user))
+    return RECORDS_WRITE in permissions_for_roles(roles_of_user(db, user))
 
 
 @assignees_router.get("")
@@ -290,9 +298,10 @@ def manage_investigation(
             assignee_ref=case.owner_ref,
             assigned_by_user_id=str(ctx.user_id),
             reference=case.business_id,
+            investigation_business_id=case.business_id,
         ):
             control_db.commit()
-    return {
+    result = {
         "id": str(case.id),
         "business_id": case.business_id,
         "investigation_identifier": case.investigation_identifier,
@@ -301,3 +310,17 @@ def manage_investigation(
         "status": case.status,
         "closed_at": case.closed_at.isoformat() if case.closed_at else None,
     }
+    # The case's tasks follow it: a new owner (or none) replaces its open task, closing cancels every open task,
+    # reopening adds one. Saved after the change; a failure is logged and never undoes it.
+    from backend.app.workflow.hooks import on_investigation_managed
+
+    on_investigation_managed(
+        db,
+        control_db,
+        case,
+        actor_user_id=ctx.user_id,
+        before_owner=before["owner"],
+        before_status=before["status"],
+        assignee_user_id=payload.assignee_id,
+    )
+    return result

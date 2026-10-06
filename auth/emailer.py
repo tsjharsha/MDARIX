@@ -15,6 +15,7 @@ import html
 import os
 import smtplib
 import ssl
+import urllib.parse
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
@@ -557,8 +558,20 @@ def _work_reason(organization: str) -> str:
     return f"You are receiving this email because of your work in MDARIX for {organization}."
 
 
-def send_assignment_notice(recipient: str, *, organization: str, reference: str, assigned_by: str | None) -> str:
-    """An investigation was assigned to the recipient."""
+def _case_link(view: str, case: str | None) -> str | None:
+    """A deep link that opens one investigation on a screen (/app/<view>?case=INV000147), or None without a case."""
+    case = str(case or "").strip()
+    if not case:
+        return None
+    return f"{company().app_url}/app/{view}?case={urllib.parse.quote(case, safe='')}"
+
+
+def send_assignment_notice(
+    recipient: str, *, organization: str, reference: str, assigned_by: str | None, case: str | None = None
+) -> str:
+    """An investigation was assigned to the recipient. With ``case`` (the investigation's business id) the button
+    opens that investigation; without it, My work."""
+    case_url = _case_link("investigations", case)
     return _send(
         recipient,
         Message(
@@ -568,14 +581,20 @@ def send_assignment_notice(recipient: str, *, organization: str, reference: str,
                 (f"{assigned_by} assigned you" if assigned_by else "You were assigned")
                 + f" investigation {reference} in MDARIX for {organization}.",
             ),
-            button=("Open My work", f"{company().app_url}/app/my-work"),
+            button=("Open the investigation", case_url)
+            if case_url
+            else ("Open My work", f"{company().app_url}/app/my-work"),
             reason=_work_reason(organization),
         ),
     )
 
 
-def send_review_pending_notice(recipient: str, *, organization: str, reference: str, submitted_by: str | None) -> str:
-    """A decision is waiting for the recipient's approval."""
+def send_review_pending_notice(
+    recipient: str, *, organization: str, reference: str, submitted_by: str | None, case: str | None = None
+) -> str:
+    """A decision is waiting for the recipient's approval. With ``case`` (the investigation's business id) the
+    button opens that case's decision."""
+    case_url = _case_link("decision", case)
     return _send(
         recipient,
         Message(
@@ -587,16 +606,24 @@ def send_review_pending_notice(recipient: str, *, organization: str, reference: 
                 "Approving or rejecting it needs your password and authenticator code.",
             ),
             # The Decisions screen, where the decision is reviewed and signed (frontend route /app/decision).
-            button=("Open Decisions", f"{company().app_url}/app/decision"),
+            button=("Open Decisions", case_url or f"{company().app_url}/app/decision"),
             reason=_work_reason(organization),
         ),
     )
 
 
 def send_signoff_completed_notice(
-    recipient: str, *, organization: str, reference: str, signed_by: str | None, decision: str | None = None
+    recipient: str,
+    *,
+    organization: str,
+    reference: str,
+    signed_by: str | None,
+    decision: str | None = None,
+    case: str | None = None,
 ) -> str:
-    """A decision on a case the recipient owns was signed: approved, rejected, or (outcome unknown) signed off."""
+    """A decision on a case the recipient owns was signed: approved, rejected, or (outcome unknown) signed off. With
+    ``case`` (the investigation's business id) the button opens that case's decision."""
+    case_url = _case_link("decision", case)
     done = {"APPROVE": "approved", "REJECT": "rejected"}.get(str(decision or "").upper(), "signed off")
     return _send(
         recipient,
@@ -608,7 +635,9 @@ def send_signoff_completed_notice(
                 + (f" by {signed_by}" if signed_by else "")
                 + f" in MDARIX for {organization}. The signature is recorded in the audit trail.",
             ),
-            button=("Open investigations", f"{company().app_url}/app/investigations"),
+            button=("Open the decision", case_url)
+            if case_url
+            else ("Open investigations", f"{company().app_url}/app/investigations"),
             reason=_work_reason(organization),
         ),
     )

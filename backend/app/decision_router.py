@@ -73,12 +73,12 @@ def review_decision(
         # duties as a signature.
         actor = session_actor(control_db, ctx)
         organization = tenant(control_db, actor)  # same tenant check and policy setup as signing
-        denial = approval_denial(control_db, organization.id, actor["active_role"], decision, ctx.user_id)
+        denial = approval_denial(control_db, organization.id, actor["roles"], decision, ctx.user_id)
         if denial:
             raise HTTPException(403, detail={"code": denial[0], "message": denial[1]})
     try:
         review = service.review(db, ctx.tenant_id, decision_id, request)
-        return {
+        result = {
             "id": review.id,
             "decision_id": review.decision_id,
             "disposition": review.disposition,
@@ -88,6 +88,12 @@ def review_decision(
         }
     except DecisionCenterError as exc:
         raise error(exc) from exc
+    # A review that sends the decision back returns it to its author as a task; an approving review leaves the
+    # approval task open (the signature is still pending). Saved after the review; never undoes it.
+    from backend.app.workflow.hooks import on_decision_reviewed
+
+    on_decision_reviewed(db, control_db, decision, actor_user_id=ctx.user_id, disposition=request.disposition)
+    return result
 
 
 @router.get("/{investigation_id}/decision-context")
@@ -138,6 +144,7 @@ def create_decision(
     # after the decision is saved; a queueing failure is logged and never undoes the decision.
     from backend.app.governance_router import _notify
 
+    investigation_business_id = _investigation_business_id(db, decision)
     if _notify(
         "notify_review_pending",
         control_db,
@@ -145,9 +152,15 @@ def create_decision(
         decision_id=decision.id,
         submitted_by_user_id=str(ctx.user_id),
         reference=decision.business_id,
+        investigation_business_id=investigation_business_id,
     ):
         control_db.commit()
-    return _decision_payload(decision, _investigation_business_id(db, decision))
+    result = _decision_payload(decision, investigation_business_id)
+    # The decision waits in the approvers' queue as a task. Saved after the decision; never undoes it.
+    from backend.app.workflow.hooks import on_decision_created
+
+    on_decision_created(db, control_db, decision, actor_user_id=ctx.user_id)
+    return result
 
 
 @router.get("/{investigation_id}/decisions")

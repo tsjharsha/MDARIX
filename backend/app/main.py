@@ -64,6 +64,7 @@ from backend.app.complaints_router import router as complaints_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
 from backend.app.risk_router import router as risk_router
+from backend.app.workflow.router import router as workflow_tasks_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -324,6 +325,7 @@ app.include_router(complaints_router)
 app.include_router(client_errors_router)
 app.include_router(support_router)
 app.include_router(risk_router)  # Risk & Traceability
+app.include_router(workflow_tasks_router)  # My Work: workflow tasks and role queues
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

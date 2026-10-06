@@ -32,7 +32,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
-from backend.app.access.permissions import AI_RUN, effective_role, permissions_for_role
+from backend.app.access.permissions import AI_RUN, effective_permissions, effective_role, permissions_for_role
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"
@@ -64,6 +64,8 @@ def _authenticated_context(request: Request, db: Session) -> dict:
         "user_id": ctx.user_id,
         "tenant_id": ctx.tenant_id,
         "active_role": effective_role(db, ctx),
+        # What the person may do: the union over their account role and additional workflow roles.
+        "permissions": effective_permissions(db, ctx),
         "correlation_id": ctx.correlation_id,
     }
 
@@ -198,7 +200,8 @@ def ask(
     context = _authenticated_context(request, db)
     # Ask resolves its own session, so its AI permission is checked here with the server-trusted role.
     role = context["active_role"]
-    if AI_RUN not in permissions_for_role(role):
+    granted = context.get("permissions")
+    if AI_RUN not in (permissions_for_role(role) if granted is None else granted):
         raise HTTPException(
             403,
             detail={

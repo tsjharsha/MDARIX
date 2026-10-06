@@ -28,6 +28,18 @@ describe("customer admin overview model", () => {
     ]);
   });
 
+  it("names roles by the label the server sends when it sends one", () => {
+    const mix = roleMix([
+      { id: "1", role: "APPROVER", role_label: "Authorized Decision Maker", status: "ACTIVE" },
+      { id: "2", role: "APPROVER", role_label: "Authorized Decision Maker", status: "ACTIVE" },
+      { id: "3", role: "VIEWER", status: "ACTIVE" },
+    ]);
+    expect(mix.map((slice) => [slice.label, slice.count])).toEqual([
+      ["Authorized Decision Maker", 2],
+      ["Viewer", 1],
+    ]);
+  });
+
   it("grades seat usage and never invents a limit", () => {
     expect(seatUsage(5, null)).toMatchObject({ limit: null, tone: "neutral" });
     expect(seatUsage(7, 10).tone).toBe("good");

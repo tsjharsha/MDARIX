@@ -26,7 +26,19 @@ import {
   workspaceAttention,
 } from "../workspaceModel";
 import { StatusBadge } from "./common";
-import { displayId } from "../../../app/displayId";
+import { displayId, safeText } from "../../../app/displayId";
+import { roleLabels } from "../../../app/roles";
+import {
+  dueState,
+  dueText,
+  hasRoleQueues,
+  taskListPath,
+  taskTypeLabel,
+  type Task,
+  type TaskList,
+  type TaskSummary,
+} from "../tasks";
+import { useOpenTask } from "./MyWork";
 
 type Breakdown = Array<{ label: string; count: number }>;
 type Trends = {
@@ -117,6 +129,8 @@ export function DashboardSection() {
 
   return (
     <div className="ac-overview ac-dashboard">
+      <MyWorkSummary />
+
       <section className={`ac-hero tone-${tone}`} aria-live="polite">
         <div className="ac-hero-status">
           <span className="ac-hero-icon">
@@ -436,6 +450,82 @@ export function DashboardSection() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+/** The person's own work first: their roles, how many tasks wait for them, and the next ones to pick up. */
+function MyWorkSummary() {
+  const { session, open } = useWorkspace();
+  const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
+  const assigned = useResource<TaskList>(taskListPath("assigned", 1, 5));
+  const openTask = useOpenTask();
+  const roles = roleLabels(session);
+  const counts = summary.data?.counts ?? {};
+  const ready = summary.state === "ready";
+  const tiles: Array<{ tab: string; label: string; value: number | undefined; urgent?: boolean }> = [
+    { tab: "Assigned to me", label: "Assigned", value: counts.assigned },
+    ...(hasRoleQueues(summary.data) ? [{ tab: "Role queues", label: "Role queues", value: counts.queue }] : []),
+    { tab: "Due soon", label: "Due soon", value: counts.due_soon },
+    { tab: "Overdue", label: "Overdue", value: counts.overdue, urgent: true },
+    { tab: "Returned to me", label: "Returned", value: counts.returned },
+  ];
+  const tasks = (listOf(assigned.data?.items) as Task[]).slice(0, 5);
+  return (
+    <Panel eyebrow="My work" title="Your tasks" source={summary} action={<OpenLink onClick={() => open("My Work")} />}>
+      {roles.length > 0 && (
+        <ul className="ca-pill-list uw-role-chips" aria-label="Your roles">
+          {roles.map((role) => (
+            <li key={role}>{role}</li>
+          ))}
+        </ul>
+      )}
+      <div className="uw-task-counts" role="group" aria-label="Your task counts">
+        {tiles.map((tile) => (
+          <button
+            type="button"
+            key={tile.tab}
+            className={`uw-task-count ${tile.urgent && (tile.value ?? 0) > 0 ? "urgent" : ""}`}
+            onClick={() => open("My Work", tile.tab)}
+          >
+            <strong>{ready ? (tile.value ?? 0) : "…"}</strong>
+            <span>{tile.label}</span>
+          </button>
+        ))}
+      </div>
+      {assigned.state === "ready" && tasks.length > 0 && (
+        <ul className="uw-list" aria-label="Your next tasks">
+          {tasks.map((task) => {
+            const go = openTask(task);
+            const due = dueState(task);
+            return (
+              <li key={task.id}>
+                <span>
+                  <strong>{safeText(task.business_id) ?? "Task"}</strong>
+                  <small>
+                    {safeText(task.title) ?? taskTypeLabel(task)} · {taskTypeLabel(task)}
+                  </small>
+                </span>
+                <span
+                  className={
+                    due === "overdue" ? "uw-flag-critical" : due === "due_soon" ? "uw-flag-warning" : "ac-muted"
+                  }
+                >
+                  {dueText(task, formatDate)}
+                </span>
+                {go && (
+                  <button type="button" className="ac-link" onClick={go}>
+                    Open <ChevronRight size={14} aria-hidden="true" />
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {assigned.state === "ready" && !tasks.length && (
+        <Empty title="Nothing is assigned to you" detail="Tasks routed to you appear here and in My Work." />
+      )}
+    </Panel>
   );
 }
 

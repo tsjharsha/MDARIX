@@ -6,6 +6,7 @@ import { Tabs, errorText, send, useResource } from "../../customer-admin/shared"
 import { signOut } from "../../shared/session";
 import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
 import { hideUuid, safeText } from "../../../app/displayId";
+import { roleLabel, rolesSummary } from "../../../app/roles";
 
 const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
@@ -38,7 +39,7 @@ function Profile() {
         </div>
         <div>
           <dt>Role</dt>
-          <dd>{session?.active_role ?? "—"}</dd>
+          <dd>{rolesSummary(session, "—")}</dd>
         </div>
         <div>
           <dt>Organization</dt>
@@ -235,7 +236,7 @@ function Access() {
         <dl className="ca-facts">
           <div>
             <dt>Active role</dt>
-            <dd>{me.data?.active_role ?? session?.active_role ?? "—"}</dd>
+            <dd>{roleLabel(me.data?.active_role ?? session?.active_role) || "—"}</dd>
           </div>
           <div>
             <dt>Policy version</dt>

@@ -481,13 +481,18 @@ def request_supplier_evidence(
         )
     )
     db.commit()
-    return {
+    result = {
         "id": str(row.id),
         "business_id": row.business_id,
         "tenant_id": ctx.tenant_id,
         "status": row.status,
         "email_delivery": delivery,
     }
+    # The requester's task waits for the supplier's reply. Saved after the request; never undoes it.
+    from backend.app.workflow.hooks import on_supplier_request_created
+
+    on_supplier_request_created(db, control_db, row, actor_user_id=ctx.user_id)
+    return result
 
 
 @router.get("/supplier-evidence-requests")
@@ -695,6 +700,7 @@ def record_supplier_reply(
     payload: SupplierReplyPayload,
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    control_db: Session = Depends(get_db),
 ):
     """Record a supplier's reply to an evidence request and link the file it came with.
 
@@ -766,7 +772,7 @@ def record_supplier_reply(
         )
     )
     db.commit()
-    return {
+    result = {
         "id": str(row.id),
         "business_id": row.business_id,
         "status": row.status,
@@ -774,6 +780,11 @@ def record_supplier_reply(
         "replies": [_reply_view(item) for item in document["replies"]],
         "evidence_acceptance": "NEVER_AUTOMATIC",
     }
+    # The reply ends the requester's waiting task and asks them to review it. Saved after the reply; never undoes it.
+    from backend.app.workflow.hooks import on_supplier_reply_recorded
+
+    on_supplier_reply_recorded(db, control_db, row, actor_user_id=ctx.user_id)
+    return result
 
 
 @router.get("/supplier-evidence-requests/{request_id}/attachments")

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -49,6 +49,23 @@ def _row(db, ctx):
 
 
 def _validate(db, ctx, data):
+    """Every record the context names exists in the tenant, and they agree with each other: the version belongs to
+    the product and the investigation to the product. When the investigation and the product disagree, the
+    investigation wins (the product becomes the investigation's) and a version of another product is cleared."""
+    investigation = None
+    if data.investigation_id:
+        investigation = (
+            db.query(Investigation.id, Investigation.product_id)
+            .filter(Investigation.id == data.investigation_id, Investigation.tenant_id == ctx.tenant_id)
+            .first()
+        )
+        if investigation is None:
+            raise HTTPException(
+                404,
+                detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"},
+            )
+        if data.product_id != investigation.product_id:
+            data.product_id = investigation.product_id
     if (
         data.product_id
         and not db.query(Product.id).filter(Product.id == data.product_id, Product.tenant_id == ctx.tenant_id).first()
@@ -56,31 +73,45 @@ def _validate(db, ctx, data):
         raise HTTPException(
             404, detail={"code": "PRODUCT_NOT_FOUND", "message": "Product is not available for this tenant"}
         )
-    if (
-        data.product_version_id
-        and not db.query(ProductVersion.id)
-        .filter(
-            ProductVersion.id == data.product_version_id,
-            ProductVersion.tenant_id == ctx.tenant_id,
-            ProductVersion.product_id == data.product_id,
+    if data.product_version_id:
+        version = (
+            db.query(ProductVersion.id, ProductVersion.product_id)
+            .filter(ProductVersion.id == data.product_version_id, ProductVersion.tenant_id == ctx.tenant_id)
+            .first()
         )
-        .first()
-    ):
-        raise HTTPException(
-            404,
-            detail={"code": "PRODUCT_VERSION_NOT_FOUND", "message": "ProductVersion is not available for this tenant"},
-        )
-    if (
-        data.investigation_id
-        and not db.query(Investigation.id)
-        .filter(Investigation.id == data.investigation_id, Investigation.tenant_id == ctx.tenant_id)
-        .first()
-    ):
-        raise HTTPException(
-            404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"}
-        )
+        if version is not None and version.product_id != data.product_id and investigation is not None:
+            # A version of another product than the case's: the case decides, so the version is dropped.
+            data.product_version_id = None
+        elif version is None or version.product_id != data.product_id:
+            raise HTTPException(
+                404,
+                detail={
+                    "code": "PRODUCT_VERSION_NOT_FOUND",
+                    "message": "ProductVersion is not available for this tenant",
+                },
+            )
     if data.temporal_mode not in {"CURRENT", "EVENT_AS_OF", "KNOWN_AS_OF"}:
         raise HTTPException(422, detail={"code": "INVALID_TEMPORAL_MODE", "message": "Unsupported temporal mode"})
+
+
+def _business_ids(db, ctx, row) -> dict:
+    """The product's and the investigation's numbers as people see them (PRD000003, INV000147), from the data plane."""
+    product = (
+        db.query(Product.business_id).filter(Product.id == row.product_id, Product.tenant_id == ctx.tenant_id).first()
+        if row.product_id
+        else None
+    )
+    investigation = (
+        db.query(Investigation.business_id)
+        .filter(Investigation.id == row.investigation_id, Investigation.tenant_id == ctx.tenant_id)
+        .first()
+        if row.investigation_id
+        else None
+    )
+    return {
+        "product_business_id": product[0] if product else None,
+        "investigation_business_id": investigation[0] if investigation else None,
+    }
 
 
 def _out(row):
@@ -133,7 +164,40 @@ def put_context(
     row.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(row)
-    return _out(row)
+    return {**_out(row), **_business_ids(business, ctx, row)}
+
+
+@router.get("/resolve")
+def resolve_investigation(
+    investigation: str = Query(min_length=1, max_length=120),
+    business: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The investigation a deep link names (/app/<view>?case=INV000147), by its business id or the customer's own
+    identifier, with its product: what the workspace context needs to open it. Only the signed-in tenant's cases."""
+    value = investigation.strip()
+    match = None
+    if value:
+        query = business.query(Investigation).filter(Investigation.tenant_id == ctx.tenant_id)
+        # Business ids are stored in upper case (INV000147); a link may carry them in any case.
+        match = query.filter(Investigation.business_id == value.upper()).first()
+        if match is None:
+            match = query.filter(Investigation.investigation_identifier == value).first()
+    if match is None:
+        raise HTTPException(
+            404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available for this tenant"}
+        )
+    product = (
+        business.query(Product.business_id)
+        .filter(Product.id == match.product_id, Product.tenant_id == ctx.tenant_id)
+        .first()
+    )
+    return {
+        "investigation_id": str(match.id),
+        "investigation_business_id": match.business_id,
+        "product_id": str(match.product_id),
+        "product_business_id": product[0] if product else None,
+    }
 
 
 @router.post("/reset")

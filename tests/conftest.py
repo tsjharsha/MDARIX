@@ -137,6 +137,10 @@ DB_MODULES = {
     "test_business_ids_custadmin_api",
     "test_business_ids_workspace_api",
     "test_business_ids_reports_api",
+    # Phase 1: additional workflow roles (customer-admin API, session, union of permissions) and case deep links.
+    "test_additional_roles",
+    # Phase 1: workflow tasks (My Work): hooks of existing actions, the task API and the backfill.
+    "test_workflow_tasks",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
