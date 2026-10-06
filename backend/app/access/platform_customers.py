@@ -354,7 +354,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         db.query(AuthUser)
         .filter(
             AuthUser.tenant_id.in_(page_ids),
-            func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"]),
+            func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "PLATFORM_ADMIN"]),
         )
         .order_by(AuthUser.created_at.asc())
         .all()
@@ -490,7 +490,8 @@ def get_platform_customer(tenant_id: uuid.UUID, request: Request, db: Session = 
     admin_count = (
         db.query(AuthUser)
         .filter(
-            AuthUser.tenant_id == tenant.id, func.upper(AuthUser.role).in_(["ADMINISTRATOR", "ADMIN", "CUSTOMER_ADMIN"])
+            AuthUser.tenant_id == tenant.id,
+            func.upper(AuthUser.role).in_(["PLATFORM_ADMIN", "CUSTOMER_ADMIN"]),
         )
         .count()
     )
@@ -757,7 +758,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
                 "administrators": db.query(AuthUser)
                 .filter(
                     AuthUser.tenant_id == tenant.id,
-                    func.upper(AuthUser.role).in_(["ADMINISTRATOR", "ADMIN", "CUSTOMER_ADMIN"]),
+                    func.upper(AuthUser.role).in_(["PLATFORM_ADMIN", "CUSTOMER_ADMIN"]),
                 )
                 .count(),
                 "connectors": db.query(ConnectorConfiguration)

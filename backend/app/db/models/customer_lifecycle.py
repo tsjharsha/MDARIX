@@ -3,6 +3,7 @@
 import uuid
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -295,9 +296,9 @@ class UsageQuotaSnapshot(Base):
     tenant_id = tenant_fk()
     captured_at = tz(False)
     active_users: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    storage_bytes: Mapped[int] = mapped_column(nullable=False, server_default="0")
-    api_requests: Mapped[int] = mapped_column(nullable=False, server_default="0")
-    ai_tokens: Mapped[int] = mapped_column(nullable=False, server_default="0")
+    storage_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    api_requests: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
+    ai_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     quota: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     created_at = tz(False)
     __table_args__ = (

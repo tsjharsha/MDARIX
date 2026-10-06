@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, String, text
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,3 +23,4 @@ class InvestigationSessionRecord(Base):
     correlation_id: Mapped[str] = mapped_column(String(120), nullable=False)
     created_at = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at = mapped_column(DateTime(timezone=True), nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_investigation_sessions_tenant_id_id"),)

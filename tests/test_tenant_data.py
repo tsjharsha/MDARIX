@@ -14,7 +14,7 @@ from backend.app.db.models.stage2 import AuthSession, TenantExport
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.tenant_export import expire_exports, run_export
-from backend.app.tenant_purge import PurgeFailed, purge_tenant, tenant_tables
+from backend.app.tenant_purge import purge_tenant, tenant_tables
 from object_storage.service import ObjectStorageService
 from tests.conftest import authenticated_client
 
@@ -153,7 +153,14 @@ def test_deleting_an_organization_removes_its_data_files_and_trail(platform, org
     wrong = {**body, "password": "not my password", "confirm_tenant_key": organization["tenant_key"]}
     assert platform.post(url, json=wrong).status_code == 403
 
-    response = platform.post(url, json={**body, "confirm_tenant_key": organization["tenant_key"]})
+    response = platform.post(
+        url,
+        json={
+            **body,
+            "confirm_tenant_key": organization["tenant_key"],
+            "export_waiver_reason": "Synthetic test organization; no customer data requires hand-back",
+        },
+    )
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["deleted_records"]["products"] == 1 and result["files_deleted"] == 1
@@ -174,7 +181,7 @@ def test_deleting_an_organization_removes_its_data_files_and_trail(platform, org
         db.close()
 
 
-def test_a_purge_that_cannot_finish_changes_nothing(organization):
+def test_a_purge_with_an_unavailable_file_store_is_durable_and_resumable(organization):
     tenant_id = organization["tenant_id"]
 
     class BrokenStorage:
@@ -183,18 +190,36 @@ def test_a_purge_that_cannot_finish_changes_nothing(organization):
 
     db = SessionLocal()
     try:
-        with pytest.raises(PurgeFailed):
-            purge_tenant(db, tenant_id, "test", reason="Testing a failed purge", storage=BrokenStorage())
+        incomplete = purge_tenant(db, tenant_id, "test", reason="Testing a failed purge", storage=BrokenStorage())
     finally:
         db.close()
-    assert _count(Product, tenant_id=tenant_id) == 1
-    assert _count(AuditEvent, tenant_id=tenant_id) >= 1
+    assert incomplete["status"] == "PURGING"
+    assert "files" in incomplete["incomplete"]
+    # The database stage commits atomically before external storage is touched.  Its
+    # erasure log is therefore a durable recovery checkpoint, not a false rollback.
+    assert _count(Product, tenant_id=tenant_id) == 0
     db = SessionLocal()
     bind_system(db, "test")
     try:
-        assert db.get(Tenant, tenant_id).status != "ARCHIVED"
+        assert db.get(Tenant, tenant_id).status == "PURGING"
+        assert (
+            db.query(AuditEvent)
+            .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.action == "TENANT_PURGE_INCOMPLETE")
+            .count()
+            == 1
+        )
+        completed = purge_tenant(
+            db,
+            tenant_id,
+            "test-recovery",
+            reason="Resume the recorded purge after storage recovery",
+            storage=ObjectStorageService(),
+        )
+        assert completed["status"] == "ARCHIVED"
+        assert db.get(Tenant, tenant_id).status == "ARCHIVED"
     finally:
         db.close()
+    assert ObjectStorageService().list_tenant_objects(str(tenant_id)) == []
 
 
 # ------------------------------------------------------------------------------------------------ erasure

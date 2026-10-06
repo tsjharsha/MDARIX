@@ -9,6 +9,7 @@ scenario's expectations read and compared (the model never sees them):
   NO_PROHIBITED         no statement matches a prohibited conclusion by meaning, and none asserts causality,
                         certainty or a regulatory decision
   CITATIONS_VALID       every cited evidence record belongs to the investigation and has a source location
+  EXPECTED_EVIDENCE_CITED every scenario-required evidence identifier is cited by the generated analysis
   GROUNDED              every observation, explanation and contradiction cites evidence
 
 Similarity scores are reported so a reviewer can see why something matched. Nothing here changes the pipeline.
@@ -27,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import Evidence, Investigation, InvestigationEvidence, Tenant
 from evaluation.harness import load_scenarios
+from genai.governance import tenant_scope
 from hypothesis_engine.schemas import HypothesisSetRequest
 from hypothesis_engine.service import CompetingHypothesisService
 from investigator.model_provider import HEDGES, asserts_causality_or_decision
@@ -34,7 +36,7 @@ from investigator.schemas import InvestigationAnalysisRequest
 from investigator.service import EvidenceGroundedInvestigatorService
 from retrieval.embedding_provider import LocalModelEmbeddingProvider
 
-EVALUATION_VERSION = "MDARIX_R1_REAL_PIPELINE_EVAL_V1"
+EVALUATION_VERSION = "MDARIX_R1_REAL_PIPELINE_EVAL_V2"
 MATCH_THRESHOLD = 0.75  # meaning match for expected contradictions / unknowns
 PROHIBITED_THRESHOLD = 0.85  # meaning match for a prohibited conclusion
 CERTAINTY = re.compile(
@@ -50,6 +52,22 @@ def asserts_certainty(statement: str) -> bool:
         not HEDGES.search(statement[max(0, match.start() - 40) : match.start()])
         for match in CERTAINTY.finditer(statement)
     )
+
+
+def prohibited_semantic_violation(prohibited: str, candidate: str | None, similarity: float) -> bool:
+    """Require assertion-mode agreement; topical similarity is not entailment.
+
+    In particular, a temporal association such as "occurred near" must not be
+    scored as the prohibited causal conclusion "caused" merely because both
+    sentences mention the same event and outcome.
+    """
+    if not candidate or similarity < PROHIBITED_THRESHOLD:
+        return False
+    if asserts_causality_or_decision(prohibited):
+        return asserts_causality_or_decision(candidate)
+    if asserts_certainty(prohibited):
+        return asserts_certainty(candidate)
+    return True
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -126,7 +144,7 @@ def score(scenario: dict[str, Any], output: dict[str, Any], matcher: _Matcher, i
         if prohibited.strip().lower() == GENERIC_PROHIBITION:
             continue  # covered by the certainty / causality check below
         similarity, match = matcher.best(prohibited, statements)
-        if similarity >= PROHIBITED_THRESHOLD:
+        if prohibited_semantic_violation(prohibited, match, similarity):
             violations.append({"prohibited": prohibited, "similarity": round(similarity, 3), "statement": match})
     for statement in dict.fromkeys(statements):
         if asserts_causality_or_decision(statement) or asserts_certainty(statement):
@@ -148,6 +166,27 @@ def score(scenario: dict[str, Any], output: dict[str, Any], matcher: _Matcher, i
     ]
     checks.append({"check": "CITATIONS_VALID", "status": "FAIL" if bad_citations else "PASS", "details": bad_citations})
 
+    cited_evidence = {
+        ref.evidence_identifier
+        for item in analysis.accepted_items()
+        for ref in item.source_references
+        if ref.reference_type == "EVIDENCE"
+    } | {
+        ref.evidence_identifier
+        for h in hypotheses
+        for rel in h.supporting_evidence + h.contradicting_evidence
+        for ref in rel.source_references
+    }
+    expected_evidence = set(scenario.get("expected_evidence") or [])
+    missing_expected_evidence = sorted(expected_evidence - cited_evidence)
+    checks.append(
+        {
+            "check": "EXPECTED_EVIDENCE_CITED",
+            "status": "FAIL" if missing_expected_evidence else "PASS",
+            "details": missing_expected_evidence,
+        }
+    )
+
     ungrounded = [
         item.statement
         for item in analysis.observations + analysis.possible_explanations + analysis.contradictions
@@ -164,6 +203,7 @@ def score(scenario: dict[str, Any], output: dict[str, Any], matcher: _Matcher, i
         # nothing false or causal was claimed - it does not show that anything was found.
         "specific_expectations": len(scenario.get("expected_contradictions") or [])
         + len(scenario.get("expected_unknowns") or [])
+        + len(scenario.get("expected_evidence") or [])
         + sum(
             1 for item in scenario.get("prohibited_conclusions") or [] if item.strip().lower() != GENERIC_PROHIBITION
         ),
@@ -201,12 +241,22 @@ def _model_name() -> str:
 
 
 def run_real_golden_suite(
-    db: Session, tenant_key: str = "ACME_CARE_SYNTHETIC", pause_seconds: float = 0.0, services=None
+    db: Session,
+    tenant_key: str = "ACME_CARE_SYNTHETIC",
+    pause_seconds: float = 0.0,
+    services=None,
+    scenario_ids: set[str] | None = None,
 ):
     tenant = db.query(Tenant).filter(Tenant.tenant_key == tenant_key).one()
     matcher = _Matcher(LocalModelEmbeddingProvider())
     results = []
-    for scenario in load_scenarios():
+    scenarios = load_scenarios()
+    if scenario_ids:
+        scenarios = [scenario for scenario in scenarios if scenario["scenario_id"] in scenario_ids]
+        missing = scenario_ids - {scenario["scenario_id"] for scenario in scenarios}
+        if missing:
+            raise ValueError(f"UNKNOWN_EVALUATION_SCENARIO: {', '.join(sorted(missing))}")
+    for scenario in scenarios:
         investigation = (
             db.query(Investigation)
             .filter(
@@ -220,7 +270,11 @@ def run_real_golden_suite(
                 {"scenario_id": scenario["scenario_id"], "status": "FAIL", "error": "INVESTIGATION_NOT_FOUND"}
             )
             continue
-        output = run_pipeline(db, tenant.id, investigation.id, services)
+        # Evaluation is a background execution and therefore must establish the
+        # same explicit organization scope as workers. This enforces the tenant's
+        # AI switch, budget, usage audit, and provider policy during the gate.
+        with tenant_scope(tenant.id):
+            output = run_pipeline(db, tenant.id, investigation.id, services)
         results.append(score(scenario, output, matcher, _investigation_evidence(db, tenant.id, investigation.id)))
         if pause_seconds:
             time.sleep(pause_seconds)  # stay inside the provider's tokens-per-minute limit

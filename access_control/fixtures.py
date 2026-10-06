@@ -28,7 +28,7 @@ FIXTURE_TENANTS = tuple(
 )
 
 _ROLE_PERSONAS = (
-    ("Administrator", ("ADMINISTRATOR",)),
+    ("PLATFORM_ADMIN", ("ADMINISTRATOR",)),
     ("Investigator", ("INVESTIGATOR",)),
     ("Reviewer", ("REVIEWER",)),
     ("Approver", ("APPROVER",)),
@@ -40,8 +40,10 @@ FIXTURE_USERS = tuple(
         key=f"R1_USER_{index:02d}",
         email=f"r1-user-{index:02d}@synthetic.invalid",
         tenant_key=FIXTURE_TENANTS[(index - 1) % len(FIXTURE_TENANTS)].key,
-        role=_ROLE_PERSONAS[(index - 1) % len(_ROLE_PERSONAS)][0],
-        personas=_ROLE_PERSONAS[(index - 1) % len(_ROLE_PERSONAS)][1],
+        # R1_USER_06 is the required Tenant B Customer Administrator for
+        # browser, mobile, and cross-tenant evidence.
+        role="CUSTOMER_ADMIN" if index == 6 else _ROLE_PERSONAS[(index - 1) % len(_ROLE_PERSONAS)][0],
+        personas=("CUSTOMER_ADMIN",) if index == 6 else _ROLE_PERSONAS[(index - 1) % len(_ROLE_PERSONAS)][1],
     )
     for index in range(1, 26)
 )
@@ -55,6 +57,9 @@ def validate_fixture() -> None:
         raise ValueError("R1_FIXTURE_TENANT_REFERENCE_INVALID")
     if len({user.email for user in FIXTURE_USERS}) != len(FIXTURE_USERS):
         raise ValueError("R1_FIXTURE_EMAIL_NOT_UNIQUE")
+    customer_admins = [user for user in FIXTURE_USERS if user.role == "CUSTOMER_ADMIN"]
+    if len(customer_admins) != 1 or customer_admins[0].tenant_key != "R1_TENANT_2":
+        raise ValueError("R1_FIXTURE_CUSTOMER_ADMIN_INVALID")
 
 
 validate_fixture()

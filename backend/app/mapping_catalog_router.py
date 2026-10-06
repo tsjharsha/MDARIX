@@ -15,6 +15,7 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser, MappingImpact
 from backend.app.db.session import get_db
 from backend.app.master_data import catalog
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.role_codes import is_customer_admin_role, is_platform_admin_role
 
 router = APIRouter(prefix="/api/v1/admin/mapping", tags=["Mapping Studio Catalog"])
 
@@ -73,7 +74,7 @@ def _platform_admin(db: Session, ctx: AuthenticatedRequestContext):
         .filter(AuthUser.id == ctx.user_id, AuthUser.tenant_id == ctx.tenant_id, AuthUser.status == "ACTIVE")
         .first()
     )
-    if user is None or user.role not in {"Administrator", "Platform Admin", "PLATFORM_ADMIN"}:
+    if user is None or not is_platform_admin_role(user.role):
         raise HTTPException(
             403, detail={"code": "PLATFORM_ADMIN_REQUIRED", "message": "Platform administrator access is required"}
         )
@@ -94,7 +95,7 @@ def _catalog_reader(db: Session, ctx: AuthenticatedRequestContext):
         .filter(AuthUser.id == ctx.user_id, AuthUser.tenant_id == ctx.tenant_id, AuthUser.status == "ACTIVE")
         .first()
     )
-    if user is not None and str(user.role or "").upper() == "CUSTOMER_ADMIN":
+    if user is not None and is_customer_admin_role(user.role):
         return
     _platform_admin(db, ctx)
 

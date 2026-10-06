@@ -76,3 +76,4 @@ class ReconciliationRecord(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSONB)
     reconciled_at = tz(False)
+    created_at = tz(False)

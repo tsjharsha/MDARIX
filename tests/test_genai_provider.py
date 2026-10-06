@@ -65,3 +65,81 @@ def test_groq_mode_uses_chat_completions_contract(monkeypatch):
     assert result.provider == "groq"
     assert result.output["answer"] == "Evidence requires human review."
     assert result.human_review_required is True
+
+
+def test_groq_structured_request_uses_strict_schema_and_reasoning_budget(monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "choices": [{"message": {"content": '{"summary":"ready"}'}}],
+                    "usage": {"prompt_tokens": 12, "completion_tokens": 7},
+                }
+            ).encode()
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data)
+        return Response()
+
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "groq")
+    monkeypatch.setenv("MDARIX_GENAI_API_KEY", "test-key")
+    monkeypatch.setenv("MDARIX_GENAI_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
+    schema = {
+        "type": "object",
+        "properties": {"summary": {"type": "string"}},
+        "required": ["summary"],
+        "additionalProperties": False,
+    }
+
+    provider_module.GenAIProvider(max_retries=0).complete(
+        "Return an analysis", {}, json_output=True, response_schema=schema, max_output_tokens=2500
+    )
+
+    assert captured["body"]["response_format"]["type"] == "json_schema"
+    assert captured["body"]["response_format"]["json_schema"]["strict"] is True
+    assert captured["body"]["response_format"]["json_schema"]["schema"] == schema
+    assert captured["body"]["reasoning_effort"] == "low"
+    assert captured["body"]["reasoning_format"] == "hidden"
+    assert captured["body"]["max_completion_tokens"] == 2500
+
+
+def test_invalid_structured_response_is_retried_before_fallback(monkeypatch):
+    calls = 0
+
+    class Response:
+        def __init__(self, content):
+            self.content = content
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"choices": [{"message": {"content": self.content}}]}).encode()
+
+    def fake_urlopen(request, timeout):
+        nonlocal calls
+        calls += 1
+        return Response("not-json" if calls == 1 else '{"summary":"repaired"}')
+
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "groq")
+    monkeypatch.setenv("MDARIX_GENAI_API_KEY", "test-key")
+    monkeypatch.setenv("MDARIX_GENAI_MODEL", "openai/gpt-oss-120b")
+    monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(provider_module.time, "sleep", lambda seconds: None)
+
+    result = provider_module.GenAIProvider(max_retries=1).complete("Return JSON", {}, json_output=True)
+
+    assert calls == 2
+    assert json.loads(result.output["answer"]) == {"summary": "repaired"}

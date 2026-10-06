@@ -6,8 +6,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 POLICY_VERSION = "MDARIX_AI_TRUST_POLICY_R1_V1"
-SUITE_VERSION = "MDARIX_R1_GOLDEN_SUITE_V1"
-DATASET_VERSION = "MDARIX_R1_GOLDEN_DATASET_V1"
+SUITE_VERSION = "MDARIX_R1_GOLDEN_SUITE_V2"
+DATASET_VERSION = "r1-ai-golden-v2"
 SCENARIO_IDS = [f"VS{i:03d}" for i in range(1, 13)]
 ROOT = Path(__file__).parent
 

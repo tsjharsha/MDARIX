@@ -9,7 +9,7 @@ const PLATFORM_ADMIN_EMAIL = process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "r1-user-01
 // A business user (non-admin) for the investigation workflows.
 const INVESTIGATOR_EMAIL = process.env.E2E_INVESTIGATOR_EMAIL ?? "r1-user-17@synthetic.invalid";
 // A Customer Administrator in a second tenant (Tenant B).
-const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "";
+const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "r1-user-06@synthetic.invalid";
 
 async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
@@ -219,16 +219,28 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated Customer Admin workflow and screenshot", async ({ page }, testInfo) => {
-    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
+    test.setTimeout(90_000);
     await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/customer-admin");
     await expect(page.locator("body")).not.toContainText("Checking your session");
     await expect(page.locator("body")).toContainText(/customer administration/i);
+    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+    const sidewaysOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(sidewaysOverflow).toBe(0);
+    const firstControl = page.locator("a:visible,button:visible,input:visible,select:visible,textarea:visible").first();
+    await expect(firstControl).toBeVisible();
+    await firstControl.focus();
+    await expect(firstControl).toBeFocused();
+    await injectAxe(page);
+    const axeResults = await page.evaluate(async () => await (window as any).axe.run(document));
+    writeFileSync(`artifacts/axe-${testInfo.project.name}-customer-admin.json`, JSON.stringify(axeResults, null, 2));
+    expect(axeResults.violations.filter((item: any) => item.impact === "critical")).toEqual([]);
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-customer-admin.png`, fullPage: true });
   });
 
   test("Tenant A and Tenant B browser sessions cannot cross-read customer admin data", async ({ browser }) => {
-    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
     test.setTimeout(60_000);
     const tenantA = await browser.newPage();
     const tenantB = await browser.newPage();

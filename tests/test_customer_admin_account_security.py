@@ -421,4 +421,4 @@ def test_platform_actions_in_the_audit_trail_name_the_platform_not_the_person(wo
 def test_platform_administrators_still_see_platform_accounts():
     platform = authenticated_client()
     roles = {str(row["role"]).upper() for row in platform.get("/api/v1/admin/identity/users").json()}
-    assert "ADMINISTRATOR" in roles
+    assert "PLATFORM_ADMIN" in roles

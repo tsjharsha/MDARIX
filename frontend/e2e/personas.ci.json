@@ -1,5 +1,5 @@
 {
-  "_comment": "Deep-crawl accounts for CI: the synthetic fixture users from scripts/provision_day35_fixture.py. No password here; the run supplies E2E_PASSWORD. The form flows need seeded products and a Customer Administrator, which the CI fixture does not have, so they are skipped.",
+  "_comment": "Required deep-crawl accounts from scripts/provision_day35_fixture.py. No password is committed; the run supplies E2E_PASSWORD.",
   "personas": [
     {
       "name": "Platform administrator",
@@ -10,6 +10,15 @@
       "name": "Investigator",
       "email": "r1-user-17@synthetic.invalid",
       "console": "workspace"
+    },
+    {
+      "name": "Customer administrator",
+      "email": "r1-user-06@synthetic.invalid",
+      "console": "customer"
     }
-  ]
+  ],
+  "flows": {
+    "invite_as": "Customer administrator",
+    "open_case_as": "Investigator"
+  }
 }

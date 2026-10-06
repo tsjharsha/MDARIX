@@ -72,5 +72,8 @@ def test_the_production_template_names_every_required_setting():
         "MDARIX_MALWARE_SCANNER_COMMAND",
         "MDARIX_OBJECT_STORAGE_BUCKET",
     }
+    # config_check inspects every MDARIX_DATA_PLANE_*_OWNER variable dynamically;
+    # ``MDARIX_DATA_PLANE_`` is a prefix, not a setting that can appear in an env file.
+    required = {name for name in required if name not in DYNAMIC_PREFIXES}
     missing = sorted(name for name in required if f"{name}=" not in template)
     assert not missing, "Add to .env.production.example: " + ", ".join(missing)

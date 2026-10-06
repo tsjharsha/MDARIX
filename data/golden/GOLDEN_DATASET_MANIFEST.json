@@ -1,5 +1,5 @@
 {
-  "canonical_sha256": "0e9323ba2c83f7688eece6dff838dde20334909c6981c87459644d18fb9465e4",
+  "canonical_sha256": "89ee28b95e6c533a929acd6cc7a6f49425e4c03941644379726737febae0c2ca",
   "counts": {
     "changes": 16,
     "complaints": 120,
@@ -22,7 +22,7 @@
     "suppliers": 5,
     "unknowns": 3
   },
-  "dataset_version": "r1-day3-golden-v1",
+  "dataset_version": "r1-ai-golden-v2",
   "deterministic_seed": 31003,
   "fictional_company": "AcmeCare Instruments",
   "layers": {

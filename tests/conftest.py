@@ -102,6 +102,7 @@ DB_MODULES = {
     "test_audit_hash_chain",
     "test_connector_sync",
     "test_tenant_data",
+    "test_role_canonicalization",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
@@ -209,7 +210,7 @@ def _ensure_legacy_user(db, tenant):
             display_name="Legacy Test Auth",
             company="Test",
             password_hash=_hash("LegacyTestPassword123!"),
-            role="Administrator",
+            role="PLATFORM_ADMIN",
             status="ACTIVE",
             email_verified=True,
             created_at=now,

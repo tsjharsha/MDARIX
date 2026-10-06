@@ -10,6 +10,25 @@ concurrency:
   group: mdarix-r1-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  ai-golden-qualification:
+    name: AI golden dataset qualification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Enforce qualified dataset lock
+        run: python scripts/qualify_ai_golden_dataset.py
+      - name: Run qualification regression tests
+        run: python -m unittest tests.test_ai_golden_qualification
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdarix-ai-golden-qualification
+          path: artifacts/ai-golden-dataset-qualification.json
+          if-no-files-found: error
   backend:
     runs-on: ubuntu-latest
     env:
@@ -55,6 +74,8 @@ jobs:
           key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
       - name: Apply complete schema and runtime hardening
         run: alembic upgrade head
+      - name: Verify ORM metadata and migrations have no schema drift
+        run: alembic check
       - name: Give the runtime role a login
         run: python scripts/configure_runtime_role.py
       - name: Seed deterministic test identities
@@ -120,6 +141,10 @@ jobs:
         run: python scripts/provision_day35_fixture.py
       - name: Plane migration, routing, schema gate, export and deletion
         run: python -m pytest -q tests/test_dedicated_plane.py
+      - name: Verify dedicated data-plane schema drift
+        env:
+          MDARIX_MIGRATION_DATABASE_URL: ${{ env.MDARIX_TEST_DATA_PLANE_URL }}
+        run: alembic check
 
   production-mode:
     name: Production mode
@@ -276,6 +301,7 @@ jobs:
           # The Chromium installed above, not a system Chrome that varies by runner image.
           PLAYWRIGHT_CHANNEL: chromium
           E2E_PASSWORD: ${{ env.DAY35_FIXTURE_PASSWORD }}
+          E2E_CUSTOMER_ADMIN_EMAIL: r1-user-06@synthetic.invalid
           # Every screen, tab and safe button for a platform administrator and an investigator.
           E2E_DEEP_PERSONAS: e2e/personas.ci.json
           E2E_DEEP_REPORT: ../artifacts/deep-crawl.json
@@ -410,6 +436,7 @@ jobs:
         image-scan,
         security,
         integration,
+        ai-golden-qualification,
       ]
     if: always()
     steps:
@@ -426,6 +453,7 @@ jobs:
           test "${{ needs.container-validation.result }}" = success
           test "${{ needs.security.result }}" = success
           test "${{ needs.integration.result }}" = success
+          test "${{ needs.ai-golden-qualification.result }}" = success
       - name: Publish workflow summary
         shell: bash
         run: |
@@ -434,5 +462,6 @@ jobs:
             echo '- Backend tests, migrations, dependency checks, and compose validation: passed'
             echo '- Frontend tests, audit, and production build: passed'
             echo '- Worker and simulator container builds: passed'
+            echo '- Qualified AI golden dataset lock and tamper gate: passed'
             echo '- Production deployment promotion and rollback remain environment-specific gates.'
           } >> "$GITHUB_STEP_SUMMARY"

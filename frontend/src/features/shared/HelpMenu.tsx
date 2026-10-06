@@ -35,6 +35,7 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
       <button
         type="button"
         className="ac-secondary"
+        aria-label={open ? "Close help menu" : "Open help menu"}
         aria-expanded={open}
         aria-controls="help-menu-list"
         onClick={() => setOpen((value) => !value)}

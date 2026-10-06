@@ -45,6 +45,8 @@ EXEMPT = {
     ("POST", "/api/v1/public/demo-requests"): "public website form; stores contact details only, rate limited",
     ("POST", "/api/v1/trial/feedback"): "the trial user's own feedback; trial workspaces only, checked in the route",
     ("POST", "/api/v1/trial/feedback/{feedback_id}/withdraw-consent"): "the user's own feedback only",
+    ("POST", "/api/v1/client-errors"): "public error-boundary telemetry; size bounded and rate limited by source",
+    ("POST", "/api/v1/support/problems"): "authenticated user's own tenant-scoped support report",
 }
 
 

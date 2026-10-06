@@ -50,6 +50,17 @@ SENSITIVE = re.compile(r"(?i)(password|token|secret|cookie|authorization|api[_-]
 logger = logging.getLogger(__name__)
 
 
+class InvalidStructuredOutput(ValueError):
+    """A provider returned an empty or non-JSON response to a structured request."""
+
+
+STRICT_JSON_SCHEMA_MODELS = {
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+}
+
+
 class GenAIUnavailable(RuntimeError):
     pass
 
@@ -162,6 +173,7 @@ class GenAIProvider:
         *,
         system: str | None = None,
         json_output: bool = False,
+        response_schema: dict | None = None,
         max_output_tokens: int | None = None,
     ) -> GenAIResult:
         """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request."""
@@ -220,6 +232,7 @@ class GenAIProvider:
                     safe_context,
                     system=system,
                     json_output=json_output,
+                    response_schema=response_schema,
                     max_output_tokens=max_output_tokens,
                     input_tokens=input_tokens,
                     started=started,
@@ -239,6 +252,7 @@ class GenAIProvider:
         *,
         system: str | None,
         json_output: bool,
+        response_schema: dict | None,
         max_output_tokens: int | None,
         input_tokens: int,
         started: float,
@@ -255,12 +269,28 @@ class GenAIProvider:
                         "content": safe_prompt + "\n\nAuthorized context:\n" + json.dumps(safe_context, default=str),
                     }
                 ],
-                "max_tokens": max_output_tokens or self.max_output,
                 "temperature": 0,
             }
+            if self.provider_name == "groq":
+                body["max_completion_tokens"] = max_output_tokens or self.max_output
+            else:
+                body["max_tokens"] = max_output_tokens or self.max_output
             if system:
                 body["messages"].insert(0, {"role": "system", "content": system})
-            if json_output:
+            if response_schema and self.provider_name == "groq" and self.model in STRICT_JSON_SCHEMA_MODELS:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "mdarix_investigation_analysis",
+                        "strict": True,
+                        "schema": response_schema,
+                    },
+                }
+                # GPT-OSS can spend the entire completion budget on reasoning. Low, hidden reasoning leaves a
+                # deterministic structured answer while retaining enough analysis for this evidence-review task.
+                body["reasoning_effort"] = "low"
+                body["reasoning_format"] = "hidden"
+            elif json_output:
                 body["response_format"] = {"type": "json_object"}
             payload = json.dumps(body).encode()
         else:
@@ -290,6 +320,15 @@ class GenAIProvider:
                 else:
                     answer = raw.get("answer", raw.get("output", raw.get("text")))
                     output_tokens = min(self.max_output, max(1, len(str(answer or "")) // 4))
+                if json_output:
+                    if not isinstance(answer, str) or not answer.strip():
+                        raise InvalidStructuredOutput("empty structured response")
+                    try:
+                        structured = json.loads(answer)
+                    except (TypeError, ValueError) as exc:
+                        raise InvalidStructuredOutput("invalid structured response") from exc
+                    if not isinstance(structured, dict):
+                        raise InvalidStructuredOutput("structured response is not an object")
                 output = {
                     "answer": answer,
                     "limitations": ["Provider output requires human review."],
@@ -317,7 +356,7 @@ class GenAIProvider:
                     status,
                     type(exc).__name__,
                 )
-                if fail_fast and status == 429:
+                if fail_fast and status == 429 and not json_output:
                     _rest(
                         self.provider_name,
                         float(os.getenv("MDARIX_GENAI_RATE_LIMIT_REST_SECONDS", "900")),

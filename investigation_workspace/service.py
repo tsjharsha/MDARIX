@@ -179,11 +179,6 @@ class InvestigationWorkspaceService:
     def _investigation_evidence_query(
         self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, temporal_mode: str, as_of: datetime | None
     ):
-        source_identifier = (
-            db.query(Investigation.source_identifier)
-            .filter(Investigation.tenant_id == tenant_id, Investigation.id == investigation_id)
-            .scalar()
-        )
         q = db.query(Evidence).filter(Evidence.tenant_id == tenant_id)
         q = q.filter(
             or_(
@@ -195,15 +190,6 @@ class InvestigationWorkspaceService:
                     )
                     .bindparams(tenant_id=tenant_id, investigation_id=investigation_id)
                     .columns(evidence_id=Evidence.id.type)
-                ),
-                Evidence.evidence_identifier.in_(
-                    text(
-                        "SELECT raw_payload->>'evidence_id' FROM staged_source_records "
-                        "WHERE tenant_id=:tenant_id AND record_type='evidence_metadata' "
-                        "AND raw_payload->>'investigation_id'=:source_identifier"
-                    )
-                    .bindparams(tenant_id=tenant_id, source_identifier=source_identifier or "")
-                    .columns(evidence_identifier=Evidence.evidence_identifier.type)
                 ),
             )
         )

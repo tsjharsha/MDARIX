@@ -99,6 +99,7 @@ def main() -> int:
                 db.flush()
             elif reset_existing:
                 user.password_hash = _hash(password)
+                user.role = fixture.role
                 user.status = "ACTIVE"
                 user.email_verified = True
                 user.updated_at = now

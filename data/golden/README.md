@@ -8,7 +8,7 @@ This dataset is an evaluation asset for MDARIX R1. It is designed to test whethe
 
 ## Dataset Version
 
-`r1-day3-golden-v1`
+`r1-ai-golden-v2`
 
 The dataset is generated deterministically with seed `31003`.
 

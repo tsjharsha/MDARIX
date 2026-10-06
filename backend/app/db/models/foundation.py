@@ -15,10 +15,11 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 from sqlalchemy.types import UserDefinedType
 
 from backend.app.db.base import Base
+from backend.app.role_codes import canonical_stored_role
 
 
 class Vector(UserDefinedType):
@@ -542,7 +543,7 @@ class AuditEvent(Base):
     old_values: Mapped[dict | None] = mapped_column(JSONB)
     new_values: Mapped[dict | None] = mapped_column(JSONB)
     # Set by the database when the row is inserted (migration md18); anything the application sets is replaced.
-    chain_seq: Mapped[int | None] = mapped_column(BigInteger)
+    chain_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
     previous_hash: Mapped[str | None] = mapped_column(String(64))
     event_hash: Mapped[str | None] = mapped_column(String(64))
     retention_until = tz(True)
@@ -639,7 +640,7 @@ class EvaluationRun(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False)
     results: Mapped[dict] = mapped_column(JSONB, nullable=False)
     started_at = tz(False)
-    completed_at = tz(False)
+    completed_at = tz()
     created_at = tz(False)
     __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_evaluation_runs_tenant_id_id"),)
 
@@ -690,9 +691,18 @@ class AuthUser(Base):
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (
-        UniqueConstraint("tenant_id", "username", name="uq_auth_users_tenant_username"),
         UniqueConstraint("tenant_id", "id", name="uq_auth_users_tenant_id_id"),
+        CheckConstraint(
+            "upper(replace(replace(btrim(role), ' ', '_'), '-', '_')) not in "
+            "('PLATFORM_ADMIN','MDARIX_ADMINISTRATOR','ADMINISTRATOR','ADMIN','CUSTOMER_ADMIN',"
+            "'CUSTOMER_ADMINISTRATOR') or role in ('PLATFORM_ADMIN','CUSTOMER_ADMIN')",
+            name="auth_user_administrator_role_canonical",
+        ),
     )
+
+    @validates("role")
+    def _canonicalize_role(self, _key: str, value: str) -> str:
+        return canonical_stored_role(value)
 
 
 class TenantMembership(Base):

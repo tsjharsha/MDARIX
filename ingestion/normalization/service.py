@@ -155,9 +155,19 @@ class NormalizationService:
             records = (
                 conn.execute(
                     text(
+                        "WITH latest_records AS ("
+                        "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
+                        "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version, "
+                        "source_row_index, row_number() OVER ("
+                        "PARTITION BY source_system, record_type, "
+                        "CASE WHEN record_type='evidence_metadata' "
+                        "THEN COALESCE(raw_payload->>'evidence_id', source_record_id) ELSE source_record_id END "
+                        "ORDER BY ingestion_timestamp DESC, created_at DESC, id DESC"
+                        ") AS source_revision_rank "
+                        "FROM staged_source_records WHERE tenant_id=:tenant_id) "
                         "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
                         "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version "
-                        "FROM staged_source_records WHERE tenant_id=:tenant_id ORDER BY CASE record_type "
+                        "FROM latest_records WHERE source_revision_rank=1 ORDER BY CASE record_type "
                         "WHEN 'product' THEN 1 WHEN 'product_version' THEN 2 WHEN 'supplier' THEN 3 WHEN 'manufacturing_site' THEN 4 "
                         "WHEN 'component' THEN 5 WHEN 'lot' THEN 6 WHEN 'requirement' THEN 7 WHEN 'change' THEN 8 "
                         "WHEN 'risk' THEN 9 WHEN 'failure_mode' THEN 10 WHEN 'control' THEN 11 WHEN 'investigation' THEN 12 "
@@ -803,7 +813,15 @@ class NormalizationService:
             text(
                 "INSERT INTO evidence (tenant_id, evidence_identifier, investigation_id, evidence_type, title, source_reference, document_ref, reliability_status, fact_type, content, source_system, source_identifier, source_timestamp, recorded_timestamp, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :identifier, :investigation_id, :type, :title, :source_ref, :document_ref, :quality, 'source_fact', :content, :source_system, :source_identifier, :source_ts, :recorded_ts, :ingestion_ts, :now, :now) "
-                "ON CONFLICT (tenant_id, evidence_identifier) DO UPDATE SET content=EXCLUDED.content, updated_at=EXCLUDED.updated_at RETURNING id"
+                "ON CONFLICT (tenant_id, evidence_identifier) DO UPDATE SET "
+                "investigation_id=COALESCE(EXCLUDED.investigation_id, evidence.investigation_id), "
+                "evidence_type=EXCLUDED.evidence_type, title=EXCLUDED.title, "
+                "source_reference=EXCLUDED.source_reference, document_ref=EXCLUDED.document_ref, "
+                "reliability_status=EXCLUDED.reliability_status, fact_type=EXCLUDED.fact_type, "
+                "content=EXCLUDED.content, source_system=EXCLUDED.source_system, "
+                "source_identifier=EXCLUDED.source_identifier, source_timestamp=EXCLUDED.source_timestamp, "
+                "recorded_timestamp=EXCLUDED.recorded_timestamp, ingestion_timestamp=EXCLUDED.ingestion_timestamp, "
+                "updated_at=EXCLUDED.updated_at RETURNING id"
             ),
             {
                 "tenant_id": tenant_id,

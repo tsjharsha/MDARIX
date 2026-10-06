@@ -6,7 +6,7 @@ import shutil
 from datetime import date, timedelta
 from pathlib import Path
 
-DATASET_VERSION = "r1-day3-golden-v1"
+DATASET_VERSION = "r1-ai-golden-v2"
 SEED = 31003
 NOTICE = "MDARIX R1 GOLDEN DATASET - SYNTHETIC TEST DATA ONLY. NOT FOR CLINICAL OR REGULATORY USE."
 ROOT = Path(__file__).resolve().parents[3]
@@ -582,6 +582,46 @@ def make_evidence() -> list[dict]:
             "Packaging label changed near complaint increase but has no electrical mechanism.",
         ),
         (
+            "EV-VS003-001",
+            "investigation_note",
+            "Required comparative test unavailable",
+            "investigation_note",
+            "uncertain",
+            "The controlled Rev A versus Rev B comparative test is unavailable.",
+        ),
+        (
+            "EV-VS004-001",
+            "complaint_history",
+            "Historical shutdowns before Rev B",
+            "qms_records",
+            "higher",
+            "Shutdown complaints were recorded before Component Rev B was introduced.",
+        ),
+        (
+            "EV-VS004-002",
+            "validation_report",
+            "Rev B qualification acceptance",
+            "approved_validation_report",
+            "higher",
+            "Rev B qualification met the documented acceptance criteria.",
+        ),
+        (
+            "EV-VS005-001",
+            "manufacturing_record",
+            "Late lot genealogy",
+            "controlled_manufacturing_record",
+            "uncertain",
+            "Lot genealogy was ingested after the initial closure decision.",
+        ),
+        (
+            "EV-VS006-001",
+            "bom_extract",
+            "Shared power-module exposure",
+            "controlled_plm_extract",
+            "higher",
+            "AsterFlow Rev C and Rev D share the Power Regulation Module.",
+        ),
+        (
             "EV-VS007-001",
             "investigation_note",
             "Closure rationale with unresolved contradiction",
@@ -590,12 +630,44 @@ def make_evidence() -> list[dict]:
             "Historical closure did not address pre-Rev B complaints.",
         ),
         (
+            "EV-VS008-001",
+            "process_control_record",
+            "Process control acceptance record",
+            "approved_process_record",
+            "higher",
+            "The sampled process-control result remained within its acceptance limit.",
+        ),
+        (
+            "EV-VS009-001",
+            "counterfactual_note",
+            "Counterfactual baseline limitation",
+            "investigation_note",
+            "uncertain",
+            "The baseline lacks a controlled matched comparator.",
+        ),
+        (
             "EV-VS010-001",
             "ai_run_metadata",
             "AI model change comparison fixture",
             "evaluation_fixture",
             "higher",
             "Same evidence packet evaluated under two model metadata records.",
+        ),
+        (
+            "EV-VS011-001",
+            "service_observation",
+            "Connector intermittency subset",
+            "controlled_service_record",
+            "higher",
+            "A subset of shutdown complaints aligns with connector intermittency.",
+        ),
+        (
+            "EV-VS012-001",
+            "field_record",
+            "Field operating condition missing",
+            "field_note",
+            "uncertain",
+            "The operating condition required to assess the event was not recorded.",
         ),
     ]
     while len(specs) < 38:
@@ -618,7 +690,11 @@ def make_evidence() -> list[dict]:
         evidence.append(
             {
                 "evidence_id": eid,
-                "investigation_id": "INV-001" if "VS001" in eid else f"INV-{((idx - 1) % 10) + 1:03d}",
+                "investigation_id": (
+                    f"INV-{min(int(eid[5:8]), 10):03d}"
+                    if eid.startswith("EV-VS")
+                    else f"INV-{((idx - 1) % 10) + 1:03d}"
+                ),
                 "evidence_type": etype,
                 "title": title,
                 "source": source,
@@ -648,28 +724,116 @@ def make_scenarios() -> list[dict]:
         "VS011": "Multiple Causes",
         "VS012": "Correct Abstention",
     }
+    expectations = {
+        "VS001": {
+            "evidence": ["EV-VS001-001", "EV-VS001-002", "EV-VS001-003", "EV-VS001-004"],
+            "contradictions": ["Pre-Rev B shutdown complaints", "Rev B validation passed"],
+            "unknowns": ["Comparative Rev A vs Rev B testing unavailable"],
+            "prohibited": ["Component Rev B definitively caused all shutdowns.", "All Rev D devices are affected."],
+            "anomalies": ["ANOM-LOT-001", "ANOM-TIME-001"],
+        },
+        "VS002": {
+            "evidence": ["EV-VS002-001"],
+            "contradictions": ["Packaging label change has no electrical mechanism"],
+            "unknowns": ["No causal mechanism links the label to shutdowns"],
+            "prohibited": ["The packaging label change caused the shutdown increase."],
+            "anomalies": ["ANOM-FALSE-001"],
+        },
+        "VS003": {
+            "evidence": ["EV-VS003-001"],
+            "contradictions": [],
+            "unknowns": ["Comparative Rev A versus Rev B testing unavailable"],
+            "prohibited": ["The available evidence is complete."],
+            "anomalies": ["ANOM-LOT-001"],
+        },
+        "VS004": {
+            "evidence": ["EV-VS004-001", "EV-VS004-002"],
+            "contradictions": [
+                "Shutdown complaints existed before Rev B",
+                "Rev B qualification met acceptance criteria",
+            ],
+            "unknowns": ["The conflicting records do not establish a single cause"],
+            "prohibited": ["Rev B qualification proves there is no product issue."],
+            "anomalies": ["ANOM-FALSE-001"],
+        },
+        "VS005": {
+            "evidence": ["EV-VS005-001"],
+            "contradictions": ["Lot genealogy arrived after the initial closure"],
+            "unknowns": ["The original decision did not include late evidence"],
+            "prohibited": ["The original closure considered all available evidence."],
+            "anomalies": ["ANOM-TIME-001", "ANOM-DATE-001"],
+        },
+        "VS006": {
+            "evidence": ["EV-VS006-001"],
+            "contradictions": [],
+            "unknowns": ["Shared component exposure does not establish defect or causality"],
+            "prohibited": ["Every product sharing the component is affected."],
+            "anomalies": ["ANOM-LOT-001"],
+        },
+        "VS007": {
+            "evidence": ["EV-VS007-001"],
+            "contradictions": ["Closure rationale omitted pre-Rev B complaints"],
+            "unknowns": ["Unresolved contradiction requires review before closure"],
+            "prohibited": ["The investigation was ready for final closure."],
+            "anomalies": ["ANOM-TIME-001"],
+        },
+        "VS008": {
+            "evidence": ["EV-VS008-001"],
+            "contradictions": ["Complaint trend persists despite an accepted process-control sample"],
+            "unknowns": ["A passing sample does not establish continuous control"],
+            "prohibited": ["The passing process-control record rules out process contribution."],
+            "anomalies": ["ANOM-MULTI-001"],
+        },
+        "VS009": {
+            "evidence": ["EV-VS009-001"],
+            "contradictions": [],
+            "unknowns": ["No controlled matched comparator is available"],
+            "prohibited": ["The counterfactual proves the outcome would not have occurred."],
+            "anomalies": ["ANOM-FALSE-001"],
+        },
+        "VS010": {
+            "evidence": ["EV-VS010-001"],
+            "contradictions": ["Model outputs must be compared against the same evidence packet"],
+            "unknowns": ["A model change alone does not establish improved correctness"],
+            "prohibited": ["The newer model is automatically more accurate."],
+            "anomalies": ["ANOM-ID-001"],
+        },
+        "VS011": {
+            "evidence": ["EV-VS011-001"],
+            "contradictions": ["Connector intermittency explains only a subset"],
+            "unknowns": ["Multiple mechanisms may explain different complaint subsets"],
+            "prohibited": ["A single mechanism caused every shutdown complaint."],
+            "anomalies": ["ANOM-MULTI-001"],
+        },
+        "VS012": {
+            "evidence": ["EV-VS012-001"],
+            "contradictions": [],
+            "unknowns": ["Field operating condition not recorded"],
+            "prohibited": ["A root cause can be concluded despite the missing field condition."],
+            "anomalies": ["ANOM-LOT-001"],
+        },
+    }
     scenarios = []
     for idx, sid in enumerate(titles, 1):
+        expected = expectations[sid]
         scenarios.append(
             {
                 "scenario_id": sid,
                 "title": titles[sid],
                 "investigation_id": f"INV-{min(idx, 10):03d}",
                 "purpose": f"Evaluate {titles[sid].lower()} behavior.",
-                "expected_system_behavior": "Use evidence, contradictions, unknowns, and abstention where warranted.",
-                "prohibited_conclusions": [
-                    "Component Rev B definitively caused all shutdowns.",
-                    "All Rev D devices are affected.",
-                    "Correlation alone establishes causality.",
-                ]
-                if sid == "VS001"
-                else ["Do not claim certainty without evidence."],
-                "expected_unknowns": ["Comparative Rev A vs Rev B testing unavailable"]
-                if sid in {"VS001", "VS003", "VS012"}
-                else [],
-                "expected_contradictions": ["Pre-Rev B shutdown complaints", "Rev B validation passed"]
-                if sid in {"VS001", "VS004"}
-                else [],
+                "expected_system_behavior": "Cite the required evidence, surface the defined contradictions and unknowns, avoid the prohibited conclusion, and require human review.",
+                "expected_evidence": expected["evidence"],
+                "prohibited_conclusions": expected["prohibited"],
+                "expected_unknowns": expected["unknowns"],
+                "expected_contradictions": expected["contradictions"],
+                "intentional_anomalies": expected["anomalies"],
+                "acceptance_criteria": [
+                    "All expected evidence identifiers are cited and authorized for the investigation.",
+                    "All defined contradictions and unknowns are explicitly surfaced.",
+                    "No prohibited conclusion, causal certainty, or regulatory decision is asserted.",
+                    "The output remains advisory and requires human review.",
+                ],
             }
         )
     return scenarios
@@ -805,7 +969,7 @@ def write_ground_truth(scenarios, anomalies, aliases):
                 "evaluation_only": True,
                 **scenario,
                 "hidden_ground_truth": "Evaluation-only. Not application-facing.",
-                "intentional_anomalies": [a["anomaly_id"] for a in anomalies],
+                "intentional_anomalies": scenario["intentional_anomalies"],
             },
         )
     write_json(GROUND / "identity_resolution_map.json", {"notice": NOTICE, "evaluation_only": True, "aliases": aliases})

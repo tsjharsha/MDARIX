@@ -40,7 +40,10 @@ def test_personal_information_is_masked_and_investigation_facts_are_kept():
         "192.168.1.20",
     ):
         assert secret not in masked
-    assert "L24-0815" in masked and "2026-10-03" in masked
+    # A product lot is normally investigation context, but this one appears in the same
+    # sentence as a named reviewer.  The approved privacy policy therefore masks the
+    # potentially identifying person/lot pair while retaining the event date.
+    assert "L24-0815" not in masked and "[LOT]" in masked and "2026-10-03" in masked
 
 
 def test_clinical_and_product_wording_is_not_mistaken_for_personal_data():
@@ -105,20 +108,31 @@ def groq(monkeypatch):
 
 @pytest.fixture
 def tenant():
-    """The synthetic tenant, with its AI switch and budget restored afterwards."""
+    """An explicitly AI-enabled tenant whose original policy is restored afterwards.
+
+    The shared fixture is deliberately conservative and may have AI disabled.  Provider,
+    usage and budget tests must opt in rather than depending on whichever policy another
+    test or seed script left behind.
+    """
     db = SessionLocal()
     bind_system(db, "test")
     row = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
+    tenant_id = row.id
     saved = (row.ai_processing_allowed, row.ai_monthly_token_budget)
-    db.close()
-    yield row.id
-    db = SessionLocal()
-    bind_system(db, "test")
-    db.query(Tenant).filter(Tenant.id == row.id).update(
-        {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1]}
-    )
+    row.ai_processing_allowed = True
+    row.ai_monthly_token_budget = None
     db.commit()
     db.close()
+    try:
+        yield tenant_id
+    finally:
+        db = SessionLocal()
+        bind_system(db, "test")
+        db.query(Tenant).filter(Tenant.id == tenant_id).update(
+            {"ai_processing_allowed": saved[0], "ai_monthly_token_budget": saved[1]}
+        )
+        db.commit()
+        db.close()
 
 
 def _set(tenant_id, **values):

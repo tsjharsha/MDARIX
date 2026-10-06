@@ -71,6 +71,10 @@ first customer from Platform Admin > Customers & Tenants > Onboarding.
 
 ## 3. Upgrading
 
+The normal CI release-evidence gate first verifies the reviewed AI golden-dataset lock. Any source, scenario, or
+ground-truth change invalidates that lock and blocks release until the controlled-change procedure in
+`docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md` is completed.
+
 Before promoting a release that changes AI behaviour (prompts, providers, models, retrieval), run **Actions > AI
 evaluation gate > Run workflow** with the contracted provider. It needs the `MDARIX_EVALUATION_API_KEY` repository
 secret and fails unless every golden scenario passes with model-written analyses

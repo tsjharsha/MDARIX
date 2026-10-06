@@ -77,6 +77,28 @@ def test_a_rate_limited_primary_hands_over_to_the_next_free_provider_at_once(mon
     assert [host for host, _ in calls] == ["cerebras"]
 
 
+def test_a_structured_request_retries_rate_limited_primary_before_provider_fallback(monkeypatch):
+    attempts = 0
+    calls = []
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        host = "groq" if "groq" in request.full_url else "cerebras"
+        calls.append(host)
+        if host == "groq":
+            attempts += 1
+            if attempts == 1:
+                raise _rate_limited(request.full_url)
+            return _Response('{"summary":"primary recovered"}')
+        return _Response('{"summary":"fallback"}')
+
+    monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
+    result = GenAIProvider(max_retries=1).complete("Analyse", {}, json_output=True)
+
+    assert result.provider == "groq"
+    assert calls == ["groq", "groq"]
+
+
 def test_a_provider_that_is_down_is_skipped_too(monkeypatch):
     calls = _route(monkeypatch, {"groq": "down", "cerebras": "down", "generativelanguage": "ok"})
     result = GenAIProvider().complete("Summarize", {})

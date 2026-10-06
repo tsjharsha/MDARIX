@@ -493,7 +493,9 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         raise HTTPException(
             404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer / Tenant ID is not an active tenant UUID"}
         )
-    role = payload.role.strip().upper()
+    from backend.app.role_codes import canonical_stored_role
+
+    role = canonical_stored_role(payload.role)
     _guard_user_administration(admin, new_role=role)
     _ensure_known_role(db, target_tenant_id, role)
     if role == "PLATFORM_ADMIN" and not _is_platform_admin(admin):

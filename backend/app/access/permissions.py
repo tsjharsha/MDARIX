@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.models.foundation import AuthUser, RoleAssignment, RoleDefinition
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.role_codes import CUSTOMER_ADMIN, PLATFORM_ADMIN, role_code
 
 RECORDS_WRITE = "records.write"
 AI_RUN = "ai.run"
@@ -31,18 +32,16 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "APPROVER": _WORK | {REGULATORY_APPROVE},
     "LEADER": ALL,
     # Platform administrators (MDARIX staff) keep full access to their own tenant's records.
-    "ADMINISTRATOR": ALL,
-    "ADMIN": ALL,
-    "MDARIX_ADMINISTRATOR": ALL,
-    "PLATFORM_ADMIN": ALL,
+    PLATFORM_ADMIN: ALL,
     # Customer administrators manage people and settings, not investigations.
-    "CUSTOMER_ADMIN": frozenset({DATA_EXPORT}),
+    CUSTOMER_ADMIN: frozenset({DATA_EXPORT}),
 }
 
 
 def normalize_role(role: str | None) -> str:
-    """'Approver', 'APPROVER' and 'approver ' are the same role everywhere roles are compared."""
-    return "_".join(str(role or "").strip().upper().replace("-", " ").split())
+    """Normalize role comparisons and map legacy administrator aliases."""
+
+    return role_code(role)
 
 
 _normalize = normalize_role  # original name, kept for existing imports

@@ -2,7 +2,7 @@
 
 ## Status
 
-IMPLEMENTED as `r1-day3-golden-v1` synthetic Golden Dataset foundation.
+IMPLEMENTED and qualified for internal MVP assurance as `r1-ai-golden-v2`.
 
 Ground Truth is stored under `evaluation/ground_truth/`. Application-facing canonical data under `data/golden/canonical/` intentionally excludes hidden answers, prohibited conclusions, and expected conclusions.
 

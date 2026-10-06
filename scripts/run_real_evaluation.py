@@ -29,6 +29,12 @@ from evaluation.real_pipeline import record_run, run_real_golden_suite  # noqa: 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--pause", type=float, default=0.0, help="seconds between scenarios (provider rate limits)")
+    parser.add_argument(
+        "--scenario",
+        action="append",
+        dest="scenarios",
+        help="run only this scenario ID; repeat for more than one (for example --scenario VS007)",
+    )
     parser.add_argument("--out", default=str(ROOT / "artifacts" / "real-golden-evaluation.json"))
     parser.add_argument("--record", action="store_true", help="save the run for the Trust page")
     parser.add_argument("--gate", action="store_true", help="exit 1 when the run does not meet the release bar")
@@ -38,7 +44,11 @@ def main() -> int:
     started = datetime.now(timezone.utc)
     db = SessionLocal()
     try:
-        report = run_real_golden_suite(db, pause_seconds=args.pause)
+        report = run_real_golden_suite(
+            db,
+            pause_seconds=args.pause,
+            scenario_ids={item.upper() for item in args.scenarios} if args.scenarios else None,
+        )
         report["generated_at"] = datetime.now(timezone.utc).isoformat()
         if args.record:
             db.rollback()  # the pipeline saved nothing; start the recording cleanly

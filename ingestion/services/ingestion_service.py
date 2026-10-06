@@ -389,11 +389,13 @@ class IngestionService:
             "supplier_id",
             "site_id",
             "lot_id",
+            # Evidence metadata also contains an investigation_id. Its durable
+            # source identity is the evidence record, not its current owner.
+            "evidence_id",
             "investigation_id",
             "risk_id",
             "failure_mode_id",
             "control_id",
-            "evidence_id",
             "filename",
         ]:
             if raw.get(key):

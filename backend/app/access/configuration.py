@@ -636,12 +636,16 @@ def update_control_plane_resource(
             404, detail={"code": "RESOURCE_NOT_FOUND", "message": "Resource is not available for this tenant"}
         )
     if resource == "users":
+        from backend.app.role_codes import canonical_stored_role
+
         _guard_user_administration(
             admin,
             target=row,
             new_role=str(payload.values["role"]) if "role" in payload.values else None,
             changes_access=bool({"role", "status"} & set(payload.values)),
         )
+        if "role" in payload.values:
+            payload.values["role"] = canonical_stored_role(str(payload.values["role"]))
     if resource == "users" and "email" in payload.values:
         new_email = str(payload.values["email"]).strip().lower()
         if (

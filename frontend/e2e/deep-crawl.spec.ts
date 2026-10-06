@@ -15,6 +15,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const PERSONAS_FILE = process.env.E2E_DEEP_PERSONAS ?? "";
 const REPORT_FILE = process.env.E2E_DEEP_REPORT ?? "";
 const config = PERSONAS_FILE ? JSON.parse(readFileSync(PERSONAS_FILE, "utf-8")) : null;
+if (!config) throw new Error("E2E_DEEP_PERSONAS is required; the deep crawl must not be silently skipped.");
 
 // Buttons the crawler never presses: anything that changes data, access or the session.
 const UNSAFE =
@@ -187,9 +188,6 @@ async function crawl(page: Page, persona: any) {
 }
 
 test.describe("deep crawl of every screen", () => {
-  test.skip(!config, "Set E2E_DEEP_PERSONAS to run the deep crawl.");
-  // One desktop pass covers every screen; the mobile project would repeat the same crawl.
-  test.skip(({ isMobile }) => isMobile, "The deep crawl runs on desktop only.");
   // A control that never becomes ready is skipped after a few seconds instead of stalling the whole crawl.
   test.use({ actionTimeout: 5_000, navigationTimeout: 20_000 });
 
@@ -214,7 +212,7 @@ test.describe("deep crawl of every screen", () => {
   test("flow: a Customer Admin invites a user through the form", async ({ page }) => {
     test.setTimeout(120_000); // sign-in, the console and the users list load on a dev server
     const admin = config.personas.find((p: any) => p.name === config.flows?.invite_as);
-    test.skip(!admin, "No Customer Administrator persona is configured for the invite flow.");
+    expect(admin, "A Customer Administrator persona is required for the invite flow.").toBeTruthy();
     watch(page, admin.name, () => "invite flow");
     await signIn(page, admin);
     await page.goto("/app/customer-admin");
@@ -235,7 +233,7 @@ test.describe("deep crawl of every screen", () => {
 
   test("flow: an Investigator opens an investigation through the form", async ({ page }) => {
     const investigator = config.personas.find((p: any) => p.name === config.flows?.open_case_as);
-    test.skip(!investigator, "No Investigator persona is configured for the open-investigation flow.");
+    expect(investigator, "An Investigator persona is required for the open-investigation flow.").toBeTruthy();
     watch(page, investigator.name, () => "open-investigation flow");
     await signIn(page, investigator);
     await page.goto("/app");

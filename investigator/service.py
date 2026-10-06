@@ -38,6 +38,33 @@ def _is_policy_note(item: AnalysisItem) -> bool:
     )
 
 
+def _required_finding_context(items: list[AnalysisItem]) -> list[dict[str, object]]:
+    return [
+        {
+            "statement": item.statement,
+            "evidence": [
+                ref.evidence_identifier
+                for ref in item.source_references
+                if ref.reference_type == "EVIDENCE" and ref.evidence_identifier
+            ],
+            "source": "MDARIX_DETERMINISTIC_REVIEW",
+        }
+        for item in items
+    ]
+
+
+def _merge_required_findings(required: list[AnalysisItem], generated: list[AnalysisItem]) -> list[AnalysisItem]:
+    """Preserve deterministic findings even when a language model omits them."""
+    merged: list[AnalysisItem] = []
+    seen: set[str] = set()
+    for item in [*required, *generated]:
+        key = " ".join(item.statement.lower().split())
+        if key not in seen:
+            seen.add(key)
+            merged.append(item)
+    return merged
+
+
 class InvestigatorError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
@@ -227,7 +254,16 @@ class EvidenceGroundedInvestigatorService:
             )
             chunk_texts = {str(row.id): row.text_content or "" for row in rows}
         try:
-            model = self.model_provider.analyze(workspace, chunk_texts, request.investigator_question)
+            required_unknowns = [item for item in rules.missing_information if not _is_policy_note(item)]
+            model = self.model_provider.analyze(
+                workspace,
+                chunk_texts,
+                request.investigator_question,
+                required_findings={
+                    "contradictions": _required_finding_context(rules.contradictions),
+                    "unknowns": _required_finding_context(required_unknowns),
+                },
+            )
         except ModelAnalysisUnavailable as exc:
             return rules.model_copy(
                 update={
@@ -246,9 +282,11 @@ class EvidenceGroundedInvestigatorService:
                 "summary": model.summary,
                 "observations": model.sections["observations"],
                 "possible_explanations": model.sections["possible_explanations"],
-                "contradictions": model.sections["contradictions"],
-                "missing_information": [item for item in rules.missing_information if not _is_policy_note(item)]
-                + model.sections["missing_information"],
+                "contradictions": _merge_required_findings(rules.contradictions, model.sections["contradictions"]),
+                "missing_information": _merge_required_findings(
+                    [item for item in rules.missing_information if not _is_policy_note(item)],
+                    model.sections["missing_information"],
+                ),
                 "questions_to_investigate": model.sections["questions_to_investigate"],
                 "model_provenance": {
                     **rules.model_provenance,

@@ -1,0 +1,19 @@
+{
+  "change_control": "MVP-AI-GOLDEN-001",
+  "hashes": {
+    "canonical_sha256": "89ee28b95e6c533a929acd6cc7a6f49425e4c03941644379726737febae0c2ca",
+    "ground_truth_bundle_sha256": "4c17d82dd45f57a91ec081ee887897aa3544794c98721635e67a890b190fabef",
+    "scenario_index_sha256": "764559f26b0661e793356e79e64b47fe7df9dbd77d091cb405d0522741438bb6",
+    "source_bundle_sha256": "97e96dffb2c7097d28db18cb5cc7129108e94a49973cf1883389d105eac738fc"
+  },
+  "qualification_version": "MDARIX_AI_GOLDEN_QUALIFICATION_V1",
+  "qualified_at": "2026-10-05T08:45:29.620531+00:00",
+  "release_policy": {
+    "allowed_dataset_errors": 0,
+    "live_model_gate_required_for_model_promotion": true,
+    "required_scenarios": 12
+  },
+  "reviewer": "MDARIX Engineering",
+  "scope": "Synthetic internal MVP AI assurance; not clinical, regulatory, or production certification.",
+  "status": "QUALIFIED_FOR_INTERNAL_MVP"
+}

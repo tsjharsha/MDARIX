@@ -31,6 +31,7 @@ from backend.app.db.models.foundation import (
 from backend.app.access.schemas import CustomerProvisionRequest
 from backend.app.access.authz import _is_platform_admin, platform_account_clause
 from backend.app.runtime_env import is_development
+from backend.app.role_codes import is_customer_admin_role
 
 
 def _development_token(token: str | None) -> str | None:
@@ -176,7 +177,7 @@ def _seat_counts(db: Session, tenant_id: uuid.UUID) -> dict:
         )
         .all()
     )
-    admins = [user for user in users if (user.role or "").upper() == "CUSTOMER_ADMIN"]
+    admins = [user for user in users if is_customer_admin_role(user.role)]
     return {"allocated_users": len(users), "allocated_customer_admins": len(admins)}
 
 
@@ -196,7 +197,7 @@ def _enforce_invite_limits(db: Session, tenant_id: uuid.UUID, role: str):
                 "available": 0,
             },
         )
-    if role.strip().upper() == "CUSTOMER_ADMIN" and counts["allocated_customer_admins"] >= admin_limit:
+    if is_customer_admin_role(role) and counts["allocated_customer_admins"] >= admin_limit:
         raise HTTPException(
             409,
             detail={

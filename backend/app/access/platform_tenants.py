@@ -737,7 +737,7 @@ def list_platform_tenants(
             db.query(AuthUser)
             .filter(
                 AuthUser.tenant_id == row.id,
-                func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "ADMINISTRATOR", "ADMIN"]),
+                func.upper(AuthUser.role).in_(["CUSTOMER_ADMIN", "PLATFORM_ADMIN"]),
             )
             .order_by(AuthUser.created_at.asc())
             .first()

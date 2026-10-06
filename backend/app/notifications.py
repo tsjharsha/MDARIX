@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuthUser, Tenant
 from backend.app.db.models.stage2 import OutboxEvent, SubscriptionLifecycle
+from backend.app.role_codes import CUSTOMER_ADMIN_ALIASES
 
 logger = logging.getLogger("mdarix.notifications")
 TRIAL_STAGES = ("7_DAY", "1_DAY", "ENDED")
@@ -42,7 +43,9 @@ def customer_admin_emails(db: Session, tenant_id) -> list[str]:
     rows = (
         db.query(AuthUser.username)
         .filter(
-            AuthUser.tenant_id == tenant_id, normalized == "CUSTOMER_ADMIN", func.upper(AuthUser.status) == "ACTIVE"
+            AuthUser.tenant_id == tenant_id,
+            normalized.in_(sorted(CUSTOMER_ADMIN_ALIASES)),
+            func.upper(AuthUser.status) == "ACTIVE",
         )
         .all()
     )
