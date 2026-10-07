@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,6 +20,10 @@ from backend.app.runtime_env import PRODUCTION, environment, is_production_like
 
 # Values that only ever appear in templates and examples; a server that still shows one was never configured.
 PLACEHOLDER_MARKERS = ("example.com", "example.test", "changeme", "change-me", "change_me")
+# Text left for the lawyer in a legal document: the draft banner, or a [PLACEHOLDER] in square brackets (no lower-case
+# letters, so a Markdown link such as [Privacy policy](/privacy) or [text][ref] never matches).
+LEGAL_DRAFT_BANNER = re.compile(r"\bDRAFT\b")
+LEGAL_PLACEHOLDER = re.compile(r"\[(?=[^\]\n]*\S)[^\]\na-z]+\](?![(\[])")
 # A connector may reach a private address only when an operator has accepted that this removes the SSRF protection.
 CONNECTOR_HOSTS_ACKNOWLEDGEMENT = "MDARIX_CONNECTOR_ALLOWED_HOSTS_ACKNOWLEDGED"
 
@@ -270,6 +275,24 @@ def _legal_documents_problem() -> str | None:
     missing = [name for name in LEGAL_DOCUMENTS.values() if not (Path(folder) / name).is_file()]
     if missing:
         return f"MDARIX_LEGAL_DIR is missing {', '.join(missing)}"
+    # The approval flag alone would publish a draft: each document must also read as final.
+    unfinished = []
+    for name in LEGAL_DOCUMENTS.values():
+        try:
+            text = (Path(folder) / name).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            unfinished.append(f"{name} (cannot be read as UTF-8 text)")
+            continue
+        reasons = []
+        if LEGAL_DRAFT_BANNER.search(text):
+            reasons.append("the DRAFT banner")
+        placeholders = LEGAL_PLACEHOLDER.findall(text)
+        if placeholders:
+            reasons.append(f"{len(placeholders)} [PLACEHOLDER] text(s), first {placeholders[0][:40]}")
+        if reasons:
+            unfinished.append(f"{name} ({' and '.join(reasons)})")
+    if unfinished:
+        return f"Legal documents still hold draft text (publish the lawyer-approved wording): {'; '.join(unfinished)}"
     return None
 
 

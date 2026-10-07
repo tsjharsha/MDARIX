@@ -287,6 +287,57 @@ def test_private_connector_hosts_need_an_explicit_acknowledgement(production):
     assert "SSRF" not in found()
 
 
+# ------------------------------------------------------------------ legal documents
+
+
+def _write_legal(name: str, text: str) -> None:
+    from pathlib import Path
+
+    (Path(os.environ["MDARIX_LEGAL_DIR"]) / name).write_text(text, encoding="utf-8")
+
+
+def test_every_legal_document_must_be_present(production):
+    from pathlib import Path
+
+    (Path(os.environ["MDARIX_LEGAL_DIR"]) / "terms.md").unlink()
+    assert "MDARIX_LEGAL_DIR is missing terms.md" in found()
+
+
+def test_a_legal_document_with_the_draft_banner_is_refused(production):
+    _write_legal("privacy.md", "# Privacy policy\n\n**DRAFT FOR LEGAL REVIEW. Not yet in effect.**\n")
+    assert "privacy.md (the DRAFT banner)" in found()
+
+
+def test_a_legal_document_with_a_placeholder_is_refused(production):
+    _write_legal(
+        "terms.md", "# Terms\n\nThese terms are governed by the laws of [GOVERNING LAW].\nNotice: [30] days.\n"
+    )
+    assert "terms.md (2 [PLACEHOLDER] text(s), first [GOVERNING LAW])" in found()
+
+
+def test_links_and_ordinary_brackets_are_not_placeholders(production):
+    _write_legal(
+        "trial-agreement.md",
+        "# Free trial agreement\n\nOur [Terms of service](/terms) and [Privacy policy][privacy] apply "
+        "(see [section 4]). The draft of a plan is not a DRAFT banner unless written in capitals.\n",
+    )
+    assert "trial-agreement.md" in found()  # the capitalised DRAFT above
+    _write_legal(
+        "trial-agreement.md", "# Free trial agreement\n\nOur [Terms of service](/terms) apply (see [section 4]).\n"
+    )
+    assert config_check.problems(offline=True) == []
+
+
+def test_the_draft_legal_documents_in_the_repository_are_refused(production):
+    """The drafts in legal/ are for the lawyer: a server pointed at them must not start, even with approval set."""
+    from pathlib import Path
+
+    production.setenv("MDARIX_LEGAL_DIR", str(Path(__file__).resolve().parents[1] / "legal"))
+    problems = found()
+    for name in ("privacy.md", "terms.md", "trial-agreement.md"):
+        assert f"{name} (the DRAFT banner and" in problems
+
+
 # ------------------------------------------------------------------ AI cost
 
 

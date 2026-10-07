@@ -13,7 +13,8 @@ address instead.
 Format: Markdown with `#`/`##`/`###` headings (the page shows its own title, so a first `# Title` line is skipped), paragraphs, `-` or `1.` lists, `**bold**`, and `[text](https://…)` or
 `[text](mailto:…)` links. Nothing else is rendered (no HTML, no images). Maximum 200 KB per file.
 
-Staging and production refuse to start until all three files are here, the company details are set, and
+Staging and production refuse to start until all three files are here, none of them still carries the
+**DRAFT** banner or a `[PLACEHOLDER]` in square brackets, the company details are set, and
 `MDARIX_LEGAL_TEXT_APPROVED=true` (see `docs/runbooks/ENVIRONMENT_VARIABLES.md`). On the server this folder is
 mounted read-only into the API (`docker-compose.prod.yml`), so an updated document is live after
 `docker compose -f docker-compose.prod.yml restart api` without a new release.
