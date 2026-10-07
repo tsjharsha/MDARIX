@@ -3,6 +3,7 @@
 // requests to colleagues and suppliers. The server decides every review and every request action.
 import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { safeText } from "../../app/displayId";
+import { sortParams, type SortState } from "../../app/tableSort";
 import { roleLabel } from "../../app/roles";
 import { dueAtFromDay } from "./caseWorkflow";
 
@@ -414,15 +415,33 @@ export function requestListPath(input: {
   status?: string | null;
   page?: number;
   pageSize?: number;
+  /** Searches every page on the server (request ID, title, case, recipient, requester, supplier). */
+  q?: string;
+  /** A column heading's sort, applied by the server across every page. */
+  sort?: SortState;
 }): string {
   const params = new URLSearchParams();
   if (input.investigationId) params.set("investigation_id", input.investigationId);
   params.set("box", input.box);
   if (input.status) params.set("status", input.status);
+  if (input.q?.trim()) params.set("q", input.q.trim());
+  for (const [key, value] of Object.entries(sortParams(input.sort ?? null))) params.set(key, value);
   params.set("page", String(Math.max(1, input.page ?? 1)));
   params.set("page_size", String(input.pageSize ?? 50));
   return `/api/v1/evidence-requests?${params}`;
 }
+
+/** The request list's columns the server sorts across every page (GET /api/v1/evidence-requests sort/order). */
+export const REQUEST_SORTS = [
+  "business_id",
+  "title",
+  "investigation",
+  "party",
+  "status",
+  "priority",
+  "due_at",
+  "attachments_count",
+] as const;
 
 export type RequestActionKey = "acknowledge" | "respond" | "cannot-provide" | "review" | "cancel";
 

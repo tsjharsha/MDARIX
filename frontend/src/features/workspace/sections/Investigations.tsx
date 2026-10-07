@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiError } from "../../../app/apiClient";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
+import { titleCase } from "../../admin/console/dashboardModel";
 import {
   Drawer,
   SearchBox,
@@ -122,9 +123,6 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   };
   return (
     <>
-      <p className="ca-lede">
-        MDARIX organizes evidence and possible explanations. It never concludes a root cause for you.
-      </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections">
         {active === "All investigations" && canOpen && (
           <div className="ca-action-row">
@@ -416,24 +414,23 @@ function Capas() {
         caption="CAPAs"
         rows={listOf(capas.data?.records)}
         rowKey={(row) => String(row.id)}
-        empty={{ title: "No CAPAs yet", detail: "CAPAs arrive from your quality system through its connection." }}
+        empty={{
+          title: "No CAPAs yet",
+          detail: "Corrective and preventive actions appear here once your quality system is connected or imported.",
+        }}
         columns={[
           idColumn("CAPA ID", "capa_identifier"),
+          sourceIdColumn("capa_identifier"),
+          { key: "capa", label: "Title", fields: ["title"], render: (row) => <strong>{row.title ?? "—"}</strong> },
           {
-            key: "capa",
-            label: "CAPA",
-            fields: ["title", "capa_identifier"],
-            render: (row) => (
-              <span className="ca-person">
-                <strong>{row.title ?? "—"}</strong>
-                {row.business_id && row.capa_identifier && <small>Source ID {row.capa_identifier}</small>}
-              </span>
-            ),
+            key: "type",
+            label: "Type",
+            fields: ["action_type"],
+            render: (row) => (row.action_type ? titleCase(String(row.action_type)) : "—"),
           },
-          { key: "type", label: "Type", fields: ["action_type"], render: (row) => row.action_type ?? "—" },
           {
             key: "case",
-            label: "From",
+            label: "From case",
             fields: ["investigation_business_id", "source_reference"],
             render: (row) =>
               referenceId(row, "investigation", caseName.get(String(row.investigation_id)), row.source_reference),

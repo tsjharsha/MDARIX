@@ -149,9 +149,8 @@ export function CaseDecisionBriefPanel({
   return (
     <>
       <p className="ac-note">
-        The Decision Brief gathers what the case's records establish, what is still unknown and what reviewers found. It
-        gives the decision maker context; it never makes the decision. AI text is always labelled and must be edited by
-        the author before it can stand in the brief.
+        The Decision Brief gathers what the records establish, what is still unknown and what reviewers found. It
+        informs the decision maker; it never makes the decision. AI text is labelled and must be edited by the author.
       </p>
       <Panel
         eyebrow={caseLabel}
@@ -191,26 +190,31 @@ export function CaseDecisionBriefPanel({
                 </dd>
               </div>
               <div>
-                <dt>Scope version</dt>
-                <dd>{current.scope_version ?? context.scopeVersion ?? "—"}</dd>
-              </div>
-              <div>
                 <dt>Records as of</dt>
                 <dd>{context.asOf ? formatDate(context.asOf) : "—"}</dd>
               </div>
-              <div>
-                <dt>Content hash</dt>
-                <dd>
-                  <Hash value={current.content_hash} />
-                </dd>
-              </div>
-              <div>
-                <dt>Evidence fingerprint</dt>
-                <dd>
-                  <Hash value={context.evidenceSetHash} />
-                </dd>
-              </div>
             </dl>
+            <details className="uw-more">
+              <summary>Version details for the audit record</summary>
+              <dl className="ca-facts">
+                <div>
+                  <dt>Scope version</dt>
+                  <dd>{current.scope_version ?? context.scopeVersion ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt>Brief fingerprint</dt>
+                  <dd>
+                    <Hash value={current.content_hash} />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Evidence fingerprint</dt>
+                  <dd>
+                    <Hash value={context.evidenceSetHash} />
+                  </dd>
+                </div>
+              </dl>
+            </details>
           </>
         ) : (
           <Empty
@@ -295,9 +299,6 @@ export function CaseDecisionBriefPanel({
               ))}
             </ul>
           )}
-          <p className="ac-note">
-            The scorecard shows what is in place and what is missing. It never decides the case: authorized people do.
-          </p>
         </Panel>
       )}
       {current && (
@@ -560,7 +561,8 @@ function ComposedSections({ version }: { version: BriefVersion }) {
   return (
     <Panel eyebrow="Composed from the case's records" title="What the brief contains">
       <p className="ac-muted">
-        Each statement shows its kind (fact, derived observation, hypothesis, AI interpretation) and who made it.
+        Each statement shows its kind (Fact, Source assertion, Derived observation or AI interpretation) and who made
+        it.
       </p>
       <Section title="Case">
         <p>
@@ -890,7 +892,7 @@ function VersionHistory({ investigationId, versions }: { investigationId: string
           { key: "created_by_name", label: "Composed by", render: (row) => safeText(row.created_by_name) ?? "—" },
           { key: "submitted_at", label: "Submitted", render: (row) => formatDate(row.submitted_at) },
           { key: "reviewed_at", label: "Reviewed", render: (row) => formatDate(row.reviewed_at) },
-          { key: "content_hash", label: "Content hash", render: (row) => <Hash value={row.content_hash} /> },
+          { key: "content_hash", label: "Brief fingerprint", render: (row) => <Hash value={row.content_hash} /> },
         ]}
       />
       {rows.length > 1 && (

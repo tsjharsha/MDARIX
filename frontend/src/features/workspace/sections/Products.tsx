@@ -7,6 +7,7 @@ import { ProductVersionStory } from "../../investigator/ProductVersionStory";
 import { useWorkspace } from "../workspaceContext";
 import { Embedded, NeedsProduct, RecordTable, StatusBadge, recordFieldKeys } from "./common";
 import { displayId, safeText } from "../../../app/displayId";
+import { timeViewLabel } from "../ContextBar";
 
 const TABS = [
   "Overview",
@@ -63,7 +64,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                       <div>
                         <dt>Time view</dt>
                         <dd>
-                          {titleCase(String(view.temporal_context.mode ?? "event"))} ·{" "}
+                          {timeViewLabel(view.temporal_context.mode ?? "event")} ·{" "}
                           {formatDate(view.temporal_context.as_of)}
                         </dd>
                       </div>
@@ -94,7 +95,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                     <StatTile
                       label="Complaints"
                       value={Number(view.overview.complaint_count ?? 0)}
-                      detail="Recorded signals"
+                      detail="Recorded for this version"
                       icon={<AlertTriangle size={18} />}
                       onOpen={() => open("Signals")}
                     />
@@ -136,6 +137,7 @@ export function ProductsSection({ tab }: { tab?: string }) {
                       idLabel="Supplier ID"
                       rows={view.configuration.suppliers}
                       columns={["supplier_identifier", "name", "component_identifier"]}
+                      labels={{ component_identifier: "Supplies component" }}
                       empty={{
                         title: "No suppliers recorded",
                         detail: "Suppliers appear once supply data is connected.",
@@ -152,6 +154,12 @@ export function ProductsSection({ tab }: { tab?: string }) {
                       idLabel="Lot ID"
                       rows={view.manufacturing.lots}
                       columns={["lot_identifier", "site_identifier", "traceability_state", "manufactured_timestamp"]}
+                      labels={{
+                        site_identifier: "Site",
+                        traceability_state: "Traceability",
+                        manufactured_timestamp: "Manufactured",
+                      }}
+                      codes={["traceability_state"]}
                       empty={{ title: "No lots recorded", detail: "Lots appear once manufacturing data is connected." }}
                     />
                   </Panel>
@@ -176,6 +184,8 @@ export function ProductsSection({ tab }: { tab?: string }) {
                     idLabel="Change ID"
                     rows={view.changes}
                     columns={["change_identifier", "change_type", "effective_timestamp"]}
+                    labels={{ change_type: "Type of change", effective_timestamp: "Effective" }}
+                    codes={["change_type"]}
                     empty={{ title: "No changes recorded", detail: "Approved changes to this product appear here." }}
                   />
                 </Panel>
@@ -198,6 +208,8 @@ export function ProductsSection({ tab }: { tab?: string }) {
                         idLabel="Control ID"
                         rows={view.controls}
                         columns={["control_identifier", "control_type", "status"]}
+                        labels={{ control_type: "Type of control" }}
+                        codes={["control_type"]}
                         empty={{ title: "No controls recorded", detail: "Risk controls appear here when connected." }}
                       />
                     </Panel>

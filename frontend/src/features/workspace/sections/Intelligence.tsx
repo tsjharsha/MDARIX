@@ -17,10 +17,6 @@ export function IntelligenceSection({ tab }: { tab?: string }) {
   const { work } = useWorkspace();
   return (
     <>
-      <p className="ca-lede">
-        AI answers use only your organization's authorized records, show their sources and limits, and never make the
-        decision for you.
-      </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Intelligence sections">
         <Embedded>
           {active === "Ask MDARIX" && (

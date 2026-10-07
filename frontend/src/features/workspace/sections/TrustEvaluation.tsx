@@ -65,51 +65,54 @@ export function TrustEvaluation() {
                 <small>{evaluation.model ?? "—"}</small>
               </div>
             </div>
-            <ul className="te-scenarios">
-              {listOf(evaluation.scenarios).map((scenario: any) => (
-                <li key={scenario.scenario_id}>
-                  <span className={`te-pill ${scenario.status === "PASS" ? "is-pass" : "is-fail"}`}>
-                    {scenario.status === "PASS" ? (
-                      <CheckCircle2 size={13} aria-hidden="true" />
-                    ) : (
-                      <XCircle size={13} aria-hidden="true" />
-                    )}
-                    {scenario.status === "PASS" ? "Pass" : "Fail"}
-                  </span>
-                  <div>
-                    <strong>
-                      {scenario.scenario_id} · {scenario.title}
-                    </strong>
-                    <small>
-                      {scenario.specific_expectations
-                        ? `${scenario.specific_expectations} specific expectations`
-                        : "No specific expectations"}
-                      {" · "}
-                      {scenario.written_by === "LANGUAGE_MODEL" ? "AI-written" : "Rules"}
-                      {scenario.seconds != null ? ` · ${scenario.seconds}s` : ""}
-                    </small>
-                    <span className="te-checks">
-                      {listOf(scenario.checks).map((check: any) => (
-                        <span
-                          key={check.check}
-                          className={`te-check ${check.status === "PASS" ? "is-pass" : "is-fail"}`}
-                          title={listOf(check.matches)
-                            .map((item: any) => `${item.expected}: similarity ${item.similarity}`)
-                            .join("\n")}
-                        >
-                          {check.status === "PASS" ? (
-                            <CheckCircle2 size={11} aria-hidden="true" />
-                          ) : (
-                            <CircleSlash size={11} aria-hidden="true" />
-                          )}
-                          {CHECK_LABELS[check.check] ?? titleCase(check.check)}
-                        </span>
-                      ))}
+            <details className="uw-more">
+              <summary>Show each scenario ({listOf(evaluation.scenarios).length})</summary>
+              <ul className="te-scenarios">
+                {listOf(evaluation.scenarios).map((scenario: any) => (
+                  <li key={scenario.scenario_id}>
+                    <span className={`te-pill ${scenario.status === "PASS" ? "is-pass" : "is-fail"}`}>
+                      {scenario.status === "PASS" ? (
+                        <CheckCircle2 size={13} aria-hidden="true" />
+                      ) : (
+                        <XCircle size={13} aria-hidden="true" />
+                      )}
+                      {scenario.status === "PASS" ? "Pass" : "Fail"}
                     </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <div>
+                      <strong>
+                        {scenario.scenario_id} · {scenario.title}
+                      </strong>
+                      <small>
+                        {scenario.specific_expectations
+                          ? `${scenario.specific_expectations} specific ${scenario.specific_expectations === 1 ? "expectation" : "expectations"}`
+                          : "No specific expectations"}
+                        {" · "}
+                        {scenario.written_by === "LANGUAGE_MODEL" ? "AI-written" : "Rules"}
+                        {scenario.seconds != null ? ` · ${scenario.seconds}s` : ""}
+                      </small>
+                      <span className="te-checks">
+                        {listOf(scenario.checks).map((check: any) => (
+                          <span
+                            key={check.check}
+                            className={`te-check ${check.status === "PASS" ? "is-pass" : "is-fail"}`}
+                            title={listOf(check.matches)
+                              .map((item: any) => `${item.expected}: similarity ${item.similarity}`)
+                              .join("\n")}
+                          >
+                            {check.status === "PASS" ? (
+                              <CheckCircle2 size={11} aria-hidden="true" />
+                            ) : (
+                              <CircleSlash size={11} aria-hidden="true" />
+                            )}
+                            {CHECK_LABELS[check.check] ?? titleCase(check.check)}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </details>
             <p className="av-note">
               <ListChecks size={14} aria-hidden="true" /> {evaluation.data_notice} The AI never sees the expected
               answers; they are compared only after it has answered.

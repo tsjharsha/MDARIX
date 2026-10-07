@@ -365,6 +365,13 @@ describe("task actions", () => {
       "/api/v1/tasks?view=queue&page=2&page_size=50&q=INV000147",
     );
     expect(taskListPath("assigned", 0, 5)).toBe("/api/v1/tasks?view=assigned&page=1&page_size=5");
+    // A column heading's sort orders every page on the server.
+    expect(taskListPath("assigned", 1, 50, "", { key: "due_at", direction: "descending" })).toBe(
+      "/api/v1/tasks?view=assigned&page=1&page_size=50&sort=due_at&order=desc",
+    );
+    expect(taskListPath("queue", 3, 50, "x", { key: "assigned", direction: "ascending" })).toBe(
+      "/api/v1/tasks?view=queue&page=3&page_size=50&q=x&sort=assigned&order=asc",
+    );
   });
 
   it("says which part of a long list is shown", () => {

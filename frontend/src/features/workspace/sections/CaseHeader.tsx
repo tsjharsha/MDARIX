@@ -93,10 +93,6 @@ export function CaseHeader({
         <p className="uw-case-question">{safeText(current.investigation_question) ?? "No question recorded."}</p>
         <dl className="ca-facts">
           <div>
-            <dt>State</dt>
-            <dd>{caseStateLabel(current) ?? safeText(current.status) ?? "—"}</dd>
-          </div>
-          <div>
             <dt>Priority</dt>
             <dd>
               <CasePriority priority={current.priority} />
@@ -169,17 +165,20 @@ export function CaseHeader({
           <h3>Readiness checklist</h3>
           <p className="ac-muted">{readinessHeadline(checks)}</p>
           {checks.length > 0 && (
-            <ul className="uw-checklist" aria-label="Readiness checks">
-              {checks.map((check) => (
-                <li key={check.key}>
-                  <ToneBadge tone={CHECK_RESULT[check.result].tone} label={CHECK_RESULT[check.result].label} />
-                  <span>
-                    <strong>{check.label}</strong>
-                    {check.rationale && <small>{check.rationale}</small>}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <details className="uw-more">
+              <summary>Show each check ({checks.length})</summary>
+              <ul className="uw-checklist" aria-label="Readiness checks">
+                {checks.map((check) => (
+                  <li key={check.key}>
+                    <ToneBadge tone={CHECK_RESULT[check.result].tone} label={CHECK_RESULT[check.result].label} />
+                    <span>
+                      <strong>{check.label}</strong>
+                      {check.rationale && <small>{check.rationale}</small>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
           <p className="ac-note">
             Readiness shows what is in place and what is missing. It never decides the case: authorized people do.

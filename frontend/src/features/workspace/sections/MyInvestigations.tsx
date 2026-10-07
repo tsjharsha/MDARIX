@@ -60,7 +60,9 @@ function MyInvestigations() {
           {cases.map((row) => {
             const name = safeText(row.business_id) ?? "Case";
             const extras = [
-              row.unreviewed_evidence ? `${row.unreviewed_evidence} to review` : "",
+              row.unreviewed_evidence
+                ? `${row.unreviewed_evidence} evidence ${row.unreviewed_evidence === 1 ? "item" : "items"} to review`
+                : "",
               row.open_requests ? `${row.open_requests} open ${row.open_requests === 1 ? "request" : "requests"}` : "",
               row.open_unknowns ? `${row.open_unknowns} open ${row.open_unknowns === 1 ? "unknown" : "unknowns"}` : "",
             ].filter(Boolean);

@@ -36,6 +36,7 @@ import {
   relationshipChips,
   relationshipLabel,
   relationshipTone,
+  requestKindLabel,
   reviewBody,
   reviewChips,
   reviewEventText,
@@ -56,6 +57,7 @@ import {
   type ReviewStatus,
 } from "../evidenceWorkflow";
 import { NewRequestDrawer, RequestDetailDrawer } from "./EvidenceRequests";
+import { readableSize } from "./ImportData";
 
 /**
  * The evidence of one case: every record linked to it, recorded on it or received through a request, with how the
@@ -590,6 +592,36 @@ type Provenance = {
 
 const TIME_KEY = /(_at|_time|timestamp)$/;
 
+/** "PDF", "PNG image", "Word document": a file's type as people name it, else its media type as recorded. */
+function fileTypeText(contentType: unknown): string {
+  const type = safeText(contentType)?.toLowerCase();
+  if (!type) return "—";
+  if (type === "application/pdf") return "PDF";
+  if (type.startsWith("image/")) return `${type.slice(6).toUpperCase()} image`;
+  if (type === "text/csv") return "CSV file";
+  if (type === "text/plain") return "Text file";
+  if (type.includes("wordprocessingml") || type === "application/msword") return "Word document";
+  if (type.includes("spreadsheetml") || type === "application/vnd.ms-excel") return "Excel workbook";
+  return type;
+}
+
+/** Plain headings for the source fields a record's provenance carries; any other field is shown by its own name. */
+const SOURCE_LABELS: Record<string, string> = {
+  system: "Source system",
+  record_identifier: "ID in the source system",
+  record_version: "Version in the source system",
+  reference: "Reference",
+  source_timestamp: "Dated in the source",
+  effective_timestamp: "Effective",
+  recorded_timestamp: "Recorded in the source",
+  ingestion_timestamp: "Received by MDARIX",
+  checksum: "File fingerprint",
+  data_quality_status: "Data quality",
+  ingestion_run: "Import run",
+  connector_run: "Connector run",
+  mapping_version: "Mapping version",
+};
+
 /** A provenance value as text: dates in the person's time zone, records by their ID or name, never a UUID. */
 function provenanceValue(key: string, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -658,7 +690,7 @@ function ProvenanceDrawer({
               <dl className="ca-facts">
                 {source.map((entry) => (
                   <div key={entry.key}>
-                    <dt>{titleCase(entry.key)}</dt>
+                    <dt>{SOURCE_LABELS[entry.key] ?? titleCase(entry.key)}</dt>
                     <dd>{entry.value}</dd>
                   </div>
                 ))}
@@ -677,14 +709,14 @@ function ProvenanceDrawer({
                 </div>
                 <div>
                   <dt>Type</dt>
-                  <dd>{safeText(data.document.content_type) ?? "—"}</dd>
+                  <dd>{fileTypeText(data.document.content_type)}</dd>
                 </div>
                 <div>
                   <dt>Size</dt>
-                  <dd>{typeof data.document.size === "number" ? `${data.document.size} bytes` : "—"}</dd>
+                  <dd>{typeof data.document.size === "number" ? readableSize(data.document.size) : "—"}</dd>
                 </div>
                 <div className="uw-wide">
-                  <dt>Checksum</dt>
+                  <dt>File fingerprint</dt>
                   <dd>
                     <code>{safeText(data.document.checksum) ?? "—"}</code>
                   </dd>
@@ -702,7 +734,7 @@ function ProvenanceDrawer({
                 {safeText(data.request.title) ? ` · ${data.request.title}` : ""}
               </p>
               <p className="ac-muted">
-                {data.request.kind ? `${titleCase(String(data.request.kind))} request` : "Request"}
+                {data.request.kind ? `${requestKindLabel(data.request.kind)} request` : "Request"}
                 {safeText(data.request.requested_by_name) ? ` by ${data.request.requested_by_name}` : ""}
                 {data.request.responded_at ? ` · answered ${formatDate(data.request.responded_at)}` : ""}
               </p>

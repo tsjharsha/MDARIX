@@ -4,6 +4,7 @@
 import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { roleLabel } from "../../app/roles";
 import { safeText } from "../../app/displayId";
+import { sortParams, type SortState } from "../../app/tableSort";
 import type { WorkspaceSection } from "./workspaceContext";
 import { signalsTab } from "./signals";
 import { reviewsTab } from "./reviews";
@@ -410,11 +411,24 @@ export const taskPath = (id: string, action?: TaskActionKey) =>
   `/api/v1/tasks/${encodeURIComponent(id)}${action ? `/${action}` : ""}`;
 
 /** One page of a task list (GET /api/v1/tasks), optionally searched. */
-export function taskListPath(view: TaskView, page = 1, pageSize = 50, query = ""): string {
+export function taskListPath(view: TaskView, page = 1, pageSize = 50, query = "", sort: SortState = null): string {
   const params = new URLSearchParams({ view, page: String(Math.max(1, page)), page_size: String(pageSize) });
   if (query.trim()) params.set("q", query.trim());
+  for (const [key, value] of Object.entries(sortParams(sort))) params.set(key, value);
   return `/api/v1/tasks?${params}`;
 }
+
+/** The My Work columns the server sorts across every page (GET /api/v1/tasks sort/order). */
+export const TASK_SORTS = [
+  "business_id",
+  "title",
+  "source",
+  "priority",
+  "status",
+  "due_at",
+  "assigned",
+  "completed_at",
+] as const;
 
 /** "Showing 51–100 of 130" under a list that has more than one page; "" when everything is on one page. */
 export function pageText(list: Pick<TaskList, "total" | "page" | "page_size"> | null | undefined, shown: number) {

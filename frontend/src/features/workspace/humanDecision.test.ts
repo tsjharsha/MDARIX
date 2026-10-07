@@ -47,6 +47,10 @@ const form = (change: Partial<DecisionForm> = {}): DecisionForm => ({ ...emptyDe
 describe("addresses", () => {
   it("builds the decision addresses", () => {
     expect(decisionsQueuePath(0, 20)).toBe("/api/v1/decisions/queue?page=1&page_size=20");
+    // A column heading's sort orders the whole queue on the server.
+    expect(decisionsQueuePath(2, 20, { key: "awaitingSince", direction: "descending" })).toBe(
+      "/api/v1/decisions/queue?page=2&page_size=20&sort=awaitingSince&order=desc",
+    );
     expect(caseDecisionPath(UUID)).toBe(`/api/v1/investigations/${UUID}/decision`);
     expect(caseDecisionPath(UUID, "sign")).toBe(`/api/v1/investigations/${UUID}/decision/sign`);
     expect(caseDecisionPath(UUID, "return")).toBe(`/api/v1/investigations/${UUID}/decision/return`);

@@ -5,6 +5,7 @@
 // does not allow; these only shape what the person sees. AI text is never presented as the decision.
 import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { safeText } from "../../app/displayId";
+import { sortParams, type SortState } from "../../app/tableSort";
 import { ApiError, describeError } from "../../app/apiClient";
 import { actionsOf, briefLines, shortHash } from "./decisionBrief";
 import { textProblem } from "./intelligence";
@@ -32,10 +33,17 @@ const idText = (value: unknown): string | null => {
 
 export const DECISIONS_SUMMARY_PATH = "/api/v1/decisions/summary";
 
-export function decisionsQueuePath(page = 1, pageSize = 20): string {
-  const params = new URLSearchParams({ page: String(Math.max(1, page)), page_size: String(pageSize) });
+export function decisionsQueuePath(page = 1, pageSize = 20, sort: SortState = null): string {
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    page_size: String(pageSize),
+    ...sortParams(sort),
+  });
   return `/api/v1/decisions/queue?${params}`;
 }
+
+/** The approvals queue's columns (queueRow keys) the server sorts across every page (GET /api/v1/decisions/queue). */
+export const QUEUE_SORTS = ["caseId", "product", "brief", "priority", "dueAt", "awaitingSince", "reviews"] as const;
 
 export const caseDecisionPath = (investigationId: string, action?: "sign" | "return") =>
   `/api/v1/investigations/${encodeURIComponent(investigationId)}/decision${action ? `/${action}` : ""}`;

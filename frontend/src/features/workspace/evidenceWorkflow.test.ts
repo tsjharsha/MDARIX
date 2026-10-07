@@ -195,6 +195,13 @@ describe("evidence requests", () => {
     expect(requestListPath({ box: "received", status: "OPEN", page: 2, pageSize: 20 })).toBe(
       "/api/v1/evidence-requests?box=received&status=OPEN&page=2&page_size=20",
     );
+    // The search and a column heading's sort go to the server, so they cover every page.
+    expect(
+      requestListPath({ box: "sent", q: "  ER-12 ", sort: { key: "party", direction: "descending" }, page: 3 }),
+    ).toBe("/api/v1/evidence-requests?box=sent&q=ER-12&sort=party&order=desc&page=3&page_size=50");
+    expect(requestListPath({ box: "all", q: " ", sort: null })).toBe(
+      "/api/v1/evidence-requests?box=all&page=1&page_size=50",
+    );
     expect(requestPath(UUID)).toBe(`/api/v1/evidence-requests/${UUID}`);
     expect(requestPath(UUID, "cannot-provide")).toBe(`/api/v1/evidence-requests/${UUID}/cannot-provide`);
     expect(attachmentPath(UUID, "a-1")).toBe(`/api/v1/evidence-requests/${UUID}/attachments/a-1`);

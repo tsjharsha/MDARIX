@@ -51,10 +51,6 @@ export function DecisionsSection({ tab }: { tab?: string }) {
   };
   return (
     <>
-      <p className="ca-lede">
-        Only people with approval authority can sign. Signing asks you to confirm your identity and is recorded with the
-        exact content you approved.
-      </p>
       <Tabs tabs={tabs} active={active} onChange={setActive} label="Decision sections">
         {active === "Approvals" && <ApprovalsPanel onOpen={openFromQueue} />}
         {active === "Decision" &&

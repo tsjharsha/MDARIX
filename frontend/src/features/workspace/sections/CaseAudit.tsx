@@ -70,6 +70,7 @@ import {
   type TimelineResponse,
 } from "../caseAudit";
 import { Fingerprint } from "./DecisionRecord";
+import { countOf } from "./common";
 
 const record = (value: unknown): Record<string, any> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
@@ -335,7 +336,7 @@ export function CaseTimeline({
         <div className="ca-action-row uw-pager">
           <span className="ac-muted">
             Page {Math.min(page, pages)} of {pages}
-            {total !== null ? ` · ${total} events` : ""} · {TIMELINE_PAGE_SIZE} per page
+            {total !== null ? ` · ${countOf(total, "event")}` : ""} · {TIMELINE_PAGE_SIZE} per page
           </span>
           <button
             type="button"
@@ -724,9 +725,8 @@ export function CaseAiRuns({ investigationId, caseLabel }: { investigationId: st
                 </span>
               ),
             },
-            { key: "kind", label: "Kind", render: (row) => aiRunKindLabel(row) },
+            { key: "kind", label: "What it did", render: (row) => aiRunKindLabel(row) },
             { key: "model", label: "Model", render: (row) => aiModelText(row) },
-            { key: "versions", label: "Prompt / orchestration", render: (row) => aiVersionText(row) },
             {
               key: "status",
               label: "Status",
@@ -748,16 +748,7 @@ export function CaseAiRuns({ investigationId, caseLabel }: { investigationId: st
             {
               key: "execution_timestamp",
               label: "Run at",
-              render: (row) => (
-                <span className="ca-person">
-                  <span>{formatDate(row.execution_timestamp)}</span>
-                  {(durationText(row.duration ?? row.duration_ms) || usageText(row)) && (
-                    <small>
-                      {[durationText(row.duration ?? row.duration_ms), usageText(row)].filter(Boolean).join(" · ")}
-                    </small>
-                  )}
-                </span>
-              ),
+              render: (row) => formatDate(row.execution_timestamp),
             },
             {
               key: "human_review",
@@ -812,7 +803,7 @@ function AiRunDrawer({ run, onClose }: { run: AiRun; onClose: () => void }) {
         </p>
         <dl className="ca-facts">
           <div>
-            <dt>Kind</dt>
+            <dt>What it did</dt>
             <dd>{aiRunKindLabel(run)}</dd>
           </div>
           <div>
@@ -820,7 +811,7 @@ function AiRunDrawer({ run, onClose }: { run: AiRun; onClose: () => void }) {
             <dd>{aiModelText(run)}</dd>
           </div>
           <div>
-            <dt>Versions</dt>
+            <dt>Prompt and software versions</dt>
             <dd>{aiVersionText(run)}</dd>
           </div>
           <div>

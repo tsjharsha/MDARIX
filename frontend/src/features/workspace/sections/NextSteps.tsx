@@ -91,7 +91,10 @@ function NextSteps({ investigationId }: { investigationId: string }) {
           ))}
         </ul>
       ) : (
-        <Empty title="No next steps offered" detail="The server offered no next steps for this case right now." />
+        <Empty
+          title="No next steps right now"
+          detail="Nothing is suggested for this case at the moment. Next steps appear here as the case moves on."
+        />
       )}
       {chosen && (
         <NextStepDrawer

@@ -5,6 +5,7 @@ import { Empty, Panel } from "../admin/console/charts";
 import { Drawer, Table, formatDate, useResource } from "../customer-admin/shared";
 import { useCan } from "../workspace/workspaceContext";
 import { SortableHeader, useSortedRows } from "../../app/tableSort";
+import { useColumnControls } from "../tables/useColumnControls";
 import { downloadFile } from "./download";
 import {
   cellText,
@@ -202,37 +203,59 @@ function PreviewTable({
   columns: string[];
   rows: Array<Record<string, unknown>>;
 }) {
+  // Headings can be dragged to move a column and their edges dragged to resize it, as in every list.
+  const controls = useColumnControls({ id: `report:${label}`, keys: columns });
   const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => {
     const value = row[key];
     return value !== null && typeof value === "object" ? cellText(value) : value;
   });
+  const heading = (column: string) =>
+    column === "business_id" ? "ID" : column.replace(/_business_id$/, " ID").replace(/_/g, " ");
   return (
-    <div className="ac-table-wrap">
-      <table className="ac-table">
-        <caption className="ca-sr-only">{label}</caption>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <SortableHeader
-                key={column}
-                label={column === "business_id" ? "ID" : column.replace(/_business_id$/, " ID").replace(/_/g, " ")}
-                sortKey={column}
-                sort={sort}
-                onSort={toggle}
-              />
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, index) => (
-            <tr key={index}>
-              {columns.map((column) => (
-                <td key={column}>{cellText(row[column])}</td>
-              ))}
+    <>
+      {controls.customized && (
+        <div className="tc-bar">
+          <button type="button" className="ac-link" onClick={controls.reset}>
+            Reset columns
+          </button>
+        </div>
+      )}
+      <div className="ac-table-wrap">
+        <table className={`ac-table ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
+          <caption className="ca-sr-only">{label}</caption>
+          {controls.colgroup}
+          <thead>
+            <tr ref={controls.headRowRef}>
+              {controls.order.map((column) => {
+                const header = controls.header(column, heading(column));
+                return (
+                  <SortableHeader
+                    key={column}
+                    label={heading(column)}
+                    sortKey={column}
+                    sort={sort}
+                    onSort={toggle}
+                    className={header.className}
+                    thProps={header.thProps}
+                    onKeyDown={header.onKeyDown}
+                  >
+                    {header.grip}
+                  </SortableHeader>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {sorted.map((row, index) => (
+              <tr key={index}>
+                {controls.order.map((column) => (
+                  <td key={column}>{cellText(row[column])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

@@ -8,6 +8,10 @@ import type { Product360 } from "../../../app/types";
 import { sectionAllowed, useWorkspace } from "../workspaceContext";
 import { Upload } from "lucide-react";
 
+/** "1 complaint", "3 complaints": a count with its noun in the right number. */
+export const countOf = (count: number, noun: string, plural = `${noun}s`) =>
+  `${count.toLocaleString()} ${count === 1 ? noun : plural}`;
+
 /** Render children only once the shared Product 360 context is available; otherwise say why not. */
 export function NeedsProduct({ children }: { children: (view: Product360) => ReactNode }) {
   const { work, session, open } = useWorkspace();
@@ -15,7 +19,7 @@ export function NeedsProduct({ children }: { children: (view: Product360) => Rea
   if (work.view) return <>{children(work.view)}</>;
   if (work.state === "loading")
     return (
-      <Panel title="Loading product context" state="loading">
+      <Panel title="Loading your products" state="loading">
         {null}
       </Panel>
     );
@@ -97,12 +101,18 @@ export function RecordTable({
   caption,
   empty,
   idLabel,
+  labels,
+  codes,
 }: {
   rows: Array<Record<string, unknown>>;
   columns: string[];
   caption: string;
   empty: { title: string; detail: string };
   idLabel?: string;
+  /** Plain-English column headings for field keys whose generated heading would read as a database name. */
+  labels?: Record<string, string>;
+  /** Field keys whose values are codes (PRODUCT_VERSION): shown as words (Product Version). */
+  codes?: string[];
 }) {
   const withId = !!idLabel && rows.some((row) => safeText(row.business_id));
   const sourceKey = withId && columns[0]?.endsWith("_identifier") ? columns[0] : null;
@@ -110,7 +120,7 @@ export function RecordTable({
     .filter((key) => key !== "business_id")
     .map((key) => ({
       key,
-      label: key === sourceKey ? "Source ID" : titleCase(key.replace(/_identifier$/, " id")),
+      label: key === sourceKey ? "Source ID" : (labels?.[key] ?? titleCase(key.replace(/_identifier$/, " id"))),
       render: (row: Record<string, unknown>) =>
         STATUS_KEY.test(key) ? (
           <StatusBadge value={row[key]} />
@@ -120,6 +130,8 @@ export function RecordTable({
           formatDate(row[key])
         ) : safeText(row[key]) === null ? (
           <span className="ac-muted">—</span>
+        ) : codes?.includes(key) ? (
+          titleCase(String(row[key]))
         ) : (
           hideUuid(row[key])
         ),
@@ -134,6 +146,28 @@ export function RecordTable({
       columns={
         withId && idLabel ? [idColumn<Record<string, unknown>>(idLabel, sourceKey ?? undefined), ...fields] : fields
       }
+    />
+  );
+}
+
+/** How each source value was matched to an MDARIX record (Evidence › Provenance, Trust & Audit › Data limitations). */
+export function ProvenanceTable({ rows }: { rows: Array<Record<string, unknown>> }) {
+  return (
+    <RecordTable
+      caption="Provenance"
+      rows={rows}
+      columns={["canonical_entity_type", "source_value", "resolution_rule", "resolution_status"]}
+      labels={{
+        canonical_entity_type: "Record type",
+        source_value: "Value in your system",
+        resolution_rule: "How it was matched",
+        resolution_status: "Match status",
+      }}
+      codes={["canonical_entity_type", "resolution_rule"]}
+      empty={{
+        title: "No provenance records",
+        detail: "Once data is imported, each source value and the MDARIX record it was matched to appear here.",
+      }}
     />
   );
 }

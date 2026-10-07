@@ -98,7 +98,7 @@ export function CaseReviewsPanel({
         MDARIX gathers the context; risk and regulatory reviewers decide. A review's outcome is always a person's
         judgement, with their rationale.
       </p>
-      <Panel eyebrow={caseLabel} title="Review policy" source={reviews}>
+      <Panel eyebrow={caseLabel} title="Which reviews this case needs" source={reviews}>
         <div className="uw-review-policy">
           {policy.map((row) => {
             const open = openReviewOf(items, row.type);
@@ -183,8 +183,8 @@ export function CaseReviewsPanel({
             },
             {
               key: "policy",
-              label: "Policy",
-              render: (row) => (row.required_by_policy ? "Required" : "Requested"),
+              label: "Basis",
+              render: (row) => (row.required_by_policy ? "Required by policy" : "Requested"),
             },
             {
               key: "open",

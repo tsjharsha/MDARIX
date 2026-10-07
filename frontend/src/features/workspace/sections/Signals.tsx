@@ -3,6 +3,7 @@ import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
 import { SearchBox, Table, Tabs, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
 import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
@@ -31,7 +32,6 @@ export function SignalsSection({ tab }: { tab?: string }) {
   };
   return (
     <>
-      <p className="ca-lede">Signals are recorded observations. They are not conclusions about cause.</p>
       <Tabs tabs={tabs} active={active} onChange={setActive} label="Signal sections">
         {active === "Signal inbox" && (
           <SignalInbox
@@ -51,6 +51,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
                   idLabel="Complaint ID"
                   rows={view.complaints}
                   columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
+                  labels={{ event_timestamp: "Event date", recorded_timestamp: "Recorded" }}
                   empty={{
                     title: "No complaints recorded",
                     detail: "Complaints for this product version appear here.",
@@ -118,6 +119,18 @@ function Trends() {
   );
 }
 
+// The complaint list's columns the server sorts across every page (GET /api/v1/complaints sort/order).
+const COMPLAINT_SORTS = [
+  "business_id",
+  "complaint_identifier",
+  "product",
+  "description",
+  "received",
+  "severity",
+  "status",
+  "cases",
+] as const;
+
 /** Every complaint in the organization, across products: search, filter by product and status, page through. */
 function ComplaintList() {
   const { work } = useWorkspace();
@@ -126,7 +139,8 @@ function ComplaintList() {
   const [product, setProduct] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: "50" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "50", ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (product) params.set("product_id", product);
   if (status) params.set("status", status);
@@ -160,7 +174,7 @@ function ComplaintList() {
           <option value="">All statuses</option>
           {listOf(list.data?.statuses).map((value: string) => (
             <option key={value} value={value}>
-              {value}
+              {titleCase(value)}
             </option>
           ))}
         </select>
@@ -170,6 +184,7 @@ function ComplaintList() {
         rows={listOf(list.data?.items)}
         rowKey={(row) => String(row.id)}
         empty={{ title: "No complaints found", detail: "Complaints arrive through connectors and imports." }}
+        serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
         columns={[
           idColumn("Complaint ID", "complaint_identifier"),
           sourceIdColumn("complaint_identifier"),
@@ -192,7 +207,7 @@ function ComplaintList() {
             fields: ["severity", "patient_involved", "serious_injury", "death"],
             render: (row) => (
               <span className="ca-person">
-                <span>{row.severity ?? "—"}</span>
+                <span>{row.severity ? titleCase(String(row.severity)) : "—"}</span>
                 {(row.death || row.serious_injury) && (
                   <small className="uw-flag-critical">Serious injury or death</small>
                 )}

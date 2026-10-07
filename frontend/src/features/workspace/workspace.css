@@ -1691,3 +1691,12 @@ div.uw-task-count:hover {
 .ta-hash-full {
   word-break: break-all;
 }
+/* A short "show more" disclosure for detail most people do not need at first sight. */
+.uw-more {
+  margin-top: 12px;
+}
+.uw-more > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+}

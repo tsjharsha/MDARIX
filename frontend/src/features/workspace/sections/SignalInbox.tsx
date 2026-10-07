@@ -17,20 +17,22 @@ import { pageText } from "../tasks";
 import {
   EMPTY_NEW_SIGNAL,
   PRIORITY_REASON_MAX,
+  SIGNAL_COLUMN_SORTS,
   SIGNAL_ORIGINS,
   SIGNAL_PRIORITIES,
   SIGNAL_SORTS,
   ageText,
   newSignalBody,
   newSignalProblem,
+  nextSignalSort,
   rankSignals,
-  signalDueState,
   signalListPath,
   signalOriginLabel,
   signalPriority,
   signalPriorityLabel,
   signalProductText,
   signalStatusLabel,
+  signalTableSort,
   signalsTab,
   statusChips,
   statusFilterLabel,
@@ -47,6 +49,8 @@ import { StatusBadge } from "./common";
 import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } from "./SignalDetail";
 
 const PAGE_SIZE = 50;
+// The "Sort by" choice that stands for a column heading's sort.
+const HEADING_SORT = "heading";
 
 /**
  * The signal inbox: every signal of the organization, filtered and sorted by the server and read a page at a time. A
@@ -82,9 +86,11 @@ export function SignalInbox({
     setFilters((current) => ({ ...current, ...next }));
     setPage(1);
   };
-  const allRows = listOf(list.data?.items) as SignalSummary[];
-  // The server filters overdue signals; the page is filtered as well, so the list never shows one that is not.
-  const rows = filters.overdue ? allRows.filter((row) => signalDueState(row) === "overdue") : allRows;
+  // The server filters (overdue signals included) and sorts every page; the rows are one page, already in order.
+  const rows = listOf(list.data?.items) as SignalSummary[];
+  const columns = signalColumns(setSelected);
+  const tableSort = signalTableSort(filters);
+  const headingSort = filters.order ? columns.find((column) => column.key === filters.sort) : undefined;
   const total = list.data?.total ?? rows.length;
   const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
   const chips = statusChips(list.data?.counts_by_status, filters.status);
@@ -191,7 +197,17 @@ export function SignalInbox({
           </select>
           <label className="ca-inline-select">
             Sort by
-            <select value={filters.sort} onChange={(event) => change({ sort: event.target.value as SignalSort })}>
+            <select
+              value={filters.order ? HEADING_SORT : filters.sort}
+              onChange={(event) => {
+                if (event.target.value !== HEADING_SORT) change({ sort: event.target.value as SignalSort, order: "" });
+              }}
+            >
+              {headingSort && (
+                <option value={HEADING_SORT}>
+                  {`${headingSort.label || "Column"} (${filters.order === "asc" ? "ascending" : "descending"})`}
+                </option>
+              )}
               {SIGNAL_SORTS.map((sort) => (
                 <option key={sort.value} value={sort.value}>
                   {sort.label}
@@ -242,7 +258,12 @@ export function SignalInbox({
                   detail: "Signals appear when the detection rule finds a pattern, or when someone creates one.",
                 }
           }
-          columns={signalColumns(setSelected)}
+          columns={columns}
+          serverSort={{
+            sort: tableSort,
+            onSort: (key) => change(nextSignalSort(filters, key)),
+            keys: SIGNAL_COLUMN_SORTS,
+          }}
         />
         {pages > 1 && (
           <div className="ca-action-row uw-pager">
@@ -315,8 +336,13 @@ function signalColumns(onOpen: (reference: string) => void): Column<SignalSummar
     },
     {
       key: "problem_key",
-      label: "Problem",
-      render: (row) => safeText(row.problem_key) ?? <span className="ac-muted">—</span>,
+      label: "Problem code",
+      render: (row) =>
+        row.problem_key === "UNSPECIFIED" ? (
+          <span className="ac-muted">Not specified</span>
+        ) : (
+          (safeText(row.problem_key) ?? <span className="ac-muted">—</span>)
+        ),
     },
     {
       key: "complaint_count",

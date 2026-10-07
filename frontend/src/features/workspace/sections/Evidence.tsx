@@ -5,7 +5,7 @@ import { displayId } from "../../../app/displayId";
 import { EvidenceAccessView } from "../../investigator/EvidenceAccessView";
 import { useWorkspace } from "../workspaceContext";
 import { parseRequestTab } from "../evidenceWorkflow";
-import { Embedded, NeedsProduct, RecordTable } from "./common";
+import { Embedded, NeedsProduct, ProvenanceTable, RecordTable } from "./common";
 import { Limitations } from "./Products";
 import { CaseEvidencePanel } from "./CaseEvidence";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
@@ -41,9 +41,6 @@ export function EvidenceSection({ tab }: { tab?: string }) {
   );
   return (
     <>
-      <p className="ca-lede">
-        Every record keeps its source. Supporting, contradicting and missing evidence stay visible side by side.
-      </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Evidence sections">
         {active === "Case evidence" && (
           <NeedsCase detail="Case evidence belongs to one investigation. Pick one in the context bar above.">
@@ -80,7 +77,16 @@ export function EvidenceSection({ tab }: { tab?: string }) {
                   idLabel="Evidence ID"
                   rows={view.evidence}
                   columns={["evidence_identifier", "evidence_type", "reliability_status", "ingestion_timestamp"]}
-                  empty={{ title: "No linked evidence", detail: "Evidence linked to this version appears here." }}
+                  labels={{
+                    evidence_type: "Type",
+                    reliability_status: "Reliability",
+                    ingestion_timestamp: "Received",
+                  }}
+                  codes={["evidence_type"]}
+                  empty={{
+                    title: "No linked evidence",
+                    detail: "Documents, test reports and records linked to this product version appear here.",
+                  }}
                 />
               </Panel>
             )}
@@ -90,12 +96,7 @@ export function EvidenceSection({ tab }: { tab?: string }) {
           <NeedsProduct>
             {(view) => (
               <Panel eyebrow="Traceability" title="Where each record came from">
-                <RecordTable
-                  caption="Provenance"
-                  rows={view.provenance}
-                  columns={["canonical_entity_type", "source_value", "resolution_rule", "resolution_status"]}
-                  empty={{ title: "No provenance records", detail: "Source-to-MDARIX resolution appears here." }}
-                />
+                <ProvenanceTable rows={view.provenance} />
               </Panel>
             )}
           </NeedsProduct>

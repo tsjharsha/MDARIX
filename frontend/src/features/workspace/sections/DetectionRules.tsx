@@ -4,6 +4,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
 import { safeText } from "../../../app/displayId";
 import { useCan, useWorkspace } from "../workspaceContext";
+import { countOf } from "./common";
 import {
   RULE_LIMITS,
   RULE_REASON_MAX,
@@ -164,9 +165,12 @@ function RulePanel({ rule, canEdit, onSaved }: { rule: DetectionRule; canEdit: b
         </div>
         {rule.defaults && (
           <div>
-            <dt>Default</dt>
+            <dt>Default setting</dt>
             <dd>
-              {rule.defaults.min_complaints ?? "—"} complaints in {rule.defaults.window_days ?? "—"} days
+              {typeof rule.defaults.min_complaints === "number"
+                ? countOf(rule.defaults.min_complaints, "complaint")
+                : "— complaints"}{" "}
+              in {typeof rule.defaults.window_days === "number" ? countOf(rule.defaults.window_days, "day") : "— days"}
             </dd>
           </div>
         )}

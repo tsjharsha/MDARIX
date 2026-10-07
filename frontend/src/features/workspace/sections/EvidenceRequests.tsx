@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FilePlus2, Paperclip } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Panel, ToneBadge } from "../../admin/console/charts";
@@ -9,12 +9,12 @@ import {
   errorText,
   formatDate,
   listOf,
-  matches,
   send,
   useResource,
   type Column,
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
+import { useServerSort } from "../../../app/tableSort";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
 import { useCan, useWorkspace } from "../workspaceContext";
 import { localDay } from "../workspaceModel";
@@ -33,6 +33,7 @@ import {
   REQUEST_ATTACHMENT_TYPES,
   REQUEST_BOXES,
   REQUEST_REASON_MAX,
+  REQUEST_SORTS,
   REQUEST_TITLE_MAX,
   REVIEW_STATUS,
   REVIEW_STATUSES,
@@ -90,10 +91,22 @@ export function EvidenceRequestsPanel({
   const [box, setBox] = useState<RequestBox>(investigationId ? "sent" : "received");
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
+  const [search, setSearch] = useState("");
+  const { sort, onSort } = useServerSort(() => setPage(1));
   const [detail, setDetail] = useState<string | null>(initialRequest);
   const [creating, setCreating] = useState(false);
-  const list = useResource<RequestList>(requestListPath({ investigationId, box, page, pageSize: PAGE_SIZE }));
-  const rows = (listOf(list.data?.items) as EvidenceRequest[]).filter((row) => matches(row, query));
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(query.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  // The server searches and sorts every page; the rows are one page, already in order.
+  const list = useResource<RequestList>(
+    requestListPath({ investigationId, box, page, pageSize: PAGE_SIZE, q: search, sort }),
+  );
+  const rows = listOf(list.data?.items) as EvidenceRequest[];
   const total = list.data?.total ?? rows.length;
   const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
   const newFor = investigationId ?? (work.investigationId || null);
@@ -147,6 +160,7 @@ export function EvidenceRequestsPanel({
                 }
           }
           columns={requestColumns(box, !investigationId, (row) => setDetail(String(row.id)))}
+          serverSort={{ sort, onSort, keys: REQUEST_SORTS }}
         />
         {pages > 1 && (
           <div className="ca-action-row uw-pager">
@@ -559,7 +573,7 @@ export function RequestDetailDrawer({
               <dd>{name}</dd>
             </div>
             <div>
-              <dt>Kind</dt>
+              <dt>Type of request</dt>
               <dd>{requestKindLabel(request.kind)}</dd>
             </div>
             <div>

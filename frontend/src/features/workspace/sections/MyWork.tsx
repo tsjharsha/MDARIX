@@ -18,6 +18,7 @@ import {
   type Resource,
 } from "../../customer-admin/shared";
 import { displayId, safeText } from "../../../app/displayId";
+import { useServerSort } from "../../../app/tableSort";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
 import { conversationSummary } from "../../ask/structuredModel";
 import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
@@ -42,6 +43,7 @@ import {
   taskDestination,
   taskEventActor,
   taskEventText,
+  TASK_SORTS,
   taskListPath,
   taskPath,
   taskSourceText,
@@ -168,6 +170,7 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const { sort, onSort } = useServerSort(() => setPage(1));
   const [drawer, setDrawer] = useState<DrawerState | null>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -176,7 +179,7 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
-  const list = useResource<TaskList>(taskListPath(view, page, PAGE_SIZE, search));
+  const list = useResource<TaskList>(taskListPath(view, page, PAGE_SIZE, search, sort));
   const reload = () => {
     list.reload();
     summary.reload();
@@ -202,6 +205,7 @@ function TaskInbox({ view, summary }: { view: TaskView; summary: Resource<TaskSu
           rows={rows}
           rowKey={(row) => String(row.id)}
           empty={search ? { title: "No matching tasks", detail: "Change the search to see more." } : LIST_EMPTY[view]}
+          serverSort={{ sort, onSort, keys: TASK_SORTS }}
           columns={taskColumns(view, {
             busy: action.busy,
             openTask,
@@ -985,7 +989,9 @@ function Conversations() {
       {rows.length ? (
         <Table
           caption="AI conversations"
-          rows={rows.slice(0, 50)}
+          rows={rows}
+          pageSize={50}
+          pageNoun="conversation"
           rowKey={(row, index) => String(row.interaction_id ?? row.id ?? index)}
           empty={{ title: "", detail: "" }}
           columns={[
@@ -1008,7 +1014,13 @@ function Conversations() {
             },
             { key: "page", label: "Asked from", render: (row) => titleCase(String(row.page_context ?? "—")) },
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
-            { key: "when", label: "When", render: (row) => formatDate(row.created_at) },
+            {
+              key: "when",
+              label: "When",
+              fields: ["created_at"],
+              sortValue: (row) => row.created_at ?? "",
+              render: (row) => formatDate(row.created_at),
+            },
           ]}
         />
       ) : (

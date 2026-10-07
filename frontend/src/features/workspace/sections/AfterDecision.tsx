@@ -238,14 +238,6 @@ export function FollowUpDrawer({
     <Drawer title={`${name}: ${followUpTypeLabel(followUp)}`} onClose={onClose}>
       <dl className="ca-facts">
         <div>
-          <dt>Follow-up ID</dt>
-          <dd>{name}</dd>
-        </div>
-        <div>
-          <dt>Action</dt>
-          <dd>{followUpTypeLabel(followUp)}</dd>
-        </div>
-        <div>
           <dt>Status</dt>
           <dd>
             <FollowUpStatus item={followUp} />
@@ -541,10 +533,6 @@ export function ImpactDrawer({
     <Drawer title={`${name}: impact on the signed decision`} onClose={onClose}>
       <dl className="ca-facts">
         <div>
-          <dt>Assessment ID</dt>
-          <dd>{name}</dd>
-        </div>
-        <div>
           <dt>Prompted by</dt>
           <dd>{impactTriggerLabel(assessment)}</dd>
         </div>
@@ -704,7 +692,7 @@ function AfterDecisionDashboard() {
     .filter((row) => !["DONE", "CANCELLED"].includes(String(row.status ?? "").toUpperCase()))
     .slice(0, 6);
   return (
-    <Panel eyebrow="After decisions" title="Follow-ups assigned to you" source={mine}>
+    <Panel eyebrow="After the decision" title="Follow-ups assigned to you" source={mine}>
       <div className="uw-task-counts" role="group" aria-label="Your follow-up counts">
         <div className="uw-task-count">
           <strong>{ready ? counts.open : "…"}</strong>

@@ -1,5 +1,6 @@
 import type { Tone } from "../admin/console/dashboardModel";
 import { safeText } from "../../app/displayId";
+import { sortParams, type SortState } from "../../app/tableSort";
 
 /*
  * The risk register and ISO 14971 traceability as GET /api/v1/risk/register and /api/v1/risk/traceability return
@@ -106,8 +107,16 @@ export type Traceability = {
 export const PAGE_SIZE = 25;
 export const NOT_CAPTURED = "Not captured in your data";
 
-export const registerPath = (offset: number, limit = PAGE_SIZE) =>
-  `/api/v1/risk/register?${new URLSearchParams({ limit: String(limit), offset: String(Math.max(0, offset)) })}`;
+export const registerPath = (offset: number, limit = PAGE_SIZE, sort: SortState = null) =>
+  `/api/v1/risk/register?${new URLSearchParams({
+    limit: String(limit),
+    offset: String(Math.max(0, offset)),
+    ...sortParams(sort),
+  })}`;
+
+/** The register's columns the server sorts across every page (GET /api/v1/risk/register sort/order). Hazard and
+ * severity × probability are never captured in the imported records, so there is nothing to sort them by. */
+export const REGISTER_SORTS = ["business_id", "risk_identifier", "risk", "product", "residual", "links"] as const;
 
 export const reviewRequestPath = (riskId: string) => `/api/v1/risk/${encodeURIComponent(riskId)}/review-request`;
 

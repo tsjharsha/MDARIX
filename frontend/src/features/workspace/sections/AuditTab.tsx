@@ -4,6 +4,7 @@ import { titleCase } from "../../admin/console/dashboardModel";
 import { Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
 import { StatusBadge } from "./common";
+import { roleLabel } from "../../../app/roles";
 
 /**
  * The record a user may see: decisions in the selected investigation and the signatures on them.
@@ -94,7 +95,7 @@ function Signatures({ decisionId }: { decisionId: string }) {
         columns={[
           idColumn("Signature ID"),
           { key: "decision", label: "Signed as", render: (row) => titleCase(String(row.decision ?? "—")) },
-          { key: "role", label: "Signer role", render: (row) => row.signer_role ?? "—" },
+          { key: "role", label: "Signer role", render: (row) => roleLabel(row.signer_role) || "—" },
           { key: "meaning", label: "Meaning", render: (row) => row.meaning ?? "—" },
           {
             key: "valid",

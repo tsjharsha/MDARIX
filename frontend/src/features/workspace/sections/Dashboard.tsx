@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   Bot,
@@ -13,9 +13,17 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { BarList, Empty, Panel, RingMeter, ToneBadge, ToneIcon } from "../../admin/console/charts";
+import { Empty, Panel, RingMeter, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { titleCase, worstTone, type Slice, type Tone } from "../../admin/console/dashboardModel";
-import { KpiTile, TrendChart, toPoints, type DailyRow } from "../../admin/console/trendCharts";
+import { KpiTile, toPoints, type DailyRow } from "../../admin/console/trendCharts";
+import {
+  ActivityExplorer,
+  Donut,
+  PlatformPulse,
+  RangeSwitch,
+  busyness,
+  type Range,
+} from "../../admin/console/dashboardVisuals";
 import { formatDate, listOf, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import {
@@ -73,7 +81,8 @@ export function DashboardSection() {
   const signals = useResource<any>("/api/v1/analytics/signals");
   const investigations = useResource<any>("/api/v1/analytics/investigations");
   const evidence = useResource<any>("/api/v1/analytics/evidence");
-  const trends = useResource<Trends>("/api/v1/analytics/trends?days=30");
+  const [range, setRange] = useState<Range>(30);
+  const trends = useResource<Trends>(`/api/v1/analytics/trends?days=${range}`);
 
   const model = useMemo(() => {
     const signalRows = listOf(signals.data?.signals);
@@ -132,8 +141,169 @@ export function DashboardSection() {
   const total = (points: { primary: number }[]) => sum(points.map((point) => point.primary));
   const firstName = (session?.display_name ?? "").trim().split(/\s+/)[0] || "there";
 
+  const perDay = (value: number) => (days ? value / days : 0);
+  const rates = {
+    signals: perDay(total(model.signals)),
+    opened: perDay(total(model.opened)),
+    evidence: perDay(total(model.evidence)),
+    ai: perDay(model.aiTotal),
+    decisions: perDay(total(model.decisions)),
+    closed: perDay(total(model.closed)),
+  };
+  const busiest = Math.max(...Object.values(rates));
+  const highSignals = model.signalRows.filter((row) => isHighSeverity(row.severity)).length;
+  const pulse = [
+    {
+      key: "signals",
+      label: "Signals",
+      value: countsReady ? (c.complaints ?? 0) : null,
+      detail: `${total(model.signals)} in ${days} days`,
+      icon: <AlertTriangle size={20} />,
+      tone: (highSignals ? "warning" : "good") as Tone,
+      onOpen: () => open("Signals"),
+    },
+    {
+      key: "investigations",
+      label: "Investigations",
+      value: investigations.state === "ready" ? model.openCases.length : null,
+      detail: "open now",
+      icon: <FileSearch size={20} />,
+      tone: (model.openCases.length ? "warning" : "good") as Tone,
+      activity: busyness(rates.opened, busiest),
+      onOpen: () => open("Investigations"),
+    },
+    {
+      key: "evidence",
+      label: "Evidence",
+      value: countsReady ? (c.evidence ?? 0) : null,
+      detail: `${model.verified} verified`,
+      icon: <FileText size={20} />,
+      tone: (model.evidenceRows.length && model.verified < model.evidenceRows.length ? "warning" : "good") as Tone,
+      activity: busyness(rates.evidence, busiest),
+      onOpen: () => open("Evidence"),
+    },
+    {
+      key: "ai",
+      label: "AI assist",
+      value: trendsReady ? model.aiTotal : null,
+      detail: "reviewed by people",
+      icon: <Sparkles size={20} />,
+      tone: (!trendsReady || !model.aiTotal ? "neutral" : model.aiFailed ? "warning" : "good") as Tone,
+      activity: busyness(rates.ai, busiest),
+      onOpen: () => open("Trust & Audit"),
+    },
+    {
+      key: "decisions",
+      label: "Decisions",
+      value: countsReady ? (c.decisions ?? 0) : null,
+      detail: `${total(model.decisions)} in ${days} days`,
+      icon: <Gavel size={20} />,
+      tone: "good" as Tone,
+      activity: busyness(rates.decisions, busiest),
+      onOpen: () => open("Decisions"),
+    },
+    {
+      key: "closed",
+      label: "Closed",
+      value: trendsReady ? total(model.closed) : null,
+      detail: `in ${days} days`,
+      icon: <CheckCircle2 size={20} />,
+      tone: (trendsReady ? "good" : "neutral") as Tone,
+      activity: busyness(rates.closed, busiest),
+      onOpen: () => open("Investigations"),
+    },
+  ];
+
   return (
     <div className="ac-overview ac-dashboard">
+      <section className={`ac-hero ac-hero-pulse tone-${tone}`}>
+        <div className="ac-hero-top">
+          <div className="ac-hero-status" aria-live="polite">
+            <span className="ac-hero-icon">
+              <ToneIcon tone={tone} size={34} />
+            </span>
+            <div>
+              <p className="ac-eyebrow">Hello {firstName}</p>
+              <h2>
+                {status === "loading"
+                  ? "Checking your workspace…"
+                  : status === "error"
+                    ? "Some of your data could not be loaded"
+                    : status === "empty"
+                      ? "Your workspace has no records yet"
+                      : status === "attention"
+                        ? `${model.attention.length} ${model.attention.length === 1 ? "thing needs" : "things need"} your attention`
+                        : "Nothing needs your attention"}
+              </h2>
+              <p>
+                {status === "error"
+                  ? `${failed?.error ?? "A source did not respond."} What is shown below may be incomplete.`
+                  : status === "empty"
+                    ? "Bring in your products, lots and complaints to start. Signals, investigations and evidence appear here as they arrive."
+                    : `${work.view?.product.name ? `Working on ${work.view.product.name}` : "No product selected"}${
+                        work.view?.selected_version?.version_identifier
+                          ? ` · version ${work.view.selected_version.version_identifier}`
+                          : ""
+                      }. Activity below covers the last ${days} days.`}
+              </p>
+              {status === "error" && failed?.requestId && (
+                <p className="ac-request-id">
+                  Reference for support: <code>{failed.requestId}</code>
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="ac-hero-controls">
+            <RangeSwitch days={range} onChange={setRange} />
+            <span className="ac-hero-actions">
+              {status === "error" && (
+                <button
+                  type="button"
+                  className="ac-primary"
+                  onClick={() => sources.forEach((resource) => resource.reload())}
+                >
+                  <RefreshCw size={16} aria-hidden="true" /> Retry
+                </button>
+              )}
+              {status === "empty" &&
+                (canImport ? (
+                  <button type="button" className="ac-primary" onClick={() => open("Import data")}>
+                    <Upload size={16} aria-hidden="true" /> Import CSV data
+                  </button>
+                ) : (
+                  <p className="ac-note">Ask your administrator to connect your systems or import your data.</p>
+                ))}
+              <button
+                type="button"
+                className={status === "error" || status === "empty" ? "ac-secondary" : "ac-primary"}
+                onClick={() => open("Investigations")}
+              >
+                <FileSearch size={16} /> Investigations
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => open("Intelligence", "Ask MDARIX")}>
+                <Bot size={16} /> Ask MDARIX
+              </button>
+            </span>
+          </div>
+        </div>
+        <PlatformPulse nodes={pulse} />
+      </section>
+
+      <nav className="ac-jump" aria-label="On this page">
+        {[
+          ["ac-work", "Your work"],
+          ["ac-figures", "Key figures"],
+          ["ac-activity", "Activity"],
+          ["ac-pipeline", "Where the work stands"],
+          ["ac-health", "What to do next"],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`}>
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <span id="ac-work" className="ac-anchor" aria-hidden="true" />
       <MyWorkSummary />
       <MyInvestigationsPanel />
       <ReviewsDashboardPanel />
@@ -142,83 +312,7 @@ export function DashboardSection() {
       <AfterDecisionDashboardPanel />
       <SignalTriagePanel />
 
-      <section className={`ac-hero tone-${tone}`} aria-live="polite">
-        <div className="ac-hero-status">
-          <span className="ac-hero-icon">
-            <ToneIcon tone={tone} size={34} />
-          </span>
-          <div>
-            <p className="ac-eyebrow">Hello {firstName}</p>
-            <h2>
-              {status === "loading"
-                ? "Checking your workspace…"
-                : status === "error"
-                  ? "Some of your data could not be loaded"
-                  : status === "empty"
-                    ? "Your workspace has no records yet"
-                    : status === "attention"
-                      ? `${model.attention.length} ${model.attention.length === 1 ? "thing needs" : "things need"} your attention`
-                      : "Nothing needs your attention"}
-            </h2>
-            <p>
-              {status === "error"
-                ? `${failed?.error ?? "A source did not respond."} What is shown below may be incomplete.`
-                : status === "empty"
-                  ? "Bring in your products, lots and complaints to start. Signals, investigations and evidence appear here as they arrive."
-                  : `${work.view?.product.name ? `Working on ${work.view.product.name}` : "No product selected"}${
-                      work.view?.selected_version?.version_identifier
-                        ? ` · version ${work.view.selected_version.version_identifier}`
-                        : ""
-                    }`}
-            </p>
-            {status === "error" && failed?.requestId && (
-              <p className="ac-request-id">
-                Reference for support: <code>{failed.requestId}</code>
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="ac-hero-meters">
-          <RingMeter value={model.openCases.length} total={model.caseRows.length} label="Investigations open" />
-          <RingMeter value={model.verified} total={model.evidenceRows.length} label="Evidence verified" />
-          <RingMeter
-            value={model.aiTotal - model.aiFailed}
-            total={model.aiTotal}
-            label={`AI runs completed · ${days} days`}
-          />
-        </div>
-        <div className="ac-hero-actions">
-          {status === "error" && (
-            <button
-              type="button"
-              className="ac-primary"
-              onClick={() => sources.forEach((resource) => resource.reload())}
-            >
-              <RefreshCw size={16} aria-hidden="true" /> Retry
-            </button>
-          )}
-          {status === "empty" &&
-            (canImport ? (
-              <button type="button" className="ac-primary" onClick={() => open("Import data")}>
-                <Upload size={16} aria-hidden="true" /> Import CSV data
-              </button>
-            ) : (
-              <p className="ac-note">Ask your administrator to connect your systems or import your data.</p>
-            ))}
-          <button
-            type="button"
-            className={status === "error" || status === "empty" ? "ac-secondary" : "ac-primary"}
-            onClick={() => open("Investigations")}
-          >
-            <FileSearch size={16} /> Investigations
-          </button>
-          <button type="button" className="ac-secondary" onClick={() => open("Intelligence", "Ask MDARIX")}>
-            <Bot size={16} /> Ask MDARIX
-          </button>
-        </div>
-      </section>
-
-      <section className="ac-kpis" aria-label="Key figures">
+      <section id="ac-figures" className="ac-kpis" aria-label="Key figures">
         <KpiTile
           label="Products"
           value={countsReady ? (c.products ?? 0) : null}
@@ -292,37 +386,77 @@ export function DashboardSection() {
         />
       </section>
 
-      <section className="ac-grid three" aria-label={`Activity, last ${days} days`}>
+      <section id="ac-activity" className="ac-grid ac-grid-wide" aria-label={`Activity, last ${days} days`}>
         <Panel
           eyebrow={`Last ${days} days`}
-          title="Signals"
+          title="Activity explorer"
           source={trends}
           action={<OpenLink onClick={() => open("Signals", "Trends")} />}
         >
-          <TrendChart data={model.signals} primaryLabel="signals" unit="signals" />
+          <ActivityExplorer
+            series={[
+              {
+                key: "signals",
+                label: "Signals",
+                points: model.signals,
+                primaryLabel: "signals",
+                unit: "signals",
+                explain: "Complaints and other signals that came in each day.",
+              },
+              {
+                key: "cases",
+                label: "Investigations",
+                points: model.opened.map((point, index) => ({
+                  ...point,
+                  secondary: model.closed[index]?.primary ?? 0,
+                })),
+                primaryLabel: "opened",
+                secondaryLabel: "closed",
+                unit: "investigations",
+                explain: "Investigations opened and closed each day.",
+              },
+              {
+                key: "evidence",
+                label: "Evidence",
+                points: model.evidence,
+                primaryLabel: "records",
+                unit: "evidence records",
+                explain: "Evidence records added each day.",
+              },
+              {
+                key: "decisions",
+                label: "Decisions",
+                points: model.decisions,
+                primaryLabel: "decisions",
+                unit: "decisions",
+                explain: "Decisions recorded by authorized people each day.",
+              },
+              {
+                key: "ai",
+                label: "AI runs",
+                points: model.ai,
+                primaryLabel: "runs",
+                secondaryLabel: "failed",
+                unit: "AI runs",
+                explain:
+                  "AI assistance used each day, and how many runs failed. AI output is always reviewed by a person.",
+              },
+            ]}
+          />
         </Panel>
-        <Panel
-          eyebrow={`Last ${days} days`}
-          title="Investigations opened"
-          source={trends}
-          action={<OpenLink onClick={() => open("Investigations")} />}
-        >
-          <TrendChart data={model.opened} primaryLabel="opened" unit="investigations opened" />
-        </Panel>
-        <Panel
-          eyebrow={`Last ${days} days`}
-          title="Evidence added"
-          source={trends}
-          action={<OpenLink onClick={() => open("Evidence")} />}
-        >
-          <TrendChart data={model.evidence} primaryLabel="records" unit="evidence records" />
+        <Panel eyebrow="At a glance" title="Where things stand" source={investigations}>
+          <div className="ac-rate-rings">
+            <RingMeter value={model.openCases.length} total={model.caseRows.length} label="Investigations open" />
+            <RingMeter value={model.verified} total={model.evidenceRows.length} label="Evidence verified" />
+            <RingMeter value={model.aiTotal - model.aiFailed} total={model.aiTotal} label="AI runs completed" />
+          </div>
         </Panel>
       </section>
 
-      <section className="ac-grid three" aria-label="Where the work stands">
+      <section id="ac-pipeline" className="ac-grid three" aria-label="Where the work stands">
         <Panel eyebrow="Investigations" title="By status" source={trends}>
           {model.caseStatus.length ? (
-            <BarList items={model.caseStatus} colour="series" />
+            <Donut items={model.caseStatus} unit="investigations" />
           ) : (
             <Empty title="No investigations yet" detail="Investigations opened in your organization appear here." />
           )}
@@ -334,7 +468,7 @@ export function DashboardSection() {
           action={<OpenLink onClick={() => open("Evidence")} />}
         >
           {model.reliability.length ? (
-            <BarList items={model.reliability} colour="series" />
+            <Donut items={model.reliability} unit="evidence records" />
           ) : (
             <Empty title="No evidence yet" detail="Evidence appears once source records are ingested." />
           )}
@@ -346,14 +480,14 @@ export function DashboardSection() {
           action={<OpenLink onClick={() => open("Decisions")} />}
         >
           {model.decisionStatus.length ? (
-            <BarList items={model.decisionStatus} colour="series" />
+            <Donut items={model.decisionStatus} unit="decisions" />
           ) : (
             <Empty title="No decisions yet" detail="Decisions recorded by authorized people appear here." />
           )}
         </Panel>
       </section>
 
-      <div className="ac-grid two">
+      <div id="ac-health" className="ac-grid two">
         <Panel
           eyebrow="Needs attention"
           title="What to do next"
@@ -454,7 +588,7 @@ export function DashboardSection() {
           action={<OpenLink onClick={() => open("Signals", "Trends")} />}
         >
           {model.signalStatus.length ? (
-            <BarList items={model.signalStatus} colour="series" />
+            <Donut items={model.signalStatus} unit="signals" />
           ) : (
             <Empty title="No signals recorded" detail="Signal statuses appear as complaints arrive." />
           )}

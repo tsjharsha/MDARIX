@@ -8,6 +8,7 @@ import { DecisionRecordDrawer } from "./DecisionRecord";
 import {
   DECISIONS_SUMMARY_PATH,
   decisionTiles,
+  QUEUE_SORTS,
   decisionsQueuePath,
   queueRow,
   recentDecision,
@@ -17,6 +18,7 @@ import {
   type RecentDecision,
 } from "../humanDecision";
 import { decisionTab } from "../decisionTabs";
+import { useServerSort } from "../../../app/tableSort";
 
 const PAGE_SIZE = 20;
 
@@ -84,10 +86,12 @@ function RecentDecisions({ items, onRecord }: { items: RecentDecision[]; onRecor
  */
 export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) {
   const [page, setPage] = useState(1);
-  const queue = useResource<{ items?: unknown[]; total?: number }>(decisionsQueuePath(page, PAGE_SIZE));
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const queue = useResource<{ items?: unknown[]; total?: number }>(decisionsQueuePath(page, PAGE_SIZE, sort));
   const summary = useResource<DecisionSummary>(DECISIONS_SUMMARY_PATH);
   const [recordId, setRecordId] = useState<string | null>(null);
-  const rows = sortQueue(listOf(queue.data?.items ?? queue.data).map((item, index) => queueRow(item, index)));
+  // The server orders the whole queue (most critical first, or the column a heading chose); rows are one page.
+  const rows = listOf(queue.data?.items ?? queue.data).map((item, index) => queueRow(item, index));
   const total = typeof queue.data?.total === "number" ? queue.data.total : rows.length;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const recent = listOf(summary.data?.recent).map((item, index) => recentDecision(item, index));
@@ -103,6 +107,7 @@ export function ApprovalsPanel({ onOpen }: { onOpen: (row: QueueRow) => void }) 
           caption="Briefs awaiting a decision"
           rows={rows}
           rowKey={(row) => row.key}
+          serverSort={{ sort, onSort, keys: QUEUE_SORTS }}
           empty={{
             title: "Nothing awaits your decision",
             detail: "Decision Briefs a quality reviewer accepted for decision appear here.",

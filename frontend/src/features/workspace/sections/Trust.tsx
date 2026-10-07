@@ -6,7 +6,7 @@ import { Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
 import { displayId } from "../../../app/displayId";
 import { useWorkspace } from "../workspaceContext";
 import { CASE_TRUST_TABS, TRUST_TABS, initialTrustTab, parseTrustTab, type TrustTab } from "../caseAudit";
-import { NeedsProduct, RecordTable } from "./common";
+import { NeedsProduct, ProvenanceTable } from "./common";
 import { Limitations } from "./Products";
 import { AuditTab } from "./AuditTab";
 import { TrustEvaluation } from "./TrustEvaluation";
@@ -71,13 +71,8 @@ export function TrustSection({ tab }: { tab?: string }) {
             {(view) => (
               <>
                 <Limitations items={view.limitations} />
-                <Panel eyebrow="Traceability" title="Source resolution">
-                  <RecordTable
-                    caption="Provenance"
-                    rows={view.provenance}
-                    columns={["canonical_entity_type", "source_value", "resolution_rule", "resolution_status"]}
-                    empty={{ title: "No provenance records", detail: "Source-to-MDARIX resolution appears here." }}
-                  />
+                <Panel eyebrow="Traceability" title="How source values were matched">
+                  <ProvenanceTable rows={view.provenance} />
                 </Panel>
               </>
             )}

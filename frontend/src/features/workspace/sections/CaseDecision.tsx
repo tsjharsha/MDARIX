@@ -417,10 +417,6 @@ function BriefForDecision({ brief, reviewers }: { brief: DecisionBrief; reviewer
     >
       <dl className="ca-facts">
         <div>
-          <dt>Brief ID</dt>
-          <dd>{safeText(brief.business_id) ?? "—"}</dd>
-        </div>
-        <div>
           <dt>Status</dt>
           <dd>{brief.status || brief.status_label ? briefStatusView(brief).label : "—"}</dd>
         </div>
@@ -434,7 +430,7 @@ function BriefForDecision({ brief, reviewers }: { brief: DecisionBrief; reviewer
         <div>
           <dt>Fingerprint</dt>
           <dd>
-            <Fingerprint value={brief.content_hash} /> <ToneBadge tone={hash.tone} label={hash.label} />
+            <Fingerprint value={brief.content_hash} />
           </dd>
         </div>
       </dl>

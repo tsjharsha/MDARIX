@@ -16,11 +16,13 @@ import {
   type Confirmation,
 } from "../customer-admin/shared";
 import { displayId } from "../../app/displayId";
+import { useServerSort } from "../../app/tableSort";
 import { WorkspaceContext, sectionAllowed, useCan } from "../workspace/workspaceContext";
 import { downloadFile } from "../reports/download";
 import {
   NOT_CAPTURED,
   PAGE_SIZE,
+  REGISTER_SORTS,
   fieldOrNotCaptured,
   filterChains,
   linkedId,
@@ -179,7 +181,8 @@ function ExportRegister() {
 
 function Register({ onReview }: { onReview: (target: ReviewTarget) => void }) {
   const [offset, setOffset] = useState(0);
-  const register = useResource<RegisterPage>(registerPath(offset));
+  const { sort, onSort } = useServerSort(() => setOffset(0));
+  const register = useResource<RegisterPage>(registerPath(offset, PAGE_SIZE, sort));
   const [open, setOpen] = useState<RiskItem | null>(null);
   const data = register.data;
   const rows = data?.items ?? [];
@@ -206,6 +209,7 @@ function Register({ onReview }: { onReview: (target: ReviewTarget) => void }) {
             rows={rows}
             rowKey={(row) => row.id}
             empty={{ title: "No risks on this page", detail: "Go back to the previous page." }}
+            serverSort={{ sort, onSort, keys: REGISTER_SORTS }}
             columns={[
               idColumn("Risk ID", "risk_identifier"),
               sourceIdColumn("risk_identifier"),
@@ -258,11 +262,8 @@ function Register({ onReview }: { onReview: (target: ReviewTarget) => void }) {
           />
           {data && (
             <div className="rk-pager">
-              <span>
-                {pageSummary(data.total, data.offset, rows.length)}
-                {/* The register is paged by the server; a heading click orders the risks on this page. */}
-                {data.total > rows.length && <span className="ac-muted"> · Sorting applies to this page</span>}
-              </span>
+              {/* The server pages and sorts the register: a heading click orders every page. */}
+              <span>{pageSummary(data.total, data.offset, rows.length)}</span>
               <button
                 type="button"
                 className="ac-secondary"

@@ -5,6 +5,7 @@ import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
 import { useCan, useWorkspace } from "../workspaceContext";
+import { countOf } from "./common";
 
 /*
  * CSV import into the organization's own records. The same validated import serves free trials (their own routes
@@ -222,8 +223,8 @@ export function ImportPanel({
         <div className="uw-trial-report" role="status">
           {report.ready ? (
             <p className="uw-trial-message is-good">
-              <CheckCircle2 size={16} aria-hidden="true" /> {report.rows} rows are ready to import ({report.new_records}{" "}
-              new records).
+              <CheckCircle2 size={16} aria-hidden="true" /> {countOf(report.rows, "row")} ready to import (
+              {countOf(report.new_records, "new record")}).
             </p>
           ) : (
             <>
@@ -244,7 +245,7 @@ export function ImportPanel({
           {report.preview.length > 0 && <FilePreviewTable rows={report.preview} />}
           {report.ready && canImport && (
             <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
-              <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${report.rows} rows`}
+              <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${countOf(report.rows, "row")}`}
             </button>
           )}
         </div>
@@ -261,10 +262,6 @@ export function ImportDataSection() {
   const templates = useResource<Templates>("/api/v1/data/import/templates");
   return (
     <>
-      <p className="ca-lede">
-        Bring records from your quality, product and supplier systems into MDARIX as CSV files. Each file is checked in
-        full and nothing is saved unless every row passes. Every import is recorded in the audit trail.
-      </p>
       {templates.state !== "ready" || !templates.data ? (
         <Panel title="Import templates" eyebrow="Import data" source={templates}>
           {null}

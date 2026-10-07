@@ -4,6 +4,7 @@
 // action; these only shape what the person sees and what is sent.
 import { titleCase, type Tone } from "../admin/console/dashboardModel";
 import { isUuid, safeText } from "../../app/displayId";
+import { nextSort, type SortState } from "../../app/tableSort";
 import type { WorkspaceSection } from "./workspaceContext";
 
 export const SIGNAL_STATUSES = [
@@ -220,6 +221,21 @@ export const SIGNAL_SORTS: ReadonlyArray<{ value: SignalSort; label: string }> =
   { value: "complaint_count", label: "Complaints" },
   { value: "created_at", label: "Created" },
 ];
+/** The inbox columns whose heading sorts every page (the server's sort keys; GET /api/v1/triage/signals). */
+export const SIGNAL_COLUMN_SORTS = [
+  "business_id",
+  "title",
+  "product",
+  "problem_key",
+  "complaint_count",
+  "highest_severity",
+  "priority",
+  "status",
+  "owner",
+  "due_at",
+  "age_days",
+] as const;
+export type SignalSortKey = SignalSort | (typeof SIGNAL_COLUMN_SORTS)[number];
 
 export type SignalFilters = {
   status: StatusFilter;
@@ -228,7 +244,10 @@ export type SignalFilters = {
   origin: string;
   owner: "" | "me" | "unassigned";
   q: string;
-  sort: SignalSort;
+  /** "Sort by" (each in its natural direction), or the column a heading sorts by when `order` is set. */
+  sort: SignalSortKey;
+  /** Set by a column heading: that column ascending or descending. Empty: the "Sort by" choice. */
+  order: "" | "asc" | "desc";
   /** Only signals past their due date (from the dashboard's Overdue count). */
   overdue: boolean;
   /** Only monitored signals whose review date has come (from the dashboard's "Monitor review due"). */
@@ -243,9 +262,40 @@ export const DEFAULT_SIGNAL_FILTERS: SignalFilters = {
   owner: "",
   q: "",
   sort: "priority",
+  order: "",
   overdue: false,
   reviewDue: false,
 };
+
+// The column a "Sort by" choice orders and its direction (Created: newest first, the youngest age first).
+const NATURAL_SORT: Partial<Record<SignalSort, NonNullable<SortState>>> = {
+  priority: { key: "priority", direction: "descending" },
+  due_at: { key: "due_at", direction: "ascending" },
+  complaint_count: { key: "complaint_count", direction: "descending" },
+  created_at: { key: "age_days", direction: "ascending" },
+};
+
+/** The heading the inbox shows as sorted: the one a heading click chose, else the "Sort by" choice's column. */
+export function signalTableSort(filters: Pick<SignalFilters, "sort" | "order">): SortState {
+  if (filters.order) return { key: filters.sort, direction: filters.order === "asc" ? "ascending" : "descending" };
+  return NATURAL_SORT[filters.sort as SignalSort] ?? null;
+}
+
+/**
+ * The sort after a click on a column heading: ascending, descending, then back to the usual order ("Sort by"
+ * Priority). A click on the column "Sort by" already orders turns it the other way round first.
+ */
+export function nextSignalSort(
+  filters: Pick<SignalFilters, "sort" | "order">,
+  key: string,
+): Pick<SignalFilters, "sort" | "order"> {
+  const current = signalTableSort(filters);
+  if (!filters.order && current?.key === key)
+    return { sort: key as SignalSortKey, order: current.direction === "ascending" ? "desc" : "asc" };
+  const next = nextSort(current, key);
+  if (!next) return { sort: DEFAULT_SIGNAL_FILTERS.sort, order: "" };
+  return { sort: next.key as SignalSortKey, order: next.direction === "ascending" ? "asc" : "desc" };
+}
 
 const isStatusFilter = (value: string): value is StatusFilter =>
   value === "OPEN" || value === "ALL" || (SIGNAL_STATUSES as readonly string[]).includes(value);
@@ -276,6 +326,7 @@ export function signalListPath(filters: Partial<SignalFilters>, page = 1, pageSi
   if (value.overdue) params.set("overdue", "true");
   if (value.reviewDue) params.set("review_due", "true");
   params.set("sort", value.sort);
+  if (value.order) params.set("order", value.order);
   params.set("page", String(Math.max(1, page)));
   params.set("page_size", String(pageSize));
   return `/api/v1/triage/signals?${params}`;

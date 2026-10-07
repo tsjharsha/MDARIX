@@ -46,6 +46,10 @@ describe("risk register", () => {
   it("pages the register and says where the page is", () => {
     expect(registerPath(50)).toBe("/api/v1/risk/register?limit=25&offset=50");
     expect(registerPath(-5)).toBe("/api/v1/risk/register?limit=25&offset=0");
+    // A column heading's sort orders the whole register on the server.
+    expect(registerPath(25, 25, { key: "residual", direction: "ascending" })).toBe(
+      "/api/v1/risk/register?limit=25&offset=25&sort=residual&order=asc",
+    );
     expect(pageSummary(61, 25, 25)).toBe("Risks 26–50 of 61");
     expect(pageSummary(0, 0, 0)).toBe("0 risks");
   });

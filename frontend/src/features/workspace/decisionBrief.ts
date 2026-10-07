@@ -635,7 +635,7 @@ export function briefParts(
     { key: "ai", label: "AI assistance", items: [`AI runs: ${aiDisclosure(content).executions.length}`] },
     { key: "readiness", label: "Readiness", items: [scorecardHeadline(groups)] },
     { key: "scope", label: "Scope version", items: one(version?.scope_version ?? context.scopeVersion) },
-    { key: "hash", label: "Content hash", items: [shortHash(version?.content_hash)] },
+    { key: "hash", label: "Brief fingerprint", items: [shortHash(version?.content_hash)] },
     { key: "fingerprint", label: "Evidence fingerprint", items: [shortHash(context.evidenceSetHash)] },
   ];
 }

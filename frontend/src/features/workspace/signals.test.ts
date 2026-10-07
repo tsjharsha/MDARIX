@@ -16,6 +16,7 @@ import {
   isSignalRef,
   mergeProblem,
   newSignalBody,
+  nextSignalSort,
   newSignalProblem,
   parseSignalsTab,
   priorityBody,
@@ -44,6 +45,7 @@ import {
   signalProductText,
   signalStatusLabel,
   signalStatusTone,
+  signalTableSort,
   signalsTab,
   statusChips,
   statusesFor,
@@ -102,6 +104,31 @@ describe("signal inbox filters", () => {
       review_due: "true",
       page: "1",
     });
+  });
+
+  it("sends a column heading's sort with its direction, and none for the Sort by choice", () => {
+    expect(query(signalListPath({ sort: "owner", order: "desc" }, 2))).toMatchObject({
+      sort: "owner",
+      order: "desc",
+      page: "2",
+    });
+    expect(query(signalListPath({ sort: "due_at" }))).not.toHaveProperty("order");
+  });
+
+  it("keeps the Sort by choice and the column headings in step", () => {
+    // "Sort by" shows as the sorted heading in its natural direction.
+    expect(signalTableSort({ sort: "priority", order: "" })).toEqual({ key: "priority", direction: "descending" });
+    expect(signalTableSort({ sort: "created_at", order: "" })).toEqual({ key: "age_days", direction: "ascending" });
+    expect(signalTableSort({ sort: "last_event_at", order: "" })).toBeNull();
+    expect(signalTableSort({ sort: "title", order: "asc" })).toEqual({ key: "title", direction: "ascending" });
+    // A click on that heading turns it round; another heading starts ascending; a third click restores the usual order.
+    expect(nextSignalSort({ sort: "priority", order: "" }, "priority")).toEqual({ sort: "priority", order: "asc" });
+    expect(nextSignalSort({ sort: "priority", order: "asc" }, "priority")).toEqual({ sort: "priority", order: "desc" });
+    expect(nextSignalSort({ sort: "priority", order: "desc" }, "priority")).toEqual(
+      expect.objectContaining({ sort: DEFAULT_SIGNAL_FILTERS.sort, order: "" }),
+    );
+    expect(nextSignalSort({ sort: "due_at", order: "" }, "owner")).toEqual({ sort: "owner", order: "asc" });
+    expect(nextSignalSort({ sort: "due_at", order: "" }, "due_at")).toEqual({ sort: "due_at", order: "desc" });
   });
 
   it("names the statuses each status filter stands for", () => {

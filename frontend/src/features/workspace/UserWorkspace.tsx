@@ -58,20 +58,95 @@ import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
 
-const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
-  "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
-  Dashboard: { icon: LayoutDashboard, description: "Live quality status", context: false },
-  "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
-  Products: { icon: Package, description: "Product 360 and versions", context: true },
-  Signals: { icon: Radio, description: "Triage, complaints and trends", context: true },
-  Investigations: { icon: FileSearch, description: "Cases and workspace", context: true },
-  Evidence: { icon: Search, description: "Library and provenance", context: true },
-  Decisions: { icon: Gavel, description: "Review, sign and verify", context: true },
-  Intelligence: { icon: Bot, description: "Ask, regulatory, risk", context: true },
-  "Trust & Audit": { icon: ShieldCheck, description: "AI assurance and records", context: true },
-  "Import data": { icon: Upload, description: "CSV files into your records", context: false },
-  "My Account": { icon: UserRound, description: "Profile, security, access", context: false },
-  "Share feedback": { icon: MessageSquareText, description: "Tell us what works and what to improve", context: false },
+/**
+ * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
+ * under the page heading (what you do here, in plain words).
+ */
+const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; guide: string; context: boolean }> = {
+  "Getting started": {
+    icon: Rocket,
+    description: "Your free trial, step by step",
+    guide: "Set up your trial one step at a time: add your data, invite your team and try a first investigation.",
+    context: false,
+  },
+  Dashboard: {
+    icon: LayoutDashboard,
+    description: "Today's quality status",
+    guide: "What needs attention today across your products, signals, investigations and decisions.",
+    context: false,
+  },
+  "My Work": {
+    icon: Briefcase,
+    description: "Your tasks and reviews",
+    guide: "Everything waiting for you: tasks assigned to you, work your roles can pick up, and evidence requests.",
+    context: true,
+  },
+  Products: {
+    icon: Package,
+    description: "Products, versions and lots",
+    guide: "One view of the selected product version: its parts, lots, suppliers, complaints and known data gaps.",
+    context: true,
+  },
+  Signals: {
+    icon: Radio,
+    description: "Triage complaints and trends",
+    guide:
+      "Review new signals, decide what each needs and follow complaint trends. Signals are recorded observations, not conclusions about cause.",
+    context: true,
+  },
+  Investigations: {
+    icon: FileSearch,
+    description: "Open and work your cases",
+    guide:
+      "Open a case and work through it step by step. MDARIX organizes evidence and possible explanations; it never concludes a root cause for you.",
+    context: true,
+  },
+  Evidence: {
+    icon: Search,
+    description: "Case evidence and sources",
+    guide:
+      "The evidence behind each case and where every record came from. Supporting, contradicting and missing evidence stay visible side by side.",
+    context: true,
+  },
+  Decisions: {
+    icon: Gavel,
+    description: "Approve, sign and verify",
+    guide:
+      "Review decision briefs, record and sign decisions, and verify signatures. Only people with approval authority can sign, and each signature is recorded with the exact content approved.",
+    context: true,
+  },
+  Intelligence: {
+    icon: Bot,
+    description: "Ask questions, regulatory, risk",
+    guide:
+      "Ask questions about your records and check regulatory and risk links. AI answers show their sources and limits and never make the decision for you.",
+    context: true,
+  },
+  "Trust & Audit": {
+    icon: ShieldCheck,
+    description: "Audit trail and AI checks",
+    guide: "The permanent record of who did what and when, and how the AI assistants are checked and limited.",
+    context: true,
+  },
+  "Import data": {
+    icon: Upload,
+    description: "Bring in CSV files",
+    guide:
+      "Bring records from your quality, product and supplier systems in as CSV files. Each file is checked in full and nothing is saved unless every row passes.",
+    context: false,
+  },
+  "My Account": {
+    icon: UserRound,
+    description: "Profile, security, access",
+    guide: "Your profile, sign-in security and the roles you hold in this organization.",
+    context: false,
+  },
+  "Share feedback": {
+    icon: MessageSquareText,
+    description: "Tell us what to improve",
+    guide: "Tell us what works and what to improve.",
+    context: false,
+  },
 };
 
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
@@ -284,7 +359,7 @@ export function UserWorkspace({
                 <h1 ref={heading} tabIndex={-1}>
                   {section}
                 </h1>
-                <p>{NAV[section].description}</p>
+                <p>{NAV[section].guide}</p>
               </div>
             </div>
             {NAV[section].context && <ContextBar />}

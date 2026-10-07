@@ -17,6 +17,7 @@ import { useResource } from "../../customer-admin/shared";
 import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
+import { countOf } from "./common";
 
 export type TrialStatus = {
   is_trial: boolean;
@@ -154,7 +155,11 @@ export function GettingStartedSection() {
   return (
     <div className="ac-overview uw-trial">
       <Panel
-        title={trial?.days_left !== undefined ? `${trial.days_left} days left in your free trial` : "Your free trial"}
+        title={
+          trial?.days_left !== undefined
+            ? `${countOf(trial.days_left, "day")} left in your free trial`
+            : "Your free trial"
+        }
         eyebrow="Getting started"
         source={status}
       >
@@ -371,7 +376,7 @@ function InsightsPanel({ insights, source }: { insights: Insights | null; source
   return (
     <Panel
       title="Automatic insights"
-      eyebrow={insights ? `From ${insights.scope} · ${insights.total_complaints} complaints` : "Insights"}
+      eyebrow={insights ? `From ${insights.scope} · ${countOf(insights.total_complaints, "complaint")}` : "Insights"}
       source={source}
     >
       {insights && insights.total_complaints === 0 ? (

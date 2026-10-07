@@ -62,7 +62,7 @@ import {
   type SignalRef,
   type SignalSummary,
 } from "../signals";
-import { StatusBadge } from "./common";
+import { StatusBadge, countOf } from "./common";
 
 /** The status of a signal, as a badge with its label (never colour alone). */
 export function SignalStatusBadge({ signal }: { signal: Pick<SignalSummary, "status" | "status_label"> }) {
@@ -238,7 +238,7 @@ function SignalBody({
         <Fact label="Priority">
           <SignalPriorityCell signal={signal} />
         </Fact>
-        <Fact label="Suggested → confirmed">{priorityText(signal)}</Fact>
+        <Fact label="How priority was set">{priorityText(signal)}</Fact>
         <Fact label="Origin">
           <span className="ca-person">
             <span>{signalOriginLabel(signal.origin, signal.origin_label)}</span>
@@ -246,7 +246,9 @@ function SignalBody({
           </span>
         </Fact>
         <Fact label="Product / version">{signalProductText(signal)}</Fact>
-        <Fact label="Problem">{safeText(signal.problem_key) ?? "—"}</Fact>
+        <Fact label="Problem code">
+          {signal.problem_key === "UNSPECIFIED" ? "Not specified" : (safeText(signal.problem_key) ?? "—")}
+        </Fact>
         <Fact label="Owner">{safeText(signal.owner?.name) ?? "Unassigned"}</Fact>
         <Fact label="Due">
           <SignalDue signal={signal} />
@@ -439,7 +441,7 @@ function SignalBody({
           {split.length ? (
             <ul className="ac-barlist uw-split">
               {split.map((item) => (
-                <li key={item.key} title={`${item.label}: ${item.count} complaints, ${item.percent}%`}>
+                <li key={item.key} title={`${item.label}: ${countOf(item.count, "complaint")}, ${item.percent}%`}>
                   <span className="ac-barlist-label">{item.label}</span>
                   <span className="ac-barlist-track" aria-hidden="true">
                     <span
@@ -839,7 +841,7 @@ function SignalChecklist({
             <span className="ca-person">
               <strong>{safeText(row.business_id) ?? "Signal"}</strong>
               <small>
-                {safeText(row.title) ?? "Untitled"} · {row.complaint_count ?? 0} complaints ·{" "}
+                {safeText(row.title) ?? "Untitled"} · {countOf(Number(row.complaint_count ?? 0), "complaint")} ·{" "}
                 {signalStatusLabel(row.status, row.status_label)}
               </small>
             </span>
