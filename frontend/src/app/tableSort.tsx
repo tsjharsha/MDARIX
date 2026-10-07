@@ -1,4 +1,4 @@
-import { isValidElement, useMemo, useState, type ReactNode } from "react";
+import { isValidElement, useMemo, useState, type KeyboardEvent, type ReactNode, type ThHTMLAttributes } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 /**
@@ -91,33 +91,65 @@ export function SortableHeader({
   sort,
   onSort,
   className,
+  thProps,
+  onKeyDown,
+  children,
 }: {
   label: ReactNode;
   sortKey: string;
   sort: SortState;
   onSort: (key: string) => void;
   className?: string;
+  /** Extra heading attributes (moving a column: features/tables/useColumnControls.tsx). */
+  thProps?: ThHTMLAttributes<HTMLTableCellElement> & Record<`data-${string}`, string>;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  /** Shown after the heading's button (the edge that resizes the column). */
+  children?: ReactNode;
 }) {
   const active = sort?.key === sortKey ? sort.direction : null;
   const Icon = active === "ascending" ? ArrowUp : active === "descending" ? ArrowDown : ArrowUpDown;
   const text = nodeText(label);
   return (
-    <th scope="col" className={className} aria-sort={active ?? "none"}>
+    <th scope="col" {...thProps} className={className || undefined} aria-sort={active ?? "none"}>
       <button
         type="button"
         className={`table-sort${active ? " active" : ""}`}
         onClick={() => onSort(sortKey)}
+        onKeyDown={onKeyDown}
         title={
-          active === "ascending"
+          (active === "ascending"
             ? `Sorted by ${text}, ascending. Click for descending.`
             : active === "descending"
               ? `Sorted by ${text}, descending. Click to restore the original order.`
-              : `Sort by ${text}`
+              : `Sort by ${text}`) +
+          (thProps?.draggable ? " Drag the heading to move the column (or Alt+Left / Alt+Right)." : "")
         }
       >
         <span>{label}</span>
         <Icon size={13} aria-hidden="true" className="table-sort-icon" />
       </button>
+      {children}
     </th>
   );
+}
+
+/**
+ * Sorting done by the server, for lists it sends one page at a time: a heading click asks the server for that order
+ * across every page (the `sort` and `order` request parameters) instead of reordering the rows on screen.
+ * `onChange` runs on every change, typically to go back to the first page.
+ */
+export function useServerSort(onChange?: () => void, initial: SortState = null) {
+  const [sort, setSort] = useState<SortState>(initial);
+  return {
+    sort,
+    onSort: (key: string) => {
+      setSort((current) => nextSort(current, key));
+      onChange?.();
+    },
+  };
+}
+
+/** The request parameters for a server sort (none when the list keeps its usual order). */
+export function sortParams(sort: SortState): Record<string, string> {
+  return sort ? { sort: sort.key, order: sort.direction === "ascending" ? "asc" : "desc" } : {};
 }

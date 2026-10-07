@@ -22,12 +22,15 @@ export function ColumnChooser({
   options,
   selection,
   defaults,
+  resized = false,
   onChange,
 }: {
   caption: string;
   options: FieldOption[];
   selection: string[];
   defaults: string[];
+  /** Column widths were changed in the list; "Reset to default" also returns them to automatic widths. */
+  resized?: boolean;
   onChange: (selection: string[] | null) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -38,7 +41,8 @@ export function ColumnChooser({
   const available = options.filter(
     (option) => !selection.includes(option.key) && (!term || option.label.toLowerCase().includes(term)),
   );
-  const isDefault = selection.length === defaults.length && selection.every((key, index) => key === defaults[index]);
+  const isDefault =
+    !resized && selection.length === defaults.length && selection.every((key, index) => key === defaults[index]);
   return (
     <div className="tc-bar">
       <button
@@ -64,7 +68,9 @@ export function ColumnChooser({
             <p className="ac-eyebrow">{caption}</p>
             <h2 id="tc-title">Fields to show</h2>
             <p className="ac-muted">
-              Add the fields you want, put them in order, and remove the ones you don&apos;t need.
+              Add the fields you want, put them in order, and remove the ones you don&apos;t need. In the list itself
+              you can also drag a column heading left or right to move it, and drag the edge of a heading to change the
+              column&apos;s width.
             </p>
             <div className="tc-lists">
               <section aria-labelledby="tc-available">

@@ -9,10 +9,11 @@ import {
   type ReactNode,
 } from "react";
 import { AlertTriangle, Search, X } from "lucide-react";
-import { SortableHeader, nodeText, useSortedRows } from "../../app/tableSort";
+import { SortableHeader, nodeText, useSortedRows, type SortState } from "../../app/tableSort";
 import { ApiError, describeError, requestJson } from "../../app/apiClient";
 import { Empty, Panel, type PanelState } from "../admin/console/charts";
 import { ColumnChooser, ColumnScope } from "../tables/ColumnChooser";
+import { useColumnControls, useColumnLayout } from "../tables/useColumnControls";
 import {
   availableFieldKeys,
   fieldLabel,
@@ -174,12 +175,25 @@ export function sourceIdColumn<T = any>(key: string, label = "Source ID"): Colum
   };
 }
 
+/**
+ * Sorting done by the server for a list it sends one page at a time (app/tableSort.tsx useServerSort): a heading
+ * click asks for that order across every page. Only the columns in `keys` can be sorted this way; their headings are
+ * plain text otherwise, so no heading pretends to sort what it cannot.
+ */
+export type ServerSort = { sort: SortState; onSort: (key: string) => void; keys: readonly string[] };
+
 type TableProps<T> = {
   rows: T[];
   columns: Column<T>[];
   empty: { title: string; detail: string };
   rowKey: (row: T, index: number) => string;
   caption: string;
+  /** The server sorts and pages this list; the rows are one page, already in order. */
+  serverSort?: ServerSort;
+  /** All rows are here: the table sorts them all and then shows them this many at a time. */
+  pageSize?: number;
+  /** What one row is, for the page summary ("120 users"). */
+  pageNoun?: string;
 };
 
 /**
@@ -191,7 +205,15 @@ export function Table<T>(props: TableProps<T>) {
   return scope ? <ChoosableTable {...props} scope={scope} /> : <PlainTable {...props} />;
 }
 
-function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: TableProps<T> & { scope: string }) {
+function ChoosableTable<T>({
+  rows,
+  columns,
+  empty,
+  rowKey,
+  caption,
+  scope,
+  ...paging
+}: TableProps<T> & { scope: string }) {
   const id = `${scope}:${caption}`;
   // Columns without a heading (row actions such as Open or Change) always stay, at the end.
   const pinned = columns.filter((column) => !column.label.trim());
@@ -206,6 +228,8 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
     [rows, columns],
   );
   const [saved, setSaved] = useState<string[] | null>(() => loadSelection(id));
+  // Column widths set by dragging a heading's edge; "Reset to default" clears them with the field choice.
+  const { layout, commit } = useColumnLayout(id);
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
   const options = [
     ...named.map((column) => ({ key: column.key, label: column.label })),
@@ -226,6 +250,10 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
     };
   };
   const shown = [...selection.map((key) => named.find((column) => column.key === key) ?? extraColumn(key)), ...pinned];
+  const choose = (next: string[] | null) => {
+    setSaved(next);
+    saveSelection(id, next);
+  };
   return (
     <>
       <ColumnChooser
@@ -233,61 +261,163 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
         options={options}
         selection={selection}
         defaults={defaults}
+        resized={Boolean(layout.widths && Object.keys(layout.widths).length)}
         onChange={(next) => {
-          setSaved(next);
-          saveSelection(id, next);
+          choose(next);
+          if (next === null) commit({});
         }}
       />
-      <PlainTable rows={rows} columns={shown} empty={empty} rowKey={rowKey} caption={caption} />
+      {/* Dragging a heading reorders the shown fields, the same order the chooser keeps. */}
+      <PlainTable
+        {...paging}
+        rows={rows}
+        columns={shown}
+        empty={empty}
+        rowKey={rowKey}
+        caption={caption}
+        layoutId={id}
+        onReorder={choose}
+      />
     </>
   );
 }
 
-function PlainTable<T>({ rows, columns, empty, rowKey, caption }: TableProps<T>) {
-  const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => {
+function PlainTable<T>({
+  rows,
+  columns,
+  empty,
+  rowKey,
+  caption,
+  layoutId,
+  onReorder,
+  serverSort,
+  pageSize,
+  pageNoun = "row",
+}: TableProps<T> & { layoutId?: string; onReorder?: (keys: string[]) => void }) {
+  const named = columns.filter((column) => column.label.trim());
+  const pinned = columns.filter((column) => !column.label.trim());
+  const controls = useColumnControls({
+    id: layoutId ?? `list:${caption}`,
+    keys: named.map((column) => column.key),
+    pinned: pinned.map((column) => column.key),
+    onReorder,
+  });
+  // Sorted here (all the rows), or by the server (the rows are one page in its order).
+  const local = useSortedRows(serverSort ? [] : rows, (row, key) => {
     const column = columns.find((item) => item.key === key);
     return column ? columnSortValue(column, row) : undefined;
   });
+  const sorted = serverSort ? rows : local.sorted;
+  const sort = serverSort ? serverSort.sort : local.sort;
+  const [page, setPage] = useState(1);
+  const toggle = (key: string) => {
+    setPage(1); // a new order starts from its first page
+    if (serverSort) serverSort.onSort(key);
+    else local.toggle(key);
+  };
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const current = Math.min(page, pages);
+  const visible = pageSize ? sorted.slice((current - 1) * pageSize, current * pageSize) : sorted;
+  const shown = [
+    ...controls.order
+      .map((key) => named.find((column) => column.key === key))
+      .filter((column): column is Column<T> => column !== undefined),
+    ...pinned,
+  ];
   // Row keys keep the server's position, so a row keeps its identity (and focus) when the list is re-sorted.
   const position = new Map(rows.map((row, index) => [row, index] as const));
   return (
-    <div className="ac-table-wrap">
-      <table className="ac-table">
-        <caption className="ca-sr-only">{caption}</caption>
-        <thead>
-          <tr>
-            {columns.map((column) =>
-              column.label.trim() ? (
-                <SortableHeader
-                  key={column.key}
-                  label={column.label}
-                  sortKey={column.key}
-                  sort={sort}
-                  onSort={toggle}
-                  className={column.numeric ? "num" : undefined}
-                />
-              ) : (
-                <th scope="col" key={column.key} className={column.numeric ? "num" : undefined}>
-                  <span className="ca-sr-only">Actions</span>
-                </th>
-              ),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((row, index) => (
-            <tr key={rowKey(row, position.get(row) ?? index)}>
-              {columns.map((column) => (
-                <td key={column.key} className={column.numeric ? "num" : undefined}>
-                  {column.render(row)}
-                </td>
-              ))}
+    <>
+      {!onReorder && controls.customized && (
+        <div className="tc-bar">
+          <button type="button" className="ac-link" onClick={controls.reset}>
+            Reset columns
+          </button>
+        </div>
+      )}
+      <div className="ac-table-wrap">
+        <table className={`ac-table ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
+          <caption className="ca-sr-only">{caption}</caption>
+          {controls.colgroup}
+          <thead>
+            <tr ref={controls.headRowRef}>
+              {shown.map((column) => {
+                if (!column.label.trim())
+                  return (
+                    <th
+                      scope="col"
+                      key={column.key}
+                      className={column.numeric ? "num" : undefined}
+                      {...controls.pinnedProps(column.key)}
+                    >
+                      <span className="ca-sr-only">Actions</span>
+                    </th>
+                  );
+                const header = controls.header(column.key, column.label);
+                if (serverSort && !serverSort.keys.includes(column.key))
+                  return (
+                    <th
+                      scope="col"
+                      key={column.key}
+                      {...header.thProps}
+                      className={[column.numeric ? "num" : "", header.className].filter(Boolean).join(" ") || undefined}
+                    >
+                      <span className="table-sort-static" title="This column cannot be sorted across all pages">
+                        {column.label}
+                      </span>
+                      {header.grip}
+                    </th>
+                  );
+                return (
+                  <SortableHeader
+                    key={column.key}
+                    label={column.label}
+                    sortKey={column.key}
+                    sort={sort}
+                    onSort={toggle}
+                    className={[column.numeric ? "num" : "", header.className].filter(Boolean).join(" ")}
+                    thProps={header.thProps}
+                    onKeyDown={header.onKeyDown}
+                  >
+                    {header.grip}
+                  </SortableHeader>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {visible.map((row, index) => (
+              <tr key={rowKey(row, position.get(row) ?? index)}>
+                {shown.map((column) => (
+                  <td key={column.key} className={column.numeric ? "num" : undefined}>
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pageSize && pages > 1 && (
+        <nav className="tc-pager" aria-label={`${caption} pages`}>
+          <button type="button" className="ac-secondary" disabled={current <= 1} onClick={() => setPage(current - 1)}>
+            Previous
+          </button>
+          <span>
+            Page {current} of {pages} · {sorted.length} {sorted.length === 1 ? pageNoun : `${pageNoun}s`}
+          </span>
+          <button
+            type="button"
+            className="ac-secondary"
+            disabled={current >= pages}
+            onClick={() => setPage(current + 1)}
+          >
+            Next
+          </button>
+        </nav>
+      )}
+    </>
   );
 }
 
