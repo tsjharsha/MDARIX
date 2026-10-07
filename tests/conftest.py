@@ -173,6 +173,8 @@ DB_MODULES = {
     "test_list_sorting_workspace",
     # Every organization-owned table is protected by forced row-level security (md05/md15/md34).
     "test_rls_coverage",
+    # CSV import options: import the rows that pass (rejects file for the rest), mask personal data instead of refusing.
+    "test_data_import_options",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

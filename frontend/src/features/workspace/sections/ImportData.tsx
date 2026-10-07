@@ -9,8 +9,10 @@ import { countOf } from "./common";
 
 /*
  * CSV import into the organization's own records. The same validated import serves free trials (their own routes
- * and limits, Getting started) and every other organization (/api/v1/data/import): the whole file is checked first,
- * nothing is saved unless every row passes, and each import is audited on the server.
+ * and limits, Getting started) and every other organization (/api/v1/data/import): the whole file is checked first and
+ * each import is audited on the server. By default nothing is saved unless every row passes; the uploader may choose to
+ * import the rows that pass (the others come back as a rejects file to fix) and to have personal data in the text
+ * replaced by placeholders such as [PERSON] instead of refused.
  */
 
 export type ImportTemplate = {
@@ -28,7 +30,16 @@ type CheckReport = {
   issues: { row: number | null; column: string | null; message: string }[];
   ready: boolean;
   preview: Record<string, string>[];
+  rows_to_import?: number;
+  rejected_rows?: number;
+  masked_values?: number;
+  /** The rows set aside, with their problems (only when problem rows are skipped); never stored on the server. */
+  rejects_csv?: string;
 };
+
+/** What to do with rows that have a problem, and with personal data in the text. */
+export type ImportOptions = { skipProblems: boolean; maskPersonal: boolean };
+export const NO_OPTIONS: ImportOptions = { skipProblems: false, maskPersonal: false };
 
 export type DateFormat = "ISO" | "DMY" | "MDY";
 export const DATE_FORMATS: [DateFormat, string][] = [
@@ -38,9 +49,32 @@ export const DATE_FORMATS: [DateFormat, string][] = [
 ];
 
 /** The import address for one template: `/check` only checks; the plain address imports. */
-export function importUrl(base: string, entity: string, mode: "check" | "import", dateFormat: DateFormat) {
+export function importUrl(
+  base: string,
+  entity: string,
+  mode: "check" | "import",
+  dateFormat: DateFormat,
+  options: ImportOptions = NO_OPTIONS,
+) {
   const path = `${base}/${encodeURIComponent(entity)}${mode === "check" ? "/check" : ""}`;
-  return dateFormat === "ISO" ? path : `${path}?date_format=${dateFormat}`;
+  const query = new URLSearchParams();
+  if (dateFormat !== "ISO") query.set("date_format", dateFormat);
+  if (options.skipProblems) query.set("on_problems", "skip");
+  if (options.maskPersonal) query.set("personal_data", "mask");
+  const search = query.toString();
+  return search ? `${path}?${search}` : path;
+}
+
+/** Save the rows set aside as a CSV file the person can fix and import again. */
+export function downloadRejects(csv: string, entity: string) {
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `mdarix-${entity}-rows-to-fix.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** "2 MB" for a file limit in bytes. */
@@ -76,6 +110,9 @@ export function ImportPanel({
   const [entity, setEntity] = useState("products");
   const [file, setFile] = useState<File | null>(null);
   const [dateFormat, setDateFormat] = useState<DateFormat>("ISO");
+  const [options, setOptions] = useState<ImportOptions>(NO_OPTIONS);
+  // The rows set aside by the last import, kept to download after the report is cleared.
+  const [rejects, setRejects] = useState<{ csv: string; rows: number } | null>(null);
   const canImport = useCan("records.write");
   const [report, setReport] = useState<CheckReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,7 +124,13 @@ export function ImportPanel({
     setFile(null);
     setReport(null);
     setMessage(null);
+    setRejects(null);
   }, [entity, dateFormat]);
+  // A new choice needs a new check of the same file.
+  useEffect(() => {
+    setReport(null);
+    setRejects(null);
+  }, [options]);
 
   const send = async (mode: "check" | "import") => {
     if (!file || !template) return null;
@@ -99,7 +142,7 @@ export function ImportPanel({
       return null;
     }
     // The file goes as it is (bytes): the server reads its encoding and its separator (comma, semicolon or tab).
-    return requestJson<any>(importUrl(basePath, template.entity, mode, dateFormat), {
+    return requestJson<any>(importUrl(basePath, template.entity, mode, dateFormat, options), {
       method: "POST",
       body: file,
       headers: { "Content-Type": "text/csv" },
@@ -122,10 +165,17 @@ export function ImportPanel({
     try {
       const result = await send("import");
       if (result) {
+        const notes = [
+          result.rejected_rows ? `${countOf(result.rejected_rows, "row")} set aside to fix` : "",
+          result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
+        ].filter(Boolean);
         setMessage({
           tone: "good",
-          text: `Imported ${template?.title.toLowerCase()}: ${result.created ?? 0} new, ${result.updated ?? 0} updated.`,
+          text: `Imported ${template?.title.toLowerCase()}: ${result.created ?? 0} new, ${result.updated ?? 0} updated${
+            notes.length ? `; ${notes.join("; ")}` : ""
+          }.`,
         });
+        setRejects(result.rejects_csv ? { csv: result.rejects_csv, rows: result.rejected_rows ?? 0 } : null);
         setReport(null);
         setFile(null);
         onImported();
@@ -147,8 +197,9 @@ export function ImportPanel({
       </header>
       <p className="uw-trial-note">
         Load the templates in the order shown: products first, then lots, then complaints, then the others that refer to
-        them. Remove patient and personal details first. Only template columns are accepted, and a file with any problem
-        imports nothing. Comma, semicolon and tab separated files are all read; save them as CSV UTF-8.
+        them. Only template columns are accepted. By default a file with any problem imports nothing; below you can
+        choose to import the rows that pass and get the others back, and to replace personal details instead of refusing
+        them. Comma, semicolon and tab separated files are all read; save them as CSV UTF-8.
       </p>
       <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
         {templates.map((item, index) => (
@@ -191,6 +242,28 @@ export function ImportPanel({
             ))}
           </select>
         </label>
+        <label className="ca-field uw-import-dates">
+          Rows with problems
+          <select
+            value={options.skipProblems ? "skip" : "refuse"}
+            disabled={busy}
+            onChange={(event) => setOptions({ ...options, skipProblems: event.target.value === "skip" })}
+          >
+            <option value="refuse">Import nothing until the file is fixed</option>
+            <option value="skip">Import the rows that pass; give me the rest to fix</option>
+          </select>
+        </label>
+        <label className="ca-field uw-import-dates">
+          Personal details in the text
+          <select
+            value={options.maskPersonal ? "mask" : "refuse"}
+            disabled={busy}
+            onChange={(event) => setOptions({ ...options, maskPersonal: event.target.value === "mask" })}
+          >
+            <option value="refuse">Refuse them: I remove them first</option>
+            <option value="mask">Replace them with [PERSON], [PHONE] and similar</option>
+          </select>
+        </label>
         <label className="ac-secondary">
           <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a CSV file"}
           <input
@@ -219,13 +292,40 @@ export function ImportPanel({
           {message.text}
         </p>
       )}
+      {rejects && !report && (
+        <button type="button" className="ac-secondary" onClick={() => downloadRejects(rejects.csv, template.entity)}>
+          <Download size={15} aria-hidden="true" /> Download the {countOf(rejects.rows, "row")} to fix
+        </button>
+      )}
       {report && (
         <div className="uw-trial-report" role="status">
           {report.ready ? (
-            <p className="uw-trial-message is-good">
-              <CheckCircle2 size={16} aria-hidden="true" /> {countOf(report.rows, "row")} ready to import (
-              {countOf(report.new_records, "new record")}).
-            </p>
+            <>
+              <p className="uw-trial-message is-good">
+                <CheckCircle2 size={16} aria-hidden="true" /> {countOf(report.rows_to_import ?? report.rows, "row")}{" "}
+                ready to import ({countOf(report.new_records, "new record")})
+                {report.masked_values
+                  ? `; personal data will be replaced in ${countOf(report.masked_values, "value")}`
+                  : ""}
+                .
+              </p>
+              {!!report.rejected_rows && (
+                <>
+                  <p className="uw-trial-message is-bad">
+                    {countOf(report.rejected_rows, "row")} will be set aside and not imported. Download them, fix them
+                    and import that file again.
+                  </p>
+                  <ul className="uw-trial-issues">
+                    {report.issues.map((issue, index) => (
+                      <li key={index}>
+                        {issue.row ? `Row ${issue.row}` : "File"}
+                        {issue.column ? ` · ${issue.column}` : ""}: {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           ) : (
             <>
               <p className="uw-trial-message is-bad">
@@ -242,10 +342,20 @@ export function ImportPanel({
               </ul>
             </>
           )}
+          {report.rejects_csv && (
+            <button
+              type="button"
+              className="ac-secondary"
+              onClick={() => downloadRejects(report.rejects_csv ?? "", report.entity)}
+            >
+              <Download size={15} aria-hidden="true" /> Download the {countOf(report.rejected_rows ?? 0, "row")} to fix
+            </button>
+          )}
           {report.preview.length > 0 && <FilePreviewTable rows={report.preview} />}
           {report.ready && canImport && (
             <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
-              <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${countOf(report.rows, "row")}`}
+              <Upload size={15} aria-hidden="true" />{" "}
+              {busy ? "Importing…" : `Import ${countOf(report.rows_to_import ?? report.rows, "row")}`}
             </button>
           )}
         </div>

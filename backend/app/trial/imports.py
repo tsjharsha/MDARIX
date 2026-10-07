@@ -2,8 +2,12 @@
 
 Every batch is checked in full before anything is written: only template columns are accepted, references must
 resolve inside the tenant, and text that looks like personal data (emails, phone numbers, dates of birth, patient
-or record numbers, named people) is rejected. A batch with any problem imports nothing. An ImportPolicy sets the
-source label recorded on each row and any row or file limits (free trials have both).
+or record numbers, named people) is rejected. By default a batch with any problem imports nothing. An uploader may
+choose instead (``on_problems=skip``) to import the rows that pass and get the others back as a rejects file with each
+row's problems (returned, never stored), and (``personal_data=mask``) to have personal data in free text replaced by
+typed placeholders such as [PERSON] or [PHONE] (genai/pii.py) instead of refused; what masking cannot remove is still
+refused. A problem of the file itself (columns, encoding, size, limits) always stops the whole file. An ImportPolicy
+sets the source label recorded on each row and any row or file limits (free trials have both).
 
 Files arrive as bytes (a raw ``text/csv`` body or a multipart upload, ``read_upload``) and are decoded strictly as
 UTF-8, with or without a byte-order mark: a file in another encoding is refused with instructions rather than read
@@ -134,20 +138,24 @@ FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no"
 LONG_TEXT = {"description": 4000, "text": 4000, "question": 4000, "content": 20000}
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,119}$")
+# (pattern, what it found, whether it matches only a label such as "MRN" or "date of birth" rather than the value).
 _PERSONAL_DATA = [
-    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "an email address"),
-    (re.compile(r"(?<!\w)(\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\w)"), "a phone number"),
-    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "a national ID number"),
-    (re.compile(r"\b(d\.?o\.?b\.?|date of birth|born on|birth ?date)\b", re.I), "a date of birth"),
+    (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "an email address", False),
+    (re.compile(r"(?<!\w)(\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\w)"), "a phone number", False),
+    (re.compile(r"\b\d{3}-\d{2}-\d{4}\b"), "a national ID number", False),
+    (re.compile(r"\b(d\.?o\.?b\.?|date of birth|born on|birth ?date)\b", re.I), "a date of birth", True),
     (
         re.compile(
             r"\b(mrn|medical record|patient (id|no|number|name)|ssn|social security|nhs (no|number)|aadhaar)\b",
             re.I,
         ),
         "a patient or record identifier",
+        True,
     ),
-    (re.compile(r"\b(mr|mrs|ms|miss|dr)\.?\s+[A-Z][a-z]+"), "a person's name"),
+    (re.compile(r"\b(mr|mrs|ms|miss|dr)\.?\s+[A-Z][a-z]+"), "a person's name", False),
 ]
+# What masking puts in place of personal data (genai/pii.py), e.g. [PERSON], [PHONE], [DATE_OF_BIRTH].
+_MASK_PLACEHOLDER = re.compile(r"\[[A-Z_]+\]")
 
 
 def template_csv(entity: str) -> str:
@@ -166,11 +174,24 @@ def _spreadsheet_formula(value: str) -> bool:
     return first in {"=", "+", "@", "\t", "\r"} or (first == "-" and "(" in value[:40])
 
 
-def _personal_data(value: str) -> str | None:
-    for pattern, label in _PERSONAL_DATA:
+def _personal_data(value: str, labels: bool = True) -> str | None:
+    """What personal data the text seems to hold. ``labels=False`` (after masking) ignores a label such as "MRN" or
+    "date of birth" left in front of a placeholder; the values themselves are still looked for."""
+    if not labels:
+        value = _MASK_PLACEHOLDER.sub(" ", value)
+    for pattern, label, label_only in _PERSONAL_DATA:
+        if label_only and not labels:
+            continue
         if pattern.search(value):
             return label
     return None
+
+
+def _mask(value: str) -> str:
+    """Personal data replaced by typed placeholders, the masking every AI request gets (genai/pii.py)."""
+    from genai.pii import mask_text
+
+    return mask_text(value)
 
 
 def _date(value: str) -> datetime | None:
@@ -288,11 +309,21 @@ class _Report:
     def __init__(self) -> None:
         self.issues: list[dict] = []
         self.error_count = 0
+        # Problems of the whole file (encoding, header, size, limits: no row can be imported) and of single rows.
+        self.file_problems = 0
+        self.row_problems: dict[int, list[str]] = {}
+        # Values whose personal data was masked, and what they were (for the rejects file only; never saved).
+        self.masked_values = 0
+        self.originals: dict[tuple[int, str], str] = {}
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
         if len(self.issues) < MAX_ISSUES:
             self.issues.append({"row": row, "column": column, "message": message})
+        if row is None or row == 1:  # line 1 is the header
+            self.file_problems += 1
+        else:
+            self.row_problems.setdefault(row, []).append(f"{column}: {message}" if column else message)
 
 
 def _parse(
@@ -344,7 +375,15 @@ def _parse(
     return rows
 
 
-def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report, date_format: str = "ISO") -> None:
+def _check_values(
+    entity: str,
+    rows: list[tuple[int, dict]],
+    report: _Report,
+    date_format: str = "ISO",
+    mask_personal_data: bool = False,
+) -> None:
+    """Check every value. With ``mask_personal_data`` free text has its personal data replaced (in the row, so the
+    masked text is what is saved) instead of being refused; what masking does not remove is still refused."""
     spec = TEMPLATES[entity]
     key = spec["required"][0]
     identity_columns = spec.get("identity")
@@ -370,12 +409,23 @@ def _check_values(entity: str, rows: list[tuple[int, dict]], report: _Report, da
                     expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
                     report.add(line, column, f"'{value}' is not a date in {expected} format.")
             else:
+                if mask_personal_data:
+                    masked = _mask(value)
+                    if masked != value:
+                        report.masked_values += 1
+                        report.originals[(line, column)] = value
+                        row[column] = value = masked
                 limit = LONG_TEXT.get(column, 255)
                 if len(value) > limit:
                     report.add(line, column, f"Keep this under {limit} characters.")
-                found = _personal_data(value)
+                found = _personal_data(value, labels=not mask_personal_data)
                 if found:
-                    report.add(line, column, f"This looks like it contains {found}. Remove personal data and retry.")
+                    advice = (
+                        "Masking could not remove it; remove it from the file."
+                        if mask_personal_data
+                        else "Remove personal data and retry, or choose to mask it."
+                    )
+                    report.add(line, column, f"This looks like it contains {found}. {advice}")
                 if _spreadsheet_formula(value):
                     report.add(line, column, "Text cannot start with =, +, @ or a formula; spreadsheets would run it.")
         if entity == "complaints" and row.get("status") and row["status"].lower() not in COMPLAINT_STATUSES:
@@ -523,24 +573,94 @@ def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
     return int(total)
 
 
+ON_PROBLEMS = ("refuse", "skip")
+PERSONAL_DATA_HANDLING = ("refuse", "mask")
+
+
+def import_options(on_problems: str, personal_data: str) -> tuple[bool, bool]:
+    """The ``on_problems`` (refuse | skip) and ``personal_data`` (refuse | mask) query parameters, as
+    (skip_problem_rows, mask_personal_data). Refusing is the default for both; anything else is a 422."""
+    on_problems, personal_data = (on_problems or "refuse").lower(), (personal_data or "refuse").lower()
+    if on_problems not in ON_PROBLEMS or personal_data not in PERSONAL_DATA_HANDLING:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "INVALID_IMPORT_OPTION",
+                "message": "on_problems is refuse or skip; personal_data is refuse or mask",
+            },
+        )
+    return on_problems == "skip", personal_data == "mask"
+
+
 def check_file(
-    db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
+    db: Session,
+    tenant_id,
+    entity: str,
+    raw: bytes,
+    policy: ImportPolicy = TRIAL_POLICY,
+    date_format: str = "ISO",
+    skip_problem_rows: bool = False,
+    mask_personal_data: bool = False,
 ) -> dict:
+    return _checked_file(db, tenant_id, entity, raw, policy, date_format, skip_problem_rows, mask_personal_data)[0]
+
+
+def _checked_file(
+    db: Session,
+    tenant_id,
+    entity: str,
+    raw: bytes,
+    policy: ImportPolicy,
+    date_format: str,
+    skip_problem_rows: bool,
+    mask_personal_data: bool,
+) -> tuple[dict, list]:
+    """The check report and the rows that would be imported (masked when asked; without the set-aside rows)."""
     report = _Report()
     rows = _parse(entity, raw, report, policy, date_format)
-    return _check_rows(db, tenant_id, entity, rows, report, policy, date_format)
+    return _check_rows(db, tenant_id, entity, rows, report, policy, date_format, skip_problem_rows, mask_personal_data)
 
 
 def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
     report = _Report()
     rows = rows_from_records(entity, records, report)
-    return _check_rows(db, tenant_id, entity, rows, report, policy)
+    return _check_rows(db, tenant_id, entity, rows, report, policy)[0]
+
+
+def _rejects_csv(rows, report: _Report) -> str:
+    """The rows set aside, as the uploader sent them (masking undone), with a ``problems`` column: returned to the
+    uploader to fix and import again, never stored. Text a spreadsheet would run as a formula is quoted with '."""
+    rejected = [(line, row) for line, row in rows if line in report.row_problems]
+    if not rejected:
+        return ""
+    columns = list(rejected[0][1])
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    writer.writerow([*columns, "problems"])
+    for line, row in rejected:
+        values = [report.originals.get((line, column), row.get(column, "")) for column in columns]
+        problems = "; ".join(report.row_problems[line])
+        writer.writerow(
+            ["'" + value if _spreadsheet_formula(value) else value for value in (*values, f"Row {line}: {problems}")]
+        )
+    return out.getvalue()
 
 
 def _check_rows(
-    db: Session, tenant_id, entity: str, rows, report: _Report, policy: ImportPolicy, date_format: str = "ISO"
-) -> dict:
+    db: Session,
+    tenant_id,
+    entity: str,
+    rows,
+    report: _Report,
+    policy: ImportPolicy,
+    date_format: str = "ISO",
+    skip_problem_rows: bool = False,
+    mask_personal_data: bool = False,
+) -> tuple[dict, list]:
+    """Check the rows. By default any problem stops the whole file. With ``skip_problem_rows`` a problem in a row
+    sets only that row aside; a problem of the file itself (columns, encoding, size, limits) still stops it all."""
     new_rows = 0
+    kept = rows
     oversized = len(rows) > MAX_ROWS_PER_FILE
     if oversized:
         report.add(
@@ -549,8 +669,17 @@ def _check_rows(
             f"This file has {len(rows):,} rows; one file can have up to {MAX_ROWS_PER_FILE:,}. Split it into smaller files.",
         )
     if rows and not oversized:
-        _check_values(entity, rows, report, date_format)
-        if not report.error_count:
+        _check_values(entity, rows, report, date_format, mask_personal_data)
+        if skip_problem_rows:
+            if not report.file_problems:
+                kept = [(line, row) for line, row in rows if line not in report.row_problems]
+                if kept:
+                    new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), report)
+                    if any(line in report.row_problems for line, _ in kept):
+                        # A row whose references do not resolve is set aside too; the rest are counted again.
+                        kept = [(line, row) for line, row in kept if line not in report.row_problems]
+                        new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), _Report()) if kept else 0
+        elif not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report)
     used = uploaded_rows(db, tenant_id, policy.source)
     if policy.row_limit is not None and new_rows and used + new_rows > policy.row_limit:
@@ -560,18 +689,31 @@ def _check_rows(
             f"This file adds {new_rows} records; {policy.limit_label} has {max(policy.row_limit - used, 0)} of "
             f"{policy.row_limit} left.",
         )
-    return {
+    if skip_problem_rows:
+        ready = bool(kept) and not report.file_problems and not oversized
+    else:
+        ready = bool(rows) and report.error_count == 0
+    rejected = sum(1 for line, _ in rows if line in report.row_problems) if skip_problem_rows else 0
+    result = {
         "entity": entity,
         "rows": len(rows),
         "new_records": new_rows,
-        "updated_records": max(len(rows) - new_rows, 0) if entity != "products" else None,
+        "updated_records": max(len(kept) - new_rows, 0) if entity != "products" else None,
         "error_count": report.error_count,
         "issues": report.issues,
-        "ready": bool(rows) and report.error_count == 0,
-        "preview": [row for _, row in rows[:8]],
+        "ready": ready,
+        "preview": [row for _, row in kept[:8]],
         "rows_used": used,
         "row_limit": policy.row_limit,
+        "skip_problem_rows": skip_problem_rows,
+        "mask_personal_data": mask_personal_data,
+        "rows_to_import": len(kept) if ready else 0,
+        "rejected_rows": rejected,
+        "masked_values": report.masked_values,
     }
+    if skip_problem_rows and rejected and not report.file_problems:
+        result["rejects_csv"] = _rejects_csv(rows, report)
+    return result, (kept if ready else [])
 
 
 def _stamp(now: datetime, row_date: datetime | None = None, source: str = UPLOAD_SOURCE) -> dict:
@@ -588,14 +730,31 @@ def _stamp(now: datetime, row_date: datetime | None = None, source: str = UPLOAD
 
 
 def import_file(
-    db: Session, tenant_id, entity: str, raw: bytes, policy: ImportPolicy = TRIAL_POLICY, date_format: str = "ISO"
+    db: Session,
+    tenant_id,
+    entity: str,
+    raw: bytes,
+    policy: ImportPolicy = TRIAL_POLICY,
+    date_format: str = "ISO",
+    skip_problem_rows: bool = False,
+    mask_personal_data: bool = False,
 ) -> dict:
-    report = check_file(db, tenant_id, entity, raw, policy, date_format)
+    report, rows = _checked_file(db, tenant_id, entity, raw, policy, date_format, skip_problem_rows, mask_personal_data)
     if not report["ready"]:
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
-    return _write_rows(db, tenant_id, entity, _parse(entity, raw, _Report(), policy, date_format), policy)
+    # The checked rows themselves: masked where asked, without the rows set aside.
+    result = _write_rows(db, tenant_id, entity, rows, policy)
+    result.update(
+        rejected_rows=report["rejected_rows"],
+        masked_values=report["masked_values"],
+        skip_problem_rows=skip_problem_rows,
+        mask_personal_data=mask_personal_data,
+    )
+    if report.get("rejects_csv"):
+        result["rejects_csv"] = report["rejects_csv"]
+    return result
 
 
 def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
