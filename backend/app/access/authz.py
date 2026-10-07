@@ -16,6 +16,7 @@ from backend.app.role_codes import (
     is_administrator_role,
     is_customer_admin_role,
     is_platform_admin_role,
+    is_strict_platform_admin_role,
     role_code,
 )
 
@@ -113,7 +114,9 @@ def _is_customer_admin(user: AuthUser) -> bool:
 
 def _require_platform_admin(request: Request, db: Session) -> AuthUser:
     user = _authenticated_user(request, db)
-    if not _is_platform_admin(user):
+    # Only PLATFORM_ADMIN (or MDARIX_ADMINISTRATOR) opens platform administration; a generic "Admin" or
+    # "Administrator" role does not.
+    if not is_strict_platform_admin_role(user.role):
         raise HTTPException(
             403, detail={"code": "PLATFORM_ADMIN_REQUIRED", "message": "Platform administrator role required"}
         )

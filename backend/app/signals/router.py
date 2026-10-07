@@ -16,7 +16,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import case, false, func, or_
+from sqlalchemy import case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import INVESTIGATION_CREATE, SIGNAL_TRIAGE, require_permission
@@ -40,15 +40,20 @@ from backend.app.signals.labels import (
     DISPOSITION_FROM,
     PRIORITY_RANK,
     RULES,
+    SEVERITY_RANK,
     THRESHOLD_DEFAULTS,
     THRESHOLD_RULE,
 )
+from backend.app.sorting import order_query
+from backend.app.sorting_lookup import lookup_order, person_names
 
 router = APIRouter(prefix="/api/v1/triage", tags=["Signals and triage"])
 
 PRIORITY_PATTERN = "^(" + "|".join(SIGNAL_PRIORITIES) + ")$"
 SORT_KEYS = ("priority", "due_at", "created_at", "complaint_count", "last_event_at")
-SORT_PATTERN = "^-?(" + "|".join(SORT_KEYS) + ")$"
+# The inbox's column headings sort by these as well (with ``order``); see _column_sorts.
+COLUMN_SORT_KEYS = ("business_id", "title", "product", "problem_key", "highest_severity", "status", "owner", "age_days")
+SORT_PATTERN = "^-?(" + "|".join((*SORT_KEYS, *COLUMN_SORT_KEYS)) + ")$"
 IDENTIFIER_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._/-]*$"
 EFFECTIVE_PRIORITY = func.coalesce(Signal.confirmed_priority, Signal.suggested_priority)
 PRIORITY_ORDER = case(PRIORITY_RANK, value=EFFECTIVE_PRIORITY, else_=0)
@@ -149,10 +154,53 @@ def _filtered(query, actor, *, statuses, priorities, origins, product_id, owner,
     return query
 
 
-def _ordered(query, sort: str | None):
+def _column_sorts(query, control_db: Session, tenant_id) -> dict:
+    """What each inbox column sorts on when a heading asks for it (``sort`` with ``order``)."""
+    product_name = (
+        select(Product.name)
+        .where(Product.tenant_id == Signal.tenant_id, Product.id == Signal.product_id)
+        .scalar_subquery()
+    )
+    version_name = (
+        select(ProductVersion.version_identifier)
+        .where(ProductVersion.tenant_id == Signal.tenant_id, ProductVersion.id == Signal.product_version_id)
+        .scalar_subquery()
+    )
+    owners = [row[0] for row in query.with_entities(Signal.owner_user_id).distinct() if row[0] is not None]
+    return {
+        "business_id": [Signal.business_id],
+        "title": [Signal.title],
+        "product": [product_name, version_name],
+        "problem_key": [Signal.problem_key],
+        "complaint_count": [Signal.complaint_count],
+        "highest_severity": [
+            case(SEVERITY_RANK, value=func.upper(func.trim(Signal.highest_severity)), else_=None),
+            Signal.serious_harm,
+        ],
+        "priority": [PRIORITY_ORDER],
+        "status": [Signal.status],
+        "owner": [lookup_order(Signal.owner_user_id, person_names(control_db, tenant_id, owners))],
+        "due_at": [Signal.due_at],
+        "created_at": [Signal.created_at],
+        "last_event_at": [Signal.last_event_at],
+    }
+
+
+def _ordered(query, sort: str | None, order: str | None = None, columns: dict | None = None):
     """Default: open signals first, then the most urgent priority, then the earliest due date. A sort key orders by
     that field in its natural direction (highest priority, earliest due, newest, most complaints, latest complaint);
-    a leading ``-`` reverses it."""
+    a leading ``-`` reverses it. With ``order`` (asc or desc), a column heading's sort: the key's column in that
+    direction across every page."""
+    key = (sort or "").lstrip("-")
+    if sort and columns is not None and (order or key not in SORT_KEYS):
+        order = order or ("desc" if sort.startswith("-") else "asc")
+        if key == "age_days":
+            # Ordering by age is ordering by the creation date the other way round (youngest first ascending).
+            key, order = "created_at", ("desc" if order == "asc" else "asc")
+        if key in columns:
+            return order_query(query, key, order, columns, default=[], tiebreak=[Signal.id])
+    if key not in SORT_KEYS:
+        sort = None
     if not sort:
         return query.order_by(
             OPEN_FIRST, PRIORITY_ORDER.desc(), Signal.due_at.asc().nulls_last(), Signal.created_at.desc(), Signal.id
@@ -183,6 +231,7 @@ def list_signals(
     overdue: bool = False,
     review_due: bool = False,
     sort: str | None = Query(default=None, pattern=SORT_PATTERN),
+    order: str | None = Query(default=None, pattern="^(asc|desc)$"),
     page: int = Query(default=1, ge=1, le=100000),
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_data_plane_db),
@@ -192,7 +241,9 @@ def list_signals(
     """One page of the organization's signals with the count per status (for the other filters). ``status`` may
     name several statuses (comma-separated) or OPEN for every open one, ``priority`` several priorities;
     ``overdue=true`` keeps signals awaiting triage (NEW, TRIAGE) past their due date, ``review_due=true`` monitored
-    signals whose review date has come."""
+    signals whose review date has come. ``sort`` alone keeps its natural direction (``-`` reverses it); with
+    ``order`` (asc or desc) it is a column heading's sort, and the inbox's columns (title, product, owner…) can be
+    named as well."""
     actor = _actor(control_db, ctx)
     statuses = _codes(status, (*SIGNAL_STATUSES, "OPEN"), "status")
     filters = {
@@ -207,7 +258,12 @@ def list_signals(
     base = db.query(Signal).filter(Signal.tenant_id == actor.tenant_id)
     query = _filtered(base, actor, statuses=statuses, **filters)
     total = query.count()
-    rows = _ordered(query, sort).offset((page - 1) * page_size).limit(page_size).all()
+    columns = (
+        _column_sorts(query, control_db, actor.tenant_id)
+        if sort and (order or sort.lstrip("-") not in SORT_KEYS)
+        else None
+    )
+    rows = _ordered(query, sort, order, columns).offset((page - 1) * page_size).limit(page_size).all()
     counts = {code: 0 for code in SIGNAL_STATUSES}
     unfiltered = _filtered(
         db.query(Signal.status, func.count(Signal.id)).filter(Signal.tenant_id == actor.tenant_id),

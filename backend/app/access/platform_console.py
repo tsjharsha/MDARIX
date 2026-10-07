@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, or_, text
+from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from auth.emailer import smtp_configuration_status
@@ -35,6 +35,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.sorting import order_query
 from backend.app.worker_status import worker_status
 
 router = APIRouter(prefix="/api/v1", tags=["Platform console"])
@@ -104,6 +105,16 @@ def _iso(value) -> str | None:
 
 def _page(page: int, page_size: int) -> tuple[int, int]:
     return max(1, page), min(100, max(1, page_size))
+
+
+def _tenant_name_of(model):
+    """The name a list shows for the tenant of each ``model`` row, as a sortable SQL expression."""
+    return (
+        select(func.coalesce(Tenant.display_name, Tenant.name))
+        .where(Tenant.id == model.tenant_id)
+        .correlate(model)
+        .scalar_subquery()
+    )
 
 
 # Plans & Licensing ---------------------------------------------------------------------------------------------
@@ -206,11 +217,14 @@ def integration_runs(
     reconciled: bool = False,
     page: int = 1,
     page_size: int = 25,
+    sort: str = "",
+    order: str = "",
     db: Session = Depends(get_db),
 ):
     """Connector runs across every tenant, newest first, with a 30-day summary by outcome.
 
-    ``reconciled`` keeps only runs that were reconciled against their source (any result).
+    ``reconciled`` keeps only runs that were reconciled against their source (any result). ``sort``/``order`` order
+    every page by a column instead (backend/app/sorting.py).
     """
     _require_platform_admin(request, db)
     page, page_size = _page(page, page_size)
@@ -236,7 +250,38 @@ def integration_runs(
             or_(func.lower(ConnectorRun.source_system).like(like), func.lower(ConnectorRun.connection_id).like(like))
         )
     total = query.count()
-    rows = query.order_by(ConnectorRun.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "when": [ConnectorRun.started_at],
+            "started_at": [ConnectorRun.started_at],
+            "completed_at": [ConnectorRun.completed_at],
+            "tenant": [_tenant_name_of(ConnectorRun)],
+            "tenant_name": [_tenant_name_of(ConnectorRun)],
+            "source": [ConnectorRun.source_system, ConnectorRun.connection_id],
+            "source_system": [ConnectorRun.source_system],
+            "connection_id": [ConnectorRun.connection_id],
+            "run_type": [ConnectorRun.run_type],
+            "records": [ConnectorRun.records_received],
+            "records_received": [ConnectorRun.records_received],
+            "records_accepted": [ConnectorRun.records_accepted],
+            "records_rejected": [ConnectorRun.records_rejected],
+            "records_quarantined": [ConnectorRun.records_quarantined],
+            "records_duplicate": [ConnectorRun.records_duplicate],
+            "retry_attempt": [ConnectorRun.retry_attempt],
+            "status": [ConnectorRun.status],
+            "reconciliation": [ConnectorRun.reconciliation_status],
+            "reconciliation_status": [ConnectorRun.reconciliation_status],
+            "schema_drift_status": [ConnectorRun.schema_drift_status],
+            "failure_category": [ConnectorRun.failure_category],
+            "problem": [ConnectorRun.failure_category, ConnectorRun.schema_drift_status, ConnectorRun.records_rejected],
+        },
+        default=[ConnectorRun.started_at.desc()],
+        tiebreak=[ConnectorRun.id],
+    )
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
     names = _tenant_names(db, [row.tenant_id for row in rows])
     since = datetime.now(timezone.utc) - timedelta(days=30)
     summary = dict(
@@ -389,9 +434,12 @@ def platform_audit(
     attention: bool = False,
     page: int = 1,
     page_size: int = 50,
+    sort: str = "",
+    order: str = "",
     db: Session = Depends(get_db),
 ):
-    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values)."""
+    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values).
+    ``sort``/``order`` order every page by a column instead (backend/app/sorting.py)."""
     _require_platform_admin(request, db)
     page, page_size = _page(page, page_size)
     query = db.query(AuditEvent)
@@ -412,7 +460,36 @@ def platform_audit(
             or_(func.lower(AuditEvent.action).like(like), func.lower(AuditEvent.entity_type).like(like))
         )
     total = query.count()
-    rows = query.order_by(AuditEvent.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    actor_name = func.coalesce(
+        select(func.coalesce(AuthUser.display_name, AuthUser.username))
+        .where(cast(AuthUser.id, String) == AuditEvent.actor_ref)
+        .correlate(AuditEvent)
+        .scalar_subquery(),
+        AuditEvent.actor_ref,
+    )
+    reason = func.coalesce(AuditEvent.reason, AuditEvent.details["reason"].astext)
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "when": [AuditEvent.created_at],
+            "at": [AuditEvent.created_at],
+            "tenant": [_tenant_name_of(AuditEvent)],
+            "tenant_name": [_tenant_name_of(AuditEvent)],
+            "who": [actor_name],
+            "actor": [actor_name],
+            "what": [AuditEvent.action, AuditEvent.entity_type],
+            "action": [AuditEvent.action],
+            "entity_type": [AuditEvent.entity_type],
+            "why": [reason],
+            "reason": [reason],
+            "source_ip": [AuditEvent.source_ip],
+        },
+        default=[AuditEvent.created_at.desc()],
+        tiebreak=[AuditEvent.id],
+    )
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
     names = _tenant_names(db, [row.tenant_id for row in rows])
     actors = _actor_names(db, [row.actor_ref for row in rows])
     items = []

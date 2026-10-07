@@ -5,12 +5,13 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Complaint, InvestigationComplaint, Product, ProductVersion
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.sorting import order_query
 
 router = APIRouter(prefix="/api/v1/complaints", tags=["Complaints"])
 
@@ -21,6 +22,31 @@ def _like(text: str) -> str:
     return f"%{escaped.lower()}%"
 
 
+RECEIVED_AT = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp)
+
+
+def _sorts() -> dict:
+    """What each column of the complaint list sorts on (``sort``/``order``)."""
+    cases = (
+        select(func.count(InvestigationComplaint.id))
+        .where(
+            InvestigationComplaint.tenant_id == Complaint.tenant_id,
+            InvestigationComplaint.complaint_id == Complaint.id,
+        )
+        .scalar_subquery()
+    )
+    return {
+        "business_id": [func.coalesce(Complaint.business_id, Complaint.complaint_identifier)],
+        "complaint_identifier": [Complaint.complaint_identifier],
+        "product": [Product.name, ProductVersion.version_identifier],
+        "description": [Complaint.description],
+        "received": [RECEIVED_AT],
+        "severity": [Complaint.severity],
+        "status": [Complaint.status],
+        "cases": [cases],
+    }
+
+
 @router.get("")
 def list_complaints(
     q: str = Query("", max_length=120),
@@ -28,6 +54,8 @@ def list_complaints(
     status: str = Query("", max_length=40),
     page: int = Query(1, ge=1, le=10_000),
     page_size: int = Query(50, ge=1, le=200),
+    sort: str | None = Query(None, max_length=60),
+    order: str | None = Query(None, max_length=10),
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
@@ -57,12 +85,11 @@ def list_complaints(
             )
         )
     total = query.count()
-    rows = (
-        query.order_by(func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp).desc().nullslast())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
+    # Newest first unless a column heading asks for another order (``sort``/``order``) across every page.
+    ordered = order_query(
+        query, sort, order, _sorts(), default=[RECEIVED_AT.desc().nullslast()], tiebreak=[Complaint.id]
     )
+    rows = ordered.offset((page - 1) * page_size).limit(page_size).all()
     ids = [complaint.id for complaint, *_ in rows]
     linked = (
         dict(

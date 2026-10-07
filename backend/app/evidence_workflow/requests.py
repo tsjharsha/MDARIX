@@ -25,7 +25,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from pydantic import ValidationError
-from sqlalchemy import false, func, or_
+from sqlalchemy import String, cast, false, func, or_, select
+from sqlalchemy import case as sql_case
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -49,6 +50,8 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.stage3 import EvidenceAttachment, SupplierEvidenceRequest
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.sorting import order_query
+from backend.app.sorting_lookup import lookup_order, person_names
 from backend.app.evidence_workflow import hooks
 from backend.app.evidence_workflow.inventory import (
     error,
@@ -505,12 +508,115 @@ def _create_supplier_request(
 
 # ---------------------------------------------------------------------------------------------------------- read
 
+# A priority column sorted ascending reads from low to critical.
+_REQUEST_PRIORITY = {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
+
+
+def _people_and_roles(query, control_db: Session, tenant_id) -> tuple[dict[str, str], dict[str, str]]:
+    """The names of the people (requesters and recipients) and role queues the requests in ``query`` name."""
+    from backend.app.workflow.labels import role_label
+
+    refs = query.with_entities(
+        SupplierEvidenceRequest.requested_by,
+        SupplierEvidenceRequest.recipient_user_id,
+        SupplierEvidenceRequest.recipient_role,
+    ).distinct()
+    people: set = set()
+    roles: set = set()
+    for requested_by, recipient_user_id, recipient_role in refs:
+        people.update(ref for ref in (requested_by, recipient_user_id) if ref is not None)
+        if recipient_role:
+            roles.add(recipient_role)
+    names = {str(key): value for key, value in person_names(control_db, tenant_id, people).items()}
+    return names, {role: role_label(role) or role for role in roles}
+
+
+def _searched(query, q: str | None, names: dict[str, str], roles: dict[str, str]):
+    """Requests whose ID, title, recipient e-mail, case, supplier, requester, recipient or role queue holds ``q``."""
+    text = " ".join(str(q or "").split())
+    if not text:
+        return query
+    escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    needle = text.casefold()
+    people = [ref for ref, name in names.items() if needle in name.casefold()]
+    held = [role for role, label in roles.items() if needle in label.casefold() or needle in role.casefold()]
+    case_ids = select(Investigation.id).where(
+        Investigation.tenant_id == SupplierEvidenceRequest.tenant_id,
+        Investigation.business_id.ilike(pattern, escape="\\"),
+    )
+    supplier_ids = select(Supplier.id).where(
+        Supplier.tenant_id == SupplierEvidenceRequest.tenant_id,
+        or_(Supplier.name.ilike(pattern, escape="\\"), Supplier.business_id.ilike(pattern, escape="\\")),
+    )
+    conditions = [
+        SupplierEvidenceRequest.business_id.ilike(pattern, escape="\\"),
+        SupplierEvidenceRequest.title.ilike(pattern, escape="\\"),
+        SupplierEvidenceRequest.recipient.ilike(pattern, escape="\\"),
+        SupplierEvidenceRequest.investigation_id.in_(case_ids),
+        SupplierEvidenceRequest.supplier_id.in_(supplier_ids),
+    ]
+    if people:
+        conditions.append(SupplierEvidenceRequest.requested_by.in_(people))
+        conditions.append(cast(SupplierEvidenceRequest.recipient_user_id, String).in_(people))
+    if held:
+        conditions.append(SupplierEvidenceRequest.recipient_role.in_(held))
+    return query.filter(or_(*conditions))
+
+
+def _column_sorts(box: str, names: dict[str, str], roles: dict[str, str]) -> dict:
+    """What each column of the request list sorts on. "To" (sent) is the recipient as the list shows it: the person,
+    else the role queue, else the supplier, else the e-mail; "From" (received, all) is the person who asked."""
+    case_id = (
+        select(Investigation.business_id)
+        .where(
+            Investigation.tenant_id == SupplierEvidenceRequest.tenant_id,
+            Investigation.id == SupplierEvidenceRequest.investigation_id,
+        )
+        .scalar_subquery()
+    )
+    supplier_name = (
+        select(func.coalesce(Supplier.name, Supplier.business_id))
+        .where(
+            Supplier.tenant_id == SupplierEvidenceRequest.tenant_id, Supplier.id == SupplierEvidenceRequest.supplier_id
+        )
+        .scalar_subquery()
+    )
+    files = (
+        select(func.count(EvidenceAttachment.id))
+        .where(
+            EvidenceAttachment.tenant_id == SupplierEvidenceRequest.tenant_id,
+            EvidenceAttachment.request_id == SupplierEvidenceRequest.id,
+        )
+        .scalar_subquery()
+    )
+    recipient = func.coalesce(
+        lookup_order(cast(SupplierEvidenceRequest.recipient_user_id, String), names),
+        lookup_order(SupplierEvidenceRequest.recipient_role, roles),
+        supplier_name,
+        SupplierEvidenceRequest.recipient,
+    )
+    requester = lookup_order(SupplierEvidenceRequest.requested_by, names)
+    return {
+        "business_id": [SupplierEvidenceRequest.business_id],
+        "title": [SupplierEvidenceRequest.title],
+        "investigation": [case_id],
+        "party": [recipient if box == "sent" else requester],
+        "status": [SupplierEvidenceRequest.status],
+        "priority": [sql_case(_REQUEST_PRIORITY, value=SupplierEvidenceRequest.priority, else_=None)],
+        "due_at": [SupplierEvidenceRequest.due_at],
+        "attachments_count": [files],
+    }
+
 
 @router.get(BASE)
 def list_evidence_requests(
     investigation_id: uuid.UUID | None = None,
     box: str = Query(default="all", pattern="^(" + "|".join(BOXES) + ")$"),
     status: str | None = Query(default=None, max_length=40),
+    q: str | None = Query(default=None, max_length=200),
+    sort: str | None = Query(default=None, max_length=60),
+    order: str | None = Query(default=None, max_length=10),
     page: int = Query(default=1, ge=1, le=100000),
     page_size: int = Query(default=50, ge=1, le=200),
     db: Session = Depends(get_data_plane_db),
@@ -518,7 +624,9 @@ def list_evidence_requests(
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """One page of the organization's evidence requests, newest first: those I sent, those asked of me or of a role I
-    hold (received), or all of them; optionally of one case and in one status."""
+    hold (received), or all of them; optionally of one case and in one status. ``q`` searches every page (request
+    ID, title, case, recipient, requester, supplier); ``sort`` (a column: business_id, title, investigation, party,
+    status, priority, due_at, attachments_count) with ``order`` (asc or desc) orders every page by that column."""
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     person = current_person(control_db, ctx)
     query = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.tenant_id == tenant_id)
@@ -535,13 +643,21 @@ def list_evidence_requests(
         query = query.filter(SupplierEvidenceRequest.request_kind == KIND_INTERNAL, or_(mine, held))
     if status:
         query = query.filter(SupplierEvidenceRequest.status == status.strip().upper())
+    columns: dict = {}
+    if (q and q.strip()) or sort:
+        names, roles = _people_and_roles(query, control_db, tenant_id)
+        query = _searched(query, q, names, roles)
+        columns = _column_sorts(box, names, roles) if sort else {}
     total = query.count()
-    rows = (
-        query.order_by(SupplierEvidenceRequest.created_at.desc(), SupplierEvidenceRequest.id)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
+    ordered = order_query(
+        query,
+        sort,
+        order,
+        columns,
+        default=[SupplierEvidenceRequest.created_at.desc()],
+        tiebreak=[SupplierEvidenceRequest.id],
     )
+    rows = ordered.offset((page - 1) * page_size).limit(page_size).all()
     return {
         "items": serialize(db, control_db, tenant_id, person, rows),
         "total": total,

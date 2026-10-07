@@ -87,12 +87,18 @@ def trial_reminders(db: Session, _state: dict) -> dict:
 def embedding_catch_up(db: Session, _state: dict) -> dict:
     """Embed evidence that has none yet (records imported while the API restarted, or a failed background step)."""
     from backend.app.db.data_plane import open_tenant_data_session
+    from backend.app.customer_lifecycle import customer_allows_access_clause
     from backend.app.db.models.foundation import Tenant
     from retrieval.service import TrustedRetrievalService
 
     service = TrustedRetrievalService()
     totals = {"tenants": 0, "indexed": 0, "failed": 0, "deferred": 0}
-    tenant_ids = [row.id for row in db.query(Tenant.id).filter(Tenant.status.in_(["ACTIVE", "active"])).all()]
+    tenant_ids = [
+        row.id
+        for row in db.query(Tenant.id)
+        .filter(Tenant.status.in_(["ACTIVE", "active"]), customer_allows_access_clause())
+        .all()
+    ]
     for tenant_id in tenant_ids:
         with open_tenant_data_session(tenant_id) as data:
             result = service.index_evidence_chunks(data, tenant_id, limit=500)

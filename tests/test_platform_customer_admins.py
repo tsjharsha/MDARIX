@@ -178,7 +178,7 @@ def test_environments_are_validated_instead_of_failing(platform, customer):
     assert platform.post(path, json={**body, "environment_type": "STAGING"}).status_code == 422
 
 
-def test_suspending_a_customer_suspends_its_tenants_and_needs_the_password(platform, customer):
+def test_suspending_a_customer_blocks_its_tenants_and_needs_the_password(platform, customer):
     path = f"/api/v1/platform-admin/customer-records/{customer['customer_id']}/lifecycle"
     wrong = platform.post(path, json={"status": "SUSPENDED", "reason": "Contract ended", "password": "wrong-password"})
     assert wrong.status_code == 403
@@ -186,18 +186,25 @@ def test_suspending_a_customer_suspends_its_tenants_and_needs_the_password(platf
         path, json={"status": "SUSPENDED", "reason": "Contract ended", "password": PLATFORM_PASSWORD}
     )
     assert suspended.status_code == 200, suspended.text
-    assert suspended.json()["tenants_changed"] == [customer["tenant_key"]]
+    body = suspended.json()
+    assert body["status"] == "SUSPENDED" and body["customer"]["lifecycle_status"] == "SUSPENDED"
+    # Only the customer changes: the tenant keeps its own status, but its access is blocked by the customer.
+    assert body["tenants_changed"] == []
+    assert [item["tenant_id"] for item in body["tenants_affected"]] == [customer["id"]]
+    assert body["tenants_affected"][0]["effective_access"] == "BLOCKED_BY_CUSTOMER"
     db = SessionLocal()
     try:
-        assert db.query(Tenant).filter(Tenant.id == uuid.UUID(customer["id"])).one().status == "SUSPENDED"
+        assert db.query(Tenant).filter(Tenant.id == uuid.UUID(customer["id"])).one().status == "ACTIVE"
     finally:
         db.close()
     record = platform.get(f"/api/v1/platform-admin/customer-records/{customer['customer_id']}").json()
     assert record["customer"]["lifecycle_status"] == "SUSPENDED"
+    assert record["tenants"][0]["effective_access"] == "BLOCKED_BY_CUSTOMER"
     reactivated = platform.post(
         path, json={"status": "ACTIVE", "reason": "Contract renewed", "password": PLATFORM_PASSWORD}
     )
     assert reactivated.status_code == 200 and reactivated.json()["status"] == "ACTIVE"
+    assert reactivated.json()["tenants_affected"][0]["effective_access"] == "ACTIVE"
 
 
 def test_the_customer_page_has_only_working_sections(platform, customer):
@@ -206,10 +213,13 @@ def test_the_customer_page_has_only_working_sections(platform, customer):
     for tab in record["tabs"][1:]:
         response = platform.get(f"/api/v1/platform-admin/customer-records/{customer['customer_id']}/tabs/{tab}")
         assert response.status_code == 200, (tab, response.text)
-    # Customer details are maintained by the customer, not edited by the platform administrator.
-    assert platform.patch(
-        f"/api/v1/platform-admin/customer-records/{customer['customer_id']}", json={"display_name": "Renamed"}
-    ).status_code in {404, 405}
+    # Customer details are edited by the platform administrator, with a reason and the version they loaded.
+    renamed = platform.patch(
+        f"/api/v1/platform-admin/customer-records/{customer['customer_id']}",
+        json={"display_name": "Renamed", "reason": "Customer asked for a new name", "lock_version": 1},
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["customer"]["display_name"] == "Renamed"
 
 
 def test_the_add_administrator_picker_lists_active_tenants_quickly(platform, customer):

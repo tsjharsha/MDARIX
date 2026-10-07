@@ -49,6 +49,108 @@ def allowed_lifecycle_transition(current: str, target: str) -> bool:
     return target.upper() in LIFECYCLE_TRANSITIONS.get(current.upper(), frozenset())
 
 
+# A tenant whose provisioning finished (PROVISIONED) may also be activated directly by a Platform Administrator, in
+# addition to the shared matrix above. Tenants still in DRAFT, PENDING_APPROVAL or PROVISIONING may not.
+TENANT_EXTRA_TRANSITIONS: dict[str, frozenset[str]] = {"PROVISIONED": frozenset({"ACTIVE"})}
+TENANT_NOT_PROVISIONED_STATUSES = frozenset({"DRAFT", "PENDING_APPROVAL", "PROVISIONING"})
+
+
+def allowed_tenant_transition(current: str, target: str) -> bool:
+    current, target = current.upper(), target.upper()
+    return allowed_lifecycle_transition(current, target) or target in TENANT_EXTRA_TRANSITIONS.get(current, frozenset())
+
+
+def tenant_transition_message(current: str, target: str) -> str:
+    if target.upper() == "ACTIVE" and current.upper() in TENANT_NOT_PROVISIONED_STATUSES:
+        return f"Provisioning of this tenant is not finished ({current}); it can be activated once it is provisioned"
+    return f"Cannot transition {current} to {target}"
+
+
+# "Customer gates tenants": a customer in one of these states blocks sign-in, the API and background jobs for every
+# tenant it owns, without changing the tenants' own status (reactivating the customer restores exactly the tenants
+# that are themselves active).
+BLOCKING_CUSTOMER_STATUSES = frozenset({"SUSPENDED", "TERMINATED", "ARCHIVED"})
+# A tenant can be (re)activated only while its customer is in one of these states.
+CUSTOMER_ACTIVE_STATUSES = frozenset({"ACTIVE", "EXPIRING_SOON"})
+# Tenant states in which a tenant itself is open for use.
+TENANT_OPEN_STATUSES = frozenset({"ACTIVE", "EXPIRING_SOON"})
+
+# What a Platform Administrator may do to a customer's own standing (the customer status route).
+CUSTOMER_STATUS_SOURCES: dict[str, frozenset[str]] = {
+    "SUSPENDED": frozenset({"ACTIVE", "EXPIRING_SOON", "EXPIRED"}),
+    "ACTIVE": frozenset(
+        {
+            "SUSPENDED",
+            "EXPIRED",
+            "DRAFT",
+            "PENDING_APPROVAL",
+            "PROVISIONING",
+            "PROVISIONED",
+            "PENDING_CUSTOMER_ACTIVATION",
+        }
+    ),
+}
+# Customer states before the first activation; the onboarding wizard moves them to ACTIVE with their first tenant.
+PRE_ACTIVE_CUSTOMER_STATUSES = frozenset(
+    {"DRAFT", "PENDING_APPROVAL", "PROVISIONING", "PROVISIONED", "PENDING_CUSTOMER_ACTIVATION"}
+)
+OPERATOR_CUSTOMER_IDENTIFIER = "MDARIX-OPERATOR"
+
+
+def customer_blocks_access(customer_status: str | None) -> bool:
+    return str(customer_status or "").upper() in BLOCKING_CUSTOMER_STATUSES
+
+
+def effective_access(tenant_status: str | None, customer_status: str | None) -> str:
+    """ACTIVE when the tenant is open and its customer does not block it; BLOCKED_BY_CUSTOMER when only the customer
+    stands in the way; otherwise BLOCKED."""
+    if str(tenant_status or "").upper() not in TENANT_OPEN_STATUSES:
+        return "BLOCKED"
+    if customer_blocks_access(customer_status):
+        return "BLOCKED_BY_CUSTOMER"
+    return "ACTIVE"
+
+
+def tenants_of_blocking_customers():
+    """SQL subquery: ids of tenants whose customer is suspended, terminated or archived."""
+    from sqlalchemy import func, select
+
+    return select(Tenant.id).where(
+        Tenant.customer_id.in_(
+            select(Customer.id).where(func.upper(Customer.lifecycle_status).in_(sorted(BLOCKING_CUSTOMER_STATUSES)))
+        )
+    )
+
+
+def customer_allows_access_clause():
+    """SQL filter on Tenant for background jobs: the tenant's customer does not block access."""
+    return Tenant.id.not_in(tenants_of_blocking_customers())
+
+
+def operator_customer_ids(db) -> set:
+    """The platform operator's own customer(s): the MDARIX-OPERATOR customer and every customer owning a tenant in
+    which an active Platform Administrator account lives. Suspending them would lock the platform out."""
+    from backend.app.db.models.foundation import AuthUser
+
+    ids = {
+        row.customer_id
+        for row in db.query(Tenant.customer_id)
+        .join(AuthUser, AuthUser.tenant_id == Tenant.id)
+        .filter(AuthUser.role == "PLATFORM_ADMIN", AuthUser.status == "ACTIVE")
+        .distinct()
+        .all()
+    }
+    ids.update(
+        row.id
+        for row in db.query(Customer.id).filter(Customer.customer_identifier == OPERATOR_CUSTOMER_IDENTIFIER).all()
+    )
+    return ids
+
+
+def is_operator_customer(db, customer_id) -> bool:
+    return customer_id in operator_customer_ids(db)
+
+
 def _slug(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:100]
 

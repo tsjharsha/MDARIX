@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import case, false, func, or_
+from sqlalchemy import case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.business_ids import as_uuid, wanted_ids
@@ -25,6 +25,8 @@ from backend.app.db.models.workflow import OPEN_TASK_STATUSES, WorkflowTask, Wor
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.role_codes import role_code
+from backend.app.sorting import order_query
+from backend.app.sorting_lookup import lookup_order, person_names
 from backend.app.workflow import tasks as service
 from backend.app.workflow.labels import (
     INVESTIGATION_ASSIGN_PERMISSION,
@@ -46,6 +48,8 @@ COMPLETED_DAYS = 90
 # A person is working on these (they can decline, release or complete them).
 WORKING_STATUSES = ("ASSIGNED", "ACCEPTED", "IN_PROGRESS")
 _PRIORITY_RANK = case({"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}, value=WorkflowTask.priority, else_=4)
+# A priority column sorted ascending reads from low to critical.
+_PRIORITY_LEVEL = case({"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}, value=WorkflowTask.priority, else_=None)
 
 
 def _error(status: int, code: str, message: str) -> HTTPException:
@@ -197,8 +201,46 @@ def _search(query, q: str | None):
     )
 
 
-def _ordered(query):
-    return query.order_by(_PRIORITY_RANK, WorkflowTask.due_at.asc().nulls_last(), WorkflowTask.created_at.desc())
+def _ordered(query, sort: str | None = None, order: str | None = None, columns: dict | None = None):
+    """Most urgent first (priority, then due date, then newest), unless a column heading asks for another order
+    (``sort``/``order``, see _column_sorts) across every page."""
+    default = [_PRIORITY_RANK, WorkflowTask.due_at.asc().nulls_last(), WorkflowTask.created_at.desc()]
+    if not sort or not columns:
+        return query.order_by(*default)
+    return order_query(query, sort, order, columns, default=default, tiebreak=[WorkflowTask.id])
+
+
+def _column_sorts(query, control_db: Session, tenant_id) -> dict:
+    """What each My Work column sorts on: the source record's ID (whatever kind it is), the priority from low to
+    critical, and who holds the task (the person's name, else the role queue's name)."""
+    source_id = case(
+        *(
+            (
+                WorkflowTask.source_entity_type == kind,
+                select(model.business_id)
+                .where(model.tenant_id == WorkflowTask.tenant_id, model.id == WorkflowTask.source_entity_id)
+                .scalar_subquery(),
+            )
+            for kind, model in _source_models().items()
+        ),
+        else_=None,
+    )
+    held = query.with_entities(WorkflowTask.assigned_user_id, WorkflowTask.assigned_role).distinct().all()
+    people = person_names(control_db, tenant_id, [user for user, _ in held if user is not None])
+    roles = {role: role_label(role) for _, role in held if role}
+    assignee = func.coalesce(
+        lookup_order(WorkflowTask.assigned_user_id, people), lookup_order(WorkflowTask.assigned_role, roles)
+    )
+    return {
+        "business_id": [WorkflowTask.business_id],
+        "title": [WorkflowTask.title],
+        "source": [source_id],
+        "priority": [_PRIORITY_LEVEL],
+        "status": [WorkflowTask.status],
+        "due_at": [WorkflowTask.due_at],
+        "assigned": [assignee],
+        "completed_at": [WorkflowTask.completed_at],
+    }
 
 
 def _source_models() -> dict:
@@ -362,15 +404,20 @@ def list_tasks(
     page: int = Query(default=1, ge=1, le=100000),
     page_size: int = Query(default=50, ge=1, le=200),
     q: str | None = Query(default=None, max_length=200),
+    sort: str | None = Query(default=None, max_length=60),
+    order: str | None = Query(default=None, max_length=10),
     db: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """One page of a view of My Work, most urgent first (priority, then due date, then newest)."""
+    """One page of a view of My Work, most urgent first (priority, then due date, then newest); ``sort`` (a column:
+    business_id, title, source, priority, status, due_at, assigned, completed_at) with ``order`` (asc or desc)
+    orders every page by that column instead."""
     actor = _actor(control_db, ctx)
     query = _search(_view_query(db, actor, view, service.now_utc()), q)
     total = query.count()
-    rows = _ordered(query).offset((page - 1) * page_size).limit(page_size).all()
+    columns = _column_sorts(query, control_db, actor.tenant_id) if sort else None
+    rows = _ordered(query, sort, order, columns).offset((page - 1) * page_size).limit(page_size).all()
     return {
         "view": view,
         "items": serialize_tasks(db, control_db, actor, rows),

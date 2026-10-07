@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from auth.service import _verify
-from sqlalchemy import func, or_
+from sqlalchemy import false, func, or_, select
 from sqlalchemy.orm import Session
 
 from auth.durable import issue_invitation
@@ -20,7 +20,11 @@ from backend.app.customer_admin_continuity import (
     validate_support_window,
 )
 from backend.app.customer_lifecycle import (
-    allowed_lifecycle_transition,
+    CUSTOMER_ACTIVE_STATUSES,
+    allowed_tenant_transition,
+    tenant_transition_message,
+    effective_access,
+    is_operator_customer,
 )
 from backend.app import csv_safe
 from backend.app.db.models.customer_lifecycle import (
@@ -47,12 +51,15 @@ from backend.app.db.models.stage2 import (
     UserInvitation,
 )
 from backend.app.db.session import get_db
+from backend.app.sorting import order_query
 from backend.app.access.schemas import (
     CustomerAdminReplacementRequest,
     EnvironmentCreateRequest,
     ScheduledLifecycleRequest,
     SupportAccessDecisionRequest,
     SupportAccessRequest,
+    TenantLifecycleRequest,
+    TenantUpdateRequest,
 )
 from backend.app.access.authz import _is_platform_admin, _require_platform_admin, _role_code
 from backend.app.access.common import (
@@ -63,6 +70,9 @@ from backend.app.access.common import (
 )
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+# Statuses the platform operator's own tenant can never be moved to (it would lock the platform out).
+OPERATOR_PROTECTED_TARGETS = frozenset({"SUSPENDED", "TERMINATED", "ARCHIVED", "EXPIRED"})
 
 # The values the tenant_environments check constraint allows.
 ENVIRONMENT_STATUSES = frozenset({"DRAFT", "PROVISIONING", "ACTIVE", "SUSPENDED", "ARCHIVED", "FAILED"})
@@ -102,32 +112,78 @@ def platform_tenant_health(tenant_id: uuid.UUID, request: Request, db: Session =
     }
 
 
+def _customer_of(db: Session, tenant: Tenant) -> Customer | None:
+    return db.query(Customer).filter(Customer.id == tenant.customer_id).first()
+
+
+def _access_fields(tenant: Tenant, customer: Customer | None) -> dict:
+    customer_status = customer.lifecycle_status if customer else None
+    return {
+        "customer_lifecycle_status": customer_status,
+        "effective_access": effective_access(tenant.status, customer_status),
+    }
+
+
+def tenant_transition_refusal(db: Session, tenant: Tenant, target: str) -> HTTPException | None:
+    """The guards every tenant status change shares: a tenant is activated only under an active customer, and the
+    operator's own tenant is never suspended or terminated."""
+    customer = _customer_of(db, tenant)
+    if target == "ACTIVE" and (
+        customer is None or str(customer.lifecycle_status).upper() not in CUSTOMER_ACTIVE_STATUSES
+    ):
+        return HTTPException(
+            409,
+            detail={
+                "code": "CUSTOMER_NOT_ACTIVE",
+                "message": "A tenant can be activated only while its customer is active; activate the customer first",
+            },
+        )
+    if target in OPERATOR_PROTECTED_TARGETS and is_operator_customer(db, tenant.customer_id):
+        return HTTPException(
+            409,
+            detail={
+                "code": "OPERATOR_PROTECTED",
+                "message": "The MDARIX operator organization's tenant cannot be suspended or terminated",
+            },
+        )
+    return None
+
+
 @router.post("/platform-admin/tenants/{tenant_id}/lifecycle")
-def transition_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
+def transition_platform_tenant(
+    tenant_id: uuid.UUID, payload: TenantLifecycleRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    target = str(payload.get("status", "")).upper()
-    reason = str(payload.get("reason", "")).strip()
-    password = str(payload.get("password", ""))
-    expected_version = payload.get("lock_version")
+    target = payload.status.strip().upper()
+    reason = payload.reason.strip()
     current = str(tenant.status).upper()
-    if expected_version is not None and int(expected_version) != int(tenant.lock_version or 0):
+    if payload.lock_version is not None and int(payload.lock_version) != int(tenant.lock_version or 0):
         raise HTTPException(
             409,
             detail={"code": "STALE_RECORD", "message": "Tenant changed since it was loaded; refresh before retrying"},
         )
     if target == "REACTIVATED":
         target = "ACTIVE"
-    if not allowed_lifecycle_transition(current, target):
+    if not allowed_tenant_transition(current, target):
         raise HTTPException(
-            409, detail={"code": "INVALID_TENANT_TRANSITION", "message": f"Cannot transition {current} to {target}"}
+            409,
+            detail={
+                "code": "INVALID_TENANT_TRANSITION",
+                "message": tenant_transition_message(current, target),
+                "from": current,
+                "to": target,
+            },
         )
     if not reason:
         raise HTTPException(422, detail={"code": "REASON_REQUIRED", "message": "A lifecycle reason is required"})
+    refusal = tenant_transition_refusal(db, tenant, target)
+    if refusal is not None:
+        raise refusal
     actor_user = db.query(AuthUser).filter(AuthUser.id == admin.id, AuthUser.tenant_id == admin.tenant_id).first()
-    if actor_user is None or not password or not _verify(password, actor_user.password_hash):
+    if actor_user is None or not _verify(payload.password, actor_user.password_hash):
         db.rollback()
         raise HTTPException(
             403,
@@ -146,6 +202,8 @@ def transition_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Req
         "status": next_status,
         "reason": reason,
         "transitioned_at": now,
+        "lock_version": tenant.lock_version,
+        **_access_fields(tenant, _customer_of(db, tenant)),
     }
 
 
@@ -156,7 +214,9 @@ def apply_tenant_transition(db: Session, tenant: Tenant, target: str, reason: st
     tenant.provisioning_status = "ACTIVE" if target == "ACTIVE" else tenant.provisioning_status
     tenant.activated_at = now if target == "ACTIVE" else tenant.activated_at
     tenant.suspended_at = now if target == "SUSPENDED" else tenant.suspended_at
+    tenant.terminated_at = now if target == "TERMINATED" else tenant.terminated_at
     tenant.lock_version = int(tenant.lock_version or 0) + 1
+    tenant.updated_at = now
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -194,9 +254,23 @@ def schedule_tenant_lifecycle(
         )
     target = "ACTIVE" if payload.target_status.upper() == "REACTIVATED" else payload.target_status.upper()
     current = str(tenant.status).upper()
-    if not allowed_lifecycle_transition(current, target):
+    if not allowed_tenant_transition(current, target):
         raise HTTPException(
-            409, detail={"code": "INVALID_TENANT_TRANSITION", "message": f"Cannot transition {current} to {target}"}
+            409,
+            detail={
+                "code": "INVALID_TENANT_TRANSITION",
+                "message": tenant_transition_message(current, target),
+                "from": current,
+                "to": target,
+            },
+        )
+    if target in OPERATOR_PROTECTED_TARGETS and is_operator_customer(db, tenant.customer_id):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "OPERATOR_PROTECTED",
+                "message": "The MDARIX operator organization's tenant cannot be suspended or terminated",
+            },
         )
     existing = (
         db.query(TenantAccessTransition)
@@ -252,12 +326,17 @@ def run_scheduled_lifecycle_job(db: Session, actor_ref: str, now: datetime | Non
         tenant = db.query(Tenant).filter(Tenant.id == row.tenant_id).with_for_update().first()
         if tenant is None or str(tenant.status).upper() != row.from_status.upper():
             continue
+        # The same guards as an immediate change; the schedule stays pending until they pass.
+        if tenant_transition_refusal(db, tenant, row.to_status.upper()) is not None:
+            continue
         tenant.status = row.to_status
         tenant.lock_version = int(tenant.lock_version or 0) + 1
         if row.to_status == "SUSPENDED":
             tenant.suspended_at = now
         if row.to_status == "ACTIVE":
             tenant.activated_at = now
+        if row.to_status == "TERMINATED":
+            tenant.terminated_at = now
         db.add(
             AuditEvent(
                 id=uuid.uuid4(),
@@ -578,6 +657,42 @@ def replace_customer_admin(
     }
 
 
+def _tenant_detail(tenant: Tenant, customer: Customer | None) -> dict:
+    """The tenant record of the Tenant 360 page (GET platform-admin/tenants/{id} and the edit route)."""
+    return {
+        "id": str(tenant.id),
+        "business_id": tenant.business_id,
+        "customer_id": str(tenant.customer_id),
+        "customer_business_id": customer.business_id if customer else None,
+        "customer_name": (customer.display_name or customer.legal_name) if customer else None,
+        "customer_identifier": customer.customer_identifier if customer else None,
+        "tenant_identifier": tenant.tenant_identifier,
+        "tenant_key": tenant.tenant_key,
+        "name": tenant.name,
+        "display_name": tenant.display_name,
+        "tenant_type": tenant.tenant_type,
+        "deployment_model": tenant.deployment_model,
+        "primary_region": tenant.primary_region,
+        "residency_region": tenant.residency_region,
+        "database_region": tenant.database_region,
+        "backup_region": tenant.backup_region,
+        "storage_region": tenant.storage_region,
+        "ai_processing_region": tenant.ai_processing_region,
+        "disaster_recovery_region": tenant.disaster_recovery_region,
+        "cross_border_processing_allowed": tenant.cross_border_processing_allowed,
+        "application_version": tenant.application_version,
+        "schema_version": tenant.schema_version,
+        "configuration_version": tenant.configuration_version,
+        "provisioning_status": tenant.provisioning_status,
+        "status": tenant.status,
+        "activated_at": tenant.activated_at,
+        "suspended_at": tenant.suspended_at,
+        "lock_version": tenant.lock_version,
+        "terminated_at": tenant.terminated_at,
+        **_access_fields(tenant, customer),
+    }
+
+
 @router.get("/platform-admin/tenants/{tenant_id}")
 def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """Return a technical Tenant 360 view with environment, identity, health, and counts."""
@@ -597,35 +712,7 @@ def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Sessi
     )
     customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     return {
-        "tenant": {
-            "id": str(tenant.id),
-            "business_id": tenant.business_id,
-            "customer_id": str(tenant.customer_id),
-            "customer_business_id": customer.business_id if customer else None,
-            "customer_name": (customer.display_name or customer.legal_name) if customer else None,
-            "customer_identifier": customer.customer_identifier if customer else None,
-            "tenant_identifier": tenant.tenant_identifier,
-            "tenant_key": tenant.tenant_key,
-            "display_name": tenant.display_name,
-            "tenant_type": tenant.tenant_type,
-            "deployment_model": tenant.deployment_model,
-            "primary_region": tenant.primary_region,
-            "residency_region": tenant.residency_region,
-            "database_region": tenant.database_region,
-            "backup_region": tenant.backup_region,
-            "storage_region": tenant.storage_region,
-            "ai_processing_region": tenant.ai_processing_region,
-            "disaster_recovery_region": tenant.disaster_recovery_region,
-            "cross_border_processing_allowed": tenant.cross_border_processing_allowed,
-            "application_version": tenant.application_version,
-            "schema_version": tenant.schema_version,
-            "configuration_version": tenant.configuration_version,
-            "provisioning_status": tenant.provisioning_status,
-            "status": tenant.status,
-            "activated_at": tenant.activated_at,
-            "suspended_at": tenant.suspended_at,
-            "lock_version": tenant.lock_version,
-        },
+        "tenant": _tenant_detail(tenant, customer),
         "environments": [
             {
                 "id": str(e.id),
@@ -672,6 +759,74 @@ def get_platform_tenant_record(tenant_id: uuid.UUID, request: Request, db: Sessi
             "Health",
             "Audit",
         ],
+    }
+
+
+def _tenant_sort_columns() -> dict:
+    """What each column of the tenant directory sorts on (``sort``; backend/app/sorting.py)."""
+    customer_name = (
+        select(func.coalesce(Customer.display_name, Customer.legal_name))
+        .where(Customer.id == Tenant.customer_id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    customer_identifier = (
+        select(Customer.customer_identifier)
+        .where(Customer.id == Tenant.customer_id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+
+    def current_plan(column):
+        return (
+            select(column)
+            .join(TenantPlanAssignment, TenantPlanAssignment.plan_id == PlanDefinition.id)
+            .where(TenantPlanAssignment.tenant_id == Tenant.id, TenantPlanAssignment.status == "ACTIVE")
+            .order_by(TenantPlanAssignment.effective_from.desc())
+            .limit(1)
+            .correlate(Tenant)
+            .scalar_subquery()
+        )
+
+    environments = (
+        select(func.count(TenantEnvironment.id))
+        .where(TenantEnvironment.tenant_id == Tenant.id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    seats = (
+        select(func.count(TenantMembership.id))
+        .where(TenantMembership.tenant_id == Tenant.id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    last_activity = (
+        select(func.max(AuditEvent.created_at))
+        .where(AuditEvent.tenant_id == Tenant.id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    return {
+        "name": [Tenant.name],
+        "status": [Tenant.status],
+        "created_at": [Tenant.created_at],
+        "region": [Tenant.residency_region, Tenant.primary_region],
+        "residency_region": [Tenant.residency_region],
+        "business_id": [Tenant.business_id, Tenant.tenant_key],
+        "tenant": [Tenant.name, Tenant.tenant_key],
+        "tenant_key": [Tenant.tenant_key],
+        "tenant_identifier": [Tenant.tenant_identifier],
+        "deployment_model": [Tenant.deployment_model],
+        "customer": [customer_name, customer_identifier],
+        "customer_name": [customer_name],
+        "customer_identifier": [customer_identifier],
+        "plan": [current_plan(PlanDefinition.name), current_plan(PlanDefinition.code)],
+        "plan_name": [current_plan(PlanDefinition.name)],
+        "plan_code": [current_plan(PlanDefinition.code)],
+        "environments": [environments],
+        "environment_count": [environments],
+        "seat_usage": [seats],
+        "last_activity": [last_activity],
     }
 
 
@@ -725,13 +880,19 @@ def list_platform_tenants(
                 .filter(func.lower(PlanDefinition.code).contains(plan.lower()), TenantPlanAssignment.status == "ACTIVE")
             )
         )
-    sort_column = {
-        "name": Tenant.name,
-        "status": Tenant.status,
-        "created_at": Tenant.created_at,
-        "region": Tenant.residency_region,
-    }.get(sort, Tenant.name)
-    rows = rows.order_by(sort_column.desc() if order.lower() == "desc" else sort_column.asc())
+    # Health and seat filters are applied before counting and paging, so the total matches the rows sent.
+    if health:
+        healthy = Tenant.status.in_(["ACTIVE", "PROVISIONED"])
+        if health.upper() == "HEALTHY":
+            rows = rows.filter(healthy)
+        elif health.upper() == "REVIEW":
+            rows = rows.filter(or_(Tenant.status.is_(None), ~healthy))
+        else:
+            rows = rows.filter(false())
+    if seat_status.upper() in ("OVER", "NEAR_CAP"):
+        # Plans carry no seat cap, so no tenant is over or near one (the rule the rows below have always applied).
+        rows = rows.filter(false())
+    rows = order_query(rows, sort, order, columns=_tenant_sort_columns(), default=[Tenant.name], tiebreak=[Tenant.id])
     total = rows.count()
     items = rows.offset((page - 1) * page_size).limit(page_size).all()
     # The customer that owns each tenant on this page, in one query.
@@ -766,12 +927,6 @@ def list_platform_tenants(
         seats = db.query(TenantMembership).filter(TenantMembership.tenant_id == row.id).count()
         cap = getattr(plan_row, "seat_cap", None) if plan_row else None
         health_status = "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "REVIEW"
-        if health and health.upper() != health_status:
-            continue
-        if seat_status.upper() == "OVER" and not (cap is not None and seats > cap):
-            continue
-        if seat_status.upper() == "NEAR_CAP" and not (cap is not None and seats >= cap * 0.8):
-            continue
         payload.append(
             {
                 "id": str(row.id),
@@ -795,6 +950,7 @@ def list_platform_tenants(
                 "seat_usage": seats,
                 "seat_cap": cap,
                 "lock_version": row.lock_version,
+                **_access_fields(row, owner),
                 "health_status": health_status,
                 "environment_count": db.query(TenantEnvironment).filter(TenantEnvironment.tenant_id == row.id).count(),
             }
@@ -841,36 +997,52 @@ def list_platform_tenants(
     }
 
 
+# Editable tenant metadata (column names) and the columns among them that cannot be emptied.
+TENANT_EDITABLE_FIELDS = (
+    "display_name",
+    "name",
+    "tenant_type",
+    "deployment_model",
+    "primary_region",
+    "residency_region",
+    "database_region",
+    "storage_region",
+    "configuration_version",
+)
+TENANT_REQUIRED_FIELDS = frozenset(
+    {"display_name", "name", "tenant_type", "deployment_model", "primary_region", "residency_region"}
+)
+
+
 @router.patch("/platform-admin/tenants/{tenant_id}")
-def update_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request, db: Session = Depends(get_db)):
-    """Update editable Tenant 360 metadata with optimistic locking and audit."""
+def update_platform_tenant(
+    tenant_id: uuid.UUID, payload: TenantUpdateRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Update editable Tenant 360 metadata with optimistic locking and an audited reason.
+
+    Omitted fields stay as they are; null leaves a required field unchanged and clears an optional one.
+    """
     admin = _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    if payload.get("lock_version") is not None and int(payload["lock_version"]) != int(tenant.lock_version or 0):
+    if int(payload.lock_version) != int(tenant.lock_version or 0):
         raise HTTPException(409, detail={"code": "STALE_RECORD", "message": "Tenant changed; refresh before editing"})
-    allowed = {
-        "display_name",
-        "name",
-        "tenant_type",
-        "deployment_model",
-        "primary_region",
-        "residency_region",
-        "database_region",
-        "storage_region",
-        "configuration_version",
-    }
-    changes = {key: value for key, value in payload.items() if key in allowed and value is not None}
+    changes: dict = {}
+    for key, value in payload.model_dump(include=set(TENANT_EDITABLE_FIELDS), exclude_unset=True).items():
+        value = (value.strip() or None) if isinstance(value, str) else value
+        if value is None and key in TENANT_REQUIRED_FIELDS:
+            continue
+        if value != getattr(tenant, key):
+            changes[key] = value
     if not changes:
-        raise HTTPException(
-            422, detail={"code": "TENANT_FIELDS_REQUIRED", "message": "At least one editable tenant field is required"}
-        )
+        raise HTTPException(422, detail={"code": "NO_CHANGES", "message": "Nothing was changed"})
     before = {key: getattr(tenant, key) for key in changes}
+    now = datetime.now(timezone.utc)
     for key, value in changes.items():
-        setattr(tenant, key, str(value).strip() if isinstance(value, str) else value)
+        setattr(tenant, key, value)
     tenant.lock_version = int(tenant.lock_version or 0) + 1
-    tenant.updated_at = datetime.now(timezone.utc)
+    tenant.updated_at = now
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -879,8 +1051,13 @@ def update_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request
             action="TENANT_UPDATED",
             entity_type="Tenant",
             entity_id=tenant.id,
-            details={"before": before, "after": changes, "reason": payload.get("reason", "Tenant 360 edit")},
-            created_at=datetime.now(timezone.utc),
+            details={
+                "before": before,
+                "after": changes,
+                "changed_fields": sorted(changes),
+                "reason": payload.reason.strip(),
+            },
+            created_at=now,
         )
     )
     db.commit()
@@ -889,6 +1066,7 @@ def update_platform_tenant(tenant_id: uuid.UUID, payload: dict, request: Request
         "business_id": tenant.business_id,
         "lock_version": tenant.lock_version,
         "updated": changes,
+        "tenant": _tenant_detail(tenant, _customer_of(db, tenant)),
     }
 
 

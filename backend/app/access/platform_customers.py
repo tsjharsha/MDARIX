@@ -5,12 +5,14 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from sqlalchemy import func
+from sqlalchemy import and_, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.customer_lifecycle import (
-    allowed_lifecycle_transition,
+    CUSTOMER_STATUS_SOURCES,
     build_customer_tenant,
+    effective_access,
+    is_operator_customer,
     shared_data_plane,
 )
 from backend.app import csv_safe
@@ -35,7 +37,13 @@ from backend.app.db.models.stage2 import (
     SubscriptionLifecycle,
 )
 from backend.app.db.session import get_db
-from backend.app.access.schemas import CustomerCreateRequest, CustomerImportRequest, CustomerLifecycleRequest
+from backend.app.sorting import order_query
+from backend.app.access.schemas import (
+    CustomerCreateRequest,
+    CustomerImportRequest,
+    CustomerLifecycleRequest,
+    CustomerUpdateRequest,
+)
 from backend.app.access.authz import _require_platform_admin
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
@@ -198,6 +206,63 @@ def platform_customer_detail(tenant_id: uuid.UUID, request: Request, db: Session
     return get_platform_customer(tenant_id, request, db)
 
 
+def _subscription_sort_columns(seat_count) -> dict:
+    """What each column of the tenant subscription list sorts on (``sort``; backend/app/sorting.py). ``name``,
+    ``status``, ``created_at`` and ``tenant_key`` keep the meaning they always had."""
+
+    def current_plan(column):
+        return (
+            select(column)
+            .join(TenantPlanAssignment, TenantPlanAssignment.plan_id == PlanDefinition.id)
+            .where(TenantPlanAssignment.tenant_id == Tenant.id, TenantPlanAssignment.status == "ACTIVE")
+            .order_by(TenantPlanAssignment.effective_from.desc())
+            .limit(1)
+            .correlate(Tenant)
+            .scalar_subquery()
+        )
+
+    def current_subscription(column):
+        return (
+            select(column)
+            .where(SubscriptionLifecycle.tenant_id == Tenant.id)
+            .order_by(SubscriptionLifecycle.created_at.desc())
+            .limit(1)
+            .correlate(Tenant)
+            .scalar_subquery()
+        )
+
+    last_activity = (
+        select(func.max(AuditEvent.created_at))
+        .where(AuditEvent.tenant_id == Tenant.id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    shown_name = func.coalesce(Customer.display_name, Tenant.name)
+    return {
+        "name": [Tenant.name],
+        "status": [Tenant.status],
+        "created_at": [Tenant.created_at],
+        "tenant_key": [Tenant.tenant_key],
+        "business_id": [Tenant.business_id, Tenant.tenant_key],
+        "tenant": [shown_name, Tenant.tenant_key],
+        "legal_name": [Customer.legal_name],
+        "customer_identifier": [Customer.customer_identifier],
+        "customer_type": [Customer.customer_type],
+        "country": [Customer.country],
+        "industry": [Customer.industry],
+        "data_region": [Tenant.residency_region],
+        "plan": [current_plan(PlanDefinition.name), current_plan(PlanDefinition.code)],
+        "plan_name": [current_plan(PlanDefinition.name)],
+        "plan_code": [current_plan(PlanDefinition.code)],
+        "period": [current_subscription(SubscriptionLifecycle.expires_at)],
+        "expires_at": [current_subscription(SubscriptionLifecycle.expires_at)],
+        "license_start": [current_subscription(SubscriptionLifecycle.starts_at)],
+        "seats": [seat_count],
+        "seat_usage": [seat_count],
+        "last_activity": [last_activity],
+    }
+
+
 @router.get("/platform-admin/customers")
 def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     """Return tenant administration metadata only; never customer business data."""
@@ -313,13 +378,29 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         )
     elif saved_view == "DESIGN_PARTNERS":
         rows = rows.filter(func.lower(Customer.customer_type).contains("design"))
-    sort_column = {
-        "name": Tenant.name,
-        "status": Tenant.status,
-        "created_at": Tenant.created_at,
-        "tenant_key": Tenant.tenant_key,
-    }.get(sort, Tenant.name)
-    rows = rows.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
+    # Seat filters are applied before counting and paging, so the total matches the rows sent.
+    seat_count = (
+        select(func.count(TenantMembership.id))
+        .where(TenantMembership.tenant_id == Tenant.id)
+        .correlate(Tenant)
+        .scalar_subquery()
+    )
+    if seat_status in ("OVER", "NEAR_CAP"):
+        # Plans carry no seat cap, so no tenant is over or near one (the rule these rows have always followed);
+        # AVAILABLE therefore keeps every tenant.
+        rows = rows.filter(false())
+    try:
+        if seat_min:
+            rows = rows.filter(seat_count >= int(seat_min))
+        if seat_max:
+            rows = rows.filter(seat_count <= int(seat_max))
+    except ValueError:
+        raise HTTPException(
+            422, detail={"code": "INVALID_SEAT_FILTER", "message": "seat_min and seat_max must be whole numbers"}
+        )
+    rows = order_query(
+        rows, sort, order, columns=_subscription_sort_columns(seat_count), default=[Tenant.name], tiebreak=[Tenant.id]
+    )
     total = rows.count()
     items = rows.offset((page - 1) * page_size).limit(page_size).all()
     # One query per kind of detail for the whole page (previously six queries per tenant). Each lookup keeps the
@@ -395,16 +476,6 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
         seat_usage = seat_counts.get(row.id, 0)
         seat_cap = getattr(plan_row, "seat_cap", None) or getattr(plan_row, "max_seats", None)
         health_status = "HEALTHY" if row.status in ("ACTIVE", "PROVISIONED") else "ATTENTION_REQUIRED"
-        if seat_status == "OVER" and not (seat_cap and seat_usage > seat_cap):
-            continue
-        if seat_status == "NEAR_CAP" and not (seat_cap and seat_usage >= seat_cap * 0.8):
-            continue
-        if seat_status == "AVAILABLE" and seat_cap is not None and seat_usage >= seat_cap:
-            continue
-        if seat_min and (seat_usage < int(seat_min)):
-            continue
-        if seat_max and (seat_usage > int(seat_max)):
-            continue
         payload.append(
             {
                 "id": str(row.id),
@@ -534,9 +605,18 @@ def get_platform_customer(tenant_id: uuid.UUID, request: Request, db: Session = 
 def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """Return the complete platform Customer 360 shell without customer business records."""
     _require_platform_admin(request, db)
+    return customer_record(db, _customer_or_404(db, customer_id))
+
+
+def _customer_or_404(db: Session, customer_id) -> Customer:
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if customer is None:
         raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
+    return customer
+
+
+def customer_record(db: Session, customer: Customer) -> dict:
+    """The customer record as GET customer-records/{id} returns it (also returned by the edit and status routes)."""
     tenants = db.query(Tenant).filter(Tenant.customer_id == customer.id).order_by(Tenant.name).all()
     return {
         "customer": {
@@ -554,10 +634,16 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
             "headquarters": customer.headquarters,
             "website": customer.website,
             "crm_reference": customer.crm_reference,
+            "primary_business_contact": customer.primary_business_contact,
+            "billing_contact": customer.billing_contact,
+            "internal_account_owner": customer.internal_account_owner,
+            "implementation_manager": customer.implementation_manager,
             "lifecycle_status": customer.lifecycle_status,
             "lock_version": customer.lock_version,
+            "is_operator": is_operator_customer(db, customer.id),
             "created_at": customer.created_at,
             "updated_at": customer.updated_at,
+            "updated_by": str(customer.updated_by) if customer.updated_by else None,
         },
         "tenants": [
             {
@@ -565,6 +651,7 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
                 "business_id": t.business_id,
                 "tenant_identifier": t.tenant_identifier,
                 "tenant_key": t.tenant_key,
+                "name": t.name,
                 "display_name": t.display_name,
                 "tenant_type": t.tenant_type,
                 "deployment_model": t.deployment_model,
@@ -572,6 +659,8 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
                 "residency_region": t.residency_region,
                 "status": t.status,
                 "provisioning_status": t.provisioning_status,
+                "lock_version": t.lock_version,
+                "effective_access": effective_access(t.status, customer.lifecycle_status),
             }
             for t in tenants
         ],
@@ -580,22 +669,130 @@ def get_platform_customer_record(customer_id: uuid.UUID, request: Request, db: S
     }
 
 
+# Editable customer details (column names); identifiers (customer_identifier, business_id) never change.
+CUSTOMER_EDITABLE_FIELDS = (
+    "legal_name",
+    "display_name",
+    "trading_name",
+    "customer_type",
+    "industry",
+    "company_size",
+    "country",
+    "state_province",
+    "headquarters",
+    "website",
+    "crm_reference",
+    "primary_business_contact",
+    "billing_contact",
+    "internal_account_owner",
+    "implementation_manager",
+)
+# Columns that cannot be emptied.
+CUSTOMER_REQUIRED_FIELDS = frozenset({"legal_name", "display_name", "customer_type", "country"})
+
+
+def _stale(kind: str) -> HTTPException:
+    return HTTPException(
+        409,
+        detail={"code": "STALE_RECORD", "message": f"{kind} changed since it was loaded; refresh before retrying"},
+    )
+
+
+def _no_changes() -> HTTPException:
+    return HTTPException(422, detail={"code": "NO_CHANGES", "message": "Nothing was changed"})
+
+
+@router.patch("/platform-admin/customer-records/{customer_id}")
+def update_platform_customer(
+    customer_id: uuid.UUID, payload: CustomerUpdateRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Edit a customer's details (Platform Administrators only), with optimistic locking and an audited reason."""
+    admin = _require_platform_admin(request, db)
+    customer = _customer_or_404(db, customer_id)
+    if int(payload.lock_version) != int(customer.lock_version or 0):
+        raise _stale("Customer")
+    sent = payload.model_dump(include=set(CUSTOMER_EDITABLE_FIELDS), exclude_unset=True)
+    changes: dict = {}
+    for field, value in sent.items():
+        if isinstance(value, str):
+            value = value.strip() or None
+        if isinstance(value, dict):
+            # A contact is stored whole, {name, email, phone}; an empty one is no contact.
+            value = {key: value.get(key) for key in ("name", "email", "phone")}
+            value = value if any(value.values()) else None
+        if value is None and field in CUSTOMER_REQUIRED_FIELDS:
+            raise HTTPException(
+                422, detail={"code": "FIELD_REQUIRED", "message": f"{field.replace('_', ' ')} cannot be empty"}
+            )
+        if value != getattr(customer, field):
+            changes[field] = value
+    if not changes:
+        raise _no_changes()
+    before = {field: getattr(customer, field) for field in changes}
+    now = datetime.now(timezone.utc)
+    for field, value in changes.items():
+        setattr(customer, field, value)
+    customer.lock_version = int(customer.lock_version or 0) + 1
+    customer.updated_by = admin.id
+    customer.updated_at = now
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            actor_ref=str(admin.id),
+            action="CUSTOMER_UPDATED",
+            entity_type="Customer",
+            entity_id=customer.id,
+            details={
+                "reason": payload.reason.strip(),
+                "customer_identifier": customer.customer_identifier,
+                "changed_fields": sorted(changes),
+                "before": before,
+                "after": changes,
+            },
+            created_at=now,
+        )
+    )
+    db.commit()
+    return customer_record(db, customer)
+
+
 @router.post("/platform-admin/customer-records/{customer_id}/lifecycle")
 def transition_platform_customer(
     customer_id: uuid.UUID, payload: CustomerLifecycleRequest, request: Request, db: Session = Depends(get_db)
 ):
-    """Suspend or reactivate a whole customer: every tenant it owns moves together (same rules as one tenant).
+    """Activate or suspend a customer. Only the customer's own status changes: its tenants keep theirs.
 
-    Customer details are maintained by the customer; the platform administrator only changes its standing.
-    Tenants already in the target state are left alone; tenants that cannot make the change are reported.
+    A suspended customer blocks sign-in, the API and background jobs for every tenant it owns (request_context.py);
+    reactivating it restores exactly the tenants that are themselves active. Re-authentication is required, and the
+    platform operator's own customer can never be suspended.
     """
     from auth.service import _verify
-    from backend.app.access.platform_tenants import apply_tenant_transition
 
     admin = _require_platform_admin(request, db)
-    customer = db.query(Customer).filter(Customer.id == customer_id).first()
-    if customer is None:
-        raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
+    customer = _customer_or_404(db, customer_id)
+    if payload.lock_version is not None and int(payload.lock_version) != int(customer.lock_version or 0):
+        raise _stale("Customer")
+    current = str(customer.lifecycle_status or "").upper()
+    target = payload.status
+    if target == "SUSPENDED" and is_operator_customer(db, customer.id):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "OPERATOR_PROTECTED",
+                "message": "The MDARIX operator organization cannot be suspended",
+            },
+        )
+    if current not in CUSTOMER_STATUS_SOURCES.get(target, frozenset()):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "INVALID_CUSTOMER_TRANSITION",
+                "message": f"A {current.lower()} customer cannot become {target.lower()}",
+                "from": current,
+                "to": target,
+            },
+        )
     actor = db.query(AuthUser).filter(AuthUser.id == admin.id, AuthUser.tenant_id == admin.tenant_id).first()
     if actor is None or not _verify(payload.password, actor.password_hash):
         db.rollback()
@@ -607,46 +804,57 @@ def transition_platform_customer(
             },
         )
     now = datetime.now(timezone.utc)
-    changed, unchanged, refused = [], [], []
-    for tenant in db.query(Tenant).filter(Tenant.customer_id == customer.id).order_by(Tenant.tenant_key).all():
-        current = str(tenant.status).upper()
-        if current == payload.status:
-            unchanged.append(tenant.tenant_key)
-        elif allowed_lifecycle_transition(current, payload.status):
-            apply_tenant_transition(
-                db,
-                tenant,
-                payload.status,
-                payload.reason,
-                admin.id,
-                now,
-                scope="CUSTOMER",
-                customer_id=str(customer.id),
-            )
-            changed.append(tenant.tenant_key)
-        else:
-            refused.append({"tenant_key": tenant.tenant_key, "status": current})
-    if not changed and refused:
-        db.rollback()
-        raise HTTPException(
-            409,
-            detail={
-                "code": "INVALID_CUSTOMER_TRANSITION",
-                "message": f"No tenant of this customer can become {payload.status.lower()}",
-                "refused": refused,
-            },
-        )
-    customer.lifecycle_status = payload.status
+    tenants = db.query(Tenant).filter(Tenant.customer_id == customer.id).order_by(Tenant.tenant_key).all()
+    before = {tenant.id: effective_access(tenant.status, current) for tenant in tenants}
+    customer.lifecycle_status = target
     customer.lock_version = int(customer.lock_version or 0) + 1
+    customer.updated_by = admin.id
     customer.updated_at = now
+    affected = [
+        {
+            "tenant_id": str(tenant.id),
+            "business_id": tenant.business_id,
+            "name": tenant.display_name or tenant.name,
+            "effective_access": effective_access(tenant.status, target),
+        }
+        for tenant in tenants
+        if effective_access(tenant.status, target) != before[tenant.id]
+    ]
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=admin.tenant_id,
+            actor_ref=str(admin.id),
+            action="CUSTOMER_LIFECYCLE_TRANSITION",
+            entity_type="Customer",
+            entity_id=customer.id,
+            details={
+                "from": current,
+                "to": target,
+                "reason": payload.reason.strip(),
+                "customer_identifier": customer.customer_identifier,
+                "tenants_access_blocked": [
+                    item["business_id"] for item in affected if item["effective_access"] != "ACTIVE"
+                ],
+                "tenants_access_restored": [
+                    item["business_id"] for item in affected if item["effective_access"] == "ACTIVE"
+                ],
+            },
+            created_at=now,
+        )
+    )
     db.commit()
     return {
+        **customer_record(db, customer),
         "customer_id": str(customer.id),
         "customer_business_id": customer.business_id,
-        "status": payload.status,
-        "tenants_changed": changed,
-        "tenants_unchanged": unchanged,
-        "tenants_refused": refused,
+        "previous_status": current,
+        "status": target,
+        "tenants_affected": affected,
+        # Earlier response fields, kept for existing callers: tenants no longer change status with the customer.
+        "tenants_changed": [],
+        "tenants_unchanged": [tenant.tenant_key for tenant in tenants],
+        "tenants_refused": [],
     }
 
 
@@ -805,7 +1013,13 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             for row in rows
         ]
     elif key in {"security", "audit", "activity"}:
-        query = db.query(AuditEvent).filter(AuditEvent.tenant_id.in_(tenant_ids))
+        # The customer's tenants' events, and the events about the customer itself (edits, status changes).
+        query = db.query(AuditEvent).filter(
+            or_(
+                AuditEvent.tenant_id.in_(tenant_ids),
+                and_(AuditEvent.entity_type == "Customer", AuditEvent.entity_id == customer.id),
+            )
+        )
         if key == "activity":
             # What people changed, without the automatic per-request log entries (still in the full audit log).
             query = query.filter(~AuditEvent.action.like("REQUEST\\_%"))

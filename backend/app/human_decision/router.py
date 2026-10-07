@@ -43,6 +43,7 @@ from backend.app.human_decision import rules
 from backend.app.human_decision import service
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.role_codes import is_administrator_role, role_code
+from backend.app.sorting import sort_rows
 from backend.app.workflow import tasks as task_service
 
 logger = logging.getLogger("mdarix.human_decision")
@@ -280,6 +281,24 @@ def _queue(data: Session, control_db: Session, tenant_id) -> list[dict]:
     return items
 
 
+def _priority_level(item: dict) -> int | None:
+    """The case's priority from low (1) to critical (4), for the queue's Priority column."""
+    rank = states.PRIORITY_RANK.get(str(item["_case"].priority or "").upper())
+    return None if rank is None else len(states.PRIORITY_RANK) - rank
+
+
+# What each column of the approvals queue (the screen's queueRow keys) sorts on.
+QUEUE_SORTS = {
+    "caseId": lambda item: item["investigation"]["business_id"],
+    "product": lambda item: item["investigation"]["product"]["name"] or item["investigation"]["product"]["business_id"],
+    "brief": lambda item: (item["brief"] or {}).get("business_id"),
+    "priority": _priority_level,
+    "dueAt": lambda item: item["_due_at"],
+    "awaitingSince": lambda item: item["_waiting"],
+    "reviews": lambda item: ", ".join(str(review.get("label") or "") for review in item["required_reviews"]),
+}
+
+
 def _public(item: dict, data: Session, decider: Decider | None) -> dict:
     result = {key: value for key, value in item.items() if not key.startswith("_")}
     if decider is not None:
@@ -292,13 +311,17 @@ def _public(item: dict, data: Session, decider: Decider | None) -> dict:
 def decision_queue(
     page: int = Query(default=1, ge=1, le=100000),
     page_size: int = Query(default=50, ge=1, le=200),
+    sort: str | None = Query(default=None, max_length=60),
+    order: str | None = Query(default=None, max_length=10),
     data: Session = Depends(get_data_plane_db),
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """One page of the briefs waiting for the decision maker, most critical first."""
+    """One page of the briefs waiting for the decision maker, most critical first; ``sort`` (a column: caseId,
+    product, brief, priority, dueAt, awaitingSince, reviews) with ``order`` (asc or desc) orders the whole queue by
+    that column before it is cut into pages."""
     decider = Decider(control_db, ctx)
-    items = _queue(data, control_db, _tenant_id(ctx))
+    items = sort_rows(_queue(data, control_db, _tenant_id(ctx)), sort, order, QUEUE_SORTS)
     start = (page - 1) * page_size
     return {
         "items": [_public(item, data, decider) for item in items[start : start + page_size]],

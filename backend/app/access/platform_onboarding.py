@@ -15,6 +15,7 @@ from auth.emailer import (
 from auth.service import _hash
 from backend.app.business_ids import business_id_of
 from backend.app.customer_lifecycle import (
+    PRE_ACTIVE_CUSTOMER_STATUSES,
     build_customer_tenant,
     shared_data_plane,
 )
@@ -74,6 +75,9 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
             region=payload.region,
             residency_region=payload.residency,
         )
+        reference = (payload.customer_reference or "").strip()
+        if reference and not customer.crm_reference:
+            customer.crm_reference = reference
         db.add(customer)
         db.add(tenant)
         db.flush()
@@ -174,6 +178,9 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
         delivery = "ALREADY_CREATED"
         invite_state = "EXISTING"
     prerequisites = {
+        # The customer record exists (created above, or already there on a retry); the CUSTOMER step reads this key
+        # and was recorded as failed while it was missing.
+        "customer": db.query(Customer.id).filter(Customer.id == tenant.customer_id).first() is not None,
         "tenant": True,
         "plan": True,
         "membership": True,
@@ -253,6 +260,16 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     tenant.provisioning_status = "ACTIVE" if tenant.status == "ACTIVE" else "RUNNING"
     tenant.activated_at = now if tenant.status == "ACTIVE" else None
     tenant.updated_at = now
+    # A customer whose first tenant goes live is active too (it used to stay PROVISIONING, which kept the customer
+    # out of "add a tenant" and the customer status workflow). A customer already past onboarding is left alone.
+    owner = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
+    customer_activated = False
+    if tenant.status == "ACTIVE" and owner is not None and owner.lifecycle_status in PRE_ACTIVE_CUSTOMER_STATUSES:
+        owner.lifecycle_status = "ACTIVE"
+        owner.lock_version = int(owner.lock_version or 0) + 1
+        owner.updated_by = admin.id
+        owner.updated_at = now
+        customer_activated = True
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -269,6 +286,8 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
                 "invitation": invite_state,
                 "email_delivery": delivery,
                 "prerequisites": prerequisites,
+                "customer_activated": customer_activated,
+                "reason": (payload.reason or "").strip() or None,
             },
             created_at=now,
         )

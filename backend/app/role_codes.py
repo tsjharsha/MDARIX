@@ -77,6 +77,18 @@ def is_platform_admin_role(role: str | None) -> bool:
     return role_code(role) == PLATFORM_ADMIN
 
 
+# The role spellings the platform-administration route guard accepts. Unlike PLATFORM_ADMIN_ALIASES (still used to
+# canonicalize what is stored and to refuse every spelling of a platform role in user administration), the generic
+# "ADMIN" and "ADMINISTRATOR" do not open platform administration.
+PLATFORM_ADMIN_GUARD_CODES = frozenset({PLATFORM_ADMIN, "MDARIX_ADMINISTRATOR"})
+
+
+def is_strict_platform_admin_role(role: str | None) -> bool:
+    """True only for PLATFORM_ADMIN (and MDARIX_ADMINISTRATOR), without resolving the generic administrator aliases."""
+    value = "_".join(str(role or "").strip().upper().replace("-", " ").split())
+    return value in PLATFORM_ADMIN_GUARD_CODES
+
+
 def is_customer_admin_role(role: str | None) -> bool:
     return role_code(role) == CUSTOMER_ADMIN
 

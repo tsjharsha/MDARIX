@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _require_platform_admin
@@ -23,10 +23,11 @@ from backend.app.access.platform_customer_admins import (
     create_customer_admin,
 )
 from backend.app.access.schemas import TenantAddRequest
-from backend.app.customer_lifecycle import build_tenant_for_customer, shared_data_plane
+from backend.app.customer_lifecycle import build_tenant_for_customer, effective_access, shared_data_plane
 from backend.app.db.models.customer_lifecycle import Customer, TenantEnvironment
 from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantPlanAssignment
 from backend.app.db.session import get_db
+from backend.app.sorting import order_query
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -42,9 +43,14 @@ def list_customer_accounts(
     plan: str = "",
     page: int = 1,
     page_size: int = 25,
+    sort: str = "",
+    order: str = "",
     db: Session = Depends(get_db),
 ):
-    """Every customer once, with its tenants (plan, data region, active administrators) underneath."""
+    """Every customer once, with its tenants (plan, data region, active administrators) underneath.
+
+    ``sort``/``order`` order every page by a column of the directory (backend/app/sorting.py); by default the list is
+    in customer-name order."""
     _require_platform_admin(request, db)
     page = max(1, page)
     page_size = min(100, max(1, page_size))
@@ -78,12 +84,43 @@ def list_customer_accounts(
         )
         query = query.filter(Customer.id.in_(on_plan))
     total = query.count()
-    customers = (
-        query.order_by(func.lower(Customer.display_name), Customer.customer_identifier)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
+    tenant_count = (
+        select(func.count(Tenant.id)).where(Tenant.customer_id == Customer.id).correlate(Customer).scalar_subquery()
     )
+    active_admins = (
+        select(func.count(AuthUser.id))
+        .join(Tenant, Tenant.id == AuthUser.tenant_id)
+        .where(
+            Tenant.customer_id == Customer.id,
+            func.upper(AuthUser.role) == ROLE,
+            func.upper(AuthUser.status) == "ACTIVE",
+        )
+        .correlate(Customer)
+        .scalar_subquery()
+    )
+    name = func.coalesce(Customer.display_name, Customer.legal_name)
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "customer_identifier": [Customer.customer_identifier],
+            "customer": [name, Customer.customer_identifier],
+            "name": [name, Customer.customer_identifier],
+            "legal_name": [Customer.legal_name],
+            "business_id": [Customer.business_id, Customer.customer_identifier],
+            "country": [Customer.country],
+            "status": [Customer.lifecycle_status],
+            "created_at": [Customer.created_at],
+            "tenants": [tenant_count],
+            "tenant_count": [tenant_count],
+            "admins": [active_admins],
+            "active_admins": [active_admins],
+        },
+        default=[func.lower(Customer.display_name), Customer.customer_identifier],
+        tiebreak=[Customer.id],
+    )
+    customers = query.offset((page - 1) * page_size).limit(page_size).all()
     customer_ids = [customer.id for customer in customers]
     tenants = (
         db.query(Tenant).filter(Tenant.customer_id.in_(customer_ids)).order_by(Tenant.tenant_key).all()
@@ -114,6 +151,7 @@ def list_customer_accounts(
             .all()
         )
     by_customer: dict = {}
+    customer_status = {customer.id: customer.lifecycle_status for customer in customers}
     for tenant in tenants:
         by_customer.setdefault(tenant.customer_id, []).append(
             {
@@ -123,6 +161,7 @@ def list_customer_accounts(
                 "tenant_identifier": tenant.tenant_identifier,
                 "display_name": tenant.display_name or tenant.name,
                 "status": tenant.status,
+                "effective_access": effective_access(tenant.status, customer_status.get(tenant.customer_id)),
                 "data_region": tenant.residency_region,
                 "plan_name": plans.get(tenant.id),
                 "active_admins": admins.get(tenant.id, 0),

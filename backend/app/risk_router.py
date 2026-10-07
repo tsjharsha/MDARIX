@@ -14,17 +14,19 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import DATA_EXPORT, RECORDS_WRITE, require_permission
 from backend.app.csv_safe import safe_cell
 from backend.app.db.data_plane import get_data_plane_db
-from backend.app.db.models.foundation import Risk
+from backend.app.db.models.foundation import Product, ProductVersion, Risk
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.paging import Page
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.risk.service import register, register_csv_rows, risk_query, traceability
+from backend.app.sorting import order_query, parse_sort, sort_rows
 
 router = APIRouter(prefix="/api/v1/risk", tags=["Risk & Traceability"])
 
@@ -44,11 +46,46 @@ def _tenant(ctx: AuthenticatedRequestContext) -> uuid.UUID:
     return uuid.UUID(str(ctx.tenant_id))
 
 
+def _register_sorts() -> dict:
+    """What the register's columns held in the risks table sort on (``sort``/``order``)."""
+    product = (
+        select(func.coalesce(Product.business_id, Product.product_identifier))
+        .where(Product.tenant_id == Risk.tenant_id, Product.id == Risk.product_id)
+        .scalar_subquery()
+    )
+    version = (
+        select(ProductVersion.version_identifier)
+        .where(ProductVersion.tenant_id == Risk.tenant_id, ProductVersion.id == Risk.product_version_id)
+        .scalar_subquery()
+    )
+    return {
+        "business_id": [func.coalesce(Risk.business_id, Risk.risk_identifier)],
+        "risk_identifier": [Risk.risk_identifier],
+        "risk": [Risk.description],
+        "product": [product, version],
+        "status": [Risk.status],
+    }
+
+
+# Columns worked out from the links (residual risk, linked records): the whole register is read and sorted.
+_RESIDUAL_ORDER = {
+    "NO_CONTROLS_LINKED": 0,
+    "CONTROLLED_WITHOUT_VERIFICATION_EVIDENCE": 1,
+    "CONTROLLED_WITH_VERIFICATION_EVIDENCE": 2,
+}
+REGISTER_ROW_SORTS = {
+    "residual": lambda item: _RESIDUAL_ORDER.get(str((item.get("residual_risk") or {}).get("state") or "")),
+    "links": lambda item: (len(item["controls"]), len(item["requirements"]), len(item["failure_modes"])),
+}
+
+
 @router.get("/register")
 def risk_register(
     response: Response,
     product_id: uuid.UUID | None = None,
     status: str | None = Query(default=None, max_length=40),
+    sort: str | None = Query(default=None, max_length=60),
+    order: str | None = Query(default=None, max_length=10),
     page: Page = Depends(),
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
@@ -56,14 +93,29 @@ def risk_register(
     """One page of the risk register: each risk with hazard, harm, severity, probability and risk level (reported as
     not captured when the imported records do not carry them), the residual-risk state, linked failure modes,
     controls with their verification evidence, requirements and the product. ``X-Total-Count`` / ``total`` give
-    the size of the whole register."""
+    the size of the whole register. Ordered by risk identifier, or by the column ``sort`` names (business_id,
+    risk_identifier, risk, product, status, residual, links) in ``order`` (asc or desc) across every page."""
     tenant_id = _tenant(ctx)
-    rows = page.apply(risk_query(db, tenant_id, product_id=product_id, status=status), response)
-    data = register(db, tenant_id, risks=rows)
-    total = int(response.headers["X-Total-Count"])
+    query = risk_query(db, tenant_id, product_id=product_id, status=status)
+    key, _ = parse_sort(sort, order)
+    if key in REGISTER_ROW_SORTS:
+        data = register(db, tenant_id, risks=query.order_by(Risk.risk_identifier, Risk.id).all())
+        everything = sort_rows(data["items"], sort, order, REGISTER_ROW_SORTS)
+        total = len(everything)
+        following = page.offset + page.limit
+        response.headers["X-Total-Count"] = str(total)
+        response.headers["X-Next-Offset"] = str(following) if following < total else ""
+        items = everything[page.offset : following]
+    else:
+        ordered = order_query(
+            query.order_by(None), sort, order, _register_sorts(), default=[Risk.risk_identifier], tiebreak=[Risk.id]
+        )
+        data = register(db, tenant_id, risks=page.apply(ordered, response))
+        items = data["items"]
+        total = int(response.headers["X-Total-Count"])
     return {
         "tenant_id": ctx.tenant_id,
-        "items": data["items"],
+        "items": items,
         "total": total,
         "limit": page.limit,
         "offset": page.offset,

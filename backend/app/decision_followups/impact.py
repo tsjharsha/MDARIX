@@ -285,6 +285,7 @@ def run_for_all_tenants(control_db: Session) -> dict:
     """The scheduler job: the late-evidence sweep for every active organization, on the shared plane or its own
     database, each committed on its own. A failing organization is logged and reported and the others still run; the
     job then fails so the scheduler alerts after repeated failures."""
+    from backend.app.customer_lifecycle import customer_allows_access_clause
     from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.models.foundation import Tenant
@@ -294,7 +295,12 @@ def run_for_all_tenants(control_db: Session) -> dict:
         row.id
         for row in control_db.query(Tenant.id)
         .join(TenantDataPlane, TenantDataPlane.tenant_id == Tenant.id)
-        .filter(Tenant.status.in_(["ACTIVE", "active"]), TenantDataPlane.status == "ACTIVE")
+        .filter(
+            Tenant.status.in_(["ACTIVE", "active"]),
+            TenantDataPlane.status == "ACTIVE",
+            # A suspended customer's tenants are skipped too (their own status is left as it is).
+            customer_allows_access_clause(),
+        )
         .order_by(Tenant.id)
         .all()
     ]

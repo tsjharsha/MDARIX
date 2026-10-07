@@ -22,6 +22,8 @@ from backend.app.db.models.foundation import (
     TenantMembership,
 )
 from backend.app.db.models.stage2 import AuthSession
+from backend.app.db.models.customer_lifecycle import Customer
+from backend.app.customer_lifecycle import customer_blocks_access
 from backend.app.db.session import get_db
 from backend.app.db.tenant_scope import bind_tenant
 
@@ -70,6 +72,20 @@ def ensure_tenant_access(db: Session, user) -> None:
     if tenant is None or str(tenant.status or "").upper() in BLOCKED_TENANT_STATUSES:
         raise HTTPException(
             403, detail={"code": "TENANT_ACCESS_SUSPENDED", "message": "Access to this organization is suspended"}
+        )
+    # A suspended (or terminated) customer blocks every tenant it owns, whatever the tenant's own status.
+    customer_status = (
+        db.query(Customer.lifecycle_status).filter(Customer.id == tenant.customer_id).scalar()
+        if getattr(tenant, "customer_id", None)
+        else None
+    )
+    if customer_blocks_access(customer_status):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "TENANT_ACCESS_SUSPENDED",
+                "message": "Your organization's access to MDARIX is suspended. Contact MDARIX support.",
+            },
         )
     memberships = db.query(TenantMembership).filter(
         TenantMembership.user_id == user.id, TenantMembership.tenant_id == user.tenant_id
