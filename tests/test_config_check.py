@@ -60,6 +60,10 @@ def production(monkeypatch, tmp_path):
         "MDARIX_TRIAL_ALERT_EMAIL": "sales@mdarix-pilot.test",
         "MDARIX_TRUSTED_PROXY_HOPS": "1",
         "MDARIX_GENAI_PROVIDER": "controlled",
+        "MDARIX_BACKUP_AGE_RECIPIENT": "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p",
+        "MDARIX_BACKUP_S3_URI": "s3://mdarix-pilot-backups/prod",
+        "MDARIX_BACKUP_HEARTBEAT_URL": "https://hc.mdarix-pilot.test/backup",
+        "MDARIX_SCHEDULER_HEARTBEAT_URL": "https://hc.mdarix-pilot.test/scheduler",
     }
     for name, value in values.items():
         monkeypatch.setenv(name, value)
@@ -285,6 +289,49 @@ def test_private_connector_hosts_need_an_explicit_acknowledgement(production):
     assert "bypassing the SSRF block" in found()
     production.setenv("MDARIX_CONNECTOR_ALLOWED_HOSTS_ACKNOWLEDGED", "true")
     assert "SSRF" not in found()
+
+
+# ------------------------------------------------------------------ backups and outside monitors
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["MDARIX_BACKUP_AGE_RECIPIENT", "MDARIX_BACKUP_HEARTBEAT_URL", "MDARIX_SCHEDULER_HEARTBEAT_URL"],
+)
+def test_production_requires_each_backup_and_monitoring_setting(production, name):
+    production.delenv(name)
+    assert f"{name} must be set in production" in found()
+
+
+def test_the_backup_key_must_be_a_public_key(production):
+    production.setenv("MDARIX_BACKUP_AGE_RECIPIENT", "AGE-SECRET-KEY-1QQQ")
+    assert "must be an age public key" in found()
+    production.setenv("MDARIX_BACKUP_AGE_RECIPIENT", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB ops@mdarix")
+    assert "MDARIX_BACKUP_AGE_RECIPIENT" not in found()
+
+
+@pytest.mark.parametrize("name", ["MDARIX_BACKUP_HEARTBEAT_URL", "MDARIX_SCHEDULER_HEARTBEAT_URL"])
+def test_heartbeats_must_be_https(production, name):
+    production.setenv(name, "http://hc.mdarix-pilot.test/ping")
+    assert f"{name} must be an https:// address" in found()
+
+
+def test_backups_must_leave_the_server(production):
+    production.delenv("MDARIX_BACKUP_S3_URI")
+    assert "Backups must leave the server" in found()
+    production.setenv("MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED", "true")
+    assert config_check.problems(offline=True) == []
+    production.setenv("MDARIX_BACKUP_S3_URI", "/mnt/backups")
+    assert "MDARIX_BACKUP_S3_URI must be an s3:// address" in found()
+
+
+def test_staging_does_not_require_backups_or_monitors(production):
+    production.setenv("MDARIX_ENV", "staging")
+    production.setenv("POSTGRES_SSLMODE", "verify-ca")
+    for name in ("MDARIX_BACKUP_AGE_RECIPIENT", "MDARIX_BACKUP_HEARTBEAT_URL", "MDARIX_SCHEDULER_HEARTBEAT_URL"):
+        production.delenv(name)
+    production.delenv("MDARIX_BACKUP_S3_URI")
+    assert config_check.problems(offline=True) == []
 
 
 # ------------------------------------------------------------------ legal documents

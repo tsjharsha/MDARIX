@@ -26,6 +26,9 @@ LEGAL_DRAFT_BANNER = re.compile(r"\bDRAFT\b")
 LEGAL_PLACEHOLDER = re.compile(r"\[(?=[^\]\n]*\S)[^\]\na-z]+\](?![(\[])")
 # A connector may reach a private address only when an operator has accepted that this removes the SSRF protection.
 CONNECTOR_HOSTS_ACKNOWLEDGEMENT = "MDARIX_CONNECTOR_ALLOWED_HOSTS_ACKNOWLEDGED"
+# Production keeps an off-site backup copy in a bucket, unless an operator states that copies leave the server another
+# way (for example the managed database's own backups and point-in-time recovery).
+BACKUP_OFFSITE_ACKNOWLEDGEMENT = "MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED"
 
 
 def _get(name: str) -> str:
@@ -141,6 +144,7 @@ def problems(*, offline: bool = False) -> list[str]:
         add("MDARIX_LEGAL_TEXT_APPROVED must be true once a lawyer has approved the privacy policy and terms")
     add(_legal_documents_problem())
     found.extend(_alerting_problems())
+    found.extend(_backup_and_monitoring_problems())
 
     if _get("MDARIX_RATE_LIMITS_ENABLED").lower() in {"0", "false", "no"}:
         add("MDARIX_RATE_LIMITS_ENABLED must not be false")
@@ -222,6 +226,44 @@ def _alerting_problems() -> list[str]:
             "Set MDARIX_TRIAL_ALERT_EMAIL and/or MDARIX_DEMO_ALERT_EMAIL: nobody would hear about trial and demo requests"
         )
     return found
+
+
+def _https_url_problem(name: str, purpose: str) -> str | None:
+    value = _get(name)
+    if not value:
+        return f"{name} must be set in production: {purpose}"
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return f"{name} must be an https:// address"
+    return None
+
+
+def _backup_and_monitoring_problems() -> list[str]:
+    """Production backups are encrypted, leave the server, and an outside monitor notices when they or the scheduler
+    stop (docs/runbooks/BACKUP_AND_RESTORE.md). The backup job reads the same .env.production."""
+    if environment() != PRODUCTION:
+        return []
+    found = []
+    recipient = _get("MDARIX_BACKUP_AGE_RECIPIENT")
+    if not recipient:
+        found.append(
+            "MDARIX_BACKUP_AGE_RECIPIENT must be set in production: the age public key backups are encrypted to"
+        )
+    elif not recipient.startswith(("age1", "ssh-ed25519 ", "ssh-rsa ")):
+        found.append("MDARIX_BACKUP_AGE_RECIPIENT must be an age public key (age1...) or an SSH public key")
+    bucket = _get("MDARIX_BACKUP_S3_URI")
+    if bucket and not bucket.startswith("s3://"):
+        found.append("MDARIX_BACKUP_S3_URI must be an s3:// address")
+    elif not bucket and _get(BACKUP_OFFSITE_ACKNOWLEDGEMENT).lower() != "true":
+        found.append(
+            "Backups must leave the server: set MDARIX_BACKUP_S3_URI (off-site bucket), or set "
+            f"{BACKUP_OFFSITE_ACKNOWLEDGEMENT}=true if copies leave another way (e.g. managed database backups)"
+        )
+    found.append(_https_url_problem("MDARIX_BACKUP_HEARTBEAT_URL", "an outside monitor must notice when backups stop"))
+    found.append(
+        _https_url_problem("MDARIX_SCHEDULER_HEARTBEAT_URL", "an outside monitor must notice when the scheduler stops")
+    )
+    return [item for item in found if item]
 
 
 def _session_and_mfa_problems() -> list[str]:

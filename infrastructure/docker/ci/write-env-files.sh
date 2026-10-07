@@ -66,6 +66,10 @@ MDARIX_REQUIRE_MFA_FOR_SIGNATURES=true
 MDARIX_BACKUP_DIR=${CI_BACKUP_DIR:-/tmp/mdarix-backups}
 MDARIX_BACKUP_AGE_RECIPIENT=${CI_AGE_RECIPIENT:-age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p}
 MDARIX_BACKUP_KEEP_DAYS=14
+# No bucket or outside monitor in CI: the hosts below never resolve and a failed ping fails nothing.
+MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED=true
+MDARIX_BACKUP_HEARTBEAT_URL=https://heartbeat.mdarix-ci.invalid/backup
+MDARIX_SCHEDULER_HEARTBEAT_URL=https://heartbeat.mdarix-ci.invalid/scheduler
 ENV
 
 cat > "${out}/.env.migrate" <<ENV

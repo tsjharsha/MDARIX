@@ -138,7 +138,7 @@ not list.
 | `MDARIX_OUTBOX_PUBLISHER`, `MDARIX_OUTBOX_HEARTBEAT_FILE` | no | Event delivery adapter and the container health file. |
 | `MDARIX_REPORT_WORKER_BATCH_SIZE` | no | Report jobs per worker cycle (10). |
 | `MDARIX_SCHEDULER_HEARTBEAT_FILE` | no | File touched after every healthy scheduler cycle; defaults to the scheduler container health-file path. |
-| `MDARIX_SCHEDULER_HEARTBEAT_URL` | no | Optional external heartbeat endpoint called after a healthy scheduler cycle. |
+| `MDARIX_SCHEDULER_HEARTBEAT_URL` | yes (production) | External heartbeat endpoint (https) called after a healthy scheduler cycle, so an outside monitor notices when the scheduler stops. |
 | `MDARIX_OPERATIONAL_URLS` | no | Addresses `scripts/validate_production_operations.py` checks from outside (comma-separated; default `MDARIX_APP_URL`). |
 
 ## Backups
@@ -148,12 +148,13 @@ docs/runbooks/BACKUP_AND_RESTORE.md.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `MDARIX_BACKUP_AGE_RECIPIENT` | yes (backup) | age public key backups are encrypted to. |
+| `MDARIX_BACKUP_AGE_RECIPIENT` | yes (production) | age public key (`age1...`) backups are encrypted to. |
 | `MDARIX_BACKUP_DB_USER`, `MDARIX_BACKUP_DB_PASSWORD` | recommended (`.env.migrate`) | The read-only backup login (`mdarix_backup`, created by `scripts/configure_backup_role.py`). Empty: backups log in as the owner. The password is refused in a long-running service's environment. |
-| `MDARIX_BACKUP_S3_URI` | recommended | Off-site copy, e.g. `s3://bucket/mdarix`. |
+| `MDARIX_BACKUP_S3_URI` | yes (production), or the acknowledgement below | Off-site copy, e.g. `s3://bucket/mdarix`. |
+| `MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED` | no | `true` states that backups leave the server another way (e.g. the managed database's own backups and point-in-time recovery), so production starts without `MDARIX_BACKUP_S3_URI`. |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | with `MDARIX_BACKUP_S3_URI` (`.env.migrate`) | Write-and-list credentials for the backup bucket (not needed with an instance role). |
 | `MDARIX_BACKUP_KEEP_DAYS` | no | Local backups kept (14 days). |
 | `MDARIX_BACKUP_DIR` | no | Host directory for backups (`/var/backups/mdarix`, owned by uid 70). |
-| `MDARIX_BACKUP_HEARTBEAT_URL` | recommended | Dead-man's switch pinged after every successful backup. |
+| `MDARIX_BACKUP_HEARTBEAT_URL` | yes (production) | Dead-man's switch (https) pinged after every successful backup. |
 | `MDARIX_BACKUP_MAX_AGE_HOURS` | no | `scripts/check_backup_age.sh` alerts when the newest backup is older (26). |
 | `MDARIX_BACKUP_AGE_KEY_FILE` | restore only | Path of the age private key, mounted only for a restore. |
