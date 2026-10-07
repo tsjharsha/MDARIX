@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
-import { titleCase, type Tone } from "../../admin/console/dashboardModel";
+import { type Tone } from "../../admin/console/dashboardModel";
 import { ASSIGNABLE_ROLES, useConsole } from "../context";
 import { Table, Tabs, errorText, listOf, send, useResource, type Confirmation } from "../shared";
+import { readable } from "../labels";
+import { roleLabel } from "../../../app/roles";
 
 const TABS = ["Roles", "Permission sets", "Approval rules"] as const;
 type Tab = (typeof TABS)[number];
@@ -17,7 +19,7 @@ export const lifecycleTone = (status: unknown): Tone => {
 };
 
 export function LifecycleBadge({ status }: { status: unknown }) {
-  return <ToneBadge tone={lifecycleTone(status)} label={titleCase(String(status ?? "Unknown"))} />;
+  return <ToneBadge tone={lifecycleTone(status)} label={readable(status, "Unknown")} />;
 }
 
 /** Activate / retire buttons for any record that uses the shared lifecycle status. */
@@ -69,7 +71,8 @@ export function AccessSection({ tab }: { tab?: string }) {
   return (
     <>
       <p className="ca-lede">
-        Deny wins. Access is the base role plus any active roles below; every check happens on the server.
+        Everyone can do what their base role allows, plus whatever an active role below adds. New roles, permission sets
+        and rules start as drafts: activate them to put them into effect.
       </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Roles and access sections">
         {active === "Roles" && <Roles />}
@@ -121,10 +124,17 @@ function Roles() {
           caption="Roles"
           rows={listOf(roles.data)}
           rowKey={(row) => row.id}
-          empty={{ title: "No custom roles yet", detail: "Create a role, add permission sets, then activate it." }}
+          empty={{
+            title: "No custom roles yet",
+            detail: "Everyone works with their base role. To give extra rights, create a role below.",
+          }}
           columns={[
-            { key: "name", label: "Role", render: (row) => <strong>{row.name}</strong> },
-            { key: "code", label: "Code", render: (row) => row.code },
+            {
+              key: "name",
+              label: "Role",
+              fields: ["name", "code"],
+              render: (row) => <strong title={row.code}>{row.name}</strong>,
+            },
             {
               key: "sets",
               label: "Permission sets",
@@ -172,16 +182,18 @@ function Roles() {
                 />
               </label>
               <label className="ca-field">
-                Code
+                Short code
                 <input
                   required
                   pattern="[A-Za-z0-9_]+"
-                  title="Letters, numbers and underscores"
+                  title="Letters, numbers and underscores, for example QA_LEAD"
+                  placeholder="e.g. QA_LEAD"
                   value={form.code}
                   onChange={(event) => setForm({ ...form, code: event.target.value })}
                 />
               </label>
             </div>
+            <p className="ac-muted">The role starts as a draft. Add permission sets to it, then activate it.</p>
             <div className="ca-action-row">
               <button type="submit" className="ac-primary">
                 <Plus size={16} /> Create role
@@ -189,7 +201,7 @@ function Roles() {
             </div>
           </form>
         </Panel>
-        <Panel eyebrow="Compose" title="Add a permission set to a role">
+        <Panel eyebrow="New" title="Add a permission set to a role">
           <form className="ca-form" onSubmit={addLink}>
             <div className="ca-form-grid">
               <label className="ca-field">
@@ -278,11 +290,11 @@ function PermissionSets() {
           caption="Permission sets"
           rows={listOf(sets.data)}
           rowKey={(row) => row.id}
-          empty={{ title: "No permission sets yet", detail: "Create one below, then add it to a role." }}
+          empty={{ title: "No permission sets yet", detail: "Create one below, then add it to a role under Roles." }}
           columns={[
             { key: "code", label: "Permission set", render: (row) => <strong>{row.code}</strong> },
             { key: "version", label: "Version", render: (row) => row.version },
-            { key: "objects", label: "Objects", numeric: true, render: (row) => count(row.object_permissions) },
+            { key: "objects", label: "Record types", numeric: true, render: (row) => count(row.object_permissions) },
             { key: "fields", label: "Fields", numeric: true, render: (row) => count(row.field_permissions) },
             { key: "actions", label: "Actions", numeric: true, render: (row) => count(row.action_permissions) },
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
@@ -303,19 +315,24 @@ function PermissionSets() {
       </Panel>
       <Panel eyebrow="New" title="Create a permission set">
         <form className="ca-form" onSubmit={create}>
+          <p className="ac-muted">
+            A permission set lists what can be opened and done, written in a technical format. If you are unsure what to
+            enter, ask MDARIX support to prepare one with you.
+          </p>
           <label className="ca-field">
-            Code
+            Short code
             <input
               required
               pattern="[A-Za-z0-9_]+"
-              title="Letters, numbers and underscores"
+              title="Letters, numbers and underscores, for example PRODUCT_READ"
+              placeholder="e.g. PRODUCT_READ"
               value={code}
               onChange={(event) => setCode(event.target.value)}
             />
           </label>
           <div className="ca-form-grid">
             <label className="ca-field">
-              Object permissions (JSON)
+              Record types it can open (JSON)
               <textarea
                 rows={4}
                 className="ca-mono"
@@ -324,7 +341,7 @@ function PermissionSets() {
               />
             </label>
             <label className="ca-field">
-              Action permissions (JSON)
+              Actions it allows (JSON)
               <textarea
                 rows={4}
                 className="ca-mono"
@@ -400,12 +417,20 @@ function ApprovalRules() {
           caption="Approval authorities"
           rows={listOf(policies.data?.approval_authorities)}
           rowKey={(row) => row.id}
-          empty={{ title: "No approval authorities", detail: "Add one below to allow a role to approve a decision." }}
+          empty={{
+            title: "No extra approval rules",
+            detail: "Approvers and Leaders approve decisions by default. Add a rule below to allow another role.",
+          }}
           columns={[
-            { key: "role", label: "Role", render: (row) => <strong>{row.role_name}</strong> },
-            { key: "object", label: "Object", render: (row) => titleCase(row.object_type) },
-            { key: "decision", label: "Decision", render: (row) => titleCase(row.decision_type) },
-            { key: "authority", label: "Authority", render: (row) => titleCase(row.authority) },
+            {
+              key: "role",
+              label: "Role",
+              fields: ["role_name"],
+              render: (row) => <strong>{roleLabel(row.role_name) || "—"}</strong>,
+            },
+            { key: "object", label: "Applies to", render: (row) => readable(row.object_type) },
+            { key: "decision", label: "Decision", render: (row) => readable(row.decision_type) },
+            { key: "authority", label: "May", render: (row) => readable(row.authority) },
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
             {
               key: "manage",
@@ -413,7 +438,7 @@ function ApprovalRules() {
               render: (row) => (
                 <LifecycleActions
                   status={row.status}
-                  name={`${row.role_name} approval`}
+                  name={`${roleLabel(row.role_name) || "This"} approval rule`}
                   path={`/api/v1/admin/governance/policies/authority/${row.id}/status`}
                   onDone={policies.reload}
                 />
@@ -421,22 +446,26 @@ function ApprovalRules() {
             },
           ]}
         />
-        <h3 className="ca-subhead">Segregation of duties</h3>
+        <h3 className="ca-subhead">Separation of duties</h3>
+        <p className="ac-muted">Rules that stop people approving their own work.</p>
         <Table
           caption="Segregation of duties policies"
           rows={listOf(policies.data?.sod_policies)}
           rowKey={(row) => row.id}
-          empty={{ title: "No segregation rules", detail: "Add one below so authors cannot approve their own work." }}
+          empty={{
+            title: "No separation-of-duties rules",
+            detail: "Add one below so authors cannot approve their own work.",
+          }}
           columns={[
-            { key: "name", label: "Policy", render: (row) => <strong>{row.name}</strong> },
-            { key: "object", label: "Object", render: (row) => titleCase(row.object_type) },
+            { key: "name", label: "Rule", render: (row) => <strong>{row.name}</strong> },
+            { key: "object", label: "Applies to", render: (row) => readable(row.object_type) },
             {
               key: "rules",
               label: "Rules",
               render: (row) =>
                 [
                   row.creator_cannot_approve && "Creator cannot approve",
-                  row.last_material_editor_cannot_approve && "Last editor cannot approve",
+                  row.last_material_editor_cannot_approve && "Last person to change it cannot approve",
                 ]
                   .filter(Boolean)
                   .join(" · ") || "—",
@@ -458,7 +487,7 @@ function ApprovalRules() {
         />
       </Panel>
       <div className="ac-grid two">
-        <Panel eyebrow="New" title="Add an approval authority">
+        <Panel eyebrow="New" title="Allow another role to approve">
           <form
             className="ca-form"
             onSubmit={(event) => {
@@ -466,7 +495,7 @@ function ApprovalRules() {
               void submit(
                 "/api/v1/admin/governance/approval-authorities",
                 authority,
-                "Approval authority added as a draft. Activate it in the list above to put it into effect.",
+                "Approval rule added as a draft. Activate it in the list above to put it into effect.",
                 () => setAuthority({ ...authority, role_name: "APPROVER" }),
               );
             }}
@@ -507,12 +536,12 @@ function ApprovalRules() {
             </label>
             <div className="ca-action-row">
               <button type="submit" className="ac-secondary">
-                Add authority
+                Add approval rule
               </button>
             </div>
           </form>
         </Panel>
-        <Panel eyebrow="New" title="Add a segregation-of-duties rule">
+        <Panel eyebrow="New" title="Add a separation-of-duties rule">
           <form
             className="ca-form"
             onSubmit={(event) => {
@@ -520,7 +549,7 @@ function ApprovalRules() {
               void submit(
                 "/api/v1/admin/governance/sod-policies",
                 sod,
-                "Segregation rule added as a draft. Activate it in the list above to put it into effect.",
+                "Separation-of-duties rule added as a draft. Activate it in the list above to put it into effect.",
                 () => setSod({ ...sod, name: "" }),
               );
             }}
@@ -556,7 +585,7 @@ function ApprovalRules() {
                 checked={sod.creator_cannot_approve}
                 onChange={(event) => setSod({ ...sod, creator_cannot_approve: event.target.checked })}
               />
-              The creator cannot approve
+              The person who created it cannot approve
             </label>
             <label className="ca-check">
               <input
@@ -564,7 +593,7 @@ function ApprovalRules() {
                 checked={sod.last_material_editor_cannot_approve}
                 onChange={(event) => setSod({ ...sod, last_material_editor_cannot_approve: event.target.checked })}
               />
-              The last material editor cannot approve
+              The last person to make a significant change cannot approve
             </label>
             <div className="ca-action-row">
               <button type="submit" className="ac-secondary">

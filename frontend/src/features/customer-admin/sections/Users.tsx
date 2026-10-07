@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Download, KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
-import { userTone, type TenantUser } from "../customerAdminModel";
+import { readable } from "../labels";
+import { userStatusLabel, userTone, type TenantUser } from "../customerAdminModel";
 import { ASSIGNABLE_ROLES, useConsole } from "../context";
 import {
   Drawer,
@@ -39,7 +39,7 @@ export function invitationNotice(
     return { tone: "good", text: `Invitation sent to ${email}. They will create their own password.` };
   return {
     tone: "good",
-    text: `Invitation created. Email delivery: ${titleCase(result?.email_delivery ?? "not configured")}.`,
+    text: `Invitation created. Email delivery: ${readable(result?.email_delivery ?? "NOT_CONFIGURED").toLowerCase()}.`,
   };
 }
 
@@ -108,6 +108,8 @@ const isPlatformRole = (role: unknown) =>
   );
 type Filter = (typeof FILTERS)[number];
 const TABS = ["People", "Invite"] as const;
+// What the confirmation says once a status change is made.
+const STATUS_DONE = { ACTIVE: "can sign in again", SUSPENDED: "is suspended", OFFBOARDED: "is offboarded" } as const;
 type Tab = (typeof TABS)[number];
 
 export function UsersSection({ tab = "People" }: { tab?: string }) {
@@ -188,7 +190,7 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
           {
             key: "status",
             label: "Status",
-            render: (row) => <ToneBadge tone={userTone(row.status)} label={titleCase(row.status ?? "Unknown")} />,
+            render: (row) => <ToneBadge tone={userTone(row.status)} label={userStatusLabel(row.status)} />,
           },
           {
             key: "manage",
@@ -259,7 +261,7 @@ function UserDrawer({
       body,
       confirmLabel: verb,
       danger: next !== "ACTIVE",
-      done: `${name}: ${verb.toLowerCase()} complete.`,
+      done: `${name} ${STATUS_DONE[next]}.`,
       run: async () => {
         await send(`/api/v1/admin/identity/users/${user.id}/status`, "PATCH", { status: next });
         onChanged();
@@ -272,7 +274,7 @@ function UserDrawer({
       notify(
         result.email_delivery === "SENT"
           ? `Password reset email sent to ${user.email}.`
-          : `Reset requested. Email delivery: ${titleCase(result.email_delivery ?? "not configured")}.`,
+          : `Reset requested. Email delivery: ${readable(result.email_delivery ?? "NOT_CONFIGURED").toLowerCase()}.`,
       );
     } catch (reason) {
       notify(errorText(reason, "Password reset could not be requested."), "critical");
@@ -301,7 +303,7 @@ function UserDrawer({
         <div>
           <dt>Status</dt>
           <dd>
-            <ToneBadge tone={userTone(user.status)} label={titleCase(user.status ?? "Unknown")} />
+            <ToneBadge tone={userTone(user.status)} label={userStatusLabel(user.status)} />
           </dd>
         </div>
         <div>
@@ -323,21 +325,23 @@ function UserDrawer({
       )}
 
       <section className="ca-drawer-section">
-        <h3>Effective access</h3>
+        <h3>What they can access now</h3>
         {access.state === "ready" ? (
           <ul className="ca-pill-list">
             {listOf(access.data?.roles).map((role) => (
               <li key={role.id}>Role · {role.name}</li>
             ))}
             {listOf(access.data?.personas).map((persona) => (
-              <li key={persona.code}>Persona · {titleCase(persona.code)}</li>
+              <li key={persona.code}>Persona · {readable(persona.code)}</li>
             ))}
             {!listOf(access.data?.roles).length && !listOf(access.data?.personas).length && (
-              <li className="ac-muted">Base role only — no assigned roles or personas.</li>
+              <li className="ac-muted">Their base role only. No extra roles or personas.</li>
             )}
           </ul>
         ) : (
-          <p className="ac-muted">{access.state === "loading" ? "Loading…" : "Effective access is unavailable."}</p>
+          <p className="ac-muted">
+            {access.state === "loading" ? "Loading…" : "This could not be loaded. Try again later."}
+          </p>
         )}
       </section>
 
@@ -380,7 +384,7 @@ function UserDrawer({
       {!managedByMdarix && (
         <>
           <section className="ca-drawer-section">
-            <h3>Assigned roles</h3>
+            <h3>Custom roles</h3>
             <ul className="ca-assignment-list">
               {myRoleAssignments.map((row) => (
                 <li key={row.id}>
@@ -408,7 +412,7 @@ function UserDrawer({
                   </button>
                 </li>
               ))}
-              {!myRoleAssignments.length && <li className="ac-muted">No roles assigned.</li>}
+              {!myRoleAssignments.length && <li className="ac-muted">None assigned.</li>}
             </ul>
             <div className="ca-inline-form">
               <select aria-label="Role to assign" value={roleId} onChange={(event) => setRoleId(event.target.value)}>
@@ -448,7 +452,7 @@ function UserDrawer({
             <ul className="ca-assignment-list">
               {myPersonaAssignments.map((row) => (
                 <li key={row.id}>
-                  <span>{titleCase(row.persona_code)}</span>
+                  <span>{readable(row.persona_code)}</span>
                   <button
                     type="button"
                     className="ac-link"
@@ -468,7 +472,7 @@ function UserDrawer({
                   </button>
                 </li>
               ))}
-              {!myPersonaAssignments.length && <li className="ac-muted">No personas assigned.</li>}
+              {!myPersonaAssignments.length && <li className="ac-muted">None assigned.</li>}
             </ul>
             <div className="ca-inline-form">
               <select
@@ -786,7 +790,7 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
     <Panel eyebrow="People" title="Invite a user">
       <form className="ca-form" onSubmit={submitInvite}>
         <p className="ac-muted">
-          The user receives an activation email and sets their own password. You never see or type it.
+          They receive an email to activate their account and choose their own password. You never see or type it.
         </p>
         <div className="ca-form-grid">
           <label className="ca-field">

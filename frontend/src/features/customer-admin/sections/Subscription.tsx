@@ -1,17 +1,17 @@
 import { CalendarClock } from "lucide-react";
 import { Empty, Panel, RingMeter, ToneBadge } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
 import { seatUsage, subscriptionEnd } from "../customerAdminModel";
 import { formatDay } from "../../../app/dates";
 import { licensedSeatLimit, useConsole } from "../context";
 import { Table, listOf, send, useResource } from "../shared";
+import { readable } from "../labels";
 
 const SEAT_STATUSES = ["ACTIVE", "INVITED", "PENDING_VERIFICATION"];
 
 const formatLimits = (limits: unknown) => {
   if (!limits || typeof limits !== "object") return "—";
   const entries = Object.entries(limits as Record<string, unknown>);
-  return entries.length ? entries.map(([key, value]) => `${titleCase(key)}: ${String(value)}`).join(" · ") : "—";
+  return entries.length ? entries.map(([key, value]) => `${readable(key)}: ${String(value)}`).join(" · ") : "—";
 };
 
 export function SubscriptionSection() {
@@ -34,14 +34,6 @@ export function SubscriptionSection() {
       <div className="ac-grid two">
         <Panel eyebrow="Plan" title={context?.plan?.name ?? "No active plan"}>
           <dl className="ca-facts">
-            <div>
-              <dt>Plan code</dt>
-              <dd>{context?.plan?.code ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Version</dt>
-              <dd>{context?.plan?.version ?? "—"}</dd>
-            </div>
             <div>
               <dt>License</dt>
               <dd>
@@ -70,11 +62,11 @@ export function SubscriptionSection() {
             )}
             <div>
               <dt>Organization status</dt>
-              <dd>{lifecycle.data ? titleCase(lifecycle.data.lifecycle_status ?? lifecycle.data.status) : "—"}</dd>
+              <dd>{lifecycle.data ? readable(lifecycle.data.lifecycle_status ?? lifecycle.data.status) : "—"}</dd>
             </div>
           </dl>
           <p className="ac-muted">
-            Plan limits are set in your contract. Only MDARIX can change them; you can request a renewal below.
+            Plan limits are set in your contract. Only MDARIX can change them. You can ask for a renewal below.
           </p>
         </Panel>
         <Panel eyebrow="Usage" title="Seats" source={users}>
@@ -93,12 +85,12 @@ export function SubscriptionSection() {
                 </dd>
               </div>
               <div>
-                <dt>Customer Administrators</dt>
+                <dt>Customer administrators</dt>
                 <dd>{customerAdmins}</dd>
               </div>
               <div>
                 <dt>Counts toward seats</dt>
-                <dd>Active, invited and pending users</dd>
+                <dd>Active users, and invited users who have not signed in yet</dd>
               </div>
             </dl>
           </div>
@@ -113,9 +105,12 @@ export function SubscriptionSection() {
           caption="Entitlements"
           rows={listOf(entitlements.data)}
           rowKey={(row, index) => `${row.feature}-${index}`}
-          empty={{ title: "No entitlements", detail: "Your plan's features appear here once assigned." }}
+          empty={{
+            title: "No features listed yet",
+            detail: "Your plan's features appear here once MDARIX sets up your plan.",
+          }}
           columns={[
-            { key: "feature", label: "Feature", render: (row) => <strong>{titleCase(row.feature ?? "")}</strong> },
+            { key: "feature", label: "Feature", render: (row) => <strong>{readable(row.feature, "")}</strong> },
             {
               key: "enabled",
               label: "Included",
@@ -150,7 +145,7 @@ export function SubscriptionSection() {
             </button>
           </div>
         ) : (
-          <Empty title="Renewal not available" detail="Contact your MDARIX account team." />
+          <Empty title="Renewal cannot be requested here" detail="Contact your MDARIX account team to renew." />
         )}
       </Panel>
     </>

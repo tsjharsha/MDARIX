@@ -16,10 +16,13 @@ export type TenantUser = {
 const USER_STATUS: Record<string, { label: string; tone: Tone; order: number }> = {
   ACTIVE: { label: "Active", tone: "good", order: 0 },
   INVITED: { label: "Invited", tone: "neutral", order: 1 },
-  PENDING_ACTIVATION: { label: "Pending activation", tone: "neutral", order: 2 },
+  PENDING_ACTIVATION: { label: "Invited, not signed in yet", tone: "neutral", order: 2 },
+  PENDING_VERIFICATION: { label: "Invited, not signed in yet", tone: "neutral", order: 2 },
   SUSPENDED: { label: "Suspended", tone: "serious", order: 3 },
   LOCKED: { label: "Locked", tone: "critical", order: 4 },
-  OFFBOARDED: { label: "Offboarded", tone: "neutral", order: 5 },
+  DEACTIVATED: { label: "Deactivated", tone: "serious", order: 5 },
+  OFFBOARDED: { label: "Offboarded", tone: "neutral", order: 6 },
+  ERASED: { label: "Personal data erased", tone: "neutral", order: 7 },
 };
 
 const code = (value: unknown) =>
@@ -46,6 +49,12 @@ export function userStatusSlices(users: TenantUser[]): Slice[] {
 
 export function userTone(status: unknown): Tone {
   return USER_STATUS[code(status)]?.tone ?? "neutral";
+}
+
+/** A person's account status in words ("Invited, not signed in yet"), never the code. */
+export function userStatusLabel(status: unknown): string {
+  const key = code(status);
+  return USER_STATUS[key]?.label ?? (key ? titleCase(key) : "Unknown");
 }
 
 export function roleMix(users: TenantUser[]): Slice[] {

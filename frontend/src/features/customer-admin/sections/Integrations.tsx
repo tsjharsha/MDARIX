@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { KeyRound, Plus } from "lucide-react";
 import { ColumnChart, Panel, ToneBadge } from "../../admin/console/charts";
-import { dailyCounts, runOutcomes, titleCase, type Tone } from "../../admin/console/dashboardModel";
+import { dailyCounts, runOutcomes, type Tone } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { Table, Tabs, errorText, formatDate, idColumn, listOf, send, useResource } from "../shared";
 import { LifecycleActions, LifecycleBadge } from "./Access";
+import { readable } from "../labels";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatTime } from "../../../app/dates";
 
@@ -30,7 +31,7 @@ const mappingOptions = (rows: unknown) => {
     .sort((a, b) => String(a.code).localeCompare(String(b.code)))
     .map((row) => ({
       code: String(row.code),
-      label: `${row.code} (${String(row.status).toUpperCase() === "RELEASED" ? "released" : titleCase(row.status ?? "draft").toLowerCase()})`,
+      label: `${row.code} (${String(row.status).toUpperCase() === "RELEASED" ? "released" : readable(row.status ?? "DRAFT").toLowerCase()})`,
     }));
 };
 
@@ -72,11 +73,14 @@ function LinkMapping({
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ca-link-mapping" onSubmit={submit}>
         <p className="ac-eyebrow">{connection.code}</p>
         <h2 id="ca-link-mapping">Mapping for this connection</h2>
-        <p>On Sync now, the records read are turned into MDARIX records with this mapping, once it is released.</p>
+        <p>
+          When you press Sync now, the records read are turned into MDARIX records with this mapping, once it is
+          released.
+        </p>
         <label className="ca-field">
           Mapping
           <select value={code} onChange={(event) => setCode(event.target.value)}>
-            <option value="">None (records are only staged)</option>
+            <option value="">None (records are read but not imported)</option>
             {mappingOptions(mappings).map((option) => (
               <option key={option.code} value={option.code}>
                 {option.label}
@@ -218,8 +222,8 @@ export function IntegrationsSection({ tab }: { tab?: string }) {
   return (
     <>
       <p className="ca-lede">
-        Each connection reads one record type from a source system with that system's API key. Keys are encrypted and
-        never shown again; a connection can instead name a credential reference held in your secret manager.
+        Each connection reads one kind of record from one of your systems. Add it, set its API key, choose a mapping,
+        test it, then activate it and press Sync now. Keys are encrypted and never shown again.
       </p>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Integration sections">
         {active === "Connections" && <Connections />}
@@ -308,30 +312,30 @@ function Connections() {
                 <span className="ca-person">
                   <strong>{row.code}</strong>
                   <small>
-                    {titleCase(row.connector_type ?? "")} · {row.version}
+                    {readable(row.connector_type, "")} · {row.version}
                   </small>
                 </span>
               ),
             },
             {
               key: "endpoint",
-              label: "Endpoint",
+              label: "Web address",
               render: (row) => row.configuration?.endpoint ?? <span className="ac-muted">Not set</span>,
             },
             {
               key: "credential",
-              label: "Credential",
+              label: "API key",
               render: (row) => (
                 <span className="ca-person">
                   {row.has_api_key ? (
-                    <ToneBadge tone="good" label={`API key ••••${row.api_key_ends_with ?? ""}`} />
+                    <ToneBadge tone="good" label={`Set · ends ${row.api_key_ends_with ?? ""}`} />
                   ) : credentialFor(row.id)?.credential_configured ? (
-                    <ToneBadge tone="good" label="Reference set" />
+                    <ToneBadge tone="good" label="Held on the server" />
                   ) : (
                     <ToneBadge tone="warning" label="No key" />
                   )}
                   <button type="button" className="ac-link" onClick={() => setKeying(row)}>
-                    <KeyRound size={14} aria-hidden="true" /> {row.has_api_key ? "Replace key" : "Set API key"}
+                    <KeyRound size={14} aria-hidden="true" /> {row.has_api_key ? "Replace" : "Set API key"}
                   </button>
                 </span>
               ),
@@ -351,24 +355,26 @@ function Connections() {
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
             {
               key: "checks",
-              label: "Checks",
+              label: "Actions",
               render: (row) => (
                 <span className="ca-row-actions">
                   <button
                     type="button"
                     className="ac-link"
                     disabled={!!busy}
-                    onClick={() => void run(row, "provider-health", "Health check")}
+                    onClick={() => void run(row, "provider-health", "Connection test")}
+                    title="Check that MDARIX can reach this system"
                   >
-                    Health
+                    Test
                   </button>
                   <button
                     type="button"
                     className="ac-link"
                     disabled={!!busy}
-                    onClick={() => void run(row, "discover-schema", "Schema discovery")}
+                    onClick={() => void run(row, "discover-schema", "Field discovery")}
+                    title="List the fields this system sends"
                   >
-                    Schema
+                    Read fields
                   </button>
                   {String(row.status).toUpperCase() === "ACTIVE" && (
                     <button
@@ -423,11 +429,11 @@ function Connections() {
         />
         {checks.length > 0 && (
           <div className="ca-results" aria-live="polite">
-            <h3 className="ca-subhead">Latest checks</h3>
+            <h3 className="ca-subhead">Latest results</h3>
             <ul>
               {checks.map((check, index) => (
                 <li key={`${check.at.getTime()}-${index}`}>
-                  <ToneBadge tone={resultTone(check.status)} label={titleCase(check.status ?? "Unknown")} />
+                  <ToneBadge tone={resultTone(check.status)} label={readable(check.status, "Unknown")} />
                   <span>
                     <strong>
                       {check.connector} · {check.action}
@@ -468,11 +474,12 @@ function Connections() {
         <form className="ca-form" onSubmit={create}>
           <div className="ca-form-grid">
             <label className="ca-field">
-              Code
+              Short code
               <input
                 required
                 pattern="[A-Za-z0-9_]+"
-                title="Letters, numbers and underscores"
+                title="Letters, numbers and underscores, for example TRACKWISE_COMPLAINTS"
+                placeholder="e.g. TRACKWISE_COMPLAINTS"
                 value={form.code}
                 onChange={(event) => setForm({ ...form, code: event.target.value })}
               />
@@ -487,22 +494,12 @@ function Connections() {
               />
             </label>
             <label className="ca-field">
-              Endpoint (https)
+              Web address (https)
               <input
                 type="url"
                 placeholder="https://"
                 value={form.endpoint}
                 onChange={(event) => setForm({ ...form, endpoint: event.target.value })}
-              />
-            </label>
-            <label className="ca-field">
-              Credential reference
-              <input
-                pattern="MDARIX_CONNECTOR_SECRET_[A-Z0-9_]{1,80}"
-                title="The name of the server secret (MDARIX_CONNECTOR_SECRET_…), never the secret itself"
-                placeholder="e.g. MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE"
-                value={form.credential_ref}
-                onChange={(event) => setForm({ ...form, credential_ref: event.target.value })}
               />
             </label>
           </div>
@@ -516,12 +513,12 @@ function Connections() {
               />
             </label>
             <label className="ca-field">
-              Mapping (turns records into MDARIX records)
+              Mapping (turns them into MDARIX records)
               <select
                 value={form.mapping_code}
                 onChange={(event) => setForm({ ...form, mapping_code: event.target.value })}
               >
-                <option value="">None yet (records are only staged)</option>
+                <option value="">None yet (records are read but not imported)</option>
                 {mappingOptions(mappings.data).map((option) => (
                   <option key={option.code} value={option.code}>
                     {option.label}
@@ -530,10 +527,26 @@ function Connections() {
               </select>
             </label>
           </div>
+          <details className="ca-advanced">
+            <summary>Advanced: key held on the server</summary>
+            <p className="ac-muted">
+              Only if MDARIX support stored this system&apos;s key on the server for you: enter the name they gave you.
+              Otherwise leave it empty and use Set API key after adding the connection.
+            </p>
+            <label className="ca-field">
+              Name of the key held on the server
+              <input
+                pattern="MDARIX_CONNECTOR_SECRET_[A-Z0-9_]{1,80}"
+                title="The name MDARIX support gave you (it starts with MDARIX_CONNECTOR_SECRET_), never the key itself"
+                placeholder="e.g. MDARIX_CONNECTOR_SECRET_TEN0351_TRACKWISE"
+                value={form.credential_ref}
+                onChange={(event) => setForm({ ...form, credential_ref: event.target.value })}
+              />
+            </label>
+          </details>
           <p className="ac-muted">
-            Add the API key after creating the connection (Set API key), or enter a credential reference name here;
-            never paste a key into these fields. Only a released mapping imports records; until then Sync now reads and
-            stages them.
+            After adding the connection, use Set API key in the list above; never paste a key into these fields. Records
+            are imported only once the chosen mapping is released; until then Sync now reads them without importing.
           </p>
           <div className="ca-action-row">
             <button type="submit" className="ac-primary">
@@ -571,22 +584,29 @@ function SyncActivity() {
       <Panel eyebrow="Integrations" title="Run history" source={runs}>
         <Table
           caption="Sync runs"
-          rows={rows.slice(0, 50)}
+          rows={rows}
           rowKey={(row) => row.id}
-          empty={{ title: "No sync runs yet", detail: "Runs appear after a connection syncs." }}
+          pageSize={50}
+          pageNoun="run"
+          empty={{ title: "No sync runs yet", detail: "Runs appear here after you press Sync now on a connection." }}
           columns={[
             { key: "source", label: "Source", render: (row) => row.source_system ?? "—" },
-            { key: "type", label: "Type", render: (row) => titleCase(row.run_type ?? "") },
+            { key: "type", label: "Type", render: (row) => readable(row.run_type) },
             {
               key: "status",
               label: "Status",
-              render: (row) => <ToneBadge tone={resultTone(row.status)} label={titleCase(row.status ?? "Unknown")} />,
+              render: (row) => <ToneBadge tone={resultTone(row.status)} label={readable(row.status, "Unknown")} />,
             },
             { key: "received", label: "Received", numeric: true, render: (row) => row.records_received ?? 0 },
             { key: "accepted", label: "Accepted", numeric: true, render: (row) => row.records_accepted ?? 0 },
             { key: "rejected", label: "Rejected", numeric: true, render: (row) => row.records_rejected ?? 0 },
-            { key: "drift", label: "Schema drift", render: (row) => titleCase(row.schema_drift_status ?? "—") },
-            { key: "started", label: "Started", numeric: true, render: (row) => formatDate(row.started_at) },
+            {
+              key: "started",
+              fields: ["started_at"],
+              label: "Started",
+              numeric: true,
+              render: (row) => formatDate(row.started_at),
+            },
           ]}
         />
       </Panel>
@@ -597,28 +617,37 @@ function SyncActivity() {
 function Reconciliation() {
   const records = useResource<any[]>("/api/v1/admin/integrations/reconciliation");
   return (
-    <Panel eyebrow="Integrations" title="Reconciliation" source={records}>
+    <Panel eyebrow="Integrations" title="Did every record arrive?" source={records}>
       <p className="ac-muted">
-        Every sync is checked: records expected versus received, accepted, rejected and unresolved.
+        After every sync, MDARIX compares how many records your system sent with how many arrived and were accepted.
+        Unresolved records need a look.
       </p>
       <Table
         caption="Reconciliation records"
-        rows={listOf(records.data).slice(0, 50)}
+        rows={listOf(records.data)}
         rowKey={(row) => row.id}
-        empty={{ title: "No reconciliation records", detail: "They appear after the first sync completes." }}
+        pageSize={50}
+        pageNoun="record"
+        empty={{ title: "Nothing to compare yet", detail: "Results appear here after the first sync completes." }}
         columns={[
           {
             key: "status",
             label: "Status",
-            render: (row) => <ToneBadge tone={resultTone(row.status)} label={titleCase(row.status ?? "Unknown")} />,
+            render: (row) => <ToneBadge tone={resultTone(row.status)} label={readable(row.status, "Unknown")} />,
           },
           { key: "expected", label: "Expected", numeric: true, render: (row) => row.expected_count ?? 0 },
           { key: "received", label: "Received", numeric: true, render: (row) => row.received_count ?? 0 },
           { key: "accepted", label: "Accepted", numeric: true, render: (row) => row.accepted_count ?? 0 },
           { key: "rejected", label: "Rejected", numeric: true, render: (row) => row.rejected_count ?? 0 },
-          { key: "quarantined", label: "Quarantined", numeric: true, render: (row) => row.quarantined_count ?? 0 },
+          { key: "quarantined", label: "Held for review", numeric: true, render: (row) => row.quarantined_count ?? 0 },
           { key: "unresolved", label: "Unresolved", numeric: true, render: (row) => row.unresolved_count ?? 0 },
-          { key: "when", label: "Reconciled", numeric: true, render: (row) => formatDate(row.reconciled_at) },
+          {
+            key: "when",
+            fields: ["reconciled_at"],
+            label: "Reconciled",
+            numeric: true,
+            render: (row) => formatDate(row.reconciled_at),
+          },
         ]}
       />
     </Panel>

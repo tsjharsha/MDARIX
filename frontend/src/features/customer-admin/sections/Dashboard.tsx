@@ -1,8 +1,16 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Activity, ChevronRight, KeyRound, LogIn, Plug, ShieldCheck, Sparkles, UserPlus, Users } from "lucide-react";
 import { BarList, Empty, Panel, RingMeter, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { titleCase, worstTone, type Slice, type Tone } from "../../admin/console/dashboardModel";
-import { KpiTile, TrendChart, toPoints, type DailyRow } from "../../admin/console/trendCharts";
+import { KpiTile, toPoints, type DailyRow } from "../../admin/console/trendCharts";
+import {
+  ActivityExplorer,
+  Donut,
+  PlatformPulse,
+  RangeSwitch,
+  busyness,
+  type Range,
+} from "../../admin/console/dashboardVisuals";
 import { customerAttention, roleMix, seatUsage, userStatusSlices, type TenantUser } from "../customerAdminModel";
 import { licensedSeatLimit, useConsole } from "../context";
 import { listOf, useResource } from "../shared";
@@ -28,7 +36,8 @@ export function Dashboard() {
   const { context, open } = useConsole();
   const dashboard = useResource<any>("/api/v1/admin/tenant-dashboard");
   const users = useResource<TenantUser[]>("/api/v1/admin/identity/users");
-  const trends = useResource<Trends>("/api/v1/admin/dashboard-trends?days=30");
+  const [range, setRange] = useState<Range>(30);
+  const trends = useResource<Trends>(`/api/v1/admin/dashboard-trends?days=${range}`);
   const audit = useResource<any[]>("/api/v1/admin/audit-history");
   const security = useResource<any>("/api/v1/admin/security-summary");
   const connectors = useResource<any[]>("/api/v1/admin/configuration/connectors");
@@ -89,52 +98,129 @@ export function Dashboard() {
   const days = trends.data?.days ?? 30;
   const recent = listOf(audit.data).slice(0, 8);
 
+  const perDay = (total: number) => (days ? total / days : 0);
+  const rates = {
+    signIns: perDay(model.signInTotal),
+    runs: perDay(model.runTotal),
+    ai: perDay(model.aiTotal),
+    events: perDay(sum(model.events.map((point) => point.primary))),
+  };
+  const busiest = Math.max(...Object.values(rates));
+  const pulse = [
+    {
+      key: "people",
+      label: "People",
+      value: users.state === "ready" ? model.people.length : null,
+      detail: `${active} active`,
+      icon: <Users size={20} />,
+      tone: (model.seats.limit !== null ? model.seats.tone : "good") as Tone,
+      onOpen: () => open("Users"),
+    },
+    {
+      key: "signins",
+      label: "Sign-ins",
+      value: trendsReady ? model.signInTotal : null,
+      detail: `last ${days} days`,
+      icon: <LogIn size={20} />,
+      tone: (trendsReady && model.signInTotal ? "good" : "neutral") as Tone,
+      activity: busyness(rates.signIns, busiest),
+      onOpen: () => open("Security"),
+    },
+    {
+      key: "connections",
+      label: "Connections",
+      value: connectors.state === "ready" ? connectorList.length : null,
+      detail: `${activeConnectors} active`,
+      icon: <Plug size={20} />,
+      tone: (!connectorList.length ? "neutral" : activeConnectors < connectorList.length ? "warning" : "good") as Tone,
+      activity: busyness(rates.runs, busiest),
+      onOpen: () => open("Integrations"),
+    },
+    {
+      key: "runs",
+      label: "Sync runs",
+      value: trendsReady ? model.runTotal : null,
+      detail: `${model.runFailed} failed`,
+      icon: <Activity size={20} />,
+      tone: (!trendsReady || !model.runTotal ? "neutral" : model.runFailed ? "critical" : "good") as Tone,
+      activity: busyness(rates.runs, busiest),
+      onOpen: () => open("Integrations", "Sync activity"),
+    },
+    {
+      key: "ai",
+      label: "AI assist",
+      value: trendsReady ? model.aiTotal : null,
+      detail: `${model.aiFailed} failed`,
+      icon: <Sparkles size={20} />,
+      tone: (!trendsReady || !model.aiTotal ? "neutral" : model.aiFailed ? "warning" : "good") as Tone,
+      activity: busyness(rates.ai, busiest),
+    },
+    {
+      key: "audit",
+      label: "Audit trail",
+      value: trendsReady ? sum(model.events.map((point) => point.primary)) : null,
+      detail: `${model.refused} refused`,
+      icon: <ShieldCheck size={20} />,
+      tone: (!trendsReady ? "neutral" : model.refused ? "warning" : "good") as Tone,
+      activity: busyness(rates.events, busiest),
+      onOpen: () => open("Audit"),
+    },
+  ];
+
   return (
     <div className="ac-overview ac-dashboard">
-      <section className={`ac-hero tone-${tone}`} aria-live="polite">
-        <div className="ac-hero-status">
-          <span className="ac-hero-icon">
-            <ToneIcon tone={tone} size={34} />
-          </span>
-          <div>
-            <p className="ac-eyebrow">{context?.current_tenant?.tenant_name ?? "Your organization"}</p>
-            <h2>
-              {loading
-                ? "Checking your organization…"
-                : model.attention.length
-                  ? `${model.attention.length} ${model.attention.length === 1 ? "item needs" : "items need"} your attention`
-                  : "Everything looks healthy"}
-            </h2>
-            <p>
-              {context?.plan?.name ? `${context.plan.name} plan` : "No active plan"} · License{" "}
-              {context?.license?.effective ? "active" : "inactive"}
-            </p>
+      <section className={`ac-hero ac-hero-pulse tone-${tone}`}>
+        <div className="ac-hero-top">
+          <div className="ac-hero-status" aria-live="polite">
+            <span className="ac-hero-icon">
+              <ToneIcon tone={tone} size={34} />
+            </span>
+            <div>
+              <p className="ac-eyebrow">{context?.current_tenant?.tenant_name ?? "Your organization"}</p>
+              <h2>
+                {loading
+                  ? "Checking your organization…"
+                  : model.attention.length
+                    ? `${model.attention.length} ${model.attention.length === 1 ? "item needs" : "items need"} your attention`
+                    : "Everything looks healthy"}
+              </h2>
+              <p>
+                {context?.plan?.name ? `${context.plan.name} plan` : "No active plan"} · License{" "}
+                {context?.license?.effective ? "active" : "inactive"} · {model.people.length}{" "}
+                {model.people.length === 1 ? "person" : "people"}, {active} active. Activity below covers the last{" "}
+                {days} days.
+              </p>
+            </div>
+          </div>
+          <div className="ac-hero-controls">
+            <RangeSwitch days={range} onChange={setRange} />
+            <span className="ac-hero-actions">
+              <button type="button" className="ac-primary" onClick={() => open("Users", "Invite")}>
+                <UserPlus size={16} /> Invite user
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => open("Security")}>
+                <ShieldCheck size={16} /> Security
+              </button>
+            </span>
           </div>
         </div>
-        <div className="ac-hero-meters">
-          <RingMeter value={active} total={model.people.length} label="Users active" />
-          {model.seats.limit !== null ? (
-            <RingMeter value={model.seats.used} total={model.seats.limit} label="Seats used" />
-          ) : (
-            <RingMeter value={activeConnectors} total={connectorList.length} label="Connections active" />
-          )}
-          <RingMeter
-            value={model.runTotal - model.runFailed}
-            total={model.runTotal}
-            label={`Syncs succeeded · ${days} days`}
-          />
-        </div>
-        <div className="ac-hero-actions">
-          <button type="button" className="ac-primary" onClick={() => open("Users", "Invite")}>
-            <UserPlus size={16} /> Invite user
-          </button>
-          <button type="button" className="ac-secondary" onClick={() => open("Security")}>
-            <ShieldCheck size={16} /> Security
-          </button>
-        </div>
+        <PlatformPulse nodes={pulse} />
       </section>
 
-      <section className="ac-kpis" aria-label="Key figures">
+      <nav className="ac-jump" aria-label="On this page">
+        {[
+          ["ac-figures", "Key figures"],
+          ["ac-activity", "Activity"],
+          ["ac-people", "People and work"],
+          ["ac-health", "What to do next"],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`}>
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <section id="ac-figures" className="ac-kpis" aria-label="Key figures">
         <KpiTile
           label="Users"
           value={users.state === "ready" ? model.people.length : null}
@@ -204,34 +290,71 @@ export function Dashboard() {
         />
       </section>
 
-      <section className="ac-grid three" aria-label={`Activity, last ${days} days`}>
-        <Panel
-          eyebrow={`Last ${days} days`}
-          title="Sign-ins"
-          source={trends}
-          action={<OpenLink onClick={() => open("Security")} />}
-        >
-          <TrendChart data={model.signIns} primaryLabel="sign-ins" unit="sign-ins" />
+      <section id="ac-activity" className="ac-grid ac-grid-wide" aria-label={`Activity, last ${days} days`}>
+        <Panel eyebrow={`Last ${days} days`} title="Activity explorer" source={trends}>
+          <ActivityExplorer
+            series={[
+              {
+                key: "signins",
+                label: "Sign-ins",
+                points: model.signIns,
+                primaryLabel: "sign-ins",
+                unit: "sign-ins",
+                explain: "How often your team signed in each day.",
+              },
+              {
+                key: "runs",
+                label: "Sync runs",
+                points: model.runs,
+                primaryLabel: "runs",
+                secondaryLabel: "failed",
+                unit: "sync runs",
+                explain: "Data brought in from your connected systems each day, and how many runs failed.",
+              },
+              {
+                key: "ai",
+                label: "AI runs",
+                points: model.ai,
+                primaryLabel: "runs",
+                secondaryLabel: "failed",
+                unit: "AI runs",
+                explain: "AI assistance your team used each day, and how many runs failed.",
+              },
+              {
+                key: "audit",
+                label: "Audit events",
+                points: model.events,
+                primaryLabel: "events",
+                secondaryLabel: "refused",
+                unit: "audit events",
+                explain: "Every recorded action each day, and how many were refused.",
+              },
+              {
+                key: "users",
+                label: "New users",
+                points: model.newUsers,
+                primaryLabel: "new users",
+                unit: "new users",
+                explain: "People added to your organization each day.",
+              },
+            ]}
+          />
         </Panel>
-        <Panel
-          eyebrow={`Last ${days} days`}
-          title="Sync runs"
-          source={trends}
-          action={<OpenLink onClick={() => open("Integrations", "Sync activity")} />}
-        >
-          <TrendChart data={model.runs} primaryLabel="runs" secondaryLabel="failed" unit="sync runs" />
-        </Panel>
-        <Panel
-          eyebrow={`Last ${days} days`}
-          title="Audit events"
-          source={trends}
-          action={<OpenLink onClick={() => open("Audit")} />}
-        >
-          <TrendChart data={model.events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
+        <Panel eyebrow={`Last ${days} days`} title="At a glance" source={trends}>
+          <div className="ac-rate-rings">
+            <RingMeter value={active} total={model.people.length} label="Users active" />
+            {model.seats.limit !== null ? (
+              <RingMeter value={model.seats.used} total={model.seats.limit} label="Seats used" />
+            ) : (
+              <RingMeter value={activeConnectors} total={connectorList.length} label="Connections active" />
+            )}
+            <RingMeter value={model.runTotal - model.runFailed} total={model.runTotal} label="Syncs succeeded" />
+            <RingMeter value={model.aiTotal - model.aiFailed} total={model.aiTotal} label="AI runs completed" />
+          </div>
         </Panel>
       </section>
 
-      <section className="ac-grid three" aria-label="People and work">
+      <section id="ac-people" className="ac-grid three" aria-label="People and work">
         <Panel
           eyebrow="People"
           title="Users by status"
@@ -251,21 +374,21 @@ export function Dashboard() {
           action={<OpenLink onClick={() => open("Roles & Access")} />}
         >
           {model.people.length ? (
-            <BarList items={model.roles} colour="series" />
+            <Donut items={model.roles} unit="people" />
           ) : (
             <Empty title="No users yet" detail="Roles appear once people are invited." />
           )}
         </Panel>
         <Panel eyebrow="Quality work" title="Investigations by status" source={trends}>
           {model.investigations.length ? (
-            <BarList items={model.investigations} colour="series" />
+            <Donut items={model.investigations} unit="investigations" />
           ) : (
             <Empty title="No investigations yet" detail="Investigations your team opens are counted here." />
           )}
         </Panel>
       </section>
 
-      <div className="ac-grid two">
+      <div id="ac-health" className="ac-grid two">
         <Panel
           eyebrow="Needs attention"
           title="What to do next"

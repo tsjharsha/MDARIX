@@ -31,7 +31,7 @@ describe("invitation results", () => {
       text: "Invitation sent to a@example.com. They will create their own password.",
     });
     expect(invitationNotice({ email_delivery: "NOT_CONFIGURED" }, "a@example.com").text).toBe(
-      "Invitation created. Email delivery: Not Configured.",
+      "Invitation created. Email delivery: not set up.",
     );
   });
 
