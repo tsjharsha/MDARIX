@@ -262,6 +262,7 @@ LEGACY_PROTECTED = {
     "test_day15_decision_center",
     "test_day17_briefs",
     "test_day18_trust_assurance",
+    "test_business_ids_reports_api",
 }
 
 

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import pytest
 
 import backend.app.evaluation_router as evaluation_router
-from backend.app.db.models.foundation import Decision, Evidence, Investigation
+from backend.app.db.models.foundation import Decision, Evidence, Investigation, Tenant
 from backend.app.db.session import SessionLocal
 from hypothesis_engine.schemas import Hypothesis
 from investigation_workspace.schemas import InvestigationWorkspaceResponse
@@ -20,6 +20,7 @@ from investigation_workspace.service import with_business_ids
 from investigator.business_ids import with_evidence_business_ids, with_hypothesis_business_ids
 from investigator.schemas import SourceReference
 from tests import reports_seed
+from tests.conftest import with_signing_plan
 from tests.reports_seed import PASSWORD, role_client
 from tests.test_business_permissions import _client_with_role
 from tests.test_manage_investigation import _open_case
@@ -189,6 +190,10 @@ def test_workspace_ids_are_added_to_a_copy_for_the_response():
 @pytest.fixture(scope="module")
 def seed():
     case = reports_seed.seed_case()
+    # Signing and Ask need the plan every real organization has (on a fresh database nothing has given it yet).
+    with SessionLocal() as db:
+        with_signing_plan(db, db.query(Tenant).filter(Tenant.id == uuid.UUID(case["tenant_id"])).one())
+        db.commit()
     yield case
     reports_seed.cleanup(case)
 

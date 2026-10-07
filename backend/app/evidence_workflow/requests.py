@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile
 from pydantic import ValidationError
@@ -1144,7 +1144,8 @@ def review_evidence_request(
             to_status=UNREVIEWED,
             to_relationship=UNREVIEWED,
             details=source,
-            now=now,
+            # Stamped a moment before the review, so the history (ordered by time) always lists the link first.
+            now=now - timedelta(microseconds=1),
         )
         review_event(
             db,

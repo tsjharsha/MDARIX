@@ -3,14 +3,16 @@
 import re
 import uuid
 
+from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from backend.app.db.session import engine
-from tests.conftest import authenticated_client
+from backend.app.main import app
 from tests.test_business_permissions import _client_with_role
 
-# Business records are read with a session (the API refuses anonymous reads).
-client = authenticated_client()
+# Signed in by conftest (LEGACY_PROTECTED) when each test runs, once the golden organization exists: a session made
+# at import would put the shared test account in whichever organization exists first on a fresh database.
+client = TestClient(app)
 
 
 def _primary_product() -> str:
