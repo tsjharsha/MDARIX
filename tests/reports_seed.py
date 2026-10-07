@@ -16,6 +16,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from auth.durable import persist_session
 from auth.service import _hash
@@ -45,6 +46,7 @@ from backend.app.db.models.foundation import (
     TenantMembership,
     Unknown,
 )
+from backend.app.db.models.retrieval_intelligence import RetrievalQuery
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
 
@@ -425,9 +427,10 @@ def cleanup(seed: dict) -> None:
             db.query(EvidenceEntityLink).filter(EvidenceEntityLink.evidence_id.in_(evidence)),
             db.query(RealityRelationship).filter(RealityRelationship.target_entity_id.in_(risks)),
             db.query(HypothesisEvidence).filter(HypothesisEvidence.hypothesis_id.in_(hypotheses)),
-            db.query(Hypothesis).filter(Hypothesis.id.in_(hypotheses)),
+            # Unknowns and failure chains may point at a hypothesis (md30), so they go first.
             db.query(Unknown).filter(Unknown.investigation_id.in_(cases)),
             db.query(FailureChain).filter(FailureChain.investigation_id.in_(cases)),
+            db.query(Hypothesis).filter(Hypothesis.id.in_(hypotheses)),
             db.query(Scenario).filter(Scenario.investigation_id.in_(cases)),
             db.query(AssuranceResult).filter(AssuranceResult.ai_execution_id.in_(executions)),
             db.query(AIExecution).filter(AIExecution.id.in_(executions)),
@@ -436,6 +439,8 @@ def cleanup(seed: dict) -> None:
             db.query(InvestigationComplaint).filter(InvestigationComplaint.investigation_id.in_(cases)),
             db.query(InvestigationEvidence).filter(InvestigationEvidence.investigation_id.in_(cases)),
             db.query(Evidence).filter(Evidence.id.in_(evidence)),
+            # Questions asked about a case (Ask, scenarios) keep a reference to it.
+            db.query(RetrievalQuery).filter(RetrievalQuery.investigation_id.in_(cases)),
             db.query(Investigation).filter(Investigation.id.in_(cases)),
             db.query(Complaint).filter(Complaint.complaint_identifier == f"C-{tag}"),
             db.query(Risk).filter(Risk.id.in_(risks)),
@@ -445,6 +450,21 @@ def cleanup(seed: dict) -> None:
             db.query(ProductVersion).filter(ProductVersion.version_identifier == f"V-{tag}"),
             db.query(Product).filter(Product.product_identifier == f"P-{tag}"),
         ]
+        # Records the workflow adds around a case (tasks and their history, review and intelligence events, scope
+        # versions, signal links, CAPAs, briefs) go before the case; children before parents.
+        if cases:
+            for statement in (
+                "DELETE FROM workflow_task_events WHERE task_id IN "
+                "(SELECT id FROM workflow_tasks WHERE tenant_id = :tenant AND investigation_id = ANY(:cases))",
+                "DELETE FROM workflow_tasks WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM evidence_review_events WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM intelligence_events WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM investigation_scope_versions WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM investigation_signals WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM capas WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+                "DELETE FROM investigation_briefs WHERE tenant_id = :tenant AND investigation_id = ANY(:cases)",
+            ):
+                db.execute(text(statement), {"tenant": tenant_id, "cases": list(cases)})
         for query in steps:
             query.filter_by(tenant_id=tenant_id).delete(synchronize_session=False)
         db.commit()

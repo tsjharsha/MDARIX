@@ -3,14 +3,14 @@
 import re
 import uuid
 
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from backend.app.db.session import engine
-from backend.app.main import app
+from tests.conftest import authenticated_client
 from tests.test_business_permissions import _client_with_role
 
-client = TestClient(app)
+# Business records are read with a session (the API refuses anonymous reads).
+client = authenticated_client()
 
 
 def _primary_product() -> str:

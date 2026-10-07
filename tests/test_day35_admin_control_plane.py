@@ -95,7 +95,8 @@ def test_admin_route_renders_the_simplified_platform_admin_shell():
     assert compact(
         'isPlatformAdmin && (activeView === "admin" || activeView in CUSTOMER_CONSOLE_VIEWS) && (<SimplifiedPlatformAdminScreen'
     ) in compact(UI)
-    assert "Administrator control plane" in SIMPLIFIED_ADMIN_UI
+    # The console's name as people see it (formerly "Administrator control plane").
+    assert "Platform administration" in SIMPLIFIED_ADMIN_UI
 
 
 def test_platform_admin_data_mapping_exposes_external_to_internal_fields():

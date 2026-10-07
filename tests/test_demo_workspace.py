@@ -406,7 +406,7 @@ def test_the_golden_signature_verifies_and_was_seeded_without_credentials(demo):
         # Seeding is a system action: audited as DEMO_SEEDED, never as a signature made with credentials.
         seeded = db.query(AuditEvent).filter_by(tenant_id=tenant.id, action="DEMO_SEEDED", entity_id=decision.id)
         assert seeded.count() == 1
-        assert seeded.one().details["credentials_verified"] is False
+        assert seeded.one().details["signer_reauthenticated"] is False
         assert (
             db.query(AuditEvent)
             .filter_by(tenant_id=tenant.id, action="CASE_DECISION_SIGNED", entity_id=decision.id)

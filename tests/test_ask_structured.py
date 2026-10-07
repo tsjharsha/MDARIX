@@ -37,6 +37,7 @@ def case():
     tenant_id, case_id = uuid.UUID(seed["tenant_id"]), uuid.UUID(seed["investigation_id"])
     with SessionLocal() as db:
         direct = db.query(Evidence).filter(Evidence.evidence_identifier == f"EV-{tag}-1").one()
+        direct_id = direct.id  # kept: the row is expired once its session commits
         linked = db.query(Evidence).filter(Evidence.evidence_identifier == f"EV-{tag}-2").one()
         hypothesis = db.query(Hypothesis).filter(Hypothesis.investigation_id == case_id).one()
         db.add_all(
@@ -107,7 +108,7 @@ def case():
         db.commit()
     yield seed
     with SessionLocal() as db:
-        db.query(EvidenceObservation).filter(EvidenceObservation.evidence_id == direct.id).delete(
+        db.query(EvidenceObservation).filter(EvidenceObservation.evidence_id == direct_id).delete(
             synchronize_session=False
         )
         db.query(AIInteraction).filter(AIInteraction.investigation_id == case_id).delete(synchronize_session=False)

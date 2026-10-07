@@ -1913,7 +1913,8 @@ def sign_decision(s: Story, brief, moment: datetime):
             reason="Demo workspace golden path: a signed decision written by the seeding, no credentials checked",
             details={
                 "seeded": "CASE_DECISION_SIGNED",
-                "credentials_verified": False,
+                # Not "credentials_…": the audit trail drops keys that look secret (enterprise_audit.SECRET_TERMS).
+                "signer_reauthenticated": False,
                 "signature_id": str(record.id),
                 "signature_business_id": record.business_id,
                 "fingerprint": content_fingerprint,

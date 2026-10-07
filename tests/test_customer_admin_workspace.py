@@ -60,7 +60,8 @@ def test_the_session_offers_the_workspace_and_the_administration(admins):
 
 def test_a_customer_admin_reads_their_own_organizations_investigations(admins):
     investigation_id = golden_investigation_id()
-    listed = admins["own"].get("/api/v1/data-plane/investigations")
+    # The full list (the default page is 100, and the shared golden organization gathers cases from other tests).
+    listed = admins["own"].get("/api/v1/data-plane/investigations", params={"limit": 500})
     assert listed.status_code == 200, listed.text
     assert listed.json()["tenant_id"] == admins["golden_tenant"]
     assert investigation_id in {str(row["id"]) for row in listed.json()["records"]}

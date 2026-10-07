@@ -222,11 +222,8 @@ def upgrade():
 
 
 def downgrade():
-    connection = op.get_bind()
+    # Prefixes are permanent (md_master.protect_prefix_registry refuses removal); re-applying reuses them.
     for item in NUMBERED.values():
-        if _registry_present(connection):
-            op.execute(f"DELETE FROM md_master.business_id_prefix WHERE prefix = '{item.prefix}'")
-            op.execute(f"DROP SEQUENCE IF EXISTS md_master.seq_business_id_{item.prefix.lower()}")
         op.execute(f"DELETE FROM public.{COUNTER_TABLE} WHERE prefix = '{item.prefix}'")
     for table in TABLES:
         op.drop_table(table)

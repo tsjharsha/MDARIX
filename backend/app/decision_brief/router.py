@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Path, Query
 from sqlalchemy import case as sql_case
@@ -844,7 +844,9 @@ def review_decision_brief(
     role = person.role_for(QUALITY_REVIEW)
     actor = person.user_id
     if row.status == rules.READY_FOR_REVIEW:
-        _start_review(db, ctx, person, row, None, role, now)
+        # Reviewing a version nobody started starts it first; stamped a moment earlier, so the history always lists
+        # the start before the outcome (it is ordered by time).
+        _start_review(db, ctx, person, row, None, role, now - timedelta(microseconds=1))
     before = row.status
     row.status = rules.status_after(row.status, action)
     row.updated_at = now

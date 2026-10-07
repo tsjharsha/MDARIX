@@ -23,8 +23,9 @@ def test_operational_admin_endpoints_are_tenant_scoped_and_secret_safe():
 
 
 def test_operational_admin_frontend_surfaces_are_connected():
-    # Runs, reconciliation and credentials are Integrations sections; AI runs are an AI Control Center section.
-    for label in ("Runs & failures", "Reconciliation", "Credentials", "Executions"):
+    # Runs, reconciliation and credentials are Data & Integrations steps; AI runs are an AI Control Center section
+    # (formerly "Executions").
+    for label in ("Runs & failures", "Reconciliation", "Credentials", "AI runs"):
         assert f'"{label}"' in SECTIONS
     assert "/api/v1/platform-admin/console/integration-runs" in INTEGRATIONS
     assert "reconciled" in INTEGRATIONS

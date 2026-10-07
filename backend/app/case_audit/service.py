@@ -387,13 +387,16 @@ def read_intelligence(found: Gathered) -> None:
         business_id = details.get("business_id")
         kind = OBJECT_LABELS.get(event.object_type, rules.readable(event.object_type))
         found.remember(str(event.object_type or "Intelligence").title().replace("_", ""), event.object_id, business_id)
-        change = f"{event.from_value or '—'} → {event.to_value}" if event.to_value else None
+        # In words: "Fact" when something is added, "Hypothesized → Supported" when it changes.
+        to_text = rules.readable(event.to_value) if event.to_value else None
+        from_text = rules.readable(event.from_value) if event.from_value else None
+        change = (f"{from_text} → {to_text}" if from_text else to_text) if to_text else None
         found.add(
             at=event.created_at,
             category="INTELLIGENCE",
             event=f"INTELLIGENCE_{event.event_type}",
             title=rules.title(f"{kind}: {(event_label(event.event_type) or '').lower()}", change),
-            obj=rules.object_ref(event.object_type, event.object_id, business_id),
+            obj=rules.object_ref(event.object_type, event.object_id, business_id, label=kind),
             reason=event.reason,
             details={"from_value": event.from_value, "to_value": event.to_value},
             origin=rules.origin_of(event.actor_ref),

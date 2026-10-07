@@ -487,8 +487,9 @@ def test_starting_from_the_ai_draft(org):
     assert unavailable.status_code == 409 and _code(unavailable) == "AI_DRAFT_NOT_AVAILABLE"
 
     now = datetime.now(timezone.utc)
+    brief_id = uuid.uuid4()  # kept: the row is expired once its session commits
     brief = InvestigationBrief(
-        id=uuid.uuid4(),
+        id=brief_id,
         tenant_id=tenant_id,
         investigation_id=uuid.UUID(case["id"]),
         brief_version=1,
@@ -514,7 +515,7 @@ def test_starting_from_the_ai_draft(org):
     assert narrative["ai_draft_source"]["brief_version"] == 1
     # The AI text is never put in the author's own fields.
     assert narrative["problem_statement"] == "" and narrative["proposed_conclusion"] == ""
-    assert made.json()["source_ai_brief_id"] == str(brief.id)
+    assert made.json()["source_ai_brief_id"] == str(brief_id)
     ai = made.json()["content"]["ai_assistance"]
     assert ai["ai_draft_used"] is True and "the author started the narrative from an AI draft" in ai["statement"]
 
@@ -546,6 +547,7 @@ def test_submission_is_refused_until_the_gate_allows_it(org):
             requested_by=user_id,
             title="Bench test results of the returned pumps",
             requested_items={"items": ["Bench test report"]},
+            recipient="supplier.quality@example.invalid",  # a request always names who is asked
             status="SENT",
             priority="HIGH",
             created_at=now,
@@ -781,6 +783,7 @@ def test_the_quality_dashboard(org):
             requested_by=user_id,
             title="Bench test results of the returned pumps",
             requested_items={"items": ["Bench test report"]},
+            recipient="supplier.quality@example.invalid",  # a request always names who is asked
             status="SENT",
             priority="CRITICAL",
             created_at=now,

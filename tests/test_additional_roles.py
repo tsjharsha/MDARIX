@@ -201,7 +201,8 @@ def test_the_api_enforces_the_union_of_roles(world):
 def test_the_user_list_shows_role_labels(world):
     listed = world["admin"].get("/api/v1/admin/identity/users").json()
     row = next(item for item in listed if item["id"] == world["investigator_id"])
-    assert row["role"] == "Investigator" and row["role_label"] == "Quality Investigator"
+    # The stored role is canonicalised by the database (md25), so compare the code, not its spelling.
+    assert row["role"].upper() == "INVESTIGATOR" and row["role_label"] == "Quality Investigator"
 
 
 def test_erasure_removes_the_persons_additional_roles(world):

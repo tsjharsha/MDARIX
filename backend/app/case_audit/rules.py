@@ -204,8 +204,13 @@ def item(
     }
 
 
-def object_ref(kind: str, row_id: Any, business_id: str | None = None) -> dict:
-    return {"type": kind, "id": as_uuid_text(row_id) or (str(row_id) if row_id else None), "business_id": business_id}
+def object_ref(kind: str, row_id: Any, business_id: str | None = None, label: str | None = None) -> dict:
+    """The record an entry is about. A record without a business id of its own (an observation, a link) carries a
+    readable label, so it is never named by its id alone."""
+    ref = {"type": kind, "id": as_uuid_text(row_id) or (str(row_id) if row_id else None), "business_id": business_id}
+    if label and not business_id:
+        ref["label"] = label
+    return ref
 
 
 def public(entry: Mapping) -> dict:

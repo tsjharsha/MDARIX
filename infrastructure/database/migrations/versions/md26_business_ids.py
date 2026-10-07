@@ -202,6 +202,4 @@ def downgrade():
         for item in OBJECTS:
             if item.prefix in MD01_PREFIXES:
                 op.execute(f"UPDATE md_master.business_id_prefix SET id_width = 5 WHERE prefix = '{item.prefix}'")
-            else:
-                op.execute(f"DELETE FROM md_master.business_id_prefix WHERE prefix = '{item.prefix}'")
-                op.execute(f"DROP SEQUENCE IF EXISTS md_master.seq_business_id_{item.prefix.lower()}")
+            # Other prefixes stay registered. # Prefixes are permanent (md_master.protect_prefix_registry refuses removal); re-applying reuses them.

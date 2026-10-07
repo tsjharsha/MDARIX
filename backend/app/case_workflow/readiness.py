@@ -517,11 +517,17 @@ def _people_analysis_fact(db: Session, case) -> int:
 
 def _contradictions_fact(db: Session, case) -> dict:
     """``{"total", "undocumented"}``: how many current hypotheses of the case have contradicting evidence that is not
-    withdrawn, and the business ids of those no person has judged yet."""
+    withdrawn, and the business ids of those no person has judged since their latest contradicting evidence (a
+    judgement made before that evidence arrived could not take it into account)."""
     from backend.app.db.models.foundation import Hypothesis, HypothesisEvidence
 
     rows = (
-        db.query(Hypothesis.business_id, Hypothesis.human_status)
+        db.query(
+            Hypothesis.business_id,
+            Hypothesis.human_status,
+            Hypothesis.status_changed_at,
+            HypothesisEvidence.created_at,
+        )
         .join(
             HypothesisEvidence,
             (HypothesisEvidence.hypothesis_id == Hypothesis.id)
@@ -537,8 +543,14 @@ def _contradictions_fact(db: Session, case) -> dict:
         .distinct()
         .all()
     )
-    undocumented = sorted({business_id for business_id, human_status in rows if not human_status})
-    return {"total": len({business_id for business_id, _ in rows}), "undocumented": undocumented}
+    undocumented = sorted(
+        {
+            business_id
+            for business_id, human_status, judged_at, linked_at in rows
+            if not human_status or (judged_at is not None and linked_at is not None and judged_at < linked_at)
+        }
+    )
+    return {"total": len({row[0] for row in rows}), "undocumented": undocumented}
 
 
 def _brief_fact(db: Session, case) -> dict:

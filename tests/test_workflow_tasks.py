@@ -371,7 +371,8 @@ def test_a_supplier_request_waits_for_the_reply_then_asks_for_its_review(monkeyp
     completed = client.post(f"/api/v1/tasks/{review.id}/complete", json={"outcome": "ACCEPTED_FOR_REVIEW"})
     assert completed.status_code == 200, completed.text
     assert completed.json()["status"] == "COMPLETED" and completed.json()["completion_outcome"] == "ACCEPTED_FOR_REVIEW"
-    assert [item["id"] for item in _listed(client, "completed", request_id)] == [str(review.id)]
+    # Both tasks of the request are now done: waiting for the reply, then reviewing it.
+    assert {item["id"] for item in _listed(client, "completed", request_id)} == {str(done.id), str(review.id)}
     again = client.post(f"/api/v1/tasks/{review.id}/complete", json={})
     assert again.status_code == 409 and again.json()["detail"]["code"] == "TASK_STATE_CONFLICT"
 

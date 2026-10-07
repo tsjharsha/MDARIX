@@ -305,7 +305,8 @@ def _request(tenant_id, case_id, requested_by: str, *, status: str, priority: st
         priority=priority,
         created_at=now,
         updated_at=now,
-        **extra,
+        # A request always names who is asked (ck_supplier_evidence_requests_has_recipient): the supplier's contact.
+        **{"recipient": "supplier.quality@example.invalid", **extra},
     )
 
 

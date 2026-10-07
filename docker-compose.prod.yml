@@ -150,7 +150,10 @@ services:
       - objects:/var/lib/mdarix/objects
       - reports:/var/lib/mdarix/reports
       - *db-ca
+      # Every process passes the same configuration gate, which reads the legal documents (config_check.py).
+      - ./legal:/var/lib/mdarix/legal:ro
     environment:
+      MDARIX_LEGAL_DIR: /var/lib/mdarix/legal
       MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
       MDARIX_REPORT_TEMP_ROOT: /var/lib/mdarix/reports
       MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
@@ -173,7 +176,10 @@ services:
     volumes:
       - objects:/var/lib/mdarix/objects
       - *db-ca
+      # Every process passes the same configuration gate, which reads the legal documents (config_check.py).
+      - ./legal:/var/lib/mdarix/legal:ro
     environment:
+      MDARIX_LEGAL_DIR: /var/lib/mdarix/legal
       MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
       MDARIX_SCHEDULER_HEARTBEAT_FILE: /tmp/mdarix-scheduler-heartbeat
     healthcheck:

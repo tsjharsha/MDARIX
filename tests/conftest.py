@@ -163,6 +163,14 @@ DB_MODULES = {
     "test_case_audit",
     # Phase 7: the 25 workflow scenarios end to end through the API (fresh organizations, six workflow roles).
     "test_e2e_workflow_scenarios",
+    # Customer and tenant administration (edit, activate, suspend; a suspended customer blocks its tenants).
+    "test_customer_tenant_admin_workflows",
+    # Platform administration lists accounts apart: platform users, customer administrators, customer users.
+    "test_platform_accounts",
+    # Column sorting of the platform administration lists across every page (sort/order on each list endpoint).
+    "test_list_sorting_admin",
+    # Column sorting of the workspace lists across every page (signals, complaints, My Work, requests, risks).
+    "test_list_sorting_workspace",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
@@ -327,3 +335,13 @@ def authenticate_legacy_module(request):
         yield
     finally:
         db.close()
+
+
+def with_signing_plan(db, tenant) -> None:
+    """Give a fresh test organization what every real one has: an active plan with controlled signatures, approval
+    authority for Approvers and Leaders, and separation of duties (governance_router.bootstrap and its defaults).
+    Without an active plan an organization has no features (access/plan_features.py), so it cannot sign."""
+    from backend.app.governance_router import bootstrap, ensure_governance_defaults
+
+    bootstrap(db, tenant)
+    ensure_governance_defaults(db, tenant)

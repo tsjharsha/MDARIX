@@ -121,6 +121,9 @@ def _copy_rows(table_name: str, column: str, value, plane_engine) -> int:
                 )
             )
         if guard:
+            # Deferred constraint triggers (tenants_default_data_plane) queue events until commit, and a table with
+            # pending events cannot be altered: run them now, then restore the guard.
+            connection.execute(text("SET CONSTRAINTS ALL IMMEDIATE"))
             connection.execute(text(f'ALTER TABLE public."{table_name}" ENABLE TRIGGER "{guard}"'))
     return len(rows)
 

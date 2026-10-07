@@ -287,10 +287,7 @@ def upgrade():
 
 
 def downgrade():
-    connection = op.get_bind()
-    if _registry_present(connection):
-        op.execute(f"DELETE FROM md_master.business_id_prefix WHERE prefix = '{SIGNALS.prefix}'")
-        op.execute(f"DROP SEQUENCE IF EXISTS md_master.seq_business_id_{SIGNALS.prefix.lower()}")
+    # Prefixes are permanent (md_master.protect_prefix_registry refuses removal); re-applying reuses them.
     op.execute(f"DELETE FROM public.{COUNTER_TABLE} WHERE prefix = '{SIGNALS.prefix}'")
     for table in reversed(TABLES):
         op.drop_table(table)

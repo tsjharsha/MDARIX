@@ -344,7 +344,8 @@ jobs:
           if docker compose -f docker-compose.prod.yml config --quiet 2> missing.txt; then
             echo "docker-compose.prod.yml resolved without .env.production"; exit 1
           fi
-          grep -q 'MDARIX_DOMAIN' missing.txt
+          # Compose versions differ in how many missing values they list; any required one must be named.
+          grep -qE 'required variable [A-Z_]+ is missing a value' missing.txt
       - name: Owner and backup secrets reach only the migrate and backup jobs
         run: |
           docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup config --format json > resolved.json

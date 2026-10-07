@@ -208,7 +208,7 @@ describe("the readiness checklist", () => {
       "brief:PENDING",
       "regulatory:NOT_AVAILABLE",
     ]);
-    expect(readinessHeadline(listed)).toBe("1 pending � 1 not available yet");
+    expect(readinessHeadline(listed)).toBe("1 pending · 1 not available yet");
   });
 });
 

@@ -24,6 +24,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
+
+from tests.conftest import with_signing_plan
 from fastapi.testclient import TestClient
 
 from auth.durable import persist_session
@@ -90,6 +92,10 @@ UUID_TEXT = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-
 # ------------------------------------------------------------------------------------------- organizations, people
 
 
+# Intelligence records without a business identifier of their own (backend/app/case_intelligence/rules.py).
+UNNUMBERED_OBJECTS = {"HYPOTHESIS_EVIDENCE", "FAILURE_CHAIN_LINK", "OBSERVATION"}
+
+
 def _organization(prefix: str):
     from backend.app.customer_lifecycle import build_customer_tenant
 
@@ -105,6 +111,7 @@ def _organization(prefix: str):
         db.add(customer)
         db.add(tenant)
         db.commit()  # registers the organization on the shared plane (migration md20)
+        with_signing_plan(db, tenant)  # the plan and decision rules every organization has
         return tenant.id
 
 
@@ -2113,7 +2120,9 @@ def test_24_the_trust_timeline_reconstructs_every_material_action(org, golden):
     # Each item says when, what and who in words; records carry business ids, never an id alone; nothing secret.
     for item in timeline:
         assert item["at"] and item["title"] and item["category"] and item["origin"] in {"HUMAN", "AI", "SYSTEM"}
-        if item["object"] is not None:
+        # Hypotheses, unknowns and failure chains are numbered; their evidence links, chain links and observations
+        # are not (they are shown with the record they belong to). No object is ever shown by a bare id (below).
+        if item["object"] is not None and item["object"]["type"] not in UNNUMBERED_OBJECTS:
             assert item["object"]["business_id"], item
     names = {(item["actor"] or {}).get("name") for item in timeline}
     assert {"Lead E2E", "Investigator E2E", "Risk E2E", "Regulatory E2E", "Quality E2E", "Decider E2E"} <= names

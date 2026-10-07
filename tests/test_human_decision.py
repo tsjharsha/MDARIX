@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 
 import pytest
 
+from tests.conftest import with_signing_plan
+
 from backend.app.db.models.decision_outcomes import DecisionFollowUp
 from backend.app.db.models.foundation import AuditEvent, Decision, SignedApprovalRecord
 from backend.app.db.models.reviews import BriefReviewAction, DecisionBriefVersion
@@ -47,6 +49,7 @@ def org():
         db.add(customer)
         db.add(tenant)
         db.commit()  # registers the organization on the shared plane (migration md20)
+        with_signing_plan(db, tenant)  # the plan and decision rules every organization has
         tenant_id = tenant.id
     people = {
         name: _client(tenant_id, role, name.title())

@@ -75,6 +75,29 @@ EXEMPT = {
     # with nobody named, anyone holding its role) works on it, whatever their permissions, so the route checks it.
     ("POST", "/api/v1/follow-ups/{follow_up_id}/start"): "checked in the route: the assignee or its role",
     ("POST", "/api/v1/follow-ups/{follow_up_id}/complete"): "checked in the route: the assignee or its role",
+    # Evidence requests to a colleague (backend/app/evidence_workflow/requests.py): who may act depends on the request
+    # (the person or role asked, its requester, or a permission), so each route checks it itself.
+    (
+        "POST",
+        "/api/v1/evidence-requests/{request_id}/acknowledge",
+    ): "checked in the route: only the person or role asked",
+    ("POST", "/api/v1/evidence-requests/{request_id}/respond"): "checked in the route: only the person or role asked",
+    (
+        "POST",
+        "/api/v1/evidence-requests/{request_id}/cannot-provide",
+    ): "checked in the route: only the person or role asked",
+    (
+        "POST",
+        "/api/v1/evidence-requests/{request_id}/cancel",
+    ): "checked in the route: the requester or investigation.assign",
+    (
+        "POST",
+        "/api/v1/evidence-requests/{request_id}/attachments",
+    ): "checked in the route: the requester or the person asked",
+    (
+        "POST",
+        "/api/v1/evidence-requests/{request_id}/review",
+    ): "checked in the route: the requester or evidence.review",
     # The human decision (backend/app/human_decision/router.py): signing is checked in the route as legacy signing is
     # (no administrator, the signature entitlement, approval authority, segregation of duties, password and MFA).
     (
@@ -91,7 +114,12 @@ EXEMPT_BUT_SIGNED_IN = {
 
 
 def _is_guarded(route) -> bool:
-    return any("require_permission" in getattr(dep.dependency, "__qualname__", "") for dep in route.dependencies)
+    # require_permission(one) or require_any_permission(several): both refuse without the permission.
+    return any(
+        name in getattr(dep.dependency, "__qualname__", "")
+        for dep in route.dependencies
+        for name in ("require_permission", "require_any_permission")
+    )
 
 
 def _business_actions():

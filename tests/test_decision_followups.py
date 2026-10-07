@@ -293,6 +293,8 @@ def _request_row(tenant_id, case_id: str, *, requester: str, status: str, priori
             status=status,
             request_kind="INTERNAL",
             recipient_user_id=uuid.UUID(recipient) if recipient else None,
+            # A request always names who is asked: the person, or else the investigators' queue.
+            recipient_role=None if recipient else "INVESTIGATOR",
             priority=priority,
             responded_at=now if status == "RECEIVED" else None,
             response_note="Batch record attached; cycle 121 C for 30 min" if status == "RECEIVED" else None,

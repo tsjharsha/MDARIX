@@ -392,8 +392,9 @@ def test_briefs_scenarios_and_counterfactuals_carry_business_ids(seed):
         f"/api/v1/investigations/{case}/scenarios",
         json={
             "scenario_type": "EXCLUDE_RELATIONSHIP",
-            "question": "What changes if the supplier change is excluded?",
-            "target": "Supplier change",
+            "question": "What changes if the occlusion sensor bench test is excluded?",
+            # The target must be part of the case (reports_seed: "Bench test of occlusion sensor").
+            "target": "occlusion sensor",
             "persist": True,
         },
     )
@@ -401,14 +402,14 @@ def test_briefs_scenarios_and_counterfactuals_carry_business_ids(seed):
     assert _matches(r"SCN\d{6}", scenario.json()["business_id"])
     explored = client.post(
         f"/api/v1/investigations/{case}/scenarios",
-        json={"scenario_type": "EXCLUDE_RELATIONSHIP", "question": "And without saving?", "target": "Supplier change"},
+        json={"scenario_type": "EXCLUDE_RELATIONSHIP", "question": "And without saving?", "target": "occlusion sensor"},
     )
     assert explored.status_code == 200 and explored.json()["business_id"] is None
     counterfactual = client.post(
         f"/api/v1/investigations/{case}/counterfactuals",
         json={
             "intervention_type": "REMOVE_CHANGE",
-            "intervention_target": "Supplier change",
+            "intervention_target": "occlusion sensor",
             "intervention_description": "Remove the candidate change from the explanation.",
         },
     )
