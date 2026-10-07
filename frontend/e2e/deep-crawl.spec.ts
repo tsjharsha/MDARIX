@@ -133,6 +133,12 @@ async function sweep(page: Page, persona: string, where: string) {
   save();
 }
 
+/** On phones the console's navigation sits behind a menu button: open it when it is closed. */
+async function openNavigation(page: Page) {
+  const toggle = page.getByRole("button", { name: "Open navigation" });
+  if (await toggle.isVisible().catch(() => false)) await toggle.click();
+}
+
 async function crawl(page: Page, persona: any) {
   const nav = page.getByRole("navigation", { name: NAV_LABEL[persona.console] });
   await expect(nav).toBeAttached({ timeout: 20_000 });
@@ -217,6 +223,8 @@ test.describe("deep crawl of every screen", () => {
     await signIn(page, admin);
     await page.goto("/app/customer-admin");
     const nav = page.getByRole("navigation", { name: NAV_LABEL.customer });
+    await expect(nav).toBeAttached({ timeout: 20_000 });
+    await openNavigation(page);
     await nav.getByRole("button", { name: /^Users/ }).click();
     await page.getByRole("tab", { name: "Invite" }).click();
     const email = `ui-invite-${Date.now()}@example.invalid`;
@@ -238,6 +246,8 @@ test.describe("deep crawl of every screen", () => {
     await signIn(page, investigator);
     await page.goto("/app");
     const nav = page.getByRole("navigation", { name: NAV_LABEL.workspace });
+    await expect(nav).toBeAttached({ timeout: 20_000 });
+    await openNavigation(page);
     await nav.getByRole("button", { name: /^Investigations/ }).click();
     await page.getByRole("button", { name: /open an investigation/i }).click();
     await page

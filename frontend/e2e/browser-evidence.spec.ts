@@ -194,7 +194,13 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.getByRole("heading", { name: "Customer directory", exact: true })).toBeVisible({
       timeout: 20_000,
     });
-    const customerLink = page.getByRole("table", { name: "Customers" }).getByRole("button").first();
+    // The first customer's own button (the header row holds the column sort buttons).
+    const customerLink = page
+      .getByRole("table", { name: "Customers" })
+      .locator("tbody tr")
+      .first()
+      .getByRole("button")
+      .first();
     if (await customerLink.count()) {
       await customerLink.click();
       const customerSections = page.getByRole("tablist", { name: "Customer sections" });

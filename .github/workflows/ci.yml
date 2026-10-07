@@ -522,6 +522,9 @@ jobs:
       - run: alembic upgrade head
       - run: python scripts/configure_runtime_role.py
       - run: python scripts/provision_day35_fixture.py
+      # Products, complaints and cases for the four fixture organizations: the browser flows open an investigation
+      # for a product, as a person would (an organization without products cannot).
+      - run: python scripts/seed_validation_dataset.py --apply
       - name: Start backend
         shell: bash
         run: |

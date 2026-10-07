@@ -97,7 +97,8 @@ test.describe("pilot features", () => {
     const tenants = page.getByRole("table", { name: "Tenants" });
     await expect(tenants).toBeVisible({ timeout: 20_000 });
     const hold = page.waitForResponse((response) => /\/legal-hold$/.test(response.url()));
-    await tenants.getByRole("button").first().click();
+    // The first tenant's own button (the header row holds the column sort buttons).
+    await tenants.locator("tbody tr").first().getByRole("button").first().click();
     expect((await hold).status()).toBe(200);
     await expect(page.getByRole("heading", { name: "Legal hold" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/No legal hold|On hold: nothing can be deleted/)).toBeVisible();
