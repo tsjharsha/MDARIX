@@ -215,7 +215,8 @@ def _subscription_sort_columns(seat_count) -> dict:
             select(column)
             .join(TenantPlanAssignment, TenantPlanAssignment.plan_id == PlanDefinition.id)
             .where(TenantPlanAssignment.tenant_id == Tenant.id, TenantPlanAssignment.status == "ACTIVE")
-            .order_by(TenantPlanAssignment.effective_from.desc())
+            # The id breaks ties, so sorting and the row shown pick the same assignment (the page lookup below).
+            .order_by(TenantPlanAssignment.effective_from.desc(), TenantPlanAssignment.id.desc())
             .limit(1)
             .correlate(Tenant)
             .scalar_subquery()
@@ -225,7 +226,8 @@ def _subscription_sort_columns(seat_count) -> dict:
         return (
             select(column)
             .where(SubscriptionLifecycle.tenant_id == Tenant.id)
-            .order_by(SubscriptionLifecycle.created_at.desc())
+            # The id breaks ties, so sorting and the row shown pick the same subscription (the page lookup below).
+            .order_by(SubscriptionLifecycle.created_at.desc(), SubscriptionLifecycle.id.desc())
             .limit(1)
             .correlate(Tenant)
             .scalar_subquery()
@@ -416,7 +418,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     assignments = first_per_tenant(
         db.query(TenantPlanAssignment)
         .filter(TenantPlanAssignment.tenant_id.in_(page_ids), TenantPlanAssignment.status == "ACTIVE")
-        .order_by(TenantPlanAssignment.effective_from.desc())
+        .order_by(TenantPlanAssignment.effective_from.desc(), TenantPlanAssignment.id.desc())
         .all()
         if page_ids
         else []
@@ -430,7 +432,7 @@ def list_platform_customers(request: Request, db: Session = Depends(get_db)):
     subscriptions = first_per_tenant(
         db.query(SubscriptionLifecycle)
         .filter(SubscriptionLifecycle.tenant_id.in_(page_ids))
-        .order_by(SubscriptionLifecycle.created_at.desc())
+        .order_by(SubscriptionLifecycle.created_at.desc(), SubscriptionLifecycle.id.desc())
         .all()
         if page_ids
         else []
