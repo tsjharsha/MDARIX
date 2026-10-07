@@ -79,10 +79,10 @@ export function purgeOutcome(
       tone: "warning",
       text:
         `${name}'s records are deleted; files are still being removed${steps.length ? ` (${steps.join(", ")})` : ""}. ` +
-        "This finishes automatically or via scripts/complete_tenant_purge.py. The organization shows as Purging until then.",
+        "This finishes automatically. The tenant shows as Purging until then.",
     };
   }
-  return { tone: "good", text: `${name}'s data has been deleted and the organization is archived.` };
+  return { tone: "good", text: `${name}'s data has been deleted and the tenant is archived.` };
 }
 
 export type LegalHold = {
@@ -90,6 +90,8 @@ export type LegalHold = {
   legal_hold_reason: string | null;
   legal_hold_set_at: string | null;
   legal_hold_set_by: string | null;
+  // The User ID (USR…) of the administrator who set the hold; the account reference above is never shown.
+  legal_hold_set_by_business_id?: string | null;
 };
 
 const MFA_MESSAGES: Record<string, string> = {

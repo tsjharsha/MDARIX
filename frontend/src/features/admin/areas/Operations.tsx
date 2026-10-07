@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Activity, Database, Inbox, Mail, RotateCcw, ServerCog, Trash2, TriangleAlert, X } from "lucide-react";
+import { Activity, Database, Inbox, Mail, RotateCcw, ServerCog, Trash2, TriangleAlert } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
 import {
   ConfirmDialog,
@@ -10,9 +10,9 @@ import {
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
-import { titleCase } from "../customers/model";
+import { displayCode } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
-import { Intro, TenantCell } from "./common";
+import { Banner, Intro, TenantCell, type BannerMessage } from "./common";
 
 type Ops = {
   database: string;
@@ -127,7 +127,7 @@ function Health() {
           tone={data ? (data.email.configured ? "good" : "warning") : undefined}
         />
       </section>
-      <Panel eyebrow="Background worker" title="Worker" state={ops.state} error={ops.error}>
+      <Panel eyebrow="Behind the scenes" title="Background worker" state={ops.state} error={ops.error}>
         <WorkerStatus worker={data?.worker} />
         {data?.queue.oldest_pending_at && (
           <p>
@@ -138,6 +138,10 @@ function Health() {
     </div>
   );
 }
+
+const ERROR_LENGTH = 90;
+/** Long text cut to `length` characters with an ellipsis. */
+const shorten = (text: string, length: number) => (text.length > length ? `${text.slice(0, length - 1)}…` : text);
 
 const sinceText = (seconds: number | null) =>
   seconds === null
@@ -153,9 +157,8 @@ function WorkerStatus({ worker }: { worker: Ops["worker"] }) {
   if (!worker || worker.state === "NOT_REPORTED")
     return (
       <Intro>
-        The background worker has not reported a heartbeat. It sends queued work (integration records, report jobs) and
-        records a heartbeat every few seconds while it runs. Start it with{" "}
-        <code>docker compose up -d mdarix-outbox-worker</code>.
+        The background worker has not checked in yet. It sends queued work (integration records, report jobs) and checks
+        in every few seconds while it runs. Ask your technical team to start the background worker.
       </Intro>
     );
   const running = worker.state === "RUNNING";
@@ -166,20 +169,20 @@ function WorkerStatus({ worker }: { worker: Ops["worker"] }) {
       <Intro>
         {running
           ? "The background worker is running: it sends queued work and produces requested reports every few seconds."
-          : "The background worker has stopped: no heartbeat for over a minute, so queued work and reports wait. Restart it with docker compose up -d mdarix-outbox-worker."}
+          : "The background worker has stopped: it has not checked in for over a minute, so queued work and reports wait. Ask your technical team to restart the background worker."}
       </Intro>
       <section className="ac-stats ar-stats-4" aria-label="Background worker">
         <StatTile
           label="State"
           value={running ? "Running" : "Stopped"}
-          detail={`Last heartbeat ${sinceText(worker.seconds_since)}`}
+          detail={`Last checked in ${sinceText(worker.seconds_since)}`}
           icon={<Activity size={18} />}
           tone={running ? "good" : "critical"}
         />
         <StatTile
           label="Running since"
           value={worker.started_at ? formatDate(worker.started_at) : null}
-          detail={`${(metrics.cycles ?? 0).toLocaleString()} cycles`}
+          detail={`Checked for work ${(metrics.cycles ?? 0).toLocaleString()} time${metrics.cycles === 1 ? "" : "s"}`}
           icon={<ServerCog size={18} />}
         />
         <StatTile
@@ -190,7 +193,7 @@ function WorkerStatus({ worker }: { worker: Ops["worker"] }) {
           tone={metrics.dead_lettered ? "warning" : "good"}
         />
         <StatTile
-          label="Reports in last cycle"
+          label="Reports in the latest round"
           value={reports.ready ?? 0}
           detail={`${reports.claimed ?? 0} picked up, ${reports.failed ?? 0} failed`}
           icon={<Database size={18} />}
@@ -255,10 +258,10 @@ export function groupGaveUp(items: GaveUpItem[]): GaveUpGroup[] {
 function GaveUp({ onChanged }: { onChanged: () => void }) {
   const list = useResource<{ total: number; items: GaveUpItem[] }>("/api/v1/platform-admin/console/dead-letters");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<BannerMessage>(null);
   const groups = useMemo(() => groupGaveUp(list.data?.items ?? []), [list.data]);
   const act = (group: GaveUpGroup, discard: boolean) => {
-    const what = `${group.count} ${titleCase(group.event_name)} item${group.count === 1 ? "" : "s"}`;
+    const what = `${group.count} ${displayCode(group.event_name)} item${group.count === 1 ? "" : "s"}`;
     const where = group.tenant_name ? ` for ${group.tenant_name}` : "";
     setConfirm({
       title: discard ? `Discard ${what}?` : `Retry ${what}?`,
@@ -278,14 +281,7 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
   };
   return (
     <Panel eyebrow="Queue" title="Gave up after retries" state={list.state} error={list.error}>
-      {message && (
-        <div className="ac-message tone-good" role="status">
-          {message}
-          <button type="button" className="ac-link" onClick={() => setMessage("")} aria-label="Dismiss message">
-            <X size={14} />
-          </button>
-        </div>
-      )}
+      <Banner message={message} onDismiss={() => setMessage(null)} />
       <Table
         caption="Gave up after retries"
         rows={groups}
@@ -296,7 +292,7 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
             "Background work that still fails after repeated retries over several hours appears here for a decision.",
         }}
         columns={[
-          { key: "kind", label: "Kind", render: (row) => titleCase(row.event_name), fields: ["event_name"] },
+          { key: "kind", label: "Kind", render: (row) => displayCode(row.event_name), fields: ["event_name"] },
           {
             key: "tenant",
             label: "Tenant",
@@ -304,7 +300,14 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
             fields: ["tenant_name", "tenant_key"],
           },
           { key: "count", label: "Items", numeric: true, render: (row) => row.count },
-          { key: "error", label: "Last error", render: (row) => row.last_error ?? "—", fields: ["last_error"] },
+          {
+            key: "error",
+            label: "Last error",
+            // A long error is shortened; the full text shows on hover.
+            render: (row) =>
+              row.last_error ? <span title={row.last_error}>{shorten(row.last_error, ERROR_LENGTH)}</span> : "—",
+            fields: ["last_error"],
+          },
           {
             key: "when",
             label: "Queued",
@@ -317,11 +320,11 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
             label: "",
             render: (row) => (
               <span className="ca-action-row">
-                <button type="button" className="ac-secondary" onClick={() => act(row, false)}>
-                  <RotateCcw size={14} /> Retry
+                <button type="button" className="ac-link" onClick={() => act(row, false)}>
+                  <RotateCcw size={14} aria-hidden="true" /> Retry
                 </button>
-                <button type="button" className="ac-secondary" onClick={() => act(row, true)}>
-                  <Trash2 size={14} /> Discard
+                <button type="button" className="ac-link" onClick={() => act(row, true)}>
+                  <Trash2 size={14} aria-hidden="true" /> Discard
                 </button>
               </span>
             ),
@@ -333,7 +336,7 @@ function GaveUp({ onChanged }: { onChanged: () => void }) {
         onClose={() => setConfirm(null)}
         onDone={(text) => {
           setConfirm(null);
-          setMessage(text);
+          setMessage({ text, tone: "good" });
           list.reload();
           onChanged();
         }}
@@ -385,17 +388,17 @@ function Queues() {
             rowKey={(row) => row.event}
             empty={{ title: "Nothing waiting", detail: "All background work is processed." }}
             columns={[
-              { key: "kind", label: "Kind", render: (row) => titleCase(row.event) },
+              { key: "kind", label: "Kind", render: (row) => displayCode(row.event) },
               { key: "count", label: "Waiting", numeric: true, render: (row) => row.pending },
             ]}
           />
         </Panel>
-        <Panel eyebrow="Tenant setup" title="Provisioning jobs" state={ops.state} error={ops.error}>
+        <Panel eyebrow="Tenant setup" title="Customer setup jobs" state={ops.state} error={ops.error}>
           <Table
-            caption="Provisioning jobs"
+            caption="Customer setup jobs"
             rows={data?.provisioning_jobs.recent ?? []}
             rowKey={(row) => row.id}
-            empty={{ title: "No jobs yet", detail: "Onboarding a customer creates a provisioning job." }}
+            empty={{ title: "No jobs yet", detail: "Creating a customer starts a setup job." }}
             columns={[
               { key: "tenant", label: "Tenant", render: (row) => <TenantCell row={row} /> },
               { key: "started", label: "Started", render: (row) => formatDate(row.created_at) },
@@ -444,7 +447,8 @@ function Email() {
       </Panel>
       <Panel eyebrow="Renewal reminders" title="Reminder emails" state={ops.state} error={ops.error}>
         <p>
-          <strong>{email?.reminders_pending ?? 0}</strong> reminders are queued.
+          <strong>{email?.reminders_pending ?? 0}</strong>{" "}
+          {email?.reminders_pending === 1 ? "reminder is waiting to be sent." : "reminders are waiting to be sent."}
         </p>
         <p className="ar-notice" role="note">
           <Mail size={16} aria-hidden="true" />{" "}
@@ -455,8 +459,8 @@ function Email() {
         </p>
         {Boolean(email?.reminders_dead_lettered) && (
           <p className="ca-inline-error" role="alert">
-            {email?.reminders_dead_lettered} reminders could not be delivered after every retry. See Queues &amp; jobs,
-            Gave up after retries.
+            {email?.reminders_dead_lettered} {email?.reminders_dead_lettered === 1 ? "reminder" : "reminders"} could not
+            be delivered after every retry. See Queues &amp; jobs, Gave up after retries.
           </p>
         )}
       </Panel>
@@ -505,8 +509,10 @@ function DeveloperApi() {
       </div>
       <Table
         caption="API operations"
-        rows={shown.slice(0, 50)}
+        rows={shown}
         rowKey={(row) => `${row.method} ${row.path}`}
+        pageSize={50}
+        pageNoun="operation"
         empty={{ title: "No matching operation", detail: "Change the search." }}
         columns={[
           { key: "area", label: "Area", render: (row) => row.tag },
@@ -527,12 +533,6 @@ function DeveloperApi() {
           },
         ]}
       />
-      {shown.length > 50 && (
-        <p className="ac-muted">
-          Showing 50 of {shown.length}. Search by path, method or area (for example &quot;subscription&quot;) to narrow
-          the list.
-        </p>
-      )}
     </Panel>
   );
 }

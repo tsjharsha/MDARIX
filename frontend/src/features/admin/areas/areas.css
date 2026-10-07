@@ -382,3 +382,89 @@
     display: none;
   }
 }
+
+/* Roles & permissions: what the chosen role allows, every permission listed, the granted ones first in weight. */
+.ar-role {
+  display: grid;
+  gap: 10px;
+}
+.ar-permission-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ar-permission-list li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+}
+.ar-permission-list li.not-granted {
+  opacity: 0.62;
+}
+.ar-permission-list small {
+  color: var(--ac-ink-2);
+}
+
+/* Data & Integrations: where the current step sits in the setup story, and the steps either side. */
+.ar-step-guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--ac-line);
+  border-left: 3px solid var(--ac-teal);
+  border-radius: 6px;
+  background: var(--ac-teal-wash);
+}
+.ar-step-guide p {
+  margin: 0;
+  min-width: 0;
+  color: var(--ac-ink-2);
+}
+.ar-step-count {
+  color: var(--ac-teal);
+  font-weight: 700;
+}
+.ar-step-nav {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+.ar-step-nav .ac-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Rules & reference data: the view chips in two labelled groups. */
+.ar-chip-group {
+  align-items: center;
+  margin-bottom: 6px;
+}
+.ar-chip-group-label {
+  min-width: 128px;
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Technical names kept out of the way: collapsed until asked for. */
+.ar-technical {
+  margin-top: 8px;
+}
+.ar-technical summary {
+  color: var(--ac-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.ar-technical[open] summary {
+  margin-bottom: 8px;
+}

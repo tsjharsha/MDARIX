@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../../customer-admin/aiSettings";
-import { ArrowLeft, Globe2, Lock, PauseCircle, PlayCircle, Plus, Unlock } from "lucide-react";
+import { ArrowLeft, Ban, Globe2, Lock, PauseCircle, Pencil, PlayCircle, Plus, Unlock } from "lucide-react";
 import { Panel, ToneBadge } from "../console/charts";
 import {
   ConfirmDialog,
@@ -15,9 +15,24 @@ import {
   type Confirmation,
 } from "../../customer-admin/shared";
 import { displayId, referenceId } from "../../../app/displayId";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 import { CustomerAdmins } from "./CustomerAdmins";
-import { lifecycleAction, titleCase } from "./model";
+import { EditDetails } from "./EditDetails";
+import {
+  REASON_MIN,
+  TENANT_FIELD_GROUPS,
+  TENANT_TYPES,
+  blockedByCustomer,
+  changeErrorText,
+  lifecycleStatusLabel,
+  presentGroups,
+  tenantStatusAction,
+  tenantActivationBlock,
+  titleCase,
+  displayCode,
+} from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { Pager } from "../areas/common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import {
   WAIVER_MIN,
@@ -33,12 +48,37 @@ import {
   type PurgeResult,
 } from "./dataGovernance";
 
+/** Columns the server can order every page by (backend platform_tenants.py _tenant_sort_columns). */
+const TENANT_SORT_KEYS = [
+  "business_id",
+  "tenant",
+  "customer",
+  "region",
+  "plan",
+  "environments",
+  "status",
+  "name",
+  "tenant_key",
+  "tenant_identifier",
+  "customer_name",
+  "customer_identifier",
+  "residency_region",
+  "deployment_model",
+  "plan_name",
+  "plan_code",
+  "environment_count",
+  "seat_usage",
+  "last_activity",
+  "created_at",
+] as const;
+
 /** Every tenant (customer workspace). Opening a row shows the tenant's page. */
 export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page) });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (status) params.set("status", status);
   const tenants = useResource<{ items: any[]; total: number; pages: number }>(
@@ -66,25 +106,27 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
         >
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
+          <option value="SUSPENDED">Inactive</option>
+          <option value="PROVISIONING">Provisioning</option>
           <option value="PROVISIONED">Provisioned</option>
+          <option value="EXPIRED">Expired</option>
         </select>
       </div>
       <Table
         caption="Tenants"
         rows={tenants.data?.items ?? []}
         rowKey={(row) => row.id}
+        serverSort={{ sort, onSort, keys: TENANT_SORT_KEYS }}
         empty={{ title: "No matching tenants", detail: "Change the search or status filter." }}
         columns={[
           idColumn("Tenant ID", "tenant_key"),
           {
             key: "tenant",
-            fields: ["name", "tenant_key", "tenant_identifier"],
+            fields: ["name", "tenant_identifier"],
             label: "Tenant",
             render: (row) => (
-              <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
+              <button type="button" className="ac-link" onClick={() => onOpen(row.id)}>
                 <strong>{row.name}</strong>
-                {row.tenant_key && <small>{row.tenant_key}</small>}
               </button>
             ),
           },
@@ -118,21 +160,24 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             numeric: true,
             render: (row) => row.environment_count ?? 0,
           },
-          { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+          {
+            key: "status",
+            fields: ["status", "effective_access", "customer_lifecycle_status"],
+            label: "Status",
+            render: (row) => (
+              <span className="cc-status-cell">
+                <StatusBadge status={row.status} label={lifecycleStatusLabel(row.status)} />
+                {blockedByCustomer(row) && (
+                  <span className="cc-blocked" title="Its customer is inactive, so nobody can sign in">
+                    <Ban size={13} aria-hidden="true" /> Blocked by customer
+                  </span>
+                )}
+              </span>
+            ),
+          },
         ]}
       />
-      <div className="cc-pager">
-        <span>{tenants.data?.total ?? 0} tenants</span>
-        <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>
-          Page {page} of {pages}
-        </span>
-        <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-          Next
-        </button>
-      </div>
+      <Pager page={page} pages={pages} total={tenants.data?.total ?? 0} noun="tenant" onPage={setPage} />
     </Panel>
   );
 }
@@ -150,11 +195,14 @@ type Section = (typeof SECTIONS)[number];
 
 export function TenantPage({
   tenantId,
+  backLabel = "All tenants",
   onBack,
   onOpenCustomer,
   onMessage,
 }: {
   tenantId: string;
+  /** What the back link returns to ("All tenants", or the customer the tenant was opened from). */
+  backLabel?: string;
   onBack: () => void;
   onOpenCustomer?: (customerId: string) => void;
   onMessage: (text: string, tone?: "good" | "critical") => void;
@@ -164,35 +212,56 @@ export function TenantPage({
   );
   const [section, setSection] = useState<Section>("Overview");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [editing, setEditing] = useState(false);
   const tenant = record.data?.tenant;
-  const next = lifecycleAction(tenant?.status);
+  const action = tenantStatusAction(tenant?.status);
   const name = tenant?.display_name ?? tenant?.tenant_key ?? "Tenant";
-  const changeStanding = () =>
-    next &&
+  // A tenant cannot be activated while its customer is inactive: the customer is reactivated first.
+  const gate =
+    action?.target === "ACTIVE"
+      ? tenantActivationBlock(tenant?.customer_name, tenant?.customer_lifecycle_status)
+      : null;
+  const blocked = blockedByCustomer(tenant);
+  const changeStatus = () =>
+    action &&
+    !gate &&
     setConfirm({
-      title: next === "SUSPENDED" ? `Suspend ${name}?` : `Reactivate ${name}?`,
+      title: `${action.verb} ${name}?`,
       body:
-        next === "SUSPENDED"
+        action.verb === "Deactivate"
           ? "Nobody in this tenant can sign in until it is reactivated. Its data is kept."
-          : "The tenant becomes active again and its users can sign in.",
-      confirmLabel: next === "SUSPENDED" ? "Suspend tenant" : "Reactivate tenant",
-      danger: next === "SUSPENDED",
-      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+          : action.verb === "Reactivate"
+            ? "The tenant becomes active again and its users can sign in."
+            : "The tenant becomes active and its users can sign in.",
+      confirmLabel: `${action.verb} tenant`,
+      danger: action.verb === "Deactivate",
+      reason: { label: "Reason (kept in the audit trail)", min: REASON_MIN },
       password: true,
-      run: (reason, password) =>
-        send(`/api/v1/platform-admin/tenants/${tenantId}/lifecycle`, "POST", {
-          status: next,
-          reason,
-          password,
-          lock_version: tenant?.lock_version,
-        }),
-      done: next === "SUSPENDED" ? `${name} is suspended.` : `${name} is active again.`,
+      run: async (reason, password) => {
+        try {
+          await send(`/api/v1/platform-admin/tenants/${tenantId}/lifecycle`, "POST", {
+            status: action.target,
+            reason,
+            password,
+            lock_version: tenant?.lock_version,
+          });
+        } catch (error) {
+          // A wrong password keeps the server's own words; conflicts and a gated tenant are explained.
+          throw new Error(changeErrorText(error, "tenant", "The status was not changed."));
+        }
+      },
+      done:
+        action.verb === "Deactivate"
+          ? `${name} is inactive.`
+          : action.verb === "Reactivate"
+            ? `${name} is active again.`
+            : `${name} is active.`,
     });
   return (
     <div className="cc-page">
       <div className="cc-page-head">
         <button type="button" className="ac-link" onClick={onBack}>
-          <ArrowLeft size={16} aria-hidden="true" /> Back
+          <ArrowLeft size={16} aria-hidden="true" /> {backLabel}
         </button>
         <div className="cc-title">
           <div>
@@ -213,24 +282,45 @@ export function TenantPage({
             )}
           </div>
           <span className="cc-actions">
-            <StatusBadge status={tenant?.status} />
-            {next && (
+            <StatusBadge status={tenant?.status} label={lifecycleStatusLabel(tenant?.status)} />
+            {tenant && action && (
               <button
                 type="button"
-                className={next === "SUSPENDED" ? "ca-danger" : "ac-primary"}
-                onClick={changeStanding}
+                className={action.verb === "Deactivate" ? "ca-danger" : "ac-primary"}
+                onClick={changeStatus}
+                disabled={!!gate}
+                aria-describedby={gate ? "cc-tenant-status-gate" : undefined}
               >
-                {next === "SUSPENDED" ? (
+                {action.verb === "Deactivate" ? (
                   <PauseCircle size={16} aria-hidden="true" />
                 ) : (
                   <PlayCircle size={16} aria-hidden="true" />
                 )}{" "}
-                {next === "SUSPENDED" ? "Suspend tenant" : "Reactivate tenant"}
+                {action.verb} tenant
               </button>
+            )}
+            {gate && (
+              <span id="cc-tenant-status-gate" className="cc-hint">
+                {gate}
+              </span>
             )}
           </span>
         </div>
       </div>
+      {blocked && (
+        <div className="ac-message tone-warning" role="status">
+          <span>
+            <Ban size={14} aria-hidden="true" /> Nobody can sign in to this tenant because its customer
+            {tenant?.customer_name ? ` ${tenant.customer_name}` : ""} is inactive. The tenant keeps its own status (
+            {lifecycleStatusLabel(tenant?.status)}) and can be used again once the customer is reactivated.
+          </span>
+          {onOpenCustomer && tenant?.customer_id && (
+            <button type="button" className="ac-link" onClick={() => onOpenCustomer(tenant.customer_id)}>
+              Open customer
+            </button>
+          )}
+        </div>
+      )}
       {record.state === "error" && (
         <p className="ca-inline-error" role="alert">
           {record.error ?? "The tenant could not be loaded."}
@@ -239,7 +329,7 @@ export function TenantPage({
       <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Tenant sections">
         {tenant && section === "Overview" && (
           <>
-            <TenantOverview tenant={tenant} />
+            <TenantOverview tenant={tenant} onEdit={() => setEditing(true)} />
             <LegalHoldPanel tenantId={tenantId} name={name} onMessage={onMessage} />
           </>
         )}
@@ -288,6 +378,26 @@ export function TenantPage({
             record.reload();
           }}
         />
+        {editing && tenant && (
+          <EditDetails
+            title={`Edit ${name}`}
+            what="tenant"
+            record={tenant}
+            groups={presentGroups(tenant, TENANT_FIELD_GROUPS)}
+            choices={{ tenant_type: TENANT_TYPES }}
+            url={`/api/v1/platform-admin/tenants/${tenantId}`}
+            onClose={() => setEditing(false)}
+            onReload={() => {
+              setEditing(false);
+              record.reload();
+            }}
+            onSaved={() => {
+              setEditing(false);
+              onMessage(`The details of ${name} are saved.`);
+              record.reload();
+            }}
+          />
+        )}
       </Tabs>
     </div>
   );
@@ -295,8 +405,10 @@ export function TenantPage({
 
 const TENANT_DETAILS: Array<[string, string]> = [
   ["Tenant ID", "business_id"],
-  ["Tenant key", "tenant_key"],
+  ["Tenant code", "tenant_key"],
+  ["Tenant type", "tenant_type"],
   ["Deployment", "deployment_model"],
+  ["Configuration version", "configuration_version"],
   ["Primary region", "primary_region"],
   ["Data residency", "residency_region"],
   ["Database region", "database_region"],
@@ -305,14 +417,28 @@ const TENANT_DETAILS: Array<[string, string]> = [
   ["Backup region", "backup_region"],
 ];
 
-function TenantOverview({ tenant }: { tenant: any }) {
+function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void }) {
   return (
-    <Panel eyebrow="Workspace" title="Tenant details">
+    <Panel
+      eyebrow="Workspace"
+      title="Tenant details"
+      action={
+        <button type="button" className="ac-secondary" onClick={onEdit}>
+          <Pencil size={16} aria-hidden="true" /> Edit details
+        </button>
+      }
+    >
       <dl className="cc-details">
         {TENANT_DETAILS.map(([label, key]) => (
           <div key={key}>
             <dt>{label}</dt>
-            <dd>{key === "business_id" ? displayId(tenant, "tenant_identifier") : tenant[key] || "—"}</dd>
+            <dd>
+              {key === "business_id"
+                ? displayId(tenant, "tenant_identifier")
+                : key === "tenant_type" && tenant[key]
+                  ? titleCase(tenant[key])
+                  : tenant[key] || "—"}
+            </dd>
           </div>
         ))}
         <div>
@@ -339,6 +465,13 @@ type AiSettings = {
   models: { provider: string; model: string }[];
   provider_name: string | null;
   masking: boolean;
+};
+
+/** The AI provider named once: the configured provider's name, else the providers of the models in use. */
+const aiProviderText = (data: { models: { provider: string }[]; provider_name: string | null }) => {
+  if (data.provider_name?.trim()) return displayCode(data.provider_name);
+  const providers = [...new Set(data.models.map((item) => displayCode(item.provider)))];
+  return providers.length ? providers.join(", ") : "None set up";
 };
 
 /** Whether the tenant's content may go to an AI model, its monthly token allowance, and this month's use. */
@@ -389,10 +522,10 @@ function TenantAiSettings({
               <dd>{on ? "On" : "Off: rule-based answers only"}</dd>
             </div>
             <div>
-              <dt>Tokens used this month</dt>
+              <dt>AI usage this month (tokens)</dt>
               <dd>
                 {data.tokens_used.toLocaleString()} of {data.monthly_token_budget.toLocaleString()}
-                {data.budget_is_default ? " (server default)" : ""}
+                {data.budget_is_default ? " (standard allowance)" : ""}
               </dd>
             </div>
             <div>
@@ -402,11 +535,8 @@ function TenantAiSettings({
               </dd>
             </div>
             <div>
-              <dt>Model in use</dt>
-              <dd>
-                {data.models.length ? data.models.map((item) => item.provider).join(", ") : "None configured"}
-                {data.provider_name ? ` · provider: ${data.provider_name}` : ""}
-              </dd>
+              <dt>AI provider</dt>
+              <dd>{aiProviderText(data)}</dd>
             </div>
           </dl>
         )}
@@ -507,7 +637,7 @@ function LegalHoldPanel({
           : `Place ${name} under a legal hold?`
         : `Release the legal hold on ${name}?`,
       body: next
-        ? "While the hold is set, none of this organization's data can be deleted, including at the end of its contract. Record who asked for it, their reference and its scope."
+        ? "While the hold is set, none of this tenant's data can be deleted, including at the end of its contract. Record who asked for it, their reference and its scope."
         : "Its data can be deleted again under the normal rules. Record who authorized the release.",
       confirmLabel: next ? (update ? "Update hold" : "Place legal hold") : "Release hold",
       danger: !next,
@@ -550,10 +680,8 @@ function LegalHoldPanel({
                   <dd>{formatDate(hold.data.legal_hold_set_at)}</dd>
                 </div>
                 <div>
-                  <dt>Set by (account)</dt>
-                  <dd>
-                    <code>{hold.data.legal_hold_set_by || "—"}</code>
-                  </dd>
+                  <dt>Set by</dt>
+                  <dd>{hold.data.legal_hold_set_by_business_id || "A platform administrator"}</dd>
                 </div>
               </>
             )}
@@ -631,8 +759,8 @@ function TenantData({
       body: resuming
         ? "The records are already deleted; this retries removing the stored files and any dedicated database."
         : handBack.kind === "export"
-          ? `Everything this organization stored is deleted for good and the organization is archived. The export completed ${formatDate(available?.completed_at)} is recorded as the data handed back.`
-          : "Everything this organization stored is deleted for good and the organization is archived. No export is handed back; your waiver reason is kept in the deletion record.",
+          ? `Everything this tenant stored is deleted for good and the tenant is archived. The export completed ${formatDate(available?.completed_at)} is recorded as the data handed back.`
+          : "Everything this tenant stored is deleted for good and the tenant is archived. No export is handed back; your waiver reason is kept in the deletion record.",
       confirmLabel: resuming ? "Finish deletion" : "Delete all data",
       danger: true,
       reason: { label: "Reason (for example the customer's written request)", min: 10 },
@@ -704,10 +832,10 @@ function TenantData({
           ]}
         />
       </Panel>
-      <Panel eyebrow="Danger zone" title="Delete all of this organization's data">
+      <Panel eyebrow="Danger zone" title="Delete all of this tenant's data">
         <p>
-          Deletes every record, the audit trail and every stored file, pseudonymizes the people and archives the
-          organization. Contract history is kept. This cannot be undone.
+          Deletes every record, the audit trail and every stored file, pseudonymizes the people and archives the tenant.
+          Contract history is kept. This cannot be undone.
         </p>
         {outcome && (
           <div className={`ac-message tone-${outcome.tone === "good" ? "good" : "warning"}`} role="status">
@@ -716,15 +844,15 @@ function TenantData({
         )}
         {onHold ? (
           <p className="ca-inline-error" role="note">
-            <Lock size={15} aria-hidden="true" /> This organization is under a legal hold: nothing can be deleted until
-            the hold is released (Overview).
+            <Lock size={15} aria-hidden="true" /> This tenant is under a legal hold: nothing can be deleted until the
+            hold is released (Overview).
           </p>
         ) : deletable ? (
           <form
             className="ca-form"
             onSubmit={(event) => {
               event.preventDefault();
-              if (typedKey.trim() !== tenantKey) return onMessage("Type the organization key exactly.", "critical");
+              if (typedKey.trim() !== tenantKey) return onMessage("Type the tenant code exactly.", "critical");
               if (!answered)
                 return onMessage("Choose the export to hand back, or record why there is none.", "critical");
               startPurge();
@@ -733,7 +861,7 @@ function TenantData({
             {resuming ? (
               <p className="ac-note">
                 A previous deletion did not finish: the records are deleted but stored files (or a dedicated database)
-                remain. Finishing it retries their removal; scripts/complete_tenant_purge.py does the same.
+                remain. Finishing it retries their removal.
               </p>
             ) : (
               <fieldset className="ca-fieldset">
@@ -778,7 +906,7 @@ function TenantData({
               </fieldset>
             )}
             <label className="ca-field">
-              {resuming ? "" : "Step 2 · "}Type the organization key <strong>{tenantKey}</strong> to confirm
+              {resuming ? "" : "Step 2 · "}Type the tenant code <strong>{tenantKey}</strong> to confirm
               <input value={typedKey} onChange={(event) => setTypedKey(event.target.value)} autoComplete="off" />
             </label>
             <div className="ca-action-row">
@@ -788,7 +916,7 @@ function TenantData({
             </div>
           </form>
         ) : (
-          <p className="ac-muted">Suspend or terminate the organization first.</p>
+          <p className="ac-muted">Deactivate the tenant first.</p>
         )}
       </Panel>
       <ConfirmDialog
@@ -1079,7 +1207,7 @@ function DomainIdentity({
           rowKey={(row) => row.id}
           empty={{ title: "Password sign-in", detail: "No single sign-on provider is configured for this tenant." }}
           columns={[
-            { key: "type", label: "Provider", render: (row) => titleCase(row.provider_type) },
+            { key: "type", label: "Provider", render: (row) => displayCode(row.provider_type) },
             { key: "mode", label: "Sign-in mode", render: (row) => titleCase(row.login_mode) },
             { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           ]}

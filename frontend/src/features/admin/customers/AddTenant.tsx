@@ -3,6 +3,7 @@ import { errorText, send, useResource } from "../../customer-admin/shared";
 import { ENVIRONMENT_TYPES, titleCase, type Plan } from "./model";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { safeText } from "../../../app/displayId";
+import { REGIONS } from "../onboardingModel";
 
 /**
  * Add a tenant to an existing customer: another region, business unit or validation workspace. The tenant is a
@@ -113,13 +114,15 @@ export function AddTenant({
           </label>
           <label className="ca-field">
             Data region
-            <input
-              required
-              minLength={2}
-              value={form.data_region}
-              onChange={set("data_region")}
-              placeholder="e.g. eu-central-1"
-            />
+            {/* The same regions as the new-customer wizard (the server accepts any region name). */}
+            <select required value={form.data_region} onChange={set("data_region")}>
+              <option value="">Choose a region</option>
+              {REGIONS.map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <label className="ca-field">

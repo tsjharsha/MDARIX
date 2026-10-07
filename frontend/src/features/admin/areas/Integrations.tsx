@@ -3,16 +3,18 @@ import { AlertTriangle, CheckCircle2, CircleSlash, RefreshCcw } from "lucide-rea
 import { BarList, Panel, StatTile } from "../console/charts";
 import type { Slice, Tone } from "../console/dashboardModel";
 import { SearchBox, Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
-import { titleCase } from "../customers/model";
+import { versionLabel } from "./dataModel";
+import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { hideUuid, referenceId } from "../../../app/displayId";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 
 export function Integrations({ section }: { section: string }) {
   if (section === "Runs & failures") return <Runs />;
   if (section === "Reconciliation") return <Reconciliation />;
   if (section === "Credentials") return <Credentials />;
-  if (section === "API & schemas") return <Schemas />;
+  if (section === "Source schemas") return <Schemas />;
   return <Catalog />;
 }
 
@@ -61,7 +63,11 @@ function Catalog() {
               ),
             },
             { key: "support", label: "Support", render: (row) => titleCase(row.integration_support_status ?? "—") },
-            { key: "type", label: "Connects by", render: (row) => row.default_connector_type ?? "—" },
+            {
+              key: "type",
+              label: "Connects by",
+              render: (row) => (row.default_connector_type ? displayCode(row.default_connector_type) : "—"),
+            },
             { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           ]}
         />
@@ -86,11 +92,11 @@ function Catalog() {
                   label: "Connector",
                   render: (row) => <strong>{hideUuid(row.connector_id)}</strong>,
                 },
-                { key: "type", label: "Type", render: (row) => row.connector_type },
-                { key: "version", label: "Version", render: (row) => row.version },
+                { key: "type", label: "Type", render: (row) => displayCode(row.connector_type) },
+                { key: "version", label: "Version", render: (row) => versionLabel(row.version) },
                 {
                   key: "sync",
-                  label: "Incremental sync",
+                  label: "Only new changes",
                   render: (row) => (row.supports_incremental_sync ? "Yes" : "No"),
                 },
                 { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
@@ -131,12 +137,39 @@ type RunPage = {
   last_30_days: { by_status: Record<string, number>; by_reconciliation: Record<string, number> };
 };
 
+/** Columns the server can order every page of runs by (backend platform_console.py integration_runs). */
+const RUN_SORT_KEYS = [
+  "when",
+  "tenant",
+  "source",
+  "records",
+  "status",
+  "problem",
+  "reconciliation",
+  "started_at",
+  "completed_at",
+  "tenant_name",
+  "source_system",
+  "connection_id",
+  "run_type",
+  "records_received",
+  "records_accepted",
+  "records_rejected",
+  "records_quarantined",
+  "records_duplicate",
+  "retry_attempt",
+  "reconciliation_status",
+  "schema_drift_status",
+  "failure_category",
+] as const;
+
 function useRuns(filters: Record<string, string>) {
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: "25" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "25", ...sortParams(sort) });
   Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
   const runs = useResource<RunPage>(`/api/v1/platform-admin/console/integration-runs?${params}`);
-  return { runs, page, setPage };
+  return { runs, page, setPage, serverSort: { sort, onSort, keys: RUN_SORT_KEYS } };
 }
 
 const toneOf = (status: string): Tone => {
@@ -146,6 +179,17 @@ const toneOf = (status: string): Tone => {
   if (["PARTIAL", "RETRYING", "QUARANTINED", "COMPLETED_WITH_WARNINGS"].includes(value)) return "warning";
   return "neutral";
 };
+
+/** Why a run failed, in words (the codes the connector sync and import record). */
+const FAILURE_LABELS: Record<string, string> = {
+  PROVIDER_READ_FAILED: "Could not read from the source system",
+  PROVIDER_RESPONSE_TOO_LARGE: "The source system sent too much at once",
+  PROVIDER_TOO_MANY_PAGES: "The source system sent too many pages",
+  PROVIDER_NEXT_LINK_REFUSED: "The source system pointed to another address",
+  MAPPING_NOT_USABLE: "The mapping cannot be used",
+  IMPORT_BLOCKED: "Import was blocked",
+};
+const failureLabel = (code: string) => FAILURE_LABELS[code.toUpperCase()] ?? displayCode(code);
 
 const slices = (counts: Record<string, number> = {}): Slice[] =>
   Object.entries(counts)
@@ -166,7 +210,7 @@ const RUN_COLUMNS = [
     label: "Source",
     render: (row: Run) => (
       <span className="cc-stack">
-        <strong>{row.source_system}</strong>
+        <strong>{displayCode(row.source_system)}</strong>
         <small>{referenceId(row, "connection", row.connection_id)}</small>
       </span>
     ),
@@ -186,7 +230,7 @@ function Runs() {
   const [status, setStatus] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [query, setQuery] = useState("");
-  const { runs, page, setPage } = useRuns({ status, tenant_id: tenantId, q: query.trim() });
+  const { runs, page, setPage, serverSort } = useRuns({ status, tenant_id: tenantId, q: query.trim() });
   const counts = runs.data?.last_30_days.by_status ?? {};
   const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
   const failed = (counts.FAILED ?? 0) + (counts.ERROR ?? 0) + (counts.PARTIAL ?? 0);
@@ -206,9 +250,9 @@ function Runs() {
           onOpen={() => filter(() => setStatus(""))}
         />
         <StatTile
-          label="Failed"
+          label="Problems"
           value={runs.data ? failed : null}
-          detail={failed ? "Needs a look" : "None"}
+          detail={failed ? "Failed or partial runs: needs a look" : "No failed or partial runs"}
           icon={<AlertTriangle size={18} />}
           tone={failed ? "critical" : "good"}
           onOpen={() => filter(() => setStatus("problems"))}
@@ -235,7 +279,7 @@ function Runs() {
           <SearchBox value={query} onChange={(value) => filter(() => setQuery(value))} label="Search source system" />
           <select aria-label="Result" value={status} onChange={(event) => filter(() => setStatus(event.target.value))}>
             <option value="">All results</option>
-            <option value="problems">Failed or rejected records</option>
+            <option value="problems">Problems: failed, partial or rejected records</option>
             <option value="completed_with_warnings">Completed with warnings</option>
             <option value="completed">Completed</option>
           </select>
@@ -250,6 +294,7 @@ function Runs() {
           caption="Integration runs"
           rows={runs.data?.items ?? []}
           rowKey={(row) => row.id}
+          serverSort={serverSort}
           empty={{ title: "No runs", detail: "No run matches these filters." }}
           columns={[
             ...RUN_COLUMNS,
@@ -258,9 +303,9 @@ function Runs() {
               label: "Problem",
               render: (row: Run) =>
                 row.failure_category
-                  ? titleCase(row.failure_category)
+                  ? failureLabel(row.failure_category)
                   : row.schema_drift_status && !/^(NONE|NO_DRIFT|OK|MATCH)$/i.test(row.schema_drift_status)
-                    ? `Schema: ${titleCase(row.schema_drift_status)}`
+                    ? `Source fields changed (${displayCode(row.schema_drift_status).toLowerCase()})`
                     : row.records_rejected
                       ? "Rejected records"
                       : "—",
@@ -275,7 +320,7 @@ function Runs() {
 
 /** Runs that were checked against their source, and whether the counts matched. */
 function Reconciliation() {
-  const { runs, page, setPage } = useRuns({ reconciled: "true" });
+  const { runs, page, setPage, serverSort } = useRuns({ reconciled: "true" });
   return (
     <div className="ac-grid two ar-wide-right">
       <Panel eyebrow="Last 30 days" title="Reconciliation results" source={runs}>
@@ -291,6 +336,7 @@ function Reconciliation() {
           caption="Reconciled runs"
           rows={runs.data?.items ?? []}
           rowKey={(row) => row.id}
+          serverSort={serverSort}
           empty={{ title: "No reconciled runs", detail: "Runs appear here once they are reconciled." }}
           columns={[
             ...RUN_COLUMNS.filter((column) => column.key !== "status"),
@@ -324,6 +370,7 @@ function Credentials() {
         rows={rows}
         rowKey={(row) => row.id}
         empty={{ title: "No connections", detail: "Connections of the platform tenant appear here." }}
+        // The secret's reference in the store is not shown by default; it can be added from the field chooser.
         columns={[
           idColumn("Connection ID", "code"),
           {
@@ -331,10 +378,8 @@ function Credentials() {
             label: "Connection",
             render: (row) => (
               <span className="cc-stack">
-                <strong>{row.code}</strong>
-                <small>
-                  {row.connector_type} · {row.version}
-                </small>
+                <strong>{displayCode(row.connector_type)}</strong>
+                <small>{versionLabel(row.version)}</small>
               </span>
             ),
           },
@@ -352,7 +397,6 @@ function Credentials() {
                 </span>
               ),
           },
-          { key: "reference", label: "Secret reference", render: (row) => row.credential_ref ?? "—" },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />
@@ -376,10 +420,7 @@ function Schemas() {
   return (
     <div className="ac-grid">
       <Panel eyebrow="Source schemas" title="Records and fields" source={applications}>
-        <Intro>
-          Choose a source system to see the records it offers, then a record to see its fields. The platform API itself
-          is under Operations, Developer API.
-        </Intro>
+        <Intro>Choose a source system to see the records it offers, then a record to see its fields.</Intro>
         <label className="ca-field ar-picker">
           Source system
           <select
@@ -417,7 +458,7 @@ function Schemas() {
                       onClick={() => setObjectId(row.source_object_id)}
                     >
                       <strong>{row.object_name}</strong>
-                      <small>Key: {row.primary_key_field ?? "—"}</small>
+                      <small>Identified by: {row.primary_key_field ?? "—"}</small>
                     </button>
                   ),
                 },
@@ -436,10 +477,7 @@ function Schemas() {
                     key: "field",
                     label: "Field",
                     render: (row) => (
-                      <span className="cc-stack">
-                        <strong>{row.field_label ?? row.field_name}</strong>
-                        <small>{row.field_name}</small>
-                      </span>
+                      <strong title={`Technical name: ${row.field_name}`}>{row.field_label ?? row.field_name}</strong>
                     ),
                   },
                   { key: "type", label: "Type", render: (row) => titleCase(row.data_type) },

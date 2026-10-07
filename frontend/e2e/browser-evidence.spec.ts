@@ -60,10 +60,10 @@ test.describe("MDARIX browser evidence", () => {
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
     for (const [route, name, expected] of [
-      ["/app/admin", "admin", /administrator control plane/i],
+      ["/app/admin", "admin", /platform administration/i],
       ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i],
       // Business routes are not part of the platform-admin role; the app returns the admin to the console.
-      ["/app/decision", "decision", /administrator control plane/i],
+      ["/app/decision", "decision", /platform administration/i],
     ] as const) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
@@ -103,12 +103,11 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("navigation", { name: "Administrator navigation" });
-    // Customers & Tenants has its own five sections, each with a clear heading.
+    // Customers & Tenants has its own sections, each with a clear heading (accounts and onboarding requests are
+    // under Identity & Access).
     const customerSections: Record<string, string> = {
       Customers: "Customer directory",
-      "Customer administrators": "Customer administrators",
       Tenants: "Tenant directory",
-      Onboarding: "New customers, demo and trial requests",
       Feedback: "Trial feedback and website quotes",
     };
     await openAdminNavigation(page);
@@ -130,20 +129,16 @@ test.describe("MDARIX browser evidence", () => {
       },
       "Identity & Access": {
         "Platform users": "Platform users",
+        "Customer administrators": "Customer administrators",
+        "Customer users": "Customer users",
+        Onboarding: "Demo and trial requests",
         "Roles & permissions": "Roles",
         "Effective access": "Effective access",
-      },
-      Integrations: {
-        "Connector catalog": "Connector catalog",
-        "Runs & failures": "Integration runs",
-        Reconciliation: "Reconciliation results",
-        Credentials: "Connection credentials",
-        "API & schemas": "Records and fields",
       },
       "AI Control Center": {
         Overview: "Model in use",
         Evaluations: "How the AI performs on our test cases",
-        Executions: "AI runs",
+        "AI runs": "AI runs",
         "Agents & guardrails": "Agents & guardrails",
       },
       Security: {
@@ -152,15 +147,21 @@ test.describe("MDARIX browser evidence", () => {
         "Support access": "Support access",
         Retention: "Retention",
       },
-      "Data & Configuration": {
+      // Data & Integrations: the setup story in order (define, connect, map, release, run).
+      "Data & Integrations": {
         "Data model": "Data model",
-        Mappings: "Mappings",
-        Releases: "Releases",
         "Rules & reference data": "Rules & reference data",
+        "Connector catalog": "Connector catalog",
+        "Source schemas": "Records and fields",
+        Credentials: "Connection credentials",
+        Mappings: "Mappings",
         "Customer configuration": "Customer configuration",
+        Releases: "Releases",
+        "Runs & failures": "Integration runs",
+        Reconciliation: "Reconciliation results",
       },
       Operations: {
-        "System health": "Worker",
+        "System health": "Background worker",
         "Queues & jobs": "Waiting work by kind",
         "Email & notifications": "Email delivery",
         "Developer API": "Developer API",
@@ -203,9 +204,11 @@ test.describe("MDARIX browser evidence", () => {
         await expect(page.locator(".ca-inline-error, .ac-panel [role='alert']")).toHaveCount(0);
       }
     }
-    await sections.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    // A new customer is started from the customer directory.
+    const backToList = page.getByRole("button", { name: "All customers" });
+    if (await backToList.count()) await backToList.click();
     await page.getByRole("button", { name: /new customer/i }).click();
-    await expect(page.getByText(/Create Customer|Provision a customer tenant/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "New customer", exact: true })).toBeVisible();
   });
 
   test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
@@ -354,8 +357,8 @@ test.describe("MDARIX browser evidence", () => {
       .getByRole("tab", { name: "Audit trail", exact: true })
       .click();
     // The platform audit trail, with export and the evidence package.
-    await expect(page.getByRole("link", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("link", { name: /download evidence package/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /export platform audit \(csv\)/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("link", { name: /platform evidence package/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
 
     await page.goto("/app/decision");

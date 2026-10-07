@@ -122,11 +122,10 @@ export function TrialFeedbackWorkspace() {
   const rows = items.filter(matches);
   const open = items.find((item) => item.id === selected) ?? null;
   return (
-    <section className="platform-admin-card trial-queue" aria-labelledby="feedback-title">
+    // The page heading ("Trial feedback and website quotes") is the section's (CustomersAndTenants).
+    <section className="platform-admin-card trial-queue" aria-label="What trial users tell us">
       <div className="platform-admin-card-title">
         <div>
-          <span className="eyebrow">Trial feedback</span>
-          <h3 id="feedback-title">What trial users tell us</h3>
           <p>
             Answers to the questionnaire in the trial workspace. A quote can be published on the website only when the
             person agreed, and is credited exactly as they chose: with their company's name or anonymously.

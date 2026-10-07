@@ -24,9 +24,8 @@ import { SECTIONS as CUSTOMER_TENANT_SECTIONS } from "./customers/model";
 import { AdminArea, isAreaDomain } from "./areas/AdminArea";
 import {
   AI_SECTIONS,
-  DATA_SECTIONS,
+  DATA_INTEGRATION_SECTIONS,
   IDENTITY_SECTIONS,
-  INTEGRATION_SECTIONS,
   OPERATIONS_SECTIONS,
   PLANS_SECTIONS,
   SECURITY_SECTIONS,
@@ -102,11 +101,10 @@ export const DOMAINS = [
   ["Platform Overview", "Health, activity and attention", LayoutDashboard, ["Overview"]],
   ["Customers & Tenants", "Customer and tenant lifecycle", Users, CUSTOMER_TENANT_SECTIONS],
   ["Plans & Licensing", "Plans, subscriptions and reminders", Settings2, PLANS_SECTIONS],
-  ["Identity & Access", "Platform users, roles and access", LockKeyhole, IDENTITY_SECTIONS],
-  ["Data & Configuration", "Data model, mappings and releases", Database, DATA_SECTIONS],
-  ["Integrations", "Connectors, runs and schemas", ExternalLink, INTEGRATION_SECTIONS],
+  ["Identity & Access", "Accounts, roles and onboarding requests", LockKeyhole, IDENTITY_SECTIONS],
+  ["Data & Integrations", "Define, connect, map, release and run customer data", Database, DATA_INTEGRATION_SECTIONS],
   ["AI Control Center", "Models, evaluations and assurance", ShieldCheck, AI_SECTIONS],
-  ["Security", "Isolation, encryption and controls", LockKeyhole, SECURITY_SECTIONS],
+  ["Security", "Isolation, audit, support access and retention", LockKeyhole, SECURITY_SECTIONS],
   ["Operations", "Health, queues, email and API", LifeBuoy, OPERATIONS_SECTIONS],
 ] as const;
 
@@ -147,7 +145,7 @@ export function PlatformAdminScreen({
   const [, setUnavailable] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [activeDomain, setActiveDomain] = useState(
-    initialDomain ?? (initialItem ? "Data & Configuration" : "Platform Overview"),
+    initialDomain ?? (initialItem ? "Data & Integrations" : "Platform Overview"),
   );
   const [activeItem, setActiveItem] = useState(initialItem ?? "Overview");
 
@@ -207,7 +205,7 @@ export function PlatformAdminScreen({
       ? data.ai
       : activeDomain === "Security"
         ? data.security
-        : activeDomain === "Operations" || activeDomain === "Integrations"
+        : activeDomain === "Operations" || activeDomain === "Data & Integrations"
           ? data.operations
           : null;
 
@@ -228,7 +226,7 @@ export function PlatformAdminScreen({
           </p>
           <div className="platform-admin-quick-actions">
             <button onClick={() => onNavigate("admin-create-customer")}>
-              <Plus size={15} /> Provision customer
+              <Plus size={15} /> Create customer
             </button>
             <button
               onClick={() => {
@@ -256,16 +254,16 @@ export function PlatformAdminScreen({
             </button>
             <button
               onClick={() => {
-                setActiveDomain("Data & Configuration");
-                setActiveItem("Data mapping");
+                setActiveDomain("Data & Integrations");
+                setActiveItem("Mappings");
               }}
             >
               <Database size={15} /> Data mapping
             </button>
             <button
               onClick={() => {
-                setActiveDomain("Integrations");
-                setActiveItem("Integration health");
+                setActiveDomain("Data & Integrations");
+                setActiveItem("Runs & failures");
               }}
             >
               <Activity size={15} /> Integration health
@@ -296,8 +294,8 @@ export function PlatformAdminScreen({
             </button>
             <button
               onClick={() => {
-                setActiveDomain("Data & Configuration");
-                setActiveItem("Configuration releases");
+                setActiveDomain("Data & Integrations");
+                setActiveItem("Releases");
               }}
             >
               <Settings2 size={15} /> Create release
@@ -309,7 +307,7 @@ export function PlatformAdminScreen({
         <div className="platform-admin-card-title">
           <div>
             <span className="eyebrow">Governance map</span>
-            <h3>One control plane across the product</h3>
+            <h3>One place to administer the whole product</h3>
             <p>
               Move from customer boundary and commercial access through data, intelligence, assurance, and operations.
             </p>
@@ -321,8 +319,7 @@ export function PlatformAdminScreen({
             ["Customers & Tenants", "Establish boundaries", Users],
             ["Plans & Licensing", "Control commercial access", Settings2],
             ["Identity & Access", "Govern privileged access", LockKeyhole],
-            ["Data & Configuration", "Govern product context", Database],
-            ["Integrations", "Operate trusted sources", ExternalLink],
+            ["Data & Integrations", "Define, connect and run customer data", Database],
             ["AI Control Center", "Assure advisory AI", ShieldCheck],
             ["Security", "Protect boundaries", LockKeyhole],
             ["Operations", "Monitor platform health", LifeBuoy],
@@ -351,7 +348,7 @@ export function PlatformAdminScreen({
             "Active connectors",
             data.connectors.filter((item) => !["INACTIVE", "FAILED"].includes(String(item.status).toUpperCase()))
               .length,
-            "Integrations",
+            "Data & Integrations",
             Database,
           ],
           ["Pending approvals", metrics.pending_approvals ?? 0, "Operations", CheckCircle2],
@@ -376,7 +373,7 @@ export function PlatformAdminScreen({
         <div className="platform-admin-card-title">
           <div>
             <span className="eyebrow">Command center intelligence</span>
-            <h3>Control plane signals</h3>
+            <h3>Platform signals</h3>
             <p>Server-derived operational trends across customers, licensing, integrations and configuration.</p>
           </div>
           <span className="platform-admin-badge success">Live signals</span>
@@ -388,10 +385,10 @@ export function PlatformAdminScreen({
             [
               "Integration health",
               data.connectors.filter((item) => String(item.status).toUpperCase() === "HEALTHY").length,
-              "Integrations",
+              "Data & Integrations",
               ExternalLink,
             ],
-            ["Configuration activity", data.mappings.length, "Data & Configuration", Database],
+            ["Configuration activity", data.mappings.length, "Data & Integrations", Database],
             ["Platform users", data.users.length, "Identity & Access", ShieldCheck],
             ["Pending approvals", metrics.pending_approvals ?? 0, "Operations", CheckCircle2],
             ["Security events", metrics.security_events ?? 0, "Security", LockKeyhole],
@@ -469,7 +466,7 @@ export function PlatformAdminScreen({
           <div className="platform-admin-card-title">
             <div>
               <span className="eyebrow">Operational insights</span>
-              <h3>Control plane signals</h3>
+              <h3>Platform signals</h3>
             </div>
           </div>
           {[
@@ -608,7 +605,7 @@ export function PlatformAdminScreen({
       <header className="platform-admin-topbar">
         <div className="platform-admin-identity">
           <span className="platform-admin-brand">MDARIX</span>
-          <span className="platform-admin-divider">Administrator Control Plane</span>
+          <span className="platform-admin-divider">Platform administration</span>
         </div>
         <div className="platform-admin-search-wrap">
           <label className="platform-admin-search">
@@ -649,7 +646,7 @@ export function PlatformAdminScreen({
       </header>
       <div className="platform-admin-layout">
         <aside className="platform-admin-sidebar" aria-label="Platform administration domains">
-          <span className="platform-admin-sidebar-title">Control plane</span>
+          <span className="platform-admin-sidebar-title">Platform administration</span>
           {DOMAINS.map((domain) => {
             const [label, description, Icon, items] = domain;
             const expanded = activeDomain === label && collapsedDomain !== label;

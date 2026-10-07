@@ -174,11 +174,14 @@ export function TrendChart({
   primaryLabel,
   secondaryLabel,
   unit,
+  summary = "total",
 }: {
   data: TrendPoint[];
   primaryLabel: string;
   secondaryLabel?: string;
   unit: string;
+  /** The headline figure: the period's total (counts per day) or the latest value (a running count). */
+  summary?: "total" | "last";
 }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
@@ -193,7 +196,8 @@ export function TrendChart({
   const height = 160;
   const primaryPath = useMemo(() => linePath(primary, width, height, top), [primary, top]);
   const secondaryPath = useMemo(() => (secondary ? linePath(secondary, width, height, top) : ""), [secondary, top]);
-  const total = primary.reduce((sum, value) => sum + value, 0);
+  const total =
+    summary === "last" ? (primary[primary.length - 1] ?? 0) : primary.reduce((sum, value) => sum + value, 0);
   const secondaryTotal = secondary?.reduce((sum, value) => sum + value, 0) ?? 0;
   const point = active === null ? null : data[active];
   const left = active === null ? 0 : data.length > 1 ? (active / (data.length - 1)) * 100 : 50;

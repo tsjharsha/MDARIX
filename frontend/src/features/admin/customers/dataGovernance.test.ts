@@ -57,10 +57,10 @@ describe("delete all data: export or waiver", () => {
     const partial = purgeOutcome("Acme", { status: "PURGING", incomplete: { files: "TimeoutError" } });
     expect(partial.tone).toBe("warning");
     expect(partial.text).toContain("Acme's records are deleted; files are still being removed (stored files)");
-    expect(partial.text).toContain("scripts/complete_tenant_purge.py");
+    expect(partial.text).toContain("This finishes automatically.");
     expect(purgeOutcome("Acme", { status: "ARCHIVED" })).toEqual({
       tone: "good",
-      text: "Acme's data has been deleted and the organization is archived.",
+      text: "Acme's data has been deleted and the tenant is archived.",
     });
   });
 });

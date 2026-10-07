@@ -32,6 +32,15 @@ import {
   type Tone,
 } from "./dashboardModel";
 import { KpiTile, TrendChart, toPoints, type DailyRow, type TrendPoint } from "./trendCharts";
+import {
+  ActivityExplorer,
+  Donut,
+  PlatformPulse,
+  RangeSwitch,
+  busyness,
+  cumulative,
+  type Range,
+} from "./dashboardVisuals";
 import { formatDateTime } from "../../../app/dates";
 import { safeText } from "../../../app/displayId";
 
@@ -62,9 +71,9 @@ const SOURCES = {
   retention: "/api/v1/admin/retention-status",
   smtp: "/api/v1/admin/smtp-status",
   // Platform-wide: daily activity and the shape of the customer base, and the latest audit events of every tenant.
-  dashboard: "/api/v1/platform-admin/console/dashboard",
+  dashboard: "/api/v1/platform-admin/console/dashboard", // ?days= is added for the chosen period
   audit: "/api/v1/platform-admin/console/audit?page_size=8",
-  users: "/api/v1/admin/identity/users",
+  users: "/api/v1/platform-admin/platform-users",
 } as const;
 
 type SourceKey = keyof typeof SOURCES;
@@ -87,27 +96,45 @@ async function fetchAllCustomers() {
   return { ...first, items: [first, ...rest].flatMap(asList) };
 }
 
-function useSources(refreshKey: number) {
+const sourceUrl = (key: SourceKey, days: number) =>
+  key === "dashboard" ? `${SOURCES.dashboard}?days=${days}` : SOURCES[key];
+
+const failed = (reason: unknown): Source => ({
+  state: reason instanceof ApiError && reason.status === 403 ? "forbidden" : "error",
+  data: null,
+  error: reason instanceof Error ? reason.message : undefined,
+});
+
+function useSources(refreshKey: number, days: number) {
   const [sources, setSources] = useState<Sources>(initial);
   const [refreshing, setRefreshing] = useState(false);
+  // A new period reloads only the activity source; the rest does not depend on it.
+  const [loadedDays, setLoadedDays] = useState(days);
+  useEffect(() => {
+    if (days === loadedDays) return;
+    let current = true;
+    setSources((previous) => ({ ...previous, dashboard: { ...previous.dashboard, state: "loading" } }));
+    requestJson<any>(sourceUrl("dashboard", days))
+      .then((data) => current && setSources((previous) => ({ ...previous, dashboard: { state: "ready", data } })))
+      .catch((reason) => current && setSources((previous) => ({ ...previous, dashboard: failed(reason) })))
+      .finally(() => current && setLoadedDays(days));
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
   useEffect(() => {
     let current = true;
     setRefreshing(true);
     const keys = Object.keys(SOURCES) as SourceKey[];
     Promise.allSettled(
-      keys.map((key) => (key === "customers" ? fetchAllCustomers() : requestJson<any>(SOURCES[key]))),
+      keys.map((key) => (key === "customers" ? fetchAllCustomers() : requestJson<any>(sourceUrl(key, days)))),
     ).then((results) => {
       if (!current) return;
       const next = {} as Sources;
       results.forEach((result, index) => {
         next[keys[index]] =
-          result.status === "fulfilled"
-            ? { state: "ready", data: result.value }
-            : {
-                state: result.reason instanceof ApiError && result.reason.status === 403 ? "forbidden" : "error",
-                data: null,
-                error: result.reason instanceof Error ? result.reason.message : undefined,
-              };
+          result.status === "fulfilled" ? { state: "ready", data: result.value } : failed(result.reason);
       });
       setSources(next);
       setRefreshing(false);
@@ -115,6 +142,7 @@ function useSources(refreshKey: number) {
     return () => {
       current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
   return { sources, refreshing };
 }
@@ -145,7 +173,8 @@ export function AdminOverview({
   onCreateCustomer: () => void;
   onUpdated: (at: Date) => void;
 }) {
-  const { sources, refreshing } = useSources(refreshKey);
+  const [range, setRange] = useState<Range>(30);
+  const { sources, refreshing } = useSources(refreshKey, range);
   const loading = Object.values(sources).some((source) => source.state === "loading");
   useEffect(() => {
     if (!loading) onUpdated(new Date());
@@ -190,6 +219,17 @@ export function AdminOverview({
       runFailed: sum(runs, "secondary"),
       eventTotal: sum(events, "primary"),
       refused: sum(events, "secondary"),
+      growth: cumulative(tenants, customers.length),
+      busiest: [...customers]
+        .filter((row) => (row.seat_usage ?? 0) > 0)
+        .sort((a, b) => (b.seat_usage ?? 0) - (a.seat_usage ?? 0))
+        .slice(0, 6)
+        .map((row, index) => ({
+          key: row.id ?? row.tenant_key ?? String(index),
+          label: row.name ?? row.tenant_key ?? "Tenant",
+          count: row.seat_usage ?? 0,
+          tone: "neutral" as Tone,
+        })),
       plans: slices(trends?.tenants_by_plan),
       regions: slices(trends?.tenants_by_region, (label) => (label === "UNSPECIFIED" ? "Not specified" : label)),
       renewals: (trends?.licences_ending ?? []).map((row) => ({
@@ -223,49 +263,127 @@ export function AdminOverview({
   const trendsReady = sources.dashboard.state === "ready";
   const days = trends?.days ?? 30;
 
+  const perDay = (total: number) => (days ? total / days : 0);
+  const rates = {
+    tenants: perDay(model.tenants.reduce((sum, point) => sum + point.primary, 0)),
+    runs: perDay(model.runTotal),
+    ai: perDay(model.aiTotal),
+    events: perDay(model.eventTotal),
+  };
+  const busiest = Math.max(...Object.values(rates));
+  const ready = (key: SourceKey) => sources[key].state === "ready";
+  const pulse = [
+    {
+      key: "customers",
+      label: "Customers",
+      value: ready("customers") ? customerTotal : null,
+      detail: "organizations",
+      icon: <Building2 size={20} />,
+      tone: "good" as Tone,
+      onOpen: () => onOpen({ domain: "Customers & Tenants", item: "Customers" }),
+    },
+    {
+      key: "tenants",
+      label: "Tenants",
+      value: ready("customers") ? customers.length : null,
+      detail: `${model.active} active`,
+      icon: <Database size={20} />,
+      tone: (model.attention.length ? worstTone(model.attention.map((item) => item.tone)) : "good") as Tone,
+      activity: busyness(rates.tenants, busiest),
+      onOpen: () => onOpen({ domain: "Customers & Tenants", item: "Tenants" }),
+    },
+    {
+      key: "people",
+      label: "People",
+      value: ready("customers") ? model.seats : null,
+      detail: "with access",
+      icon: <Users size={20} />,
+      tone: "good" as Tone,
+      activity: busyness(rates.events, busiest),
+      onOpen: () => onOpen({ domain: "Identity & Access", item: "Customer users" }),
+    },
+    {
+      key: "data",
+      label: "Data in",
+      value: trendsReady ? model.runTotal : null,
+      detail: `${model.runFailed} failed runs`,
+      icon: <Plug size={20} />,
+      tone: (!trendsReady || !model.runTotal ? "neutral" : model.runFailed ? "critical" : "good") as Tone,
+      activity: busyness(rates.runs, busiest),
+      onOpen: () => onOpen({ domain: "Data & Integrations", item: "Runs & failures" }),
+    },
+    {
+      key: "ai",
+      label: "AI assist",
+      value: trendsReady ? model.aiTotal : null,
+      detail: `${model.aiFailed} failed runs`,
+      icon: <Sparkles size={20} />,
+      tone: (!trendsReady || !model.aiTotal ? "neutral" : model.aiFailed ? "warning" : "good") as Tone,
+      activity: busyness(rates.ai, busiest),
+      onOpen: () => onOpen({ domain: "AI Control Center", item: "Executions" }),
+    },
+    {
+      key: "audit",
+      label: "Audit trail",
+      value: trendsReady ? model.eventTotal : null,
+      detail: `${model.refused} refused`,
+      icon: <ShieldCheck size={20} />,
+      tone: (!trendsReady ? "neutral" : model.refused ? "warning" : "good") as Tone,
+      activity: busyness(rates.events, busiest),
+      onOpen: () => onOpen({ domain: "Security", item: "Audit trail" }),
+    },
+  ];
+
   return (
     <div className={`ac-overview ac-dashboard ${refreshing && !loading ? "is-refreshing" : ""}`}>
-      <section className={`ac-hero tone-${overallTone}`} aria-live="polite">
-        <div className="ac-hero-status">
-          <span className="ac-hero-icon">
-            <ToneIcon tone={overallTone} size={34} />
-          </span>
-          <div>
-            <p className="ac-eyebrow">Platform status</p>
-            <h2>{headline}</h2>
-            <p>
-              {loading
-                ? "Reading live administrator sources."
-                : failingSources.length
-                  ? `${failingSources.length} of ${Object.keys(SOURCES).length} data sources are unavailable; their panels say so.`
-                  : `All ${Object.keys(SOURCES).length} administrator data sources responded.`}
-            </p>
+      <section className={`ac-hero ac-hero-pulse tone-${overallTone}`}>
+        <div className="ac-hero-top">
+          <div className="ac-hero-status" aria-live="polite">
+            <span className="ac-hero-icon">
+              <ToneIcon tone={overallTone} size={34} />
+            </span>
+            <div>
+              <p className="ac-eyebrow">Platform status</p>
+              <h2>{headline}</h2>
+              <p>
+                {loading
+                  ? "Reading live administrator sources."
+                  : failingSources.length
+                    ? `${failingSources.length} of ${Object.keys(SOURCES).length} data sources are unavailable; their panels say so.`
+                    : `${customerTotal} customers, ${model.active} active tenants and ${model.seats} people with access. Activity below covers the last ${days} days.`}
+              </p>
+            </div>
+          </div>
+          <div className="ac-hero-controls">
+            <RangeSwitch days={range} onChange={setRange} />
+            <span className="ac-hero-actions">
+              <button type="button" className="ac-primary" onClick={onCreateCustomer}>
+                <Plus size={16} /> Create customer
+              </button>
+              <button type="button" className="ac-secondary" onClick={() => onOpen({ domain: "Operations" })}>
+                <Activity size={16} /> Operations
+              </button>
+            </span>
           </div>
         </div>
-        <div className="ac-hero-meters">
-          <RingMeter value={model.active} total={customers.length} label="Tenants active" />
-          <RingMeter
-            value={model.runTotal - model.runFailed}
-            total={model.runTotal}
-            label={`Integration runs succeeded · ${days} days`}
-          />
-          <RingMeter
-            value={model.aiTotal - model.aiFailed}
-            total={model.aiTotal}
-            label={`AI runs completed · ${days} days`}
-          />
-        </div>
-        <div className="ac-hero-actions">
-          <button type="button" className="ac-primary" onClick={onCreateCustomer}>
-            <Plus size={16} /> Create customer
-          </button>
-          <button type="button" className="ac-secondary" onClick={() => onOpen({ domain: "Operations" })}>
-            <Activity size={16} /> Operations
-          </button>
-        </div>
+        <PlatformPulse nodes={pulse} />
       </section>
 
-      <section className="ac-kpis" aria-label="Key figures">
+      <nav className="ac-jump" aria-label="On this page">
+        {[
+          ["ac-figures", "Key figures"],
+          ["ac-activity", "Activity"],
+          ["ac-customers", "Customers"],
+          ["ac-health", "Health & attention"],
+          ["ac-recent", "Recent activity"],
+        ].map(([id, label]) => (
+          <a key={id} href={`#${id}`}>
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <section id="ac-figures" className="ac-kpis" aria-label="Key figures">
         <KpiTile
           label="Customers"
           value={sources.customers.state === "ready" ? customerTotal : null}
@@ -315,7 +433,7 @@ export function AdminOverview({
           icon={<Plug size={18} />}
           series={model.runs.map((point) => point.primary)}
           seriesLabel={`Integration runs per day, last ${days} days`}
-          onOpen={() => onOpen({ domain: "Integrations", item: "Runs & failures" })}
+          onOpen={() => onOpen({ domain: "Data & Integrations", item: "Runs & failures" })}
         />
         <KpiTile
           label="Audit events"
@@ -337,37 +455,72 @@ export function AdminOverview({
         />
       </section>
 
-      <section className="ac-grid three" aria-label={`Activity, last ${days} days`}>
+      <section id="ac-activity" className="ac-grid ac-grid-wide" aria-label={`Activity, last ${days} days`}>
         <Panel
           eyebrow={`Last ${days} days · all tenants`}
-          title="AI runs"
+          title="Activity explorer"
           state={sources.dashboard.state}
           error={sources.dashboard.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "AI Control Center", item: "Executions" })} />}
         >
-          <TrendChart data={model.ai} primaryLabel="runs" secondaryLabel="failed" unit="AI runs" />
+          <ActivityExplorer
+            series={[
+              {
+                key: "runs",
+                label: "Integration runs",
+                points: model.runs,
+                primaryLabel: "runs",
+                secondaryLabel: "failed",
+                unit: "integration runs",
+                explain: "Data brought in from customers' systems each day, and how many runs failed.",
+              },
+              {
+                key: "ai",
+                label: "AI runs",
+                points: model.ai,
+                primaryLabel: "runs",
+                secondaryLabel: "failed",
+                unit: "AI runs",
+                explain: "AI assistance used each day across all tenants, and how many runs failed.",
+              },
+              {
+                key: "audit",
+                label: "Audit events",
+                points: model.events,
+                primaryLabel: "events",
+                secondaryLabel: "refused",
+                unit: "audit events",
+                explain: "Every recorded action each day, and how many were refused or failed.",
+              },
+              {
+                key: "tenants",
+                label: "New tenants",
+                points: model.tenants,
+                primaryLabel: "new tenants",
+                unit: "new tenants",
+                explain: "Tenants created each day.",
+              },
+            ]}
+          />
         </Panel>
         <Panel
-          eyebrow={`Last ${days} days · all tenants`}
-          title="Integration runs"
+          eyebrow={`Last ${days} days`}
+          title="Success rates"
           state={sources.dashboard.state}
           error={sources.dashboard.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Integrations", item: "Runs & failures" })} />}
         >
-          <TrendChart data={model.runs} primaryLabel="runs" secondaryLabel="failed" unit="integration runs" />
-        </Panel>
-        <Panel
-          eyebrow={`Last ${days} days · all tenants`}
-          title="Audit events"
-          state={sources.dashboard.state}
-          error={sources.dashboard.error}
-          action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Audit trail" })} />}
-        >
-          <TrendChart data={model.events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
+          <div className="ac-rate-rings">
+            <RingMeter value={model.active} total={customers.length} label="Tenants active" />
+            <RingMeter
+              value={model.runTotal - model.runFailed}
+              total={model.runTotal}
+              label="Integration runs succeeded"
+            />
+            <RingMeter value={model.aiTotal - model.aiFailed} total={model.aiTotal} label="AI runs completed" />
+          </div>
         </Panel>
       </section>
 
-      <section className="ac-grid three" aria-label="Customer base">
+      <section id="ac-customers" className="ac-grid three" aria-label="Customer base">
         <Panel
           eyebrow="Customer base"
           title="Tenants by plan"
@@ -376,7 +529,7 @@ export function AdminOverview({
           action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Subscriptions" })} />}
         >
           {model.plans.length ? (
-            <BarList items={model.plans} colour="series" />
+            <Donut items={model.plans} unit="tenants" />
           ) : (
             <Empty title="No plans assigned" detail="Tenants and their plans appear here." />
           )}
@@ -389,7 +542,7 @@ export function AdminOverview({
           action={<OpenLink onClick={() => onOpen({ domain: "Security", item: "Overview" })} />}
         >
           {model.regions.length ? (
-            <BarList items={model.regions} colour="series" />
+            <Donut items={model.regions} unit="tenants" />
           ) : (
             <Empty title="No tenants yet" detail="Data regions appear once tenants exist." />
           )}
@@ -405,7 +558,32 @@ export function AdminOverview({
         </Panel>
       </section>
 
-      <div className="ac-grid two">
+      <section className="ac-grid two" aria-label="Growth and use">
+        <Panel
+          eyebrow={`Last ${days} days`}
+          title="Customer growth"
+          state={sources.dashboard.state === "ready" ? sources.customers.state : sources.dashboard.state}
+          error={sources.dashboard.error ?? sources.customers.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Customers & Tenants", item: "Tenants" })} />}
+        >
+          <TrendChart data={model.growth} primaryLabel="tenants" unit="tenants" summary="last" />
+        </Panel>
+        <Panel
+          eyebrow="Seats in use"
+          title="Busiest tenants"
+          state={sources.customers.state}
+          error={sources.customers.error}
+          action={<OpenLink onClick={() => onOpen({ domain: "Plans & Licensing", item: "Subscriptions" })} />}
+        >
+          {model.busiest.length ? (
+            <BarList items={model.busiest} colour="series" />
+          ) : (
+            <Empty title="No seats in use yet" detail="Tenants with people signed up appear here." />
+          )}
+        </Panel>
+      </section>
+
+      <div id="ac-health" className="ac-grid two">
         <Panel eyebrow="Operations" title="Health checks">
           <ul className="ac-signals">
             {model.signals.map((signal) => {
@@ -469,6 +647,7 @@ export function AdminOverview({
         </div>
       </div>
 
+      <span id="ac-recent" className="ac-anchor" aria-hidden="true" />
       <Panel
         eyebrow="All tenants"
         title="Recent activity"

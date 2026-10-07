@@ -1030,6 +1030,44 @@ th.num .table-sort {
   color: #fff;
   font-weight: 600;
 }
+/* A sequence of steps (Data & Integrations): each tab carries its step number, each stage starts with its name. */
+.ac-tabs {
+  align-items: center;
+}
+.ac-tab-stage {
+  margin-left: 8px;
+  color: var(--ac-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ac-tab-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+}
+.ac-tab-group:first-child .ac-tab-stage {
+  margin-left: 0;
+}
+.ac-tabs button .ac-tab-step {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--ac-track);
+  color: var(--ac-ink-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ac-tabs button.selected .ac-tab-step {
+  background: #fff;
+  color: var(--ac-teal);
+}
 .ac-workspace {
   min-width: 0;
 }
@@ -1615,4 +1653,458 @@ button.ac-kpi:focus-visible {
 }
 .ac-tabpanel:empty {
   display: none;
+}
+
+/* Dashboard hero with the platform pulse (dashboardVisuals.tsx): status and controls on top, the flow underneath. */
+.ac-hero.ac-hero-pulse {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 18px;
+}
+.ac-hero-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ac-hero-top .ac-hero-status {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.ac-hero-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.ac-hero-controls .ac-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ac-range {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-page);
+}
+.ac-range button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ac-ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ac-range button.selected {
+  background: var(--ac-navy);
+  color: #fff;
+  font-weight: 700;
+}
+.ac-range button:focus-visible,
+.ac-explorer-switch button:focus-visible,
+.ac-pulse-node:focus-visible {
+  outline: 2px solid var(--ac-teal);
+  outline-offset: 2px;
+}
+
+/* The pulse: steps connected by links whose dots move faster when that flow was busier. */
+.ac-pulse {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ac-pulse-step {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  min-width: 0;
+  animation: ac-rise 0.55s ease-out both;
+  animation-delay: calc(var(--step, 0) * 0.09s + 0.1s);
+}
+.ac-pulse-step:first-child {
+  flex: 0 1 auto;
+}
+.ac-pulse-link {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 18px;
+  height: 2px;
+  margin: 0 4px;
+  border-radius: 1px;
+  background: var(--ac-line);
+}
+.ac-pulse-link i {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ac-teal);
+  opacity: 0;
+  animation: ac-pulse-travel var(--pulse-speed, 4s) linear infinite;
+}
+.ac-pulse-link i:nth-child(2) {
+  animation-delay: calc(var(--pulse-speed, 4s) / -3);
+}
+.ac-pulse-link i:nth-child(3) {
+  animation-delay: calc(var(--pulse-speed, 4s) / -1.5);
+}
+.ac-pulse-link.tone-warning i,
+.ac-pulse-link.tone-serious i {
+  background: var(--ac-warning);
+}
+.ac-pulse-link.tone-critical i {
+  background: var(--ac-critical);
+}
+.ac-pulse-link.quiet i {
+  display: none;
+}
+@keyframes ac-pulse-travel {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    left: calc(100% - 8px);
+    opacity: 0;
+  }
+}
+.ac-pulse-node {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  min-width: 108px;
+  padding: 12px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 12px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+.ac-pulse-node:hover:not(:disabled) {
+  border-color: var(--ac-teal);
+  box-shadow: 0 6px 16px rgb(16 32 47 / 10%);
+  transform: translateY(-2px);
+}
+.ac-pulse-node:disabled {
+  cursor: default;
+}
+.ac-pulse-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--ac-teal-wash);
+  color: var(--ac-teal);
+}
+.ac-pulse-node.tone-warning .ac-pulse-icon,
+.ac-pulse-node.tone-serious .ac-pulse-icon {
+  background: #fff4dc;
+  color: #8a5a00;
+}
+.ac-pulse-node.tone-critical .ac-pulse-icon {
+  background: #fbe5e5;
+  color: var(--ac-critical);
+}
+.ac-pulse-node.tone-neutral .ac-pulse-icon {
+  background: var(--ac-track);
+  color: var(--ac-ink-2);
+}
+.ac-pulse-state {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--ac-surface);
+}
+.ac-pulse-value {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--ac-navy);
+}
+.ac-pulse-label {
+  font-weight: 700;
+  font-size: 13px;
+}
+.ac-pulse-detail {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+
+/* On this page: jump to a part of the dashboard. */
+.ac-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ac-jump a {
+  padding: 4px 11px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  text-decoration: none;
+}
+.ac-jump a:hover,
+.ac-jump a:focus-visible {
+  border-color: var(--ac-teal);
+  color: var(--ac-teal);
+}
+#ac-figures,
+#ac-activity,
+#ac-customers,
+#ac-health,
+#ac-people,
+#ac-work,
+#ac-pipeline,
+.ac-anchor {
+  scroll-margin-top: 80px;
+}
+.ac-anchor {
+  display: block;
+  height: 0;
+}
+
+/* Activity explorer beside the success rates. */
+.ac-grid.ac-grid-wide {
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+}
+.ac-explorer {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.ac-explorer-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ac-explorer-switch button {
+  padding: 5px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ac-explorer-switch button.selected {
+  border-color: var(--ac-series);
+  background: var(--ac-series);
+  color: #fff;
+  font-weight: 700;
+}
+.ac-explorer-explain {
+  margin: 0;
+}
+.ac-rate-rings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 14px;
+  justify-items: center;
+}
+/* Four rings sit as two pairs rather than three and one. */
+.ac-rate-rings:has(> :nth-child(4)) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* Donut: a share of a whole with its legend; every slice is named and counted in the legend. */
+.ac-donut {
+  display: grid;
+  grid-template-columns: minmax(120px, 150px) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+.ac-donut svg {
+  width: 100%;
+  max-width: 150px;
+  overflow: visible;
+}
+.ac-donut-track {
+  fill: none;
+  stroke: var(--ac-track);
+  stroke-width: 14;
+}
+.ac-donut-slice {
+  fill: none;
+  stroke-width: 14;
+  transition:
+    opacity 0.15s ease,
+    stroke-width 0.15s ease;
+}
+.ac-donut-slice.dim {
+  opacity: 0.25;
+}
+.ac-donut-slice:hover {
+  stroke-width: 17;
+}
+.ac-donut svg {
+  animation: ac-rise 0.6s ease-out 0.15s both;
+}
+.ac-donut-value {
+  fill: var(--ac-navy);
+  font-size: 15px;
+  font-weight: 700;
+}
+.ac-donut-caption {
+  fill: var(--ac-muted);
+  font-size: 6.5px;
+}
+.ac-donut-legend {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ac-donut-legend li > span,
+.ac-donut-legend li > button {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto 36px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ac-ink);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+.ac-donut-legend li > button {
+  cursor: pointer;
+}
+.ac-donut-legend li.active > span,
+.ac-donut-legend li.active > button {
+  background: var(--ac-page);
+}
+.ac-donut-key {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.ac-donut-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ac-donut-legend strong {
+  font-variant-numeric: tabular-nums;
+}
+.ac-donut-legend small {
+  color: var(--ac-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1080px) {
+  .ac-grid.ac-grid-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* Narrow screens: the pulse runs top to bottom. */
+@media (max-width: 900px) {
+  .ac-pulse {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ac-pulse-step,
+  .ac-pulse-step:first-child {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ac-pulse-link {
+    align-self: center;
+    width: 2px;
+    min-width: 0;
+    height: 22px;
+    margin: 2px 0;
+  }
+  .ac-pulse-link i {
+    top: 0;
+    left: -3px;
+    animation-name: ac-pulse-travel-down;
+  }
+  .ac-pulse-node {
+    grid-template-areas:
+      "icon value label"
+      "icon value detail";
+    grid-template-columns: auto auto minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: center;
+    justify-items: start;
+    text-align: left;
+  }
+  .ac-pulse-icon {
+    grid-area: icon;
+  }
+  .ac-pulse-value {
+    grid-area: value;
+  }
+  .ac-pulse-label {
+    grid-area: label;
+  }
+  .ac-pulse-detail {
+    grid-area: detail;
+  }
+  .ac-donut {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+}
+@keyframes ac-pulse-travel-down {
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: calc(100% - 8px);
+    opacity: 0;
+  }
+}
+/* Less motion asked for: still dashed links instead of moving dots (all other motion already stops). */
+@media (prefers-reduced-motion: reduce) {
+  .ac-pulse-link i {
+    display: none;
+  }
+  .ac-pulse-link {
+    background: repeating-linear-gradient(90deg, var(--ac-axis) 0 6px, transparent 6px 10px);
+  }
 }

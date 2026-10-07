@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useResource } from "../../customer-admin/shared";
 import { tenantOptionLabel, type TenantSummary } from "../customers/model";
 import { safeText } from "../../../app/displayId";
@@ -121,4 +122,19 @@ export function Pager({
 /** A short plain-language explanation shown at the top of a section. */
 export function Intro({ children }: { children: React.ReactNode }) {
   return <p className="ar-intro">{children}</p>;
+}
+
+export type BannerMessage = { text: string; tone: "good" | "critical" } | null;
+
+/** The area's message banner (a result or an error), shown at the top and dismissable, as AdminArea shows it. */
+export function Banner({ message, onDismiss }: { message: BannerMessage; onDismiss: () => void }) {
+  if (!message) return null;
+  return (
+    <div className={`ac-message tone-${message.tone}`} role="status">
+      {message.text}
+      <button type="button" className="ac-link" onClick={onDismiss} aria-label="Dismiss message">
+        <X size={14} />
+      </button>
+    </div>
+  );
 }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ArrowLeft, CreditCard, PauseCircle, PlayCircle, Plus } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, Ban, CreditCard, PauseCircle, Pencil, PlayCircle, Plus } from "lucide-react";
 import { Panel } from "../console/charts";
 import {
   ConfirmDialog,
@@ -15,7 +15,24 @@ import {
 import { displayId } from "../../../app/displayId";
 import { AddTenant } from "./AddTenant";
 import { CustomerAdmins } from "./CustomerAdmins";
-import { isoDate, lifecycleAction, titleCase, type Plan, type TenantSummary } from "./model";
+import { EditDetails } from "./EditDetails";
+import {
+  CUSTOMER_FIELD_GROUPS,
+  REASON_MIN,
+  blockedByCustomer,
+  changeErrorText,
+  customerGivesAccess,
+  customerStatusResult,
+  isoDate,
+  lifecycleStatusLabel,
+  presentGroups,
+  customerStatusAction,
+  tenantsLosingAccess,
+  titleCase,
+  type Plan,
+  type TenantAffected,
+  type TenantSummary,
+} from "./model";
 import { StatusBadge } from "./StatusBadge";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
@@ -23,15 +40,15 @@ const SECTIONS = ["Overview", "Administrators", "Subscription", "Usage", "Activi
 type Section = (typeof SECTIONS)[number];
 
 type Record = {
-  customer: { [key: string]: any; id: string; lifecycle_status?: string };
-  tenants: Array<TenantSummary & { [key: string]: any }>;
+  customer: { [key: string]: any; id: string; lifecycle_status?: string; lock_version?: number | null };
+  tenants: Array<TenantSummary & { [key: string]: any; effective_access?: string | null }>;
 };
 
 /**
- * One customer (the legal and commercial parent) and the tenants it owns: its details (maintained by the
- * customer, shown read-only), tenants, administrators, subscription, usage and activity. The platform
- * administrator changes only standing, tenants, administrators and subscription. Administrators, plans and
- * usage belong to a tenant, so each is shown with its tenant.
+ * One customer (the legal and commercial parent) and the tenants it owns: its details (maintained by MDARIX
+ * platform administrators), status, tenants, administrators, subscription, usage and activity. Administrators,
+ * plans and usage belong to a tenant, so each is shown with its tenant. A customer's status gates its tenants: while
+ * it is inactive nobody can sign in to any of them, but each tenant keeps its own status.
  */
 export function CustomerPage({
   customerId,
@@ -48,32 +65,49 @@ export function CustomerPage({
   const [section, setSection] = useState<Section>("Overview");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [addingTenant, setAddingTenant] = useState(false);
+  const [editing, setEditing] = useState(false);
+  // The result of the latest status change, naming the tenants it reached (read when the dialog reports done).
+  const outcome = useRef<string | null>(null);
   const customer = record.data?.customer;
   const tenants = record.data?.tenants ?? [];
   const name = customer?.display_name ?? customer?.legal_name ?? "Customer";
   const status = customer?.lifecycle_status;
-  const next = lifecycleAction(status);
+  const action = customerStatusAction(status, customer?.is_operator);
+  const canAddTenant = customerGivesAccess(status);
 
-  const changeStanding = () =>
-    next &&
+  const changeStatus = () => {
+    if (!action) return;
+    const count = tenantsLosingAccess(tenants);
+    const body =
+      action.verb === "Deactivate"
+        ? `Nobody can sign in to its ${count} tenant${count === 1 ? "" : "s"} while it is inactive. Each tenant keeps its own status, and is restored when the customer is reactivated. Data is kept.`
+        : action.verb === "Reactivate"
+          ? `People can sign in again to the tenants of ${name} that are themselves active. Inactive tenants stay inactive.`
+          : `${name} becomes active. Each of its tenants can be used once the tenant itself is active.`;
+    outcome.current = null;
     setConfirm({
-      title: next === "SUSPENDED" ? `Suspend ${name}?` : `Reactivate ${name}?`,
-      body:
-        next === "SUSPENDED"
-          ? `Every tenant of ${name} is suspended: nobody in the customer can sign in until it is reactivated. Data is kept.`
-          : `Every tenant of ${name} becomes active again and its users can sign in.`,
-      confirmLabel: next === "SUSPENDED" ? "Suspend customer" : "Reactivate customer",
-      danger: next === "SUSPENDED",
-      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+      title: `${action.verb} ${name}?`,
+      body,
+      confirmLabel: `${action.verb} customer`,
+      danger: action.verb === "Deactivate",
+      reason: { label: "Reason (kept in the audit trail)", min: REASON_MIN },
       password: true,
-      run: (reason, password) =>
-        send(`/api/v1/platform-admin/customer-records/${customerId}/lifecycle`, "POST", {
-          status: next,
-          reason,
-          password,
-        }),
-      done: next === "SUSPENDED" ? `${name} is suspended.` : `${name} is active again.`,
+      run: async (reason, password) => {
+        try {
+          const response = await send<{ tenants_affected?: TenantAffected[] }>(
+            `/api/v1/platform-admin/customer-records/${customerId}/lifecycle`,
+            "POST",
+            { status: action.target, reason, password, lock_version: customer?.lock_version },
+          );
+          outcome.current = customerStatusResult(name, action.verb, response?.tenants_affected ?? []);
+        } catch (error) {
+          // A wrong password keeps the server's own words; conflicts and protected organizations are explained.
+          throw new Error(changeErrorText(error, "customer", "The status was not changed."));
+        }
+      },
+      done: customerStatusResult(name, action.verb),
     });
+  };
 
   return (
     <div className="cc-page">
@@ -87,22 +121,24 @@ export function CustomerPage({
             <h2>{name}</h2>
           </div>
           <span className="cc-actions">
-            <StatusBadge status={status} />
-            {next && (
+            <StatusBadge status={status} label={lifecycleStatusLabel(status)} />
+            {customer && (
+              <button type="button" className="ac-secondary" onClick={() => setEditing(true)}>
+                <Pencil size={16} aria-hidden="true" /> Edit details
+              </button>
+            )}
+            {customer && action && (
               <button
                 type="button"
-                className={next === "SUSPENDED" ? "ca-danger" : "ac-primary"}
-                onClick={changeStanding}
+                className={action.verb === "Deactivate" ? "ca-danger" : "ac-primary"}
+                onClick={changeStatus}
               >
-                {next === "SUSPENDED" ? (
-                  <>
-                    <PauseCircle size={16} aria-hidden="true" /> Suspend customer
-                  </>
+                {action.verb === "Deactivate" ? (
+                  <PauseCircle size={16} aria-hidden="true" />
                 ) : (
-                  <>
-                    <PlayCircle size={16} aria-hidden="true" /> Reactivate customer
-                  </>
-                )}
+                  <PlayCircle size={16} aria-hidden="true" />
+                )}{" "}
+                {action.verb} customer
               </button>
             )}
           </span>
@@ -119,7 +155,7 @@ export function CustomerPage({
             customer={customer}
             tenants={tenants}
             onOpenTenant={onOpenTenant}
-            onAddTenant={next === "SUSPENDED" ? () => setAddingTenant(true) : undefined}
+            onAddTenant={canAddTenant ? () => setAddingTenant(true) : undefined}
           />
         )}
         {customer && section === "Administrators" && (
@@ -135,10 +171,30 @@ export function CustomerPage({
           onClose={() => setConfirm(null)}
           onDone={(message) => {
             setConfirm(null);
-            onMessage(message);
+            onMessage(outcome.current ?? message);
+            outcome.current = null;
             record.reload();
           }}
         />
+        {editing && customer && (
+          <EditDetails
+            title={`Edit ${name}`}
+            what="customer"
+            record={customer}
+            groups={presentGroups(customer, CUSTOMER_FIELD_GROUPS)}
+            url={`/api/v1/platform-admin/customer-records/${customerId}`}
+            onClose={() => setEditing(false)}
+            onReload={() => {
+              setEditing(false);
+              record.reload();
+            }}
+            onSaved={() => {
+              setEditing(false);
+              onMessage(`The details of ${name} are saved.`);
+              record.reload();
+            }}
+          />
+        )}
         {addingTenant && (
           <AddTenant
             customerId={customerId}
@@ -163,10 +219,25 @@ const DETAILS: Array<[string, string]> = [
   ["Industry", "industry"],
   ["Company size", "company_size"],
   ["Country", "country"],
+  ["State or province", "state_province"],
   ["Headquarters", "headquarters"],
   ["Website", "website"],
   ["CRM reference", "crm_reference"],
+  ["Account owner", "internal_account_owner"],
+  ["Implementation manager", "implementation_manager"],
 ];
+
+const CONTACTS: Array<[string, string]> = [
+  ["Business contact", "primary_business_contact"],
+  ["Billing contact", "billing_contact"],
+];
+
+// A contact as one line: name, email and phone where given.
+const contactText = (contact: unknown) => {
+  if (!contact || typeof contact !== "object") return "—";
+  const { name, email, phone } = contact as { name?: string | null; email?: string | null; phone?: string | null };
+  return [name, email, phone].filter(Boolean).join(" · ") || "—";
+};
 
 function Overview({
   customer,
@@ -180,18 +251,27 @@ function Overview({
   // Offered only while the customer is active.
   onAddTenant?: () => void;
 }) {
+  // Rows the server does not return (an older record) are left out rather than shown empty.
+  const details = DETAILS.filter(([, key]) => key in customer);
+  const contacts = CONTACTS.filter(([, key]) => key in customer);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Maintained by the customer" title="Customer details">
+      <Panel eyebrow="Maintained by MDARIX platform administrators" title="Customer details">
         <dl className="cc-details">
           <div>
             <dt>Customer ID</dt>
             <dd>{displayId(customer, "customer_identifier")}</dd>
           </div>
-          {DETAILS.map(([label, key]) => (
+          {details.map(([label, key]) => (
             <div key={key}>
               <dt>{label}</dt>
               <dd>{customer[key] || "—"}</dd>
+            </div>
+          ))}
+          {contacts.map(([label, key]) => (
+            <div key={key}>
+              <dt>{label}</dt>
+              <dd>{contactText(customer[key])}</dd>
             </div>
           ))}
           <div>
@@ -204,10 +284,12 @@ function Overview({
         eyebrow="Workspaces and data boundaries"
         title="Tenants"
         action={
-          onAddTenant && (
+          onAddTenant ? (
             <button type="button" className="ac-primary" onClick={onAddTenant}>
               <Plus size={16} aria-hidden="true" /> Add tenant
             </button>
+          ) : (
+            <span className="cc-hint">Activate the customer to add tenants.</span>
           )
         }
       >
@@ -225,14 +307,27 @@ function Overview({
               key: "tenant",
               label: "Tenant",
               render: (row) => (
-                <button type="button" className="ac-link cc-stack" onClick={() => onOpenTenant(row.id)}>
+                <button type="button" className="ac-link" onClick={() => onOpenTenant(row.id)}>
                   <strong>{row.display_name ?? row.tenant_key}</strong>
-                  <small>{row.tenant_key}</small>
                 </button>
               ),
             },
             { key: "region", label: "Data region", render: (row) => row.residency_region ?? "—" },
-            { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+            {
+              key: "status",
+              fields: ["status", "effective_access"],
+              label: "Status",
+              render: (row) => (
+                <span className="cc-status-cell">
+                  <StatusBadge status={row.status} label={lifecycleStatusLabel(row.status)} />
+                  {blockedByCustomer(row) && (
+                    <span className="cc-blocked">
+                      <Ban size={13} aria-hidden="true" /> Blocked: customer inactive
+                    </span>
+                  )}
+                </span>
+              ),
+            },
           ]}
         />
       </Panel>
