@@ -36,7 +36,7 @@ from sqlalchemy.dialects.postgresql import insert  # noqa: E402
 from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, _secret_url  # noqa: E402
 from backend.app.db.models.customer_lifecycle import TenantDataPlane  # noqa: E402
 from backend.app.db.session import SessionLocal, engine as control_engine  # noqa: E402
-from backend.app.db.tenant_scope import bind_system  # noqa: E402
+from backend.app.db.tenant_scope import bind_connection_system, bind_system  # noqa: E402
 from backend.app.db.tls import connect_args  # noqa: E402
 
 # Tables that belong to the control database. They exist on a plane (same migrations) but stay empty there, and the
@@ -99,6 +99,7 @@ def plane_state(url: str) -> tuple[str, str | None]:
 def _copy_rows(table_name: str, column: str, value, plane_engine) -> int:
     source = Table(table_name, MetaData(), autoload_with=control_engine)
     with control_engine.connect() as connection:
+        bind_connection_system(connection)  # organization rows are protected by row-level security (md34)
         rows = [dict(row._mapping) for row in connection.execute(source.select().where(source.c[column] == value))]
     if not rows:
         return 0
@@ -108,6 +109,7 @@ def _copy_rows(table_name: str, column: str, value, plane_engine) -> int:
     # this owner-only sync lifts that one trigger for its own transaction to correct a copy numbered on the plane.
     guard = f"{table_name}_business_id_immutable" if "business_id" in shared else None
     with plane_engine.begin() as connection:
+        bind_connection_system(connection)
         if guard and _has_trigger(connection, table_name, guard):
             connection.execute(text(f'ALTER TABLE public."{table_name}" DISABLE TRIGGER "{guard}"'))
         else:
@@ -170,6 +172,7 @@ def migrate(plane: TenantDataPlane, head: str, apply: bool) -> str:
     plane_engine = create_engine(url, connect_args=connect_args())
     try:
         with control_engine.connect() as connection:
+            bind_connection_system(connection)
             customer_id = connection.execute(
                 text("SELECT customer_id FROM tenants WHERE id = :t"), {"t": plane.tenant_id}
             ).scalar()

@@ -18,6 +18,7 @@ from backend.app.db.models.foundation import (
     TenantMembership,
 )
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 
 def main() -> int:
@@ -34,6 +35,7 @@ def main() -> int:
 
     now = datetime.now(timezone.utc)
     db = SessionLocal()
+    bind_system(db, "provision the Day 35 fixture organizations and accounts")
     try:
         tenants = {}
         for fixture in FIXTURE_TENANTS:

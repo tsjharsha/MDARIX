@@ -1,11 +1,10 @@
 """Row-level security defence in depth for the customer records, the organizations table and the master data.
 
-PREPARED, NOT APPLIED. The ``.pending`` suffix keeps Alembic from loading this file. To enable it, rename it to
-``md34_rls_defence.py`` (re-point ``down_revision`` at the head of the day if a newer migration landed first), after
-every writer listed in the data-governance report runs in system scope or in the scope the policy allows; otherwise
-those writes fail with "new row violates row-level security policy".
+Applied once every writer runs in system scope or in the scope the policy allows (request handlers, the scheduler and
+the worker already did; operator scripts and the ingestion fixture bind system scope, raw connections through
+``tenant_scope.bind_connection_system``). tests/test_rls_coverage.py keeps every organization-owned table covered.
 
-Until now these tables rely on the application alone to filter by organization:
+Before this migration these tables relied on the application alone to filter by organization:
 
 - ``tenants``: a session bound to an organization sees only its own row (``id = app.tenant_id``); system scope sees
   every row (platform administration, sign-in before the organization is known, the scheduler).

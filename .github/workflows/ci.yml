@@ -87,6 +87,8 @@ jobs:
         run: alembic check
       - name: Give the runtime role a login
         run: python scripts/configure_runtime_role.py
+      - name: Database hardening report (row-level security, roles; tests/test_rls_coverage.py enforces coverage)
+        run: python scripts/validate_db_hardening.py
       - name: Seed deterministic test identities
         env:
           DAY35_FIXTURE_APPLY: '1'

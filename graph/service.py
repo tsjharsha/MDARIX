@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.db.tenant_scope import bind_connection_system
 from graph.schemas import GraphNode, GraphRelationship, GraphResponse, RelationshipDetail
 
 TENANT_KEY = "ACME_CARE_SYNTHETIC"
@@ -93,6 +94,9 @@ class RealityGraphService:
 
     def tenant_id(self) -> str:
         with self.connection() as conn:
+            if self.db is None:
+                # A standalone service (no request session) looks the organization up in system scope (md34).
+                bind_connection_system(conn)
             value = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}).scalar_one()
             return str(value)
 

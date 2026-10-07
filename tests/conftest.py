@@ -171,6 +171,8 @@ DB_MODULES = {
     "test_list_sorting_admin",
     # Column sorting of the workspace lists across every page (signals, complaints, My Work, requests, risks).
     "test_list_sorting_workspace",
+    # Every organization-owned table is protected by forced row-level security (md05/md15/md34).
+    "test_rls_coverage",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

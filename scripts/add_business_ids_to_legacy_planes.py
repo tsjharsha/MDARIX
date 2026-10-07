@@ -28,7 +28,7 @@ from sqlalchemy import create_engine, inspect, text  # noqa: E402
 from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE, _secret_url  # noqa: E402
 from backend.app.db.models.customer_lifecycle import TenantDataPlane  # noqa: E402
 from backend.app.db.session import SessionLocal  # noqa: E402
-from backend.app.db.tenant_scope import bind_system  # noqa: E402
+from backend.app.db.tenant_scope import bind_connection_system, bind_system  # noqa: E402
 from backend.app.db.tls import connect_args  # noqa: E402
 from infrastructure.database.migrations.business_ids import COUNTER_TABLE, OBJECTS  # noqa: E402
 
@@ -102,6 +102,7 @@ def sync_copies(url: str, tenant_id) -> int:
     engine = create_engine(url, connect_args=connect_args())
     try:
         with migrate.control_engine.connect() as connection:
+            bind_connection_system(connection)
             customer_id = connection.execute(
                 text("SELECT customer_id FROM tenants WHERE id = :t"), {"t": tenant_id}
             ).scalar()

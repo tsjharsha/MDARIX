@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.db.tenant_scope import bind_connection_system
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES_PATH = ROOT / "ingestion" / "normalization" / "rules" / "identity_rules.json"
@@ -279,6 +280,7 @@ class NormalizationService:
 
     def tenant_id(self) -> str:
         with engine.connect() as conn:
+            bind_connection_system(conn)  # the organizations table is protected by row-level security (md34)
             tenant_id = conn.execute(
                 text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}
             ).scalar_one_or_none()

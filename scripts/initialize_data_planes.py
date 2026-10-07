@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 
 PLANES = {
@@ -98,6 +99,7 @@ def main() -> None:
                 if statement.strip():
                     connection.execute(text(statement))
             with SessionLocal() as control_session:
+                bind_system(control_session, "initialize data planes: read the organizations they serve")
                 tenant_id = control_session.query(Tenant.id).filter(Tenant.tenant_key == tenant_key).scalar()
             if tenant_id is None:
                 raise RuntimeError(f"Missing control-plane tenant: {tenant_key}")

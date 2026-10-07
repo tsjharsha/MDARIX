@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.app.db.session import SessionLocal  # noqa: E402
+from backend.app.db.tenant_scope import bind_system  # noqa: E402
 from backend.app.demo_workspace import DemoWorkspaceError, reset_demo, setup_demo, status  # noqa: E402
 
 
@@ -27,6 +28,7 @@ def main() -> int:
         return 2
     started = time.monotonic()
     db = SessionLocal()
+    bind_system(db, "set up or reset the demo organization")
     try:
         if command == "setup":
             result = setup_demo(db, os.getenv("MDARIX_DEMO_PASSWORD", ""))

@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from backend.app.db.models.foundation import Complaint, Evidence, Investigation, Product, ProductVersion
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 PLANES = {
     "R1_TENANT_1": ("mdarix_tenant_a", 5541),
@@ -31,6 +32,7 @@ def main() -> None:
     password = os.getenv("MDARIX_DATA_PLANE_PASSWORD", "change-this-local-secret")
     migrated = {}
     with SessionLocal() as source:
+        bind_system(source, "copy synthetic business data to the organization databases")
         from backend.app.db.models.foundation import Tenant
 
         tenants = {t.tenant_key: t for t in source.query(Tenant).filter(Tenant.tenant_key.in_(PLANES)).all()}

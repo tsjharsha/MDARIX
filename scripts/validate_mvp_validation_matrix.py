@@ -24,6 +24,7 @@ from backend.app.db.models.enterprise import ConnectorRun, ConnectorSourceRecord
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 from integration.simulator_ingestion import persist_provider_ingestion, read_provider
 from source_simulator.provider_catalog import PROVIDER_CATALOG, PROVIDER_PORTS
 
@@ -53,6 +54,7 @@ def main() -> int:
     assert_provider_authentication()
     matrix: list[dict[str, object]] = []
     with SessionLocal() as db:
+        bind_system(db, "validate the MVP validation matrix")
         tenant_rows = {row.tenant_key: row for row in db.query(Tenant).filter(Tenant.tenant_key.in_(TENANTS)).all()}
         if set(tenant_rows) != set(TENANTS):
             raise RuntimeError(f"expected four validation tenants, found {sorted(tenant_rows)}")

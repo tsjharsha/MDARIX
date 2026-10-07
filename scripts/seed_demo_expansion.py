@@ -30,6 +30,7 @@ from backend.app.db.models.foundation import (
     Tenant,
 )
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 NOW = datetime.now(timezone.utc)
 PRODUCTS = [
@@ -53,6 +54,7 @@ def stamp(offset: int = 0) -> dict:
 
 def run() -> None:
     db = SessionLocal()
+    bind_system(db, "seed deterministic investigation data")
     try:
         tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").first() or db.query(Tenant).first()
         if not tenant:

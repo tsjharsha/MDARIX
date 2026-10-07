@@ -7,6 +7,7 @@ from sqlalchemy import inspect, text
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.app.db.session import SessionLocal, engine
+from backend.app.db.tenant_scope import bind_system
 
 REQUIRED_TABLES = {
     "tenant_memberships",
@@ -29,6 +30,7 @@ def main() -> int:
         print("Missing tables:", ", ".join(sorted(missing)))
         return 1
     with SessionLocal() as db:
+        bind_system(db, "verify the Day 35 database")
         tenant_count = db.execute(text("SELECT COUNT(*) FROM tenants WHERE tenant_key LIKE 'R1_TENANT_%'")).scalar_one()
         user_count = db.execute(
             text("SELECT COUNT(*) FROM auth_users WHERE username LIKE 'r1-user-%@synthetic.invalid'")
