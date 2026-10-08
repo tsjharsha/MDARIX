@@ -33,6 +33,10 @@ def _set_role(monkeypatch, role: str, tenant=None) -> None:
     else:
         monkeypatch.setenv("MDARIX_CELL_TENANT_ID", str(tenant.id))
         monkeypatch.setenv("MDARIX_CELL_TENANT_KEY", tenant.tenant_key)
+        # A cell pins the platform's package-signing key (backend/app/cell_packages.py).
+        from backend.app.cell_packages import generate_keypair
+
+        monkeypatch.setenv("MDARIX_PLATFORM_SIGNING_PUBLIC_KEY", generate_keypair()[1])
 
 
 def _tenant(tenant_id) -> Tenant:
@@ -159,10 +163,17 @@ def test_the_configuration_check_names_what_each_role_needs(monkeypatch):
         roles.deployment_role()
 
     _set_role(monkeypatch, "CELL")
+    monkeypatch.delenv("MDARIX_PLATFORM_SIGNING_PUBLIC_KEY", raising=False)
     problems = " ".join(_deployment_role_problems())
     assert "MDARIX_CELL_TENANT_ID" in problems and "MDARIX_CELL_TENANT_KEY" in problems
+    assert "MDARIX_PLATFORM_SIGNING_PUBLIC_KEY" in problems
     _set_role(monkeypatch, "CELL", organization)
     assert _deployment_role_problems() == []
+    monkeypatch.setenv("MDARIX_PLATFORM_SIGNING_PUBLIC_KEY", "not-a-key")
+    assert "MDARIX_PLATFORM_SIGNING_PUBLIC_KEY" in _deployment_role_problems()[0]
+    monkeypatch.setenv("MDARIX_PLATFORM_SIGNING_PUBLIC_KEY", "AAAA")  # base64, but not 32 bytes
+    assert "32 bytes" in _deployment_role_problems()[0]
+    _set_role(monkeypatch, "CELL", organization)
     assert _cell_tenant_problem() is None
     monkeypatch.setenv("MDARIX_DATA_PLANE_R1_TENANT_1_DATABASE_URL", "postgresql+pg8000://x:y@localhost/z")
     assert "one database" in _deployment_role_problems()[0]

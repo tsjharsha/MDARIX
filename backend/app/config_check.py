@@ -193,6 +193,11 @@ def _deployment_role_problems() -> list[str]:
         )
         if planes:
             found.append(f"A cell has one database: remove {', '.join(planes)}")
+        from backend.app.cell_packages import platform_public_key, public_key_problem
+
+        # A cell trusts only documents the platform signed (licences, packages): the public key is pinned here.
+        if problem := public_key_problem(platform_public_key()):
+            found.append(problem)
     elif _get("MDARIX_CELL_TENANT_ID") or _get("MDARIX_CELL_TENANT_KEY"):
         found.append(f"MDARIX_CELL_TENANT_ID and MDARIX_CELL_TENANT_KEY are for a CELL, not a {value} deployment")
     return found
