@@ -3,7 +3,7 @@ import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
+import { DOMAINS } from "./consoleDomains";
 import { AdminArea, isAreaDomain } from "./areas/AdminArea";
 import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import { nextTabIndex } from "../shared/focus";
@@ -21,7 +21,6 @@ import "./console/admin-console.css";
 
 type Props = {
   securityContext: { display_name: string; active_role: string | null } | null;
-  onNavigate: (view: any) => void;
   initialSection?: string;
 };
 
@@ -49,7 +48,7 @@ function locationFor(target: OverviewTarget | string): Location {
   return { domain: domain[0], item: requested && items.includes(requested) ? requested : items[0] };
 }
 
-export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = OVERVIEW }: Props) {
+export function SimplifiedPlatformAdminScreen({ securityContext, initialSection = OVERVIEW }: Props) {
   const [location, setLocation] = useState<Location>(() =>
     initialSection === NEW_CUSTOMER
       ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })
@@ -327,19 +326,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                         section={location.item}
                         onSection={(item) => setLocation({ domain: location.domain, item })}
                       />
-                    ) : (
-                      <PlatformAdminScreen
-                        embedded
-                        securityContext={securityContext}
-                        onNavigate={onNavigate}
-                        initialDomain={location.domain}
-                        initialItem={location.item}
-                        onLocationChange={(domain, item) => {
-                          if (domain === "Platform Overview") open(OVERVIEW);
-                          else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
-                        }}
-                      />
-                    )}
+                    ) : null}
                   </SectionErrorBoundary>
                 </div>
               </>

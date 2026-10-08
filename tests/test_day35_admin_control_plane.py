@@ -21,7 +21,8 @@ def compact(text: str) -> str:
 ROOT = Path(__file__).parents[1]
 FRONTEND = ROOT / "frontend" / "src"
 UI = frontend_app_source()
-PLATFORM_ADMIN_UI = (FRONTEND / "features" / "admin" / "PlatformAdminScreen.tsx").read_text(encoding="utf-8")
+# The console's areas (the older embedded PlatformAdminScreen, unreachable once every area had its own page, is gone).
+CONSOLE_DOMAINS = (FRONTEND / "features" / "admin" / "consoleDomains.ts").read_text(encoding="utf-8")
 CUSTOMER_ADMIN_UI = "\n".join(
     path.read_text(encoding="utf-8")
     for path in sorted((FRONTEND / "features" / "customer-admin").rglob("*.ts*"))
@@ -30,7 +31,7 @@ CUSTOMER_ADMIN_UI = "\n".join(
 SIMPLIFIED_ADMIN_UI = (FRONTEND / "features" / "admin" / "SimplifiedPlatformAdminScreen.tsx").read_text(
     encoding="utf-8"
 )
-LIVE_ADMIN_UI = "\n".join((UI, PLATFORM_ADMIN_UI, CUSTOMER_ADMIN_UI, SIMPLIFIED_ADMIN_UI))
+LIVE_ADMIN_UI = "\n".join((UI, CUSTOMER_ADMIN_UI, SIMPLIFIED_ADMIN_UI))
 ROUTER = access_api_source()
 
 
@@ -39,7 +40,6 @@ def test_admin_dashboard_loads_all_control_plane_domains():
         "/api/v1/admin/identity/users",
         "/api/v1/admin/identity/roles",
         "/api/v1/admin/identity/permission-sets",
-        "/api/v1/admin/identity/memberships",
         "/api/v1/admin/identity/persona-assignments",
         "/api/v1/admin/governance/entitlements",
         "/api/v1/admin/configuration/connectors",
@@ -49,8 +49,9 @@ def test_admin_dashboard_loads_all_control_plane_domains():
     for endpoint in live_reads:
         assert endpoint in LIVE_ADMIN_UI
         assert endpoint.removeprefix("/api/v1") in ROUTER
-    # Backend-only today (no reachable UI reads it yet).
+    # Backend-only today (no reachable UI reads them yet; memberships were read only by the removed older screen).
     assert "/admin/governance/policies" in ROUTER
+    assert "/admin/identity/memberships" in ROUTER
 
 
 def test_admin_create_endpoints_exist_and_user_invitation_is_wired():
@@ -126,6 +127,6 @@ def test_platform_admin_console_overview_uses_live_sources_and_embeds_every_doma
         assert endpoint in overview
     # Plans & Licensing … Operations have their own pages; the remaining domains embed the real workspaces.
     assert "<AdminArea" in SIMPLIFIED_ADMIN_UI and "isAreaDomain" in SIMPLIFIED_ADMIN_UI
-    assert "<PlatformAdminScreen" in SIMPLIFIED_ADMIN_UI and "embedded" in SIMPLIFIED_ADMIN_UI
-    assert "export const DOMAINS" in PLATFORM_ADMIN_UI
+    assert "<PlatformAdminScreen" not in SIMPLIFIED_ADMIN_UI
+    assert "export const DOMAINS" in CONSOLE_DOMAINS
     assert "/api/v1/auth/signout" in SIMPLIFIED_ADMIN_UI
