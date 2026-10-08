@@ -1,3 +1,20 @@
+# Every text file is stored with LF line endings, whatever each developer's core.autocrlf says; a checkout may still
+# use the platform's endings. The rules below that pin eol=lf keep LF in the working copy too.
+* text=auto
+
+# Binary files are never converted or diffed as text.
+*.webp binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.gz binary
+*.zip binary
+*.woff binary
+*.woff2 binary
+
 # The golden dataset generator writes LF line endings on every platform.
 # Checking these files out with LF keeps them byte-identical to regenerated
 # output, so ingestion's file checksums (idempotency) are platform-independent.
