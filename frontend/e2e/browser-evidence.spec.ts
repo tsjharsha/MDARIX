@@ -386,8 +386,13 @@ test.describe("MDARIX browser evidence", () => {
     await page.goto("/app/signals");
     const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
     await expect(navigation).toBeAttached({ timeout: 20_000 });
-    // The session ends on the server's side (as after a sign-out elsewhere or the idle timeout): drop the cookie.
-    await page.context().clearCookies();
+    // The session ends on the server's side, as after a sign-out elsewhere or the idle timeout. Only dropping the
+    // browser's cookie is not enough: a session check still in flight re-issues it (GET /auth/session renews the
+    // cookie by design), which on a slower page let the old session carry on.
+    const signedOut = await page.evaluate(
+      async () => (await fetch("/api/v1/auth/signout", { method: "POST", credentials: "same-origin" })).status,
+    );
+    expect(signedOut).toBe(200);
     const toggle = page.getByRole("button", { name: "Open navigation" });
     if (await toggle.isVisible()) await toggle.click();
     // Any API call now answers 401, and the app goes to sign-in with the reason and the page to return to.
