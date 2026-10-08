@@ -252,7 +252,7 @@ def test_reset_removes_what_the_demo_created_and_restores_the_story(demo):
         assert time.monotonic() - started < 120
         assert db.query(Decision).filter(Decision.id == decision_id).first() is None
         assert result["records"] == STORY
-        # The reset writes the golden path again (backend/app/demo_golden_path.py), signed and verifiable.
+        # The reset writes the golden path again (backend/app/demo_golden_path/), signed and verifiable.
         assert result["golden_path_seeded"]["seeded"] is True, result["golden_path_seeded"]
         assert result["golden_path"]["decision"]["verification"] == "VALID"
         assert status(db)["data_location_registered"] is True

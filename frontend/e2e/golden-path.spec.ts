@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 /*
  * The demo golden path, read only: the AcmeCare demo workspace's case (ACD-INV-401 by default, seeded by
- * backend/app/demo_golden_path.py) walked through the screens its people use. The triage lead opens the signal inbox;
+ * backend/app/demo_golden_path/) walked through the screens its people use. The triage lead opens the signal inbox;
  * the investigator opens the case from a link and reads every case tab (Scope, Intelligence, Reviews, Decision Brief,
  * Decision), its evidence, and its Trust & Audit timeline and replay. Nothing is changed: no button that writes is
  * pressed. Every screen must load without page errors, server errors or a panel that reports a failure.
