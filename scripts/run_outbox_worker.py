@@ -213,10 +213,17 @@ def record_database_heartbeat(instance_id, started_at, metrics):
 
 def process_pending_reports(limit: int = 10):
     """Drain report jobs from every registered tenant data plane."""
+    from backend.app.deployment_role import served_tenants_clause
+
     claimed = ready = failed = 0
     with SessionLocal() as control_db:
         bind_system(control_db, "report worker: list registered data planes")
-        planes = control_db.query(TenantDataPlane).filter(TenantDataPlane.status == "ACTIVE").all()
+        # A cell drains its own organization's report jobs only.
+        planes = (
+            control_db.query(TenantDataPlane)
+            .filter(TenantDataPlane.status == "ACTIVE", served_tenants_clause(TenantDataPlane.tenant_id))
+            .all()
+        )
         for plane in planes:
             try:
                 with plane_session(plane) as data_db:

@@ -96,6 +96,7 @@ def problems(*, offline: bool = False) -> list[str]:
         if problem:
             found.append(problem)
 
+    found.extend(_deployment_role_problems())
     app_url = urlparse(_get("MDARIX_APP_URL"))
     if app_url.scheme != "https" or not app_url.netloc:
         add("MDARIX_APP_URL must be the https address people use, e.g. https://app.example.com")
@@ -168,7 +169,66 @@ def problems(*, offline: bool = False) -> list[str]:
         if _get("MDARIX_RLS_SYSTEM_TOKEN"):
             add(_database_token_problem())
         add(_runtime_role_problem())
+        if not _deployment_role_problems():
+            add(_cell_tenant_problem())
     return found
+
+
+def _deployment_role_problems() -> list[str]:
+    """MDARIX_DEPLOYMENT_ROLE (backend/app/deployment_role.py) and what each role needs: a CELL names the one
+    organization it serves and has no second database; the PLATFORM names no cell organization."""
+    from backend.app import deployment_role as roles
+
+    value = _get("MDARIX_DEPLOYMENT_ROLE").upper() or roles.MULTI
+    if value not in roles.ROLES:
+        return [f"MDARIX_DEPLOYMENT_ROLE must be MULTI, PLATFORM or CELL (got {value})"]
+    found: list[str] = []
+    if value == roles.CELL:
+        if roles.cell_tenant_id() is None:
+            found.append("MDARIX_CELL_TENANT_ID must be the UUID of the one organization this cell serves")
+        if not roles.cell_tenant_key():
+            found.append("MDARIX_CELL_TENANT_KEY must be the key of the one organization this cell serves")
+        planes = sorted(
+            name for name in os.environ if name.startswith("MDARIX_DATA_PLANE_") and "_DATABASE_URL" in name
+        )
+        if planes:
+            found.append(f"A cell has one database: remove {', '.join(planes)}")
+    elif _get("MDARIX_CELL_TENANT_ID") or _get("MDARIX_CELL_TENANT_KEY"):
+        found.append(f"MDARIX_CELL_TENANT_ID and MDARIX_CELL_TENANT_KEY are for a CELL, not a {value} deployment")
+    return found
+
+
+def _cell_tenant_problem() -> str | None:
+    """A cell's database must hold the organization it is configured for, under that key, on the shared plane (the
+    cell's own database is that plane)."""
+    from backend.app import deployment_role as roles
+
+    if not roles.is_cell():
+        return None
+    try:
+        from backend.app.db.data_plane import SHARED_CONTROL_DATA_PLANE
+        from backend.app.db.models.customer_lifecycle import TenantDataPlane
+        from backend.app.db.models.foundation import Tenant
+        from backend.app.db.session import SessionLocal
+        from backend.app.db.tenant_scope import bind_system
+
+        with SessionLocal() as db:
+            bind_system(db, "configuration check: the cell's organization")
+            tenant = db.query(Tenant).filter(Tenant.id == roles.cell_tenant_id()).first()
+            if tenant is None:
+                return "The database does not hold the organization MDARIX_CELL_TENANT_ID names"
+            if tenant.tenant_key != roles.cell_tenant_key():
+                return f"MDARIX_CELL_TENANT_KEY does not match the organization's key ({tenant.tenant_key})"
+            plane = (
+                db.query(TenantDataPlane)
+                .filter(TenantDataPlane.tenant_id == tenant.id, TenantDataPlane.status == "ACTIVE")
+                .first()
+            )
+            if plane is None or plane.connection_secret_ref != SHARED_CONTROL_DATA_PLANE:
+                return "A cell's organization lives in the cell's own database: its data-plane registry row must be the shared plane"
+    except Exception as exc:
+        return f"Could not check the cell's organization against the database ({type(exc).__name__})"
+    return None
 
 
 def _database_tls_problems() -> list[str]:

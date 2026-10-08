@@ -31,6 +31,7 @@ from backend.app.alerts import send_alert
 from backend.app.db.models.stage2 import SchedulerRun
 from backend.app.db.session import SessionLocal, engine
 from backend.app.db.tenant_scope import bind_system
+from backend.app.deployment_role import CELL, MULTI, PLATFORM, ROLES, deployment_role, served_tenants_clause
 
 logger = logging.getLogger("mdarix.scheduler")
 ACTOR = "system:scheduler"
@@ -38,6 +39,10 @@ ALERT_AFTER_FAILURES = 3
 # A job that has not started or finished within this many of its intervals is "missed".
 MISSED_AFTER_INTERVALS = 2
 DEFAULT_HEARTBEAT_FILE = "/tmp/mdarix-scheduler-heartbeat"
+# Which deployments run a job (backend/app/deployment_role.py): the platform owns customers, licences and trials,
+# a cell owns its organization's records, and some jobs watch the deployment itself.
+PLATFORM_JOBS = frozenset({MULTI, PLATFORM})
+CELL_JOBS = frozenset({MULTI, CELL})
 
 
 @dataclass(frozen=True)
@@ -46,6 +51,7 @@ class Job:
     every: timedelta
     run: Callable[[Session, dict], dict]
     description: str
+    roles: frozenset[str] = ROLES
 
 
 # ------------------------------------------------------------------------------------------- jobs
@@ -96,7 +102,9 @@ def embedding_catch_up(db: Session, _state: dict) -> dict:
     tenant_ids = [
         row.id
         for row in db.query(Tenant.id)
-        .filter(Tenant.status.in_(["ACTIVE", "active"]), customer_allows_access_clause())
+        .filter(
+            Tenant.status.in_(["ACTIVE", "active"]), customer_allows_access_clause(), served_tenants_clause(Tenant.id)
+        )
         .all()
     ]
     for tenant_id in tenant_ids:
@@ -225,21 +233,68 @@ def late_evidence_sweep(db: Session, _state: dict) -> dict:
 
 
 JOBS: tuple[Job, ...] = (
-    Job("tenant-lifecycle", timedelta(minutes=15), tenant_lifecycle, "Apply scheduled tenant status changes"),
-    Job("subscription-lifecycle", timedelta(hours=1), subscription_lifecycle, "Expiry, grace and renewal reminders"),
-    Job("trial-reminders", timedelta(hours=6), trial_reminders, "Email trial owners before and when the trial ends"),
-    Job("trial-retention", timedelta(hours=24), trial_retention, "Delete trial data 30 days after the trial ends"),
-    Job("embedding-catch-up", timedelta(minutes=15), embedding_catch_up, "Embed evidence that has no embedding yet"),
+    Job(
+        "tenant-lifecycle",
+        timedelta(minutes=15),
+        tenant_lifecycle,
+        "Apply scheduled tenant status changes",
+        PLATFORM_JOBS,
+    ),
+    Job(
+        "subscription-lifecycle",
+        timedelta(hours=1),
+        subscription_lifecycle,
+        "Expiry, grace and renewal reminders",
+        PLATFORM_JOBS,
+    ),
+    Job(
+        "trial-reminders",
+        timedelta(hours=6),
+        trial_reminders,
+        "Email trial owners before and when the trial ends",
+        PLATFORM_JOBS,
+    ),
+    Job(
+        "trial-retention",
+        timedelta(hours=24),
+        trial_retention,
+        "Delete trial data 30 days after the trial ends",
+        PLATFORM_JOBS,
+    ),
+    Job(
+        "embedding-catch-up",
+        timedelta(minutes=15),
+        embedding_catch_up,
+        "Embed evidence that has no embedding yet",
+        CELL_JOBS,
+    ),
     Job("operations-alerts", timedelta(minutes=5), operations_alerts, "Alert on dead letters and a stopped worker"),
-    Job("export-expiry", timedelta(hours=1), export_expiry, "Delete data exports after their download period"),
-    Job("connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule"),
-    Job("purge-completion", timedelta(hours=24), purge_completion, "Finish organization deletions left incomplete"),
-    Job("signal_detection", timedelta(minutes=60), signal_detection, "Raise and update signals from new complaints"),
+    Job(
+        "export-expiry", timedelta(hours=1), export_expiry, "Delete data exports after their download period", CELL_JOBS
+    ),
+    Job(
+        "connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule", CELL_JOBS
+    ),
+    Job(
+        "purge-completion",
+        timedelta(hours=24),
+        purge_completion,
+        "Finish organization deletions left incomplete",
+        CELL_JOBS,
+    ),
+    Job(
+        "signal_detection",
+        timedelta(minutes=60),
+        signal_detection,
+        "Raise and update signals from new complaints",
+        CELL_JOBS,
+    ),
     Job(
         "late_evidence_sweep",
         timedelta(minutes=60),
         late_evidence_sweep,
         "Ask for an impact assessment of evidence that reached a decided case",
+        CELL_JOBS,
     ),
     Job(
         "audit-chain-verification",
@@ -248,6 +303,12 @@ JOBS: tuple[Job, ...] = (
         "Verify every organization's tamper-evident audit trail",
     ),
 )
+
+
+def active_jobs() -> tuple[Job, ...]:
+    """The jobs this deployment runs (its role's share of JOBS)."""
+    role = deployment_role()
+    return tuple(job for job in JOBS if role in job.roles)
 
 
 # ------------------------------------------------------------------------------------------- run loop
@@ -348,11 +409,11 @@ def _run_rows() -> dict[str, SchedulerRun]:
         db.close()
 
 
-def run_due_jobs(now: datetime | None = None, jobs: tuple[Job, ...] = JOBS) -> list[dict]:
+def run_due_jobs(now: datetime | None = None, jobs: tuple[Job, ...] | None = None) -> list[dict]:
     now = now or datetime.now(timezone.utc)
     rows = _run_rows()
     outcomes = []
-    for job in jobs:
+    for job in active_jobs() if jobs is None else jobs:
         if _due(rows.get(job.name), job, now):
             outcome = run_job(job, now)
             if outcome is not None:
@@ -382,11 +443,13 @@ def write_heartbeat(now: datetime | None = None) -> Path | None:
         return None
 
 
-def missed_jobs(rows: dict[str, SchedulerRun], now: datetime, jobs: tuple[Job, ...] = JOBS) -> list[tuple[Job, float]]:
+def missed_jobs(
+    rows: dict[str, SchedulerRun], now: datetime, jobs: tuple[Job, ...] | None = None
+) -> list[tuple[Job, float]]:
     """Jobs whose last activity (start or finish) is older than MISSED_AFTER_INTERVALS times their interval, with the
     age in seconds. A job that has never run is not missed: it is due and runs on this cycle."""
     found = []
-    for job in jobs:
+    for job in active_jobs() if jobs is None else jobs:
         row = rows.get(job.name)
         if row is None:
             continue
@@ -402,10 +465,11 @@ def missed_jobs(rows: dict[str, SchedulerRun], now: datetime, jobs: tuple[Job, .
 _missed_reported: set[str] = set()
 
 
-def check_missed_jobs(now: datetime | None = None, jobs: tuple[Job, ...] = JOBS, rows=None) -> list[str]:
+def check_missed_jobs(now: datetime | None = None, jobs: tuple[Job, ...] | None = None, rows=None) -> list[str]:
     """Alert once when a job becomes missed and once more when it runs again; returns the names currently missed."""
     now = now or datetime.now(timezone.utc)
     rows = _run_rows() if rows is None else rows
+    jobs = active_jobs() if jobs is None else jobs
     missed = {job.name: (job, age) for job, age in missed_jobs(rows, now, jobs)}
     for name, (job, age) in missed.items():
         if name not in _missed_reported:
@@ -430,7 +494,12 @@ def serve(
     once instead of finishing a sleep) or ``stop()`` returns true. Every cycle writes the heartbeat file and checks
     for missed jobs; a cycle that fails (the database may be briefly unavailable) is logged and tried again."""
     shutdown = shutdown or threading.Event()
-    logger.info("Scheduler started with %d jobs; heartbeat file %s", len(JOBS), heartbeat_file())
+    logger.info(
+        "Scheduler started as %s with %d jobs; heartbeat file %s",
+        deployment_role(),
+        len(active_jobs()),
+        heartbeat_file(),
+    )
     while not shutdown.is_set() and not (stop and stop()):
         try:
             run_due_jobs()

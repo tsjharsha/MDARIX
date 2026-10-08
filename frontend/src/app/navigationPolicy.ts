@@ -86,9 +86,25 @@ export function isCustomerAdminRole(role?: string | null) {
   return ["CUSTOMER ADMIN", "CUSTOMER_ADMIN"].includes((role ?? "").trim().toUpperCase());
 }
 
-export function allowedViewsForRole(role?: string | null): readonly AppView[] | null {
-  if (isPlatformAdminRole(role)) return PLATFORM_ADMIN_VIEWS;
-  if (isCustomerAdminRole(role)) return CUSTOMER_ADMIN_VIEWS;
+/** Which part of MDARIX the server is (session context `deployment_role`): the whole product (MULTI), the platform
+ * (platform administration only) or one organization's cell (its workspace and administration only). The server
+ * answers 404 for the rest; the interface does not offer it. */
+export type DeploymentRole = "MULTI" | "PLATFORM" | "CELL";
+
+export function viewsForDeployment(
+  views: readonly AppView[] | null,
+  deploymentRole?: string | null,
+): readonly AppView[] | null {
+  if (!views) return views;
+  const role = (deploymentRole ?? "MULTI").trim().toUpperCase();
+  if (role === "PLATFORM") return views.filter((view) => !WORKSPACE_VIEWS.includes(view) && view !== "customer-admin");
+  if (role === "CELL") return views.filter((view) => WORKSPACE_VIEWS.includes(view) || view === "customer-admin");
+  return views;
+}
+
+export function allowedViewsForRole(role?: string | null, deploymentRole?: string | null): readonly AppView[] | null {
+  if (isPlatformAdminRole(role)) return viewsForDeployment(PLATFORM_ADMIN_VIEWS, deploymentRole);
+  if (isCustomerAdminRole(role)) return viewsForDeployment(CUSTOMER_ADMIN_VIEWS, deploymentRole);
   return null;
 }
 

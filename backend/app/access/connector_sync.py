@@ -272,13 +272,16 @@ def run_scheduled_syncs(db: Session, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     synced, failed = 0, []
     from backend.app.customer_lifecycle import tenants_of_blocking_customers
+    from backend.app.deployment_role import served_tenants_clause
 
-    # Connections of a suspended customer's tenants wait until the customer is reactivated.
+    # Connections of a suspended customer's tenants wait until the customer is reactivated; a cell syncs its own
+    # organization's connections only.
     rows = (
         db.query(ConnectorConfiguration)
         .filter(
             ConnectorConfiguration.status == "ACTIVE",
             ConnectorConfiguration.tenant_id.not_in(tenants_of_blocking_customers()),
+            served_tenants_clause(ConnectorConfiguration.tenant_id),
         )
         .all()
     )

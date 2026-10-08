@@ -35,6 +35,22 @@ describe("authentication and role navigation", () => {
     expect(allowedViewsForRole("Viewer")).toBeNull();
   });
 
+  it("offers only the screens the deployment serves", () => {
+    expect(allowedViewsForRole("Administrator", "MULTI")).toEqual(PLATFORM_ADMIN_VIEWS);
+    const platform = allowedViewsForRole("Administrator", "PLATFORM") ?? [];
+    expect(platform).toContain("admin");
+    expect(platform).not.toContain("regulatory-copilot");
+    expect(platform.some((view) => WORKSPACE_VIEWS.includes(view))).toBe(false);
+    const cellAdmin = allowedViewsForRole("Customer Admin", "CELL") ?? [];
+    expect(cellAdmin).toContain("customer-admin");
+    expect(cellAdmin).toContain("investigations");
+    // Platform staff cannot sign in to a cell; were a session to exist, no platform screen would be offered.
+    const cellStaff = allowedViewsForRole("Administrator", "CELL") ?? [];
+    expect(cellStaff).not.toContain("admin");
+    expect(cellStaff.every((view) => WORKSPACE_VIEWS.includes(view))).toBe(true);
+    expect(allowedViewsForRole("Viewer", "CELL")).toBeNull();
+  });
+
   it("keeps every declared admin route addressable", () => {
     for (const [view, path] of Object.entries(APP_ROUTES)) expect(viewFromPath(path)).toBe(view);
   });

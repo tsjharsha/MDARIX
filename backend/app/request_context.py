@@ -26,6 +26,7 @@ from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.customer_lifecycle import customer_blocks_access
 from backend.app.db.session import get_db
 from backend.app.db.tenant_scope import bind_tenant
+from backend.app.deployment_role import serves_account
 
 logger = logging.getLogger(__name__)
 DEFAULT_IDLE_MINUTES = 30
@@ -216,6 +217,10 @@ def get_request_context(
         .first()
     )
     if user is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    if not serves_account(user.tenant_id, user.role):
+        # A session this deployment does not serve (another organization's in a CELL, a customer's on the PLATFORM,
+        # platform staff in a CELL) is no session here, whatever database it was created in.
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     ensure_tenant_access(db, user)
     from genai.governance import set_request_tenant

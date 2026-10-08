@@ -58,6 +58,7 @@ from backend.app.db.models.stage2 import (
 )
 from backend.app.db.session import get_db
 from backend.app.db.tenant_scope import bind_system, bind_tenant
+from backend.app.deployment_role import serves_account
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.rate_limit import enforce
 from backend.app.request_context import ensure_tenant_access, renew_session_if_due, session_expiry
@@ -680,6 +681,10 @@ def signin(data: Signin, request: Request, response: Response, db: Session = Dep
         )
     bind_system(db, "sign-in: find this person's accounts across organizations")
     matches = _accounts_for_password(db, identifier, data.password)
+    # A CELL signs in only its own organization's people and never platform staff; the PLATFORM only platform staff
+    # (backend/app/deployment_role.py). An account this deployment does not serve is as good as none: the answer
+    # stays INVALID_CREDENTIALS, so it does not reveal where the account lives.
+    matches = [item for item in matches if serves_account(item.tenant_id, item.role)]
     row = None
     if data.tenant_id is not None:
         row = next((item for item in matches if item.tenant_id == data.tenant_id), None)

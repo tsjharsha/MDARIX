@@ -84,6 +84,7 @@ from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
 from scenario_intelligence.router import router as scenario_router
 from backend.app.runtime_env import is_production_like
+from backend.app.deployment_role import serves_path
 from backend.app.db.tenant_scope import bind_tenant, scoped_bind
 
 configure_logging()
@@ -245,6 +246,23 @@ async def genai_request_scope(request: Request, call_next):
         return await call_next(request)
     finally:
         end_request_scope(marker)
+
+
+@app.middleware("http")
+async def deployment_role_gate(request: Request, call_next):
+    """A PLATFORM deployment does not serve the investigation workspace and a CELL does not serve platform
+    administration (backend/app/deployment_role.py): those paths answer 404 here, before any handler runs."""
+    if not serves_path(request.url.path):
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": {
+                    "code": "NOT_SERVED_BY_THIS_DEPLOYMENT",
+                    "message": "This deployment does not serve that part of MDARIX",
+                }
+            },
+        )
+    return await call_next(request)
 
 
 @app.middleware("http")

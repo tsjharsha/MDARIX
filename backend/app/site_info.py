@@ -14,6 +14,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Response
 
+from backend.app.deployment_role import deployment_role
+
 router = APIRouter(prefix="/api/v1/public", tags=["Website"])
 
 LEGAL_DOCUMENTS = {"privacy": "privacy.md", "terms": "terms.md", "trial-agreement": "trial-agreement.md"}
@@ -34,6 +36,8 @@ def site_info(response: Response) -> dict:
         "privacy_email": _get("MDARIX_PRIVACY_EMAIL") or None,
         "legal_text_approved": _get("MDARIX_LEGAL_TEXT_APPROVED").lower() == "true",
         "trial": {"days": 30, "users": 3, "rows": 5000, "data_deleted_after_days": 30},
+        # MULTI, PLATFORM or CELL (backend/app/deployment_role.py); free trials exist on MULTI only.
+        "deployment_role": deployment_role(),
     }
 
 

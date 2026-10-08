@@ -55,8 +55,12 @@ def verify_all(db: Session, state: dict) -> dict:
     """Verify every organization's chain from its anchor; returns totals and the organizations whose chain broke.
 
     ``state["anchors"]`` maps tenant id -> {"seq", "hash"} of the last verified head (kept between runs)."""
+    from backend.app.deployment_role import serves_tenant
+
     anchors: dict = dict(state.get("anchors") or {})
     tenants = [row[0] for row in db.execute(text("SELECT DISTINCT tenant_id FROM public.audit_events")).all()]
+    # A cell verifies its own organization's chain only.
+    tenants = [tenant_id for tenant_id in tenants if serves_tenant(tenant_id)]
     broken: list[dict] = []
     checked = 0
     for tenant_id in tenants:

@@ -40,7 +40,10 @@ def main(argv: list[str] | None = None) -> int:
             rows = {row.job: row for row in db.query(SchedulerRun).all()}
         finally:
             db.close()
-        for job in scheduler.JOBS:
+        from backend.app.deployment_role import deployment_role
+
+        print(f"Deployment role {deployment_role()}: {len(scheduler.active_jobs())} of {len(scheduler.JOBS)} jobs")
+        for job in scheduler.active_jobs():
             row = rows.get(job.name)
             print(
                 f"{job.name:24} every {job.every}  last: "
