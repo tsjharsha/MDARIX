@@ -46,11 +46,18 @@ export function handBackReady(handBack: HandBack, available: DataExport | null):
 }
 
 /** The body of POST .../purge. The waiver reason is sent only when the administrator chose to waive the export. */
-export function purgeRequest(reason: string, password: string, tenantKey: string, handBack: HandBack | null) {
+export function purgeRequest(
+  reason: string,
+  password: string,
+  tenantKey: string,
+  handBack: HandBack | null,
+  mfaCode = "",
+) {
   return {
     reason: reason.trim(),
     password,
     confirm_tenant_key: tenantKey.trim(),
+    ...(mfaCode ? { mfa_code: mfaCode } : {}),
     ...(handBack?.kind === "waiver" ? { export_waiver_reason: handBack.reason.trim() } : {}),
   };
 }

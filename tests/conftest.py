@@ -175,6 +175,8 @@ DB_MODULES = {
     "test_rls_coverage",
     # CSV import options: import the rows that pass (rejects file for the rest), mask personal data instead of refusing.
     "test_data_import_options",
+    # A full export and a purge also need a current authenticator code.
+    "test_export_purge_mfa",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

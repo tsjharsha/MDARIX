@@ -765,11 +765,12 @@ function TenantData({
       danger: true,
       reason: { label: "Reason (for example the customer's written request)", min: 10 },
       password: true,
-      run: async (reason, password) => {
+      mfaCode: true,
+      run: async (reason, password, _acknowledged, mfaCode) => {
         purgeResult.current = await send<PurgeResult>(
           `${base}/purge`,
           "POST",
-          purgeRequest(reason, password, typedKey, resuming ? null : handBack),
+          purgeRequest(reason, password, typedKey, resuming ? null : handBack, mfaCode),
         );
       },
       done: "",
@@ -791,7 +792,9 @@ function TenantData({
                 body: "The export is prepared in the background; refresh this page to download it.",
                 confirmLabel: "Prepare export",
                 reason: { label: "Reason (kept in the audit trail)", min: 10 },
-                run: (reason) => send(`${base}/exports`, "POST", { reason }),
+                mfaCode: true,
+                run: (reason, _password, _acknowledged, mfaCode) =>
+                  send(`${base}/exports`, "POST", { reason, ...(mfaCode ? { mfa_code: mfaCode } : {}) }),
                 done: "The export is being prepared.",
               })
             }
