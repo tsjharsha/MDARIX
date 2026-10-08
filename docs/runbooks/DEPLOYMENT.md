@@ -197,6 +197,7 @@ All commands run in `~/mdarix`; `dc` stands for `docker compose -f docker-compos
 | Invite a Platform Administrator | `dc run --rm migrate python scripts/create_platform_admin.py person@yourcompany.com --name "Full Name"` |
 | Rotate the system-scope token | set a new `MDARIX_RLS_SYSTEM_TOKEN`, then `dc up -d --no-build --wait` (migrate stores it, services restart) |
 | Rotate the backup login's password | change `MDARIX_BACKUP_DB_PASSWORD` in `.env.migrate`, then `dc run --rm migrate python scripts/configure_backup_role.py` |
+| Rotate any other key or secret | KEY_ROTATION.md: which ones rotate freely, the connector keyring, and the two that need a plan |
 
 **Break-glass: a platform administrator lost their MFA device and no other platform administrator can reset it** (the
 normal path is a colleague resetting it). On the VM:
