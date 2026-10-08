@@ -39,7 +39,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   evaluate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     env:
       POSTGRES_USER: mdarix_app

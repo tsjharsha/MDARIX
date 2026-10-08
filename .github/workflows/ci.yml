@@ -18,7 +18,7 @@ jobs:
   ai-golden-qualification:
     name: AI golden dataset qualification
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -37,7 +37,7 @@ jobs:
           if-no-files-found: error
   backend:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -103,7 +103,7 @@ jobs:
   dedicated-plane:
     name: Dedicated data plane
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -161,7 +161,7 @@ jobs:
   dataplane-tests:
     name: Data-plane routing (four tenant databases)
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -240,7 +240,7 @@ jobs:
   production-mode:
     name: Production mode
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -333,7 +333,7 @@ jobs:
   prod-compose-config:
     name: Production compose definition
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Shell scripts parse
@@ -370,7 +370,7 @@ jobs:
   prod-stack:
     name: Production stack (Caddy, TLS database, smoke test, scheduler, backup and restore)
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     env:
       COMPOSE_FILE: docker-compose.prod.yml
@@ -462,7 +462,7 @@ jobs:
 
   frontend:
     if: github.event_name != 'schedule'
-    runs-on: windows-latest
+    runs-on: ${{ vars.CI_WINDOWS_RUNNER || 'windows-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       # The same Node major version as the web image (Dockerfile.web).
@@ -484,7 +484,7 @@ jobs:
   browser:
     name: Browser and accessibility evidence
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     needs: frontend
     env:
       POSTGRES_USER: mdarix_app
@@ -568,7 +568,7 @@ jobs:
   container-validation:
     name: Container and simulator validation
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Validate Docker Compose definition
@@ -578,7 +578,7 @@ jobs:
 
   image-scan:
     name: Production image scan
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build the production images
@@ -595,7 +595,7 @@ jobs:
 
   security:
     name: Security and static gates
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     # gitleaks reads the pull request's commits to scan them.
     permissions:
       contents: read
@@ -621,7 +621,7 @@ jobs:
   integration:
     name: Simulator and integration gates
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
       POSTGRES_PASSWORD: mdarix_app
@@ -676,7 +676,7 @@ jobs:
 
   release-report:
     name: Release evidence gate
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     needs:
       [
         backend,
