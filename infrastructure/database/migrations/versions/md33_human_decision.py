@@ -15,6 +15,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from infrastructure.database.migrations.helpers import quoted as _quoted
+from infrastructure.database.migrations.helpers import register_prefixes
+from infrastructure.database.migrations.helpers import tenant_policy as _tenant_policy
+
 from infrastructure.database.migrations.business_ids import COUNTER_TABLE, LATER_OBJECTS, WIDTH
 
 revision = "md33humandecision"
@@ -52,26 +56,6 @@ DECISION_COLUMNS = (
     "superseded_at",
     "supersede_reason",
 )
-
-_TENANT = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-_SYSTEM = "(SELECT public.mdarix_system_scope())"
-_GRANT = (
-    "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mdarix_runtime') THEN "
-    "GRANT SELECT, INSERT, UPDATE, DELETE ON public.{table} TO mdarix_runtime; END IF; END $$;"
-)
-
-
-def _quoted(values) -> str:
-    return ", ".join(f"'{value}'" for value in values)
-
-
-def _tenant_policy(table: str, system_scope: bool = True) -> None:
-    match = f"tenant_id = {_TENANT}"
-    allowed = f"{match} OR {_SYSTEM}" if system_scope else match
-    op.execute(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
-    op.execute(f"CREATE POLICY mdarix_tenant_isolation ON public.{table} USING ({allowed}) WITH CHECK ({allowed})")
-    op.execute(_GRANT.format(table=table))
 
 
 def _number(table: str) -> None:
@@ -205,24 +189,9 @@ def apply_decision_changes(system_scope: bool = True) -> None:
     _number("impact_assessments")
 
 
-def _registry_present(connection) -> bool:
-    return bool(connection.execute(sa.text("SELECT to_regclass('md_master.business_id_prefix') IS NOT NULL")).scalar())
-
-
 def upgrade():
     apply_decision_changes()
-    connection = op.get_bind()
-    if _registry_present(connection):
-        for item in NUMBERED.values():
-            sequence = f"seq_business_id_{item.prefix.lower()}"
-            op.execute(f"CREATE SEQUENCE IF NOT EXISTS md_master.{sequence}")
-            op.execute(
-                f"""
-                INSERT INTO md_master.business_id_prefix (prefix, entity_name, sequence_name, id_width, owning_schema)
-                VALUES ('{item.prefix}', '{item.entity}', '{sequence}', {WIDTH}, 'md_transaction')
-                ON CONFLICT (prefix) DO UPDATE SET id_width = {WIDTH}
-                """
-            )
+    register_prefixes(NUMBERED.values())
 
 
 def downgrade():
