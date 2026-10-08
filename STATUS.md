@@ -1,7 +1,61 @@
 # MDARIX R1 — current status
 
-**Last verified:** 2026-10-03, branch `mvp/admin-console-areas`, local Windows development stack (Docker Compose). Earlier results
-are kept below for comparison. Update this file only from real command output.
+**Last verified:** 2026-10-08, `main` after PR #2 (`mvp/pilot-readiness-final`, merged as `c57e2d9`), CI on GitHub
+Actions and the local Windows development stack (Docker Compose). Earlier results are kept below for comparison.
+Update this file only from real command output.
+
+## 2026-10-08 verified results (PR #2, `mvp/pilot-readiness-final`, merged into `main`)
+
+The testing round ran every suite after the six-role workflow (Phases 1-7), the console redesigns and the readiness
+fixes. Every failure was classified as an outdated test or a code regression; the commit messages say which.
+
+| Check | Command | Result |
+|---|---|---|
+| Lint, format, build | `ruff check .`, `ruff format --check .`, `npm run lint`, `npm run format:check`, `npm run build` | All clean; build succeeds |
+| Frontend unit tests | `npx vitest run` | 558 passed (68 files) in CI on the merged head `371fca3` |
+| Migrations, fresh database | `alembic upgrade head`, `downgrade` 8 steps, `upgrade head`, `alembic check` | Up, down and up again; no schema drift. Before the fix, downgrades md26-md33 failed (they deleted business-ID prefixes, which the database refuses); prefixes and counters are now kept. md34 also downgrades and re-applies |
+| Backend unit tests | `pytest -m unit` | 1,336 passed, 3 failed (outdated tests: renamed labels, a role code's case, the permission-coverage check); fixed and re-run green |
+| Backend database tests, local | `pytest -m "db and not dataplane"` on `mdarix_r1_test` | First run 35 failed, 5 errors (outdated tests: plans now needed to sign, supplier requests need a recipient, ordering; code regressions: brief history order, audit labels, readiness rule, demo audit key). After fixes: 1,123 passed, 1 skipped, 0 failed (23 min 35 s) |
+| Whole backend suite with md34, local | `pytest -m "not dataplane"` | 2,472 passed, 1 failed: a test asserting the organizations table had no row-level security (outdated by md34; fixed) |
+| Backend suite, CI | `python -m pytest -q` (fresh database, runtime role under row-level security) | 2,477 passed, 5 skipped, 0 failed on `371fca3` (earlier CI runs found 7, then 1, fresh-database failures: test setup order and two timestamp ties, all fixed) |
+| Dedicated data plane | `pytest tests/test_dedicated_plane.py` | 4 passed locally and in CI. Before the fix, copying organization rows to a plane failed on every plane ("pending trigger events") |
+| Data-plane routing (four tenant databases) | CI job | 4 passed |
+| Production stack | CI job: Caddy, TLS database, migrate, API, worker, scheduler, ClamAV; every scheduled job once; backup and restore with and without BYPASSRLS | Passed. Before the fix the scheduler was unhealthy: the legal documents were not mounted into the worker and scheduler |
+| Production configuration | CI jobs "Production mode" and "Production compose definition"; `pytest tests/test_config_check.py` | Passed. The configuration check now also refuses draft legal documents and requires encrypted off-site backups and heartbeat monitors in production (69 config and environment tests pass; the CI jobs supply stand-in values) |
+| Images | CI "Production image scan" (Trivy, fixable HIGH/CRITICAL fail) | Passed |
+| Browser and accessibility (Playwright, desktop and phone) | CI "Browser and accessibility evidence": smoke, accessibility, every screen crawled for three personas, the invite and open-investigation flows, the golden path | 56 passed, 6 skipped (36.7 min) on `371fca3`. Earlier runs failed on outdated selectors (sortable table headers, the phone menu), on fixture organizations without products (the job now seeds them) and on an ended-session test that only cleared the browser's cookie; all fixed, none was a product fault |
+| Release evidence gate | CI job that requires every gate above | Passed; all 17 checks on PR #2 green before the merge |
+| Scripts under row-level security | The CI and operator scripts run as `mdarix_runtime` (subject to RLS) on a database with md34 | Fixed scripts see the 4 fixture organizations and 25 users; before the fix the same scripts saw 0 and 0 |
+
+What changed (details in `git log` on the branch):
+
+- The six-role investigation workflow (seven workflow roles counting Leader): signals and triage, versioned case
+  scope, evidence review and requests, human judgements beside AI output, risk and regulatory reviews, the Decision
+  Brief with quality review, signed decisions with password and MFA, follow-ups and late-evidence impact assessments,
+  and per-case trust and audit. The pilot guide (`frontend/src/features/help/PILOT_GUIDE.md`) is rewritten around it,
+  with the minimum team.
+- Row-level security now also covers the organizations and customer tables (md34), and master data is writable only
+  in system scope; every script and raw connection that reads them binds system scope.
+  `tests/test_rls_coverage.py` fails when an organization-owned table lacks a forced policy (six reviewed exemptions).
+- Platform and customer administration: customer and tenant lifecycle (suspend, reactivate; a suspended customer
+  blocks its tenants), separate screens for platform users, customer administrators and customer users, sorting
+  across all pages, movable and resizable columns, redesigned dashboards, Data & Integrations in ten ordered steps.
+- Production gates: draft legal texts and placeholders refused; backups encrypted and off-site (or acknowledged), and
+  heartbeat monitors for backups and the scheduler, required in production.
+
+Known limits:
+
+- Production has not been run on real infrastructure: no staging deployment, real email, restore drill on a managed
+  database, end-to-end alert test or penetration test yet. No release has been tagged.
+- The legal documents (privacy policy, terms, trial agreement) are drafts awaiting a lawyer; no DPA or subprocessor
+  list is final.
+- The default personal-data check of CSV imports misses most names ("Dr. Alan Grant", "Patient Jane Doe"); a masking
+  option and a stricter check are proposed on the separate `mvp/import-options` branch.
+- Four platform-only tables (onboarding requests, incidents, provisioning jobs and steps) and the session and
+  data-plane routing tables have no row-level security, by reviewed exemption; three older features that look up
+  accounts across organizations are blocked by row-level security and need their own fix.
+- Risk and regulatory reviews have no separation-of-duties rule: the investigator may complete a review.
+- No formal validation package (IQ/OQ/PQ, Part 11 traceability) exists yet.
 
 ## 2026-10-03 verified results (branch `mvp/admin-console-areas`)
 
