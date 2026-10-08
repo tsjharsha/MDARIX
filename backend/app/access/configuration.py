@@ -57,6 +57,8 @@ router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
 # Mapping states reachable only through the release workflow (request approval -> approve -> release).
 GOVERNED_MAPPING_STATUSES = frozenset({"READY_FOR_APPROVAL", "APPROVED", "ACTIVE", "RELEASED"})
+# The governed states a mapping leaves only by rolling back (a request for approval can still be withdrawn).
+APPROVED_MAPPING_STATUSES = frozenset({"APPROVED", "ACTIVE", "RELEASED"})
 
 
 def _code_taken(db: Session, model, tenant_id, code: str, version: str, kind: str) -> None:
@@ -644,6 +646,27 @@ def update_control_plane_resource(
         raise HTTPException(
             404, detail={"code": "RESOURCE_NOT_FOUND", "message": "Resource is not available for this tenant"}
         )
+    if resource == "mappings":
+        # The release workflow is the only way into READY_FOR_APPROVAL, APPROVED and RELEASED (a second administrator
+        # approves), and what it approved stays as approved: this route neither sets a mapping's status nor edits a
+        # mapping that is under review, approved or released.
+        if "status" in payload.values:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "MAPPING_STATUS_GOVERNED",
+                    "message": "Change a mapping's status through its status endpoint or the release workflow.",
+                },
+            )
+        if str(row.status).upper() in GOVERNED_MAPPING_STATUSES:
+            raise HTTPException(
+                409,
+                detail={
+                    "code": "MAPPING_FROZEN",
+                    "message": "A mapping awaiting approval, approved or released cannot be edited. "
+                    "Roll it back, or create a new version.",
+                },
+            )
     if resource == "users":
         from backend.app.role_codes import canonical_stored_role
 
@@ -927,6 +950,17 @@ def activate_mapping(
             detail={
                 "code": "MAPPING_STATUS_GOVERNED",
                 "message": "Use the release workflow (request approval, approve, release) for this status.",
+            },
+        )
+    if str(row.status).upper() in APPROVED_MAPPING_STATUSES:
+        # Leaving an approved or released state is a rollback (audited, through /release-action), never a plain
+        # status change that would put an approved mapping back under editing. A request for approval that has not
+        # been approved yet may still be withdrawn here.
+        raise HTTPException(
+            409,
+            detail={
+                "code": "MAPPING_STATUS_GOVERNED",
+                "message": "An approved or released mapping leaves that state only through the release workflow.",
             },
         )
     row.status = payload.status

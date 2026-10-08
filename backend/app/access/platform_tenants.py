@@ -402,6 +402,7 @@ def list_support_access(request: Request, db: Session = Depends(get_db)):
                 "status": row.status,
                 "starts_at": row.starts_at,
                 "expires_at": row.expires_at,
+                "requested_by": str(row.requested_by) if row.requested_by else None,
                 "approved_by": str(row.approved_by) if row.approved_by else None,
             }
             for row in rows
@@ -433,6 +434,7 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
         scope=payload.scope,
         reason=payload.reason.strip(),
         status="PENDING",
+        requested_by=admin.id,
         starts_at=starts_at,
         expires_at=expires_at,
         created_at=now,
@@ -478,9 +480,15 @@ def approve_support_access(
         raise HTTPException(
             409, detail={"code": "SUPPORT_ACCESS_NOT_APPROVABLE", "message": "Grant is expired or no longer pending"}
         )
-    if row.platform_user_id == admin.id:
+    if admin.id in {row.platform_user_id, row.requested_by}:
+        # Separation of duties: neither the administrator who asked for the access nor the one who would receive it
+        # approves it. A third platform administrator does.
         raise HTTPException(
-            409, detail={"code": "SUPPORT_ACCESS_SOD", "message": "Requester cannot approve their own support access"}
+            409,
+            detail={
+                "code": "SUPPORT_ACCESS_SOD",
+                "message": "The administrator who requested support access, or who would receive it, cannot approve it",
+            },
         )
     row.status = "APPROVED"
     row.approved_by = admin.id

@@ -186,6 +186,8 @@ class SupportAccessGrant(Base):
     scope: Mapped[dict] = mapped_column(JSONB, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PENDING")
+    # Who asked (md35): approval refuses the requester as well as the person who would receive the access.
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     starts_at = tz(False)
     expires_at = tz(False)

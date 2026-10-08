@@ -374,6 +374,9 @@ def _expire_support_grants(db: Session, tenant_id: uuid.UUID | None = None) -> i
     return len(rows)
 
 
+_PROVIDER_PATH_DEFAULTS = {"health_path": "health", "schema_path": "schema"}
+
+
 def _provider_get(row: ConnectorConfiguration, path_key: str):
     configuration = row.configuration or {}
     endpoint = configuration.get("endpoint")
@@ -381,10 +384,19 @@ def _provider_get(row: ConnectorConfiguration, path_key: str):
         return {"status": "NOT_CONFIGURED", "reason": "CONNECTOR_ENDPOINT_MISSING", "connector_id": str(row.id)}
     timeout = float(configuration.get("timeout_seconds", 5))
     try:
-        url = _safe_provider_url(endpoint, configuration.get(path_key, "health"), timeout=timeout)
+        # The same defaults the connector summary shows (health_path "health", schema_path "schema"): without this,
+        # schema discovery of a connector that never set schema_path quietly read the health page.
+        url = _safe_provider_url(
+            endpoint, configuration.get(path_key, _PROVIDER_PATH_DEFAULTS[path_key]), timeout=timeout
+        )
         token = _connector_credential(configuration, row)
     except ValueError as exc:
         return {"status": "INVALID_CONFIGURATION", "reason": str(exc), "connector_id": str(row.id)}
+    tenant_key = configuration.get("tenant_key")
+    if tenant_key:
+        # As record reads do (connector_sync.fetch_provider_records): the simulated systems serve one tenant's
+        # schema and health per key.
+        url += ("&" if "?" in url else "?") + f"tenant={tenant_key}"
     headers = {"Accept": "application/json"}
     if token:
         # Customer systems differ: some read a bearer token, the simulated ones read X-Provider-Token.

@@ -163,6 +163,7 @@ def problems(*, offline: bool = False) -> list[str]:
 
     found.extend(ai_problems())
     add(_ai_cost_problem())
+    add(_embedding_model_problem())
     if not offline:
         if _get("MDARIX_RLS_SYSTEM_TOKEN"):
             add(_database_token_problem())
@@ -305,6 +306,16 @@ def _ai_cost_problem() -> str | None:
     if cost <= 0:
         return "MDARIX_GENAI_COST_PER_1K_TOKENS must be above 0 when a model provider is configured (admins see cost)"
     return None
+
+
+def _embedding_model_problem() -> str | None:
+    """Evidence search embeds text with a model shipped in the image; a server never downloads weights. The pinned
+    model must be present and unchanged (retrieval/embedding_provider.py)."""
+    if (_get("MDARIX_EMBEDDING_PROVIDER") or "local").lower() == "deterministic":
+        return None
+    from retrieval.embedding_provider import local_model_problem
+
+    return local_model_problem()
 
 
 def _legal_documents_problem() -> str | None:

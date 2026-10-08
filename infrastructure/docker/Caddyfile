@@ -73,13 +73,11 @@
 		output stdout
 		format filter {
 			wrap json
-			# Activation, invitation and password-reset links carry a single-use token in the query string. It must
-			# not land in the access log, where anyone reading logs could use an unexpired link: the query parameter
-			# is removed, and so is the Referer header (the pages a link opens send it with the token).
-			# Caddy already redacts cookies and Authorization headers.
-			request>uri query {
-				delete token
-			}
+			# The query string never lands in the access log. Activation, invitation and password-reset links carry a
+			# single-use token in it (anyone reading logs could use an unexpired link), and searches carry what people
+			# looked for in their records. The Referer header goes too (the pages a link opens send it with the
+			# token). Caddy already redacts cookies and Authorization headers.
+			request>uri regexp "\?.*$" ""
 			request>headers>Referer delete
 		}
 	}

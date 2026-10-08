@@ -58,9 +58,11 @@ def plane_session(plane):
     control database bound to that tenant, as the API does (data_plane.get_data_plane_db)."""
     if plane.connection_secret_ref == SHARED_CONTROL_DATA_PLANE:
         db = SessionLocal()
-        bind_tenant(db, plane.tenant_id)
     else:
         db = session_factory(plane.database_ref, plane.connection_secret_ref)()
+    # A dedicated database holds one tenant, but its row-level security is forced like the shared one's (md05, md34):
+    # the session is bound to the tenant either way, or every statement sees nothing.
+    bind_tenant(db, plane.tenant_id)
     try:
         yield db
     finally:
