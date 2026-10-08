@@ -1,7 +1,7 @@
 """The curated AcmeCare demo story: four devices, five investigations, realistic synthetic evidence.
 
 FlowSure 300 and its case ACD-INV-401 carry the golden path (signal, triage, scope, evidence review, intelligence,
-reviews, Decision Brief, signed decision, follow-up and late evidence), written by backend/app/demo_golden_path.py.
+reviews, Decision Brief, signed decision, follow-up and late evidence), written by backend/app/demo_golden_path/.
 
 Everything here is invented for demonstrations (no real company, device, patient or person). Dates are days before the
 day the story is loaded, so the workspace always looks current. Each open investigation carries real tension for the
@@ -78,7 +78,7 @@ PRODUCTS: list[ProductSpec] = [
         ],
         "lots": [("ACD-BZ-L1901", 680), ("ACD-BZ-L2101", 520), ("ACD-BZ-L2301", 300), ("ACD-BZ-L2401", 180)],
     },
-    # The golden path (backend/app/demo_golden_path.py): a case taken from signal to signed decision.
+    # The golden path (backend/app/demo_golden_path/): a case taken from signal to signed decision.
     {
         "id": "ACD-FLOWSURE-300",
         "name": "FlowSure 300 Ambulatory Infusion Pump",
@@ -215,7 +215,7 @@ INVESTIGATIONS = [
     ("ACD-INV-201", _PV, "Are PulseView 12 SpO2 signal dropouts linked to the new cable supplier?", "open", 30, None),
     ("ACD-INV-301", _BZ, "Do Breeza 50 battery runtime complaints point to a cell supplier problem?", "open", 25, None),
     ("ACD-INV-302", _BZ, "Was the quieter alarm report caused by the SP-2 speaker change?", "closed", 60, 20),
-    # The golden path: opened from signal triage, decided and signed (backend/app/demo_golden_path.py).
+    # The golden path: opened from signal triage, decided and signed (backend/app/demo_golden_path/).
     ("ACD-INV-401", _F3, "Why do FlowSure 300 Rev 2 pumps interrupt flow after cassette loading?", "open", 61, None),
 ]
 GOLDEN_CASE = "ACD-INV-401"
@@ -519,6 +519,6 @@ EVIDENCE = {
     ],
 }
 
-# Evidence of the golden case that reaches it later in the story (backend/app/demo_golden_path.py attaches it to
+# Evidence of the golden case that reaches it later in the story (backend/app/demo_golden_path/ attaches it to
 # the case at its moment): the answer to an evidence request, and evidence received after the decision was signed.
 GOLDEN_DEFERRED_EVIDENCE = frozenset({"ACD-EV-4016", "ACD-EV-4017"})

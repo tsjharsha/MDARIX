@@ -266,11 +266,11 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
       const link = !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined;
       setMessage(
         sent
-          ? { tone: "good", text: `Invitation emailed to ${result.email}. The link is valid for 72 hours.` }
+          ? { tone: "good", text: `Invitation emailed to ${result.email}. The link is valid for 48 hours.` }
           : link
             ? {
                 tone: "good",
-                text: `Email is not set up on this development server. Send ${result.email} this one-time link (valid 72 hours):`,
+                text: `Email is not set up on this development server. Send ${result.email} this one-time link (valid 48 hours):`,
                 link,
               }
             : {

@@ -1,0 +1,88 @@
+# Reviewed exceptions for the image scans (ci.yml "Production image scan", release.yml). Each HIGH or CRITICAL finding
+# listed here has no fix in the base image's distribution yet and was reviewed as not reachable in MDARIX's containers.
+# Every other finding, fixed or not, fails the scan.
+#
+# Review facts the statements rely on (docker-compose.prod.yml, Dockerfile.api): the API, worker, scheduler and migrate
+# containers run as the non-root user "mdarix" on a read-only root filesystem, with no-new-privileges and every Linux
+# capability dropped, so a setuid program cannot raise privileges; nobody logs in to them; MDARIX stores its data in
+# PostgreSQL and never opens a SQLite file; its only subprocess is an operator-configured malware scanner command.
+#
+# An entry stops applying on its expired_at date: the scan then fails until the finding is reviewed again (renew the
+# date with a fresh statement, or remove the entry once the base image ships a fix). Reviewed 2026-10-08 against
+# python:3.13-slim-bookworm (Debian 12.15).
+
+vulnerabilities:
+  - id: CVE-2023-45853
+    statement: >-
+      zlib MiniZip (zipOpenNewFileInZip4_64). MiniZip is not part of the zlib library Python links; MDARIX never builds
+      zip files with MiniZip (exports use Python's zipfile). Debian: will not fix.
+    expired_at: 2027-01-06
+  - id: CVE-2025-7458
+    statement: >-
+      SQLite integer overflow needing an attacker who can run arbitrary SQL in SQLite. MDARIX uses PostgreSQL and runs
+      no SQLite statements from user input.
+    expired_at: 2027-01-06
+  - id: CVE-2026-11822
+    statement: >-
+      SQLite FTS5 memory corruption from a crafted database file. MDARIX never opens SQLite databases, uploaded or
+      otherwise. Debian: fix deferred.
+    expired_at: 2027-01-06
+  - id: CVE-2026-11824
+    statement: >-
+      SQLite FTS5 heap overflow from a crafted database file. MDARIX never opens SQLite databases, uploaded or
+      otherwise. Debian: fix deferred.
+    expired_at: 2027-01-06
+  - id: CVE-2025-69720
+    statement: >-
+      Stack overflow in the ncurses infocmp command-line tool. The tool is never run in MDARIX's containers.
+    expired_at: 2027-01-06
+  - id: CVE-2026-16742
+    statement: >-
+      systemd-homed local privilege escalation. The containers run no systemd and no homed-managed users; only the
+      client libraries are installed. Debian: fix deferred.
+    expired_at: 2027-01-06
+  - id: CVE-2026-41992
+    statement: >-
+      GNU gzip program LZH decompression. MDARIX never runs the gzip program (Python's gzip module uses zlib), and
+      decompresses nothing users upload. Debian: fix deferred.
+    expired_at: 2027-01-06
+  - id: CVE-2026-53613
+    statement: >-
+      util-linux mount(8) TOCTOU for user fstab entries, a local privilege escalation through setuid mount. No local
+      users, no user fstab entries, and no-new-privileges stops setuid escalation.
+    expired_at: 2027-01-06
+  - id: CVE-2026-76642
+    statement: >-
+      util-linux mount post-hooks after a failed helper, local privilege escalation through setuid mount. No local
+      users, and no-new-privileges stops setuid escalation.
+    expired_at: 2027-01-06
+  - id: CVE-2026-78408
+    statement: >-
+      util-linux nsenter --join-cgroup authority leak. nsenter is never run in MDARIX's containers, which have every
+      capability dropped.
+    expired_at: 2027-01-06
+  - id: CVE-2026-78409
+    statement: >-
+      util-linux X-mount.subdir symlink escape (Linux 6.15+ mounts). MDARIX's containers mount nothing; no-new-privileges
+      stops setuid mount.
+    expired_at: 2027-01-06
+  - id: CVE-2026-78410
+    statement: >-
+      util-linux restricted bind mount source redirection through setuid mount. No local users and no fstab entries;
+      no-new-privileges stops setuid escalation.
+    expired_at: 2027-01-06
+  - id: CVE-2026-54369
+    statement: >-
+      libacl symlink traversal in pathname-based ACL functions used by a privileged process. MDARIX sets no ACLs and runs
+      no privileged process that does. Debian: fix deferred.
+    expired_at: 2027-01-06
+  - id: CVE-2026-84782
+    statement: >-
+      OpenSSL DTLS handshake retransmission. MDARIX uses TLS over TCP only (PostgreSQL, SMTP, HTTPS to providers), never
+      DTLS.
+    expired_at: 2027-01-06
+  - id: CVE-2026-9538
+    statement: >-
+      Perl Archive::Tar memory exhaustion from a crafted tar header. MDARIX runs no Perl and reads no tar files. Debian:
+      fix deferred.
+    expired_at: 2027-01-06

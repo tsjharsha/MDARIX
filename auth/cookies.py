@@ -55,9 +55,11 @@ def set_session_cookie(response: Response, token: str, max_age: int = SESSION_WI
         path="/",
         secure=secure_cookies(),
         httponly=True,
-        samesite="lax",
+        # Strict: the browser sends the session only on requests MDARIX's own pages make (every API call); a link from
+        # an email or another site opens the app without it, and the app's first call carries it.
+        samesite="strict",
     )
 
 
 def clear_session_cookie(response: Response) -> None:
-    response.delete_cookie(session_cookie_name(), path="/", secure=secure_cookies(), httponly=True, samesite="lax")
+    response.delete_cookie(session_cookie_name(), path="/", secure=secure_cookies(), httponly=True, samesite="strict")

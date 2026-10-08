@@ -452,7 +452,9 @@ export type Confirmation = {
   password?: boolean;
   /** A statement the administrator must tick before the change is allowed (sent to the server as acknowledged). */
   acknowledge?: string;
-  run: (reason: string, password: string, acknowledged: boolean) => Promise<unknown>;
+  /** Ask for the current code from the administrator's authenticator app (the server decides whether it is needed). */
+  mfaCode?: boolean;
+  run: (reason: string, password: string, acknowledged: boolean, mfaCode: string) => Promise<unknown>;
   done: string;
 };
 
@@ -471,19 +473,21 @@ export function ConfirmDialog({
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [code, setCode] = useState("");
   useEffect(() => {
     setBusy(false);
     setError("");
     setReason("");
     setPassword("");
     setAcknowledged(false);
+    setCode("");
   }, [request]);
   if (!request) return null;
   const confirm = async () => {
     setBusy(true);
     setError("");
     try {
-      await request.run(reason.trim(), password, acknowledged);
+      await request.run(reason.trim(), password, acknowledged, code.trim());
       onDone(request.done);
     } catch (reason) {
       setError(errorText(reason, "The change was not applied."));
@@ -520,6 +524,20 @@ export function ConfirmDialog({
             />
           </label>
         )}
+        {request.mfaCode && (
+          <label className="ca-field">
+            Code from your authenticator app
+            <input
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6 digits"
+            />
+          </label>
+        )}
         {request.acknowledge && (
           <label className="ca-check ca-acknowledge">
             <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
@@ -543,6 +561,7 @@ export function ConfirmDialog({
               busy ||
               (!!request.reason && reason.trim().length < request.reason.min) ||
               (!!request.password && !password) ||
+              (!!request.mfaCode && code.length > 0 && code.length < 6) ||
               (!!request.acknowledge && !acknowledged)
             }
           >

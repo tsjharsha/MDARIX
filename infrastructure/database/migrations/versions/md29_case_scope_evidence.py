@@ -19,6 +19,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from infrastructure.database.migrations.helpers import forced_tables as _forced
+from infrastructure.database.migrations.helpers import quoted as _quoted
+from infrastructure.database.migrations.helpers import tenant_policy as _tenant_policy
+
 revision = "md29casescope"
 down_revision = "md28signals"
 branch_labels = None
@@ -31,37 +35,6 @@ RELATIONSHIPS = ("SUPPORTING", "CONTRADICTING", "CONTEXTUAL", "UNRESOLVED", "UNR
 NEW_TABLES = ("investigation_scope_versions", "evidence_review_events")
 # Tables the backfill reads or writes; FORCE row-level security is lifted on them for the backfill only.
 BACKFILL_TABLES = ("investigations", "investigation_complaints", "complaints")
-
-_TENANT = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-_SYSTEM = "(SELECT public.mdarix_system_scope())"
-_GRANT = (
-    "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mdarix_runtime') THEN "
-    "GRANT SELECT, INSERT, UPDATE, DELETE ON public.{table} TO mdarix_runtime; END IF; END $$;"
-)
-
-
-def _quoted(values) -> str:
-    return ", ".join(f"'{value}'" for value in values)
-
-
-def _tenant_policy(table: str, system_scope: bool = True) -> None:
-    match = f"tenant_id = {_TENANT}"
-    allowed = f"{match} OR {_SYSTEM}" if system_scope else match
-    op.execute(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
-    op.execute(f"CREATE POLICY mdarix_tenant_isolation ON public.{table} USING ({allowed}) WITH CHECK ({allowed})")
-    op.execute(_GRANT.format(table=table))
-
-
-def _forced(connection, tables) -> list[str]:
-    return [
-        table
-        for table in tables
-        if connection.execute(
-            sa.text("SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass(:name)"),
-            {"name": f"public.{table}"},
-        ).scalar()
-    ]
 
 
 def apply_case_scope_changes(system_scope: bool = True) -> None:

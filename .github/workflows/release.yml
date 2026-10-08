@@ -1,8 +1,8 @@
 name: Release
 # A release is a git tag vX.Y.Z matching the VERSION file. This builds the three production images (api, web, backup),
-# scans each with Trivy (a fixable HIGH or CRITICAL finding stops the release before anything is pushed), pushes them
-# to GitHub Container Registry as ghcr.io/<owner>/<repo>/{api,web,backup}:<tag> and publishes a GitHub release whose
-# notes record each image's digest. Servers pull exactly these images (docs/runbooks/DEPLOYMENT.md); rolling back
+# scans each with Trivy (a HIGH or CRITICAL finding not reviewed in .trivyignore.yaml stops the release before anything
+# is pushed), pushes them to GitHub Container Registry as ghcr.io/<owner>/<repo>/{api,web,backup}:<tag> and publishes a
+# GitHub release whose notes record each image's digest. Servers pull exactly these images (docs/runbooks/DEPLOYMENT.md); rolling back
 # means running the previous tag.
 on:
   push:
@@ -14,12 +14,12 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write   # the GitHub release
       packages: write   # the images
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: The tag matches VERSION
         run: |
           test "${GITHUB_REF_NAME}" = "v$(tr -d '[:space:]' < VERSION)" \
@@ -36,13 +36,15 @@ jobs:
           docker build -f Dockerfile.api -t "$REPOSITORY/api:$GITHUB_REF_NAME" .
           docker build -f Dockerfile.web -t "$REPOSITORY/web:$GITHUB_REF_NAME" .
           docker build -f infrastructure/docker/backup/Dockerfile -t "$REPOSITORY/backup:$GITHUB_REF_NAME" .
-      - name: Scan the images (fixable high and critical findings stop the release)
+      - name: Scan the images (high and critical findings stop the release unless reviewed in .trivyignore.yaml)
         env:
           REPOSITORY: ${{ steps.names.outputs.repository }}
         run: |
           for image in api web backup; do
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
-              --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$REPOSITORY/$image:$GITHUB_REF_NAME"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivyignore.yaml:/review/.trivyignore.yaml:ro" aquasec/trivy:0.57.0 image \
+              --exit-code 1 --severity CRITICAL,HIGH --ignorefile /review/.trivyignore.yaml --no-progress \
+              "$REPOSITORY/$image:$GITHUB_REF_NAME"
           done
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:

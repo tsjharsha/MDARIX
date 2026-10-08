@@ -53,6 +53,11 @@ describe("delete all data: export or waiver", () => {
     expect(purgeRequest("End of pilot", "pw", "ACME", null)).not.toHaveProperty("export_waiver_reason");
   });
 
+  it("sends the authenticator code only when one was typed", () => {
+    expect(purgeRequest("End of pilot", "pw", "ACME", null, "123456")).toMatchObject({ mfa_code: "123456" });
+    expect(purgeRequest("End of pilot", "pw", "ACME", null)).not.toHaveProperty("mfa_code");
+  });
+
   it("is honest when files are still being removed", () => {
     const partial = purgeOutcome("Acme", { status: "PURGING", incomplete: { files: "TimeoutError" } });
     expect(partial.tone).toBe("warning");

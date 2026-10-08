@@ -283,7 +283,7 @@ def test_a_refused_password_leaves_the_reset_link_usable_and_success_ends_every_
     assert again.status_code == 400
 
 
-def test_invitations_last_72_hours_and_a_new_one_replaces_the_old():
+def test_invitations_last_48_hours_and_a_new_one_replaces_the_old():
     user = _user()
     db = SessionLocal()
     try:
@@ -298,7 +298,7 @@ def test_invitations_last_72_hours_and_a_new_one_replaces_the_old():
             ),
             {"h": hashlib.sha256(second.encode()).hexdigest()},
         ).scalar()
-        assert round(float(hours)) == 72
+        assert round(float(hours)) == 48
         assert consume(db, second, "activation") == str(user.id)
     finally:
         db.close()
@@ -401,6 +401,8 @@ def test_the_production_session_cookie_is_host_bound_and_secure(monkeypatch):
     header = response.headers["set-cookie"]
     assert header.startswith("__Host-mdarix_session=token-value")
     assert "Secure" in header and "HttpOnly" in header and "Path=/" in header and "Domain" not in header
+    # Strict: only requests MDARIX's own pages make carry the session (no cross-site request ever does).
+    assert "SameSite=strict" in header or "SameSite=Strict" in header
 
 
 # ------------------------------------------------------------------------------------------- Configuration

@@ -42,9 +42,10 @@ function DataExports() {
                 body: "Every record, the audit trail and every file your organization stored are collected into one zip file. Passwords and secrets are never included. It is ready in a few minutes and can be downloaded for 7 days.",
                 confirmLabel: "Prepare export",
                 reason: { label: "Why is the export needed?", min: 10 },
+                mfaCode: true,
                 done: "The export is being prepared. Refresh in a few minutes.",
-                run: async (reason) => {
-                  await send("/api/v1/admin/exports", "POST", { reason });
+                run: async (reason, _password, _acknowledged, mfaCode) => {
+                  await send("/api/v1/admin/exports", "POST", { reason, ...(mfaCode ? { mfa_code: mfaCode } : {}) });
                   exports.reload();
                 },
               })

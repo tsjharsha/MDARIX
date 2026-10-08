@@ -383,7 +383,7 @@ def issue_activation_link(user_id: uuid.UUID, request: Request, response: Respon
     """A fresh single-use activation link for a person who has not activated their account yet, for MDARIX support
     to pass on when the invitation email did not arrive (or was deleted).
 
-    The link is the same kind an invitation emails (72 hours, single use) and replaces any earlier unused one, so
+    The link is the same kind an invitation emails (48 hours, single use) and replaces any earlier unused one, so
     only the link handed over works. Whoever holds it sets the account's password, so it is issued only to a
     platform administrator whose own session passed multi-factor authentication, and only for an account that is
     still waiting to be activated: an active account recovers through a password reset, which reaches its owner's

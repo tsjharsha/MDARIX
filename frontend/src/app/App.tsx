@@ -340,7 +340,6 @@ export function PrivateApplication() {
             <SimplifiedPlatformAdminScreen
               key={activeView}
               securityContext={securityContext}
-              onNavigate={changeView}
               initialSection={CUSTOMER_CONSOLE_VIEWS[activeView] ?? "Overview"}
             />
           )}

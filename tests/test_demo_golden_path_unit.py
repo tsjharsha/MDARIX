@@ -1,5 +1,5 @@
 """The demo workspace's golden path without a database: its pure helpers, and that the story it writes passes the same
-rules the endpoints apply (backend/app/demo_golden_path.py, backend/app/demo_story.py)."""
+rules the endpoints apply (backend/app/demo_golden_path/, backend/app/demo_story.py)."""
 
 from datetime import datetime, timedelta, timezone
 

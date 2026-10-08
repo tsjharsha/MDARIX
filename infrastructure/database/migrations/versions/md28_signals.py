@@ -13,6 +13,10 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from infrastructure.database.migrations.helpers import quoted as _quoted
+from infrastructure.database.migrations.helpers import register_prefixes
+from infrastructure.database.migrations.helpers import tenant_policy as _tenant_policy
+
 from infrastructure.database.migrations.business_ids import COUNTER_TABLE, LATER_OBJECTS, WIDTH
 
 revision = "md28signals"
@@ -37,28 +41,7 @@ SIGNAL_PRIORITIES = ("LOW", "MEDIUM", "HIGH", "CRITICAL")
 SIGNAL_ORIGINS = ("MANUAL", "THRESHOLD_RULE", "AI_SUGGESTED", "IMPORT")
 SIGNALS = next(item for item in LATER_OBJECTS if item.table == "signals")
 
-_TENANT = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-_SYSTEM = "(SELECT public.mdarix_system_scope())"
-_GRANT = (
-    "DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mdarix_runtime') THEN "
-    "GRANT SELECT, INSERT, UPDATE, DELETE ON public.{table} TO mdarix_runtime; END IF; END $$;"
-)
 TABLES = ("signals", "signal_complaints", "signal_events", "investigation_signals", "signal_rules")
-
-
-def _quoted(values) -> str:
-    return ", ".join(f"'{value}'" for value in values)
-
-
-def _tenant_policy(table: str, system_scope: bool = True) -> None:
-    """Rows are visible to their organization and to system scope, as in md23 and md27 (organization only in a
-    legacy database, which has no system scope)."""
-    match = f"tenant_id = {_TENANT}"
-    allowed = f"{match} OR {_SYSTEM}" if system_scope else match
-    op.execute(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
-    op.execute(f"CREATE POLICY mdarix_tenant_isolation ON public.{table} USING ({allowed}) WITH CHECK ({allowed})")
-    op.execute(_GRANT.format(table=table))
 
 
 def _id() -> sa.Column:
@@ -267,23 +250,9 @@ def create_signal_tables(system_scope: bool = True) -> None:
     _tenant_policy("signal_rules", system_scope)
 
 
-def _registry_present(connection) -> bool:
-    return bool(connection.execute(sa.text("SELECT to_regclass('md_master.business_id_prefix') IS NOT NULL")).scalar())
-
-
 def upgrade():
     create_signal_tables()
-    connection = op.get_bind()
-    if _registry_present(connection):
-        sequence = f"seq_business_id_{SIGNALS.prefix.lower()}"
-        op.execute(f"CREATE SEQUENCE IF NOT EXISTS md_master.{sequence}")
-        op.execute(
-            f"""
-            INSERT INTO md_master.business_id_prefix (prefix, entity_name, sequence_name, id_width, owning_schema)
-            VALUES ('{SIGNALS.prefix}', '{SIGNALS.entity}', '{sequence}', {WIDTH}, 'md_transaction')
-            ON CONFLICT (prefix) DO UPDATE SET id_width = {WIDTH}
-            """
-        )
+    register_prefixes([SIGNALS])
 
 
 def downgrade():

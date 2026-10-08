@@ -74,11 +74,20 @@ def import_template(entity: str, ctx: AuthenticatedRequestContext = Depends(get_
 
 
 def _import_and_audit(
-    db, data, ctx, tenant_id, entity: str, raw: bytes, policy: imports.ImportPolicy, date_format: str = "ISO"
+    db,
+    data,
+    ctx,
+    tenant_id,
+    entity: str,
+    raw: bytes,
+    policy: imports.ImportPolicy,
+    date_format: str = "ISO",
+    options: tuple[bool, bool] = (False, False),
 ) -> dict:
-    """All-or-nothing import, then its audit record (runs in the thread pool)."""
+    """The import (all or nothing, unless the uploader chose to set problem rows aside), then its audit record (runs
+    in the thread pool). ``options`` is (skip_problem_rows, mask_personal_data)."""
     try:
-        result = imports.import_file(data, tenant_id, entity, raw, policy, date_format)
+        result = imports.import_file(data, tenant_id, entity, raw, policy, date_format, *options)
         data.commit()
     except HTTPException:
         data.rollback()
@@ -95,7 +104,8 @@ def _import_and_audit(
             actor_ref=str(ctx.user_id),
             action="DATA_IMPORTED",
             entity_type="DataImport",
-            details={**result, "source": policy.source},
+            # Counts only: the rejects file holds the uploader's own rows, personal data included.
+            details={**{k: v for k, v in result.items() if k != "rejects_csv"}, "source": policy.source},
             created_at=datetime.now(timezone.utc),
         )
     )
@@ -111,15 +121,20 @@ async def check_import(
     entity: str,
     request: Request,
     date_format: str = Query(default="ISO", max_length=8),
+    on_problems: str = Query(default="refuse", max_length=8),
+    personal_data: str = Query(default="refuse", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     order = imports.date_format_or_422(date_format)
+    options = imports.import_options(on_problems, personal_data)
     policy = await run_in_threadpool(_policy, db, ctx)
     raw = await _body(request, policy)
     # Parsing and checking query the database: off the event loop, so other requests are not held up.
-    return await run_in_threadpool(imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy, order)
+    return await run_in_threadpool(
+        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy, order, *options
+    )
 
 
 @router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -128,15 +143,18 @@ async def run_import(
     request: Request,
     background: BackgroundTasks,
     date_format: str = Query(default="ISO", max_length=8),
+    on_problems: str = Query(default="refuse", max_length=8),
+    personal_data: str = Query(default="refuse", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     order = imports.date_format_or_422(date_format)
+    options = imports.import_options(on_problems, personal_data)
     policy = await run_in_threadpool(_policy, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request, policy)
-    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order)
+    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options)
     if result.get("rows"):
         # Semantic search over the imported records, after the response (their text is already searchable).
         background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)

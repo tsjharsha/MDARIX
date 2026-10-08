@@ -10,7 +10,7 @@
   itself is audited. The golden evaluation tenant is never touched.
 - status: what the workspace holds, who can sign in (name, address and role) and the golden path by business id.
 
-Setup and reset also write the golden path (backend/app/demo_golden_path.py): case ACD-INV-401 taken from its signal
+Setup and reset also write the golden path (backend/app/demo_golden_path/): case ACD-INV-401 taken from its signal
 through triage, scope, evidence, intelligence, reviews and the Decision Brief to a signed decision with its follow-up
 and late evidence, so every workflow screen has a worked example; ACD-INV-101, -201 and -301 stay mid-investigation
 for live demos, and detection leaves new signals awaiting triage.
@@ -312,7 +312,7 @@ def reset_demo(db: Session) -> dict:
 
 
 def _seed_golden_path(db: Session, tenant_id, now: datetime | None) -> dict:
-    """The golden path of the story (backend/app/demo_golden_path.py): case ACD-INV-401 from its signal to a signed
+    """The golden path of the story (backend/app/demo_golden_path/): case ACD-INV-401 from its signal to a signed
     decision, written once the team exists and before the other tasks and signals are derived from the story. In a
     session of its own bound to the demo tenant, in one transaction; idempotent. A failure is logged and reported,
     never failing the setup or the reset."""

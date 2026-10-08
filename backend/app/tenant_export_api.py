@@ -41,6 +41,56 @@ PERSON_AUDIT_LIMIT = 10000
 
 class ExportRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=1000)
+    # A current code from the administrator's authenticator app (confirm_with_authenticator).
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
+
+
+def confirm_with_authenticator(
+    db: Session, user: AuthUser, code: str | None, *, tenant_id, action: str, request: Request | None = None
+) -> None:
+    """Taking every record of an organization, or deleting them, needs a current authenticator code as well as the
+    signed-in session: a session left open on a shared screen, or stolen, is not enough for either.
+
+    An account with an authenticator must give a current code (recovery codes are not accepted; wrong codes count
+    towards the sign-in code lock). An account whose role must use MFA but has none set up is refused until it does.
+    Only where no MFA policy applies (local development) does an account without an authenticator go ahead. A refusal
+    is audited (``{action}_REFUSED_MFA``) and committed. The code is AUTHENTICATOR_CODE_REQUIRED, not MFA_REQUIRED,
+    so the browser shows it in the dialog instead of treating the whole session as unverified."""
+    from backend.app import mfa
+
+    if not mfa.is_enrolled(user):
+        if mfa._normalize(user.role) in mfa.required_roles():
+            raise HTTPException(
+                403,
+                detail={
+                    "code": "MFA_ENROLLMENT_REQUIRED",
+                    "message": "Set up an authenticator app (My Account > Security) before this operation",
+                },
+            )
+        return
+    mfa.ensure_not_locked(db, user)
+    if not code or not mfa.check_code(user, code, allow_recovery=False):
+        mfa.record_failure(db, user)
+        db.add(
+            make_audit_event(
+                tenant_id=tenant_id,
+                actor_ref=str(user.id),
+                action=f"{action}_REFUSED_MFA",
+                entity_type="Tenant",
+                entity_id=tenant_id,
+                request=request,
+                details={"code_given": bool(code)},
+            )
+        )
+        db.commit()
+        raise HTTPException(
+            403,
+            detail={
+                "code": "AUTHENTICATOR_CODE_REQUIRED",
+                "message": "Enter the current code from your authenticator app",
+            },
+        )
+    mfa.record_success(db, user)
 
 
 def _queue(db: Session, tenant_id, actor_ref: str, reason: str) -> dict:
@@ -105,6 +155,9 @@ def _download(db: Session, tenant_id, export_id: uuid.UUID, actor_ref: str) -> S
 @router.post("/admin/exports", status_code=202)
 def request_own_export(payload: ExportRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
+    confirm_with_authenticator(
+        db, admin, payload.mfa_code, tenant_id=admin.tenant_id, action="TENANT_EXPORT", request=request
+    )
     return _queue(db, admin.tenant_id, str(admin.id), payload.reason)
 
 
@@ -270,7 +323,11 @@ def request_tenant_export(
     tenant_id: uuid.UUID, payload: ExportRequest, request: Request, db: Session = Depends(get_db)
 ):
     platform_admin = _require_platform_admin(request, db)
-    return _queue(db, _tenant(db, tenant_id), str(platform_admin.id), payload.reason)
+    tenant_id = _tenant(db, tenant_id)
+    confirm_with_authenticator(
+        db, platform_admin, payload.mfa_code, tenant_id=tenant_id, action="TENANT_EXPORT", request=request
+    )
+    return _queue(db, tenant_id, str(platform_admin.id), payload.reason)
 
 
 @router.get("/platform-admin/tenants/{tenant_id}/exports")
@@ -288,6 +345,8 @@ def download_tenant_export(tenant_id: uuid.UUID, export_id: uuid.UUID, request: 
 class PurgeRequest(BaseModel):
     reason: str = Field(min_length=10, max_length=1000)
     password: str = Field(min_length=1, max_length=128)
+    # A current code from the administrator's authenticator app, after the password (confirm_with_authenticator).
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
     # The organization's key typed back, so the wrong organization is never deleted by a slip.
     confirm_tenant_key: str = Field(min_length=1, max_length=80)
     # A paying customer's data is handed back before it is deleted: a READY export newer than the suspension is
@@ -344,7 +403,8 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
     """Delete everything an organization stored and archive it (end of a pilot, or an erasure request).
 
     Irreversible. The organization must be suspended or terminated first and not under a legal hold; the
-    administrator re-enters their password, types the organization's key and gives the reason
+    administrator re-enters their password and a current authenticator code, types the organization's key and gives
+    the reason
     (docs/runbooks/DATA_REQUESTS.md). The data is exported first unless a waiver reason is recorded. The database
     rows are deleted all-or-nothing; if the stored files or a dedicated database cannot then be removed, the
     organization stays PURGING and the response says what remains."""
@@ -397,6 +457,7 @@ def purge_tenant_data(tenant_id: uuid.UUID, payload: PurgeRequest, request: Requ
         raise HTTPException(
             403, detail={"code": "INVALID_REAUTHENTICATION", "message": "Your current password is required"}
         )
+    confirm_with_authenticator(db, actor, payload.mfa_code, tenant_id=tenant.id, action="TENANT_PURGE", request=request)
     busy = (
         db.query(TenantExport)
         .filter(TenantExport.tenant_id == tenant_id, TenantExport.status.in_(["QUEUED", "RUNNING"]))

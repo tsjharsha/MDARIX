@@ -7,7 +7,7 @@
 
 Checks: health (a readiness or status answer of 503 fails: the server is up but not fit for traffic); API documentation
 is off; security headers (HSTS, CSP, frame denial); a sign-in from another site is refused (CSRF); an invited platform
-administrator activates, signs in, gets a __Host- session cookie that is Secure, HttpOnly and SameSite, and must set up
+administrator activates, signs in, gets a __Host- session cookie that is Secure, HttpOnly and SameSite=Strict, and must set up
 MFA before anything else; a weak or breached password is refused. With ``--front-door`` the base is Caddy
 (docker-compose.prod.yml): readiness detail must then be hidden (404) and API responses must not be cacheable. Exits 1
 listing every failed check.
@@ -124,8 +124,8 @@ def main(argv: list[str] | None = None) -> int:
     check("the session cookie is __Host- prefixed", cookie.startswith("__Host-mdarix_session="), cookie[:60])
     lowered = cookie.lower()
     check(
-        "the session cookie is Secure, HttpOnly and SameSite",
-        "secure" in lowered and "httponly" in lowered and "samesite" in lowered,
+        "the session cookie is Secure, HttpOnly and SameSite=Strict",
+        "secure" in lowered and "httponly" in lowered and "samesite=strict" in lowered,
         cookie,
     )
     session = cookie.split(";", 1)[0]

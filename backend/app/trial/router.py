@@ -172,10 +172,20 @@ async def _body(request: Request) -> bytes:
     return await imports.read_upload(request, TRIAL_FILE_LIMIT_BYTES, "Files can be up to 2 MB during the free trial")
 
 
-def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, date_format: str = "ISO") -> dict:
-    """All-or-nothing trial import with its audit record (runs in the thread pool)."""
+def _trial_import_and_audit(
+    db,
+    data,
+    ctx,
+    tenant_id,
+    entity: str,
+    raw: bytes,
+    date_format: str = "ISO",
+    options: tuple[bool, bool] = (False, False),
+) -> dict:
+    """The trial import (all or nothing, unless problem rows are set aside) with its audit record (runs in the thread
+    pool). ``options`` is (skip_problem_rows, mask_personal_data)."""
     try:
-        result = imports.import_file(data, tenant_id, entity, raw, imports.TRIAL_POLICY, date_format)
+        result = imports.import_file(data, tenant_id, entity, raw, imports.TRIAL_POLICY, date_format, *options)
         db.add(
             AuditEvent(
                 id=uuid.uuid4(),
@@ -183,7 +193,8 @@ def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, d
                 actor_ref=str(ctx.user_id),
                 action="TRIAL_DATA_IMPORTED",
                 entity_type="TrialImport",
-                details=result,
+                # Counts only: the rejects file holds the uploader's own rows, personal data included.
+                details={k: v for k, v in result.items() if k != "rejects_csv"},
                 created_at=datetime.now(timezone.utc),
             )
         )
@@ -211,15 +222,18 @@ async def check_trial_import(
     entity: str,
     request: Request,
     date_format: str = Query(default="ISO", max_length=8),
+    on_problems: str = Query(default="refuse", max_length=8),
+    personal_data: str = Query(default="refuse", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     order = imports.date_format_or_422(date_format)
+    options = imports.import_options(on_problems, personal_data)
     await run_in_threadpool(_require_trial, db, ctx)
     raw = await _body(request)
     return await run_in_threadpool(
-        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, imports.TRIAL_POLICY, order
+        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, imports.TRIAL_POLICY, order, *options
     )
 
 
@@ -229,15 +243,18 @@ async def run_trial_import(
     request: Request,
     background: BackgroundTasks,
     date_format: str = Query(default="ISO", max_length=8),
+    on_problems: str = Query(default="refuse", max_length=8),
+    personal_data: str = Query(default="refuse", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     order = imports.date_format_or_422(date_format)
+    options = imports.import_options(on_problems, personal_data)
     await run_in_threadpool(_require_trial, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request)
-    result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order)
+    result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order, options)
     if result.get("rows"):
         # Semantic search over the imported records, after the response (their text is already searchable).
         background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)

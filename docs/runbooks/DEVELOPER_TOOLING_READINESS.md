@@ -15,7 +15,7 @@ on its findings.
 | Python dependencies | pip-audit | In CI | `pip-audit -r requirements.txt` |
 | JavaScript dependencies | npm audit | In CI | `frontend` job, high and above |
 | Secret scanning | Gitleaks | In CI (`security` job) | `gitleaks/gitleaks-action` |
-| Container images | Trivy | In CI (`image-scan` job) | Production images, high and critical findings with a fix |
+| Container images | Trivy | In CI (`image-scan` job) and before each release | Production images: every high and critical finding, except reviewed ones in `.trivyignore.yaml` (each with its reason and an expiry) |
 | Static analysis | CodeQL | Pull requests, `main` and weekly | `.github/workflows/codeql.yml` (Python, TypeScript) |
 | Dependency updates | Dependabot | Weekly | `.github/dependabot.yml` (pip, npm, docker, github-actions) |
 | Email capture (local) | Mailpit | In `docker-compose.yml` | Web UI `http://localhost:8025`, SMTP port 1025 |

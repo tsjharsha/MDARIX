@@ -15,7 +15,8 @@ controller and handles the request directly.
 ## 1. Access or portability: "give me a copy of my data"
 
 * **A whole organization** (end of a pilot, or the customer asks for its data): Customer administrator, or Platform
-  Admin > Customers & Tenants > tenant > **Data** > **Prepare export**. The background worker writes one zip:
+  Admin > Customers & Tenants > tenant > **Data** > **Prepare export**, with the reason and a current code from
+  your authenticator app (a session alone cannot take everything). The background worker writes one zip:
   a JSON Lines file per table, a spreadsheet (CSV) bundle of investigations, complaints, CAPAs and the evidence index,
   every stored file, and `manifest.json` with row counts, a SHA-256 per entry and the audit trail's verified head.
   Passwords, secrets, tokens and encrypted keys are never included. Download it within 7 days (the scheduler then
@@ -68,8 +69,8 @@ What erasure leaves, and why (say so in the reply):
      `export_waiver_reason` why none is handed back (for example "customer declined a copy in writing, ticket 4711";
      until the screen has the field, send it with `POST /api/v1/platform-admin/tenants/{id}/purge`). The export, or
      the waiver, is named in the records that survive the deletion. Free trials need neither.
-  3. Platform Admin > tenant > **Data** > **Delete all data** (type the organization key, re-enter your password,
-     give the reason).
+  3. Platform Admin > tenant > **Data** > **Delete all data** (type the organization key, re-enter your password
+     and a current authenticator code, give the reason).
 
 Deleted: every table holding the organization's rows (discovered from the database), the whole audit trail and every
 stored file, in its dedicated database too if it has one. Kept: the organization row (archived), subscription and
