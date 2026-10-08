@@ -21,11 +21,32 @@ CHECK = "/api/v1/data/import/complaints/check"
 IMPORT = "/api/v1/data/import/complaints"
 
 
+def _remove_signals_on_imported_products():
+    """Three complaints on one product within 30 days rightly raise a signal (the default trend rule); it points at the
+    imported product, so it goes first, with what hangs off it, or the product cannot be removed."""
+    with engine.begin() as connection:
+        signal_ids = (
+            "SELECT s.id FROM signals s JOIN products p ON p.id = s.product_id AND p.tenant_id = s.tenant_id "
+            "WHERE p.source_system = 'CSV_IMPORT'"
+        )
+        for table in ("investigation_signals", "signal_events", "signal_complaints"):
+            connection.execute(text(f"DELETE FROM {table} WHERE signal_id IN ({signal_ids})"))
+        connection.execute(
+            text(f"UPDATE signals SET canonical_signal_id = NULL WHERE canonical_signal_id IN ({signal_ids})")
+        )
+        connection.execute(text(f"DELETE FROM signals WHERE id IN ({signal_ids})"))
+
+
+def _clean_imports():
+    _remove_signals_on_imported_products()
+    _cleanup()
+
+
 @pytest.fixture(autouse=True, scope="module")
 def _clean():
-    _cleanup()
+    _clean_imports()
     yield
-    _cleanup()
+    _clean_imports()
 
 
 @pytest.fixture(scope="module")
