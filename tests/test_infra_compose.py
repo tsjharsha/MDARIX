@@ -126,8 +126,9 @@ def test_caddy_keeps_readiness_internal_and_publishes_the_status():
     assert "handle /health/status {" in CADDYFILE
     assert 'header >Cache-Control "no-store"' in CADDYFILE
     assert 'Cross-Origin-Resource-Policy "same-origin"' in CADDYFILE
-    # Single-use tokens in links never reach the access log.
-    assert re.search(r"request>uri query \{\s*delete token\s*\}", CADDYFILE)
+    # Single-use tokens in links and search terms never reach the access log: the query string is dropped whole.
+    assert re.search(r'request>uri regexp "\\\?\.\*\$" ""', CADDYFILE)
+    assert "request>headers>Referer delete" in CADDYFILE
 
 
 def test_every_action_in_the_workflows_is_pinned_to_a_commit():
