@@ -586,11 +586,14 @@ jobs:
           docker build -f Dockerfile.api -t mdarix/api:ci .
           docker build -f Dockerfile.web -t mdarix/web:ci .
           docker build -f infrastructure/docker/backup/Dockerfile -t mdarix/backup:ci .
-      - name: Scan the images (high and critical findings that have a fix fail the job)
+      # Every high or critical finding fails the job, fixable or not, except the reviewed ones in .trivyignore.yaml
+      # (each with its reason and an expiry date, after which it fails again until reviewed).
+      - name: Scan the images (high and critical findings fail the job unless reviewed in .trivyignore.yaml)
         run: |
           for image in mdarix/api:ci mdarix/web:ci mdarix/backup:ci; do
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
-              --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$image"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivyignore.yaml:/review/.trivyignore.yaml:ro" aquasec/trivy:0.57.0 image \
+              --exit-code 1 --severity CRITICAL,HIGH --ignorefile /review/.trivyignore.yaml --no-progress "$image"
           done
 
   security:
