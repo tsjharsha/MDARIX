@@ -186,6 +186,8 @@ class SupportAccessGrant(Base):
     scope: Mapped[dict] = mapped_column(JSONB, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PENDING")
+    # Who asked (md35): approval refuses the requester as well as the person who would receive the access.
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     starts_at = tz(False)
     expires_at = tz(False)
@@ -196,6 +198,52 @@ class SupportAccessGrant(Base):
         UniqueConstraint("tenant_id", "id", name="uq_support_access_grant_tenant_id"),
         CheckConstraint("expires_at > starts_at", name="support_access_expiry_after_start"),
     )
+
+
+class Cell(Base):
+    """A customer's tenant cell as the platform knows it (ADR-014, md36): where it runs and what it last reported.
+    The platform never holds a credential for the cell's database; the cell calls in."""
+
+    __tablename__ = "cells"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    hosting_mode: Mapped[str] = mapped_column(String(40), nullable=False)
+    public_endpoint: Mapped[str | None] = mapped_column(String(500))
+    enrollment_token_hash: Mapped[str | None] = mapped_column(String(64))
+    enrolled_at = tz()
+    client_certificate_fingerprint: Mapped[str | None] = mapped_column(String(128))
+    software_version: Mapped[str | None] = mapped_column(String(80))
+    schema_version: Mapped[str | None] = mapped_column(String(80))
+    last_heartbeat_at = tz()
+    health: Mapped[str | None] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PROVISIONING")
+    created_at = tz(False)
+    updated_at = tz(False)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_cells_tenant"),
+        UniqueConstraint("tenant_id", "id", name="uq_cells_tenant_id"),
+        CheckConstraint(
+            "hosting_mode in ('MDARIX_MANAGED','CUSTOMER_CLOUD','CUSTOMER_ON_PREM')", name="cell_hosting_mode_allowed"
+        ),
+        CheckConstraint("status in ('PROVISIONING','ACTIVE','SUSPENDED','RETIRED')", name="cell_status_allowed"),
+    )
+
+
+class CellLicence(Base):
+    """A licence applied in a cell (backend/app/cell_licence.py): the signed document as received, so what the
+    organization runs under can always be shown and re-verified."""
+
+    __tablename__ = "cell_licences"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    key_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    issued_at = tz(False)
+    valid_until = tz()
+    applied_at = tz(False)
+    envelope: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_cell_licences_tenant_id"),)
 
 
 class SubscriptionVersion(Base):

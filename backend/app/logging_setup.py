@@ -79,10 +79,22 @@ def _json_output() -> bool:
 
 
 def _scrub_event(event, _hint):
+    """What leaves for the error reporter: the exception type, the stack frames (file, function, line) and the
+    request method and path. Everything that can quote a customer's records stays here: exception messages (a
+    database error repeats the statement, an HTTP error the body), local variables, log breadcrumbs, extra data,
+    request bodies, headers, cookies and query strings."""
     request = event.get("request") or {}
     for key in ("cookies", "data", "headers", "query_string", "env"):
         request.pop(key, None)
-    event.pop("user", None)
+    for key in ("user", "breadcrumbs", "extra", "logentry", "message"):
+        event.pop(key, None)
+    for entry in (event.get("exception") or {}).get("values") or []:
+        entry["value"] = ""
+        for frame in (entry.get("stacktrace") or {}).get("frames") or []:
+            frame.pop("vars", None)
+            frame.pop("context_line", None)
+            frame.pop("pre_context", None)
+            frame.pop("post_context", None)
     return event
 
 
@@ -101,6 +113,9 @@ def _init_sentry() -> None:
         dsn=dsn,
         environment=environment(),
         send_default_pii=False,
+        # Local variables hold the records a request was working on; breadcrumbs are log lines before redaction.
+        include_local_variables=False,
+        max_breadcrumbs=0,
         traces_sample_rate=float(os.getenv("MDARIX_SENTRY_TRACES_SAMPLE_RATE", "0") or 0),
         before_send=_scrub_event,
     )

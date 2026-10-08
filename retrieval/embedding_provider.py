@@ -103,7 +103,16 @@ class LocalModelEmbeddingProvider:
                 cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
                 try:
                     cls._model = TextEmbedding(LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir, local_files_only=True)
-                except Exception:
+                except Exception as missing:
+                    from backend.app.runtime_env import is_production_like
+
+                    if is_production_like():
+                        # The image carries the model, pinned and checked (Dockerfile.api, config_check): a server
+                        # never fetches model weights from the internet, where they could be swapped.
+                        raise EmbeddingUnavailable(
+                            f"Local embedding model is not in {cache_dir}; a staging or production server never "
+                            "downloads it (the image carries it)"
+                        ) from missing
                     # First use on this machine: download once into the cache, then it works offline.
                     try:
                         cls._model = TextEmbedding(LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir)
@@ -128,6 +137,32 @@ class LocalModelEmbeddingProvider:
 
 
 EmbeddingProvider = DeterministicEmbeddingProvider | LocalModelEmbeddingProvider
+
+# SHA-256 of model_optimized.onnx at the pinned revision of Qdrant/bge-small-en-v1.5-onnx-Q (Dockerfile.api,
+# EMBEDDING_REVISION). Change both together, and re-index evidence when the weights change.
+LOCAL_EMBEDDING_MODEL_SHA256 = "51f1bd0addd6e859e42c2c8021a5e5461385bb676a649f4b269aa445449f2431"
+
+
+def local_model_problem(cache_dir: str | None = None) -> str | None:
+    """Why the local embedding model in the cache is not the pinned one (None when it is): missing, or its weights
+    differ from the checksum this build was tested with. Run by config_check on staging and production."""
+    import hashlib
+    from pathlib import Path
+
+    root = Path(cache_dir or os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or DEFAULT_CACHE_DIR)
+    candidates = sorted(root.glob("models--*/snapshots/*/model_optimized.onnx")) if root.is_dir() else []
+    if not candidates:
+        return (
+            f"The local embedding model is not in {root} (MDARIX_EMBEDDING_CACHE_DIR): the image carries it, and a "
+            "server never downloads it"
+        )
+    digest = hashlib.sha256()
+    with candidates[-1].open("rb") as weights:
+        for chunk in iter(lambda: weights.read(1 << 20), b""):
+            digest.update(chunk)
+    if digest.hexdigest() != LOCAL_EMBEDDING_MODEL_SHA256:
+        return f"The local embedding model in {root} is not the pinned one (checksum differs): rebuild the image"
+    return None
 
 
 def active_embedding_provider() -> EmbeddingProvider:

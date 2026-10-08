@@ -10,6 +10,9 @@ not list.
 | Variable | Required | Meaning |
 |---|---|---|
 | `MDARIX_ENV` | yes | `development`, `test`, `staging` or `production`. Unset or unknown means production, with every protection on. |
+| `MDARIX_DEPLOYMENT_ROLE` | no | Which part of MDARIX this deployment is (ADR-013, `backend/app/deployment_role.py`): `MULTI` (default; everything in one deployment, as today), `PLATFORM` (platform administration only: customers, tenants, licences, standards; the workspace answers 404 and only platform staff sign in) or `CELL` (one organization's workspace and administration in its own database; platform administration answers 404 and platform staff cannot sign in). The scheduler and the worker run only their role's jobs. |
+| `MDARIX_CELL_TENANT_ID`, `MDARIX_CELL_TENANT_KEY` | in a CELL | The UUID and key of the one organization a `CELL` serves. The start-up check refuses a cell whose database does not hold that organization under that key on the shared plane, and refuses any `MDARIX_DATA_PLANE_*` setting (a cell has one database). Not set for `MULTI` or `PLATFORM`. |
+| `MDARIX_PLATFORM_SIGNING_PUBLIC_KEY` | in a CELL | The platform's package-signing public key (Ed25519, URL-safe base64 of 32 bytes; `scripts/cell_platform.py keygen`). A cell applies only licences and packages signed with its private counterpart (`backend/app/cell_packages.py`); `scripts/cell_install.py` writes it into the cell's settings. |
 | `MDARIX_APP_URL` | yes | The https address people use (`https://app.example.com`). Links in emails and the trusted browser origin. |
 | `MDARIX_ALLOWED_ORIGINS` | no | Extra trusted browser origins, comma-separated. |
 | `MDARIX_DOMAIN`, `ACME_EMAIL` | yes (compose) | Caddy's domain and Let's Encrypt account email. |
@@ -130,7 +133,7 @@ not list.
 | Variable | Required | Meaning |
 |---|---|---|
 | `MDARIX_ALERT_WEBHOOK`, `MDARIX_ALERT_EMAIL`, `MDARIX_ALERT_TIMEOUT_SECONDS` | recommended | Where operational alerts go (dead letters, stopped worker, failing jobs). |
-| `MDARIX_SENTRY_DSN`, `MDARIX_SENTRY_TRACES_SAMPLE_RATE` | no | Error reporting (no request bodies, cookies or user details are sent). |
+| `MDARIX_SENTRY_DSN`, `MDARIX_SENTRY_TRACES_SAMPLE_RATE` | no | Error reporting. Only the shape of an error leaves: its type, the stack frames (file, function, line) and the request method and path. Exception messages, local variables, log breadcrumbs, request bodies, headers, cookies, query strings and user details are not sent (`backend/app/logging_setup.py`). |
 | `MDARIX_LOG_LEVEL`, `MDARIX_LOG_FORMAT` | no | `INFO`; `json` (default in production) or `text`. |
 | `MDARIX_OUTBOX_INTERVAL_SECONDS`, `MDARIX_OUTBOX_BATCH_SIZE`, `MDARIX_OUTBOX_MAX_ATTEMPTS` | no | Worker cycle: every 5 s, up to 50 events, 12 delivery attempts before an event is dead-lettered (OUTBOX_AND_SCHEDULER.md). |
 | `MDARIX_OUTBOX_BASE_DELAY_SECONDS` | no | Wait before the first retry of a failed event (30 s), doubling with each further attempt. |

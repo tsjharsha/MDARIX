@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
+from backend.app.deployment_role import served_tenants_clause
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +117,8 @@ class OutboxWorker:
             candidates = [
                 row[0]
                 for row in db.query(OutboxEvent.id)
-                .filter(*_due_filter(now))
+                # A cell delivers its own organization's events only (backend/app/deployment_role.py).
+                .filter(*_due_filter(now), served_tenants_clause(OutboxEvent.tenant_id))
                 .order_by(OutboxEvent.occurred_at)
                 .limit(limit)
                 .all()

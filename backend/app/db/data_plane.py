@@ -159,6 +159,9 @@ def session_factory(database_ref: str, secret_ref: str) -> sessionmaker[Session]
         pool_size=int(os.getenv("MDARIX_DATA_PLANE_POOL_SIZE", "3")),
         max_overflow=int(os.getenv("MDARIX_DATA_PLANE_MAX_OVERFLOW", "5")),
         connect_args=connect_args(),
+        # A failing statement is reported without its bound values: they are the customer's records, and the message
+        # travels to logs and error reports (the control engine in session.py does the same).
+        hide_parameters=True,
     )
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 

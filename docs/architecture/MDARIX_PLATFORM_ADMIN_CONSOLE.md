@@ -43,8 +43,9 @@ Audit trail.
 - **Reminder email templates:** the screen offers only the variables the server accepts: `customer_name`,
   `expiry_date`, `days_remaining` and `activation_link`. The previous screen sent other names, so every save
   failed.
-- **Support access:** Approve and Revoke work again. Each asks for a reason and refuses self-approval, as the
-  server already did.
+- **Support access:** Approve and Revoke work again. Each asks for a reason. The server refuses approval by the
+  administrator who requested the access and by the one who would receive it (md35 records the requester), so a
+  third platform administrator approves.
 
 ### Data & Configuration (25 tabs became 5)
 

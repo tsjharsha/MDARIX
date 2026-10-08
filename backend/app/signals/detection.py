@@ -278,6 +278,7 @@ def run_for_all_tenants(control_db: Session) -> dict:
     from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.models.foundation import Tenant
+    from backend.app.deployment_role import served_tenants_clause
 
     totals = {"tenants": 0, "created": 0, "updated": 0, "monitor_reopened": 0, "failed": []}
     tenant_ids = [
@@ -289,6 +290,8 @@ def run_for_all_tenants(control_db: Session) -> dict:
             TenantDataPlane.status == "ACTIVE",
             # A suspended customer's tenants are skipped too (their own status is left as it is).
             customer_allows_access_clause(),
+            # A cell works on its own organization only.
+            served_tenants_clause(Tenant.id),
         )
         .order_by(Tenant.id)
         .all()

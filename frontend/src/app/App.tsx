@@ -149,6 +149,7 @@ type SecurityContext = {
   personas?: Array<{ code: string; label: string }>;
   allowed_menu?: string[];
   environment?: string;
+  deployment_role?: string;
   memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
   current_tenant?: { tenant_id: string; tenant_name?: string };
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
@@ -175,7 +176,7 @@ export function PrivateApplication() {
           .trim()
           .toUpperCase();
         const current = viewFromPath(window.location.pathname);
-        const allowed = allowedViewsForRole(role);
+        const allowed = allowedViewsForRole(role, value.deployment_role);
         let target: AppView = current;
         if (isPlatformAdminRole(role) && !allowed?.includes(current)) target = "admin";
         else if (isCustomerAdminRole(role)) {
@@ -225,7 +226,7 @@ export function PrivateApplication() {
   const activeRole = securityContext?.active_role?.trim().toUpperCase();
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
-  const allowedViews = allowedViewsForRole(activeRole);
+  const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role);
 
   useEffect(() => {
     if (isPlatformAdmin && !allowedViews?.includes(activeView)) changeView("admin");
