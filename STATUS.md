@@ -49,8 +49,9 @@ Known limits:
   database, end-to-end alert test or penetration test yet. No release has been tagged.
 - The legal documents (privacy policy, terms, trial agreement) are drafts awaiting a lawyer; no DPA or subprocessor
   list is final.
-- The default personal-data check of CSV imports misses most names ("Dr. Alan Grant", "Patient Jane Doe"); a masking
-  option and a stricter check are proposed on the separate `mvp/import-options` branch.
+- The default personal-data check of CSV imports misses most names ("Dr. Alan Grant", "Patient Jane Doe"). An import
+  can now mask personal data (the masker every AI request uses) or set problem rows aside; making the default check
+  refuse whatever the masker would change is proposed, not done.
 - Four platform-only tables (onboarding requests, incidents, provisioning jobs and steps) and the session and
   data-plane routing tables have no row-level security, by reviewed exemption; three older features that look up
   accounts across organizations are blocked by row-level security and need their own fix.
