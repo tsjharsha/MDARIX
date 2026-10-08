@@ -1,11 +1,16 @@
 import { useWorkspace } from "./workspaceContext";
 import type { TemporalMode } from "../../app/types";
+import { displayId } from "../../app/displayId";
+import { caseStateLabel } from "./caseWorkflow";
 
 const MODES: Array<{ value: TemporalMode; label: string; hint: string }> = [
   { value: "current", label: "Current", hint: "Latest recorded state" },
   { value: "event", label: "As it happened", hint: "State at the event date" },
   { value: "known", label: "As known then", hint: "Only what was known on the date" },
 ];
+
+/** The time view's name as the context bar shows it ("As it happened"). */
+export const timeViewLabel = (mode: unknown) => MODES.find((item) => item.value === mode)?.label ?? MODES[0].label;
 
 /** One compact row that sets the product, version, case and point in time for every section below it. */
 export function ContextBar() {
@@ -55,7 +60,8 @@ export function ContextBar() {
           {!work.investigations.length && <option value="">No investigations</option>}
           {work.investigations.map((item) => (
             <option key={String(item.id)} value={String(item.id ?? "")}>
-              {item.investigation_identifier ?? "Investigation"} · {item.status ?? "unknown"}
+              {displayId(item, "investigation_identifier", "Investigation")} ·{" "}
+              {caseStateLabel(item) ?? item.status ?? "unknown"}
             </option>
           ))}
         </select>

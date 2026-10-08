@@ -79,7 +79,16 @@ def _brief_reply(context):
 class FullModel(TwoStepModel):
     """Writes analysis, hypotheses, challenges and the brief from what it was given."""
 
-    def complete(self, prompt, context=None, *, system=None, json_output=False, max_output_tokens=None):
+    def complete(
+        self,
+        prompt,
+        context=None,
+        *,
+        system=None,
+        json_output=False,
+        response_schema=None,
+        max_output_tokens=None,
+    ):
         if "sceptical reviewer" in (system or ""):
             reply = _challenges_reply(context)
         elif "one-page investigation brief" in (system or ""):

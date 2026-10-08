@@ -99,6 +99,7 @@ def test_system_scope_sees_every_tenant_and_never_leaks_to_the_next_session():
     fresh = RuntimeSessionLocal()
     try:
         assert fresh.query(func.count(Product.id)).scalar() == 0
-        assert fresh.query(func.count(Tenant.id)).scalar() > 0  # tenants is a platform table without RLS
+        # The organizations table is protected too (md34): an unscoped session sees no organization at all.
+        assert fresh.query(func.count(Tenant.id)).scalar() == 0
     finally:
         fresh.close()

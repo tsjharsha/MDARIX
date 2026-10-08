@@ -5,6 +5,8 @@ import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { signOut } from "../../shared/session";
 import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
+import { hideUuid, safeText } from "../../../app/displayId";
+import { roleLabel, rolesSummary } from "../../../app/roles";
 
 const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
@@ -13,10 +15,11 @@ export function AccountSection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<Tab>((TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Profile");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections" />
-      {active === "Profile" && <Profile />}
-      {active === "Security" && <Security />}
-      {active === "Access" && <Access />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections">
+        {active === "Profile" && <Profile />}
+        {active === "Security" && <Security />}
+        {active === "Access" && <Access />}
+      </Tabs>
     </>
   );
 }
@@ -27,19 +30,26 @@ function Profile() {
     <Panel eyebrow="My account" title={session?.display_name ?? "Your profile"}>
       <dl className="ca-facts">
         <div>
+          <dt>User ID</dt>
+          <dd>{hideUuid(session?.business_id)}</dd>
+        </div>
+        <div>
           <dt>Email</dt>
           <dd>{session?.email ?? "—"}</dd>
         </div>
         <div>
           <dt>Role</dt>
-          <dd>{session?.active_role ?? "—"}</dd>
+          <dd>{rolesSummary(session, "—")}</dd>
         </div>
         <div>
           <dt>Organization</dt>
-          <dd>{session?.current_tenant?.tenant_name ?? "—"}</dd>
+          <dd>
+            {session?.current_tenant?.tenant_name ?? "—"}
+            {safeText(session?.tenant_business_id) ? ` · ${session?.tenant_business_id}` : ""}
+          </dd>
         </div>
         <div>
-          <dt>Environment</dt>
+          <dt>Workspace type</dt>
           <dd>{titleCase(session?.environment ?? "—")}</dd>
         </div>
       </dl>
@@ -170,7 +180,6 @@ function Security() {
         <ul className="ca-check-list">
           <li>You are signed out after 30 minutes without activity.</li>
           <li>Every session ends after 60 minutes, even when active.</li>
-          <li>Your session cookie cannot be read by page scripts.</li>
           <li>If your administrator suspends your account, you are signed out everywhere immediately.</li>
         </ul>
         <div className="ca-action-row">
@@ -203,12 +212,12 @@ function Access() {
         : [];
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Access" title="What you can open">
+      <Panel eyebrow="Access" title="Sections you can open">
         <ul className="ca-boundary">
           {WORKSPACE_SECTIONS.filter(
             (section) => section !== "My Account" && !TRIAL_ONLY_SECTIONS.includes(section),
           ).map((section) => {
-            const allowed = sectionAllowed(section, session?.allowed_menu);
+            const allowed = sectionAllowed(section, session?.allowed_menu, session?.business_permissions);
             return (
               <li key={section} className={allowed ? "" : "ac-muted"}>
                 <CheckCircle2
@@ -222,15 +231,11 @@ function Access() {
           })}
         </ul>
       </Panel>
-      <Panel eyebrow="Access" title="Your role and personas" state={me.state} error={me.error}>
+      <Panel eyebrow="Access" title="Your role" source={me}>
         <dl className="ca-facts">
           <div>
             <dt>Active role</dt>
-            <dd>{me.data?.active_role ?? session?.active_role ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Policy version</dt>
-            <dd>{me.data?.role_version ?? "—"}</dd>
+            <dd>{roleLabel(me.data?.active_role ?? session?.active_role) || "—"}</dd>
           </div>
         </dl>
         <h3 className="ca-subhead">Personas</h3>
@@ -241,16 +246,18 @@ function Access() {
           {!(me.data?.personas ?? session?.personas ?? []).length && <li className="ac-muted">No personas assigned</li>}
         </ul>
         {actions.length > 0 && (
-          <>
-            <h3 className="ca-subhead">Allowed actions</h3>
+          <details className="uw-more">
+            <summary>What your role allows you to do ({actions.length})</summary>
             <ul className="ca-pill-list">
               {actions.slice(0, 40).map((action) => (
-                <li key={String(action)}>{titleCase(String(action))}</li>
+                <li key={String(action)}>{titleCase(String(action).replace(/\./g, " "))}</li>
               ))}
             </ul>
-          </>
+          </details>
         )}
-        <p className="ac-muted">Access is decided by the server on every request. Deny always wins.</p>
+        <p className="ac-muted">
+          Your access is checked each time you open or change a record. To change it, ask your administrator.
+        </p>
       </Panel>
     </div>
   );

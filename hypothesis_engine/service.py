@@ -222,7 +222,8 @@ class CompetingHypothesisService:
         model_written = hypothesis_set.provenance.get("author") == "LANGUAGE_MODEL"
         if model_written:
             # Model wording differs per run: retire earlier unreviewed AI hypotheses (and their open unknowns) so
-            # briefs and Ask show only the current set. Anything a person has reviewed is kept as it is.
+            # briefs and Ask show only the current set. Anything a person has reviewed or judged is kept as it is,
+            # and so is anything a person added (origin "human").
             current = {item.statement for item in hypothesis_set.hypotheses}
             stale = (
                 db.query(HypothesisRow)
@@ -231,6 +232,7 @@ class CompetingHypothesisService:
                     HypothesisRow.investigation_id == request.investigation_id,
                     HypothesisRow.origin == "ai",
                     HypothesisRow.reviewer_disposition.is_(None),
+                    HypothesisRow.human_status.is_(None),
                     HypothesisRow.status != SUPERSEDED,
                 )
                 .all()
@@ -243,6 +245,7 @@ class CompetingHypothesisService:
                     Unknown.tenant_id == request.tenant_id,
                     Unknown.hypothesis_id == old.id,
                     Unknown.status == "open",
+                    Unknown.origin != "human",
                 ).update({"status": SUPERSEDED, "updated_at": now}, synchronize_session=False)
         for item in hypothesis_set.hypotheses:
             row = (
@@ -293,6 +296,7 @@ class CompetingHypothesisService:
                             description=unknown_text,
                             evidence_needed=unknown_text,
                             status="open",
+                            origin="ai" if model_written else "system",
                             created_at=now,
                             updated_at=item.updated_at,
                         )

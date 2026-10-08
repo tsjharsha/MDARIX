@@ -1,0 +1,118 @@
+/* Regulatory copilot: where each section's text came from, and what still needs a person. */
+.rg-copilot {
+  display: grid;
+  gap: 16px;
+}
+.rg-outcome {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line, #d6dee4);
+  border-left-width: 4px;
+  border-radius: 8px;
+  background: var(--ac-surface, #fff);
+}
+.rg-outcome > div {
+  display: grid;
+  gap: 2px;
+}
+.rg-outcome.is-ai {
+  border-left-color: var(--ac-good, #0b7a3b);
+}
+.rg-outcome.is-rules {
+  border-left-color: var(--ac-warning, #b54708);
+}
+.rg-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.rg-origin {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+}
+.rg-origin.is-rules {
+  color: var(--ac-warning, #b54708);
+}
+.rg-review {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ac-warning, #b54708);
+}
+.rg-sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.rg-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line, #d6dee4);
+  border-radius: 8px;
+}
+.rg-section > header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px;
+  align-items: baseline;
+}
+.rg-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.rg-text {
+  display: grid;
+  gap: 4px;
+}
+.rg-text > small {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  color: var(--ac-muted, #5b6b78);
+  font-weight: 600;
+}
+.rg-text p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.rg-text.is-ai {
+  padding-left: 10px;
+  border-left: 3px solid var(--ac-line, #d6dee4);
+}
+.rg-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  align-items: center;
+  font-size: 13px;
+}
+.rg-findings,
+.rg-claims,
+.rg-limitations ul,
+.rg-history ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.rg-claims li {
+  margin-bottom: 6px;
+}
+.rg-history,
+.rg-limitations,
+.rg-sections-input {
+  margin-top: 12px;
+}
+.rg-sections-input summary,
+.rg-history summary {
+  cursor: pointer;
+  font-weight: 600;
+}

@@ -9,7 +9,7 @@ const PLATFORM_ADMIN_EMAIL = process.env.E2E_PLATFORM_ADMIN_EMAIL ?? "r1-user-01
 // A business user (non-admin) for the investigation workflows.
 const INVESTIGATOR_EMAIL = process.env.E2E_INVESTIGATOR_EMAIL ?? "r1-user-17@synthetic.invalid";
 // A Customer Administrator in a second tenant (Tenant B).
-const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "";
+const CUSTOMER_ADMIN_EMAIL = process.env.E2E_CUSTOMER_ADMIN_EMAIL ?? "r1-user-06@synthetic.invalid";
 
 async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
@@ -60,10 +60,10 @@ test.describe("MDARIX browser evidence", () => {
     if (await consent.isVisible().catch(() => false))
       await consent.getByRole("button", { name: /acknowledge/i }).click();
     for (const [route, name, expected] of [
-      ["/app/admin", "admin", /administrator control plane/i],
+      ["/app/admin", "admin", /platform administration/i],
       ["/app/admin/mapping-studio", "mapping-studio", /mapping studio/i],
       // Business routes are not part of the platform-admin role; the app returns the admin to the console.
-      ["/app/decision", "decision", /administrator control plane/i],
+      ["/app/decision", "decision", /platform administration/i],
     ] as const) {
       await page.goto(route);
       await expect(page.locator("body")).not.toContainText("Checking your session");
@@ -103,12 +103,11 @@ test.describe("MDARIX browser evidence", () => {
     await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/admin");
     const navigation = page.getByRole("navigation", { name: "Administrator navigation" });
-    // Customers & Tenants has its own five sections, each with a clear heading.
+    // Customers & Tenants has its own sections, each with a clear heading (accounts and onboarding requests are
+    // under Identity & Access).
     const customerSections: Record<string, string> = {
       Customers: "Customer directory",
-      "Customer administrators": "Customer administrators",
       Tenants: "Tenant directory",
-      Onboarding: "New customers, demo and trial requests",
       Feedback: "Trial feedback and website quotes",
     };
     await openAdminNavigation(page);
@@ -130,20 +129,16 @@ test.describe("MDARIX browser evidence", () => {
       },
       "Identity & Access": {
         "Platform users": "Platform users",
+        "Customer administrators": "Customer administrators",
+        "Customer users": "Customer users",
+        Onboarding: "Demo and trial requests",
         "Roles & permissions": "Roles",
         "Effective access": "Effective access",
-      },
-      Integrations: {
-        "Connector catalog": "Connector catalog",
-        "Runs & failures": "Integration runs",
-        Reconciliation: "Reconciliation results",
-        Credentials: "Connection credentials",
-        "API & schemas": "Records and fields",
       },
       "AI Control Center": {
         Overview: "Model in use",
         Evaluations: "How the AI performs on our test cases",
-        Executions: "AI runs",
+        "AI runs": "AI runs",
         "Agents & guardrails": "Agents & guardrails",
       },
       Security: {
@@ -152,15 +147,21 @@ test.describe("MDARIX browser evidence", () => {
         "Support access": "Support access",
         Retention: "Retention",
       },
-      "Data & Configuration": {
+      // Data & Integrations: the setup story in order (define, connect, map, release, run).
+      "Data & Integrations": {
         "Data model": "Data model",
-        Mappings: "Mappings",
-        Releases: "Releases",
         "Rules & reference data": "Rules & reference data",
+        "Connector catalog": "Connector catalog",
+        "Source schemas": "Records and fields",
+        Credentials: "Connection credentials",
+        Mappings: "Mappings",
         "Customer configuration": "Customer configuration",
+        Releases: "Releases",
+        "Runs & failures": "Integration runs",
+        Reconciliation: "Reconciliation results",
       },
       Operations: {
-        "System health": "Worker",
+        "System health": "Background worker",
         "Queues & jobs": "Waiting work by kind",
         "Email & notifications": "Email delivery",
         "Developer API": "Developer API",
@@ -193,7 +194,13 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.getByRole("heading", { name: "Customer directory", exact: true })).toBeVisible({
       timeout: 20_000,
     });
-    const customerLink = page.getByRole("table", { name: "Customers" }).getByRole("button").first();
+    // The first customer's own button (the header row holds the column sort buttons).
+    const customerLink = page
+      .getByRole("table", { name: "Customers" })
+      .locator("tbody tr")
+      .first()
+      .getByRole("button")
+      .first();
     if (await customerLink.count()) {
       await customerLink.click();
       const customerSections = page.getByRole("tablist", { name: "Customer sections" });
@@ -203,9 +210,11 @@ test.describe("MDARIX browser evidence", () => {
         await expect(page.locator(".ca-inline-error, .ac-panel [role='alert']")).toHaveCount(0);
       }
     }
-    await sections.getByRole("tab", { name: "Onboarding", exact: true }).click();
+    // A new customer is started from the customer directory.
+    const backToList = page.getByRole("button", { name: "All customers" });
+    if (await backToList.count()) await backToList.click();
     await page.getByRole("button", { name: /new customer/i }).click();
-    await expect(page.getByText(/Create Customer|Provision a customer tenant/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "New customer", exact: true })).toBeVisible();
   });
 
   test("Mapping Studio and investigation workflows expose specific controls", async ({ page }) => {
@@ -219,16 +228,28 @@ test.describe("MDARIX browser evidence", () => {
   });
 
   test("authenticated Customer Admin workflow and screenshot", async ({ page }, testInfo) => {
-    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
+    test.setTimeout(90_000);
     await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
     await page.goto("/app/customer-admin");
     await expect(page.locator("body")).not.toContainText("Checking your session");
     await expect(page.locator("body")).toContainText(/customer administration/i);
+    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+    const sidewaysOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(sidewaysOverflow).toBe(0);
+    const firstControl = page.locator("a:visible,button:visible,input:visible,select:visible,textarea:visible").first();
+    await expect(firstControl).toBeVisible();
+    await firstControl.focus();
+    await expect(firstControl).toBeFocused();
+    await injectAxe(page);
+    const axeResults = await page.evaluate(async () => await (window as any).axe.run(document));
+    writeFileSync(`artifacts/axe-${testInfo.project.name}-customer-admin.json`, JSON.stringify(axeResults, null, 2));
+    expect(axeResults.violations.filter((item: any) => item.impact === "critical")).toEqual([]);
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-customer-admin.png`, fullPage: true });
   });
 
   test("Tenant A and Tenant B browser sessions cannot cross-read customer admin data", async ({ browser }) => {
-    test.skip(!CUSTOMER_ADMIN_EMAIL, "Set E2E_CUSTOMER_ADMIN_EMAIL to a Tenant B Customer Administrator.");
     test.setTimeout(60_000);
     const tenantA = await browser.newPage();
     const tenantB = await browser.newPage();
@@ -342,8 +363,8 @@ test.describe("MDARIX browser evidence", () => {
       .getByRole("tab", { name: "Audit trail", exact: true })
       .click();
     // The platform audit trail, with export and the evidence package.
-    await expect(page.getByRole("link", { name: /export csv/i })).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByRole("link", { name: /download evidence package/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /export platform audit \(csv\)/i })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("link", { name: /platform evidence package/i })).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-audit.png`, fullPage: true });
 
     await page.goto("/app/decision");
@@ -357,5 +378,94 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page.locator("body")).toContainText(/MFA|authenticator|identity/i, { timeout: 20_000 });
     await expect(page.getByLabel("Six digit authentication code")).toBeVisible();
     await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-compliance-mfa.png`, fullPage: true });
+  });
+
+  test("an ended session sends the person to sign-in and back to the same page", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/signals");
+    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    await expect(navigation).toBeAttached({ timeout: 20_000 });
+    // The session ends on the server's side, as after a sign-out elsewhere or the idle timeout. Only dropping the
+    // browser's cookie is not enough: a session check still in flight re-issues it (GET /auth/session renews the
+    // cookie by design), which on a slower page let the old session carry on.
+    const signedOut = await page.evaluate(
+      async () => (await fetch("/api/v1/auth/signout", { method: "POST", credentials: "same-origin" })).status,
+    );
+    expect(signedOut).toBe(200);
+    // Any API call now answers 401, and the app goes to sign-in with the reason and the page to return to. A
+    // background check of the page may get there first; otherwise moving to another section makes the request (and
+    // the redirect may land while the click is under way).
+    if (!page.url().includes("/signin")) {
+      const toggle = page.getByRole("button", { name: "Open navigation" });
+      if (await toggle.isVisible().catch(() => false)) await toggle.click().catch(() => {});
+      await navigation
+        .getByRole("button", { name: /^Investigations/ })
+        .click({ timeout: 10_000 })
+        .catch(() => {});
+    }
+    await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Fsignals/, { timeout: 20_000 });
+    await expect(page.getByRole("status")).toContainText(/session has ended/i);
+    await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
+    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("button", { name: /sign in/i }).click();
+    await expect(page).toHaveURL(/\/app\/signals$/, { timeout: 20_000 });
+    await expect(page.getByRole("heading", { level: 1, name: "Signals" })).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("Help menu: Report a problem opens a form that reaches the MDARIX team", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, INVESTIGATOR_EMAIL, E2E_PASSWORD);
+    await page.goto("/app");
+    await page.getByRole("button", { name: "Open help menu" }).click();
+    await page.getByRole("button", { name: "Report a problem" }).click();
+    const dialog = page.getByRole("dialog", { name: "Report a problem" });
+    await expect(dialog).toBeVisible();
+    // Focus starts inside the form and Tab stays inside the dialog.
+    await expect(dialog.getByLabel(/what went wrong/i)).toBeFocused();
+    for (let index = 0; index < 6; index += 1) await page.keyboard.press("Tab");
+    expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
+    await dialog.getByLabel(/what went wrong/i).fill("Browser evidence: test report");
+    await dialog.getByLabel(/details/i).fill("Automated browser test of the problem report form. No action needed.");
+    const response = page.waitForResponse(
+      (item) => item.url().endsWith("/api/v1/support/problems") && item.request().method() === "POST",
+    );
+    await dialog.getByRole("button", { name: "Send report" }).click();
+    expect((await response).status()).toBe(201);
+    await expect(dialog.getByRole("status")).toContainText(/reached the MDARIX team/i);
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+
+  test("a customer administrator opens the workspace and sees Import data", async ({ page }, testInfo) => {
+    test.setTimeout(90_000);
+    await signIn(page, CUSTOMER_ADMIN_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/customer-admin");
+    await page.getByRole("button", { name: "Open workspace" }).click();
+    const navigation = page.getByRole("navigation", { name: "Workspace navigation" });
+    await expect(navigation).toBeAttached({ timeout: 20_000 });
+    const toggle = page.getByRole("button", { name: "Open navigation" });
+    if (await toggle.isVisible()) await toggle.click();
+    await navigation.getByRole("button", { name: /^Import data/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Import data" })).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Upload a CSV file" })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByLabel("Dates in the file")).toBeVisible();
+    await expect(page.getByRole("link", { name: /download products\.csv/i })).toBeVisible();
+    await page.screenshot({ path: `artifacts/browser-${testInfo.project.name}-import-data.png`, fullPage: true });
+    // And back to the console from the workspace.
+    await page.getByRole("button", { name: "Admin console" }).click();
+    await expect(page.getByRole("navigation", { name: "Customer administration navigation" })).toBeAttached();
+  });
+
+  test("the platform admin console has no sideways scrolling", async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, PLATFORM_ADMIN_EMAIL, E2E_PASSWORD);
+    await page.goto("/app/admin");
+    await expect(page.locator(".admin-console main.ac-main")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("body")).not.toContainText("Checking your session");
+    const sidewaysOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(sidewaysOverflow).toBe(0);
   });
 });

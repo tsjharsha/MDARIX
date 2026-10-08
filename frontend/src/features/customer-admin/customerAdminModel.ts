@@ -2,15 +2,27 @@
 import { titleCase, type Slice, type Tone } from "../admin/console/dashboardModel";
 import type { Section } from "./context";
 
-export type TenantUser = { id: string; email?: string; display_name?: string; role?: string; status?: string };
+export type TenantUser = {
+  id: string;
+  business_id?: string | null;
+  email?: string;
+  display_name?: string;
+  role?: string;
+  /** The role as people read it ("Quality Investigator"), sent next to the code. */
+  role_label?: string | null;
+  status?: string;
+};
 
 const USER_STATUS: Record<string, { label: string; tone: Tone; order: number }> = {
   ACTIVE: { label: "Active", tone: "good", order: 0 },
   INVITED: { label: "Invited", tone: "neutral", order: 1 },
-  PENDING_ACTIVATION: { label: "Pending activation", tone: "neutral", order: 2 },
+  PENDING_ACTIVATION: { label: "Invited, not signed in yet", tone: "neutral", order: 2 },
+  PENDING_VERIFICATION: { label: "Invited, not signed in yet", tone: "neutral", order: 2 },
   SUSPENDED: { label: "Suspended", tone: "serious", order: 3 },
   LOCKED: { label: "Locked", tone: "critical", order: 4 },
-  OFFBOARDED: { label: "Offboarded", tone: "neutral", order: 5 },
+  DEACTIVATED: { label: "Deactivated", tone: "serious", order: 5 },
+  OFFBOARDED: { label: "Offboarded", tone: "neutral", order: 6 },
+  ERASED: { label: "Personal data erased", tone: "neutral", order: 7 },
 };
 
 const code = (value: unknown) =>
@@ -39,11 +51,17 @@ export function userTone(status: unknown): Tone {
   return USER_STATUS[code(status)]?.tone ?? "neutral";
 }
 
+/** A person's account status in words ("Invited, not signed in yet"), never the code. */
+export function userStatusLabel(status: unknown): string {
+  const key = code(status);
+  return USER_STATUS[key]?.label ?? (key ? titleCase(key) : "Unknown");
+}
+
 export function roleMix(users: TenantUser[]): Slice[] {
   const counts = new Map<string, number>();
   for (const user of users) {
     if (code(user.status) === "OFFBOARDED") continue;
-    const label = user.role ? titleCase(user.role) : "No role";
+    const label = user.role_label?.trim() || (user.role ? titleCase(user.role) : "No role");
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return [...counts.entries()]
@@ -118,4 +136,26 @@ export function customerAttention(input: {
     });
   const rank: Record<Tone, number> = { critical: 4, serious: 3, warning: 2, neutral: 1, good: 0 };
   return items.sort((a, b) => rank[b.tone] - rank[a.tone]);
+}
+
+/**
+ * When the organization's subscription ends, and how many whole days are left: from the lifecycle answer
+ * (`subscription.expires_at`, or `expires_at`) or, during a free trial, the trial status. Null when the subscription
+ * has no end date the console can read.
+ */
+export function subscriptionEnd(
+  lifecycle: { expires_at?: string | null; subscription?: { expires_at?: string | null } | null } | null,
+  trial: { is_trial?: boolean; expires_at?: string | null; days_left?: number } | null,
+  now = new Date(),
+): { endsAt: string; daysLeft: number; trial: boolean } | null {
+  const fromLifecycle = lifecycle?.subscription?.expires_at ?? lifecycle?.expires_at ?? null;
+  const fromTrial = trial?.is_trial ? (trial.expires_at ?? null) : null;
+  const endsAt = fromLifecycle ?? fromTrial;
+  const time = endsAt ? Date.parse(endsAt) : Number.NaN;
+  if (!endsAt || Number.isNaN(time)) return null;
+  const daysLeft =
+    !fromLifecycle && typeof trial?.days_left === "number"
+      ? trial.days_left
+      : Math.max(0, Math.ceil((time - now.getTime()) / 86_400_000));
+  return { endsAt, daysLeft, trial: !fromLifecycle && !!fromTrial };
 }

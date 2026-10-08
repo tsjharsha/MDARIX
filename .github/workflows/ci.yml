@@ -4,13 +4,39 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly: the dependency audits, secret scan and image scans run again, so an advisory published after a merge is
+  # noticed without waiting for the next change. Only the security and image-scan jobs run on this schedule.
+  schedule:
+    - cron: '41 4 * * 1'
 permissions:
   contents: read
 concurrency:
   group: mdarix-r1-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+# Third-party actions are pinned to commit SHAs (the comment names the release); Dependabot proposes updates.
 jobs:
+  ai-golden-qualification:
+    name: AI golden dataset qualification
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: Enforce qualified dataset lock
+        run: python scripts/qualify_ai_golden_dataset.py
+      - name: Run qualification regression tests
+        run: python -m unittest tests.test_ai_golden_qualification
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mdarix-ai-golden-qualification
+          path: artifacts/ai-golden-dataset-qualification.json
+          if-no-files-found: error
   backend:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       POSTGRES_USER: mdarix_app
@@ -39,8 +65,8 @@ jobs:
           --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       # The hashed runtime lock, then the development tools (pytest, pip-audit, ruff) from their own file.
@@ -49,14 +75,20 @@ jobs:
       - run: python -m pip check
       - run: pip-audit -r requirements.txt
       - name: Cache the local embedding model
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .model-cache
           key: embedding-model-bge-small-en-v1.5-fastembed-0.8.1
       - name: Apply complete schema and runtime hardening
         run: alembic upgrade head
+      - name: The newest migration can be undone and applied again
+        run: alembic downgrade -1 && alembic upgrade head
+      - name: Verify ORM metadata and migrations have no schema drift
+        run: alembic check
       - name: Give the runtime role a login
         run: python scripts/configure_runtime_role.py
+      - name: Database hardening report (row-level security, roles; tests/test_rls_coverage.py enforces coverage)
+        run: python scripts/validate_db_hardening.py
       - name: Seed deterministic test identities
         env:
           DAY35_FIXTURE_APPLY: '1'
@@ -70,6 +102,7 @@ jobs:
         run: docker compose config --quiet
   dedicated-plane:
     name: Dedicated data plane
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       POSTGRES_USER: mdarix_app
@@ -105,8 +138,8 @@ jobs:
           --health-cmd="pg_isready -U mdarix_plane -d mdarix_plane"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r requirements.txt
@@ -120,9 +153,14 @@ jobs:
         run: python scripts/provision_day35_fixture.py
       - name: Plane migration, routing, schema gate, export and deletion
         run: python -m pytest -q tests/test_dedicated_plane.py
+      - name: Verify dedicated data-plane schema drift
+        env:
+          MDARIX_MIGRATION_DATABASE_URL: ${{ env.MDARIX_TEST_DATA_PLANE_URL }}
+        run: alembic check
 
-  production-mode:
-    name: Production mode
+  dataplane-tests:
+    name: Data-plane routing (four tenant databases)
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       POSTGRES_USER: mdarix_app
@@ -130,11 +168,96 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: '5432'
       POSTGRES_DB: mdarix_r1
-      POSTGRES_SSLMODE: require
+      MDARIX_DB_HARDENING_APPLY: '1'
+      MDARIX_ENV: development
+      MDARIX_DB_RUNTIME_USER: mdarix_runtime
+      MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
+      DAY35_FIXTURE_APPLY: '1'
+      # The tests sign in with the same password (tests/test_data_plane_routing.py).
+      DAY35_FIXTURE_PASSWORD: ci-fixture-${{ github.run_id }}-${{ github.run_attempt }}-Aa1!
+      # The four tenant databases of docker-compose.yml (tenant-a..d-data on 5541-5544). In development the
+      # application builds their connection strings from this password (backend/app/db/data_plane.py).
+      MDARIX_DATA_PLANE_PASSWORD: ci-plane-${{ github.run_id }}-${{ github.run_attempt }}
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: mdarix_app
+          POSTGRES_PASSWORD: mdarix_app
+          POSTGRES_DB: mdarix_r1
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - run: python -m pip install --require-hashes -r requirements.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - name: Start the four tenant databases
+        run: docker compose up -d --wait tenant-a-data tenant-b-data tenant-c-data tenant-d-data
+      - name: Control database, runtime role and the four fixture organizations
+        run: |
+          alembic upgrade head
+          python scripts/configure_runtime_role.py
+          python scripts/provision_day35_fixture.py
+      - name: Route R1_TENANT_1..4 to their own databases
+        run: |
+          # Every new organization is put on the shared plane first (migration md20); the registry holds one plane
+          # per organization, so the shared entries go before the dedicated ones are registered.
+          docker exec ${{ job.services.postgres.id }} psql -U mdarix_app -d mdarix_r1 -v ON_ERROR_STOP=1 -c \
+            "DELETE FROM tenant_data_planes WHERE connection_secret_ref = 'MDARIX_TRIAL_SHARED_CONTROL_PLANE' AND tenant_id IN (SELECT id FROM tenants WHERE tenant_key IN ('R1_TENANT_1','R1_TENANT_2','R1_TENANT_3','R1_TENANT_4'))"
+          python scripts/register_mvp_data_planes.py
+      - name: Migrate the tenant databases (as the migrate job does in production)
+        run: |
+          set -o pipefail
+          python scripts/migrate_data_planes.py --apply
+          python scripts/migrate_data_planes.py | tee planes.txt
+          test "$(grep -c '^CURRENT' planes.txt)" = 4
+      - name: Business records for R1_TENANT_1 in its own database
+        run: |
+          docker compose exec -T tenant-a-data psql -U mdarix_data -d mdarix_tenant_a -v ON_ERROR_STOP=1 -v key=R1_TENANT_1 <<'SQL'
+          BEGIN;
+          INSERT INTO products (tenant_id, product_identifier, name, description, lifecycle_status, source_system, source_identifier, created_at, updated_at)
+            SELECT id, :'key' || '-PRODUCT-CANARY', :'key' || ' Synthetic Product', 'Synthetic data-plane canary', 'active', 'VALIDATION', :'key' || '-PRODUCT-CANARY', now(), now()
+            FROM tenants WHERE tenant_key = :'key';
+          INSERT INTO product_versions (tenant_id, product_id, version_identifier, lifecycle_status, release_timestamp, created_at, updated_at)
+            SELECT tenant_id, id, 'VALIDATION-1', 'active', now() - interval '30 days', now(), now()
+            FROM products WHERE product_identifier = :'key' || '-PRODUCT-CANARY';
+          INSERT INTO investigations (tenant_id, investigation_identifier, product_id, investigation_question, status, opened_at, created_at, updated_at)
+            SELECT tenant_id, :'key' || '-INVESTIGATION-CANARY', id, 'Synthetic tenant-scoped validation investigation', 'open', now() - interval '7 days', now(), now()
+            FROM products WHERE product_identifier = :'key' || '-PRODUCT-CANARY';
+          INSERT INTO evidence (tenant_id, evidence_identifier, investigation_id, evidence_type, title, content, source_reference, reliability_status, ingestion_timestamp, created_at, updated_at)
+            SELECT tenant_id, :'key' || '-EVIDENCE-CANARY', id, 'synthetic', 'Validation evidence', 'Synthetic evidence for data-plane validation only.', :'key' || '-COMPLAINT-CANARY', 'reviewed', now(), now(), now()
+            FROM investigations WHERE investigation_identifier = :'key' || '-INVESTIGATION-CANARY';
+          COMMIT;
+          SQL
+      - name: Data-plane routing tests
+        run: python -m pytest -m dataplane -q tests/test_data_plane_routing.py
+
+  production-mode:
+    name: Production mode
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_USER: mdarix_app
+      POSTGRES_PASSWORD: mdarix_app
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: mdarix_r1
+      # Production verifies the database certificate and host name (config_check refuses anything weaker).
+      POSTGRES_SSLMODE: verify-full
+      POSTGRES_SSLROOTCERT: /tmp/pgtls/db-ca.pem
       MDARIX_DB_HARDENING_APPLY: '1'
       MDARIX_DB_RUNTIME_USER: mdarix_runtime
       MDARIX_DB_RUNTIME_PASSWORD: ci-runtime-${{ github.run_id }}-${{ github.run_attempt }}-disposable
-      MDARIX_APP_URL: https://app.example.test
+      MDARIX_DB_OWNER_USER: mdarix_app
+      # Not example.com / example.test: configuration placeholders are refused.
+      MDARIX_APP_URL: https://app.mdarix-ci.test
+      MDARIX_DOMAIN: app.mdarix-ci.test
+      MDARIX_TRUSTED_PROXY_HOPS: '1'
       MDARIX_GENAI_PROVIDER: controlled
       MDARIX_OBJECT_STORAGE_PROVIDER: local
       MDARIX_OBJECT_STORAGE_ROOT: /tmp/mdarix-objects
@@ -149,19 +272,27 @@ jobs:
       MDARIX_COMPANY_ADDRESS: 1 Test Street, Test City
       MDARIX_LEGAL_TEXT_APPROVED: 'true'
       MDARIX_LEGAL_DIR: /tmp/mdarix-legal
+      # Operational alerts and staff alerts need somewhere to go (no real mailbox: SMTP is smtp.invalid).
+      MDARIX_ALERT_EMAIL: ops@mdarix-ci.test
+      MDARIX_TRIAL_ALERT_EMAIL: sales@mdarix-ci.test
+      MDARIX_DEMO_ALERT_EMAIL: sales@mdarix-ci.test
+      # Backups and outside monitors (no real bucket or monitor in CI; these hosts never resolve).
+      MDARIX_BACKUP_AGE_RECIPIENT: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+      MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED: 'true'
+      MDARIX_BACKUP_HEARTBEAT_URL: https://heartbeat.mdarix-ci.invalid/backup
+      MDARIX_SCHEDULER_HEARTBEAT_URL: https://heartbeat.mdarix-ci.invalid/scheduler
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r requirements.txt
-      - name: PostgreSQL with TLS (production refuses an unencrypted database connection)
-        run: |
-          mkdir -p /tmp/pgtls
-          openssl req -new -x509 -days 2 -nodes -subj "/CN=localhost" -keyout /tmp/pgtls/server.key -out /tmp/pgtls/server.crt
-          sudo chown 999:999 /tmp/pgtls/server.key /tmp/pgtls/server.crt && sudo chmod 600 /tmp/pgtls/server.key
-          docker run -d --name pg -p 5432:5432 -e POSTGRES_USER=mdarix_app -e POSTGRES_PASSWORD=mdarix_app -e POSTGRES_DB=mdarix_r1 -v /tmp/pgtls:/tls pgvector/pgvector:pg16 -c ssl=on -c ssl_cert_file=/tls/server.crt -c ssl_key_file=/tls/server.key
-          for attempt in $(seq 1 30); do docker exec pg pg_isready -U mdarix_app -d mdarix_r1 && break; sleep 2; done
+      - name: PostgreSQL with TLS and a CA-signed certificate (production refuses anything weaker)
+        env:
+          CERT_DIR: /tmp/pgtls
+          PG_CONTAINER: pg
+          PG_PORT: '5432'
+        run: bash infrastructure/docker/ci/pg-tls.sh
       - name: Generate this run's secrets and legal documents
         run: |
           python - >> "$GITHUB_ENV" <<'PY'
@@ -175,13 +306,17 @@ jobs:
           PY
           mkdir -p /tmp/mdarix-legal /tmp/mdarix-objects
           for name in privacy terms trial-agreement; do echo "# $name (CI placeholder)" > "/tmp/mdarix-legal/$name.md"; done
+      - name: The pre-flight configuration check passes (before any migration)
+        env:
+          MDARIX_ENV: production
+        run: python -m backend.app.config_check --offline
       - name: Migrations, runtime role and system-scope token (as the migrate job does)
         run: |
           alembic upgrade head
           python scripts/configure_runtime_role.py
           python scripts/grant_runtime_privileges.py
           python scripts/set_rls_system_token.py
-      - name: The configuration check passes
+      - name: The full configuration check passes (database token and runtime role included)
         env:
           MDARIX_ENV: production
         run: python -m backend.app.config_check
@@ -195,17 +330,151 @@ jobs:
           for attempt in $(seq 1 30); do curl --silent --fail http://127.0.0.1:8000/health/live > /dev/null && break; sleep 2; done
           python scripts/production_smoke.py --base http://127.0.0.1:8000 --origin "$MDARIX_APP_URL" --email admin@mdarix-ci.test --token "${link#token=}" || { cat api.log; exit 1; }
 
+  prod-compose-config:
+    name: Production compose definition
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Shell scripts parse
+        run: |
+          for script in infrastructure/docker/backup/*.sh infrastructure/docker/ci/*.sh scripts/check_backup_age.sh; do
+            bash -n "$script"
+          done
+      - name: The documented commands resolve on a fresh server (filled .env.production and .env.migrate)
+        run: |
+          bash infrastructure/docker/ci/write-env-files.sh .
+          docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
+          docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup config --quiet
+      - name: Without --env-file the required values are reported missing, not silently empty
+        run: |
+          if docker compose -f docker-compose.prod.yml config --quiet 2> missing.txt; then
+            echo "docker-compose.prod.yml resolved without .env.production"; exit 1
+          fi
+          # Compose versions differ in how many missing values they list; any required one must be named.
+          grep -qE 'required variable [A-Z_]+ is missing a value' missing.txt
+      - name: Owner and backup secrets reach only the migrate and backup jobs
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.production --profile backup config --format json > resolved.json
+          python3 - <<'PY'
+          import json
+          services = json.load(open("resolved.json"))["services"]
+          secrets = ("MDARIX_DB_OWNER_PASSWORD", "MDARIX_BACKUP_DB_PASSWORD")
+          for name, service in services.items():
+              holds = [key for key in secrets if key in (service.get("environment") or {})]
+              allowed = name in ("migrate", "backup")
+              print(f"{name}: {holds or 'none'}")
+              assert bool(holds) == allowed, f"{name} must {'' if allowed else 'not '}receive the owner credentials"
+          PY
+
+  prod-stack:
+    name: Production stack (Caddy, TLS database, smoke test, scheduler, backup and restore)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      COMPOSE_FILE: docker-compose.prod.yml
+      COMPOSE_ENV_FILES: .env.production
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.13'
+      - name: TLS PostgreSQL that the stack reaches as "db"
+        env:
+          CERT_DIR: ${{ github.workspace }}/certs
+          PG_CONTAINER: pg
+          PG_PORT: '5432'
+        run: bash infrastructure/docker/ci/pg-tls.sh
+      - name: Settings, legal documents and the backup folder
+        run: |
+          sudo install -d -o 70 -g 70 -m 700 "$RUNNER_TEMP/backups"
+          CI_BACKUP_DIR="$RUNNER_TEMP/backups" bash infrastructure/docker/ci/write-env-files.sh .
+          for name in privacy terms trial-agreement; do echo "# $name (CI placeholder)" > "legal/$name.md"; done
+      - name: Build the production images
+        run: docker compose --profile backup build
+      - name: Backup encryption key for this run
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          docker run --rm --entrypoint age-keygen mdarix/backup:ci > "$RUNNER_TEMP/keys/backup.key" 2> /dev/null
+          chmod 644 "$RUNNER_TEMP/keys/backup.key"
+          recipient=$(grep -o 'age1[0-9a-z]*' "$RUNNER_TEMP/keys/backup.key")
+          sed -i "s/^MDARIX_BACKUP_AGE_RECIPIENT=.*/MDARIX_BACKUP_AGE_RECIPIENT=$recipient/" .env.production
+      - name: Start the stack (migrate, API, worker, scheduler, ClamAV, Caddy)
+        run: |
+          docker compose up --no-start
+          docker network connect --alias db mdarix_internal pg
+          docker compose up -d --no-build --wait --wait-timeout 1200 api worker scheduler web
+          docker compose ps -a
+      - name: Production checks through Caddy
+        run: |
+          set -o pipefail
+          link=$(docker compose run --rm migrate python scripts/create_platform_admin.py admin@mdarix-ci.test --name "CI Admin" | grep -o 'token=[^ ]*' | head -1)
+          test -n "$link" || { echo "No activation link was printed"; exit 1; }
+          docker compose cp web:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
+          SSL_CERT_FILE=caddy-root.crt python scripts/production_smoke.py --front-door --base https://localhost \
+            --origin https://localhost --email admin@mdarix-ci.test --token "${link#token=}"
+      - name: Every due scheduled job runs once without failing
+        run: docker compose exec -T scheduler python scripts/run_scheduler.py --once
+      - name: Backup with the BYPASSRLS backup login, restored into a scratch database
+        run: |
+          set -o pipefail
+          docker compose run --rm migrate python scripts/configure_backup_role.py
+          docker compose --profile backup run --rm backup | tee backup.log
+          grep -q 'login bypasses row-level security' backup.log
+          docker exec pg psql -U mdarix_app -d mdarix_r1 -v ON_ERROR_STOP=1 -c "CREATE DATABASE mdarix_restore"
+          docker exec pg psql -U mdarix_app -d mdarix_restore -v ON_ERROR_STOP=1 -c "CREATE EXTENSION vector; CREATE EXTENSION pgcrypto;"
+          stamp=$(sudo ls "$RUNNER_TEMP/backups" | tail -n 1)
+          docker compose --profile backup run --rm --entrypoint mdarix-restore \
+            -v "$RUNNER_TEMP/keys:/keys:ro" -e MDARIX_BACKUP_AGE_KEY_FILE=/keys/backup.key -e PGPASSWORD=mdarix_app \
+            backup "/backups/$stamp" control \
+            "host=db port=5432 dbname=mdarix_restore user=mdarix_app sslmode=verify-full sslrootcert=/etc/mdarix/certs/db-ca.pem"
+          docker compose run --rm -e POSTGRES_DB=mdarix_restore migrate alembic current | tee current.txt
+          grep -q '(head)' current.txt
+          count() { docker exec pg psql -U mdarix_app -d "$1" -tAc "SELECT (SELECT count(*) FROM auth_users) || '/' || (SELECT count(*) FROM tenants) || '/' || (SELECT count(*) FROM pg_policies)"; }
+          echo "source $(count mdarix_r1), restored $(count mdarix_restore)"
+          test "$(count mdarix_r1)" = "$(count mdarix_restore)"
+      - name: Backup without BYPASSRLS reads every row through the system scope
+        run: |
+          set -o pipefail
+          docker exec pg psql -U mdarix_app -d mdarix_r1 -v ON_ERROR_STOP=1 -c "ALTER ROLE mdarix_backup NOBYPASSRLS"
+          docker compose --profile backup run --rm backup | tee backup.log
+          grep -q 'through the system scope' backup.log
+          docker exec pg psql -U mdarix_app -d mdarix_r1 -v ON_ERROR_STOP=1 -c "CREATE DATABASE mdarix_restore2"
+          docker exec pg psql -U mdarix_app -d mdarix_restore2 -v ON_ERROR_STOP=1 -c "CREATE EXTENSION vector; CREATE EXTENSION pgcrypto;"
+          stamp=$(sudo ls "$RUNNER_TEMP/backups" | tail -n 1)
+          docker compose --profile backup run --rm --entrypoint mdarix-restore \
+            -v "$RUNNER_TEMP/keys:/keys:ro" -e MDARIX_BACKUP_AGE_KEY_FILE=/keys/backup.key -e PGPASSWORD=mdarix_app \
+            backup "/backups/$stamp" control \
+            "host=db port=5432 dbname=mdarix_restore2 user=mdarix_app sslmode=verify-full sslrootcert=/etc/mdarix/certs/db-ca.pem"
+          users() { docker exec pg psql -U mdarix_app -d "$1" -tAc "SELECT count(*) FROM auth_users"; }
+          test "$(users mdarix_r1)" = "$(users mdarix_restore2)"
+          docker compose --profile backup run --rm --entrypoint mdarix-check-backup-age backup
+      - name: Service logs
+        if: failure()
+        run: docker compose --profile backup logs --no-color > prod-stack.log 2>&1 || true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: failure()
+        with:
+          name: mdarix-prod-stack-logs
+          path: prod-stack.log
+          if-no-files-found: ignore
+
   frontend:
+    if: github.event_name != 'schedule'
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # The same Node major version as the web image (Dockerfile.web).
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '24'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm.cmd --prefix frontend ci
       - run: npm.cmd --prefix frontend audit --audit-level=high
+      - name: Dependencies shipped to browsers have no high or critical advisory
+        run: npm.cmd --prefix frontend audit --omit=dev --audit-level=high
       - run: npm.cmd --prefix frontend run build
       - run: npm.cmd --prefix frontend run lint
       - run: npm.cmd --prefix frontend run format:check
@@ -214,6 +483,7 @@ jobs:
 
   browser:
     name: Browser and accessibility evidence
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     needs: frontend
     env:
@@ -246,14 +516,17 @@ jobs:
           --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r requirements.txt
       - run: alembic upgrade head
       - run: python scripts/configure_runtime_role.py
       - run: python scripts/provision_day35_fixture.py
+      # Products, complaints and cases for the four fixture organizations: the browser flows open an investigation
+      # for a product, as a person would (an organization without products cannot).
+      - run: python scripts/seed_validation_dataset.py --apply
       - name: Start backend
         shell: bash
         run: |
@@ -264,9 +537,9 @@ jobs:
           done
           cat backend.log
           exit 1
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: '24'
+          node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci --prefix frontend
@@ -276,13 +549,14 @@ jobs:
           # The Chromium installed above, not a system Chrome that varies by runner image.
           PLAYWRIGHT_CHANNEL: chromium
           E2E_PASSWORD: ${{ env.DAY35_FIXTURE_PASSWORD }}
+          E2E_CUSTOMER_ADMIN_EMAIL: r1-user-06@synthetic.invalid
           # Every screen, tab and safe button for a platform administrator and an investigator.
           E2E_DEEP_PERSONAS: e2e/personas.ci.json
           E2E_DEEP_REPORT: ../artifacts/deep-crawl.json
         run: npm --prefix frontend run test:e2e
       - name: Upload browser evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mdarix-browser-evidence
           path: |
@@ -293,9 +567,10 @@ jobs:
 
   container-validation:
     name: Container and simulator validation
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Validate Docker Compose definition
         run: docker compose config --quiet
       - name: Build simulator and worker images
@@ -305,15 +580,17 @@ jobs:
     name: Production image scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Build the production images
         run: |
-          docker build -f Dockerfile.api -t mdarix-app:ci .
-          docker build -f Dockerfile.web -t mdarix-web:ci .
-      - name: Scan both images (high and critical findings that have a fix fail the job)
+          docker build -f Dockerfile.api -t mdarix/api:ci .
+          docker build -f Dockerfile.web -t mdarix/web:ci .
+          docker build -f infrastructure/docker/backup/Dockerfile -t mdarix/backup:ci .
+      - name: Scan the images (high and critical findings that have a fix fail the job)
         run: |
-          for image in mdarix-app:ci mdarix-web:ci; do
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image               --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$image"
+          for image in mdarix/api:ci mdarix/web:ci mdarix/backup:ci; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
+              --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$image"
           done
 
   security:
@@ -324,11 +601,11 @@ jobs:
       contents: read
       pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # gitleaks scans the pull request's commits, which needs the history (a shallow clone cannot list them).
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       # ruff is pinned (requirements-dev.txt) to the version used to format the repository.
@@ -337,12 +614,13 @@ jobs:
       - run: pip-audit -r requirements.txt
       - run: ruff check .
       - run: ruff format --check .
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   integration:
     name: Simulator and integration gates
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       POSTGRES_USER: mdarix_app
@@ -371,8 +649,8 @@ jobs:
           --health-cmd="pg_isready -U mdarix_app -d mdarix_r1"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r requirements.txt
@@ -390,7 +668,7 @@ jobs:
       - run: python -m pytest -q tests/test_persistent_source_simulator.py tests/test_api_connector_contract.py tests/test_connector_security.py
       - name: Upload integration evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mdarix-integration-evidence
           path: artifacts
@@ -403,36 +681,47 @@ jobs:
       [
         backend,
         dedicated-plane,
+        dataplane-tests,
         production-mode,
+        prod-compose-config,
+        prod-stack,
         frontend,
         browser,
         container-validation,
         image-scan,
         security,
         integration,
+        ai-golden-qualification,
       ]
-    if: always()
+    # The weekly scheduled run only re-scans; it is not release evidence.
+    if: always() && github.event_name != 'schedule'
     steps:
-      - uses: actions/checkout@v4
       - name: Enforce required CI jobs
         shell: bash
         run: |
           test "${{ needs.backend.result }}" = success
           test "${{ needs.dedicated-plane.result }}" = success
+          test "${{ needs.dataplane-tests.result }}" = success
           test "${{ needs.production-mode.result }}" = success
+          test "${{ needs.prod-compose-config.result }}" = success
+          test "${{ needs.prod-stack.result }}" = success
           test "${{ needs.image-scan.result }}" = success
           test "${{ needs.frontend.result }}" = success
           test "${{ needs.browser.result }}" = success
           test "${{ needs.container-validation.result }}" = success
           test "${{ needs.security.result }}" = success
           test "${{ needs.integration.result }}" = success
+          test "${{ needs.ai-golden-qualification.result }}" = success
       - name: Publish workflow summary
         shell: bash
         run: |
           {
             echo '## MDARIX R1 CI/CD validation'
-            echo '- Backend tests, migrations, dependency checks, and compose validation: passed'
+            echo '- Backend tests, migrations (with a downgrade/upgrade round trip), dependency checks, and compose validation: passed'
+            echo '- Data-plane routing against four tenant databases: passed'
+            echo '- Production mode, production compose definition and the full production stack (smoke test, scheduler, backup and restore): passed'
             echo '- Frontend tests, audit, and production build: passed'
-            echo '- Worker and simulator container builds: passed'
-            echo '- Production deployment promotion and rollback remain environment-specific gates.'
+            echo '- Worker and simulator container builds; api, web and backup image scans: passed'
+            echo '- Qualified AI golden dataset lock and tamper gate: passed'
+            echo '- Production promotion is a tagged release (release.yml); rollback is the previous tag (docs/runbooks/DEPLOYMENT.md).'
           } >> "$GITHUB_STEP_SUMMARY"

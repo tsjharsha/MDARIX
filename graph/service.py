@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.db.tenant_scope import bind_connection_system
 from graph.schemas import GraphNode, GraphRelationship, GraphResponse, RelationshipDetail
 
 TENANT_KEY = "ACME_CARE_SYNTHETIC"
@@ -93,6 +94,9 @@ class RealityGraphService:
 
     def tenant_id(self) -> str:
         with self.connection() as conn:
+            if self.db is None:
+                # A standalone service (no request session) looks the organization up in system scope (md34).
+                bind_connection_system(conn)
             value = conn.execute(text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}).scalar_one()
             return str(value)
 
@@ -128,7 +132,8 @@ class RealityGraphService:
             status=row.get("status") or row.get("lifecycle_status") or row.get("reliability_status"),
             quality_state=row.get("data_quality_status") or row.get("reliability_status"),
             source_count=source_count,
-            metadata={"business_identifier": row["business_identifier"]},
+            # ``business_identifier`` is the source system's identifier; ``business_id`` is the MDARIX one (md26).
+            metadata={"business_identifier": row["business_identifier"], "business_id": row.get("business_id")},
         )
 
     def get_relationship(self, relationship_key: str, tenant_id: str | None = None) -> GraphRelationship:

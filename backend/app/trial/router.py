@@ -1,7 +1,10 @@
 """Free-trial API: the Platform Admin request queue, and the trial workspace's status, templates, import and insights.
 
 Trial endpoints take the tenant only from the signed-in session and refuse tenants that are not on the Free Trial
-plan, so the CSV import path never exists for paying customers.
+plan. Every organization (trial or not) imports through /api/v1/data/import (backend/app/data_import_router.py);
+the trial routes here keep the trial's own limits and the Getting started page. Inviting colleagues is a trial
+feature too: in a paying organization its Customer Administrators invite users (/api/v1/admin/identity/users), and a
+converted trial's owner becomes one (backend/app/access/platform_subscriptions.py).
 """
 
 from __future__ import annotations
@@ -9,10 +12,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
-from backend.app.request_body import read_limited
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -167,13 +169,13 @@ def trial_template(
 
 
 async def _body(request: Request) -> bytes:
-    return await read_limited(request, TRIAL_FILE_LIMIT_BYTES, message="Files can be up to 2 MB during the free trial")
+    return await imports.read_upload(request, TRIAL_FILE_LIMIT_BYTES, "Files can be up to 2 MB during the free trial")
 
 
-def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes) -> dict:
+def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, date_format: str = "ISO") -> dict:
     """All-or-nothing trial import with its audit record (runs in the thread pool)."""
     try:
-        result = imports.import_file(data, tenant_id, entity, raw)
+        result = imports.import_file(data, tenant_id, entity, raw, imports.TRIAL_POLICY, date_format)
         db.add(
             AuditEvent(
                 id=uuid.uuid4(),
@@ -196,6 +198,11 @@ def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes) -
         raise HTTPException(
             500, detail={"code": "TRIAL_IMPORT_FAILED", "message": "The import failed; nothing was saved"}
         ) from exc
+    from backend.app.signals import hooks as signal_hooks
+
+    if signal_hooks.imported_complaints(result):
+        # Signals from the new complaints (backend/app/signals/detection.py); never fails or undoes the import.
+        signal_hooks.after_complaints_saved(data, tenant_id, source="trial import")
     return result
 
 
@@ -203,13 +210,17 @@ def _trial_import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes) -
 async def check_trial_import(
     entity: str,
     request: Request,
+    date_format: str = Query(default="ISO", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    order = imports.date_format_or_422(date_format)
     await run_in_threadpool(_require_trial, db, ctx)
     raw = await _body(request)
-    return await run_in_threadpool(imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw)
+    return await run_in_threadpool(
+        imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, imports.TRIAL_POLICY, order
+    )
 
 
 @router.post("/trial/imports/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -217,14 +228,16 @@ async def run_trial_import(
     entity: str,
     request: Request,
     background: BackgroundTasks,
+    date_format: str = Query(default="ISO", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    order = imports.date_format_or_422(date_format)
     await run_in_threadpool(_require_trial, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request)
-    result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw)
+    result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order)
     if result.get("rows"):
         # Semantic search over the imported records, after the response (their text is already searchable).
         background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)

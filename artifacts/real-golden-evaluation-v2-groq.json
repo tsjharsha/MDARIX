@@ -1,0 +1,788 @@
+{
+  "evaluation_version": "MDARIX_R1_REAL_PIPELINE_EVAL_V2",
+  "tenant": "ACME_CARE_SYNTHETIC",
+  "model": "groq:openai/gpt-oss-120b",
+  "passed": 2,
+  "total": 12,
+  "model_written": 11,
+  "with_specific_expectations": 12,
+  "passed_with_specific_expectations": 2,
+  "thresholds": {
+    "match": 0.75,
+    "prohibited": 0.85
+  },
+  "results": [
+    {
+      "scenario_id": "VS001",
+      "title": "Supplier Change Correlation",
+      "investigation": "INV-001",
+      "status": "FAIL",
+      "specific_expectations": 9,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 7,
+        "contradictions": 2,
+        "missing_information": 8,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 45.8,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Pre-Rev B shutdown complaints",
+              "similarity": 0.829,
+              "matched": "Shutdown complaints were already present before Component Rev B was introduced."
+            },
+            {
+              "expected": "Rev B validation passed",
+              "similarity": 0.767,
+              "matched": "Validation testing of Rev B met acceptance criteria, suggesting it performed as expected under test conditions."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Comparative Rev A vs Rev B testing unavailable",
+              "similarity": 0.732,
+              "matched": "Environmental stress test results for Component Rev B."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS002",
+      "title": "False Correlation",
+      "investigation": "INV-002",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 6,
+        "contradictions": 1,
+        "missing_information": 8,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 1
+      },
+      "seconds": 33.3,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Packaging label change has no electrical mechanism",
+              "similarity": 0.754,
+              "matched": "Label revision is near complaint increase (suggesting association) versus label has no electrical mechanism (suggesting no causal link)."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "No causal mechanism links the label to shutdowns",
+              "similarity": 0.779,
+              "matched": "Detailed timeline of shutdown complaints relative to label change."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "FAIL",
+          "details": [
+            {
+              "prohibited": "The packaging label change caused the shutdown increase.",
+              "similarity": 0.907,
+              "statement": "Label revision occurred near a rise in shutdown complaints."
+            }
+          ]
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "FAIL",
+          "details": [
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001",
+            "EV-VS002-001"
+          ]
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS003",
+      "title": "Missing Evidence",
+      "investigation": "INV-003",
+      "status": "PASS",
+      "specific_expectations": 3,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 2,
+        "contradictions": 0,
+        "missing_information": 6,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 12.8,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Comparative Rev A versus Rev B testing unavailable",
+              "similarity": 0.889,
+              "matched": "Actual Rev A vs Rev B comparative test results"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS004",
+      "title": "Conflicting Evidence",
+      "investigation": "INV-004",
+      "status": "FAIL",
+      "specific_expectations": 6,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 5,
+        "contradictions": 2,
+        "missing_information": 8,
+        "hypotheses": 4,
+        "statements_dropped_by_checks": 1
+      },
+      "seconds": 21.1,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Shutdown complaints existed before Rev B",
+              "similarity": 0.814,
+              "matched": "complaints pre-date the documented introduction, suggesting Rev B might not have been in use yet"
+            },
+            {
+              "expected": "Rev B qualification met acceptance criteria",
+              "similarity": 0.867,
+              "matched": "qualification acceptance suggests Rev B was already qualified and possibly in use at the time of the complaints"
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "The conflicting records do not establish a single cause",
+              "similarity": 0.624,
+              "matched": "Obtain the formal release documentation and compare its timestamp to the complaint dates"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS005",
+      "title": "Incorrect Timeline",
+      "investigation": "INV-005",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "RULES",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 4,
+        "contradictions": 0,
+        "missing_information": 8,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 41.4,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Lot genealogy arrived after the initial closure",
+              "similarity": 0.531,
+              "matched": "Contradictory or tension-bearing evidence must be resolved before this hypothesis can be narrowed."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "The original decision did not include late evidence",
+              "similarity": 0.673,
+              "matched": "Evidence isolating one sufficient explanation would weaken a multi-factor explanation."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS006",
+      "title": "Shared Component Exposure",
+      "investigation": "INV-006",
+      "status": "FAIL",
+      "specific_expectations": 3,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 2,
+        "contradictions": 0,
+        "missing_information": 4,
+        "hypotheses": 2,
+        "statements_dropped_by_checks": 1
+      },
+      "seconds": 34.9,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Shared component exposure does not establish defect or causality",
+              "similarity": 0.635,
+              "matched": "Environmental or usage conditions that could stress the module."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS007",
+      "title": "Premature Closure",
+      "investigation": "INV-007",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "RULES",
+      "hypotheses_author": "RULES",
+      "fallback_reason": "MODEL_INVALID_JSON",
+      "counts": {
+        "observations": 4,
+        "contradictions": 1,
+        "missing_information": 5,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 22.2,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Closure rationale omitted pre-Rev B complaints",
+              "similarity": 0.614,
+              "matched": "Contradictory or tension-bearing evidence must be resolved before this hypothesis can be narrowed."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Unresolved contradiction requires review before closure",
+              "similarity": 0.636,
+              "matched": "Is comparative verification or validation evidence available for the affected and unaffected configurations?"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "FAIL",
+          "details": [
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001",
+            "EV-VS007-001"
+          ]
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS008",
+      "title": "Control Failure",
+      "investigation": "INV-008",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 3,
+        "contradictions": 1,
+        "missing_information": 6,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 3
+      },
+      "seconds": 32.8,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Complaint trend persists despite an accepted process-control sample",
+              "similarity": 0.691,
+              "matched": "The temporal proximity of the label change to the complaint increase could be mistaken for causation when it is merely coincidental."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "A passing sample does not establish continuous control",
+              "similarity": 0.633,
+              "matched": "Retrieve and test retained Rev B units for functional parameters"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS009",
+      "title": "Counterfactual",
+      "investigation": "INV-009",
+      "status": "PASS",
+      "specific_expectations": 3,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 4,
+        "contradictions": 0,
+        "missing_information": 6,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 37.8,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "No controlled matched comparator is available",
+              "similarity": 0.823,
+              "matched": "what specific characteristics a matched comparator should have"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS010",
+      "title": "AI Model Change",
+      "investigation": "INV-010",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 5,
+        "contradictions": 2,
+        "missing_information": 8,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 1
+      },
+      "seconds": 35.6,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": [
+            {
+              "expected": "Model outputs must be compared against the same evidence packet",
+              "similarity": 0.763,
+              "matched": "The same evidence packet evaluated under two AI model metadata records may yield differing interpretations, yet synthetic evidence artifacts provide only generic content."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "A model change alone does not establish improved correctness",
+              "similarity": 0.729,
+              "matched": "Root cause analysis linking any observed changes to evidence sufficiency is lacking."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS011",
+      "title": "Multiple Causes",
+      "investigation": "INV-010",
+      "status": "FAIL",
+      "specific_expectations": 4,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 5,
+        "contradictions": 1,
+        "missing_information": 8,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 1
+      },
+      "seconds": 31.0,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Connector intermittency explains only a subset",
+              "similarity": 0.735,
+              "matched": "Subset alignment of shutdown complaints with connector intermittency shows a consistent signal that may persist across AI model evaluations."
+            }
+          ]
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Multiple mechanisms may explain different complaint subsets",
+              "similarity": 0.741,
+              "matched": "7 complaints lack resolved lot context."
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    },
+    {
+      "scenario_id": "VS012",
+      "title": "Correct Abstention",
+      "investigation": "INV-010",
+      "status": "FAIL",
+      "specific_expectations": 3,
+      "analysis_author": "LANGUAGE_MODEL",
+      "hypotheses_author": "LANGUAGE_MODEL",
+      "fallback_reason": null,
+      "counts": {
+        "observations": 5,
+        "contradictions": 2,
+        "missing_information": 6,
+        "hypotheses": 3,
+        "statements_dropped_by_checks": 0
+      },
+      "seconds": 43.1,
+      "checks": [
+        {
+          "check": "CONTRADICTIONS_FOUND",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "UNKNOWNS_FOUND",
+          "status": "FAIL",
+          "details": [
+            {
+              "expected": "Field operating condition not recorded",
+              "similarity": 0.726,
+              "matched": "Retrieve or reconstruct operating condition logs from device telemetry for the event period"
+            }
+          ]
+        },
+        {
+          "check": "NO_PROHIBITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "CITATIONS_VALID",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "EXPECTED_EVIDENCE_CITED",
+          "status": "PASS",
+          "details": []
+        },
+        {
+          "check": "GROUNDED",
+          "status": "PASS",
+          "details": []
+        }
+      ]
+    }
+  ],
+  "generated_at": "2026-10-05T09:43:00.406060+00:00"
+}

@@ -1,9 +1,9 @@
 """Platform administration: onboarding drafts and validation, tenant provisioning jobs, domain and identity-provider verification."""
 
+import re
 import secrets
 import uuid
-from datetime import datetime, timezone
-from urllib.parse import urlparse
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -13,7 +13,9 @@ from auth.emailer import (
     send_activation_email,
 )
 from auth.service import _hash
+from backend.app.business_ids import business_id_of
 from backend.app.customer_lifecycle import (
+    PRE_ACTIVE_CUSTOMER_STATUSES,
     build_customer_tenant,
     shared_data_plane,
 )
@@ -22,7 +24,6 @@ from backend.app.db.models.customer_lifecycle import (
     CustomerDomain,
     CustomerOnboardingDraft,
     DomainVerification,
-    IdentityProviderConfiguration,
     ProvisioningJob,
     ProvisioningJobStep,
     TenantEnvironment,
@@ -43,7 +44,6 @@ from backend.app.db.session import get_db
 from backend.app.access.schemas import (
     CustomerProvisionRequest,
     DomainVerificationRequest,
-    IdentityProviderVerificationRequest,
     OnboardingDraftRequest,
 )
 from backend.app.access.authz import _require_platform_admin
@@ -75,6 +75,9 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
             region=payload.region,
             residency_region=payload.residency,
         )
+        reference = (payload.customer_reference or "").strip()
+        if reference and not customer.crm_reference:
+            customer.crm_reference = reference
         db.add(customer)
         db.add(tenant)
         db.flush()
@@ -175,6 +178,9 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
         delivery = "ALREADY_CREATED"
         invite_state = "EXISTING"
     prerequisites = {
+        # The customer record exists (created above, or already there on a retry); the CUSTOMER step reads this key
+        # and was recorded as failed while it was missing.
+        "customer": db.query(Customer.id).filter(Customer.id == tenant.customer_id).first() is not None,
         "tenant": True,
         "plan": True,
         "membership": True,
@@ -254,6 +260,16 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     tenant.provisioning_status = "ACTIVE" if tenant.status == "ACTIVE" else "RUNNING"
     tenant.activated_at = now if tenant.status == "ACTIVE" else None
     tenant.updated_at = now
+    # A customer whose first tenant goes live is active too (it used to stay PROVISIONING, which kept the customer
+    # out of "add a tenant" and the customer status workflow). A customer already past onboarding is left alone.
+    owner = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
+    customer_activated = False
+    if tenant.status == "ACTIVE" and owner is not None and owner.lifecycle_status in PRE_ACTIVE_CUSTOMER_STATUSES:
+        owner.lifecycle_status = "ACTIVE"
+        owner.lock_version = int(owner.lock_version or 0) + 1
+        owner.updated_by = admin.id
+        owner.updated_at = now
+        customer_activated = True
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -270,6 +286,8 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
                 "invitation": invite_state,
                 "email_delivery": delivery,
                 "prerequisites": prerequisites,
+                "customer_activated": customer_activated,
+                "reason": (payload.reason or "").strip() or None,
             },
             created_at=now,
         )
@@ -279,12 +297,15 @@ def provision_tenant(payload: CustomerProvisionRequest, request: Request, db: Se
     customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first()
     return {
         "customer_id": str(customer.id) if customer else None,
+        "customer_business_id": customer.business_id if customer else None,
         "customer_identifier": customer.customer_identifier if customer else None,
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "tenant_key": key,
         "tenant_identifier": tenant.tenant_identifier,
         "status": tenant.status,
         "customer_admin_id": str(user.id),
+        "customer_admin_business_id": user.business_id,
         "customer_admin_email": email,
         "invitation": invite_state,
         "email_delivery": delivery,
@@ -302,20 +323,67 @@ def validate_onboarding(payload: CustomerProvisionRequest, request: Request, db:
     return {"valid": True, "checks": _validate_onboarding_payload(payload, db), "mutation": "NONE", "resume_safe": True}
 
 
+# Proof of a domain: a file the domain's owner publishes over HTTPS (dnspython is not a dependency, so no DNS TXT).
+PROOF_PATH = "/.well-known/mdarix-verify.txt"
+PROOF_MAX_BYTES = 4096
+CHALLENGE_DAYS = 14
+_DOMAIN = re.compile(r"^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$")
+
+
+def fetch_domain_proof(domain: str, timeout: float = 5.0) -> tuple[str | None, str | None]:
+    """(content, None) of https://<domain>/.well-known/mdarix-verify.txt, or (None, error code).
+
+    Fetched through the connector outbound policy (backend/app/access/outbound.py): public addresses only (checked on
+    the open socket), no redirects followed, HTTPS only, and at most 4 KB read, so a domain name typed by an
+    administrator can never be used to reach an internal service.
+    """
+    from urllib.error import HTTPError, URLError
+    from urllib.request import Request as UrlRequest
+
+    from backend.app.access.outbound import ConnectorDestinationBlocked, safe_urlopen
+
+    request = UrlRequest(f"https://{domain}{PROOF_PATH}", headers={"Accept": "text/plain"}, method="GET")
+    try:
+        with safe_urlopen(request, timeout=timeout) as response:
+            body = response.read(PROOF_MAX_BYTES + 1)
+    except HTTPError as exc:
+        if 300 <= exc.code < 400:
+            return None, "PROOF_REDIRECT_NOT_FOLLOWED"
+        return None, "PROOF_NOT_FOUND" if exc.code == 404 else f"PROOF_HTTP_{exc.code}"
+    except ConnectorDestinationBlocked:
+        return None, "PROOF_DESTINATION_BLOCKED"
+    except (URLError, TimeoutError, OSError):
+        return None, "PROOF_UNREACHABLE"
+    if len(body) > PROOF_MAX_BYTES:
+        return None, "PROOF_TOO_LARGE"
+    return body.decode("utf-8", errors="replace"), None
+
+
+def _proof_matches(content: str, token: str) -> bool:
+    return any(line.strip() == token for line in content.splitlines())
+
+
 @router.post("/platform-admin/tenants/{tenant_id}/domain-verifications")
 def verify_customer_domain(
     tenant_id: uuid.UUID, payload: DomainVerificationRequest, request: Request, db: Session = Depends(get_db)
 ):
-    """Record an authenticated domain challenge/verification result.
+    """Prove that a customer controls a domain: MDARIX issues a token, the customer publishes it, MDARIX checks.
 
-    The actual DNS/file proof is supplied by the deployment or identity
-    provider; MDARIX stores only the hashed challenge and verified state.
+    Without ``verification_token`` a new token is issued and returned once (only its hash is stored), with where
+    to publish it: one line in ``https://<domain>/.well-known/mdarix-verify.txt``. With the token, MDARIX fetches
+    that file and the domain becomes VERIFIED only when the file contains it; otherwise it stays PENDING and the
+    answer says why (``last_error``), so the administrator can fix it and check again. Every issue and check is
+    audited with the result, never the token.
     """
     admin = _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    domain = payload.domain.strip().lower()
+    domain = payload.domain.strip().lower().rstrip(".")
+    if not _DOMAIN.match(domain):
+        raise HTTPException(
+            422, detail={"code": "DOMAIN_INVALID", "message": "Enter a domain name such as example.com"}
+        )
     row = (
         db.query(CustomerDomain)
         .filter(CustomerDomain.customer_id == tenant.customer_id, CustomerDomain.domain == domain)
@@ -333,113 +401,105 @@ def verify_customer_domain(
         )
         db.add(row)
         db.flush()
+    token = (payload.verification_token or "").strip()
+    issued = None
+    if not token:
+        issued = f"mdarix-verify-{secrets.token_urlsafe(24)}"
+        token_hash = hash_token(issued)
+    else:
+        token_hash = hash_token(token)
     challenge = (
         db.query(DomainVerification)
         .filter(DomainVerification.customer_domain_id == row.id)
         .order_by(DomainVerification.created_at.desc())
         .first()
     )
-    if challenge is None:
+    if challenge is None or challenge.verification_token_hash != token_hash:
+        # A token MDARIX did not issue (typed by the administrator from the customer) is a new challenge too: what
+        # proves control is that the domain publishes it.
         challenge = DomainVerification(
             id=uuid.uuid4(),
             customer_domain_id=row.id,
-            verification_method=payload.verification_method,
-            verification_token_hash=hash_token(payload.verification_token or secrets.token_urlsafe(24)),
+            verification_method="HTTPS_FILE",
+            verification_token_hash=token_hash,
             status="PENDING",
+            expires_at=now + timedelta(days=CHALLENGE_DAYS),
             created_at=now,
         )
         db.add(challenge)
-    if payload.verification_token:
-        challenge.status = "VERIFIED"
-        challenge.verified_at = now
-        row.status = "VERIFIED"
-        row.updated_at = now
+    error = None
+    if issued is None:
+        if challenge.expires_at is not None and challenge.expires_at <= now and challenge.status != "VERIFIED":
+            error = "CHALLENGE_EXPIRED"
+        else:
+            content, error = fetch_domain_proof(domain)
+            if error is None and not _proof_matches(content or "", token):
+                error = "PROOF_MISMATCH"
+        if error is None:
+            challenge.status = "VERIFIED"
+            challenge.verified_at = now
+            row.status = "VERIFIED"
+            row.updated_at = now
+        elif row.status != "VERIFIED":
+            row.status = "PENDING"
+            row.updated_at = now
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
             tenant_id=admin.tenant_id,
             actor_ref=str(admin.id),
-            action="DOMAIN_VERIFICATION_UPDATED",
+            action="DOMAIN_VERIFICATION_ISSUED" if issued else "DOMAIN_VERIFICATION_CHECKED",
             entity_type="CustomerDomain",
             entity_id=row.id,
-            details={"domain": domain, "status": row.status, "method": challenge.verification_method},
+            details={
+                "domain": domain,
+                "tenant_id": str(tenant.id),
+                "status": row.status,
+                "method": challenge.verification_method,
+                "checked_at": None if issued else now.isoformat(),
+                "error": error,
+            },
             created_at=now,
         )
     )
     db.commit()
-    return {
+    result = {
         "tenant_id": str(tenant.id),
         "domain": domain,
         "status": row.status,
         "verification_id": str(challenge.id),
         "verified_at": challenge.verified_at,
+        "method": challenge.verification_method,
+        "proof_url": f"https://{domain}{PROOF_PATH}",
+        "last_checked_at": None if issued else now.isoformat(),
+        "last_error": error,
     }
+    if issued:
+        result.update(
+            verification_token=issued,
+            expires_at=challenge.expires_at.isoformat() if challenge.expires_at else None,
+            instructions=f"Publish a file at https://{domain}{PROOF_PATH} whose content is the token on one line, "
+            "then check again with the token.",
+        )
+    return result
 
 
 @router.post("/platform-admin/tenants/{tenant_id}/identity-provider/verify")
-def verify_identity_provider(
-    tenant_id: uuid.UUID, payload: IdentityProviderVerificationRequest, request: Request, db: Session = Depends(get_db)
-):
-    """Persist a provider verification contract after external discovery succeeds."""
-    admin = _require_platform_admin(request, db)
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-    if tenant is None:
-        raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    parsed = urlparse(payload.issuer)
-    if parsed.scheme not in {"https"} or not parsed.netloc:
-        raise HTTPException(
-            422, detail={"code": "IDENTITY_ISSUER_MUST_BE_HTTPS", "message": "Identity provider issuer must use HTTPS"}
-        )
-    now = datetime.now(timezone.utc)
-    row = (
-        db.query(IdentityProviderConfiguration)
-        .filter(
-            IdentityProviderConfiguration.tenant_id == tenant.id,
-            IdentityProviderConfiguration.provider_type == payload.provider_type,
-        )
-        .first()
+def verify_identity_provider(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """Single sign-on is not part of this release: nothing is recorded and no provider is ever marked VERIFIED.
+
+    Sign-in is email, password and an authenticator app. This answers 409 whatever is sent, so that no screen or
+    script can claim a verified identity provider that MDARIX does not actually use.
+    """
+    _require_platform_admin(request, db)
+    raise HTTPException(
+        409,
+        detail={
+            "code": "SSO_NOT_AVAILABLE",
+            "message": "Single sign-on is not available in this release; sign-in uses a password and an "
+            "authenticator app.",
+        },
     )
-    if row is None:
-        row = IdentityProviderConfiguration(
-            id=uuid.uuid4(),
-            tenant_id=tenant.id,
-            provider_type=payload.provider_type,
-            issuer=payload.issuer,
-            client_reference=payload.client_reference,
-            login_mode="SSO_MFA",
-            configuration={},
-            status="VERIFIED",
-            verified_at=now,
-            created_at=now,
-            updated_at=now,
-        )
-        db.add(row)
-    else:
-        row.issuer = payload.issuer
-        row.client_reference = payload.client_reference
-        row.status = "VERIFIED"
-        row.verified_at = now
-        row.updated_at = now
-    db.add(
-        AuditEvent(
-            id=uuid.uuid4(),
-            tenant_id=admin.tenant_id,
-            actor_ref=str(admin.id),
-            action="IDENTITY_PROVIDER_VERIFIED",
-            entity_type="IdentityProviderConfiguration",
-            entity_id=row.id,
-            details={"provider_type": row.provider_type, "issuer": row.issuer},
-            created_at=now,
-        )
-    )
-    db.commit()
-    return {
-        "tenant_id": str(tenant.id),
-        "provider_type": row.provider_type,
-        "issuer": row.issuer,
-        "status": row.status,
-        "verified_at": row.verified_at,
-    }
 
 
 @router.get("/platform-admin/provisioning-jobs/{job_id}")
@@ -473,7 +533,9 @@ def get_provisioning_job(job_id: uuid.UUID, request: Request, db: Session = Depe
         "id": str(job.id),
         "job_identifier": job.job_identifier,
         "customer_id": str(job.customer_id),
+        "customer_business_id": business_id_of(db, Customer, job.customer_id),
         "tenant_id": str(job.tenant_id) if job.tenant_id else None,
+        "tenant_business_id": business_id_of(db, Tenant, job.tenant_id),
         "status": job.status,
         "retry_count": job.retry_count,
         "failure_details": job.failure_details,

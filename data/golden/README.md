@@ -8,7 +8,7 @@ This dataset is an evaluation asset for MDARIX R1. It is designed to test whethe
 
 ## Dataset Version
 
-`r1-day3-golden-v1`
+`r1-ai-golden-v2`
 
 The dataset is generated deterministically with seed `31003`.
 
@@ -58,10 +58,13 @@ Ground Truth must not flow into normal application retrieval.
 - Late-arriving evidence.
 - False temporal correlation.
 - Multiple plausible complaint mechanisms.
+- An instruction aimed at the AI model inside an evidence record (VS013).
+- Synthetic personal data inside an evidence record, which must be masked before any model request (VS014).
+- A leading investigation question that asserts the cause (VS015).
 
 ## Relationship to Golden Scenarios
 
-The dataset implements VS001 through VS012. Application-facing records support the scenarios, while expected conclusions, prohibited conclusions, hidden causal structure, and abstention behavior are stored only in `evaluation/ground_truth/`.
+The dataset implements VS001 through VS015 (VS013-VS015 are adversarial: prompt injection inside evidence, personal data inside evidence, and a leading question; see `docs/validation/AI_GOLDEN_DATASET_QUALIFICATION.md`). Application-facing records support the scenarios, while expected conclusions, prohibited conclusions, hidden causal structure, and abstention behavior are stored only in `evaluation/ground_truth/`.
 
 ## Safe Reset
 

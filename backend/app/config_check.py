@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import base64
 import os
+import re
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,8 +20,15 @@ from backend.app.runtime_env import PRODUCTION, environment, is_production_like
 
 # Values that only ever appear in templates and examples; a server that still shows one was never configured.
 PLACEHOLDER_MARKERS = ("example.com", "example.test", "changeme", "change-me", "change_me")
+# Text left for the lawyer in a legal document: the draft banner, or a [PLACEHOLDER] in square brackets (no lower-case
+# letters, so a Markdown link such as [Privacy policy](/privacy) or [text][ref] never matches).
+LEGAL_DRAFT_BANNER = re.compile(r"\bDRAFT\b")
+LEGAL_PLACEHOLDER = re.compile(r"\[(?=[^\]\n]*\S)[^\]\na-z]+\](?![(\[])")
 # A connector may reach a private address only when an operator has accepted that this removes the SSRF protection.
 CONNECTOR_HOSTS_ACKNOWLEDGEMENT = "MDARIX_CONNECTOR_ALLOWED_HOSTS_ACKNOWLEDGED"
+# Production keeps an off-site backup copy in a bucket, unless an operator states that copies leave the server another
+# way (for example the managed database's own backups and point-in-time recovery).
+BACKUP_OFFSITE_ACKNOWLEDGEMENT = "MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED"
 
 
 def _get(name: str) -> str:
@@ -136,6 +144,7 @@ def problems(*, offline: bool = False) -> list[str]:
         add("MDARIX_LEGAL_TEXT_APPROVED must be true once a lawyer has approved the privacy policy and terms")
     add(_legal_documents_problem())
     found.extend(_alerting_problems())
+    found.extend(_backup_and_monitoring_problems())
 
     if _get("MDARIX_RATE_LIMITS_ENABLED").lower() in {"0", "false", "no"}:
         add("MDARIX_RATE_LIMITS_ENABLED must not be false")
@@ -180,8 +189,8 @@ def _owner_credentials_problems() -> list[str]:
     """Owner credentials belong to the one-shot migrate and backup jobs (.env.migrate), never to a running service.
 
     A long-running service holding the owner password could bypass row-level security if any part of it were
-    compromised, so the API refuses to start with it in reach. The same applies to the owner connection strings of
-    dedicated customer databases.
+    compromised, so the API refuses to start with it in reach. The same applies to the backup login and to the owner
+    connection strings of dedicated customer databases.
     """
     found = []
     if _get("MDARIX_DB_OWNER_PASSWORD"):
@@ -189,7 +198,15 @@ def _owner_credentials_problems() -> list[str]:
             "MDARIX_DB_OWNER_PASSWORD must not be in a long-running service's environment: keep the owner "
             "credentials in .env.migrate, which only the migrate and backup jobs load"
         )
-    owner_urls = sorted(name for name in os.environ if name.startswith("MDARIX_DATA_PLANE_") and name.endswith("_OWNER"))
+    if _get("MDARIX_BACKUP_DB_PASSWORD"):
+        # The backup login reads every organization's rows (BYPASSRLS): it is no safer in reach than the owner's.
+        found.append(
+            "MDARIX_BACKUP_DB_PASSWORD must not be in a long-running service's environment: keep the backup "
+            "credentials in .env.migrate, which only the migrate and backup jobs load"
+        )
+    owner_urls = sorted(
+        name for name in os.environ if name.startswith("MDARIX_DATA_PLANE_") and name.endswith("_OWNER")
+    )
     if owner_urls:
         found.append(f"{', '.join(owner_urls)} must not be in a long-running service's environment (.env.migrate)")
     runtime_user = _get("MDARIX_DB_RUNTIME_USER")
@@ -209,6 +226,44 @@ def _alerting_problems() -> list[str]:
             "Set MDARIX_TRIAL_ALERT_EMAIL and/or MDARIX_DEMO_ALERT_EMAIL: nobody would hear about trial and demo requests"
         )
     return found
+
+
+def _https_url_problem(name: str, purpose: str) -> str | None:
+    value = _get(name)
+    if not value:
+        return f"{name} must be set in production: {purpose}"
+    parsed = urlparse(value)
+    if parsed.scheme != "https" or not parsed.hostname:
+        return f"{name} must be an https:// address"
+    return None
+
+
+def _backup_and_monitoring_problems() -> list[str]:
+    """Production backups are encrypted, leave the server, and an outside monitor notices when they or the scheduler
+    stop (docs/runbooks/BACKUP_AND_RESTORE.md). The backup job reads the same .env.production."""
+    if environment() != PRODUCTION:
+        return []
+    found = []
+    recipient = _get("MDARIX_BACKUP_AGE_RECIPIENT")
+    if not recipient:
+        found.append(
+            "MDARIX_BACKUP_AGE_RECIPIENT must be set in production: the age public key backups are encrypted to"
+        )
+    elif not recipient.startswith(("age1", "ssh-ed25519 ", "ssh-rsa ")):
+        found.append("MDARIX_BACKUP_AGE_RECIPIENT must be an age public key (age1...) or an SSH public key")
+    bucket = _get("MDARIX_BACKUP_S3_URI")
+    if bucket and not bucket.startswith("s3://"):
+        found.append("MDARIX_BACKUP_S3_URI must be an s3:// address")
+    elif not bucket and _get(BACKUP_OFFSITE_ACKNOWLEDGEMENT).lower() != "true":
+        found.append(
+            "Backups must leave the server: set MDARIX_BACKUP_S3_URI (off-site bucket), or set "
+            f"{BACKUP_OFFSITE_ACKNOWLEDGEMENT}=true if copies leave another way (e.g. managed database backups)"
+        )
+    found.append(_https_url_problem("MDARIX_BACKUP_HEARTBEAT_URL", "an outside monitor must notice when backups stop"))
+    found.append(
+        _https_url_problem("MDARIX_SCHEDULER_HEARTBEAT_URL", "an outside monitor must notice when the scheduler stops")
+    )
+    return [item for item in found if item]
 
 
 def _session_and_mfa_problems() -> list[str]:
@@ -262,6 +317,24 @@ def _legal_documents_problem() -> str | None:
     missing = [name for name in LEGAL_DOCUMENTS.values() if not (Path(folder) / name).is_file()]
     if missing:
         return f"MDARIX_LEGAL_DIR is missing {', '.join(missing)}"
+    # The approval flag alone would publish a draft: each document must also read as final.
+    unfinished = []
+    for name in LEGAL_DOCUMENTS.values():
+        try:
+            text = (Path(folder) / name).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            unfinished.append(f"{name} (cannot be read as UTF-8 text)")
+            continue
+        reasons = []
+        if LEGAL_DRAFT_BANNER.search(text):
+            reasons.append("the DRAFT banner")
+        placeholders = LEGAL_PLACEHOLDER.findall(text)
+        if placeholders:
+            reasons.append(f"{len(placeholders)} [PLACEHOLDER] text(s), first {placeholders[0][:40]}")
+        if reasons:
+            unfinished.append(f"{name} ({' and '.join(reasons)})")
+    if unfinished:
+        return f"Legal documents still hold draft text (publish the lawyer-approved wording): {'; '.join(unfinished)}"
     return None
 
 
@@ -292,7 +365,9 @@ def _runtime_role_problem() -> str | None:
 
         with runtime_engine.connect() as connection:
             row = connection.execute(
-                text("SELECT rolname, rolsuper OR rolbypassrls AS unrestricted FROM pg_roles WHERE rolname = current_user")
+                text(
+                    "SELECT rolname, rolsuper OR rolbypassrls AS unrestricted FROM pg_roles WHERE rolname = current_user"
+                )
             ).one()
     except Exception as exc:
         return f"Could not check the database role the server runs as ({type(exc).__name__})"

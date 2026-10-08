@@ -1,11 +1,19 @@
-import { useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { DOMAINS, PlatformAdminScreen } from "./PlatformAdminScreen";
 import { AdminArea, isAreaDomain } from "./areas/AdminArea";
-import { LEGACY_SECTIONS } from "./areas/sections";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
+import { nextTabIndex } from "../shared/focus";
+import {
+  DATA_INTEGRATION_STAGES,
+  DOMAIN_ALIASES,
+  LEGACY_SECTIONS,
+  dataIntegrationStep,
+  sectionGuide,
+} from "./areas/sections";
 import { AdminOverview, type OverviewTarget } from "./console/AdminOverview";
 import { CustomersAndTenants } from "./customers/CustomersAndTenants";
 import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSection } from "./customers/model";
@@ -22,13 +30,17 @@ type Location = { domain: string; item: string };
 // The landing page (formerly "Overview"); any unknown or old target opens it.
 const OVERVIEW = "Dashboard";
 const CUSTOMERS_AND_TENANTS = "Customers & Tenants";
+/** The initial section that opens the new-customer wizard (App.tsx, the former create-customer screen). */
+const NEW_CUSTOMER = "New customer";
 // "Platform Overview" is replaced by the dashboard below; every other domain keeps its real workspaces.
 const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
 
 function locationFor(target: OverviewTarget | string): Location {
   // A string is a domain, or "Domain:Section" for a deep link.
-  const [domainName, deepItem] =
+  const [requestedDomain, deepItem] =
     typeof target === "string" ? (target.split(":", 2) as [string, string | undefined]) : [target.domain, target.item];
+  // Former area names (Data & Configuration, Integrations) open the area that replaced them.
+  const domainName = DOMAIN_ALIASES[requestedDomain] ?? requestedDomain;
   const domain = SECTIONS.find((entry) => entry[0] === domainName);
   if (!domain) return { domain: OVERVIEW, item: OVERVIEW };
   const items = domain[3] as readonly string[];
@@ -39,10 +51,15 @@ function locationFor(target: OverviewTarget | string): Location {
 
 export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, initialSection = OVERVIEW }: Props) {
   const [location, setLocation] = useState<Location>(() =>
-    (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
-      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection })
-      : locationFor(initialSection),
+    initialSection === NEW_CUSTOMER
+      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })
+      : (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
+        ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection })
+        : locationFor(initialSection),
   );
+  // "New customer" (the dashboard button, or the former create-customer screen) opens the wizard on Customers.
+  const [createCustomer, setCreateCustomer] = useState(initialSection === NEW_CUSTOMER);
+  const creatingStarted = useCallback(() => setCreateCustomer(false), []);
   const [refreshKey, setRefreshKey] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [query, setQuery] = useState("");
@@ -88,7 +105,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="ac-brand">
-          MDARIX <span>Administrator control plane</span>
+          MDARIX <span>Platform administration</span>
         </div>
         <div className="ac-search">
           <label>
@@ -136,7 +153,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
 
       <div className="ac-body">
         <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Administrator navigation">
-          <p className="ac-nav-label">Administrator control plane</p>
+          <p className="ac-nav-label">Platform administration</p>
           <button
             type="button"
             className={location.domain === OVERVIEW ? "selected" : ""}
@@ -187,7 +204,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
             <>
               <div className="ac-page-head">
                 <div>
-                  <p className="ac-eyebrow">Administrator control plane</p>
+                  <p className="ac-eyebrow">Platform administration</p>
                   <h1>Dashboard</h1>
                   <p>Live status across customers, subscriptions, integrations, security and operations.</p>
                 </div>
@@ -202,12 +219,17 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
                   </button>
                 </div>
               </div>
-              <AdminOverview
-                refreshKey={refreshKey}
-                onOpen={open}
-                onCreateCustomer={() => open({ domain: CUSTOMERS_AND_TENANTS, item: "Onboarding" })}
-                onUpdated={setUpdatedAt}
-              />
+              <SectionErrorBoundary name="The dashboard" resetKey={refreshKey}>
+                <AdminOverview
+                  refreshKey={refreshKey}
+                  onOpen={open}
+                  onCreateCustomer={() => {
+                    setCreateCustomer(true);
+                    open({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" });
+                  }}
+                  onUpdated={setUpdatedAt}
+                />
+              </SectionErrorBoundary>
               <section className="ac-areas" aria-label="Administration areas">
                 <h2>Administration areas</h2>
                 <div>
@@ -227,49 +249,98 @@ export function SimplifiedPlatformAdminScreen({ securityContext, onNavigate, ini
               <>
                 <div className="ac-page-head">
                   <div>
-                    <p className="ac-eyebrow">Administrator control plane · {activeDomain[1]}</p>
+                    <p className="ac-eyebrow">Platform administration · {activeDomain[1]}</p>
                     <h1>{activeDomain[0]}</h1>
+                    {/* One line on what the open section is for (Data & Integrations has its own step guide). */}
+                    {sectionGuide(activeDomain[0], location.item) && (
+                      <p className="ac-muted">{sectionGuide(activeDomain[0], location.item)}</p>
+                    )}
                   </div>
                 </div>
-                <div className="ac-tabs" role="tablist" aria-label={`${activeDomain[0]} sections`}>
-                  {(activeDomain[3] as readonly string[]).map((item) => (
-                    <button
-                      type="button"
-                      role="tab"
-                      key={item}
-                      aria-selected={location.item === item}
-                      className={location.item === item ? "selected" : ""}
-                      onClick={() => setLocation({ domain: activeDomain[0], item })}
-                    >
-                      {item}
-                    </button>
-                  ))}
+                <div
+                  className="ac-tabs"
+                  role="tablist"
+                  aria-label={`${activeDomain[0]} sections`}
+                  onKeyDown={(event) => {
+                    // Arrow keys, Home and End move between the sections (WAI-ARIA tabs pattern).
+                    const items = activeDomain[3] as readonly string[];
+                    const next = nextTabIndex(event.key, Math.max(0, items.indexOf(location.item)), items.length);
+                    if (next === null) return;
+                    event.preventDefault();
+                    setLocation({ domain: activeDomain[0], item: items[next] });
+                    const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+                    buttons[next]?.focus();
+                  }}
+                >
+                  {(() => {
+                    const tab = (item: string) => {
+                      const step = dataIntegrationStep(item);
+                      return (
+                        <button
+                          type="button"
+                          role="tab"
+                          key={item}
+                          tabIndex={location.item === item ? 0 : -1}
+                          aria-selected={location.item === item}
+                          className={location.item === item ? "selected" : ""}
+                          onClick={() => setLocation({ domain: activeDomain[0], item })}
+                        >
+                          {step && (
+                            <span className="ac-tab-step" aria-hidden="true">
+                              {step.number}
+                            </span>
+                          )}
+                          {item}
+                        </button>
+                      );
+                    };
+                    const items = activeDomain[3] as readonly string[];
+                    // Data & Integrations is a sequence: each stage keeps its name and its numbered steps together.
+                    if (!items.every((item) => dataIntegrationStep(item)))
+                      return items.map((item) => <Fragment key={item}>{tab(item)}</Fragment>);
+                    return DATA_INTEGRATION_STAGES.map((stage) => (
+                      <span className="ac-tab-group" key={stage.stage}>
+                        <span className="ac-tab-stage" aria-hidden="true">
+                          {stage.stage}
+                        </span>
+                        {stage.sections.map((item) => tab(item))}
+                      </span>
+                    ));
+                  })()}
                 </div>
                 <div className="ac-workspace" role="tabpanel" aria-label={location.item}>
-                  {location.domain === CUSTOMERS_AND_TENANTS ? (
-                    <CustomersAndTenants
-                      section={location.item as CustomerTenantSection}
-                      onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
-                    />
-                  ) : isAreaDomain(location.domain) ? (
-                    <AdminArea
-                      key={`${location.domain}:${location.item}`}
-                      domain={location.domain}
-                      section={location.item}
-                    />
-                  ) : (
-                    <PlatformAdminScreen
-                      embedded
-                      securityContext={securityContext}
-                      onNavigate={onNavigate}
-                      initialDomain={location.domain}
-                      initialItem={location.item}
-                      onLocationChange={(domain, item) => {
-                        if (domain === "Platform Overview") open(OVERVIEW);
-                        else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
-                      }}
-                    />
-                  )}
+                  <SectionErrorBoundary
+                    name={`${activeDomain[0]} · ${location.item}`}
+                    resetKey={`${location.domain}:${location.item}`}
+                  >
+                    {location.domain === CUSTOMERS_AND_TENANTS ? (
+                      <CustomersAndTenants
+                        section={location.item as CustomerTenantSection}
+                        onSection={(item) => setLocation({ domain: CUSTOMERS_AND_TENANTS, item })}
+                        startCreating={createCustomer}
+                        onCreatingStarted={creatingStarted}
+                      />
+                    ) : isAreaDomain(location.domain) ? (
+                      <AdminArea
+                        key={`${location.domain}:${location.item}`}
+                        domain={location.domain}
+                        section={location.item}
+                        onSection={(item) => setLocation({ domain: location.domain, item })}
+                      />
+                    ) : (
+                      <PlatformAdminScreen
+                        embedded
+                        securityContext={securityContext}
+                        onNavigate={onNavigate}
+                        initialDomain={location.domain}
+                        initialItem={location.item}
+                        onLocationChange={(domain, item) => {
+                          if (domain === "Platform Overview") open(OVERVIEW);
+                          else if (domain !== location.domain || item !== location.item) setLocation({ domain, item });
+                        }}
+                      />
+                    )}
+                  </SectionErrorBoundary>
                 </div>
               </>
             )

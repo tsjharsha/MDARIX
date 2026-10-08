@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.db.tenant_scope import bind_connection_system
 from ingestion.adapters.csv_adapter import CSVSourceAdapter
 from ingestion.adapters.evidence_file_adapter import EvidenceFileAdapter
 from ingestion.adapters.json_adapter import JSONSourceAdapter
@@ -131,6 +132,8 @@ class IngestionService:
         tenant_key = "ACME_CARE_SYNTHETIC"
         now = utcnow()
         with engine.begin() as conn:
+            # The organization and its customer are protected by row-level security (md34): an operator step.
+            bind_connection_system(conn)
             tenant_id = conn.execute(
                 text("SELECT id FROM tenants WHERE tenant_key=:tenant_key"), {"tenant_key": tenant_key}
             ).scalar_one_or_none()
@@ -389,11 +392,13 @@ class IngestionService:
             "supplier_id",
             "site_id",
             "lot_id",
+            # Evidence metadata also contains an investigation_id. Its durable
+            # source identity is the evidence record, not its current owner.
+            "evidence_id",
             "investigation_id",
             "risk_id",
             "failure_mode_id",
             "control_id",
-            "evidence_id",
             "filename",
         ]:
             if raw.get(key):

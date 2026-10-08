@@ -1,9 +1,10 @@
 import { CheckCircle2, Download, RefreshCw, XCircle } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
-import { Table, formatDate, listOf, send, useResource } from "../shared";
+import { Table, formatDate, idColumn, listOf, send, useResource } from "../shared";
 import { LifecycleBadge } from "./Access";
+import { hideUuid } from "../../../app/displayId";
+import { readable } from "../labels";
 
 type DataExport = {
   id: string;
@@ -25,8 +26,7 @@ function DataExports() {
     <Panel
       eyebrow="Your data"
       title="Export all your data"
-      state={exports.state}
-      error={exports.error}
+      source={exports}
       action={
         <span className="ca-row-actions">
           <button type="button" className="ac-secondary" onClick={() => exports.reload()}>
@@ -56,8 +56,8 @@ function DataExports() {
       }
     >
       <p className="ac-muted">
-        One zip with a JSON Lines file per table, your stored files and a manifest of row counts and checksums. Each
-        download is recorded in the audit trail.
+        One zip file with all your records, your stored files and a list of what is inside, so you can check that
+        nothing is missing. Each download is recorded in the audit trail.
       </p>
       <Table
         caption="Data exports"
@@ -68,8 +68,9 @@ function DataExports() {
           detail: "Prepare an export to download everything your organization stored.",
         }}
         columns={[
+          idColumn("Export ID"),
           { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
-          { key: "status", label: "Status", render: (row) => titleCase(row.status) },
+          { key: "status", label: "Status", render: (row) => readable(row.status) },
           {
             key: "contents",
             label: "Contents",
@@ -110,16 +111,12 @@ export function OrganizationSection() {
         <Panel eyebrow="Organization" title={context?.current_tenant?.tenant_name ?? "Your organization"}>
           <dl className="ca-facts">
             <div>
-              <dt>Tenant key</dt>
-              <dd>{context?.current_tenant?.tenant_key ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Tenant ID</dt>
-              <dd className="ca-mono-sm">{context?.tenant_id ?? "—"}</dd>
+              <dt>Organization ID</dt>
+              <dd>{hideUuid(context?.tenant_business_id ?? context?.current_tenant?.tenant_business_id)}</dd>
             </div>
             <div>
               <dt>Environment</dt>
-              <dd>{titleCase(context?.environment ?? "—")}</dd>
+              <dd>{readable(context?.environment)}</dd>
             </div>
             <div>
               <dt>Plan</dt>
@@ -127,8 +124,8 @@ export function OrganizationSection() {
             </div>
           </dl>
           <p className="ac-muted">
-            Company details, data residency and region are set when MDARIX provisions your organization. Contact your
-            account team to change them.
+            Company details and where your data is stored are set by MDARIX when your organization is set up. Contact
+            your MDARIX account team to change them.
           </p>
         </Panel>
         <Panel eyebrow="Your account" title={context?.display_name ?? "Administrator"}>
@@ -148,7 +145,8 @@ export function OrganizationSection() {
               "Invite, suspend, restore and offboard users",
               "Create roles and permission sets and assign them",
               "Configure connections, mappings and their releases",
-              "Set single sign-on, reminders and contacts",
+              "Turn AI processing on or off, and set reminders and contacts",
+              "Work in the investigation workspace with an Investigator's rights",
               "Review and export the audit trail",
             ].map((item) => (
               <li key={item}>
@@ -168,26 +166,26 @@ export function OrganizationSection() {
           </ul>
         </Panel>
       </div>
-      <Panel eyebrow="Organization" title="Products" state={products.state} error={products.error}>
+      <Panel eyebrow="Organization" title="Products" source={products}>
         <Table
           caption="Products"
           rows={listOf(products.data)}
           rowKey={(row) => row.id}
-          empty={{ title: "No products yet", detail: "Products appear once your product data is connected." }}
+          empty={{
+            title: "No products yet",
+            detail: "Products appear once your product data is imported or connected under Integrations.",
+          }}
           columns={[
+            idColumn("Product ID", "product_identifier"),
             {
               key: "name",
               label: "Product",
-              render: (row) => (
-                <span className="ca-person">
-                  <strong>{row.name}</strong>
-                  <small>{row.product_identifier}</small>
-                </span>
-              ),
+              fields: ["name"],
+              render: (row) => <strong>{row.name}</strong>,
             },
             { key: "family", label: "Family", render: (row) => row.product_family ?? "—" },
             { key: "versions", label: "Versions", numeric: true, render: (row) => row.version_count ?? 0 },
-            { key: "status", label: "Lifecycle", render: (row) => <LifecycleBadge status={row.lifecycle_status} /> },
+            { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.lifecycle_status} /> },
           ]}
         />
       </Panel>

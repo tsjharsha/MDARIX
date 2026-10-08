@@ -32,7 +32,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import get_request_context
-from backend.app.access.permissions import AI_RUN, effective_role, permissions_for_role
+from backend.app.access.permissions import AI_RUN, effective_permissions, effective_role, permissions_for_role
 
 router = APIRouter(prefix="/api/v1/ask", tags=["Ask MDARIX"])
 ASK_FEATURE = "ASK_MDARIX"
@@ -64,6 +64,8 @@ def _authenticated_context(request: Request, db: Session) -> dict:
         "user_id": ctx.user_id,
         "tenant_id": ctx.tenant_id,
         "active_role": effective_role(db, ctx),
+        # What the person may do: the union over their account role and additional workflow roles.
+        "permissions": effective_permissions(db, ctx),
         "correlation_id": ctx.correlation_id,
     }
 
@@ -198,7 +200,8 @@ def ask(
     context = _authenticated_context(request, db)
     # Ask resolves its own session, so its AI permission is checked here with the server-trusted role.
     role = context["active_role"]
-    if AI_RUN not in permissions_for_role(role):
+    granted = context.get("permissions")
+    if AI_RUN not in (permissions_for_role(role) if granted is None else granted):
         raise HTTPException(
             403,
             detail={
@@ -451,6 +454,7 @@ def ask(
                 .filter(
                     HypothesisEvidence.tenant_id == UUID(context["tenant_id"]),
                     HypothesisEvidence.hypothesis_id.in_(hypothesis_ids) if hypothesis_ids else False,
+                    HypothesisEvidence.retracted_at.is_(None),  # a withdrawn link no longer counts
                 )
                 .all()
             )
@@ -464,19 +468,34 @@ def ask(
                 .all()
             )
             evidence_by_id = {row.id: row for row in evidence_rows}
+            hypothesis_business_ids = {row.id: row.business_id for row in hypotheses}
             intelligence = {
                 "hypotheses": [
-                    {"id": str(row.id), "statement": row.statement, "status": row.status, "origin": row.origin}
+                    {
+                        "id": str(row.id),
+                        "business_id": row.business_id,
+                        "statement": row.statement,
+                        "status": row.status,
+                        "origin": row.origin,
+                    }
                     for row in hypotheses
                 ],
                 "unknowns": [
-                    {"id": str(row.id), "category": row.category, "description": row.description, "status": row.status}
+                    {
+                        "id": str(row.id),
+                        "business_id": row.business_id,
+                        "category": row.category,
+                        "description": row.description,
+                        "status": row.status,
+                    }
                     for row in unknowns
                 ],
                 "provenance": [
                     {
                         "hypothesis_id": str(link.hypothesis_id),
+                        "hypothesis_business_id": hypothesis_business_ids.get(link.hypothesis_id),
                         "evidence_id": str(link.evidence_id),
+                        "evidence_business_id": evidence_by_id[link.evidence_id].business_id,
                         "evidence_identifier": evidence_by_id[link.evidence_id].evidence_identifier,
                         "relation_type": link.relation_type,
                         "created_by_type": link.created_by_type,

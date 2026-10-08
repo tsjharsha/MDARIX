@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Pencil, Plus } from "lucide-react";
+import { ArrowRight, GitBranch, Layers, Package, Pencil, Plug, Plus } from "lucide-react";
 import { Panel, StatTile } from "../console/charts";
 import {
   ConfirmDialog,
@@ -8,19 +8,28 @@ import {
   Table,
   errorText,
   formatDate,
+  idColumn,
   listOf,
   matches,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
-import { titleCase } from "../customers/model";
+import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { MappingCheckResult, MappingWizard } from "../../mapping/MappingWizard";
 import type { MappingCheck } from "../../mapping/mappingModel";
 import { requestJson } from "../../../app/apiClient";
 import { Intro, TenantPicker } from "./common";
-import { RELEASE_STEPS, changePolicyLabel, mappingRuleCount, nextReleaseAction, releaseStageOf } from "./dataModel";
+import {
+  RELEASE_STEPS,
+  changePolicyLabel,
+  mappingRuleCount,
+  mappingStatusLabel,
+  nextReleaseAction,
+  releaseStageOf,
+  versionLabel,
+} from "./dataModel";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
@@ -82,9 +91,9 @@ function DataModel() {
                   className={row.entity_id === entityId ? "selected" : ""}
                   aria-current={row.entity_id === entityId ? "true" : undefined}
                   onClick={() => setSelected(row.entity_id)}
+                  title={row.business_id}
                 >
                   <strong>{row.entity_name}</strong>
-                  <small>{row.business_id}</small>
                 </button>
               </li>
             ))}
@@ -116,10 +125,9 @@ function DataModel() {
               key: "field",
               label: "Field",
               render: (row) => (
-                <span className="cc-stack">
-                  <strong>{row.field_label ?? titleCase(row.field_name)}</strong>
-                  <small>{row.field_name}</small>
-                </span>
+                <strong title={`Technical name: ${row.field_name}`}>
+                  {row.field_label ?? titleCase(row.field_name)}
+                </strong>
               ),
             },
             {
@@ -180,8 +188,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
     <Panel
       eyebrow="Source system → MDARIX"
       title="Mappings"
-      state={mappings.state}
-      error={mappings.error}
+      source={mappings}
       action={
         <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
           <Plus size={16} aria-hidden="true" /> New mapping
@@ -218,7 +225,8 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
       {tenant && (
         <p className="ac-note">
           Preparing drafts for {tenant.name}. Their own Customer Administrators request approval, approve (a second
-          administrator) and release them, so the customer decides what imports into their data.
+          administrator) and release them, so the customer decides what imports into their data. Their mappings are
+          listed here but cannot be opened: the field details are shown only inside the customer&apos;s own tenant.
         </p>
       )}
       <div className="cc-toolbar">
@@ -226,7 +234,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
         <select aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
           {STATUS_FILTERS.map((value) => (
             <option key={value} value={value}>
-              {value ? titleCase(value) : "All statuses"}
+              {value ? mappingStatusLabel(value) : "All statuses"}
             </option>
           ))}
         </select>
@@ -245,12 +253,12 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
               tenant ? (
                 <span className="cc-stack">
                   <strong>{row.code}</strong>
-                  <small>Version {row.version}</small>
+                  <small>{versionLabel(row.version)}</small>
                 </span>
               ) : (
                 <button type="button" className="ac-link cc-stack" onClick={() => setOpen(row)}>
                   <strong>{row.code}</strong>
-                  <small>Version {row.version}</small>
+                  <small>{versionLabel(row.version)}</small>
                 </button>
               ),
           },
@@ -260,7 +268,7 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
             label: "From → to",
             render: (row) => (
               <span className="ar-route">
-                {titleCase(row.source_system)} <ArrowRight size={14} aria-hidden="true" />{" "}
+                {displayCode(row.source_system)} <ArrowRight size={14} aria-hidden="true" />{" "}
                 {titleCase(row.target_entity)}
               </span>
             ),
@@ -272,7 +280,11 @@ function Mappings({ onMessage }: { onMessage: Notify }) {
             numeric: true,
             render: (row) => mappingRuleCount(row.mapping_rules),
           },
-          { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => <StatusBadge status={row.status} label={mappingStatusLabel(row.status)} />,
+          },
         ]}
       />
       {open && <MappingDetail mapping={open} onClose={() => setOpen(null)} />}
@@ -332,10 +344,11 @@ function MappingDetail({ mapping, onClose }: { mapping: Mapping; onClose: () => 
     <Drawer title={mapping.code} onClose={onClose}>
       <div className="ar-drawer-body">
         <p className="ar-route">
-          {titleCase(mapping.source_system)} <ArrowRight size={14} aria-hidden="true" />{" "}
+          {displayCode(mapping.source_system)} <ArrowRight size={14} aria-hidden="true" />{" "}
           {titleCase(mapping.target_entity)}
           <span>
-            · Version {mapping.version} · <StatusBadge status={mapping.status} />
+            · {versionLabel(mapping.version)} ·{" "}
+            <StatusBadge status={mapping.status} label={mappingStatusLabel(mapping.status)} />
           </span>
         </p>
         <h3 className="ar-subhead">Fields</h3>
@@ -386,8 +399,12 @@ function MappingDetail({ mapping, onClose }: { mapping: Mapping; onClose: () => 
           rowKey={(row, index) => String(row.id ?? index)}
           empty={{ title: "One version", detail: "No other version of this mapping exists." }}
           columns={[
-            { key: "version", label: "Version", render: (row) => row.version },
-            { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+            { key: "version", label: "Version", render: (row) => versionLabel(row.version) },
+            {
+              key: "status",
+              label: "Status",
+              render: (row) => <StatusBadge status={row.status} label={mappingStatusLabel(row.status)} />,
+            },
             { key: "updated", label: "Changed", render: (row) => formatDate(row.updated_at ?? row.created_at) },
           ]}
         />
@@ -452,7 +469,7 @@ function Releases({ onMessage }: { onMessage: Notify }) {
           </button>
         ))}
       </section>
-      <Panel eyebrow="Configuration releases" title="Releases" state={mappings.state} error={mappings.error}>
+      <Panel eyebrow="Configuration releases" title="Releases" source={mappings}>
         <Intro>
           A mapping goes live only after someone requests approval and a different administrator approves it. Releasing
           replaces nothing silently: a released version can be rolled back.
@@ -461,7 +478,12 @@ function Releases({ onMessage }: { onMessage: Notify }) {
           caption="Releases"
           rows={rows}
           rowKey={(row) => row.id}
-          empty={{ title: "Nothing here", detail: stage ? "Choose another stage." : "No mapping yet." }}
+          empty={{
+            title: stage ? "No mappings at this stage" : "No mappings yet",
+            detail: stage
+              ? "Choose another stage above, or choose it again to show every mapping."
+              : "Create a mapping under Mappings; it appears here to be approved and released.",
+          }}
           columns={[
             {
               key: "mapping",
@@ -470,12 +492,16 @@ function Releases({ onMessage }: { onMessage: Notify }) {
                 <button type="button" className="ac-link cc-stack" onClick={() => setOpen(row)}>
                   <strong>{row.code}</strong>
                   <small>
-                    {titleCase(row.source_system)} → {titleCase(row.target_entity)} · {row.version}
+                    {displayCode(row.source_system)} → {titleCase(row.target_entity)} · {versionLabel(row.version)}
                   </small>
                 </button>
               ),
             },
-            { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+            {
+              key: "status",
+              label: "Status",
+              render: (row) => <StatusBadge status={row.status} label={mappingStatusLabel(row.status)} />,
+            },
             {
               key: "next",
               label: "Next step",
@@ -536,12 +562,12 @@ function ReleaseHistory({
               <div>
                 <dt>Status</dt>
                 <dd>
-                  <StatusBadge status={data.status} />
+                  <StatusBadge status={data.status} label={mappingStatusLabel(data.status)} />
                 </dd>
               </div>
               <div>
                 <dt>Version</dt>
-                <dd>{data.version}</dd>
+                <dd>{versionLabel(data.version)}</dd>
               </div>
               <div>
                 <dt>Field rules</dt>
@@ -580,19 +606,20 @@ function ReleaseHistory({
   );
 }
 
-const REFERENCE_VIEWS = [
+// The views in two groups: the rules mappings and checks apply, and the controlled values they use.
+const RULE_VIEWS = [
   "Transformations",
   "Validation rules",
   "Data-quality rules",
   "Lookup rules",
-  "Value sets",
-  "Countries",
-  "Units",
-  "Time zones",
-  "Jurisdictions",
   "Customer change policies",
 ] as const;
-type ReferenceView = (typeof REFERENCE_VIEWS)[number];
+const VALUE_VIEWS = ["Value sets", "Countries", "Units", "Time zones", "Jurisdictions"] as const;
+const REFERENCE_GROUPS = [
+  ["Rules", RULE_VIEWS],
+  ["Reference values", VALUE_VIEWS],
+] as const;
+type ReferenceView = (typeof RULE_VIEWS)[number] | (typeof VALUE_VIEWS)[number];
 
 /** The rules and controlled values mappings and checks rely on. Read-only: master data changes go through a release. */
 function RulesAndReferenceData() {
@@ -635,7 +662,7 @@ function RulesAndReferenceData() {
               { key: "name", label: "Rule", render: (row) => <strong>{row.label}</strong> },
               { key: "type", label: "Checks", render: (row) => titleCase(row.rule_type) },
               { key: "severity", label: "Severity", render: (row) => titleCase(row.severity) },
-              { key: "blocking", label: "Stops a release", render: (row) => yes(row.blocking) },
+              { key: "blocking", label: "Blocks a release", render: (row) => yes(row.blocking) },
             ]}
           />
         );
@@ -660,7 +687,7 @@ function RulesAndReferenceData() {
               { key: "record", label: "Record", render: (row) => row.entity ?? "—" },
               { key: "type", label: "Kind", render: (row) => titleCase(row.type) },
               { key: "severity", label: "Severity", render: (row) => titleCase(row.severity) },
-              { key: "blocking", label: "Blocks", render: (row) => yes(row.blocking) },
+              { key: "blocking", label: "Blocks a release", render: (row) => yes(row.blocking) },
             ]}
           />
         );
@@ -807,23 +834,23 @@ function RulesAndReferenceData() {
     }
   })();
   return (
-    <Panel
-      eyebrow="Master data · read-only"
-      title="Rules & reference data"
-      state={reference.state}
-      error={reference.error}
-    >
+    <Panel eyebrow="Read-only" title="Rules & reference data" source={reference}>
       <Intro>
         The rules and controlled values that mappings and data checks use. They change only through a controlled
         release, so they are shown here without edit buttons.
       </Intro>
-      <div className="ca-chips" role="group" aria-label="Show">
-        {REFERENCE_VIEWS.map((item) => (
-          <button key={item} type="button" className={view === item ? "selected" : ""} onClick={() => setView(item)}>
-            {item}
-          </button>
-        ))}
-      </div>
+      {REFERENCE_GROUPS.map(([group, views]) => (
+        <div key={group} className="ca-chips ar-chip-group" role="group" aria-label={group}>
+          <span className="ar-chip-group-label" aria-hidden="true">
+            {group}
+          </span>
+          {views.map((item) => (
+            <button key={item} type="button" className={view === item ? "selected" : ""} onClick={() => setView(item)}>
+              {item}
+            </button>
+          ))}
+        </div>
+      ))}
       {body}
     </Panel>
   );
@@ -833,6 +860,7 @@ type ProductConfiguration = {
   tenant: { id: string; tenant_key: string; name: string; status: string };
   products: Array<{
     id: string;
+    business_id?: string | null;
     identifier: string;
     name: string;
     status: string;
@@ -841,7 +869,14 @@ type ProductConfiguration = {
     manufacturer?: string | null;
   }>;
   versions: Array<{ id: string; product_id: string; identifier: string; status: string; release_timestamp?: string }>;
-  connectors: Array<{ id: string; code: string; connector_type: string; version: string; status: string }>;
+  connectors: Array<{
+    id: string;
+    business_id?: string | null;
+    code: string;
+    connector_type: string;
+    version: string;
+    status: string;
+  }>;
   mapping_versions: Array<{ id: string; master_mapping_id: string; version: string; status: string }>;
 };
 
@@ -872,32 +907,31 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
               label="Products"
               value={data ? data.products.length : null}
               detail="In this tenant"
-              icon={<Plus size={18} />}
+              icon={<Package size={18} />}
             />
             <StatTile
               label="Product versions"
               value={data ? data.versions.length : null}
               detail="All products"
-              icon={<Plus size={18} />}
+              icon={<Layers size={18} />}
             />
             <StatTile
               label="Connections"
               value={data ? data.connectors.length : null}
               detail="Source systems"
-              icon={<ArrowRight size={18} />}
+              icon={<Plug size={18} />}
             />
             <StatTile
               label="Mapping versions"
               value={data ? data.mapping_versions.length : null}
               detail="Tenant-specific mappings"
-              icon={<ArrowRight size={18} />}
+              icon={<GitBranch size={18} />}
             />
           </section>
           <Panel
             eyebrow={data?.tenant.name ?? "Tenant"}
             title="Products"
-            state={config.state}
-            error={config.error}
+            source={config}
             action={
               <button type="button" className="ac-primary" onClick={() => setDialog({ kind: "product" })}>
                 <Plus size={16} aria-hidden="true" /> Add product
@@ -910,16 +944,14 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
               rowKey={(row) => row.id}
               empty={{ title: "No products", detail: "Add the tenant's first product." }}
               columns={[
+                idColumn("Product ID", "identifier"),
                 {
                   key: "product",
                   label: "Product",
                   render: (row) => (
                     <span className="cc-stack">
                       <strong>{row.name}</strong>
-                      <small>
-                        {row.identifier}
-                        {row.family ? ` · ${row.family}` : ""}
-                      </small>
+                      {row.family && <small>{row.family}</small>}
                     </span>
                   ),
                 },
@@ -958,22 +990,21 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
             />
           </Panel>
           <div className="ac-grid two">
-            <Panel eyebrow="Source systems" title="Connections" state={config.state} error={config.error}>
+            <Panel eyebrow="Source systems" title="Connections" source={config}>
               <Table
                 caption="Connections"
                 rows={data?.connectors ?? []}
                 rowKey={(row) => row.id}
                 empty={{ title: "No connections", detail: "This tenant has no source system connected." }}
                 columns={[
+                  idColumn("Connection ID", "code"),
                   {
                     key: "connection",
                     label: "Connection",
                     render: (row) => (
                       <span className="cc-stack">
-                        <strong>{row.code}</strong>
-                        <small>
-                          {row.connector_type} · {row.version}
-                        </small>
+                        <strong>{displayCode(row.connector_type)}</strong>
+                        <small>{versionLabel(row.version)}</small>
                       </span>
                     ),
                   },
@@ -981,15 +1012,23 @@ function CustomerConfiguration({ onMessage }: { onMessage: Notify }) {
                 ]}
               />
             </Panel>
-            <Panel eyebrow="Tenant-specific" title="Mapping versions" state={config.state} error={config.error}>
+            <Panel eyebrow="Tenant-specific" title="Mapping versions" source={config}>
+              <Intro>
+                Versions of the standard mappings adjusted for this tenant. The mapping names are listed under Mappings
+                (choose this tenant there).
+              </Intro>
               <Table
                 caption="Mapping versions"
                 rows={data?.mapping_versions ?? []}
                 rowKey={(row) => row.id}
                 empty={{ title: "None", detail: "This tenant uses the standard mappings." }}
                 columns={[
-                  { key: "version", label: "Version", render: (row) => <strong>{row.version}</strong> },
-                  { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+                  { key: "version", label: "Version", render: (row) => <strong>{versionLabel(row.version)}</strong> },
+                  {
+                    key: "status",
+                    label: "Status",
+                    render: (row) => <StatusBadge status={row.status} label={mappingStatusLabel(row.status)} />,
+                  },
                 ]}
               />
             </Panel>

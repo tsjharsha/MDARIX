@@ -1,22 +1,48 @@
 import { useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, UserPlus } from "lucide-react";
 import { Panel } from "../console/charts";
-import { SearchBox, Table, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, idColumn, useResource } from "../../customer-admin/shared";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 import { CustomerImportDialog } from "./CustomerImportDialog";
-import type { CustomerAccount } from "./model";
+import { lifecycleStatusLabel, type CustomerAccount } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { Pager } from "../areas/common";
+
+/** Columns the server can order every page by (backend platform_customer_accounts.py). */
+const CUSTOMER_SORT_KEYS = [
+  "business_id",
+  "customer",
+  "tenants",
+  "admins",
+  "status",
+  "name",
+  "customer_identifier",
+  "legal_name",
+  "country",
+  "created_at",
+  "tenant_count",
+  "active_admins",
+] as const;
 
 /**
  * Every customer once, with the tenants it owns. A customer is the legal and commercial parent; each tenant is a
  * separate workspace and data boundary with its own plan and administrators. Opening a row shows the customer.
  */
-export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => void }) {
+export function CustomerDirectory({
+  onOpen,
+  onCreate,
+}: {
+  onOpen: (customerId: string) => void;
+  /** Starts the new-customer wizard (its first tenant, plan and Customer Administrator). */
+  onCreate?: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [plan, setPlan] = useState("");
   const [page, setPage] = useState(1);
   const [importing, setImporting] = useState(false);
-  const params = new URLSearchParams({ page: String(page) });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (status) params.set("status", status);
   if (plan.trim()) params.set("plan", plan.trim());
@@ -38,10 +64,14 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
     <Panel
       eyebrow="Customers"
       title="Customer directory"
-      state={customers.state}
-      error={customers.error}
+      source={customers}
       action={
         <span className="cc-actions">
+          {onCreate && (
+            <button type="button" className="ac-primary" onClick={onCreate}>
+              <UserPlus size={16} aria-hidden="true" /> New customer
+            </button>
+          )}
           <a
             className="ac-secondary"
             href={`/api/v1/platform-admin/customers?${exportParams}`}
@@ -64,7 +94,8 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
         <select aria-label="Status" value={status} onChange={(event) => reset(() => setStatus(event.target.value))}>
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
+          <option value="SUSPENDED">Inactive</option>
+          <option value="PROVISIONING">Provisioning</option>
           <option value="PROVISIONED">Provisioned</option>
           <option value="EXPIRED">Expired</option>
         </select>
@@ -81,8 +112,13 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
         caption="Customers"
         rows={customers.data?.items ?? []}
         rowKey={(row) => row.id}
-        empty={{ title: "No matching customers", detail: "Change the search or filters, or onboard a new customer." }}
+        serverSort={{ sort, onSort, keys: CUSTOMER_SORT_KEYS }}
+        empty={{
+          title: "No matching customers",
+          detail: "Change the search or filters, or add one with New customer.",
+        }}
         columns={[
+          idColumn("Customer ID", "customer_identifier"),
           {
             key: "customer",
             fields: ["name", "customer_identifier", "legal_name"],
@@ -90,7 +126,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
             render: (row) => (
               <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
                 <strong>{row.name || "Unnamed customer"}</strong>
-                <small>{row.customer_identifier}</small>
+                {row.legal_name && row.legal_name !== row.name && <small>{row.legal_name}</small>}
               </button>
             ),
           },
@@ -121,7 +157,11 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
             numeric: true,
             render: (row) => row.active_admins,
           },
-          { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => <StatusBadge status={row.status} label={lifecycleStatusLabel(row.status)} />,
+          },
           {
             key: "open",
             label: "",
@@ -133,20 +173,7 @@ export function CustomerDirectory({ onOpen }: { onOpen: (customerId: string) => 
           },
         ]}
       />
-      <div className="cc-pager">
-        <span>
-          {total} customer{total === 1 ? "" : "s"}
-        </span>
-        <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>
-          Page {page} of {pages}
-        </span>
-        <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-          Next
-        </button>
-      </div>
+      <Pager page={page} pages={pages} total={total} noun="customer" onPage={setPage} />
       {importing && (
         <CustomerImportDialog
           onClose={() => setImporting(false)}

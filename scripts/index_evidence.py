@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.app.db.models.foundation import Evidence, Tenant  # noqa: E402
 from backend.app.db.session import SessionLocal  # noqa: E402
+from backend.app.db.tenant_scope import bind_system  # noqa: E402
 from retrieval.indexing import index_tenant_evidence  # noqa: E402
 
 
@@ -29,6 +30,7 @@ def main() -> int:
     args = parser.parse_args()
 
     db = SessionLocal()
+    bind_system(db, "index organizations' evidence for retrieval")
     try:
         query = db.query(Tenant)
         if args.tenant:

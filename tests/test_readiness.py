@@ -112,7 +112,10 @@ def test_the_request_log_line_carries_the_path_without_the_query_string(caplog):
 
 
 def test_logged_text_never_shows_tokens_or_passwords():
-    assert redact("sent https://app/activate-account?token=abc123&x=1") == "sent https://app/activate-account?token=[REDACTED]&x=1"
+    assert (
+        redact("sent https://app/activate-account?token=abc123&x=1")
+        == "sent https://app/activate-account?token=[REDACTED]&x=1"
+    )
     assert redact("Password=hunter2; api_key=k") == "Password=[REDACTED]; api_key=[REDACTED]"
     record = logging.LogRecord("t", logging.INFO, __file__, 1, "reset link token=%s", ("tok-xyz",), None)
     formatted = JsonFormatter().format(record)

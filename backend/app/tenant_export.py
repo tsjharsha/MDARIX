@@ -32,6 +32,7 @@ from pathlib import Path
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.app.csv_safe import safe_cell
 from backend.app.db.models.foundation import AuditEvent, Tenant
 from backend.app.db.models.stage2 import OutboxEvent, TenantExport
 
@@ -45,16 +46,30 @@ SECRET_COLUMN = re.compile(
 )
 SCHEMAS = ("public", "md_master")
 FETCH_ROWS = 1000
-# The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order).
+# The quality records a reader opens first, as spreadsheets: table -> (file name, columns in reading order). Each
+# starts with the record's MDARIX identifier (business_id), then the customer's own number for it.
 # Columns absent from a schema are skipped, so an older dedicated plane still exports.
 READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "investigations": (
         "readable/investigations.csv",
-        ("investigation_identifier", "status", "investigation_question", "product_id", "owner_ref", "opened_at", "closed_at", "created_at", "updated_at", "id"),
+        (
+            "business_id",
+            "investigation_identifier",
+            "status",
+            "investigation_question",
+            "product_id",
+            "owner_ref",
+            "opened_at",
+            "closed_at",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
     "complaints": (
         "readable/complaints.csv",
         (
+            "business_id",
             "complaint_identifier",
             "status",
             "severity",
@@ -83,11 +98,40 @@ READABLE_TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "capas": (
         "readable/capas.csv",
-        ("capa_identifier", "title", "status", "action_type", "source_type", "source_reference", "product_id", "investigation_id", "opened_at", "due_at", "effectiveness_check_at", "created_at", "updated_at", "id"),
+        (
+            "business_id",
+            "capa_identifier",
+            "title",
+            "status",
+            "action_type",
+            "source_type",
+            "source_reference",
+            "product_id",
+            "investigation_id",
+            "opened_at",
+            "due_at",
+            "effectiveness_check_at",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
     "evidence": (
         "readable/evidence_index.csv",
-        ("evidence_identifier", "title", "evidence_type", "fact_type", "reliability_status", "investigation_id", "source_reference", "document_ref", "created_at", "updated_at", "id"),
+        (
+            "business_id",
+            "evidence_identifier",
+            "title",
+            "evidence_type",
+            "fact_type",
+            "reliability_status",
+            "investigation_id",
+            "source_reference",
+            "document_ref",
+            "created_at",
+            "updated_at",
+            "id",
+        ),
     ),
 }
 
@@ -141,6 +185,7 @@ def request_export(db: Session, tenant_id, requested_by: str, reason: str) -> Te
 def describe(row: TenantExport) -> dict:
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "status": row.status,
         "requested_by": row.requested_by,
         "reason": row.reason,
@@ -209,13 +254,17 @@ def _write_readable(db: Session, archive: zipfile.ZipFile, tenant_id, manifest: 
     present = {
         name
         for (name,) in db.execute(
-            text("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'")
+            text(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'"
+            )
         )
     }
     for table, (name, preferred) in READABLE_TABLES.items():
         if table not in present:
             continue
-        result = db.execute(text(f'SELECT * FROM "{table}" WHERE tenant_id = :tenant ORDER BY created_at, id'), {"tenant": tenant_id})
+        result = db.execute(
+            text(f'SELECT * FROM "{table}" WHERE tenant_id = :tenant ORDER BY created_at, id'), {"tenant": tenant_id}
+        )
         available = set(result.keys())
         columns = [column for column in preferred if column in available]
         count = 0
@@ -227,7 +276,8 @@ def _write_readable(db: Session, archive: zipfile.ZipFile, tenant_id, manifest: 
             sheet.writeheader()
             while rows := result.fetchmany(FETCH_ROWS):
                 for row in rows:
-                    sheet.writerow({key: _cell(row._mapping[key]) for key in columns})
+                    # Formula-safe: a value starting with =, +, -, @ must not run when the sheet is opened.
+                    sheet.writerow({key: safe_cell(_cell(row._mapping[key])) for key in columns})
                     count += 1
                 writer.write(buffer.getvalue())
                 buffer.seek(0)
@@ -253,7 +303,11 @@ def _build_archive(db: Session, tenant_id, tenant: Tenant | None, storage, path:
 
     now = datetime.now(timezone.utc)
     manifest: dict = {
-        "organization": {"id": str(tenant_id), "name": tenant.display_name if tenant else None},
+        "organization": {
+            "id": str(tenant_id),
+            "business_id": tenant.business_id if tenant else None,
+            "name": tenant.display_name if tenant else None,
+        },
         "generated_at": now.isoformat(),
         "format": (
             "JSON Lines per table under data/; CSV spreadsheets of the quality records under readable/; "

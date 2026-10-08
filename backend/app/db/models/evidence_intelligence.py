@@ -57,17 +57,25 @@ class EvidenceObservation(Base):
     limitations: Mapped[dict | None] = mapped_column(JSONB)
     ai_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at = now_tz()
+    # md30: what kind of statement this is (FACT, SOURCE_ASSERTION, DERIVED_OBSERVATION, AI_INTERPRETATION) and who
+    # made it (HUMAN, AI, SYSTEM); a person's observation names the case it was made in.
+    epistemic_type: Mapped[str | None] = mapped_column(String(30))
+    origin: Mapped[str | None] = mapped_column(String(20))
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
         ForeignKeyConstraint(["tenant_id", "chunk_id"], ["evidence_chunks.tenant_id", "evidence_chunks.id"]),
         ForeignKeyConstraint(["tenant_id", "ai_execution_id"], ["ai_executions.tenant_id", "ai_executions.id"]),
         CheckConstraint(
-            "observation_type in ('EXPLICIT_SOURCE_STATEMENT','STRUCTURED_EXTRACTION','DETERMINISTIC_DERIVATION','AI_EXTRACTED_OBSERVATION')",
+            # HUMAN_OBSERVATION / HUMAN: observations a person records in a case (md31).
+            "observation_type in ('EXPLICIT_SOURCE_STATEMENT','STRUCTURED_EXTRACTION','DETERMINISTIC_DERIVATION',"
+            "'AI_EXTRACTED_OBSERVATION','HUMAN_OBSERVATION')",
             name="evidence_obs_type_allowed",
         ),
         CheckConstraint(
-            "extraction_method in ('DETERMINISTIC','GENAI')",
+            "extraction_method in ('DETERMINISTIC','GENAI','HUMAN')",
             name="evidence_obs_method_allowed",
         ),
         UniqueConstraint("tenant_id", "id", name="uq_evidence_observations_tenant_id_id"),

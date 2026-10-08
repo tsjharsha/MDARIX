@@ -2,7 +2,7 @@ import datetime as dt
 
 from fastapi.testclient import TestClient
 
-from backend.app.db.models.foundation import Investigation, Tenant
+from backend.app.db.models.foundation import Evidence, Investigation, InvestigationEvidence, Tenant
 from backend.app.db.session import SessionLocal
 from backend.app.main import app
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
@@ -73,6 +73,46 @@ def test_workspace_known_as_of_excludes_late_available_evidence():
         or dt.datetime.fromisoformat(evidence["temporal"]["ingestion_timestamp"]) <= as_of
         for evidence in known.evidence_context
     )
+
+
+def test_workspace_rejects_staged_only_cross_investigation_claim():
+    """Raw staging metadata cannot authorize evidence for an investigation."""
+    db = SessionLocal()
+    try:
+        tenant = db.query(Tenant).filter(Tenant.tenant_key == "ACME_CARE_SYNTHETIC").one()
+        inv_001 = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-001")
+            .one()
+        )
+        inv_002 = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant.id, Investigation.investigation_identifier == "INV-002")
+            .one()
+        )
+        evidence = (
+            db.query(Evidence)
+            .filter(Evidence.tenant_id == tenant.id, Evidence.evidence_identifier == "EV-VS002-001")
+            .one()
+        )
+        evidence.investigation_id = inv_001.id
+        db.query(InvestigationEvidence).filter(
+            InvestigationEvidence.tenant_id == tenant.id,
+            InvestigationEvidence.investigation_id == inv_002.id,
+            InvestigationEvidence.evidence_id == evidence.id,
+        ).delete(synchronize_session=False)
+        db.flush()
+
+        rows = (
+            InvestigationWorkspaceService()
+            ._investigation_evidence_query(db, tenant.id, inv_002.id, "current", None)
+            .all()
+        )
+
+        assert "EV-VS002-001" not in {row.evidence_identifier for row in rows}
+    finally:
+        db.rollback()
+        db.close()
 
 
 def test_workspace_api_endpoint():

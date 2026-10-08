@@ -2,6 +2,7 @@ from evaluation.harness import (
     configuration_hash,
     configuration_snapshot,
     classify_configuration_change,
+    load_scenarios,
     run_golden_suite,
 )
 
@@ -9,7 +10,8 @@ from evaluation.harness import (
 def test_golden_suite_runs_all_canonical_scenarios_without_ground_truth_runtime_leakage():
     result = run_golden_suite()
     assert result["status"] == "PASS"
-    assert len(result["scenario_results"]) == 12
+    # VS001-VS012 plus the adversarial VS013-VS015.
+    assert len(result["scenario_results"]) == len(load_scenarios()) == 15
     assert result["ground_truth_runtime_leakage"] == 0
 
 

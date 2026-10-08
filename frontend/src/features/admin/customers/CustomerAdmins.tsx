@@ -1,18 +1,22 @@
-import { useState } from "react";
-import { KeyRound, MailPlus, PauseCircle, PlayCircle, ShieldOff, UserPlus } from "lucide-react";
+import { useRef, useState } from "react";
+import { Copy, KeyRound, Link2, MailPlus, PauseCircle, PlayCircle, ShieldOff, UserPlus } from "lucide-react";
 import { Panel } from "../console/charts";
 import {
   ConfirmDialog,
   SearchBox,
   Table,
   errorText,
+  formatDate,
+  idColumn,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
 import { tenantOptionLabel, type CustomerAdmin, type TenantSummary } from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { safeText } from "../../../app/displayId";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { activationLinkError } from "./dataGovernance";
 
 const REASON = { label: "Reason (kept in the audit trail)", min: 5 };
 
@@ -45,6 +49,7 @@ export function CustomerAdmins({
   const admins = useResource<{ items: CustomerAdmin[] }>(`/api/v1/platform-admin/customer-admins?${params}`);
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [adding, setAdding] = useState(false);
+  const [linkFor, setLinkFor] = useState<CustomerAdmin | null>(null);
   const rows = admins.data?.items ?? [];
   const base = (row: CustomerAdmin) => `/api/v1/platform-admin/customer-admins/${row.id}`;
   const name = (row: CustomerAdmin) => row.display_name || row.email;
@@ -67,6 +72,11 @@ export function CustomerAdmins({
           }
         >
           <MailPlus size={14} aria-hidden="true" /> Resend invitation
+        </button>
+      )}
+      {String(row.status).toUpperCase() === "INVITED" && (
+        <button type="button" className="ac-link" onClick={() => setLinkFor(row)}>
+          <Link2 size={14} aria-hidden="true" /> Copy activation link
         </button>
       )}
       {row.can_reset_password && (
@@ -157,8 +167,7 @@ export function CustomerAdmins({
     <Panel
       eyebrow={tenantId ? "This tenant" : customerId ? "Every tenant of this customer" : "All customers"}
       title="Customer administrators"
-      state={admins.state}
-      error={admins.error}
+      source={admins}
       action={
         <button type="button" className="ac-primary" onClick={() => setAdding(true)}>
           <UserPlus size={16} aria-hidden="true" /> Add administrator
@@ -170,7 +179,7 @@ export function CustomerAdmins({
         tenants has administrators for each.
       </p>
       <div className="cc-toolbar">
-        <SearchBox value={query} onChange={setQuery} label="Search name, email, customer or tenant" />
+        <SearchBox value={query} onChange={setQuery} label="Search name, email, ID, customer or tenant" />
         {!tenantId && tenants && tenants.length > 1 && (
           <select aria-label="Tenant" value={tenantFilter} onChange={(event) => setTenantFilter(event.target.value)}>
             <option value="">All tenants</option>
@@ -201,6 +210,7 @@ export function CustomerAdmins({
               : "No administrator matches.",
         }}
         columns={[
+          idColumn("User ID"),
           {
             key: "name",
             fields: ["display_name", "email"],
@@ -217,9 +227,14 @@ export function CustomerAdmins({
             : [
                 {
                   key: "customer",
-                  fields: ["customer_name", "customer_id"],
+                  fields: ["customer_name", "customer_business_id", "customer_id"],
                   label: "Customer",
-                  render: (row: CustomerAdmin) => <strong>{row.customer_name ?? "—"}</strong>,
+                  render: (row: CustomerAdmin) => (
+                    <span className="cc-stack">
+                      <strong>{row.customer_name ?? "—"}</strong>
+                      {safeText(row.customer_business_id) && <small>{row.customer_business_id}</small>}
+                    </span>
+                  ),
                 },
               ]),
           ...(tenantId
@@ -227,12 +242,14 @@ export function CustomerAdmins({
             : [
                 {
                   key: "tenant",
-                  fields: ["tenant_name", "tenant_key", "tenant_id"],
+                  fields: ["tenant_name", "tenant_key", "tenant_business_id", "tenant_id"],
                   label: "Tenant",
                   render: (row: CustomerAdmin) => (
                     <span className="cc-stack">
                       <strong>{row.tenant_name ?? row.tenant_key ?? "—"}</strong>
-                      <small>{row.tenant_key}</small>
+                      <small>
+                        {[safeText(row.tenant_business_id), safeText(row.tenant_key)].filter(Boolean).join(" · ")}
+                      </small>
                     </span>
                   ),
                 },
@@ -250,6 +267,7 @@ export function CustomerAdmins({
           admins.reload();
         }}
       />
+      {linkFor && <ActivationLinkDialog admin={linkFor} onClose={() => setLinkFor(null)} />}
       {adding && (
         <AddAdministrator
           tenants={tenantId ? tenants?.filter((tenant) => tenant.id === tenantId) : tenants}
@@ -379,6 +397,96 @@ function AddAdministrator({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/**
+ * A fresh single-use activation link for a person whose invitation email did not arrive, for MDARIX support to pass
+ * on. Issuing it replaces any earlier unused link and is audited (the account only, never the link). The link is a
+ * credential: it is shown once, kept only in this dialog, never logged, and forgotten when the dialog closes.
+ */
+function ActivationLinkDialog({ admin, onClose }: { admin: CustomerAdmin; onClose: () => void }) {
+  const [link, setLink] = useState<{ url: string; expires_at: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const field = useRef<HTMLInputElement>(null);
+  const issue = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      setLink(
+        await send<{ url: string; expires_at: string }>(
+          `/api/v1/platform-admin/users/${admin.id}/activation-link`,
+          "POST",
+        ),
+      );
+    } catch (reason) {
+      setError(activationLinkError(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link.url);
+      setCopied(true);
+    } catch {
+      // Without clipboard access the link is selected so it can be copied by hand.
+      field.current?.select();
+      setError("Copying was not allowed by the browser; the link is selected, copy it with Ctrl+C.");
+    }
+  };
+  const name = admin.display_name || admin.email;
+  return (
+    <div className="ac-modal-backdrop" role="presentation">
+      <DialogBehaviour onClose={onClose} />
+      <section className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="cc-activation-title">
+        <p className="ac-eyebrow">Customer administrators · recorded in the audit trail</p>
+        <h2 id="cc-activation-title">Activation link for {name}</h2>
+        {!link ? (
+          <p>
+            Use this when the invitation email did not arrive. A new single-use link is created and any earlier one
+            stops working. Whoever opens it sets the account&apos;s password, so pass it only to {admin.email}, through
+            a channel you trust.
+          </p>
+        ) : (
+          <>
+            <p>
+              Shown once. It works once and expires {formatDate(link.expires_at)}. Pass it only to {admin.email}.
+            </p>
+            <div className="cc-link-box">
+              <input
+                ref={field}
+                readOnly
+                aria-label="Activation link"
+                value={link.url}
+                onFocus={(event) => event.target.select()}
+              />
+              <button type="button" className="ac-primary" onClick={() => void copy()}>
+                <Copy size={15} aria-hidden="true" /> {copied ? "Copied" : "Copy link"}
+              </button>
+            </div>
+          </>
+        )}
+        {error && (
+          <p className="ca-inline-error" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="ac-modal-actions">
+          <button type="button" className="ac-secondary" onClick={onClose} disabled={busy} autoFocus>
+            {link ? "Done" : "Cancel"}
+          </button>
+          {!link && (
+            <button type="button" className="ac-primary" onClick={() => void issue()} disabled={busy}>
+              {busy ? "Creating…" : "Create link"}
+            </button>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

@@ -58,8 +58,8 @@ def main() -> int:
         "products": 2,
         "suppliers": 5,
         "manufacturing_sites": 2,
-        "investigations": 10,
-        "scenarios": 12,
+        "investigations": 13,
+        "scenarios": 15,
     }
     for key, expected_value in expected.items():
         if counts[key] != expected_value:
@@ -97,8 +97,8 @@ def main() -> int:
         fail("Evidence references unknown investigation")
 
     scenario_ids = {item["scenario_id"] for item in data["scenarios"]}
-    if scenario_ids != {f"VS{i:03d}" for i in range(1, 13)}:
-        fail("Scenario IDs VS001-VS012 are not complete")
+    if scenario_ids != {f"VS{i:03d}" for i in range(1, 16)}:
+        fail("Scenario IDs VS001-VS015 are not complete")
 
     pre_rev_b_shutdown = [
         c for c in data["complaints"] if c["failure_mode"] == "shutdown" and c["event_timestamp"] < "2026-01-18"
@@ -120,6 +120,9 @@ def main() -> int:
         "multiple_causes",
         "late_arriving_evidence",
         "duplicate_candidate",
+        "prompt_injection",
+        "personal_data_in_evidence",
+        "leading_question",
     ]:
         if required not in anomaly_types:
             fail(f"Missing anomaly type {required}")

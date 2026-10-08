@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
+import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../aiSettings";
 import { BadgeCheck, Bot, Gauge, ShieldCheck } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { Table, Tabs, formatDate, listOf, send, useResource } from "../shared";
+import { plural, readable } from "../labels";
 
 const TABS = ["Posture", "AI processing", "Single sign-on", "Security events"] as const;
 type Tab = (typeof TABS)[number];
+
+// How a single sign-on setup reads while MDARIX checks it ("Pending verification" alone says nothing about who acts).
+const SSO_STATUS: Record<string, string> = {
+  PENDING: "Waiting for MDARIX to verify",
+  PENDING_VERIFICATION: "Waiting for MDARIX to verify",
+};
 
 const SECURITY_ACTIONS = [
   "DENIED",
@@ -26,11 +33,12 @@ export function SecuritySection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<Tab>((TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Posture");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Security sections" />
-      {active === "Posture" && <Posture />}
-      {active === "AI processing" && <AiProcessing />}
-      {active === "Single sign-on" && <SingleSignOn />}
-      {active === "Security events" && <SecurityEvents />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Security sections">
+        {active === "Posture" && <Posture />}
+        {active === "AI processing" && <AiProcessing />}
+        {active === "Single sign-on" && <SingleSignOn />}
+        {active === "Security events" && <SecurityEvents />}
+      </Tabs>
     </>
   );
 }
@@ -38,31 +46,8 @@ export function SecuritySection({ tab }: { tab?: string }) {
 function Posture() {
   const summary = useResource<any>("/api/v1/admin/security-summary");
   const retention = useResource<any>("/api/v1/admin/retention-status");
-  const metrics = summary.data?.metrics ?? {};
   return (
     <>
-      <section className="ac-stats three" aria-label="Security figures">
-        <StatTile
-          label="Security events"
-          value={summary.state === "ready" ? (metrics.security_events ?? 0) : null}
-          detail="In the latest 200 audit events"
-          tone={summary.state === "ready" ? (metrics.security_events ? "serious" : "good") : undefined}
-          icon={<ShieldCheck size={18} />}
-        />
-        <StatTile
-          label="Policy denials"
-          value={summary.state === "ready" ? (metrics.policy_denials ?? 0) : null}
-          detail="Requests the server refused"
-          icon={<ShieldCheck size={18} />}
-        />
-        <StatTile
-          label="Audit retention"
-          value={retention.state === "ready" ? titleCase(retention.data?.status ?? "Unknown") : null}
-          detail={retention.data ? `${retention.data.policy} · ${retention.data.total_events} events` : "Unavailable"}
-          tone={retention.state === "ready" ? (retention.data?.status === "HEALTHY" ? "good" : "serious") : undefined}
-          icon={<BadgeCheck size={18} />}
-        />
-      </section>
       <div className="ac-grid two">
         <Panel eyebrow="Your account" title="Multi-factor authentication">
           <p>
@@ -74,20 +59,23 @@ function Posture() {
             </a>
           </div>
           <p className="ac-muted">
-            MFA is required for administrators and before every electronic signature. Other users can turn it on from
-            their account.
+            MFA (multi-factor authentication) is required for administrators and before every electronic signature.
+            Other users can turn it on from their account.
           </p>
         </Panel>
         <Panel eyebrow="Sessions" title="How sign-in sessions are protected">
           <ul className="ca-check-list">
-            <li>Sessions expire automatically after 60 minutes.</li>
+            <li>
+              Users are signed out after 30 minutes without activity (warned two minutes before) and must sign in again
+              after 12 hours at most.
+            </li>
             <li>Suspending or offboarding a user signs them out everywhere immediately.</li>
-            <li>Session cookies are HTTP-only and never readable by page scripts.</li>
+            <li>Sign-in details are stored where web page code cannot read or copy them.</li>
             <li>Every administrative change is recorded in the audit trail.</li>
           </ul>
         </Panel>
       </div>
-      <Panel eyebrow="Controls · declared by the security service" title="Protections in place" state={summary.state}>
+      <Panel eyebrow="Security" title="Protections in place" state={summary.state}>
         <ul className="ac-posture-list">
           {listOf(summary.data?.controls).map((control: string) => (
             <li key={control}>
@@ -95,6 +83,13 @@ function Posture() {
             </li>
           ))}
         </ul>
+        {retention.state === "ready" && retention.data && (
+          <p className="ac-muted">
+            Audit trail: {readable(retention.data.status, "Unknown").toLowerCase()}
+            {retention.data.policy ? ` · ${retention.data.policy}` : ""} ·{" "}
+            {plural(Number(retention.data.total_events ?? 0), "event")} kept.
+          </p>
+        )}
       </Panel>
     </>
   );
@@ -108,6 +103,9 @@ type AiSettings = {
   refused: number;
   month: string;
   models: { provider: string; model: string }[];
+  /** The provider content is sent to when AI is on (named in the acknowledgement); null when none is configured. */
+  provider_name: string | null;
+  masking: boolean;
 };
 
 /** Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. */
@@ -123,12 +121,13 @@ function AiProcessing() {
       title: on ? "Turn AI processing off?" : "Turn AI processing on?",
       body: on
         ? "Nothing from your organization will be sent to an AI model. Ask MDARIX, hypotheses and briefs answer from rules only, and say so."
-        : "AI features may send the records needed for an answer to the AI model listed here, with personal information masked first.",
+        : `AI features (Ask MDARIX, hypotheses, challenges and briefs) will send the records an answer needs to ${providerLabel(data?.provider_name)}. ${MASKING_SUMMARY}`,
       confirmLabel: on ? "Turn AI off" : "Turn AI on",
       reason: { label: "Reason for the change", min: 10 },
+      ...(on ? {} : { acknowledge: aiAcknowledgement(data?.provider_name) }),
       done: on ? "AI processing is off for your organization." : "AI processing is on for your organization.",
-      run: async (reason) => {
-        await send("/api/v1/admin/ai-settings", "PUT", { ai_processing_allowed: !on, reason });
+      run: async (reason, _password, acknowledged) => {
+        await send("/api/v1/admin/ai-settings", "PUT", aiSettingsPayload(!on, reason, acknowledged));
         settings.reload();
       },
     });
@@ -143,9 +142,11 @@ function AiProcessing() {
           icon={<Bot size={18} />}
         />
         <StatTile
-          label="Tokens used this month"
+          label="AI allowance used this month"
           value={data ? data.tokens_used.toLocaleString() : null}
-          detail={data ? `of ${data.monthly_token_budget.toLocaleString()} (${share.toFixed(0)}%)` : "Unavailable"}
+          detail={
+            data ? `of ${data.monthly_token_budget.toLocaleString()} units (${share.toFixed(0)}%)` : "Unavailable"
+          }
           tone={data ? (share >= 90 ? "serious" : share >= 75 ? "warning" : "good") : undefined}
           icon={<Gauge size={18} />}
         />
@@ -157,7 +158,7 @@ function AiProcessing() {
         />
       </section>
       <div className="ac-grid two">
-        <Panel eyebrow="Your organization" title="AI processing" state={settings.state} error={settings.error}>
+        <Panel eyebrow="Your organization" title="AI processing" source={settings}>
           <p>
             {on
               ? "AI features (Ask MDARIX, hypotheses, challenges and briefs) may send the records an answer needs to the model below. A person reviews every AI suggestion."
@@ -174,14 +175,16 @@ function AiProcessing() {
         </Panel>
         <Panel eyebrow="What is sent" title="How your data is protected">
           <ul className="ca-check-list">
-            <li>Names, email addresses, phone numbers, dates of birth and record numbers are masked before sending.</li>
+            <li>{MASKING_SUMMARY}</li>
             <li>Only providers under a contract that forbids training on your data, or models we host, are used.</li>
             <li>Every AI request is counted against your organization&apos;s monthly allowance.</li>
             <li>Changing this setting is recorded in the audit trail with your reason.</li>
           </ul>
           <p className="ac-muted">
             {data?.models.length
-              ? `Model in use: ${data.models.map((item) => `${item.provider} (${item.model})`).join(", ")}.`
+              ? `Model in use: ${data.models.map((item) => `${readable(item.provider)} (${item.model})`).join(", ")}${
+                  data.provider_name ? ` · provider: ${data.provider_name}` : ""
+                }.`
               : "No AI model is configured on this server, so every answer comes from rules."}
           </p>
         </Panel>
@@ -196,23 +199,28 @@ function SingleSignOn() {
   const [form, setForm] = useState({ provider_type: "OIDC", issuer: "", client_reference: "", login_mode: "SSO_MFA" });
   return (
     <>
-      <Panel eyebrow="Security" title="Identity providers" state={providers.state} error={providers.error}>
+      <p className="ca-lede" role="note">
+        Single sign-on is not available yet: everyone signs in with their MDARIX password and an authenticator app. You
+        can record your identity provider here so it is ready when single sign-on is switched on for your organization.
+        Saving it does not change how anyone signs in.
+      </p>
+      <Panel eyebrow="Security" title="Identity providers" source={providers}>
         <Table
           caption="Identity providers"
           rows={listOf(providers.data?.providers)}
           rowKey={(row) => row.id}
           empty={{ title: "Single sign-on is not set up", detail: "Users sign in with their MDARIX password." }}
           columns={[
-            { key: "type", label: "Type", render: (row) => <strong>{row.provider_type}</strong> },
-            { key: "issuer", label: "Issuer", render: (row) => row.issuer },
-            { key: "mode", label: "Sign-in", render: (row) => titleCase(row.login_mode) },
+            { key: "type", label: "Type", render: (row) => <strong>{readable(row.provider_type)}</strong> },
+            { key: "issuer", label: "Sign-in address", render: (row) => row.issuer },
+            { key: "mode", label: "Sign-in", render: (row) => readable(row.login_mode) },
             {
               key: "status",
               label: "Status",
               render: (row) => (
                 <ToneBadge
                   tone={row.status === "VERIFIED" || row.status === "ACTIVE" ? "good" : "warning"}
-                  label={titleCase(row.status)}
+                  label={SSO_STATUS[String(row.status ?? "").toUpperCase()] ?? readable(row.status)}
                 />
               ),
             },
@@ -220,11 +228,6 @@ function SingleSignOn() {
           ]}
         />
       </Panel>
-      <p className="ac-muted" role="note">
-        Single sign-on (OpenID Connect or SAML) is not available yet: everyone signs in with their MDARIX password and
-        an authenticator app. You can record your identity provider here so it is ready when single sign-on is switched
-        on for your organization. Saving it does not change how anyone signs in.
-      </p>
       <Panel eyebrow="Configure" title="Set up or change single sign-on">
         <form
           className="ca-form"
@@ -259,7 +262,7 @@ function SingleSignOn() {
               </select>
             </label>
             <label className="ca-field">
-              Issuer URL (https)
+              Sign-in address (issuer URL, https)
               <input
                 required
                 type="url"
@@ -270,9 +273,9 @@ function SingleSignOn() {
               />
             </label>
             <label className="ca-field">
-              Client reference
+              Application (client) ID
               <input
-                placeholder="Application / client id (not a secret)"
+                placeholder="Not a secret"
                 value={form.client_reference}
                 onChange={(event) => setForm({ ...form, client_reference: event.target.value })}
               />
@@ -314,7 +317,7 @@ function SecurityEvents() {
     [audit.data],
   );
   return (
-    <Panel eyebrow="Security" title="Security events" state={audit.state} error={audit.error}>
+    <Panel eyebrow="Security" title="Security events" source={audit}>
       <p className="ac-muted">
         Denied access, sign-in failures, account status changes, password resets and access changes from the latest 200
         audit events.
@@ -326,9 +329,9 @@ function SecurityEvents() {
           rowKey={(row) => row.id}
           empty={{ title: "", detail: "" }}
           columns={[
-            { key: "action", label: "Event", render: (row) => <strong>{titleCase(row.action ?? "")}</strong> },
-            { key: "object", label: "Object", render: (row) => titleCase(row.entity_type ?? "—") },
-            { key: "source", label: "Source IP", render: (row) => row.source_ip ?? "—" },
+            { key: "action", label: "Event", render: (row) => <strong>{readable(row.action)}</strong> },
+            { key: "object", label: "Applies to", render: (row) => readable(row.entity_type) },
+            { key: "source", label: "IP address", render: (row) => row.source_ip ?? "—" },
             { key: "when", label: "When", numeric: true, render: (row) => formatDate(row.created_at) },
           ]}
         />

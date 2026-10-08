@@ -40,6 +40,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 from backend.app.governance_router import bootstrap
 
 PASSWORD = os.environ.get("DAY27_FIXTURE_PASSWORD", "")
@@ -366,5 +367,6 @@ def ensure_fixture(db: Session, suffix: str) -> dict[str, str]:
 
 if __name__ == "__main__":
     with SessionLocal() as db:
+        bind_system(db, "provision the Day 27 live fixture")
         print(ensure_fixture(db, "A"))
         print(ensure_fixture(db, "B"))

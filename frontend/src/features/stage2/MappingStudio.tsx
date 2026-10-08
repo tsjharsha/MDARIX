@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { requestJson } from "../../app/apiClient";
 
 type Item = Record<string, any>;
-const request = async <T,>(url: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(url, init);
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.detail?.message ?? "Mapping Studio request failed");
-  return body;
-};
+// The shared client: the server's own message and request id on failure, and the session rules of every screen.
+const request = <T,>(url: string, init?: RequestInit): Promise<T> => requestJson<T>(url, init);
 
 export function MappingStudio() {
   const [apps, setApps] = useState<Item[]>([]),

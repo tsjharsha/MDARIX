@@ -7,6 +7,7 @@ so a failure never leaves a half-built workspace with a live activation link.
 
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import uuid
@@ -161,6 +162,7 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
     subscription = trial_subscription(db, row.tenant_id) if row.tenant_id else None
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "email": row.email,
         "display_name": row.display_name,
         "organization": row.organization,
@@ -169,6 +171,7 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
         "decision_reason": row.decision_reason,
         "tenant_id": str(row.tenant_id) if row.tenant_id else None,
+        "tenant_business_id": tenant.business_id if tenant else None,
         "tenant_key": tenant.tenant_key if tenant else None,
         "tenant_identifier": tenant.tenant_identifier if tenant else None,
         "trial_expires_at": subscription.expires_at.isoformat() if subscription else None,
@@ -363,8 +366,27 @@ def decline_request(db: Session, request_id: uuid.UUID, admin: AuthUser, reason:
             created_at=now,
         )
     )
+    # The requester hears back politely (never the internal reason). Queued with the decision and sent by the
+    # outbox worker, so a slow or failing mail provider never fails or delays the decline, and delivery is retried.
+    from backend.app.notifications import notify_trial_request_declined
+
+    notify_trial_request_declined(db, admin.tenant_id, request_id=row.id)
     db.commit()
     return serialize_request(db, row)
+
+
+def acknowledge_trial_request(organization: str, display_name: str, email: str) -> None:
+    """Confirm to a requester that their free-trial request arrived (a background task after sign-up's response).
+
+    Never raises: the request is already stored and the visitor already has their answer, so a mail failure is only
+    logged (without the address).
+    """
+    from auth.emailer import send_trial_request_acknowledgement
+
+    try:
+        send_trial_request_acknowledgement(email, display_name=display_name, organization=organization)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial request acknowledgement failed: %s", type(exc).__name__)
 
 
 def resend_invitation(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict:

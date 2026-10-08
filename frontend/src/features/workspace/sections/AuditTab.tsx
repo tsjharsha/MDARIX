@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
-import { Table, formatDate, listOf, useResource } from "../../customer-admin/shared";
+import { Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
 import { StatusBadge } from "./common";
+import { roleLabel } from "../../../app/roles";
 
 /**
  * The record a user may see: decisions in the selected investigation and the signatures on them.
@@ -24,12 +25,7 @@ export function AuditTab() {
   const rows = listOf(decisions.data?.decisions ?? decisions.data);
   return (
     <>
-      <Panel
-        eyebrow="Decision record"
-        title="Decisions in this investigation"
-        state={decisions.state}
-        error={decisions.error}
-      >
+      <Panel eyebrow="Decision record" title="Decisions in this investigation" source={decisions}>
         <p className="ac-muted">
           Every decision keeps who decided, when, and the exact version signed. Your organization's full audit trail is
           available to its administrators.
@@ -40,7 +36,7 @@ export function AuditTab() {
           rowKey={(row) => String(row.id)}
           empty={{ title: "No decisions yet", detail: "Decisions recorded for this investigation appear here." }}
           columns={[
-            { key: "id", label: "Decision", render: (row) => <strong>{row.decision_identifier ?? "Decision"}</strong> },
+            idColumn("Decision ID", "decision_identifier"),
             {
               key: "action",
               label: "Action",
@@ -68,17 +64,25 @@ export function AuditTab() {
 function Signatures({ decisionId }: { decisionId: string }) {
   const verification = useResource<any>(`/api/v1/governance/decisions/${decisionId}/signature-verification`);
   const status = String(verification.data?.verification_status ?? "");
+  // INVALID: at least one signature no longer matches what was signed - a problem, shown as one.
+  const label =
+    status === "VALID"
+      ? "All signatures valid"
+      : status === "INVALID"
+        ? "Invalid — a signature does not match"
+        : status === "NOT_SIGNED"
+          ? "Not signed"
+          : titleCase(status || "Unknown");
   return (
     <Panel
       eyebrow="Signatures"
       title="Signature verification"
-      state={verification.state}
-      error={verification.error}
+      source={verification}
       action={
         verification.data ? (
           <ToneBadge
             tone={status === "VALID" ? "good" : status === "NOT_SIGNED" ? "neutral" : "critical"}
-            label={titleCase(status || "Unknown")}
+            label={label}
           />
         ) : undefined
       }
@@ -89,8 +93,9 @@ function Signatures({ decisionId }: { decisionId: string }) {
         rowKey={(row) => String(row.signature_id)}
         empty={{ title: "Not signed yet", detail: "Signatures appear once an authorized person signs." }}
         columns={[
+          idColumn("Signature ID"),
           { key: "decision", label: "Signed as", render: (row) => titleCase(String(row.decision ?? "—")) },
-          { key: "role", label: "Signer role", render: (row) => row.signer_role ?? "—" },
+          { key: "role", label: "Signer role", render: (row) => roleLabel(row.signer_role) || "—" },
           { key: "meaning", label: "Meaning", render: (row) => row.meaning ?? "—" },
           {
             key: "valid",

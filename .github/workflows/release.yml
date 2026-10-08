@@ -1,0 +1,80 @@
+name: Release
+# A release is a git tag vX.Y.Z matching the VERSION file. This builds the three production images (api, web, backup),
+# scans each with Trivy (a fixable HIGH or CRITICAL finding stops the release before anything is pushed), pushes them
+# to GitHub Container Registry as ghcr.io/<owner>/<repo>/{api,web,backup}:<tag> and publishes a GitHub release whose
+# notes record each image's digest. Servers pull exactly these images (docs/runbooks/DEPLOYMENT.md); rolling back
+# means running the previous tag.
+on:
+  push:
+    tags: ['v*.*.*']
+permissions:
+  contents: read
+concurrency:
+  group: mdarix-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # the GitHub release
+      packages: write   # the images
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: The tag matches VERSION
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(tr -d '[:space:]' < VERSION)" \
+            || { echo "Tag ${GITHUB_REF_NAME} does not match VERSION ($(cat VERSION))"; exit 1; }
+      - name: Image names
+        id: names
+        run: |
+          # Registry paths must be lower case.
+          echo "repository=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - name: Build the images
+        env:
+          REPOSITORY: ${{ steps.names.outputs.repository }}
+        run: |
+          docker build -f Dockerfile.api -t "$REPOSITORY/api:$GITHUB_REF_NAME" .
+          docker build -f Dockerfile.web -t "$REPOSITORY/web:$GITHUB_REF_NAME" .
+          docker build -f infrastructure/docker/backup/Dockerfile -t "$REPOSITORY/backup:$GITHUB_REF_NAME" .
+      - name: Scan the images (fixable high and critical findings stop the release)
+        env:
+          REPOSITORY: ${{ steps.names.outputs.repository }}
+        run: |
+          for image in api web backup; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.57.0 image \
+              --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed --no-progress "$REPOSITORY/$image:$GITHUB_REF_NAME"
+          done
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the images and record their digests
+        env:
+          REPOSITORY: ${{ steps.names.outputs.repository }}
+        run: |
+          {
+            echo "## Images"
+            echo
+            echo "Set \`MDARIX_RELEASE=${GITHUB_REF_NAME}\` and \`MDARIX_IMAGE_REPOSITORY=${REPOSITORY}\` in .env.production,"
+            echo "then follow docs/runbooks/DEPLOYMENT.md (section 3). Pull by digest to be certain of the bytes:"
+            echo
+            echo '| Image | Digest |'
+            echo '|---|---|'
+          } > release-notes.md
+          for image in api web backup; do
+            docker push "$REPOSITORY/$image:$GITHUB_REF_NAME"
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$REPOSITORY/$image:$GITHUB_REF_NAME")
+            echo "| \`$image\` | \`$digest\` |" >> release-notes.md
+          done
+          {
+            echo
+            echo "## Changes"
+            echo
+            echo "See CHANGELOG.md for ${GITHUB_REF_NAME#v}."
+          } >> release-notes.md
+          cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          body_path: release-notes.md
+          fail_on_unmatched_files: false

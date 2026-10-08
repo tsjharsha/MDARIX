@@ -6,9 +6,21 @@
 
 type DateInput = string | number | Date | null | undefined;
 
+// A calendar date without a time ("2026-03-04", a *_date field). JavaScript reads it as midnight UTC, which is the
+// day before anywhere west of Greenwich; it is read as that day where the person is instead.
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Whether a value is a calendar date without a time of day. */
+export const isDateOnly = (value: unknown) => typeof value === "string" && DATE_ONLY.test(value.trim());
+
 function toDate(value: DateInput): Date | null {
   if (value === null || value === undefined || value === "") return null;
-  const date = value instanceof Date ? value : new Date(value);
+  const day = typeof value === "string" ? DATE_ONLY.exec(value.trim()) : null;
+  const date = day
+    ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]))
+    : value instanceof Date
+      ? value
+      : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

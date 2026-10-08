@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_map, business_id_of
 from backend.app.db.models.foundation import (
     AuditEvent,
     ConnectorConfiguration,
@@ -50,6 +51,7 @@ def list_platform_plans(request: Request, db: Session = Depends(get_db)):
         result.append(
             {
                 "id": str(plan.id),
+                "business_id": plan.business_id,
                 "code": plan.code,
                 "name": plan.name,
                 "description": plan.description,
@@ -108,7 +110,7 @@ def create_platform_plan(payload: PlanCreateRequest, request: Request, db: Sessi
         )
     )
     db.commit()
-    return {"id": str(plan.id), "code": plan.code, "status": plan.status}
+    return {"id": str(plan.id), "business_id": plan.business_id, "code": plan.code, "status": plan.status}
 
 
 @router.get("/platform-admin/customers/{tenant_id}/subscription")
@@ -137,7 +139,9 @@ def get_platform_subscription(tenant_id: uuid.UUID, request: Request, db: Sessio
     return {
         "subscription_id": str(assignment.id),
         "tenant_id": str(tenant_id),
+        "tenant_business_id": business_id_of(db, Tenant, tenant_id),
         "plan_id": str(assignment.plan_id),
+        "plan_business_id": plan.business_id if plan else None,
         "plan_code": plan.code if plan else None,
         "status": assignment.status,
         "effective_from": assignment.effective_from.isoformat() if assignment.effective_from else None,
@@ -160,7 +164,9 @@ def get_platform_subscription_detail(subscription_id: uuid.UUID, request: Reques
     return {
         "subscription_id": str(assignment.id),
         "tenant_id": str(assignment.tenant_id),
+        "tenant_business_id": business_id_of(db, Tenant, assignment.tenant_id),
         "plan_id": str(assignment.plan_id),
+        "plan_business_id": plan.business_id if plan else None,
         "plan_code": plan.code if plan else None,
         "status": assignment.status,
         "effective_from": assignment.effective_from.isoformat() if assignment.effective_from else None,
@@ -352,6 +358,10 @@ def set_platform_subscription(
         raise HTTPException(
             422, detail={"code": "INVALID_SUBSCRIPTION_WINDOW", "message": "Expiry must be after start"}
         )
+    from backend.app.trial.service import FREE_TRIAL_PLAN, trial_subscription
+
+    # A Free Trial moving to any other plan is a conversion: decided before the subscription row changes plan.
+    converting = plan.code != FREE_TRIAL_PLAN and trial_subscription(db, tenant_id) is not None
     current = (
         db.query(SubscriptionLifecycle)
         .filter(
@@ -390,6 +400,7 @@ def set_platform_subscription(
         )
         db.add(row)
     previous_plan = _assign_plan(db, tenant_id, plan, now, payload.reason)
+    promoted = _promote_trial_owner(db, tenant_id, admin, plan, now) if converting else None
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -410,11 +421,66 @@ def set_platform_subscription(
     db.commit()
     return {
         "subscription_id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(tenant_id),
+        "tenant_business_id": tenant.business_id,
+        "plan_id": str(plan.id),
+        "plan_business_id": plan.business_id,
         "status": row.status,
         "expiry_version": row.expiry_version,
         "expires_at": row.expires_at.isoformat(),
+        "trial_converted": converting,
+        "trial_owner_promoted": promoted,
     }
+
+
+def _promote_trial_owner(db: Session, tenant_id: uuid.UUID, admin, plan: PlanDefinition, now: datetime) -> str | None:
+    """Make the person who started a converted trial its Customer Administrator, so the organization can invite
+    its users (trial workspaces have no administrator; free-trial colleagues are invited by the owner instead).
+
+    Their sessions are ended: the next sign-in goes through the administrator rules (an authenticator app is
+    required), and no session keeps the old role. Audited ``TRIAL_OWNER_PROMOTED`` in the customer's organization
+    with the account id only. Returns the promoted user id, or None when there is no owner account to promote.
+    """
+    from auth.durable import revoke_user_sessions
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.role_codes import CUSTOMER_ADMIN, is_customer_admin_role
+    from backend.app.trial.team import trial_request
+
+    request = trial_request(db, tenant_id)
+    if request is None:
+        return None
+    owner = (
+        db.query(AuthUser)
+        .filter(
+            AuthUser.tenant_id == tenant_id,
+            AuthUser.username == request.email.strip().lower(),
+            func.upper(AuthUser.status).in_(["ACTIVE", "INVITED"]),
+        )
+        .with_for_update()
+        .first()
+    )
+    if owner is None or is_customer_admin_role(owner.role):
+        return None
+    previous_role = owner.role
+    owner.role = CUSTOMER_ADMIN
+    owner.updated_at = now
+    revoke_user_sessions(db, owner.id, tenant_id)
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(admin.id),
+            action="TRIAL_OWNER_PROMOTED",
+            entity_type="AuthUser",
+            entity_id=owner.id,
+            details={"user_id": str(owner.id), "plan_code": plan.code, "reason": "Free trial converted"},
+            old_values={"role": previous_role},
+            new_values={"role": CUSTOMER_ADMIN},
+            created_at=now,
+        )
+    )
+    return str(owner.id)
 
 
 @router.get("/platform/subscriptions/expiring")
@@ -424,10 +490,13 @@ def expiring_subscriptions(request: Request, db: Session = Depends(get_db)):
     rows = (
         db.query(SubscriptionLifecycle).filter(SubscriptionLifecycle.status.in_(["ACTIVE", "GRACE", "EXPIRED"])).all()
     )
+    tenant_business_ids = business_id_map(db, Tenant, (row.tenant_id for row in rows))
     return [
         {
             "subscription_id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(row.tenant_id),
+            "tenant_business_id": tenant_business_ids.get(str(row.tenant_id)),
             "status": row.status,
             "expires_at": row.expires_at.isoformat(),
             "days_remaining": (row.expires_at - now).days,
@@ -597,6 +666,19 @@ def create_email_template(
             },
         )
     now = datetime.now(timezone.utc)
+    # The newest saved email for a stage is the one customers receive (backend/app/notifications.py); the versions
+    # before it stay on record as SUPERSEDED.
+    for previous in (
+        db.query(EmailTemplate)
+        .filter(
+            EmailTemplate.tenant_id == tenant_id,
+            EmailTemplate.stage == payload.stage,
+            func.upper(EmailTemplate.status).in_(["ACTIVE", "DRAFT"]),
+        )
+        .all()
+    ):
+        previous.status = "SUPERSEDED"
+        previous.updated_at = now
     row = EmailTemplate(
         id=uuid.uuid4(),
         tenant_id=tenant_id,
@@ -605,7 +687,7 @@ def create_email_template(
         subject=payload.subject,
         body=payload.body,
         allowed_variables=payload.allowed_variables,
-        status="DRAFT",
+        status="ACTIVE",
         created_at=now,
         updated_at=now,
     )

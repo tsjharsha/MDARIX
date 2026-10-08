@@ -1006,11 +1006,11 @@ export function CompanyPage() {
             ],
             [
               "What MDARIX is not",
-              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system. Those systems stay the record; MDARIX connects them for investigation.",
+              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system: its regulatory drafts are a starting point that your team reviews, edits and approves. Those systems stay the record; MDARIX connects them for investigation.",
             ],
             [
               "Design-partner outcome",
-              "Measure complaint-to-investigation time, evidence retrieval time, import success, and decision traceability during a controlled pilot.",
+              "During a pilot, MDARIX records when each investigation is opened and closed, every data import with its result, and every decision with its review and signature, so the pilot can be reviewed from the audit trail.",
             ],
           ].map(([title, text], index) => (
             <Reveal key={title} delay={index * 80} className="ms-card">
@@ -1037,7 +1037,7 @@ export function CompanyPage() {
               ],
               [
                 "Try it on your own data",
-                "Download the CSV templates for products, lots and complaints. Every file is checked for problems and personal data before import, and insights appear straight away.",
+                "Download the CSV templates for products, lots, complaints and the components, suppliers, changes and risks around them. Every file is checked for problems and personal data before import, and insights appear straight away.",
               ],
             ].map(([title, text], index) => (
               <li key={title}>

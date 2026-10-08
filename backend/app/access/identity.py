@@ -1,10 +1,12 @@
 """Tenant identity administration: users, memberships, personas, roles and permission sets."""
 
+import logging
 import secrets
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -28,8 +30,10 @@ from backend.app.db.models.foundation import (
     Tenant,
     TenantMembership,
 )
+from backend.app.db.models.workflow import UserAdditionalRole
 from backend.app.db.session import get_db
 from backend.app.access.schemas import (
+    AdditionalRolesRequest,
     MembershipRequest,
     MfaResetRequest,
     PersonalDataErasureRequest,
@@ -60,10 +64,13 @@ from backend.app.access.common import (
     _audit_configuration,
     _development_token,
     _enforce_invite_limits,
+    erasure_refused,
 )
 from backend.app.access.session import context
+from backend.app.role_codes import WORKFLOW_ROLES, role_label
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/admin/identity/personas")
@@ -92,10 +99,12 @@ def admin_user(user_id: uuid.UUID, request: Request, db: Session = Depends(get_d
         if user.id == admin.id
         else {
             "user_id": str(user.id),
+            "business_id": user.business_id,
             "display_name": user.display_name,
             "email": user.username,
             "tenant_id": str(user.tenant_id),
             "role": user.role,
+            "role_label": role_label(user.role),
             "status": user.status,
         }
     )
@@ -327,7 +336,12 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
         )
     )
     db.commit()
-    return {"user_id": str(user.id), "tenant_id": str(user.tenant_id), "status": user.status}
+    return {
+        "user_id": str(user.id),
+        "business_id": user.business_id,
+        "tenant_id": str(user.tenant_id),
+        "status": user.status,
+    }
 
 
 @router.post("/admin/identity/users/{user_id}/mfa-reset")
@@ -355,7 +369,12 @@ def reset_user_mfa(user_id: uuid.UUID, payload: MfaResetRequest, request: Reques
         )
     )
     db.commit()
-    return {"user_id": str(user.id), "status": "MFA_RESET", "sessions_revoked": revoked}
+    return {
+        "user_id": str(user.id),
+        "business_id": user.business_id,
+        "status": "MFA_RESET",
+        "sessions_revoked": revoked,
+    }
 
 
 @router.post("/admin/identity/users/{user_id}/erase")
@@ -371,12 +390,213 @@ def erase_user_personal_data(
     _guard_user_administration(admin, target=user, changes_access=True)
     try:
         result = erase_person(db, user, str(admin.id), payload.reason.strip())
-    except PurgeFailed:
+    except PurgeFailed as exc:
+        raise erasure_refused(str(exc)) from exc
+    db.commit()
+    return {**result, "business_id": user.business_id, "status": "ERASED"}
+
+
+ROLE_NOT_ALLOWED = (
+    "ROLE_NOT_ALLOWED",
+    "Additional roles must be workflow roles (PMS / Signal Triage Lead, Quality Investigator, Risk Reviewer, "
+    "Regulatory Reviewer, Quality Reviewer, Authorized Decision Maker, Leader), never an administrator role or the "
+    "person's account role",
+)
+
+
+def _additional_roles(db: Session, admin, user: AuthUser) -> dict:
+    """The person's account role, the workflow roles they hold besides it, and the ones they could be given."""
+    from backend.app.access.permissions import normalize_role, role_of_user
+
+    account = role_of_user(db, user)
+    account_code = normalize_role(account)
+    rows = (
+        db.query(UserAdditionalRole)
+        .filter(
+            UserAdditionalRole.tenant_id == admin.tenant_id,
+            UserAdditionalRole.user_id == user.id,
+            UserAdditionalRole.status == "ACTIVE",
+        )
+        .all()
+    )
+    held = {normalize_role(row.role_code): row for row in rows}
+    granters = {str(row.granted_by) for row in rows if row.granted_by}
+    names = {}
+    for granter in granters:
+        try:
+            granter_id = uuid.UUID(granter)
+        except ValueError:
+            continue
+        person = db.query(AuthUser).filter(AuthUser.id == granter_id, AuthUser.tenant_id == admin.tenant_id).first()
+        if person is not None and not is_hidden_from(admin, person):
+            names[granter] = person.display_name
+    return {
+        "user_id": str(user.id),
+        "business_id": user.business_id,
+        "account_role": {"code": account_code, "label": role_label(account)},
+        "additional_roles": [
+            {
+                "code": code,
+                "label": role_label(code),
+                "granted_at": held[code].granted_at,
+                "granted_by_name": names.get(str(held[code].granted_by or "")),
+            }
+            for code in WORKFLOW_ROLES
+            if code in held and code != account_code
+        ],
+        "available_roles": [
+            {"code": code, "label": role_label(code)} for code in WORKFLOW_ROLES if code != account_code
+        ],
+    }
+
+
+@router.get("/admin/identity/users/{user_id}/roles")
+def user_roles(user_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """The workflow roles a person holds besides their account role (a small company's Investigator may also be
+    its Risk Reviewer). What they may do is the union of all their roles."""
+    admin = _admin_tenant(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    user = ensure_user_visible(admin, user)
+    return _additional_roles(db, admin, user)
+
+
+@router.put("/admin/identity/users/{user_id}/roles")
+def set_user_roles(
+    user_id: uuid.UUID, payload: AdditionalRolesRequest, request: Request, db: Session = Depends(get_db)
+):
+    """Set the complete list of a person's additional workflow roles: missing ones are granted, removed ones revoked
+    (the row is kept as REVOKED). Each change is audited with the reason. Administrators cannot change their own."""
+    from backend.app.access.permissions import normalize_role, role_of_user
+
+    admin = _admin_tenant(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    user = ensure_user_visible(admin, user)
+    _guard_user_administration(admin, target=user, changes_access=True)
+    reason = payload.reason.strip()
+    if len(reason) < 10:
         raise HTTPException(
-            409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
+            422, detail={"code": "REASON_REQUIRED", "message": "Give a reason of at least 10 characters"}
+        )
+    account_code = normalize_role(role_of_user(db, user))
+    if account_code in {"PLATFORM_ADMIN", "CUSTOMER_ADMIN"} and payload.additional_roles:
+        # Administrators stay outside the case workflow; removing roles granted earlier is still allowed.
+        raise HTTPException(
+            422,
+            detail={
+                "code": ROLE_NOT_ALLOWED[0],
+                "message": "Administrator accounts cannot hold workflow roles; use a separate account for case work",
+            },
+        )
+    wanted: list[str] = []
+    for value in payload.additional_roles:
+        code = normalize_role(value)
+        if code not in WORKFLOW_ROLES or code == account_code:
+            raise HTTPException(
+                422, detail={"code": ROLE_NOT_ALLOWED[0], "message": ROLE_NOT_ALLOWED[1], "role": str(value)[:60]}
+            )
+        if code not in wanted:
+            wanted.append(code)
+    rows = {
+        normalize_role(row.role_code): row
+        for row in db.query(UserAdditionalRole).filter(
+            UserAdditionalRole.tenant_id == admin.tenant_id, UserAdditionalRole.user_id == user.id
+        )
+    }
+    now = datetime.now(timezone.utc)
+    changes = []
+    for code in wanted:
+        row = rows.get(code)
+        if row is not None and row.status == "ACTIVE":
+            continue
+        if row is None:
+            db.add(
+                UserAdditionalRole(
+                    id=uuid.uuid4(),
+                    tenant_id=admin.tenant_id,
+                    user_id=user.id,
+                    role_code=code,
+                    status="ACTIVE",
+                    reason=reason,
+                    granted_by=str(admin.id),
+                    granted_at=now,
+                )
+            )
+        else:
+            # Granted again after a revocation: the same row, with the new grant's details.
+            row.status = "ACTIVE"
+            row.reason = reason
+            row.granted_by = str(admin.id)
+            row.granted_at = now
+            row.revoked_by = None
+            row.revoked_at = None
+        changes.append(("ROLE_GRANTED", code))
+    for code, row in rows.items():
+        if row.status == "ACTIVE" and code not in wanted:
+            row.status = "REVOKED"
+            row.reason = reason
+            row.revoked_by = str(admin.id)
+            row.revoked_at = now
+            changes.append(("ROLE_REVOKED", code))
+    for action, code in changes:
+        db.add(
+            AuditEvent(
+                id=uuid.uuid4(),
+                tenant_id=admin.tenant_id,
+                actor_ref=str(admin.id),
+                action=action,
+                entity_type="AuthUser",
+                entity_id=user.id,
+                reason=reason,
+                details={"role": code, "role_label": role_label(code), "source": "ADMIN_CONTROL_PLANE"},
+                created_at=now,
+            )
         )
     db.commit()
-    return {**result, "status": "ERASED"}
+    return _additional_roles(db, admin, user)
+
+
+DELIVERY_FAILED = "FAILED"
+DELIVERY_FAILED_MESSAGE = (
+    "The account was created, but the invitation email could not be delivered. Ask MDARIX support for an "
+    "activation link to pass on to the person."
+)
+
+
+def _send_invitation(user: AuthUser, token: str, organization: str | None) -> str:
+    """Email the activation link; the delivery result ("SENT", "NOT_CONFIGURED", or "FAILED").
+
+    The account and its link are already committed (``issue_invitation`` commits), so a mail outage must not turn
+    into an error that hides a created account: the failure is recorded (audit ``email_delivery``) and answered,
+    and MDARIX support can issue a fresh activation link (``POST /api/v1/platform-admin/users/{id}/activation-link``).
+    """
+    try:
+        return send_activation_email(user.username, token, organization or "")
+    except EmailDeliveryError as exc:
+        # No address in the log: the account id is enough to find the person.
+        logger.warning("Invitation email for user %s was not delivered: %s", user.id, exc)
+        return DELIVERY_FAILED
+
+
+def _invitation_response(body: dict, delivery: str, token: str):
+    """The answer to an invitation: 200 when the email went (or, locally, when there is no email server); 201 with
+    ``delivery: "FAILED"`` and what to do next when the account exists but the email did not go out."""
+    body = {
+        **body,
+        "email_delivery": delivery,
+        # Local development shows the link's token instead of an email that never arrives.
+        "development_token": _development_token(token) if delivery in {"NOT_CONFIGURED", DELIVERY_FAILED} else None,
+    }
+    if delivery != DELIVERY_FAILED:
+        return body
+    return JSONResponse(
+        status_code=201,
+        content={
+            **body,
+            "invitation_status": "NOT_SENT",
+            "delivery": DELIVERY_FAILED,
+            "message": DELIVERY_FAILED_MESSAGE,
+        },
+    )
 
 
 @router.post("/admin/identity/users/{user_id}/reactivate")
@@ -405,11 +625,7 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
         membership.status = "INVITED"
         membership.updated_at = now
     token = issue_invitation(db, user.id, user.tenant_id, admin.id)
-    try:
-        delivery = send_activation_email(user.username, token, user.company)
-    except EmailDeliveryError as exc:
-        db.rollback()
-        raise HTTPException(502, detail={"code": "SMTP_DELIVERY_FAILED", "message": str(exc)}) from exc
+    delivery = _send_invitation(user, token, user.company)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -423,14 +639,17 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
         )
     )
     db.commit()
-    return {
-        "user_id": str(user.id),
-        "email": user.username,
-        "status": user.status,
-        "invitation_status": "RESENT",
-        "email_delivery": delivery,
-        "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
-    }
+    return _invitation_response(
+        {
+            "user_id": str(user.id),
+            "business_id": user.business_id,
+            "email": user.username,
+            "status": user.status,
+            "invitation_status": "RESENT",
+        },
+        delivery,
+        token,
+    )
 
 
 @router.get("/admin/identity/users")
@@ -446,10 +665,12 @@ def list_users(request: Request, db: Session = Depends(get_db)):
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "email": row.username,
             "display_name": row.display_name,
             "company": row.company,
             "role": row.role,
+            "role_label": role_label(row.role),
             "status": row.status,
             "tenant_id": str(row.tenant_id),
         }
@@ -459,7 +680,19 @@ def list_users(request: Request, db: Session = Depends(get_db)):
 
 # Roles every tenant has. A tenant may also define its own (Roles & Access); anything else is refused, so a typo
 # cannot create an account whose role means nothing.
-STANDARD_ROLES = frozenset({"VIEWER", "INVESTIGATOR", "REVIEWER", "APPROVER", "LEADER", "CUSTOMER_ADMIN"})
+STANDARD_ROLES = frozenset(
+    {
+        "VIEWER",
+        "TRIAGE_LEAD",
+        "INVESTIGATOR",
+        "RISK_REVIEWER",
+        "REGULATORY_REVIEWER",
+        "REVIEWER",
+        "APPROVER",
+        "LEADER",
+        "CUSTOMER_ADMIN",
+    }
+)
 
 
 def _ensure_known_role(db: Session, tenant_id, role: str) -> None:
@@ -479,8 +712,9 @@ def _ensure_known_role(db: Session, tenant_id, role: str) -> None:
             422,
             detail={
                 "code": "ROLE_NOT_RECOGNIZED",
-                "message": "Choose one of the organization's roles (Viewer, Investigator, Reviewer, Approver, Leader, "
-                "Customer Administrator, or an active custom role)",
+                "message": "Choose one of the organization's roles (Viewer, PMS / Signal Triage Lead, Quality "
+                "Investigator, Risk Reviewer, Regulatory Reviewer, Quality Reviewer, Authorized Decision Maker, "
+                "Leader (Quality Manager), Customer Administrator, or an active custom role)",
             },
         )
 
@@ -493,7 +727,9 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         raise HTTPException(
             404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer / Tenant ID is not an active tenant UUID"}
         )
-    role = payload.role.strip().upper()
+    from backend.app.role_codes import canonical_stored_role
+
+    role = canonical_stored_role(payload.role)
     _guard_user_administration(admin, new_role=role)
     _ensure_known_role(db, target_tenant_id, role)
     if role == "PLATFORM_ADMIN" and not _is_platform_admin(admin):
@@ -581,11 +817,7 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
             membership.status = "INVITED"
             membership.updated_at = now
     token = issue_invitation(db, row.id, row.tenant_id, admin.id)
-    try:
-        delivery = send_activation_email(row.username, token, payload.company.strip())
-    except EmailDeliveryError as exc:
-        db.rollback()
-        raise HTTPException(502, detail={"code": "SMTP_DELIVERY_FAILED", "message": str(exc)}) from exc
+    delivery = _send_invitation(row, token, payload.company.strip())
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -599,17 +831,20 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
         )
     )
     db.commit()
-    return {
-        "id": str(row.id),
-        "email": row.username,
-        "display_name": row.display_name,
-        "tenant_id": str(row.tenant_id),
-        "role": row.role,
-        "status": row.status,
-        "invitation_status": "SENT",
-        "email_delivery": delivery,
-        "development_token": _development_token(token) if delivery == "NOT_CONFIGURED" else None,
-    }
+    return _invitation_response(
+        {
+            "id": str(row.id),
+            "business_id": row.business_id,
+            "email": row.username,
+            "display_name": row.display_name,
+            "tenant_id": str(row.tenant_id),
+            "role": row.role,
+            "status": row.status,
+            "invitation_status": "SENT",
+        },
+        delivery,
+        token,
+    )
 
 
 @router.post("/admin/identity/users/password-reset")
@@ -848,6 +1083,7 @@ def user_effective_access(user_id: uuid.UUID, request: Request, db: Session = De
     )
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "tenant_id": str(admin.tenant_id),
         "status": user.status,
         "roles": roles,

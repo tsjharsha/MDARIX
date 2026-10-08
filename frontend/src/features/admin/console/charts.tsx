@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { AlertOctagon, AlertTriangle, CheckCircle2, CircleDashed, Lock, XCircle } from "lucide-react";
+import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { compactNumber, type DayCount, type Slice, type Tone } from "./dashboardModel";
 
 const TONE_LABEL: Record<Tone, string> = {
@@ -36,11 +37,26 @@ export function ToneBadge({ tone, label }: { tone: Tone; label?: string }) {
 
 export type PanelState = "loading" | "ready" | "error" | "forbidden";
 
+/** What a data source reports to the panel that shows it (useResource in customer-admin/shared.tsx fits). */
+export type PanelSource = {
+  state: PanelState;
+  error?: string;
+  /** The server's error code (TRIAL_ENDED reads differently from a role that may not see the data). */
+  code?: string;
+  /** The id the server logged the failure under, for a problem report. */
+  requestId?: string;
+  reload?: () => void;
+};
+
 export function Panel({
   title,
   eyebrow,
   state = "ready",
   error,
+  code,
+  requestId,
+  onRetry,
+  source,
   action,
   children,
   className = "",
@@ -49,12 +65,18 @@ export function Panel({
   eyebrow?: string;
   state?: PanelState;
   error?: string;
+  code?: string;
+  requestId?: string;
+  onRetry?: () => void;
+  /** The resource behind the panel: its state, message, request id and reload in one prop. */
+  source?: PanelSource;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const shown = source ?? { state, error, code, requestId, reload: onRetry };
   return (
-    <section className={`ac-panel ${className}`} aria-busy={state === "loading"}>
+    <section className={`ac-panel ${className}`} aria-busy={shown.state === "loading"}>
       <header className="ac-panel-head">
         <div>
           {eyebrow && <p className="ac-eyebrow">{eyebrow}</p>}
@@ -62,23 +84,55 @@ export function Panel({
         </div>
         {action}
       </header>
-      {state === "loading" && <div className="ac-skeleton" aria-label={`Loading ${title}`} />}
-      {state === "forbidden" && (
-        <div className="ac-empty">
-          <Lock size={20} aria-hidden="true" />
-          <strong>Not authorized</strong>
-          <span>Your role cannot read this data.</span>
-        </div>
+      {shown.state === "loading" && <div className="ac-skeleton" aria-label={`Loading ${title}`} />}
+      {shown.state === "forbidden" &&
+        (shown.code === "TRIAL_ENDED" ? (
+          <div className="ac-empty">
+            <Lock size={20} aria-hidden="true" />
+            <strong>Your free trial has ended</strong>
+            <span>{shown.error || "Contact us to continue with your data intact."}</span>
+          </div>
+        ) : (
+          <div className="ac-empty">
+            <Lock size={20} aria-hidden="true" />
+            <strong>Not authorized</strong>
+            <span>Your role cannot read this data.</span>
+          </div>
+        ))}
+      {shown.state === "error" && (
+        <Unavailable message={shown.error} requestId={shown.requestId} onRetry={shown.reload} />
       )}
-      {state === "error" && (
-        <div className="ac-empty tone-critical-text">
-          <XCircle size={20} aria-hidden="true" />
-          <strong>Unavailable</strong>
-          <span>{error ?? "This source did not respond."}</span>
-        </div>
-      )}
-      {state === "ready" && children}
+      {shown.state === "ready" && children}
     </section>
+  );
+}
+
+/** A failed load the person can act on: what went wrong, a retry, and the reference to quote to support. */
+export function Unavailable({
+  message,
+  requestId,
+  onRetry,
+}: {
+  message?: string;
+  requestId?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div className="ac-empty tone-critical-text">
+      <XCircle size={20} aria-hidden="true" />
+      <strong>Unavailable</strong>
+      <span>{message ?? "This source did not respond."}</span>
+      {requestId && (
+        <small className="ac-request-id">
+          Reference for support: <code>{requestId}</code>
+        </small>
+      )}
+      {onRetry && (
+        <button type="button" className="ac-secondary" onClick={onRetry}>
+          Retry
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -193,6 +247,7 @@ function niceMax(value: number) {
 export function ColumnChart({ data, unit, caption }: { data: DayCount[]; unit: string; caption: string }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const table = useSortedRows(data, (day, key) => (key === "date" ? day.date : day.count));
   const peak = Math.max(0, ...data.map((day) => day.count));
   const top = niceMax(peak);
   const peakIndex = peak ? data.findIndex((day) => day.count === peak) : -1;
@@ -213,14 +268,12 @@ export function ColumnChart({ data, unit, caption }: { data: DayCount[]; unit: s
           <table className="ac-table">
             <thead>
               <tr>
-                <th scope="col">Day</th>
-                <th scope="col" className="num">
-                  {unit}
-                </th>
+                <SortableHeader label="Day" sortKey="date" sort={table.sort} onSort={table.toggle} />
+                <SortableHeader label={unit} sortKey="count" sort={table.sort} onSort={table.toggle} className="num" />
               </tr>
             </thead>
             <tbody>
-              {data.map((day) => (
+              {table.sorted.map((day) => (
                 <tr key={day.date}>
                   <td>{day.label}</td>
                   <td className="num">{day.count}</td>

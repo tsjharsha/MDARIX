@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { ArrowLeft, Globe2, PauseCircle, PlayCircle, Plus } from "lucide-react";
-import { Panel } from "../console/charts";
+import { useRef, useState } from "react";
+import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../../customer-admin/aiSettings";
+import { ArrowLeft, Ban, Globe2, Lock, PauseCircle, Pencil, PlayCircle, Plus, Unlock } from "lucide-react";
+import { Panel, ToneBadge } from "../console/charts";
 import {
   ConfirmDialog,
   SearchBox,
@@ -8,21 +9,76 @@ import {
   Tabs,
   errorText,
   formatDate,
+  idColumn,
   send,
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
+import { displayId, referenceId } from "../../../app/displayId";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 import { CustomerAdmins } from "./CustomerAdmins";
-import { lifecycleAction, titleCase } from "./model";
+import { EditDetails } from "./EditDetails";
+import {
+  REASON_MIN,
+  TENANT_FIELD_GROUPS,
+  TENANT_TYPES,
+  blockedByCustomer,
+  changeErrorText,
+  lifecycleStatusLabel,
+  presentGroups,
+  tenantStatusAction,
+  tenantActivationBlock,
+  titleCase,
+  displayCode,
+} from "./model";
 import { StatusBadge } from "./StatusBadge";
+import { Pager } from "../areas/common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import {
+  WAIVER_MIN,
+  exportAfterSuspension,
+  handBackReady,
+  legalHoldError,
+  legalHoldRequest,
+  purgeOutcome,
+  purgeRequest,
+  type DataExport,
+  type HandBack,
+  type LegalHold,
+  type PurgeResult,
+} from "./dataGovernance";
+
+/** Columns the server can order every page by (backend platform_tenants.py _tenant_sort_columns). */
+const TENANT_SORT_KEYS = [
+  "business_id",
+  "tenant",
+  "customer",
+  "region",
+  "plan",
+  "environments",
+  "status",
+  "name",
+  "tenant_key",
+  "tenant_identifier",
+  "customer_name",
+  "customer_identifier",
+  "residency_region",
+  "deployment_model",
+  "plan_name",
+  "plan_code",
+  "environment_count",
+  "seat_usage",
+  "last_activity",
+  "created_at",
+] as const;
 
 /** Every tenant (customer workspace). Opening a row shows the tenant's page. */
 export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page) });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (status) params.set("status", status);
   const tenants = useResource<{ items: any[]; total: number; pages: number }>(
@@ -30,7 +86,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
   );
   const pages = tenants.data?.pages ?? 1;
   return (
-    <Panel eyebrow="Tenants" title="Tenant directory" state={tenants.state} error={tenants.error}>
+    <Panel eyebrow="Tenants" title="Tenant directory" source={tenants}>
       <div className="cc-toolbar">
         <SearchBox
           value={query}
@@ -38,7 +94,7 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             setQuery(value);
             setPage(1);
           }}
-          label="Search tenant name"
+          label="Search tenant name or ID"
         />
         <select
           aria-label="Tenant status"
@@ -50,35 +106,38 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
         >
           <option value="">All statuses</option>
           <option value="ACTIVE">Active</option>
-          <option value="SUSPENDED">Suspended</option>
+          <option value="SUSPENDED">Inactive</option>
+          <option value="PROVISIONING">Provisioning</option>
           <option value="PROVISIONED">Provisioned</option>
+          <option value="EXPIRED">Expired</option>
         </select>
       </div>
       <Table
         caption="Tenants"
         rows={tenants.data?.items ?? []}
         rowKey={(row) => row.id}
+        serverSort={{ sort, onSort, keys: TENANT_SORT_KEYS }}
         empty={{ title: "No matching tenants", detail: "Change the search or status filter." }}
         columns={[
+          idColumn("Tenant ID", "tenant_key"),
           {
             key: "tenant",
-            fields: ["name", "tenant_key", "tenant_identifier"],
+            fields: ["name", "tenant_identifier"],
             label: "Tenant",
             render: (row) => (
-              <button type="button" className="ac-link cc-stack" onClick={() => onOpen(row.id)}>
+              <button type="button" className="ac-link" onClick={() => onOpen(row.id)}>
                 <strong>{row.name}</strong>
-                <small>{row.tenant_key ?? row.tenant_identifier}</small>
               </button>
             ),
           },
           {
             key: "customer",
-            fields: ["customer_name", "customer_identifier", "customer_id"],
+            fields: ["customer_name", "customer_business_id", "customer_identifier", "customer_id"],
             label: "Customer",
             render: (row) => (
               <span className="cc-stack">
                 <strong>{row.customer_name ?? "—"}</strong>
-                <small>{row.customer_identifier}</small>
+                <small>{referenceId(row, "customer", row.customer_identifier)}</small>
               </span>
             ),
           },
@@ -101,21 +160,24 @@ export function TenantDirectory({ onOpen }: { onOpen: (tenantId: string) => void
             numeric: true,
             render: (row) => row.environment_count ?? 0,
           },
-          { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+          {
+            key: "status",
+            fields: ["status", "effective_access", "customer_lifecycle_status"],
+            label: "Status",
+            render: (row) => (
+              <span className="cc-status-cell">
+                <StatusBadge status={row.status} label={lifecycleStatusLabel(row.status)} />
+                {blockedByCustomer(row) && (
+                  <span className="cc-blocked" title="Its customer is inactive, so nobody can sign in">
+                    <Ban size={13} aria-hidden="true" /> Blocked by customer
+                  </span>
+                )}
+              </span>
+            ),
+          },
         ]}
       />
-      <div className="cc-pager">
-        <span>{tenants.data?.total ?? 0} tenants</span>
-        <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <span>
-          Page {page} of {pages}
-        </span>
-        <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-          Next
-        </button>
-      </div>
+      <Pager page={page} pages={pages} total={tenants.data?.total ?? 0} noun="tenant" onPage={setPage} />
     </Panel>
   );
 }
@@ -133,11 +195,14 @@ type Section = (typeof SECTIONS)[number];
 
 export function TenantPage({
   tenantId,
+  backLabel = "All tenants",
   onBack,
   onOpenCustomer,
   onMessage,
 }: {
   tenantId: string;
+  /** What the back link returns to ("All tenants", or the customer the tenant was opened from). */
+  backLabel?: string;
   onBack: () => void;
   onOpenCustomer?: (customerId: string) => void;
   onMessage: (text: string, tone?: "good" | "critical") => void;
@@ -147,39 +212,60 @@ export function TenantPage({
   );
   const [section, setSection] = useState<Section>("Overview");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [editing, setEditing] = useState(false);
   const tenant = record.data?.tenant;
-  const next = lifecycleAction(tenant?.status);
+  const action = tenantStatusAction(tenant?.status);
   const name = tenant?.display_name ?? tenant?.tenant_key ?? "Tenant";
-  const changeStanding = () =>
-    next &&
+  // A tenant cannot be activated while its customer is inactive: the customer is reactivated first.
+  const gate =
+    action?.target === "ACTIVE"
+      ? tenantActivationBlock(tenant?.customer_name, tenant?.customer_lifecycle_status)
+      : null;
+  const blocked = blockedByCustomer(tenant);
+  const changeStatus = () =>
+    action &&
+    !gate &&
     setConfirm({
-      title: next === "SUSPENDED" ? `Suspend ${name}?` : `Reactivate ${name}?`,
+      title: `${action.verb} ${name}?`,
       body:
-        next === "SUSPENDED"
+        action.verb === "Deactivate"
           ? "Nobody in this tenant can sign in until it is reactivated. Its data is kept."
-          : "The tenant becomes active again and its users can sign in.",
-      confirmLabel: next === "SUSPENDED" ? "Suspend tenant" : "Reactivate tenant",
-      danger: next === "SUSPENDED",
-      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+          : action.verb === "Reactivate"
+            ? "The tenant becomes active again and its users can sign in."
+            : "The tenant becomes active and its users can sign in.",
+      confirmLabel: `${action.verb} tenant`,
+      danger: action.verb === "Deactivate",
+      reason: { label: "Reason (kept in the audit trail)", min: REASON_MIN },
       password: true,
-      run: (reason, password) =>
-        send(`/api/v1/platform-admin/tenants/${tenantId}/lifecycle`, "POST", {
-          status: next,
-          reason,
-          password,
-          lock_version: tenant?.lock_version,
-        }),
-      done: next === "SUSPENDED" ? `${name} is suspended.` : `${name} is active again.`,
+      run: async (reason, password) => {
+        try {
+          await send(`/api/v1/platform-admin/tenants/${tenantId}/lifecycle`, "POST", {
+            status: action.target,
+            reason,
+            password,
+            lock_version: tenant?.lock_version,
+          });
+        } catch (error) {
+          // A wrong password keeps the server's own words; conflicts and a gated tenant are explained.
+          throw new Error(changeErrorText(error, "tenant", "The status was not changed."));
+        }
+      },
+      done:
+        action.verb === "Deactivate"
+          ? `${name} is inactive.`
+          : action.verb === "Reactivate"
+            ? `${name} is active again.`
+            : `${name} is active.`,
     });
   return (
     <div className="cc-page">
       <div className="cc-page-head">
         <button type="button" className="ac-link" onClick={onBack}>
-          <ArrowLeft size={16} aria-hidden="true" /> Back
+          <ArrowLeft size={16} aria-hidden="true" /> {backLabel}
         </button>
         <div className="cc-title">
           <div>
-            <p className="ac-eyebrow">Tenant · {tenant?.tenant_key ?? "…"}</p>
+            <p className="ac-eyebrow">Tenant · {tenant ? displayId(tenant, "tenant_key") : "…"}</p>
             <h2>{name}</h2>
             {tenant?.customer_name && (
               <p className="ac-muted">
@@ -191,88 +277,138 @@ export function TenantPage({
                 ) : (
                   <strong>{tenant.customer_name}</strong>
                 )}{" "}
-                ({tenant.customer_identifier})
+                ({referenceId(tenant, "customer", tenant.customer_identifier)})
               </p>
             )}
           </div>
           <span className="cc-actions">
-            <StatusBadge status={tenant?.status} />
-            {next && (
+            <StatusBadge status={tenant?.status} label={lifecycleStatusLabel(tenant?.status)} />
+            {tenant && action && (
               <button
                 type="button"
-                className={next === "SUSPENDED" ? "ca-danger" : "ac-primary"}
-                onClick={changeStanding}
+                className={action.verb === "Deactivate" ? "ca-danger" : "ac-primary"}
+                onClick={changeStatus}
+                disabled={!!gate}
+                aria-describedby={gate ? "cc-tenant-status-gate" : undefined}
               >
-                {next === "SUSPENDED" ? (
+                {action.verb === "Deactivate" ? (
                   <PauseCircle size={16} aria-hidden="true" />
                 ) : (
                   <PlayCircle size={16} aria-hidden="true" />
                 )}{" "}
-                {next === "SUSPENDED" ? "Suspend tenant" : "Reactivate tenant"}
+                {action.verb} tenant
               </button>
+            )}
+            {gate && (
+              <span id="cc-tenant-status-gate" className="cc-hint">
+                {gate}
+              </span>
             )}
           </span>
         </div>
       </div>
+      {blocked && (
+        <div className="ac-message tone-warning" role="status">
+          <span>
+            <Ban size={14} aria-hidden="true" /> Nobody can sign in to this tenant because its customer
+            {tenant?.customer_name ? ` ${tenant.customer_name}` : ""} is inactive. The tenant keeps its own status (
+            {lifecycleStatusLabel(tenant?.status)}) and can be used again once the customer is reactivated.
+          </span>
+          {onOpenCustomer && tenant?.customer_id && (
+            <button type="button" className="ac-link" onClick={() => onOpenCustomer(tenant.customer_id)}>
+              Open customer
+            </button>
+          )}
+        </div>
+      )}
       {record.state === "error" && (
         <p className="ca-inline-error" role="alert">
           {record.error ?? "The tenant could not be loaded."}
         </p>
       )}
-      <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Tenant sections" />
-      {tenant && section === "Overview" && <TenantOverview tenant={tenant} />}
-      {tenant && section === "Administrators" && (
-        <CustomerAdmins
-          tenantId={tenantId}
-          tenants={[{ id: tenantId, tenant_key: tenant.tenant_key, display_name: tenant.display_name }]}
-          onMessage={onMessage}
-        />
-      )}
-      {tenant && section === "Environments" && (
-        <Environments
-          tenantId={tenantId}
-          rows={record.data?.environments ?? []}
-          defaultRegion={tenant.residency_region ?? tenant.primary_region ?? ""}
-          onChanged={(message) => {
+      <Tabs tabs={SECTIONS} active={section} onChange={setSection} label="Tenant sections">
+        {tenant && section === "Overview" && (
+          <>
+            <TenantOverview tenant={tenant} onEdit={() => setEditing(true)} />
+            <LegalHoldPanel tenantId={tenantId} name={name} onMessage={onMessage} />
+          </>
+        )}
+        {tenant && section === "Administrators" && (
+          <CustomerAdmins
+            tenantId={tenantId}
+            tenants={[{ id: tenantId, tenant_key: tenant.tenant_key, display_name: tenant.display_name }]}
+            onMessage={onMessage}
+          />
+        )}
+        {tenant && section === "Environments" && (
+          <Environments
+            tenantId={tenantId}
+            rows={record.data?.environments ?? []}
+            defaultRegion={tenant.residency_region ?? tenant.primary_region ?? ""}
+            onChanged={(message) => {
+              onMessage(message);
+              record.reload();
+            }}
+          />
+        )}
+        {tenant && section === "Domain & identity" && (
+          <DomainIdentity tenantId={tenantId} providers={record.data?.identity_providers ?? []} onMessage={onMessage} />
+        )}
+        {tenant && section === "AI processing" && (
+          <TenantAiSettings tenantId={tenantId} name={name} onMessage={onMessage} />
+        )}
+        {tenant && section === "Data" && (
+          <TenantData
+            tenantId={tenantId}
+            tenantKey={tenant.tenant_key}
+            status={tenant.status}
+            suspendedAt={tenant.suspended_at ?? null}
+            name={name}
+            onMessage={onMessage}
+            onChanged={() => record.reload()}
+          />
+        )}
+        {tenant && section === "Activity" && <TenantActivity tenantId={tenantId} />}
+        <ConfirmDialog
+          request={confirm}
+          onClose={() => setConfirm(null)}
+          onDone={(message) => {
+            setConfirm(null);
             onMessage(message);
             record.reload();
           }}
         />
-      )}
-      {tenant && section === "Domain & identity" && (
-        <DomainIdentity tenantId={tenantId} providers={record.data?.identity_providers ?? []} onMessage={onMessage} />
-      )}
-      {tenant && section === "AI processing" && (
-        <TenantAiSettings tenantId={tenantId} name={name} onMessage={onMessage} />
-      )}
-      {tenant && section === "Data" && (
-        <TenantData
-          tenantId={tenantId}
-          tenantKey={tenant.tenant_key}
-          status={tenant.status}
-          name={name}
-          onMessage={onMessage}
-          onChanged={() => record.reload()}
-        />
-      )}
-      {tenant && section === "Activity" && <TenantActivity tenantId={tenantId} />}
-      <ConfirmDialog
-        request={confirm}
-        onClose={() => setConfirm(null)}
-        onDone={(message) => {
-          setConfirm(null);
-          onMessage(message);
-          record.reload();
-        }}
-      />
+        {editing && tenant && (
+          <EditDetails
+            title={`Edit ${name}`}
+            what="tenant"
+            record={tenant}
+            groups={presentGroups(tenant, TENANT_FIELD_GROUPS)}
+            choices={{ tenant_type: TENANT_TYPES }}
+            url={`/api/v1/platform-admin/tenants/${tenantId}`}
+            onClose={() => setEditing(false)}
+            onReload={() => {
+              setEditing(false);
+              record.reload();
+            }}
+            onSaved={() => {
+              setEditing(false);
+              onMessage(`The details of ${name} are saved.`);
+              record.reload();
+            }}
+          />
+        )}
+      </Tabs>
     </div>
   );
 }
 
 const TENANT_DETAILS: Array<[string, string]> = [
-  ["Tenant key", "tenant_key"],
-  ["Tenant ID", "tenant_identifier"],
+  ["Tenant ID", "business_id"],
+  ["Tenant code", "tenant_key"],
+  ["Tenant type", "tenant_type"],
   ["Deployment", "deployment_model"],
+  ["Configuration version", "configuration_version"],
   ["Primary region", "primary_region"],
   ["Data residency", "residency_region"],
   ["Database region", "database_region"],
@@ -281,14 +417,28 @@ const TENANT_DETAILS: Array<[string, string]> = [
   ["Backup region", "backup_region"],
 ];
 
-function TenantOverview({ tenant }: { tenant: any }) {
+function TenantOverview({ tenant, onEdit }: { tenant: any; onEdit: () => void }) {
   return (
-    <Panel eyebrow="Workspace" title="Tenant details">
+    <Panel
+      eyebrow="Workspace"
+      title="Tenant details"
+      action={
+        <button type="button" className="ac-secondary" onClick={onEdit}>
+          <Pencil size={16} aria-hidden="true" /> Edit details
+        </button>
+      }
+    >
       <dl className="cc-details">
         {TENANT_DETAILS.map(([label, key]) => (
           <div key={key}>
             <dt>{label}</dt>
-            <dd>{tenant[key] || "—"}</dd>
+            <dd>
+              {key === "business_id"
+                ? displayId(tenant, "tenant_identifier")
+                : key === "tenant_type" && tenant[key]
+                  ? titleCase(tenant[key])
+                  : tenant[key] || "—"}
+            </dd>
           </div>
         ))}
         <div>
@@ -313,6 +463,15 @@ type AiSettings = {
   refused: number;
   month: string;
   models: { provider: string; model: string }[];
+  provider_name: string | null;
+  masking: boolean;
+};
+
+/** The AI provider named once: the configured provider's name, else the providers of the models in use. */
+const aiProviderText = (data: { models: { provider: string }[]; provider_name: string | null }) => {
+  if (data.provider_name?.trim()) return displayCode(data.provider_name);
+  const providers = [...new Set(data.models.map((item) => displayCode(item.provider)))];
+  return providers.length ? providers.join(", ") : "None set up";
 };
 
 /** Whether the tenant's content may go to an AI model, its monthly token allowance, and this month's use. */
@@ -340,9 +499,22 @@ function TenantAiSettings({
       run: (reason) => send(url, "PUT", { ...body, reason }),
       done,
     });
+  // Turning AI on needs the acknowledgement, given here on the customer's instruction (the API refuses it otherwise).
+  const switchAi = () =>
+    setConfirm({
+      title: on ? `Turn AI off for ${name}?` : `Turn AI on for ${name}?`,
+      body: on
+        ? "Nothing from this tenant is sent to an AI model; its features answer from rules."
+        : `This tenant's AI features will send the records an answer needs to ${providerLabel(data?.provider_name)}. ${MASKING_SUMMARY}`,
+      confirmLabel: on ? "Turn AI off" : "Turn AI on",
+      reason: { label: "Reason (kept in the audit trail)", min: 5 },
+      ...(on ? {} : { acknowledge: aiAcknowledgement(data?.provider_name, name) }),
+      run: (reason, _password, acknowledged) => send(url, "PUT", aiSettingsPayload(!on, reason, acknowledged)),
+      done: on ? `AI processing is off for ${name}.` : `AI processing is on for ${name}.`,
+    });
   return (
     <>
-      <Panel eyebrow="AI processing" title={`AI for ${name}`} state={settings.state} error={settings.error}>
+      <Panel eyebrow="AI processing" title={`AI for ${name}`} source={settings}>
         {data && (
           <dl className="cc-details">
             <div>
@@ -350,10 +522,10 @@ function TenantAiSettings({
               <dd>{on ? "On" : "Off: rule-based answers only"}</dd>
             </div>
             <div>
-              <dt>Tokens used this month</dt>
+              <dt>AI usage this month (tokens)</dt>
               <dd>
                 {data.tokens_used.toLocaleString()} of {data.monthly_token_budget.toLocaleString()}
-                {data.budget_is_default ? " (server default)" : ""}
+                {data.budget_is_default ? " (standard allowance)" : ""}
               </dd>
             </div>
             <div>
@@ -363,27 +535,13 @@ function TenantAiSettings({
               </dd>
             </div>
             <div>
-              <dt>Model in use</dt>
-              <dd>{data.models.length ? data.models.map((item) => item.provider).join(", ") : "None configured"}</dd>
+              <dt>AI provider</dt>
+              <dd>{aiProviderText(data)}</dd>
             </div>
           </dl>
         )}
         <div className="ca-action-row">
-          <button
-            type="button"
-            className={on ? "ca-danger" : "ac-primary"}
-            disabled={!data}
-            onClick={() =>
-              ask(
-                { ai_processing_allowed: !on },
-                on ? `Turn AI off for ${name}?` : `Turn AI on for ${name}?`,
-                on
-                  ? "Nothing from this tenant is sent to an AI model; its features answer from rules."
-                  : "This tenant's AI features may send the records an answer needs to the configured model, with personal information masked.",
-                on ? `AI processing is off for ${name}.` : `AI processing is on for ${name}.`,
-              )
-            }
-          >
+          <button type="button" className={on ? "ca-danger" : "ac-primary"} disabled={!data} onClick={switchAi}>
             {on ? "Turn AI off" : "Turn AI on"}
           </button>
         </div>
@@ -453,20 +611,119 @@ function TenantAiSettings({
   );
 }
 
-type DataExport = {
-  id: string;
-  status: string;
-  reason: string;
-  summary: { tables: number; rows: number; files: number } | null;
-  created_at: string;
-  expires_at: string | null;
-};
+const legalHoldPath = (tenantId: string) => `/api/v1/platform-admin/tenants/${tenantId}/legal-hold`;
+
+/**
+ * The organization's legal hold: while it is set nothing of the organization can be deleted (the server refuses a
+ * purge and records the attempt). Setting, updating and releasing it each need a reason and an MFA-verified session.
+ */
+function LegalHoldPanel({
+  tenantId,
+  name,
+  onMessage,
+}: {
+  tenantId: string;
+  name: string;
+  onMessage: (text: string, tone?: "good" | "critical") => void;
+}) {
+  const hold = useResource<LegalHold>(legalHoldPath(tenantId));
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const on = !!hold.data?.legal_hold;
+  const change = (next: boolean, update = false) =>
+    setConfirm({
+      title: next
+        ? update
+          ? `Update the legal hold on ${name}?`
+          : `Place ${name} under a legal hold?`
+        : `Release the legal hold on ${name}?`,
+      body: next
+        ? "While the hold is set, none of this tenant's data can be deleted, including at the end of its contract. Record who asked for it, their reference and its scope."
+        : "Its data can be deleted again under the normal rules. Record who authorized the release.",
+      confirmLabel: next ? (update ? "Update hold" : "Place legal hold") : "Release hold",
+      danger: !next,
+      reason: {
+        label: next ? "Who asked, their reference and the scope" : "Who authorized the release, and why",
+        min: 10,
+      },
+      run: async (reason) => {
+        try {
+          await send(legalHoldPath(tenantId), "PUT", legalHoldRequest(next, reason));
+        } catch (error) {
+          throw new Error(legalHoldError(error));
+        }
+      },
+      done: next ? `${name} is under a legal hold.` : `The legal hold on ${name} is released.`,
+    });
+  return (
+    <Panel eyebrow="Data retention" title="Legal hold" source={hold}>
+      {hold.data && (
+        <>
+          <dl className="cc-details">
+            <div>
+              <dt>Status</dt>
+              <dd>
+                {on ? (
+                  <ToneBadge tone="serious" label="On hold: nothing can be deleted" />
+                ) : (
+                  <ToneBadge tone="neutral" label="No legal hold" />
+                )}
+              </dd>
+            </div>
+            {on && (
+              <>
+                <div>
+                  <dt>Reason</dt>
+                  <dd>{hold.data.legal_hold_reason || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Set</dt>
+                  <dd>{formatDate(hold.data.legal_hold_set_at)}</dd>
+                </div>
+                <div>
+                  <dt>Set by</dt>
+                  <dd>{hold.data.legal_hold_set_by_business_id || "A platform administrator"}</dd>
+                </div>
+              </>
+            )}
+          </dl>
+          <div className="ca-action-row">
+            {on ? (
+              <>
+                <button type="button" className="ac-secondary" onClick={() => change(true, true)}>
+                  <Lock size={15} aria-hidden="true" /> Update reason
+                </button>
+                <button type="button" className="ca-danger" onClick={() => change(false)}>
+                  <Unlock size={15} aria-hidden="true" /> Release hold
+                </button>
+              </>
+            ) : (
+              <button type="button" className="ac-primary" onClick={() => change(true)}>
+                <Lock size={15} aria-hidden="true" /> Place legal hold
+              </button>
+            )}
+          </div>
+          <p className="ac-muted">Changing the hold needs a session that passed multi-factor authentication.</p>
+        </>
+      )}
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(message) => {
+          setConfirm(null);
+          onMessage(message);
+          hold.reload();
+        }}
+      />
+    </Panel>
+  );
+}
 
 /** Export everything the tenant stored (to hand it back), and delete it at the end of a contract or on request. */
 function TenantData({
   tenantId,
   tenantKey,
   status,
+  suspendedAt,
   name,
   onMessage,
   onChanged,
@@ -474,20 +731,52 @@ function TenantData({
   tenantId: string;
   tenantKey: string;
   status: string;
+  suspendedAt: string | null;
   name: string;
   onMessage: (text: string, tone?: "good" | "critical") => void;
   onChanged: () => void;
 }) {
   const base = `/api/v1/platform-admin/tenants/${tenantId}`;
   const exports = useResource<{ exports: DataExport[] }>(`${base}/exports`);
+  const hold = useResource<LegalHold>(legalHoldPath(tenantId));
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [typedKey, setTypedKey] = useState("");
+  const [handBack, setHandBack] = useState<HandBack>({ kind: "export" });
+  const [outcome, setOutcome] = useState<{ tone: "good" | "warning"; text: string } | null>(null);
+  const purgeResult = useRef<PurgeResult | null>(null);
   const rows = exports.data?.exports ?? [];
   const busy = rows.some((row) => row.status === "QUEUED" || row.status === "RUNNING");
-  const deletable = ["SUSPENDED", "TERMINATED"].includes(String(status).toUpperCase());
+  const upper = String(status).toUpperCase();
+  const resuming = upper === "PURGING";
+  const deletable = ["SUSPENDED", "TERMINATED", "PURGING"].includes(upper);
+  const onHold = !!hold.data?.legal_hold;
+  const available = exportAfterSuspension(rows, suspendedAt);
+  // A purge left PURGING already recorded its hand-back; resuming it asks only for the confirmation.
+  const answered = resuming || handBackReady(handBack, available);
+  const startPurge = () =>
+    setConfirm({
+      title: resuming ? `Finish deleting ${name}'s data?` : `Delete all of ${name}'s data?`,
+      body: resuming
+        ? "The records are already deleted; this retries removing the stored files and any dedicated database."
+        : handBack.kind === "export"
+          ? `Everything this tenant stored is deleted for good and the tenant is archived. The export completed ${formatDate(available?.completed_at)} is recorded as the data handed back.`
+          : "Everything this tenant stored is deleted for good and the tenant is archived. No export is handed back; your waiver reason is kept in the deletion record.",
+      confirmLabel: resuming ? "Finish deletion" : "Delete all data",
+      danger: true,
+      reason: { label: "Reason (for example the customer's written request)", min: 10 },
+      password: true,
+      run: async (reason, password) => {
+        purgeResult.current = await send<PurgeResult>(
+          `${base}/purge`,
+          "POST",
+          purgeRequest(reason, password, typedKey, resuming ? null : handBack),
+        );
+      },
+      done: "",
+    });
   return (
     <>
-      <Panel eyebrow="Data" title="Exports" state={exports.state} error={exports.error}>
+      <Panel eyebrow="Data" title="Exports" source={exports}>
         <p className="ac-muted">
           A zip of every record, the audit trail and every stored file (no passwords or secrets), kept for 7 days.
         </p>
@@ -519,6 +808,7 @@ function TenantData({
           rowKey={(row) => row.id}
           empty={{ title: "No exports", detail: "Prepare one to hand the data back to the customer." }}
           columns={[
+            idColumn("Export ID"),
             { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
             { key: "status", label: "Status", render: (row) => titleCase(row.status) },
             {
@@ -542,52 +832,106 @@ function TenantData({
           ]}
         />
       </Panel>
-      <Panel eyebrow="Danger zone" title="Delete all of this organization's data">
+      <Panel eyebrow="Danger zone" title="Delete all of this tenant's data">
         <p>
-          Deletes every record, the audit trail and every stored file, pseudonymizes the people and archives the
-          organization. Contract history is kept. This cannot be undone; prepare an export first if the data is to be
-          returned.
+          Deletes every record, the audit trail and every stored file, pseudonymizes the people and archives the tenant.
+          Contract history is kept. This cannot be undone.
         </p>
-        {deletable ? (
+        {outcome && (
+          <div className={`ac-message tone-${outcome.tone === "good" ? "good" : "warning"}`} role="status">
+            {outcome.text}
+          </div>
+        )}
+        {onHold ? (
+          <p className="ca-inline-error" role="note">
+            <Lock size={15} aria-hidden="true" /> This tenant is under a legal hold: nothing can be deleted until the
+            hold is released (Overview).
+          </p>
+        ) : deletable ? (
           <form
             className="ca-form"
             onSubmit={(event) => {
               event.preventDefault();
-              if (typedKey.trim() !== tenantKey) return onMessage("Type the organization key exactly.", "critical");
-              setConfirm({
-                title: `Delete all of ${name}'s data?`,
-                body: "Everything this organization stored is deleted for good and the organization is archived.",
-                confirmLabel: "Delete all data",
-                danger: true,
-                reason: { label: "Reason (for example the customer's written request)", min: 10 },
-                password: true,
-                run: (reason, password) =>
-                  send(`${base}/purge`, "POST", { reason, password, confirm_tenant_key: typedKey.trim() }),
-                done: `${name}'s data has been deleted.`,
-              });
+              if (typedKey.trim() !== tenantKey) return onMessage("Type the tenant code exactly.", "critical");
+              if (!answered)
+                return onMessage("Choose the export to hand back, or record why there is none.", "critical");
+              startPurge();
             }}
           >
+            {resuming ? (
+              <p className="ac-note">
+                A previous deletion did not finish: the records are deleted but stored files (or a dedicated database)
+                remain. Finishing it retries their removal.
+              </p>
+            ) : (
+              <fieldset className="ca-fieldset">
+                <legend>Step 1 · The customer's data is handed back first</legend>
+                <label className="ca-check">
+                  <input
+                    type="radio"
+                    name="hand-back"
+                    checked={handBack.kind === "export"}
+                    disabled={!available}
+                    onChange={() => setHandBack({ kind: "export" })}
+                  />
+                  {available
+                    ? `Use the export completed ${formatDate(available.completed_at)}${
+                        available.summary ? ` (${available.summary.rows.toLocaleString()} records)` : ""
+                      }, prepared after the suspension`
+                    : "No export completed after the suspension yet: prepare one above, or waive it below"}
+                </label>
+                <label className="ca-check">
+                  <input
+                    type="radio"
+                    name="hand-back"
+                    checked={handBack.kind === "waiver"}
+                    onChange={() => setHandBack({ kind: "waiver", reason: "" })}
+                  />
+                  No export: record why the data is not being returned
+                </label>
+                {handBack.kind === "waiver" && (
+                  <label className="ca-field">
+                    Why no export is handed back (for example the customer declined in writing)
+                    <textarea
+                      rows={2}
+                      minLength={WAIVER_MIN}
+                      maxLength={1000}
+                      value={handBack.reason}
+                      onChange={(event) => setHandBack({ kind: "waiver", reason: event.target.value })}
+                      placeholder={`At least ${WAIVER_MIN} characters`}
+                    />
+                  </label>
+                )}
+                <p className="ac-muted">Free trials are deleted without a hand-back; either choice is accepted.</p>
+              </fieldset>
+            )}
             <label className="ca-field">
-              Type the organization key <strong>{tenantKey}</strong> to confirm
+              {resuming ? "" : "Step 2 · "}Type the tenant code <strong>{tenantKey}</strong> to confirm
               <input value={typedKey} onChange={(event) => setTypedKey(event.target.value)} autoComplete="off" />
             </label>
             <div className="ca-action-row">
-              <button type="submit" className="ca-danger" disabled={busy || typedKey.trim() !== tenantKey}>
-                Delete all data
+              <button type="submit" className="ca-danger" disabled={busy || typedKey.trim() !== tenantKey || !answered}>
+                {resuming ? "Finish deletion" : "Delete all data"}
               </button>
             </div>
           </form>
         ) : (
-          <p className="ac-muted">Suspend or terminate the organization first.</p>
+          <p className="ac-muted">Deactivate the tenant first.</p>
         )}
       </Panel>
       <ConfirmDialog
         request={confirm}
         onClose={() => setConfirm(null)}
         onDone={(message) => {
+          const purged = purgeResult.current;
+          purgeResult.current = null;
           setConfirm(null);
           setTypedKey("");
-          onMessage(message);
+          if (purged) {
+            const result = purgeOutcome(name, purged);
+            setOutcome(result);
+            onMessage(result.text, result.tone === "good" ? "good" : "critical");
+          } else onMessage(message);
           exports.reload();
           onChanged();
         }}
@@ -767,6 +1111,25 @@ function AddEnvironment({
   );
 }
 
+// Why a domain check stayed PENDING, in words (codes from POST .../domain-verifications).
+const PROOF_ERRORS: Record<string, string> = {
+  PROOF_MISMATCH: "the file was found but does not contain this token",
+  PROOF_NOT_FOUND: "the file was not found at that address",
+  PROOF_UNREACHABLE: "the domain could not be reached over HTTPS",
+  PROOF_DESTINATION_BLOCKED: "the domain points to an address MDARIX does not connect to",
+  PROOF_REDIRECT_NOT_FOLLOWED: "the address redirects elsewhere; publish the file at the exact address",
+  PROOF_TOO_LARGE: "the file is larger than a verification file can be",
+  CHALLENGE_EXPIRED: "the token has expired; get a new one",
+};
+
+/** The result of a domain check, in one sentence: verified, or still pending and why. */
+export function domainCheckMessage(domain: string, result: { status?: string; last_error?: string | null }): string {
+  if (String(result.status ?? "").toUpperCase() === "VERIFIED") return `Domain ${domain} is verified.`;
+  const code = result.last_error ?? "";
+  const why = PROOF_ERRORS[code] ?? (code.startsWith("PROOF_HTTP_") ? `the site answered HTTP ${code.slice(11)}` : "");
+  return `Domain ${domain} is not verified yet${why ? `: ${why}` : ""}.`;
+}
+
 function DomainIdentity({
   tenantId,
   providers,
@@ -780,25 +1143,61 @@ function DomainIdentity({
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [issued, setIssued] = useState<{
+    token: string;
+    proofUrl?: string;
+    instructions?: string;
+    expiresAt?: string;
+  } | null>(null);
+  const [pending, setPending] = useState<{ text: string; checkedAt?: string } | null>(null);
+  const url = `/api/v1/platform-admin/tenants/${tenantId}/domain-verifications`;
+  // Step 1: a token is issued once (only its hash is kept); the customer publishes it on their own web site.
+  const getToken = async () => {
+    if (!domain.trim()) return setError("Enter the domain first.");
+    setBusy(true);
+    setError("");
+    setPending(null);
+    try {
+      const result = await send<any>(url, "POST", { domain: domain.trim(), verification_method: "FILE" });
+      setIssued({
+        token: String(result.verification_token ?? ""),
+        proofUrl: result.proof_url,
+        instructions: result.instructions,
+        expiresAt: result.expires_at,
+      });
+      setToken(String(result.verification_token ?? ""));
+    } catch (reason) {
+      setError(errorText(reason, "A verification token could not be issued."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  // Step 2: MDARIX fetches https://<domain>/.well-known/mdarix-verify.txt and compares it with the token.
   const verify = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setError("");
+    setPending(null);
     try {
-      const result = await send<any>(`/api/v1/platform-admin/tenants/${tenantId}/domain-verifications`, "POST", {
+      const result = await send<any>(url, "POST", {
         domain: domain.trim(),
-        verification_method: "DNS",
+        verification_method: "FILE",
         verification_token: token.trim(),
       });
-      onMessage(`Domain ${domain.trim()}: ${titleCase(result.status ?? "submitted")}.`);
-      setDomain("");
-      setToken("");
+      const text = domainCheckMessage(domain.trim(), result);
+      if (String(result.status ?? "").toUpperCase() === "VERIFIED") {
+        onMessage(text);
+        setDomain("");
+        setToken("");
+        setIssued(null);
+      } else setPending({ text, checkedAt: result.last_checked_at ?? undefined });
     } catch (reason) {
       setError(errorText(reason, "The domain was not verified."));
     } finally {
       setBusy(false);
     }
   };
+  const proofUrl = domain.trim() ? `https://${domain.trim()}/.well-known/mdarix-verify.txt` : "";
   return (
     <div className="ac-grid two">
       <Panel eyebrow="Sign-in" title="Identity providers">
@@ -808,7 +1207,7 @@ function DomainIdentity({
           rowKey={(row) => row.id}
           empty={{ title: "Password sign-in", detail: "No single sign-on provider is configured for this tenant." }}
           columns={[
-            { key: "type", label: "Provider", render: (row) => titleCase(row.provider_type) },
+            { key: "type", label: "Provider", render: (row) => displayCode(row.provider_type) },
             { key: "mode", label: "Sign-in mode", render: (row) => titleCase(row.login_mode) },
             { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           ]}
@@ -825,23 +1224,47 @@ function DomainIdentity({
               placeholder="example.com"
             />
           </label>
+          <p className="ac-muted">
+            1. Get a token. 2. The customer publishes it, on one line, at{" "}
+            <code>{proofUrl || "https://<domain>/.well-known/mdarix-verify.txt"}</code>. 3. Verify.
+          </p>
+          <div className="ca-action-row">
+            <button type="button" className="ac-secondary" disabled={busy || !domain.trim()} onClick={getToken}>
+              Get a token
+            </button>
+          </div>
+          {issued && (
+            <div className="ac-message tone-good" role="status">
+              <span>
+                Token (shown once): <code>{issued.token}</code>
+                {issued.instructions ? ` ${issued.instructions}` : ""}
+                {issued.expiresAt ? ` Valid until ${formatDate(issued.expiresAt)}.` : ""}
+              </span>
+            </div>
+          )}
           <label className="ca-field">
-            DNS verification token
+            Verification token
             <input
               required
               minLength={8}
               value={token}
               onChange={(event) => setToken(event.target.value)}
-              placeholder="The TXT record value the customer published"
+              placeholder={`Published at ${proofUrl || "https://<domain>/.well-known/mdarix-verify.txt"}`}
             />
           </label>
+          {pending && (
+            <p className="ca-inline-error" role="status">
+              {pending.text}
+              {pending.checkedAt ? ` Checked ${formatDate(pending.checkedAt)}.` : ""}
+            </p>
+          )}
           {error && (
             <p className="ca-inline-error" role="alert">
               {error}
             </p>
           )}
           <button type="submit" className="ac-primary" disabled={busy}>
-            <Globe2 size={16} aria-hidden="true" /> {busy ? "Verifying…" : "Verify domain"}
+            <Globe2 size={16} aria-hidden="true" /> {busy ? "Working…" : "Verify domain"}
           </button>
         </form>
       </Panel>
@@ -852,7 +1275,7 @@ function DomainIdentity({
 function TenantActivity({ tenantId }: { tenantId: string }) {
   const activity = useResource<{ items: any[] }>(`/api/v1/platform-admin/tenants/${tenantId}/tabs/Activity`);
   return (
-    <Panel eyebrow="Audit trail" title="Recent activity" state={activity.state} error={activity.error}>
+    <Panel eyebrow="Audit trail" title="Recent activity" source={activity}>
       <Table
         caption="Recent tenant activity"
         rows={activity.data?.items ?? []}

@@ -15,7 +15,9 @@ from investigation_workspace.schemas import (
 from investigation_workspace.service import (
     InvestigationWorkspaceError,
     InvestigationWorkspaceService,
+    with_business_ids,
 )
+from investigator.business_ids import with_evidence_business_ids, with_hypothesis_business_ids
 from investigator.schemas import (
     InvestigationAnalysisRequest,
     InvestigationAnalysisResponse,
@@ -65,9 +67,10 @@ def get_investigation_workspace(
         retrieval_top_k=retrieval_top_k,
     )
     try:
-        return service.workspace(data_db, request, data_plane_engine=scoped_bind(data_db))
+        workspace = service.workspace(data_db, request, data_plane_engine=scoped_bind(data_db))
     except InvestigationWorkspaceError as exc:
         raise workspace_error(exc) from exc
+    return with_business_ids(data_db, workspace)
 
 
 @router.post(
@@ -84,9 +87,10 @@ def create_investigation_analysis(
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        return investigator_service.analyze(data_db, scoped_request)
+        result = investigator_service.analyze(data_db, scoped_request)
     except InvestigatorError as exc:
         raise investigator_error(exc) from exc
+    return with_evidence_business_ids(data_db, result)
 
 
 @router.get("/{investigation_id}/analysis/latest", response_model=InvestigationAnalysisResponse)
@@ -101,7 +105,7 @@ def get_latest_investigation_analysis(
         raise HTTPException(
             status_code=404, detail={"code": "ANALYSIS_NOT_FOUND", "message": "No investigation analysis exists"}
         )
-    return result
+    return with_evidence_business_ids(data_db, result)
 
 
 @router.get("/{investigation_id}/analysis/{analysis_id}", response_model=InvestigationAnalysisResponse)
@@ -113,9 +117,10 @@ def get_investigation_analysis(
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
     try:
-        return investigator_service.get(data_db, tenant_id, investigation_id, analysis_id)
+        result = investigator_service.get(data_db, tenant_id, investigation_id, analysis_id)
     except InvestigatorError as exc:
         raise investigator_error(exc) from exc
+    return with_evidence_business_ids(data_db, result)
 
 
 @router.post(
@@ -132,9 +137,10 @@ def create_hypotheses(
     tenant_id = ctx.tenant_id
     scoped_request = request.model_copy(update={"tenant_id": tenant_id, "investigation_id": investigation_id})
     try:
-        return hypothesis_service.generate(data_db, scoped_request)
+        result = hypothesis_service.generate(data_db, scoped_request)
     except HypothesisEngineError as exc:
         raise hypothesis_error(exc) from exc
+    return with_hypothesis_business_ids(data_db, tenant_id, result)
 
 
 @router.get("/{investigation_id}/hypotheses", response_model=HypothesisSetResponse)
@@ -149,7 +155,7 @@ def list_latest_hypotheses(
         raise HTTPException(
             status_code=404, detail={"code": "HYPOTHESIS_SET_NOT_FOUND", "message": "No hypothesis set exists"}
         )
-    return result
+    return with_hypothesis_business_ids(data_db, tenant_id, result)
 
 
 @router.get("/{investigation_id}/hypotheses/{hypothesis_id}", response_model=HypothesisSetResponse)
@@ -161,6 +167,7 @@ def get_hypothesis(
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     try:
-        return hypothesis_service.get(data_db, tenant_id, investigation_id, hypothesis_id)
+        result = hypothesis_service.get(data_db, tenant_id, investigation_id, hypothesis_id)
     except HypothesisEngineError as exc:
         raise hypothesis_error(exc) from exc
+    return with_hypothesis_business_ids(data_db, tenant_id, result)

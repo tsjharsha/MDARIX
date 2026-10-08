@@ -1,0 +1,83 @@
+"""Row-level security defence in depth for the customer records, the organizations table and the master data.
+
+Applied once every writer runs in system scope or in the scope the policy allows (request handlers, the scheduler and
+the worker already did; operator scripts and the ingestion fixture bind system scope, raw connections through
+``tenant_scope.bind_connection_system``). tests/test_rls_coverage.py keeps every organization-owned table covered.
+
+Before this migration these tables relied on the application alone to filter by organization:
+
+- ``tenants``: a session bound to an organization sees only its own row (``id = app.tenant_id``); system scope sees
+  every row (platform administration, sign-in before the organization is known, the scheduler).
+- ``customers``, ``customer_contacts``, ``customer_domains``, ``customer_onboarding_drafts``: the commercial customer
+  behind an organization. A session bound to an organization sees and writes only its own customer's rows (the
+  ``customer_id`` of its ``tenants`` row); system scope sees all.
+- ``md_master.*``: global reference and mapping master data, the same for every organization. Everyone may read it;
+  inserts, updates and deletes from the application role are allowed only in system scope (the platform mapping
+  catalogue). This is the "revoke writes except system-scope paths" rule: a plain REVOKE cannot tell system scope
+  apart, because system scope is a setting on the same runtime role, so the write rights stay granted and the
+  policies decide. RLS is ENABLEd but not FORCEd on md_master, so the owner (migrations, seed scripts run by an
+  operator) keeps writing as before; the runtime role is the one being restricted.
+
+The organization tables are FORCEd like every other tenant table (md05, md15): the owner connection used by scripts
+must bind system scope too.
+"""
+
+from alembic import op
+
+revision = "md34rlsdefence"
+down_revision = "md33humandecision"
+branch_labels = None
+depends_on = None
+
+_TENANT = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+_SYSTEM = "(SELECT public.mdarix_system_scope())"
+# The caller's own customer. Evaluated under the tenants policy below, which shows the caller its own row only.
+_OWN_CUSTOMER = f"(SELECT t.customer_id FROM public.tenants t WHERE t.id = {_TENANT})"
+
+ORGANIZATION_POLICIES = {
+    "tenants": f"id = {_TENANT}",
+    "customers": f"id = {_OWN_CUSTOMER}",
+    "customer_contacts": f"customer_id = {_OWN_CUSTOMER}",
+    "customer_domains": f"customer_id = {_OWN_CUSTOMER}",
+    "customer_onboarding_drafts": f"customer_id = {_OWN_CUSTOMER}",
+}
+POLICY = "mdarix_tenant_isolation"
+MASTER_POLICIES = (
+    ("mdarix_master_read", "SELECT", "USING (true)"),
+    ("mdarix_master_insert", "INSERT", f"WITH CHECK ({_SYSTEM})"),
+    ("mdarix_master_update", "UPDATE", f"USING ({_SYSTEM}) WITH CHECK ({_SYSTEM})"),
+    ("mdarix_master_delete", "DELETE", f"USING ({_SYSTEM})"),
+)
+
+
+def _master_tables() -> list[str]:
+    rows = op.get_bind().exec_driver_sql(
+        "SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'md_master'::regnamespace AND c.relkind IN ('r', 'p') "
+        "ORDER BY c.relname"
+    )
+    return [name for (name,) in rows]
+
+
+def upgrade() -> None:
+    for table, match in ORGANIZATION_POLICIES.items():
+        op.execute(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
+        op.execute(
+            f"CREATE POLICY {POLICY} ON public.{table} "
+            f"USING (({match}) OR {_SYSTEM}) WITH CHECK (({match}) OR {_SYSTEM})"
+        )
+    for table in _master_tables():
+        op.execute(f"ALTER TABLE md_master.{table} ENABLE ROW LEVEL SECURITY")
+        for name, command, clause in MASTER_POLICIES:
+            op.execute(f"CREATE POLICY {name} ON md_master.{table} FOR {command} {clause}")
+
+
+def downgrade() -> None:
+    for table in _master_tables():
+        for name, _command, _clause in MASTER_POLICIES:
+            op.execute(f"DROP POLICY IF EXISTS {name} ON md_master.{table}")
+        op.execute(f"ALTER TABLE md_master.{table} DISABLE ROW LEVEL SECURITY")
+    for table in reversed(list(ORGANIZATION_POLICIES)):
+        op.execute(f"DROP POLICY IF EXISTS {POLICY} ON public.{table}")
+        op.execute(f"ALTER TABLE public.{table} NO FORCE ROW LEVEL SECURITY")
+        op.execute(f"ALTER TABLE public.{table} DISABLE ROW LEVEL SECURITY")

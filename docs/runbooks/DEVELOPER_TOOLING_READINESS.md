@@ -1,52 +1,30 @@
-# Developer and Demo Readiness Tooling
+# Developer and quality tooling
 
-## Current repository status
+What the repository has today. CI jobs are in `.github/workflows/ci.yml`; a tool listed as "in CI" fails the build
+on its findings.
 
-| Area | Tool | Status | Evidence or next action |
-| --- | --- | --- | --- |
-| Browser automation/screenshots | Playwright | **Available** | `frontend/package.json`, `frontend/playwright.config.ts`, `frontend/e2e/` |
-| Accessibility checks | axe-core + axe-playwright | **Available** | Frontend dependencies are installed; run through Playwright evidence tests |
-| Web security scanning | OWASP ZAP | **Manual/local** | Run against a started frontend and backend; do not treat an empty local scan as production proof |
-| Secret scanning | Gitleaks | **Not wired into CI** | Install locally or add an approved CI action before release |
-| SMTP capture | Mailpit/MailHog | **Not in Compose** | Add only for local email-flow testing; production delivery still requires a real provider |
-| API testing | Bruno/Insomnia/Postman | **Optional manual** | Use the checked-in PowerShell/API scripts and redacted request evidence; tool choice is not a product dependency |
-| Database inspection | pgAdmin/DBeaver Community | **Optional manual** | Useful for inspection; never use it as an authorization boundary |
-| Load testing | k6 OSS | **Not in repository** | Add an approved scenario and target environment before performance claims |
-| Container scanning | Trivy | **Not wired into CI** | Scan built images in a Docker-enabled CI or release environment |
-| Python dependency scanning | pip-audit | **Available and CI-wired** | `.github/workflows/ci.yml` runs `pip-audit -r requirements.txt` |
-| JavaScript dependency scanning | npm audit | **Available and CI-wired** | `.github/workflows/ci.yml` runs `npm audit --audit-level=high` |
-| Python quality | Ruff/mypy | **Not configured** | Add configuration and baseline before making lint/type claims |
-| JavaScript quality | ESLint | **Not configured** | Add config and scripts before making lint claims |
-| Object storage simulation | MinIO/LocalStack | **Not in Compose** | Current local object storage remains a development fallback; production storage is still external |
-| Metrics | Prometheus/Grafana | **Not in Compose** | Worker emits structured metrics logs; production scraping/dashboard setup remains required |
-| Error tracking | Sentry/OpenTelemetry | **Not configured** | Structured logs exist; external error collection requires an approved destination |
+| Area | Tool | Status | Where |
+|---|---|---|---|
+| Browser tests and accessibility | Playwright + axe | In CI (`browser` job) | `frontend/playwright.config.ts`, `frontend/e2e/` |
+| Frontend unit tests | Vitest | In CI (`frontend` job) | `npm --prefix frontend test` |
+| Frontend type check | TypeScript (`tsc --noEmit --noUnusedLocals`) | In CI | `npm --prefix frontend run lint` |
+| Frontend formatting | Prettier | In CI | `frontend/.prettierrc.json`, `npm --prefix frontend run format:check` |
+| Frontend lint rules | ESLint | Not configured | The `lint` script is the TypeScript check above |
+| Python lint and format | Ruff | In CI (`security` job) | `ruff.toml`; `ruff check .`, `ruff format --check .` |
+| Python type check | mypy | Not configured | |
+| Python dependencies | pip-audit | In CI | `pip-audit -r requirements.txt` |
+| JavaScript dependencies | npm audit | In CI | `frontend` job, high and above |
+| Secret scanning | Gitleaks | In CI (`security` job) | `gitleaks/gitleaks-action` |
+| Container images | Trivy | In CI (`image-scan` job) | Production images, high and critical findings with a fix |
+| Static analysis | CodeQL | Pull requests, `main` and weekly | `.github/workflows/codeql.yml` (Python, TypeScript) |
+| Dependency updates | Dependabot | Weekly | `.github/dependabot.yml` (pip, npm, docker, github-actions) |
+| Email capture (local) | Mailpit | In `docker-compose.yml` | Web UI `http://localhost:8025`, SMTP port 1025 |
+| Object storage (local) | MinIO | In `docker-compose.yml` | S3 API port 9000, console 9001 |
+| Load smoke | k6 | Script only, run by hand | `scripts/k6/mdarix-smoke.js` (non-production targets only) |
+| Error tracking | Sentry | Optional | Set `MDARIX_SENTRY_DSN` (`backend/app/logging_setup.py`) |
+| Web security scan | OWASP ZAP | Manual | Run against a local or staging stack with test accounts only |
+| Metrics dashboards | Prometheus/Grafana | Not provided | Services log structured JSON; the worker logs its metrics every cycle |
 
-## Implemented checks
-
-The existing CI already covers Python 3.13, PostgreSQL/pgvector service startup,
-migrations, Python compilation, backend tests, `pip-audit`, frontend dependency
-audit, and frontend production build. Playwright is configured for desktop and
-mobile projects with JSON browser evidence and failure traces.
-
-The outbox worker emits structured heartbeat metrics and supports configurable
-dead-letter webhook alerts through `MDARIX_OUTBOX_ALERT_WEBHOOK`.
-
-## Manual setup sequence
-
-1. Start Docker Desktop and verify `docker info`.
-2. Start PostgreSQL and the simulator services with `docker compose up -d`.
-3. Start Mailpit for local email capture, if email-flow testing is required.
-4. Start MinIO for object-storage contract testing, if attachment testing is required.
-5. Start the backend and frontend using the repository run commands.
-6. Run Playwright desktop/mobile evidence and axe checks.
-7. Run ZAP against the local API/frontend with test credentials only.
-8. Run Trivy against images and `gitleaks` against the repository.
-9. Run k6 only against a dedicated non-production target.
-10. Configure Prometheus/Grafana and an approved error destination for operational testing.
-
-## Important limitations
-
-Tool installation does not prove production readiness. Real SMTP/provider
-delivery, object storage, customer connector health, multi-instance behavior,
-hosted CI execution, and production monitoring require their corresponding
-external credentials and deployment environments.
+Passing these tools does not prove production readiness. Real SMTP delivery, the managed database, backups and
+monitoring are proven on the deployment itself ([DEPLOYMENT.md](DEPLOYMENT.md),
+[BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md)).

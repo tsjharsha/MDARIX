@@ -52,6 +52,13 @@ class ConnectionConfig:
 
 
 class Connector:
+    """Records already read from a source, with their schema and metadata.
+
+    It does not talk to the customer's system: reachability is checked for real by
+    backend/app/access/configuration.py:connection_test, and records are read by backend/app/access/connector_sync.py,
+    both through the SSRF-safe outbound client.
+    """
+
     def __init__(self, config: ConnectionConfig, records=None):
         self.config = config
         self.records = records or []
@@ -60,9 +67,6 @@ class Connector:
         if self.config.connector_type not in {"FILE", "REST", "DATABASE"}:
             return {"status": "INVALID_CONFIGURATION", "category": "SOURCE_SCHEMA"}
         return {"status": "VALID", "category": None}
-
-    def test_connection(self):
-        return {"status": "SUCCESS", "connector_type": self.config.connector_type}
 
     def discover_schema(self):
         sample = self.records[0] if self.records else {}
@@ -77,9 +81,6 @@ class Connector:
     def read_incremental(self, watermark=None):
         return list(self.records)
 
-    def get_health(self):
-        return {"status": "HEALTHY", "last_failure": None, "records_processed": len(self.records)}
-
     def get_source_metadata(self):
         return {"source_system_type": self.config.source_system_type, "connector_type": self.config.connector_type}
 
@@ -92,14 +93,6 @@ class FileConnector(Connector):
     @classmethod
     def from_json(cls, config, text):
         return cls(config, json.loads(text))
-
-
-class RestConnector(Connector):
-    pass
-
-
-class DatabaseConnector(Connector):
-    pass
 
 
 @dataclass

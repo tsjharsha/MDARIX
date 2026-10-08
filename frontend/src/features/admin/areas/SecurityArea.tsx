@@ -13,11 +13,13 @@ import {
   useResource,
   type Confirmation,
 } from "../../customer-admin/shared";
-import { titleCase } from "../customers/model";
+import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatDay } from "../../../app/dates";
+import { sortParams, useServerSort } from "../../../app/tableSort";
+import { PersonCell } from "./common";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -70,8 +72,14 @@ function Overview() {
       <section className="ac-stats ar-stats-4" aria-label="Security at a glance">
         <StatTile
           label="Tenant isolation"
-          value={data ? `${data.isolation.protected} / ${data.isolation.tenant_tables}` : null}
-          detail={isolated ? "Every tenant table is protected or excluded by design" : "Check the tables below"}
+          value={data ? (isolated ? "Protected" : "Needs attention") : null}
+          detail={
+            data
+              ? isolated
+                ? `Each tenant sees only its own data (${data.isolation.protected} of ${data.isolation.tenant_tables} tables separate tenants; the rest are shared by design)`
+                : "Some tenant data is not protected: see Tenant isolation below"
+              : "Checking"
+          }
           icon={<LockKeyhole size={18} />}
           tone={isolated === null ? undefined : isolated ? "good" : "critical"}
         />
@@ -97,24 +105,32 @@ function Overview() {
         />
       </section>
       <div className="ac-grid two">
-        <Panel eyebrow="Row-level security" title="Tenant isolation" state={posture.state} error={posture.error}>
+        <Panel
+          eyebrow="Data separation between tenants"
+          title="Tenant isolation"
+          state={posture.state}
+          error={posture.error}
+        >
           {data && (
             <>
               <Intro>
-                {data.isolation.protected} of {data.isolation.tenant_tables} tables holding tenant data only return the
-                signed-in tenant&apos;s rows. The others are platform tables kept apart on purpose.
+                {data.isolation.protected} of the {data.isolation.tenant_tables} places where data is stored only ever
+                show a tenant its own records. The others hold the platform&apos;s own shared information and are kept
+                apart on purpose.
               </Intro>
               {data.isolation.unexpected.length > 0 && (
                 <p className="ca-inline-error" role="alert">
                   Not protected: {data.isolation.unexpected.join(", ")}
                 </p>
               )}
-              <h4 className="ar-subhead">Platform tables (excluded by design)</h4>
-              <ul className="ar-chips">
-                {data.isolation.excluded_by_design.map((name) => (
-                  <li key={name}>{name}</li>
-                ))}
-              </ul>
+              <details className="ar-technical">
+                <summary>Technical detail: platform tables (excluded by design)</summary>
+                <ul className="ar-chips">
+                  {data.isolation.excluded_by_design.map((name) => (
+                    <li key={name}>{name}</li>
+                  ))}
+                </ul>
+              </details>
             </>
           )}
         </Panel>
@@ -145,11 +161,28 @@ type AuditRow = {
   action: string;
   entity_type: string;
   actor?: string | null;
+  actor_business_id?: string | null;
   reason?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
 };
+
+/** Columns the server can order every page by (backend platform_console.py platform_audit). */
+const AUDIT_SORT_KEYS = [
+  "when",
+  "tenant",
+  "who",
+  "what",
+  "why",
+  "at",
+  "tenant_name",
+  "actor",
+  "action",
+  "entity_type",
+  "reason",
+  "source_ip",
+] as const;
 
 /** Who did what, where and why, across every tenant. Record contents are never shown. */
 function AuditTrail() {
@@ -157,7 +190,8 @@ function AuditTrail() {
   const [tenantId, setTenantId] = useState("");
   const [attention, setAttention] = useState(false);
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: "25" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "25", ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (tenantId) params.set("tenant_id", tenantId);
   if (attention) params.set("attention", "true");
@@ -172,8 +206,7 @@ function AuditTrail() {
     <Panel
       eyebrow="All tenants"
       title="Audit trail"
-      state={audit.state}
-      error={audit.error}
+      source={audit}
       action={
         <span className="cc-actions">
           <a
@@ -181,14 +214,14 @@ function AuditTrail() {
             href="/api/v1/admin/audit-history/export?output_format=CSV"
             title="The MDARIX platform tenant's own audit trail"
           >
-            <Download size={16} aria-hidden="true" /> Export CSV
+            <Download size={16} aria-hidden="true" /> Export platform audit (CSV)
           </a>
           <a
             className="ac-secondary"
             href="/api/v1/stage3/compliance-report?output_format=PDF"
             title="Compliance report of the MDARIX platform tenant"
           >
-            <Download size={16} aria-hidden="true" /> Download evidence package
+            <Download size={16} aria-hidden="true" /> Platform evidence package (PDF)
           </a>
         </span>
       }
@@ -226,16 +259,22 @@ function AuditTrail() {
         caption="Audit trail"
         rows={audit.data?.items ?? []}
         rowKey={(row) => row.id}
+        serverSort={{ sort, onSort, keys: AUDIT_SORT_KEYS }}
         empty={{ title: "No events", detail: "No event matches these filters." }}
         columns={[
           { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },
-          { key: "who", fields: ["actor"], label: "Who", render: (row) => row.actor ?? "System" },
+          {
+            key: "who",
+            fields: ["actor", "actor_business_id"],
+            label: "Who",
+            render: (row) => <PersonCell name={row.actor} businessId={row.actor_business_id} none="System" />,
+          },
           {
             key: "what",
             fields: ["action", "entity_type"],
@@ -243,7 +282,7 @@ function AuditTrail() {
             render: (row) => (
               <span className="cc-stack">
                 <strong>{actionLabel(row.action)}</strong>
-                <small>{titleCase(row.entity_type)}</small>
+                <small>{displayCode(row.entity_type)}</small>
               </span>
             ),
           },
@@ -258,6 +297,7 @@ function AuditTrail() {
 type Grant = {
   id: string;
   person?: string | null;
+  platform_user_business_id?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
@@ -283,8 +323,7 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
     <Panel
       eyebrow="Customer support"
       title="Support access"
-      state={grants.state}
-      error={grants.error}
+      source={grants}
       action={
         <button type="button" className="ac-primary" onClick={() => setRequesting(true)}>
           <LifeBuoy size={16} aria-hidden="true" /> Request access
@@ -303,16 +342,21 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
         columns={[
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },
-          { key: "person", fields: ["person", "platform_user_id"], label: "For", render: (row) => row.person ?? "—" },
+          {
+            key: "person",
+            fields: ["person", "platform_user_business_id", "platform_user_id"],
+            label: "For",
+            render: (row) => <PersonCell name={row.person} businessId={row.platform_user_business_id} />,
+          },
           { key: "why", label: "Reason", render: (row) => row.reason },
           {
             key: "window",
             fields: ["starts_at", "expires_at"],
-            label: "Window",
+            label: "Access period",
             render: (row) => (
               <span className="cc-stack">
                 <strong>{formatDate(row.starts_at)}</strong>
@@ -527,9 +571,9 @@ function Retention() {
           icon={<ShieldCheck size={18} />}
         />
         <StatTile
-          label="First release date"
+          label="Earliest date records may be deleted"
           value={retention?.earliest_release_at ? formatDay(retention.earliest_release_at) : null}
-          detail="Nothing may be removed before this"
+          detail="Nothing may be deleted before this"
           icon={<LockKeyhole size={18} />}
         />
       </section>

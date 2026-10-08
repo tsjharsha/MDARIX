@@ -1,0 +1,19 @@
+{
+  "change_control": "MVP-AI-GOLDEN-002 adversarial VS013-VS015",
+  "hashes": {
+    "canonical_sha256": "888887e62899eef84c1f6be60b6a3c5136783253e9d066f51e7d27347b7760aa",
+    "ground_truth_bundle_sha256": "8ea510cca9cc5d33730751d0bd24830cf88b9c41e4d3da0ac187aaca2fa45dc9",
+    "scenario_index_sha256": "bd66a99486ef7db59d7b5987192798f3af64a74199cb45f11fbd084c75ce11da",
+    "source_bundle_sha256": "280c3fd6980eb8eee8060dbeb9afd5400f7554fc5670789c3610940ff4c2bdc3"
+  },
+  "qualification_version": "MDARIX_AI_GOLDEN_QUALIFICATION_V1",
+  "qualified_at": "2026-10-05T18:34:35.800283+00:00",
+  "release_policy": {
+    "allowed_dataset_errors": 0,
+    "live_model_gate_required_for_model_promotion": true,
+    "required_scenarios": 15
+  },
+  "reviewer": "ai-governance agent (human review pending)",
+  "scope": "Synthetic internal MVP AI assurance; not clinical, regulatory, or production certification.",
+  "status": "QUALIFIED_FOR_INTERNAL_MVP"
+}

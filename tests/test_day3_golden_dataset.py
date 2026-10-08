@@ -42,7 +42,7 @@ def test_expected_record_counts():
     assert 15 <= counts["lots"] <= 20
     assert 15 <= counts["changes"] <= 20
     assert 100 <= counts["complaints"] <= 150
-    assert counts["investigations"] == 10
+    assert counts["investigations"] == 13  # INV-011..INV-013 back the adversarial VS013-VS015
     assert counts["risks"] == 15
     assert counts["failure_modes"] == 15
     assert 30 <= counts["evidence"] <= 50
@@ -63,10 +63,10 @@ def test_unique_ids_and_relationships():
     assert all(row["lot_id"] is None or row["lot_id"] in lot_ids for row in data["complaints"])
 
 
-def test_all_12_scenarios_exist():
+def test_all_15_scenarios_exist():
     data = load(CANONICAL)
-    assert {s["scenario_id"] for s in data["scenarios"]} == {f"VS{i:03d}" for i in range(1, 13)}
-    for sid in [f"VS{i:03d}" for i in range(1, 13)]:
+    assert {s["scenario_id"] for s in data["scenarios"]} == {f"VS{i:03d}" for i in range(1, 16)}
+    for sid in [f"VS{i:03d}" for i in range(1, 16)]:
         assert (GROUND / sid / "ground_truth.json").exists()
 
 

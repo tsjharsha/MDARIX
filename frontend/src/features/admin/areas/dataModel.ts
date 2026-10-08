@@ -86,3 +86,21 @@ export const nextReleaseAction = (status: unknown): NextAction | null => {
       return null;
   }
 };
+
+/**
+ * A mapping status in words. A rolled-back mapping is SUPERSEDED on the server (rollback is the only step that sets
+ * it), so it reads "Rolled back" everywhere, as its release stage does.
+ */
+export const mappingStatusLabel = (status: unknown) => {
+  const value = String(status ?? "").toUpperCase();
+  if (value === "SUPERSEDED") return "Rolled back";
+  if (value === "READY_FOR_APPROVAL") return "Waiting for approval";
+  if (!value) return "Unknown";
+  return value.charAt(0) + value.slice(1).toLowerCase().replace(/_/g, " ");
+};
+
+/** "v2" or "2" -> "Version 2". */
+export const versionLabel = (version: unknown) => {
+  const text = String(version ?? "").trim();
+  return text ? `Version ${text.replace(/^v(?=\d)/i, "")}` : "—";
+};

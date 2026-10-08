@@ -24,7 +24,7 @@ from backend.app.db.models.foundation import (
     Tenant,
 )
 from backend.app.db.session import get_db
-from integration.gateway import ConnectionConfig, Connector, MappingDefinition, preview
+from integration.gateway import MappingDefinition, preview
 from backend.app.access.schemas import (
     AdminUpdateRequest,
     ConnectorRequest,
@@ -50,6 +50,7 @@ from backend.app.access.connector_mapping import (
     standard_mappings,
 )
 from backend.app.db.models.enterprise import ConnectorRun
+from backend.app.role_codes import CUSTOMER_ADMIN_ALIASES, is_customer_admin_role
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 
@@ -177,6 +178,7 @@ def create_connector(payload: ConnectorRequest, request: Request, db: Session = 
     _commit_unique(db, "connector", payload.code)
     return {
         "connector_id": str(row.id),
+        "business_id": row.business_id,
         "tenant_id": str(admin.tenant_id),
         "code": row.code,
         "version": row.version,
@@ -352,6 +354,7 @@ def list_connectors(request: Request, db: Session = Depends(get_db)):
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "code": row.code,
             "connector_type": row.connector_type,
             "version": row.version,
@@ -414,7 +417,12 @@ def set_connector_api_key(
         request=request,
     )
     db.commit()
-    return {"connector_id": str(row.id), "has_api_key": True, "api_key_ends_with": row.credential_hint}
+    return {
+        "connector_id": str(row.id),
+        "business_id": row.business_id,
+        "has_api_key": True,
+        "api_key_ends_with": row.credential_hint,
+    }
 
 
 @router.delete("/admin/configuration/connectors/{configuration_id}/api-key")
@@ -429,7 +437,7 @@ def remove_connector_api_key(configuration_id: uuid.UUID, request: Request, db: 
         db, admin, "CONNECTOR_API_KEY_REMOVED", "ConnectorConfiguration", row.id, row.version, request=request
     )
     db.commit()
-    return {"connector_id": str(row.id), "has_api_key": False}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "has_api_key": False}
 
 
 @router.get("/admin/configuration/mappings")
@@ -527,7 +535,7 @@ def activate_connector(
         db, admin, "CONNECTOR_CONFIGURATION_STATUS_CHANGED", "ConnectorConfiguration", row.id, row.version
     )
     db.commit()
-    return {"id": str(row.id), "status": row.status, "version": row.version}
+    return {"id": str(row.id), "business_id": row.business_id, "status": row.status, "version": row.version}
 
 
 @router.get("/admin/configuration/connectors/{code}/versions")
@@ -542,6 +550,7 @@ def connector_versions(code: str, request: Request, db: Session = Depends(get_db
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "code": row.code,
             "connector_type": row.connector_type,
             "version": row.version,
@@ -636,12 +645,21 @@ def update_control_plane_resource(
             404, detail={"code": "RESOURCE_NOT_FOUND", "message": "Resource is not available for this tenant"}
         )
     if resource == "users":
+        from backend.app.role_codes import canonical_stored_role
+
         _guard_user_administration(
             admin,
             target=row,
             new_role=str(payload.values["role"]) if "role" in payload.values else None,
             changes_access=bool({"role", "status"} & set(payload.values)),
         )
+        if "role" in payload.values:
+            payload.values["role"] = canonical_stored_role(str(payload.values["role"]))
+    if resource == "approval-authorities":
+        # The same rule as creating one (access/governance.py): an administrator role never holds approval authority.
+        from backend.app.access.governance import _refuse_administrator_authority
+
+        _refuse_administrator_authority(str(payload.values.get("role_name", row.role_name)))
     if resource == "users" and "email" in payload.values:
         new_email = str(payload.values["email"]).strip().lower()
         if (
@@ -681,7 +699,14 @@ def update_control_plane_resource(
     version = getattr(row, "version", "v1")
     _audit_configuration(db, admin, action, model.__name__, row.id, version)
     db.commit()
-    return {"id": str(row.id), "resource": resource, "status": getattr(row, "status", "ACTIVE"), "version": version}
+    return {
+        "id": str(row.id),
+        # Users and connectors have an MDARIX ID; roles, policies and mappings do not (None).
+        "business_id": getattr(row, "business_id", None),
+        "resource": resource,
+        "status": getattr(row, "status", "ACTIVE"),
+        "version": version,
+    }
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/test")
@@ -696,12 +721,37 @@ def test_connector(configuration_id: uuid.UUID, request: Request, db: Session = 
         raise HTTPException(
             404, detail={"code": "CONNECTOR_NOT_FOUND", "message": "Connector is not available for this tenant"}
         )
-    result = Connector(
-        ConnectionConfig(str(admin.tenant_id), str(row.id), row.code, row.connector_type, "CONFIGURED")
-    ).test_connection()
+    result = connection_test(row)
     _audit_configuration(db, admin, "CONNECTOR_TEST_EXECUTED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
     return result
+
+
+def connection_test(row: ConnectorConfiguration) -> dict:
+    """Whether MDARIX can reach the connector's system now, as a real request through the outbound policy.
+
+    A connector with an endpoint is asked for its health path (the same SSRF-safe request as provider health: public
+    destinations only, no redirects, its credential sent): SUCCESS only when it answers 2xx, otherwise FAILED with
+    the reason. A connector without an endpoint has nothing to reach: file connectors receive uploads
+    (NOT_APPLICABLE); any other type is NOT_CONFIGURED until an endpoint is saved.
+    """
+    connector_type = str(row.connector_type or "").upper()
+    if not (row.configuration or {}).get("endpoint"):
+        if connector_type == "FILE":
+            return {
+                "status": "NOT_APPLICABLE",
+                "connector_type": connector_type,
+                "reason": "FILE_CONNECTOR_RECEIVES_UPLOADS",
+            }
+        return {"status": "NOT_CONFIGURED", "connector_type": connector_type, "reason": "CONNECTOR_ENDPOINT_MISSING"}
+    probe = _provider_get(row, "health_path")
+    outcome = {"status": "SUCCESS" if probe.get("status") == "HEALTHY" else "FAILED", "connector_type": connector_type}
+    for key in ("http_status", "reason"):
+        if probe.get(key) is not None:
+            outcome[key] = probe[key]
+    if probe.get("status") == "INVALID_CONFIGURATION":
+        outcome["status"] = "INVALID_CONFIGURATION"
+    return outcome
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/provider-health")
@@ -719,7 +769,7 @@ def provider_health(configuration_id: uuid.UUID, request: Request, db: Session =
     result = _provider_get(row, "health_path")
     _audit_configuration(db, admin, "CONNECTOR_PROVIDER_HEALTH_CHECKED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
-    return {"connector_id": str(row.id), "code": row.code, **result}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "code": row.code, **result}
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/discover-schema")
@@ -739,7 +789,7 @@ def provider_schema(configuration_id: uuid.UUID, request: Request, db: Session =
     result["schema_version"] = (row.configuration or {}).get("schema_version", row.version)
     _audit_configuration(db, admin, "CONNECTOR_SCHEMA_DISCOVERED", "ConnectorConfiguration", row.id, row.version)
     db.commit()
-    return {"connector_id": str(row.id), "code": row.code, **result}
+    return {"connector_id": str(row.id), "business_id": row.business_id, "code": row.code, **result}
 
 
 def _record_sync(tenant_id, connector: ConnectorConfiguration, source_system: str, read: int, outcome) -> ConnectorRun:
@@ -820,6 +870,7 @@ def execute_connector(
         "run_id": str(outcome["run"].id),
         "tenant_id": str(admin.tenant_id),
         "connector_id": str(row.id),
+        "connector_business_id": row.business_id,
         "records_read": outcome["records_read"],
         "outbox_enqueued": outcome["records_read"],
         "canonical_import": canonical_import,
@@ -979,6 +1030,7 @@ def mapping_release_action(
                 "message": f"Cannot {payload.action.lower()} a {current} release.",
             },
         )
+    self_approved = False
     if payload.action == "APPROVE":
         requester = (
             db.query(AuditEvent.actor_ref)
@@ -991,14 +1043,20 @@ def mapping_release_action(
             .first()
         )
         if requester is None or requester[0] == str(admin.id):
-            # Segregation of duties: the administrator who asked for approval cannot also approve.
-            raise HTTPException(
-                403,
-                detail={
-                    "code": "SOD_DENIED",
-                    "message": "A different administrator from the one who requested approval must approve.",
-                },
-            )
+            # Segregation of duties: the administrator who asked for approval cannot also approve, unless they are
+            # the organization's only administrator; then they approve with a typed reason (the request's
+            # ``reason``, at least 10 characters), audited MAPPING_RELEASE_SELF_APPROVED. The two-person rule
+            # applies again as soon as a second administrator is active.
+            single_admin = requester is not None and is_customer_admin_role(admin.role)
+            if not (single_admin and _active_customer_admins(db, admin.tenant_id) == 1):
+                raise HTTPException(
+                    403,
+                    detail={
+                        "code": "SOD_DENIED",
+                        "message": "A different administrator from the one who requested approval must approve.",
+                    },
+                )
+            self_approved = True
     if payload.action in {"REQUEST_APPROVAL", "APPROVE", "PROMOTE"} and not has_rules:
         raise HTTPException(
             409,
@@ -1028,7 +1086,7 @@ def mapping_release_action(
         id=uuid.uuid4(),
         tenant_id=admin.tenant_id,
         actor_ref=str(admin.id),
-        action=f"MAPPING_RELEASE_{payload.action}",
+        action="MAPPING_RELEASE_SELF_APPROVED" if self_approved else f"MAPPING_RELEASE_{payload.action}",
         entity_type="MappingConfiguration",
         entity_id=row.id,
         details={
@@ -1037,6 +1095,7 @@ def mapping_release_action(
             "version": row.version,
             "reason": payload.reason,
             "dependencies": [row.source_system, row.target_entity],
+            **({"self_approved": True, "single_administrator": True} if self_approved else {}),
         },
         created_at=datetime.now(timezone.utc),
     )
@@ -1050,4 +1109,20 @@ def mapping_release_action(
         "status": target,
         "audit_event_id": str(event.id),
         "rollback_supported": target in {"RELEASED", "ACTIVE"},
+        "self_approved": self_approved,
     }
+
+
+def _active_customer_admins(db: Session, tenant_id) -> int:
+    """How many active Customer Administrators the organization has (any spelling of the role)."""
+    normalized = func.upper(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"))
+    return (
+        db.query(func.count(AuthUser.id))
+        .filter(
+            AuthUser.tenant_id == tenant_id,
+            normalized.in_(sorted(CUSTOMER_ADMIN_ALIASES)),
+            func.upper(AuthUser.status) == "ACTIVE",
+        )
+        .scalar()
+        or 0
+    )

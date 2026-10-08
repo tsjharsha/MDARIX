@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { Drawer, SearchBox, Table, Tabs, formatDate, listOf, matches, send, useResource } from "../shared";
 import { LifecycleBadge } from "./Access";
+import { plural, readable } from "../labels";
 import { MappingCheckResult, MappingWizard } from "../../mapping/MappingWizard";
 import type { MappingCheck } from "../../mapping/mappingModel";
 
@@ -27,11 +27,12 @@ export function DataMappingSection({ tab }: { tab?: string }) {
   return (
     <>
       <p className="ca-lede">
-        Your mappings translate your systems' fields into MDARIX. They stay separate from the platform's master
-        mappings, and every release is approved and audited.
+        A mapping says which field in your system fills which MDARIX field. A new or changed mapping is used only once
+        another administrator has approved it and it is released.
       </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Data mapping sections" />
-      {active === "Mappings" ? <Mappings /> : <FieldMappings />}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Data mapping sections">
+        {active === "Mappings" ? <Mappings /> : <FieldMappings />}
+      </Tabs>
     </>
   );
 }
@@ -46,8 +47,7 @@ function Mappings() {
       <Panel
         eyebrow="Data mapping"
         title="Mappings"
-        state={mappings.state}
-        error={mappings.error}
+        source={mappings}
         action={
           <button type="button" className="ac-primary" onClick={() => setCreating(true)}>
             <Plus size={16} aria-hidden="true" /> New mapping
@@ -58,12 +58,15 @@ function Mappings() {
           caption="Mappings"
           rows={listOf(mappings.data)}
           rowKey={(row) => row.id}
-          empty={{ title: "No mappings yet", detail: "Create a mapping for each source object you connect." }}
+          empty={{
+            title: "No mappings yet",
+            detail: "Create a mapping for each kind of record you connect (New mapping).",
+          }}
           columns={[
             { key: "code", label: "Mapping", render: (row) => <strong>{row.code}</strong> },
             {
               key: "flow",
-              label: "Source → MDARIX",
+              label: "From → to",
               render: (row) => `${row.source_system ?? "—"} → ${row.target_entity ?? "—"}`,
             },
             {
@@ -79,7 +82,7 @@ function Mappings() {
               label: "",
               render: (row) => (
                 <button type="button" className="ac-link" onClick={() => setSelected(row)}>
-                  Release &amp; history
+                  Review &amp; release
                 </button>
               ),
             },
@@ -127,18 +130,18 @@ function ReleaseDrawer({ mapping, onClose, onChanged }: { mapping: any; onClose:
           </dd>
         </div>
         <div>
-          <dt>Flow</dt>
+          <dt>From → to</dt>
           <dd>
             {mapping.source_system} → {mapping.target_entity}
           </dd>
         </div>
         <div>
-          <dt>Validation</dt>
+          <dt>Checks</dt>
           <dd>
             {release.data?.validation ? (
               <ToneBadge
                 tone={release.data.validation.status === "PASS" ? "good" : "warning"}
-                label={`${titleCase(release.data.validation.status)} · ${release.data.validation.rule_count} rules`}
+                label={`${readable(release.data.validation.status)} · ${plural(Number(release.data.validation.rule_count ?? 0), "rule")}`}
               />
             ) : (
               "—"
@@ -162,7 +165,7 @@ function ReleaseDrawer({ mapping, onClose, onChanged }: { mapping: any; onClose:
                       option.action === "PROMOTE"
                         ? "This version becomes the one used for your incoming data."
                         : option.action === "ROLLBACK"
-                          ? "This version stops being used and is marked superseded."
+                          ? "This version stops being used and is marked as replaced."
                           : "An approver reviews this version before it can be released.",
                     confirmLabel: option.label,
                     danger: option.action === "ROLLBACK",
@@ -184,7 +187,9 @@ function ReleaseDrawer({ mapping, onClose, onChanged }: { mapping: any; onClose:
             ))}
           </div>
         ) : (
-          <p className="ac-muted">No release step is available from the {titleCase(status || "current")} status.</p>
+          <p className="ac-muted">
+            Nothing to do here while the mapping is {readable(status, "in its current state").toLowerCase()}.
+          </p>
         )}
       </section>
       <section className="ca-drawer-section">
@@ -193,7 +198,7 @@ function ReleaseDrawer({ mapping, onClose, onChanged }: { mapping: any; onClose:
           <ul className="ca-timeline">
             {listOf(release.data?.audit).map((event, index) => (
               <li key={index}>
-                <strong>{titleCase(event.action ?? "Event")}</strong>
+                <strong>{readable(event.action, "Event")}</strong>
                 <small>
                   {formatDate(event.created_at)}
                   {event.details?.reason ? ` · ${event.details.reason}` : ""}
@@ -214,16 +219,18 @@ function FieldMappings() {
   const [query, setQuery] = useState("");
   const rows = useMemo(() => listOf(fields.data).filter((row) => matches(row, query)), [fields.data, query]);
   return (
-    <Panel eyebrow="Data mapping" title="Field mappings" state={fields.state} error={fields.error}>
+    <Panel eyebrow="Data mapping" title="Field mappings" source={fields}>
       <div className="ca-toolbar">
-        <SearchBox value={query} onChange={setQuery} label="Search source or MDARIX field" />
-        <span className="ac-muted">{rows.length} fields</span>
+        <SearchBox value={query} onChange={setQuery} label="Search your field or MDARIX field" />
+        <span className="ac-muted">{plural(rows.length, "field")}</span>
       </div>
       <Table
         caption="Field mappings"
-        rows={rows.slice(0, 200)}
+        rows={rows}
         rowKey={(row, index) => `${row.mapping_id}-${row.source_field}-${index}`}
-        empty={{ title: "No field mappings", detail: "Field rules appear once a mapping has them." }}
+        pageSize={50}
+        pageNoun="field"
+        empty={{ title: "No field mappings", detail: "Fields appear here once a mapping has them." }}
         columns={[
           { key: "mapping", label: "Mapping", render: (row) => row.mapping_code },
           {
@@ -244,11 +251,11 @@ function FieldMappings() {
             render: (row) => (
               <span className="ca-person">
                 <strong>{row.target_field}</strong>
-                <small>{row.target_table}</small>
+                <small>{readable(row.target_table, "")}</small>
               </span>
             ),
           },
-          { key: "transform", label: "Transform", render: (row) => titleCase(row.transform ?? "DIRECT") },
+          { key: "transform", label: "How it is filled", render: (row) => readable(row.transform ?? "DIRECT") },
           { key: "required", label: "Required", render: (row) => (row.required ? "Yes" : "No") },
           { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
         ]}

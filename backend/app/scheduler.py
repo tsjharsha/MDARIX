@@ -87,12 +87,18 @@ def trial_reminders(db: Session, _state: dict) -> dict:
 def embedding_catch_up(db: Session, _state: dict) -> dict:
     """Embed evidence that has none yet (records imported while the API restarted, or a failed background step)."""
     from backend.app.db.data_plane import open_tenant_data_session
+    from backend.app.customer_lifecycle import customer_allows_access_clause
     from backend.app.db.models.foundation import Tenant
     from retrieval.service import TrustedRetrievalService
 
     service = TrustedRetrievalService()
     totals = {"tenants": 0, "indexed": 0, "failed": 0, "deferred": 0}
-    tenant_ids = [row.id for row in db.query(Tenant.id).filter(Tenant.status.in_(["ACTIVE", "active"])).all()]
+    tenant_ids = [
+        row.id
+        for row in db.query(Tenant.id)
+        .filter(Tenant.status.in_(["ACTIVE", "active"]), customer_allows_access_clause())
+        .all()
+    ]
     for tenant_id in tenant_ids:
         with open_tenant_data_session(tenant_id) as data:
             result = service.index_evidence_chunks(data, tenant_id, limit=500)
@@ -162,6 +168,27 @@ def export_expiry(db: Session, _state: dict) -> dict:
     return {"expired": expire_exports(db)}
 
 
+def purge_completion(db: Session, state: dict) -> dict:
+    """Finish organization deletions left PURGING (files or a dedicated database that could not be deleted at the
+    time; backend/app/tenant_purge.py). An organization under a legal hold is skipped, never forced. An operator is
+    alerted once while a deletion stays incomplete, and again only if the list of incomplete deletions changes."""
+    from backend.app.tenant_purge import complete_pending_purges
+
+    summary = complete_pending_purges(db, "system:scheduler")
+    stuck = sorted(
+        str(item.get("tenant_id") or item) for item in summary.get("incomplete", []) + summary.get("failed", [])
+    )
+    if stuck and stuck != state.get("reported_incomplete"):
+        send_alert(
+            "Organization deletion still incomplete",
+            f"{len(stuck)} organization deletion(s) could not be finished: {', '.join(stuck)}. "
+            "Check object storage and dedicated databases, then run scripts/complete_tenant_purge.py "
+            "(docs/runbooks/DATA_REQUESTS.md).",
+        )
+    state["reported_incomplete"] = stuck
+    return {key: len(value) for key, value in summary.items() if isinstance(value, list)}
+
+
 def audit_chain_verification(db: Session, state: dict) -> dict:
     """Recompute every organization's audit hash chain from its last verified anchor; alert on any break."""
     from backend.app.audit_chain import verify_all
@@ -180,6 +207,23 @@ def audit_chain_verification(db: Session, state: dict) -> dict:
     return result
 
 
+def signal_detection(db: Session, _state: dict) -> dict:
+    """The complaint threshold rule for every active organization, on the shared plane or its own database
+    (backend/app/signals/detection.py); each organization is committed on its own."""
+    from backend.app.signals.detection import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
+def late_evidence_sweep(db: Session, _state: dict) -> dict:
+    """Impact assessments for evidence ingested for a decided or closed case after its decision was signed, for every
+    active organization on the shared plane or its own database (backend/app/decision_followups/impact.py). Idempotent;
+    each organization is committed on its own."""
+    from backend.app.decision_followups.impact import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 JOBS: tuple[Job, ...] = (
     Job("tenant-lifecycle", timedelta(minutes=15), tenant_lifecycle, "Apply scheduled tenant status changes"),
     Job("subscription-lifecycle", timedelta(hours=1), subscription_lifecycle, "Expiry, grace and renewal reminders"),
@@ -189,6 +233,14 @@ JOBS: tuple[Job, ...] = (
     Job("operations-alerts", timedelta(minutes=5), operations_alerts, "Alert on dead letters and a stopped worker"),
     Job("export-expiry", timedelta(hours=1), export_expiry, "Delete data exports after their download period"),
     Job("connector-sync", timedelta(minutes=15), connector_sync, "Sync connections that have a sync schedule"),
+    Job("purge-completion", timedelta(hours=24), purge_completion, "Finish organization deletions left incomplete"),
+    Job("signal_detection", timedelta(minutes=60), signal_detection, "Raise and update signals from new complaints"),
+    Job(
+        "late_evidence_sweep",
+        timedelta(minutes=60),
+        late_evidence_sweep,
+        "Ask for an impact assessment of evidence that reached a decided case",
+    ),
     Job(
         "audit-chain-verification",
         timedelta(hours=24),

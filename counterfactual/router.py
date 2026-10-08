@@ -16,6 +16,7 @@ service = CounterfactualService()
 def payload(item) -> CounterfactualResponse:
     return CounterfactualResponse(
         id=item.id,
+        business_id=item.business_id,
         investigation_id=item.investigation_id,
         status=item.status,
         result=item.assumptions["result"],

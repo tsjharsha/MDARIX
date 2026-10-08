@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.production.example
+!.env.migrate.example
 **/.env
 .git
 .github
@@ -30,3 +31,11 @@ infrastructure/database/backups
 *.log
 *.dump
 docs
+# Keys, certificates, dumps and backups.
+**/*.pem
+**/*.key
+**/*.p12
+**/*.age
+.env.migrate
+certs
+.logs

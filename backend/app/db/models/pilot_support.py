@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
 
 __all__ = ["ErasureLog", "SupportProblemReport", "ClientErrorReport"]
 
@@ -36,6 +37,7 @@ class SupportProblemReport(Base):
     """A problem reported from the help menu of a signed-in screen."""
 
     __tablename__ = "support_problem_reports"
+    business_id: Mapped[str] = business_id_column()
     id = _pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

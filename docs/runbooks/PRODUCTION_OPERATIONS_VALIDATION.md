@@ -1,39 +1,36 @@
 # Production operations validation
 
-The repository provides the code-side controls for liveness/readiness probes,
-a dedicated transactional-outbox worker, worker retry/dead-letter handling,
-and tenant-scoped operational health APIs. Production evidence requires the
-deployment itself.
+What can be checked from outside a running deployment, and what still needs evidence from the real one.
 
 ## Health gate
 
-Set a comma-separated list of deployed application URLs and run:
-
-```powershell
-$env:MDARIX_OPERATIONAL_URLS = "https://mdarix-app-1.example,https://mdarix-app-2.example"
-python scripts/validate_production_operations.py
+```bash
+MDARIX_OPERATIONAL_URLS=https://app.yourdomain.com python scripts/validate_production_operations.py
 ```
 
-The gate requires HTTP 200 from `/health/live` and `/health/ready` on every
-target. Two distinct URLs are required before multi-instance health is shown
-as PASS.
+For every address (comma-separated; default `MDARIX_APP_URL`) the gate needs HTTP 200 from `/health/live` (the API
+answers) and from `/health/status` with `ok` or `degraded`. `down` (HTTP 503: the database or its schema is not fit
+for traffic) or an unreachable address fails it. `degraded` passes but names a component to look at: read
+`/health/ready` on the server (DEPLOYMENT.md, section 5), which Caddy does not serve publicly.
 
-## Monitoring and alerts
+The same gate runs inside CI against the full production stack (`prod-stack` job: Caddy, TLS database, migrate, API,
+worker, scheduler, ClamAV) through `scripts/production_smoke.py --front-door`.
 
-Configure `MDARIX_MONITORING_ALERT_WEBHOOK` to the approved PagerDuty,
-Opsgenie, Teams, or equivalent alert receiver. Configure
-`MDARIX_OUTBOX_ALERT_WEBHOOK` separately for dead-letter alerts. Do not place
-credentials in this document or source control. The worker emits structured
-heartbeat/retry/dead-letter logs; production monitoring must scrape those logs
-and retain alert delivery evidence.
+## Alerts and heartbeats
 
-The worker also supports `MDARIX_OUTBOX_HEARTBEAT_FILE`, an atomic JSON
-heartbeat file suitable for a sidecar, Prometheus textfile collector, or host
-monitor. The file contains only timestamps and counters, never event payloads.
+| What | Setting | Proof |
+|---|---|---|
+| Operational alerts (dead letters, stopped worker, failing or missed scheduled jobs, audit-chain failures) | `MDARIX_ALERT_WEBHOOK` and/or `MDARIX_ALERT_EMAIL` | `docker compose -f docker-compose.prod.yml --env-file .env.production exec api python scripts/send_test_alert.py` arrives |
+| Scheduler stopped | `MDARIX_SCHEDULER_HEARTBEAT_URL` (dead-man's switch, pinged every 5 minutes) | the monitor shows recent pings; it alerts when they stop |
+| Backup failed | `MDARIX_ALERT_WEBHOOK` (posted by the backup job) | BACKUP_AND_RESTORE.md, section 1 |
+| Backups stopped arriving | `scripts/check_backup_age.sh` (cron), `MDARIX_BACKUP_HEARTBEAT_URL` | BACKUP_AND_RESTORE.md, section 1 |
+| Site down | external uptime monitor on `https://<domain>/health/status` | DEPLOYMENT.md, section 6 |
 
-## Honest release status
+The gate reports which of these are configured where it runs; configuration is not proof of delivery. The worker and
+scheduler also write heartbeat files that their container health checks read (OUTBOX_AND_SCHEDULER.md).
 
-Local readiness is not production validation. The following remain PENDING
-until evidence is captured from deployed infrastructure: alert delivery,
-worker heartbeat monitoring, two-instance session/revocation behavior,
-database-backed readiness on each instance, and operational incident routing.
+## Still to be evidenced on the real deployment
+
+Alert delivery to the on-call people (a test alert received), the uptime monitor and both heartbeat monitors set up,
+a backup restored into a scratch database on the managed service (BACKUP_AND_RESTORE.md, section 2), and the
+provider's point-in-time recovery tried once. Record each in the operations log with the date.

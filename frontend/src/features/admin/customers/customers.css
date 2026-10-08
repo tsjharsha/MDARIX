@@ -137,6 +137,46 @@
   min-width: 0;
   text-overflow: ellipsis;
 }
+/* Edit details drawer: each group of fields is a fieldset that looks like a drawer section. */
+.cc-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-top: 1px solid var(--ac-line);
+}
+.cc-fieldset > legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0;
+  color: var(--ac-navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+.cc-problems {
+  margin: 0;
+  padding-left: 18px;
+}
+/* A tenant that cannot be used because its customer is inactive (its own status is unchanged). */
+.cc-blocked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ac-critical);
+  font-size: 12px;
+  font-weight: 600;
+}
+.cc-status-cell {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+.cc-hint {
+  max-width: 320px;
+  color: var(--ac-muted);
+  font-size: 12px;
+}
 .cc-wizard {
   display: grid;
   gap: 10px;
@@ -222,5 +262,267 @@
   .fb-detail dl > div {
     grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+  }
+}
+
+/* A result that is not a failure but still needs attention (a deletion that is still removing files). */
+.ac-message.tone-warning {
+  border-left-color: var(--ac-warning);
+  margin-bottom: 12px;
+}
+.cc-link-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cc-link-box input {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* New-customer wizard (CreateCustomer.tsx): numbered steps, one step's fields, then the review and the result. */
+.cw-wizard,
+.cw-result {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.cw-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--ac-teal);
+  border-radius: 6px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink-2);
+}
+.cw-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cw-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.cw-step:disabled {
+  color: var(--ac-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.cw-step-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ac-track);
+  color: var(--ac-ink-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.cw-step.done .cw-step-number {
+  background: var(--ac-teal-wash);
+  color: var(--ac-teal);
+}
+.cw-step.current {
+  border-color: var(--ac-navy);
+  background: var(--ac-navy);
+  color: #ffffff;
+  font-weight: 700;
+}
+.cw-step.current .cw-step-number {
+  background: #ffffff;
+  color: var(--ac-navy);
+}
+.cw-step:focus-visible {
+  outline: 2px solid var(--ac-teal);
+  outline-offset: 2px;
+}
+.cw-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.cw-panel h3 {
+  margin: 0;
+  color: var(--ac-ink);
+  font-size: 17px;
+}
+.cw-fields {
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+}
+.cw-required {
+  color: var(--ac-muted);
+  font-weight: 400;
+}
+.cw-inline {
+  display: flex;
+  gap: 8px;
+}
+.cw-inline input {
+  flex: 1;
+  min-width: 0;
+}
+.cw-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cw-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cw-list svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--ac-teal);
+}
+.cw-review {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+.cw-review dl,
+dl.cw-review {
+  display: grid;
+  margin: 0;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.cw-review-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 200px) minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ac-grid);
+}
+.cw-review-row:last-child {
+  border-bottom: 0;
+}
+.cw-review-row dt {
+  color: var(--ac-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+.cw-review-row dd {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--ac-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.cw-review-row small {
+  color: var(--ac-muted);
+  font-weight: 400;
+}
+.cw-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-weight: 600;
+}
+.cw-check.ok {
+  color: var(--ac-teal);
+}
+.cw-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--ac-ink);
+  cursor: pointer;
+}
+.cw-confirm input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--ac-teal);
+}
+.cw-problems {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}
+.cw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cw-hint-right {
+  margin: -6px 0 0;
+  text-align: right;
+}
+.cw-result h4 {
+  margin: 0;
+  color: var(--ac-ink);
+}
+.cw-job {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cw-job li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: 6px;
+}
+.cw-job li.done {
+  border-color: transparent;
+  background: var(--ac-teal-wash);
+}
+.cw-job li.done svg {
+  color: var(--ac-teal);
+}
+.cw-job li.failed svg {
+  color: var(--ac-critical);
+}
+.cw-job small {
+  color: var(--ac-muted);
+}
+@media (max-width: 720px) {
+  .cw-review-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .cw-review-row dd:first-of-type {
+    grid-column: 1 / -1;
   }
 }

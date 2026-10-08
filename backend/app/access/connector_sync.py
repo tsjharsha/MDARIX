@@ -9,6 +9,11 @@ before (no private destinations, no redirects).
 ``sync_connector`` imports the records through the released mapping (all or nothing), queues one outbox event per
 record carrying its identity and fingerprint only, records the run for Sync activity and Reconciliation, and audits
 it. The scheduler (``run_scheduled_syncs``) syncs connections that set ``sync_every_minutes`` (at least 15).
+
+When a scheduled run fails (the system cannot be read, or what it returned cannot be imported) the organization's
+customer administrators are emailed (``CONNECTOR_SYNC_FAILED``), once per outage: only when the connection's previous
+run had not failed, so a system that is down for a day does not send an email every quarter of an hour. A failed
+"Sync now" is shown to the person who ran it and is not emailed.
 """
 
 from __future__ import annotations
@@ -170,6 +175,11 @@ def sync_connector(
                     canonical_import = {"status": "BLOCKED", "reason": str(exc)}
                 if canonical_import.get("status") == "IMPORTED":
                     data.commit()
+                    from backend.app.signals import hooks as signal_hooks
+
+                    if signal_hooks.imported_complaints(canonical_import):
+                        # Signals from the synced complaints; never fails or undoes the sync.
+                        signal_hooks.after_complaints_saved(data, tenant_id, source=f"connector sync {row.code}")
                 else:
                     data.rollback()
     now = datetime.now(timezone.utc)
@@ -195,6 +205,8 @@ def sync_connector(
         )
     run = _record_sync(tenant_id, row, source_system, len(result), canonical_import)
     run.run_type = run_type
+    if run.status == "FAILED":
+        _notify_failure(db, tenant_id, row, run.failure_category or "IMPORT_BLOCKED", run_type)
     db.add(run)
     db.add(
         make_audit_event(
@@ -210,10 +222,29 @@ def sync_connector(
     return {"run": run, "records_read": len(result), "canonical_import": canonical_import}
 
 
+def _notify_failure(db: Session, tenant_id, row: ConnectorConfiguration, code: str, run_type: str) -> None:
+    """Queue the administrators' email for a failed unattended run, unless the previous run had failed too (call
+    before the new run is added, so "previous" is the one before it)."""
+    if run_type == "MANUAL":
+        return
+    from backend.app.notifications import notify_connector_sync_failed
+
+    previous = (
+        db.query(ConnectorRun.status)
+        .filter(ConnectorRun.tenant_id == tenant_id, ConnectorRun.connection_id == row.code)
+        .order_by(ConnectorRun.started_at.desc())
+        .first()
+    )
+    if previous is not None and str(previous[0]).upper() == "FAILED":
+        return
+    notify_connector_sync_failed(db, tenant_id, connector_id=row.id, failure=code)
+
+
 def record_failed_run(
     db: Session, tenant_id, row: ConnectorConfiguration, source_system: str, code: str, run_type: str
 ):
     now = datetime.now(timezone.utc)
+    _notify_failure(db, tenant_id, row, code, run_type)
     db.add(
         ConnectorRun(
             id=uuid.uuid4(),
@@ -240,7 +271,17 @@ def run_scheduled_syncs(db: Session, now: datetime | None = None) -> dict:
 
     now = now or datetime.now(timezone.utc)
     synced, failed = 0, []
-    rows = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.status == "ACTIVE").all()
+    from backend.app.customer_lifecycle import tenants_of_blocking_customers
+
+    # Connections of a suspended customer's tenants wait until the customer is reactivated.
+    rows = (
+        db.query(ConnectorConfiguration)
+        .filter(
+            ConnectorConfiguration.status == "ACTIVE",
+            ConnectorConfiguration.tenant_id.not_in(tenants_of_blocking_customers()),
+        )
+        .all()
+    )
     for row in rows:
         configuration = row.configuration or {}
         try:

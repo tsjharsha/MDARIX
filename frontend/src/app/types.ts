@@ -1,5 +1,7 @@
 export type Product = {
   id: string;
+  // The MDARIX ID people see (PROD000001); product_identifier is the customer system's own number.
+  business_id?: string | null;
   product_identifier: string;
   name: string;
   product_family: string | null;
@@ -99,6 +101,7 @@ export type InvestigationAnalysis = {
 
 export type InvestigationBrief = {
   id: string;
+  business_id?: string | null;
   investigation_id: string;
   brief_version: number;
   status: string;
@@ -112,6 +115,7 @@ export type InvestigationBrief = {
 
 export type Hypothesis = {
   hypothesis_id: string;
+  business_id?: string | null;
   statement: string;
   scope: string;
   status: string;
@@ -137,6 +141,7 @@ export type HypothesisSet = {
 export type UnknownSet = {
   unknowns: Array<{
     unknown_id: string;
+    business_id?: string | null;
     category: string;
     statement: string;
     why_it_matters: string;
@@ -150,6 +155,7 @@ export type UnknownSet = {
 export type FailureChainSet = {
   chains: Array<{
     chain_id: string;
+    business_id?: string | null;
     chain_statement: string;
     overall_status: string;
     links: Array<{
@@ -180,6 +186,7 @@ export type ChallengeSet = {
 
 export type EvidenceSummary = {
   id: string;
+  business_id?: string | null;
   evidence_identifier: string;
   evidence_type: string;
   title: string;
@@ -205,4 +212,11 @@ export type DecisionContext = {
   decision_options: string[];
 };
 
-export type AdminTenant = { id: string; tenant_key: string; name: string; status: string; created_at?: string | null };
+export type AdminTenant = {
+  id: string;
+  business_id?: string | null;
+  tenant_key: string;
+  name: string;
+  status: string;
+  created_at?: string | null;
+};

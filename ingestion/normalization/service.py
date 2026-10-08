@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import text
 
 from backend.app.db.session import engine
+from backend.app.db.tenant_scope import bind_connection_system
 
 ROOT = Path(__file__).resolve().parents[2]
 RULES_PATH = ROOT / "ingestion" / "normalization" / "rules" / "identity_rules.json"
@@ -132,6 +133,36 @@ def json_param(value: Any) -> str:
     return json.dumps(value, sort_keys=True, default=str)
 
 
+# The identity of one source record, used to keep only its latest staged revision. source_record_id is not unique
+# per record: it is the first identifier column a row has, so a lot or an investigation row carrying product_id gets the
+# product's id. Grouping on it merged every lot of a product into one. Each known record type is grouped on its own
+# identifier; an unknown type is not merged at all (each staged row stands alone, as before revisions were collapsed).
+REVISION_KEYS = {
+    "product": "product_id",
+    "product_version": "product_version_id",
+    "product_component": "product_component_id",
+    "supplier": "supplier_id",
+    "manufacturing_site": "site_id",
+    "component": "component_id",
+    "lot": "lot_id",
+    "requirement": "requirement_id",
+    "change": "change_id",
+    "risk": "risk_id",
+    "failure_mode": "failure_mode_id",
+    "control": "control_id",
+    "investigation": "investigation_id",
+    "complaint": "complaint_id",
+    "evidence_metadata": "evidence_id",
+    "evidence_file": "filename",
+}
+REVISION_KEY_SQL = (
+    "CASE record_type "
+    + " ".join(f"WHEN '{record_type}' THEN raw_payload->>'{key}'" for record_type, key in REVISION_KEYS.items())
+    + " END"
+)
+REVISION_KEY_SQL = f"COALESCE({REVISION_KEY_SQL}, id::text)"
+
+
 class NormalizationService:
     def normalize_all(self) -> dict[str, Any]:
         tenant_id = self.tenant_id()
@@ -155,9 +186,17 @@ class NormalizationService:
             records = (
                 conn.execute(
                     text(
+                        "WITH latest_records AS ("
+                        "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
+                        "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version, "
+                        "source_row_index, row_number() OVER ("
+                        "PARTITION BY source_system, record_type, " + REVISION_KEY_SQL + " "
+                        "ORDER BY ingestion_timestamp DESC, created_at DESC, id DESC"
+                        ") AS source_revision_rank "
+                        "FROM staged_source_records WHERE tenant_id=:tenant_id) "
                         "SELECT id, source_system, record_type, source_file, source_record_id, raw_payload, parsed_payload, candidate_canonical_payload, "
                         "source_timestamp, effective_timestamp, recorded_timestamp, ingestion_timestamp, data_quality_status, mapping_version "
-                        "FROM staged_source_records WHERE tenant_id=:tenant_id ORDER BY CASE record_type "
+                        "FROM latest_records WHERE source_revision_rank=1 ORDER BY CASE record_type "
                         "WHEN 'product' THEN 1 WHEN 'product_version' THEN 2 WHEN 'supplier' THEN 3 WHEN 'manufacturing_site' THEN 4 "
                         "WHEN 'component' THEN 5 WHEN 'lot' THEN 6 WHEN 'requirement' THEN 7 WHEN 'change' THEN 8 "
                         "WHEN 'risk' THEN 9 WHEN 'failure_mode' THEN 10 WHEN 'control' THEN 11 WHEN 'investigation' THEN 12 "
@@ -241,6 +280,7 @@ class NormalizationService:
 
     def tenant_id(self) -> str:
         with engine.connect() as conn:
+            bind_connection_system(conn)  # the organizations table is protected by row-level security (md34)
             tenant_id = conn.execute(
                 text("SELECT id FROM tenants WHERE tenant_key=:key"), {"key": TENANT_KEY}
             ).scalar_one_or_none()
@@ -803,7 +843,15 @@ class NormalizationService:
             text(
                 "INSERT INTO evidence (tenant_id, evidence_identifier, investigation_id, evidence_type, title, source_reference, document_ref, reliability_status, fact_type, content, source_system, source_identifier, source_timestamp, recorded_timestamp, ingestion_timestamp, created_at, updated_at) "
                 "VALUES (:tenant_id, :identifier, :investigation_id, :type, :title, :source_ref, :document_ref, :quality, 'source_fact', :content, :source_system, :source_identifier, :source_ts, :recorded_ts, :ingestion_ts, :now, :now) "
-                "ON CONFLICT (tenant_id, evidence_identifier) DO UPDATE SET content=EXCLUDED.content, updated_at=EXCLUDED.updated_at RETURNING id"
+                "ON CONFLICT (tenant_id, evidence_identifier) DO UPDATE SET "
+                "investigation_id=COALESCE(EXCLUDED.investigation_id, evidence.investigation_id), "
+                "evidence_type=EXCLUDED.evidence_type, title=EXCLUDED.title, "
+                "source_reference=EXCLUDED.source_reference, document_ref=EXCLUDED.document_ref, "
+                "reliability_status=EXCLUDED.reliability_status, fact_type=EXCLUDED.fact_type, "
+                "content=EXCLUDED.content, source_system=EXCLUDED.source_system, "
+                "source_identifier=EXCLUDED.source_identifier, source_timestamp=EXCLUDED.source_timestamp, "
+                "recorded_timestamp=EXCLUDED.recorded_timestamp, ingestion_timestamp=EXCLUDED.ingestion_timestamp, "
+                "updated_at=EXCLUDED.updated_at RETURNING id"
             ),
             {
                 "tenant_id": tenant_id,

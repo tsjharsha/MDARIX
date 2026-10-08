@@ -66,6 +66,12 @@ def bind_system(session: Session, reason: str) -> None:
     _apply_now(session)
 
 
+def bind_connection_system(connection) -> None:
+    """System scope for a raw Connection used without a Session (operator scripts, ingestion). The setting is
+    transaction-local, so call it first in each transaction that reads or writes tenant-owned rows."""
+    connection.execute(_APPLY, {"tenant": "", "bypass": system_token()})
+
+
 def scope_of(session: Session) -> dict:
     return {"tenant_id": session.info.get(_TENANT_KEY), "system_reason": session.info.get(_SYSTEM_KEY)}
 

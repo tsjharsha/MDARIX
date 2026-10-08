@@ -6,7 +6,8 @@ from sqlalchemy import or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk, EvidenceEntityLink, EvidenceObservation
-from backend.app.db.models.foundation import Evidence, Investigation, ProductVersion
+from backend.app.business_ids import business_id_map
+from backend.app.db.models.foundation import Evidence, Investigation, Product, ProductVersion
 from backend.app.product360.service import Product360Service
 from graph.service import GraphError, RealityGraphService
 from investigation_workspace.schemas import InvestigationWorkspaceRequest, InvestigationWorkspaceResponse
@@ -26,6 +27,59 @@ class InvestigationWorkspaceError(ValueError):
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def with_business_ids(db: Session, workspace: InvestigationWorkspaceResponse) -> InvestigationWorkspaceResponse:
+    """The workspace as the screens get it: the investigation, its product and each evidence record with its MDARIX
+    ID (``business_id``).
+
+    Added only to the API response: ``InvestigationWorkspaceService.workspace`` is also the grounding context of the
+    AI workflows, which stays unchanged.
+    """
+    header = workspace.investigation
+    investigation_ids = business_id_map(db, Investigation, [header.get("id")])
+    product_ids = business_id_map(db, Product, [header.get("product_id")])
+    evidence_ids = business_id_map(db, Evidence, (item.get("id") for item in workspace.evidence_context))
+    investigation = {
+        **header,
+        "business_id": investigation_ids.get(str(header.get("id"))),
+        "product_business_id": product_ids.get(str(header.get("product_id"))),
+        **_workflow_fields(db, header.get("id")),
+    }
+    evidence = [
+        {"id": item.get("id"), "business_id": evidence_ids.get(str(item.get("id"))), **item}
+        for item in workspace.evidence_context
+    ]
+    return workspace.model_copy(update={"investigation": investigation, "evidence_context": evidence})
+
+
+def _workflow_fields(db: Session, investigation_id) -> dict[str, Any]:
+    """The case's workflow state (with its label), priority and due date for the workspace header (API only). Empty
+    when they cannot be read: the header never fails because of them."""
+    from sqlalchemy import select
+
+    from backend.app.business_ids import as_uuid
+    from backend.app.case_workflow.states import effective_state, state_label
+
+    key = as_uuid(investigation_id)
+    if key is None:
+        return {}
+    try:
+        rows = db.execute(
+            select(
+                Investigation.status, Investigation.workflow_state, Investigation.priority, Investigation.due_at
+            ).where(Investigation.id == key)
+        ).all()
+        status, workflow_state, priority, due_at = rows[0]
+    except Exception:
+        return {}
+    state = effective_state(workflow_state, status)
+    return {
+        "workflow_state": state,
+        "workflow_state_label": state_label(state),
+        "priority": priority,
+        "due_at": due_at.isoformat() if isinstance(due_at, datetime) else None,
+    }
 
 
 class InvestigationWorkspaceService:
@@ -179,11 +233,6 @@ class InvestigationWorkspaceService:
     def _investigation_evidence_query(
         self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, temporal_mode: str, as_of: datetime | None
     ):
-        source_identifier = (
-            db.query(Investigation.source_identifier)
-            .filter(Investigation.tenant_id == tenant_id, Investigation.id == investigation_id)
-            .scalar()
-        )
         q = db.query(Evidence).filter(Evidence.tenant_id == tenant_id)
         q = q.filter(
             or_(
@@ -195,15 +244,6 @@ class InvestigationWorkspaceService:
                     )
                     .bindparams(tenant_id=tenant_id, investigation_id=investigation_id)
                     .columns(evidence_id=Evidence.id.type)
-                ),
-                Evidence.evidence_identifier.in_(
-                    text(
-                        "SELECT raw_payload->>'evidence_id' FROM staged_source_records "
-                        "WHERE tenant_id=:tenant_id AND record_type='evidence_metadata' "
-                        "AND raw_payload->>'investigation_id'=:source_identifier"
-                    )
-                    .bindparams(tenant_id=tenant_id, source_identifier=source_identifier or "")
-                    .columns(evidence_identifier=Evidence.evidence_identifier.type)
                 ),
             )
         )

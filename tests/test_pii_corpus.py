@@ -143,14 +143,49 @@ def test_investigation_facts_are_kept(text):
     assert mask_text(text) == text
 
 
-def test_serials_and_lots_are_masked_only_beside_a_person(monkeypatch):
-    sentence = "Dr. Alan Grant reviewed lot L24-0815 and serial SN-4471-X on 2026-10-03. Lot L24-0816 was fine."
+def test_serials_and_lots_are_masked_only_beside_a_patient(monkeypatch):
+    sentence = (
+        "Complainant Thaddeus Wrexham returned lot L24-0815 and serial SN-4471-X on 2026-10-03. Lot L24-0816 was fine."
+    )
     masked = mask_text(sentence)
-    assert "Alan Grant" not in masked and "L24-0815" not in masked and "SN-4471-X" not in masked
+    assert "Thaddeus Wrexham" not in masked and "L24-0815" not in masked and "SN-4471-X" not in masked
     assert "[LOT]" in masked and "[SERIAL]" in masked
-    assert "L24-0816" in masked and "2026-10-03" in masked  # a sentence without a person keeps its lot
+    assert "L24-0816" in masked and "2026-10-03" in masked  # a sentence without a patient keeps its lot
+    for patient_side in ("A 67-year-old male used lot L24-0815.", "MRN 004512: device lot L24-0815."):
+        assert "L24-0815" not in mask_text(patient_side), patient_side
     monkeypatch.setenv("MDARIX_GENAI_MASK_SERIALS_NEAR_PII", "false")
-    assert "L24-0815" in mask_text(sentence) and "Alan Grant" not in mask_text(sentence)
+    assert "L24-0815" in mask_text(sentence) and "Thaddeus Wrexham" not in mask_text(sentence)
+
+
+# Precision: a staff member's name is masked, but the lot, standard, product and event date beside it are facts of
+# the investigation and stay exactly as written.
+STAFF_BESIDE_FACTS = [
+    ("Dr. Alan Grant reviewed lot L24-0815 on 2026-10-03.", "Alan Grant", ["L24-0815", "2026-10-03"]),
+    (
+        "Dr. Alan Grant reviewed lot L24-0815 and serial SN-4471-X on 2026-10-03.",
+        "Alan Grant",
+        ["L24-0815", "SN-4471-X", "2026-10-03"],
+    ),
+    ("Alan Grant reviewed lot L24-0815.", "Alan Grant", ["L24-0815"]),
+    (
+        "Engineer Priya Patel tested lot L24-0815 against ISO 14971 on 2026-10-03.",
+        "Priya Patel",
+        ["L24-0815", "ISO 14971", "2026-10-03"],
+    ),
+    (
+        "Signed off by J. Smith for OrbitCare 300 Rev B lot SAMPLE-ORBIT-300-LOT-003 on 2026-10-03 per IEC 60601-1.",
+        "J. Smith",
+        ["OrbitCare 300 Rev B", "SAMPLE-ORBIT-300-LOT-003", "2026-10-03", "IEC 60601-1"],
+    ),
+]
+
+
+@pytest.mark.parametrize("text, person, facts", STAFF_BESIDE_FACTS, ids=[case[0][:40] for case in STAFF_BESIDE_FACTS])
+def test_a_staff_name_beside_investigation_facts_keeps_the_facts(text, person, facts):
+    masked = mask_text(text)
+    assert person not in masked and "[PERSON]" in masked, masked
+    for fact in facts:
+        assert fact in masked, f"{fact!r} was masked: {masked!r}"
 
 
 def test_dictionary_keys_in_any_casing_style_are_recognised():
@@ -170,4 +205,7 @@ def test_dictionary_keys_in_any_casing_style_are_recognised():
 
 def test_nested_values_are_masked_everywhere():
     value = {"notes": ["Reported by Jane Doe", {"text": "Patient ID 88213", "lot": "L24-0815"}], "n": 3}
-    assert mask(value) == {"notes": ["Reported by [PERSON]", {"text": "Patient ID [ID_NUMBER]", "lot": "L24-0815"}], "n": 3}
+    assert mask(value) == {
+        "notes": ["Reported by [PERSON]", {"text": "Patient ID [ID_NUMBER]", "lot": "L24-0815"}],
+        "n": 3,
+    }

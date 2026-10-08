@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from backend.app.db.models.customer_lifecycle import TenantDataPlane
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import SessionLocal
+from backend.app.db.tenant_scope import bind_system
 
 PLANES = {
     "R1_TENANT_1": "mdarix-tenant-a-data",
@@ -24,6 +25,7 @@ PLANES = {
 def main() -> None:
     now = datetime.now(timezone.utc)
     with SessionLocal() as db:
+        bind_system(db, "register the validation organizations' data planes")
         tenants = {row.tenant_key: row for row in db.query(Tenant).filter(Tenant.tenant_key.in_(PLANES)).all()}
         if set(tenants) != set(PLANES):
             raise SystemExit(f"Expected four provisioned validation tenants; found {sorted(tenants)}")

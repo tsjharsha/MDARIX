@@ -21,6 +21,7 @@ from backend.app.demo_workspace import (
     status,
 )
 from backend.app.main import app
+from backend.app.role_codes import canonical_stored_role
 
 PASSWORD = "Demo workspace test 2026!"
 STORY = {
@@ -70,7 +71,8 @@ def test_setup_creates_its_own_tenant_and_is_idempotent(demo):
         assert db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant.id).one().status == "ACTIVE"
         for role, email, _ in DEMO_TEAM:
             user = db.query(AuthUser).filter(AuthUser.username == email).one()
-            assert (user.tenant_id, user.role, user.status) == (tenant.id, role, "ACTIVE")
+            # Built-in roles are stored as canonical codes (backend/app/role_codes.py), e.g. INVESTIGATOR.
+            assert (user.tenant_id, user.role, user.status) == (tenant.id, canonical_stored_role(role), "ACTIVE")
         assert status(db)["plan"] == "R1_GOVERNANCE_DEMO"
     finally:
         db.close()
@@ -250,6 +252,9 @@ def test_reset_removes_what_the_demo_created_and_restores_the_story(demo):
         assert time.monotonic() - started < 120
         assert db.query(Decision).filter(Decision.id == decision_id).first() is None
         assert result["records"] == STORY
+        # The reset writes the golden path again (backend/app/demo_golden_path.py), signed and verifiable.
+        assert result["golden_path_seeded"]["seeded"] is True, result["golden_path_seeded"]
+        assert result["golden_path"]["decision"]["verification"] == "VALID"
         assert status(db)["data_location_registered"] is True
     finally:
         db.close()
@@ -283,3 +288,230 @@ def test_a_demo_case_has_its_own_graph_and_search_context(demo):
         }
     finally:
         db.close()
+
+
+# ------------------------------------------------------------------------------------- Phase 7: the golden path
+
+
+def _demo_tenant(db):
+    return db.query(Tenant).filter(Tenant.tenant_key == DEMO_TENANT_KEY).one()
+
+
+def _golden_case(db, tenant):
+    return db.query(Investigation).filter_by(tenant_id=tenant.id, investigation_identifier=story.GOLDEN_CASE).one()
+
+
+def test_every_workflow_role_has_a_demo_person(demo):
+    from backend.app.role_codes import WORKFLOW_ROLES
+
+    db = SessionLocal()
+    try:
+        tenant = _demo_tenant(db)
+        roles = {
+            user.role
+            for user in db.query(AuthUser).filter(
+                AuthUser.tenant_id == tenant.id,
+                AuthUser.username.in_([email for _, email, _ in DEMO_TEAM]),
+                AuthUser.status == "ACTIVE",
+            )
+        }
+        assert set(WORKFLOW_ROLES) <= roles
+        assert {"TRIAGE_LEAD", "RISK_REVIEWER", "REGULATORY_REVIEWER"} <= roles
+        assert all(email.endswith("@acmecare-demo.invalid") for _, email, _ in DEMO_TEAM)
+        team = {item["email"]: item for item in status(db)["team"]}
+        assert team["triage@acmecare-demo.invalid"]["role_label"] == "PMS / Signal Triage Lead"
+        assert team["risk@acmecare-demo.invalid"]["name"] == "Rita Risk"
+        assert team["regulatory@acmecare-demo.invalid"]["active"] is True
+    finally:
+        db.close()
+
+
+def test_approvers_and_leaders_may_sign_in_the_demo_tenant(demo):
+    from backend.app.access.permissions import normalize_role
+    from backend.app.db.models.foundation import ApprovalAuthority
+
+    db = SessionLocal()
+    try:
+        tenant = _demo_tenant(db)
+        authorized = {
+            normalize_role(row.role_name)
+            for row in db.query(ApprovalAuthority).filter_by(
+                tenant_id=tenant.id,
+                object_type="Decision",
+                decision_type="INVESTIGATION_REVIEW",
+                authority="AUTHORIZED",
+                status="ACTIVE",
+            )
+        }
+        assert {normalize_role("APPROVER"), normalize_role("LEADER")} <= authorized
+    finally:
+        db.close()
+
+
+def test_the_golden_path_is_seeded_with_business_ids(demo):
+    db = SessionLocal()
+    try:
+        golden = status(db)["golden_path"]
+    finally:
+        db.close()
+    assert golden["seeded"] is True, golden
+    assert golden["investigation"]["identifier"] == story.GOLDEN_CASE
+    assert golden["investigation"]["business_id"].startswith("INV")
+    assert golden["investigation"]["workflow_state"] == "DECIDED"
+    assert [item["status"] for item in golden["signals"]] == ["DECISION_RECORDED"]
+    assert golden["signals"][0]["business_id"].startswith("SIG")
+    assert [(item["version"], item["status"]) for item in golden["decision_briefs"]] == [
+        (1, "RETURNED"),
+        (2, "APPROVED_FOR_DECISION"),
+    ]
+    assert all(item["business_id"].startswith("DBV") for item in golden["decision_briefs"])
+    assert {(item["type"], item["outcome"]) for item in golden["reviews"]} == {
+        ("RISK", "RISK_CONTROL_REVIEW_REQUIRED"),
+        ("REGULATORY", "REPORTABILITY_ASSESSMENT_COMPLETE"),
+    }
+    assert all(item["business_id"].startswith("REV") for item in golden["reviews"])
+    decision = golden["decision"]
+    assert decision["business_id"].startswith("DEC")
+    assert decision["identifier"] == f"{story.GOLDEN_CASE}-D1"
+    assert decision["outcome"] == "ACCEPT_WITH_CONDITIONS"
+    assert decision["signature"].startswith("ESIG")
+    assert decision["verification"] == "VALID"
+    assert [item["action_type"] for item in golden["follow_ups"]] == ["CAPA_REQUIRED"]
+    assert golden["follow_ups"][0]["business_id"].startswith("FUP")
+    assert len(golden["capas"]) == 1 and golden["capas"][0].startswith("CAPA-")
+    assert [item["status"] for item in golden["impact_assessments"]] == ["OPEN"]
+    assert golden["impact_assessments"][0]["business_id"].startswith("IMP")
+    # A case stays mid-investigation for live demos, and detection leaves signals awaiting triage.
+    assert golden["live_case"]["workflow_state"] not in ("DECIDED", "CLOSED", "CANCELLED")
+    assert golden["signals_awaiting_triage"] and all(
+        item.startswith("SIG") for item in golden["signals_awaiting_triage"]
+    )
+
+
+def test_the_golden_signature_verifies_and_was_seeded_without_credentials(demo):
+    from backend.app.db.models.foundation import AuditEvent, Decision
+    from backend.app.human_decision import service
+
+    db = SessionLocal()
+    try:
+        tenant = _demo_tenant(db)
+        case = _golden_case(db, tenant)
+        decision = service.current_decision(db, case)
+        record = service.signature_record(db, decision)
+        result = service.verify_signature(db, record, decision)
+        assert result["status"] == "VALID" and all(check["ok"] for check in result["checks"])
+        approver = db.query(AuthUser).filter(AuthUser.username == "approver@acmecare-demo.invalid").one()
+        assert decision.decided_by_user_id == approver.id and record.signer_user_id == str(approver.id)
+        assert decision.decision_kind == "BRIEF" and decision.conditions
+        # Seeding is a system action: audited as DEMO_SEEDED, never as a signature made with credentials.
+        seeded = db.query(AuditEvent).filter_by(tenant_id=tenant.id, action="DEMO_SEEDED", entity_id=decision.id)
+        assert seeded.count() == 1
+        assert seeded.one().details["signer_reauthenticated"] is False
+        assert (
+            db.query(AuditEvent)
+            .filter_by(tenant_id=tenant.id, action="CASE_DECISION_SIGNED", entity_id=decision.id)
+            .count()
+            == 0
+        )
+        assert db.query(Decision).filter_by(tenant_id=tenant.id, investigation_id=case.id).count() == 1
+    finally:
+        db.close()
+
+
+def test_the_golden_case_carries_every_workflow_record(demo):
+    from backend.app.db.models.case_scope import InvestigationScopeVersion
+    from backend.app.db.models.foundation import (
+        FailureChain,
+        FailureChainEdge,
+        Hypothesis,
+        HypothesisEvidence,
+        InvestigationEvidence,
+        Unknown,
+    )
+    from backend.app.db.models.signals import Signal
+    from backend.app.db.models.stage3 import SupplierEvidenceRequest
+    from backend.app.db.models.workflow import WorkflowTask
+
+    db = SessionLocal()
+    try:
+        tenant = _demo_tenant(db)
+        case = _golden_case(db, tenant)
+        assert case.priority == "HIGH" and case.owner_ref == "investigator@acmecare-demo.invalid"
+        versions = (
+            db.query(InvestigationScopeVersion)
+            .filter_by(tenant_id=tenant.id, investigation_id=case.id)
+            .order_by(InvestigationScopeVersion.version)
+            .all()
+        )
+        assert [row.version for row in versions] == [1, 2]
+        assert len(versions[1].excluded_complaints) == 1 and versions[1].excluded_complaints[0]["reason"]
+        signal = (
+            db.query(Signal)
+            .filter_by(tenant_id=tenant.id, origin="THRESHOLD_RULE", problem_key=story.GOLDEN_PROBLEM)
+            .one()
+        )
+        assert (signal.confirmed_priority, signal.dispositioned_by) == ("HIGH", str(_user(db, "triage").id))
+        links = db.query(InvestigationEvidence).filter_by(tenant_id=tenant.id, investigation_id=case.id).all()
+        statuses = {row.review_status for row in links}
+        assert {"ACCEPTED", "ACCEPTED_WITH_LIMITATION", "REJECTED", "UNREVIEWED"} <= statuses
+        assert all(row.review_reason for row in links if row.review_status == "REJECTED")
+        assert {"SUPPORTING", "CONTRADICTING"} <= {row.relationship for row in links}
+        request = db.query(SupplierEvidenceRequest).filter_by(tenant_id=tenant.id, investigation_id=case.id).one()
+        assert request.request_kind == "INTERNAL" and request.status == "REVIEWED"
+        assert request.resolved_evidence_id is not None and request.unknown_id is not None
+        resolved = db.query(Unknown).filter_by(tenant_id=tenant.id, id=request.unknown_id).one()
+        assert resolved.status == "resolved"
+        unknowns = {row.status for row in db.query(Unknown).filter_by(tenant_id=tenant.id, investigation_id=case.id)}
+        assert {"resolved", "accepted_limitation"} <= unknowns
+        hypotheses = {
+            row.origin: row for row in db.query(Hypothesis).filter_by(tenant_id=tenant.id, investigation_id=case.id)
+        }
+        assert hypotheses["ai"].human_status == "PARTIALLY_SUPPORTED"
+        assert hypotheses["human"].human_status == "RETIRED"
+        relations = {
+            row.relation_type
+            for row in db.query(HypothesisEvidence).filter_by(tenant_id=tenant.id, hypothesis_id=hypotheses["ai"].id)
+        }
+        assert {"support", "contradict"} <= relations
+        chain = db.query(FailureChain).filter_by(tenant_id=tenant.id, investigation_id=case.id).one()
+        assert chain.origin == "human"
+        states = {row.edge_status for row in db.query(FailureChainEdge).filter_by(failure_chain_id=chain.id)}
+        assert len(states) >= 3
+        # The case's work is in My Work: Ines keeps the case task, the follow-up and the impact assessment.
+        open_types = {
+            row.task_type
+            for row in db.query(WorkflowTask).filter(
+                WorkflowTask.tenant_id == tenant.id,
+                WorkflowTask.investigation_id == case.id,
+                WorkflowTask.status.in_(("NEW", "ASSIGNED", "ACCEPTED", "IN_PROGRESS", "WAITING")),
+            )
+        }
+        assert {"INVESTIGATION", "FOLLOW_UP", "IMPACT_ASSESSMENT"} <= open_types
+    finally:
+        db.close()
+
+
+def _user(db, local_part: str):
+    return db.query(AuthUser).filter(AuthUser.username == f"{local_part}@acmecare-demo.invalid").one()
+
+
+def test_the_golden_path_is_written_once_and_never_in_the_golden_tenant(demo):
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.demo_golden_path import seed_golden_path
+
+    assert demo["second"]["golden_path"]["seeded"] is False
+    db = SessionLocal()
+    try:
+        tenant = _demo_tenant(db)
+        again = seed_golden_path(db, tenant.id)
+        assert again["seeded"] is False
+        assert status(db)["golden_path"]["decision"]["verification"] == "VALID"
+        golden = db.query(Tenant).filter(Tenant.tenant_key == LEGACY_DEMO_TENANT_KEY).one()
+        assert (
+            db.query(Investigation).filter_by(tenant_id=golden.id, investigation_identifier=story.GOLDEN_CASE).count()
+            == 0
+        )
+        assert db.query(AuditEvent).filter_by(tenant_id=golden.id, action="DEMO_SEEDED").count() == 0
+    finally:
+        db.close()
+    assert _golden_products() == demo["golden_before"]

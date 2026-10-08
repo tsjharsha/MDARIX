@@ -16,7 +16,8 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.evidence_intelligence import EvidenceChunk
-from investigator.model_provider import asserts_causality_or_decision
+from genai.provider import GenAIUnavailable
+from investigator.model_provider import HEDGES, asserts_causality_or_decision
 from retrieval.schemas import RetrievalRequest
 from retrieval.service import RetrievalError, TrustedRetrievalService
 
@@ -25,6 +26,23 @@ TEXT_BUDGET = 6000  # characters of retrieved evidence text sent with the questi
 TEXT_PER_ITEM = 1000
 CITATION = re.compile(r"\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\]")
 UNICODE_DASHES = re.compile("[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]")
+CERTAINTY = re.compile(
+    # Asserted certainty only: "proves" / "proven" / "is proof", not the plain verb ("needed to prove sufficiency").
+    r"(?i)\b(definitively|conclusively|certainly|undoubtedly|proves|proven|is proof|all(\s+\w+){1,3}\s+devices\s+are)\b"
+)
+
+
+def asserts_certainty(statement: str) -> bool:
+    """Certainty wording that is asserted, not negated or hedged ("does not prove" is careful, not certain)."""
+    return any(
+        not HEDGES.search(statement[max(0, match.start() - 40) : match.start()])
+        for match in CERTAINTY.finditer(statement)
+    )
+
+
+def refusal(exc: GenAIUnavailable) -> dict[str, Any]:
+    """Why the model did not answer, for the reader: {status: REFUSED, code, user_message} (stable codes)."""
+    return exc.refusal()
 
 
 def normalize_answer(answer: str | None) -> str | None:
@@ -178,15 +196,23 @@ def compact_context(grounded: dict[str, Any], budget_chars: int) -> dict[str, An
 
 
 def check_answer(answer: str | None, known_identifiers: set[str]) -> dict[str, Any]:
-    """Citations in the answer that are not in the evidence the model was given, and causal/decision wording."""
+    """Citations in the answer that are not in the evidence the model was given, causal/decision wording, and
+    asserted certainty."""
     if not answer:
-        return {"cited": [], "unverified_citations": [], "causal_or_decision_wording": False, "notes": []}
+        return {
+            "cited": [],
+            "unverified_citations": [],
+            "causal_or_decision_wording": False,
+            "certainty_wording": False,
+            "notes": [],
+        }
     bracketed = list(dict.fromkeys(CITATION.findall(answer)))
     unverified = [identifier for identifier in bracketed if identifier not in known_identifiers]
     mentioned = [identifier for identifier in sorted(known_identifiers) if identifier and identifier in answer]
     cited = list(dict.fromkeys(bracketed + mentioned))
     sentences = re.split(r"(?<=[.!?])\s+|\n+", answer)
     causal = any(asserts_causality_or_decision(sentence) for sentence in sentences)
+    certain = any(asserts_certainty(sentence) for sentence in sentences)
     notes = []
     if unverified:
         notes.append(
@@ -198,4 +224,12 @@ def check_answer(answer: str | None, known_identifiers: set[str]) -> dict[str, A
         notes.append(
             "The answer contains wording that sounds like a causal or regulatory conclusion; a person decides."
         )
-    return {"cited": cited, "unverified_citations": unverified, "causal_or_decision_wording": causal, "notes": notes}
+    if certain:
+        notes.append("The answer states something with a certainty the evidence may not support; check it.")
+    return {
+        "cited": cited,
+        "unverified_citations": unverified,
+        "causal_or_decision_wording": causal,
+        "certainty_wording": certain,
+        "notes": notes,
+    }

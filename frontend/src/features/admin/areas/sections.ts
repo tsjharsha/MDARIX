@@ -9,15 +9,70 @@ export const DATA_SECTIONS = [
   "Customer configuration",
 ] as const;
 export const PLANS_SECTIONS = ["Plans", "Subscriptions", "Renewals", "Reminders"] as const;
-export const IDENTITY_SECTIONS = ["Platform users", "Roles & permissions", "Effective access"] as const;
+export const IDENTITY_SECTIONS = [
+  "Platform users",
+  "Customer administrators",
+  "Customer users",
+  "Onboarding",
+  "Roles & permissions",
+  "Effective access",
+] as const;
 export const INTEGRATION_SECTIONS = [
   "Connector catalog",
   "Runs & failures",
   "Reconciliation",
   "Credentials",
-  "API & schemas",
+  "Source schemas",
 ] as const;
-export const AI_SECTIONS = ["Overview", "Evaluations", "Executions", "Agents & guardrails"] as const;
+
+/**
+ * Data & Integrations: everything needed to bring a customer's data into MDARIX, in the order it is done. Define what
+ * MDARIX keeps, connect the customer's systems, map their fields, release the configuration, then run and check it.
+ * (It brings together the former Data & Configuration and Integrations areas; each screen is unchanged.)
+ */
+export const DATA_AND_INTEGRATIONS = "Data & Integrations";
+export const DATA_INTEGRATION_STAGES = [
+  { stage: "Define", sections: ["Data model", "Rules & reference data"] },
+  { stage: "Connect", sections: ["Connector catalog", "Source schemas", "Credentials"] },
+  { stage: "Map", sections: ["Mappings", "Customer configuration"] },
+  { stage: "Release", sections: ["Releases"] },
+  { stage: "Run", sections: ["Runs & failures", "Reconciliation"] },
+] as const;
+export const DATA_INTEGRATION_SECTIONS = [
+  "Data model",
+  "Rules & reference data",
+  "Connector catalog",
+  "Source schemas",
+  "Credentials",
+  "Mappings",
+  "Customer configuration",
+  "Releases",
+  "Runs & failures",
+  "Reconciliation",
+] as const;
+
+/** What each step of Data & Integrations is for, in one line. */
+export const DATA_INTEGRATION_GUIDE: Record<string, string> = {
+  "Data model": "The records MDARIX keeps (products, complaints, investigations…) and their fields.",
+  "Rules & reference data": "The controlled values, transformations and checks that mappings use.",
+  "Connector catalog": "The source systems a customer can connect (QMS, ERP, PLM…) and their connector versions.",
+  "Source schemas": "The records and fields each source system offers, ready to be mapped.",
+  Credentials: "Connection secrets for the platform's own connections, held in the secret store.",
+  Mappings: "Which source field fills which MDARIX field; new mappings start as drafts.",
+  "Customer configuration": "One tenant's products, connections and the mapping versions it uses.",
+  Releases: "Approve mappings and publish them; a released version can be rolled back.",
+  "Runs & failures": "Every integration run across tenants, and what failed.",
+  Reconciliation: "After each run, the records kept are checked against the source system.",
+};
+
+/** The stage a Data & Integrations step belongs to, with its position (1-based) among all steps. */
+export const dataIntegrationStep = (section: string) => {
+  const index = (DATA_INTEGRATION_SECTIONS as readonly string[]).indexOf(section);
+  if (index < 0) return null;
+  const stage = DATA_INTEGRATION_STAGES.find((item) => (item.sections as readonly string[]).includes(section));
+  return { number: index + 1, total: DATA_INTEGRATION_SECTIONS.length, stage: stage?.stage ?? "" };
+};
+export const AI_SECTIONS = ["Overview", "Evaluations", "AI runs", "Agents & guardrails"] as const;
 export const SECURITY_SECTIONS = ["Overview", "Audit trail", "Support access", "Retention"] as const;
 export const OPERATIONS_SECTIONS = [
   "System health",
@@ -26,15 +81,67 @@ export const OPERATIONS_SECTIONS = [
   "Developer API",
 ] as const;
 
+/**
+ * What each section of the other areas is for, in one line, shown under the area's header. Data & Integrations is
+ * explained by its own step guide (DATA_INTEGRATION_GUIDE).
+ */
+export const SECTION_GUIDE: Record<string, Record<string, string>> = {
+  "Customers & Tenants": {
+    Customers: "Every customer organization and its status. Open one to see its tenants and administrators.",
+    Tenants: "Each customer's separate workspaces: their plan, administrators, sign-in, AI use and data.",
+    Feedback: "What trial users told us about MDARIX, and the quotes that may appear on the website.",
+  },
+  "Plans & Licensing": {
+    Plans: "The plans a tenant can be on, with the features and limits each one includes.",
+    Subscriptions: "Which plan each tenant is on and its license period; change the plan or its limits here.",
+    Renewals: "Licenses by when they end, so renewals are handled before access stops.",
+    Reminders: "When renewal reminder emails are sent, and what they say.",
+  },
+  "Identity & Access": {
+    "Platform users": "MDARIX staff who administer the platform.",
+    "Customer administrators": "The people who manage each customer's own users.",
+    "Customer users": "Everyone else with an account in a customer's tenant (read-only here).",
+    Onboarding: "Demo and trial requests from prospective customers.",
+    "Roles & permissions": "What each role is allowed to do.",
+    "Effective access": "Everything one person can do, and why.",
+  },
+  "AI Control Center": {
+    Overview: "Which AI model is in use, how often it ran in the last 30 days and how fast it answers.",
+    Evaluations: "Test results that show the AI gives the expected answers before a release.",
+    "AI runs": "Every recent AI run: for which tenant, with which model, and how it went.",
+    "Agents & guardrails": "The AI assistants in MDARIX and the safety limits they work within.",
+  },
+  Security: {
+    Overview: "How each tenant's data is kept separate and protected.",
+    "Audit trail": "Every recorded change across tenants: who did what, when and why.",
+    "Support access": "Time-limited access that lets our support team look into a customer's tenant.",
+    Retention: "How long audit records are kept, and the earliest date any may be deleted.",
+  },
+  Operations: {
+    "System health": "Whether the platform's services are up and the background worker is running.",
+    "Queues & jobs": "Work waiting in the background, work that gave up after retries, and customer setup jobs.",
+    "Email & notifications": "Whether the platform can send email, and the renewal reminders waiting to go out.",
+    "Developer API": "For developers: what other systems can ask MDARIX to do. Not needed to run the platform.",
+  },
+};
+
+/** The one-line purpose of a section, or "" when the area explains itself another way. */
+export const sectionGuide = (area: string, section: string) => SECTION_GUIDE[area]?.[section] ?? "";
+
 /** Area name -> its sections, for the areas this folder renders. */
 export const AREA_SECTIONS: Record<string, readonly string[]> = {
   "Plans & Licensing": PLANS_SECTIONS,
-  "Data & Configuration": DATA_SECTIONS,
+  [DATA_AND_INTEGRATIONS]: DATA_INTEGRATION_SECTIONS,
   "Identity & Access": IDENTITY_SECTIONS,
-  Integrations: INTEGRATION_SECTIONS,
   "AI Control Center": AI_SECTIONS,
   Security: SECURITY_SECTIONS,
   Operations: OPERATIONS_SECTIONS,
+};
+
+/** Former area names (bookmarks, links from other screens) and the area that replaced them. */
+export const DOMAIN_ALIASES: Record<string, string> = {
+  "Data & Configuration": DATA_AND_INTEGRATIONS,
+  Integrations: DATA_AND_INTEGRATIONS,
 };
 
 /** Where an old bookmark or link lands in the new structure. */
@@ -76,14 +183,16 @@ export const LEGACY_SECTIONS: Record<string, string> = {
   "Integration runs": "Runs & failures",
   "Failures & logs": "Runs & failures",
   "Integration health": "Runs & failures",
-  "Schema registry": "API & schemas",
-  "API & contract registry": "API & schemas",
+  "Schema registry": "Source schemas",
+  "API & contract registry": "Source schemas",
+  "API & schemas": "Source schemas",
   "AI overview": "Overview",
   "Models & versions": "Overview",
   "Golden Evaluation": "Evaluations",
   "Trust & Assurance": "Evaluations",
   "Release Assurance": "Evaluations",
-  "AI executions": "Executions",
+  "AI executions": "AI runs",
+  Executions: "AI runs",
   Agents: "Agents & guardrails",
   Guardrails: "Agents & guardrails",
   "Security overview": "Overview",

@@ -9,3 +9,6 @@ INV-007,INV-007,PRD-ASTER-100,Did process control drift contribute to the compla
 INV-008,INV-008,PRD-NIMBUS-200,What constrained counterfactual can be evaluated for Rev B?,2026-03-16,closed
 INV-009,INV-009,PRD-NIMBUS-200,How should AI model-change outputs be compared?,2026-03-19,closed
 INV-010,INV-010,PRD-NIMBUS-200,When should MDARIX abstain due to insufficient evidence?,2026-03-22,open
+INV-011,INV-011,PRD-NIMBUS-200,Why do Nimbus-200 Rev B pumps report occlusion alarms after the valve change?,2026-03-25,open
+INV-012,INV-012,PRD-NIMBUS-200,What explains the leak complaints on Nimbus-200 Rev A pumps?,2026-03-28,open
+INV-013,INV-013,PRD-NIMBUS-200,Confirm that the seal supplier change caused the leak complaints so the CAPA can be closed.,2026-03-31,open

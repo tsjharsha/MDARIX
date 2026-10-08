@@ -1,43 +1,75 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
-import { SearchBox, Table, Tabs, formatDate, listOf, useResource } from "../../customer-admin/shared";
-import { useWorkspace } from "../workspaceContext";
+import { SearchBox, Table, Tabs, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
+import { formatDay } from "../../../app/dates";
+import { sortParams, useServerSort } from "../../../app/tableSort";
+import { displayId } from "../../../app/displayId";
+import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
+import { SIGNALS_TABS, parseSignalsTab, type SignalsTab } from "../signals";
+import { SignalInbox } from "./SignalInbox";
+import { DetectionRules } from "./DetectionRules";
 
-const TABS = ["Product complaints", "Complaint list", "All signals", "Trends"] as const;
-type Tab = (typeof TABS)[number];
-
+/**
+ * Signals: the signal inbox (triage), the complaints behind signals, and their trends. `tab` may carry the inbox's
+ * filters or a signal to open (see signalsTab in ../signals.ts); a former tab name opens the tab that replaced it.
+ */
 export function SignalsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Product complaints",
+  const canTriage = useCan("signal.triage");
+  const tabs = SIGNALS_TABS.filter((item) => item !== "Detection rules" || canTriage);
+  const [target, setTarget] = useState(() => parseSignalsTab(tab));
+  // Each new target (from a link, a task, the rules' run result) opens the inbox afresh with it.
+  const [targetKey, setTargetKey] = useState(0);
+  const [active, setActive] = useState<SignalsTab>(() =>
+    (tabs as readonly string[]).includes(target.tab) ? target.tab : "Signal inbox",
   );
+  const openSignal = (signal: string) => {
+    setTarget({ ...parseSignalsTab("Signal inbox"), signal });
+    setTargetKey((value) => value + 1);
+    setActive("Signal inbox");
+  };
   return (
     <>
-      <p className="ca-lede">Signals are recorded observations. They are not conclusions about cause.</p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Signal sections" />
-      {active === "Product complaints" && (
-        <NeedsProduct>
-          {(view) => (
-            <Panel eyebrow={view.product.name ?? "Product"} title="Complaints for the selected version">
-              <RecordTable
-                caption="Complaints"
-                rows={view.complaints}
-                columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
-                empty={{ title: "No complaints recorded", detail: "Complaints for this product version appear here." }}
-              />
-            </Panel>
-          )}
-        </NeedsProduct>
-      )}
-      {active === "All signals" && (
-        <Embedded>
-          <Stage2Experience mode="signals" />
-        </Embedded>
-      )}
-      {active === "Complaint list" && <ComplaintList />}
-      {active === "Trends" && <Trends />}
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Signal sections">
+        {active === "Signal inbox" && (
+          <SignalInbox
+            key={targetKey}
+            initialFilters={target.filters}
+            initialSignal={target.signal}
+            // Back on the list, the signal is not opened again when the person returns to this tab.
+            onSignalClosed={() => setTarget((current) => ({ ...current, signal: null }))}
+          />
+        )}
+        {active === "Product complaints" && (
+          <NeedsProduct>
+            {(view) => (
+              <Panel eyebrow={view.product.name ?? "Product"} title="Complaints for the selected version">
+                <RecordTable
+                  caption="Complaints"
+                  idLabel="Complaint ID"
+                  rows={view.complaints}
+                  columns={["complaint_identifier", "event_timestamp", "recorded_timestamp", "status"]}
+                  labels={{ event_timestamp: "Event date", recorded_timestamp: "Recorded" }}
+                  empty={{
+                    title: "No complaints recorded",
+                    detail: "Complaints for this product version appear here.",
+                  }}
+                />
+              </Panel>
+            )}
+          </NeedsProduct>
+        )}
+        {active === "Recent complaints" && (
+          <Embedded>
+            <Stage2Experience mode="signals" />
+          </Embedded>
+        )}
+        {active === "Complaint list" && <ComplaintList />}
+        {active === "Trends" && <Trends />}
+        {active === "Detection rules" && <DetectionRules onOpenSignal={openSignal} />}
+      </Tabs>
     </>
   );
 }
@@ -72,10 +104,10 @@ function Trends() {
   }, [signals.data]);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Signals" title={model.title} state={signals.state} error={signals.error}>
+      <Panel eyebrow="Signals" title={model.title} source={signals}>
         <ColumnChart data={model.trend} unit="signals" caption="latest 100 recorded signals" />
       </Panel>
-      <Panel eyebrow="Signals" title="By recorded severity" state={signals.state} error={signals.error}>
+      <Panel eyebrow="Signals" title="By recorded severity" source={signals}>
         {model.severity.length ? (
           <BarList items={model.severity} colour="series" />
         ) : (
@@ -87,14 +119,28 @@ function Trends() {
   );
 }
 
+// The complaint list's columns the server sorts across every page (GET /api/v1/complaints sort/order).
+const COMPLAINT_SORTS = [
+  "business_id",
+  "complaint_identifier",
+  "product",
+  "description",
+  "received",
+  "severity",
+  "status",
+  "cases",
+] as const;
+
 /** Every complaint in the organization, across products: search, filter by product and status, page through. */
 function ComplaintList() {
   const { work } = useWorkspace();
+  const openInvestigation = useOpenInvestigation();
   const [query, setQuery] = useState("");
   const [product, setProduct] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: "50" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "50", ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   if (product) params.set("product_id", product);
   if (status) params.set("status", status);
@@ -108,8 +154,7 @@ function ComplaintList() {
     <Panel
       eyebrow="Signals"
       title={`Complaints in your organization${list.data ? ` · ${list.data.total}` : ""}`}
-      state={list.state}
-      error={list.error}
+      source={list}
     >
       <div className="cc-toolbar">
         <SearchBox
@@ -129,7 +174,7 @@ function ComplaintList() {
           <option value="">All statuses</option>
           {listOf(list.data?.statuses).map((value: string) => (
             <option key={value} value={value}>
-              {value}
+              {titleCase(value)}
             </option>
           ))}
         </select>
@@ -139,13 +184,10 @@ function ComplaintList() {
         rows={listOf(list.data?.items)}
         rowKey={(row) => String(row.id)}
         empty={{ title: "No complaints found", detail: "Complaints arrive through connectors and imports." }}
+        serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
         columns={[
-          {
-            key: "id",
-            label: "Complaint",
-            fields: ["complaint_identifier"],
-            render: (row) => <strong>{row.complaint_identifier}</strong>,
-          },
+          idColumn("Complaint ID", "complaint_identifier"),
+          sourceIdColumn("complaint_identifier"),
           {
             key: "product",
             label: "Product",
@@ -157,7 +199,7 @@ function ComplaintList() {
             key: "received",
             label: "Received",
             fields: ["received_date"],
-            render: (row) => formatDate(row.received_date ?? row.event_date),
+            render: (row) => formatDay(row.received_date ?? row.event_date),
           },
           {
             key: "severity",
@@ -165,7 +207,7 @@ function ComplaintList() {
             fields: ["severity", "patient_involved", "serious_injury", "death"],
             render: (row) => (
               <span className="ca-person">
-                <span>{row.severity ?? "—"}</span>
+                <span>{row.severity ? titleCase(String(row.severity)) : "—"}</span>
                 {(row.death || row.serious_injury) && (
                   <small className="uw-flag-critical">Serious injury or death</small>
                 )}
@@ -181,6 +223,27 @@ function ComplaintList() {
             fields: ["investigations"],
             render: (row) => row.investigations,
           },
+          ...(openInvestigation
+            ? [
+                {
+                  key: "open-investigation",
+                  label: "",
+                  render: (row: any) => {
+                    const request = investigationRequestFor(row);
+                    return request ? (
+                      <button
+                        type="button"
+                        className="ac-link"
+                        aria-label={`Open an investigation for ${displayId(row, "complaint_identifier", "this complaint")}`}
+                        onClick={() => openInvestigation(request)}
+                      >
+                        Open investigation
+                      </button>
+                    ) : null;
+                  },
+                },
+              ]
+            : []),
         ]}
       />
       {pages > 1 && (

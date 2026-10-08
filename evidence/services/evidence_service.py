@@ -84,11 +84,18 @@ class EvidenceIntelligenceService:
         if not evidence:
             raise ValueError(f"Evidence record {evidence_id} not found for tenant {tenant_id}")
 
+        # Observations a person recorded (origin HUMAN) are theirs: they neither count as processed nor are cleared.
+        extracted = EvidenceObservation.origin.is_distinct_from("HUMAN")
+
         # Idempotency check: if already processed and not forced reprocess, return existing summary
         if not reprocess:
             existing_obs = (
                 db.query(EvidenceObservation)
-                .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
+                .filter(
+                    EvidenceObservation.tenant_id == tenant_id,
+                    EvidenceObservation.evidence_id == evidence_id,
+                    extracted,
+                )
                 .count()
             )
             if existing_obs > 0:
@@ -101,7 +108,9 @@ class EvidenceIntelligenceService:
         obs_ids = [
             o.id
             for o in db.query(EvidenceObservation.id)
-            .filter(EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id)
+            .filter(
+                EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id, extracted
+            )
             .all()
         ]
         if obs_ids:
@@ -113,7 +122,7 @@ class EvidenceIntelligenceService:
             EvidenceEntityLink.tenant_id == tenant_id, EvidenceEntityLink.evidence_id == evidence_id
         ).delete(synchronize_session=False)
         db.query(EvidenceObservation).filter(
-            EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id
+            EvidenceObservation.tenant_id == tenant_id, EvidenceObservation.evidence_id == evidence_id, extracted
         ).delete(synchronize_session=False)
         db.flush()
 
@@ -145,7 +154,7 @@ class EvidenceIntelligenceService:
                 chunk_id=matching_chunk.id if matching_chunk else None,
                 statement=obs_schema.statement,
                 observation_type=obs_schema.observation_type,
-                extraction_method="GENAI",
+                extraction_method=validated_result.extraction_method,  # GENAI, or DETERMINISTIC for the rules
                 source_anchor=anchor_dict,
                 quality_status="VALIDATED" if not validated_result.warnings else "LIMITATIONS",
                 limitations=[l.model_dump() for l in validated_result.limitations]
@@ -244,6 +253,7 @@ class EvidenceIntelligenceService:
         return {
             "evidence": {
                 "id": str(evidence.id),
+                "business_id": evidence.business_id,
                 "evidence_identifier": evidence.evidence_identifier,
                 "evidence_type": evidence.evidence_type,
                 "title": evidence.title,
@@ -299,6 +309,7 @@ class EvidenceIntelligenceService:
             "ai_provenance": [
                 {
                     "id": str(ex.id),
+                    "business_id": ex.business_id,
                     "provider": ex.provider,
                     "model_name": ex.model_name,
                     "prompt_template_version": ex.prompt_template_version,

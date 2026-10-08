@@ -6,9 +6,10 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 
 POLICY_VERSION = "MDARIX_AI_TRUST_POLICY_R1_V1"
-SUITE_VERSION = "MDARIX_R1_GOLDEN_SUITE_V1"
-DATASET_VERSION = "MDARIX_R1_GOLDEN_DATASET_V1"
-SCENARIO_IDS = [f"VS{i:03d}" for i in range(1, 13)]
+SUITE_VERSION = "MDARIX_R1_GOLDEN_SUITE_V2"
+DATASET_VERSION = "r1-ai-golden-v2"
+# VS001-VS015 (scenarios/scenario_index.json; VS013-VS015 are the adversarial scenarios).
+SCENARIO_IDS = [f"VS{i:03d}" for i in range(1, 16)]
 ROOT = Path(__file__).parent
 
 

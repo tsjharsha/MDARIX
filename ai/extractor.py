@@ -40,12 +40,19 @@ def sanitize_evidence_text(text_content: str) -> tuple[str, bool]:
     return text_content, has_injection_attempt
 
 
+# Provenance of an extraction written by the rule-based fallback: no model was involved.
+RULES_PROVENANCE = {"provider": "RULES", "model": "mdarix-rule-extractor", "model_version": "rules-v1"}
+
+
 class AIEvidenceExtractor:
-    def __init__(self, provider: str = "google", model_name: str = "gemini-3.6-flash"):
-        self.provider = provider
-        self.model_name = model_name
+    """Extracts observations from evidence with the governed model when one may answer, else with rules.
+
+    The AI execution record names who actually wrote the result: the provider, model and model version the model
+    call returned, or ``RULES`` for the fallback (whose observations are DETERMINISTIC_DERIVATION, not AI)."""
+
+    def __init__(self, provider_client: GenAIProvider | None = None):
         self.prompt_template_version = "v1.0"
-        self.provider_client = GenAIProvider()
+        self.provider_client = provider_client or GenAIProvider()
 
     def extract_evidence(
         self,
@@ -86,12 +93,14 @@ class AIEvidenceExtractor:
 
         latency_ms = int((time.time() - start_time) * 1000)
 
-        # Log AIExecution provenance in database
+        # Log AIExecution provenance in database: the provider and model that actually wrote the result.
+        provenance = result.model_provenance or RULES_PROVENANCE
         execution_record = record_ai_execution(
             db=db,
             tenant_id=tenant_id,
-            provider=self.provider,
-            model_name=self.model_name,
+            provider=provenance["provider"],
+            model_name=provenance["model"],
+            model_version=provenance.get("model_version"),
             prompt_template_version=self.prompt_template_version,
             evidence_refs={"evidence_id": str(evidence_id), "title": evidence_title},
             structured_input=structured_input,
@@ -130,6 +139,8 @@ class AIEvidenceExtractor:
                     "prompt_injection_detected": injection_detected,
                 },
             )
+            if result.provider == "controlled":
+                return None  # no model answered (controlled mode): the rules write the extraction
             raw = result.output.get("answer")
             if not isinstance(raw, str):
                 return None
@@ -140,6 +151,12 @@ class AIEvidenceExtractor:
                 cleaned = cleaned[:-3]
             parsed = json.loads(cleaned.strip())
             parsed["evidence_id"] = evidence_id
+            parsed["extraction_method"] = "GENAI"
+            parsed["model_provenance"] = {
+                "provider": result.provider,
+                "model": result.model,
+                "model_version": result.model_version,
+            }
             parsed.setdefault("title", title)
             parsed.setdefault("warnings", [])
             parsed["warnings"].append("AI output was schema-validated and grounded against the source document.")
@@ -193,8 +210,8 @@ class AIEvidenceExtractor:
                 cand_entities = self._extract_candidate_entities(para)
                 entity_candidates.extend(cand_entities)
 
-                # Classify observation
-                obs_type = "AI_EXTRACTED_OBSERVATION"
+                # Classify observation (rules, not a model: a derivation unless the source states it explicitly)
+                obs_type = "DETERMINISTIC_DERIVATION"
                 if "validation" in para.lower() or "test" in para.lower() or "passed" in para.lower():
                     obs_type = "EXPLICIT_SOURCE_STATEMENT"
 
@@ -226,7 +243,7 @@ class AIEvidenceExtractor:
             observations.append(
                 ExtractedObservationSchema(
                     statement=content.strip(),
-                    observation_type="AI_EXTRACTED_OBSERVATION",
+                    observation_type="DETERMINISTIC_DERIVATION",
                     source_anchor=anchor,
                 )
             )
@@ -243,6 +260,8 @@ class AIEvidenceExtractor:
             limitations=limitations,
             extraction_status=status,
             warnings=warnings,
+            extraction_method="DETERMINISTIC",
+            model_provenance=dict(RULES_PROVENANCE),
         )
 
     def _extract_candidate_entities(self, text: str) -> List[EntityLinkCandidateSchema]:

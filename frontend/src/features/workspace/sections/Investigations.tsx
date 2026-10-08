@@ -1,22 +1,94 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ApiError } from "../../../app/apiClient";
 import { FilePlus2 } from "lucide-react";
 import { Empty, Panel } from "../../admin/console/charts";
-import { Drawer, Table, Tabs, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
+import { titleCase } from "../../admin/console/dashboardModel";
+import {
+  Drawer,
+  SearchBox,
+  Table,
+  Tabs,
+  errorText,
+  formatDate,
+  idColumn,
+  listOf,
+  send,
+  sourceIdColumn,
+  useResource,
+} from "../../customer-admin/shared";
+import { displayId, referenceId } from "../../../app/displayId";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
 import { Embedded, StatusBadge } from "./common";
+import { localDay } from "../workspaceModel";
+import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
+import { CaseScopePanel } from "./CaseScope";
+import { CaseIntelligencePanel } from "./CaseIntelligence";
+import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
+import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
+import { CaseDecisionPanel } from "./CaseDecision";
+import { ClosureCriteria } from "./AfterDecision";
+import { parseReviewsTab } from "../reviews";
+import { parseDecisionTab } from "../decisionTabs";
+import { closureAllowed, closureCheckPath, type ClosureCheck } from "../afterDecision";
+import { INTELLIGENCE_TAB, parseInvestigationsTab, type IntelligenceView } from "../intelligence";
+import {
+  CASE_PRIORITIES,
+  caseState,
+  caseStateLabel,
+  caseStatusText,
+  casePriorityLabel,
+  dayFromDueAt,
+  planningChange,
+  type StepDestination,
+} from "../caseWorkflow";
+import { priorityRank } from "../tasks";
 
-const TABS = ["All investigations", "Workspace", "Story", "CAPAs"] as const;
+const TABS = [
+  "All investigations",
+  "Workspace",
+  "Intelligence",
+  "Scope",
+  "Reviews",
+  "Decision Brief",
+  "Decision",
+  "Story",
+  "CAPAs",
+] as const;
 type Tab = (typeof TABS)[number];
 
-export function InvestigationsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "All investigations",
-  );
+export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const { work, open } = useWorkspace();
+  // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
+  const { tab, view: requestedView } = parseInvestigationsTab(requested);
+  const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
+  // "Reviews?review=<id>" opens the Reviews tab on that review (a review task, the dashboard).
+  const [requestedReview] = useState(() => parseReviewsTab(requested));
+  // "Decision?follow_up=<id>" or "Decision?assessment=<id>" opens the Decision tab on that follow-up or assessment.
+  const [requestedDecision] = useState(() => parseDecisionTab(requested));
+  // The case the review was requested with; another case chosen later does not reopen it.
+  const [reviewCase] = useState(() => work.investigationId);
   const canOpen = useCan("records.write");
-  const [starting, setStarting] = useState(false);
+  // A complaint or signal asked to open an investigation for it (see useOpenInvestigation): open the form, ticked.
+  const pending = work.openInvestigationRequest ?? null;
+  const [prefill, setPrefill] = useState<OpenInvestigationRequest | null>(() => (canOpen ? pending : null));
+  const [active, setActive] = useState<Tab>(() =>
+    prefill
+      ? "All investigations"
+      : (TABS as readonly string[]).includes(tab ?? "")
+        ? (tab as Tab)
+        : "All investigations",
+  );
+  const [starting, setStarting] = useState(() => prefill !== null);
+  useEffect(() => {
+    if (!pending) return;
+    work.clearOpenInvestigationRequest();
+    if (!canOpen || pending === prefill) return;
+    setPrefill(pending);
+    setActive("All investigations");
+    setStarting(true);
+  }, [pending]);
   const [managing, setManaging] = useState<any | null>(null);
   const all = useResource<any>("/api/v1/analytics/investigations");
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
@@ -26,124 +98,306 @@ export function InvestigationsSection({ tab }: { tab?: string }) {
       setActive("Workspace");
     }
   };
+  // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
+  const goToStep = (destination: StepDestination) => {
+    if (
+      destination.section === "Investigations" &&
+      (destination.tab === "Scope" ||
+        destination.tab === "Reviews" ||
+        destination.tab === "Decision Brief" ||
+        destination.tab === "Decision")
+    ) {
+      setActive(destination.tab);
+      return;
+    }
+    if (destination.section === "Investigations" && destination.tab === INTELLIGENCE_TAB) {
+      if (destination.view) setIntelView(destination.view);
+      setActive("Intelligence");
+      return;
+    }
+    if (destination.section === "Investigations" && destination.anchor) {
+      document.getElementById(destination.anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    open(destination.section, destination.tab);
+  };
   return (
     <>
-      <p className="ca-lede">
-        MDARIX organizes evidence and possible explanations. It never concludes a root cause for you.
-      </p>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections" />
-      {active === "All investigations" && canOpen && (
-        <div className="ca-action-row">
-          <button type="button" className="ac-primary" onClick={() => setStarting((value) => !value)}>
-            <FilePlus2 size={16} /> {starting ? "Close" : "Open an investigation"}
-          </button>
-        </div>
-      )}
-      {active === "All investigations" && starting && (
-        <OpenInvestigation
-          onOpened={(id) => {
-            setStarting(false);
-            all.reload();
-            work.refreshInvestigations(id);
-            setActive("Workspace");
-          }}
-        />
-      )}
-      {active === "All investigations" && (
-        <Panel eyebrow="Investigations" title="Investigations in your organization" state={all.state} error={all.error}>
-          <Table
-            caption="Investigations"
-            rows={listOf(all.data?.investigations)}
-            rowKey={(row) => String(row.id)}
-            empty={{
-              title: "No investigations yet",
-              detail: "Investigations opened in your organization appear here.",
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections">
+        {active === "All investigations" && canOpen && (
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-primary"
+              onClick={() => {
+                setStarting((value) => !value);
+                setPrefill(null);
+              }}
+            >
+              <FilePlus2 size={16} /> {starting ? "Close" : "Open an investigation"}
+            </button>
+          </div>
+        )}
+        {active === "All investigations" && starting && (
+          <OpenInvestigation
+            key={prefill?.complaint.id ?? "new"}
+            prefill={prefill}
+            onOpened={(id) => {
+              setStarting(false);
+              setPrefill(null);
+              all.reload();
+              work.refreshInvestigations(id);
+              setActive("Workspace");
             }}
-            columns={[
-              { key: "id", label: "Investigation", render: (row) => <strong>{row.investigation_identifier}</strong> },
-              { key: "question", label: "Question", render: (row) => row.investigation_question ?? "—" },
-              { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
-              ...(canOpen
-                ? [
-                    {
-                      key: "manage",
-                      label: "",
-                      render: (row: any) => (
-                        <button type="button" className="ac-link" onClick={() => setManaging(row)}>
-                          Manage
-                        </button>
-                      ),
-                    },
-                  ]
-                : []),
-              {
-                key: "open",
-                label: "",
-                render: (row) =>
-                  work.investigations.some((item) => String(item.id) === String(row.id)) ? (
-                    <button type="button" className="ac-link" onClick={() => openCase(String(row.id))}>
-                      Open workspace
-                    </button>
-                  ) : (
-                    <span className="ac-muted" title="Choose its product in the context bar to open it">
-                      Other product
-                    </span>
-                  ),
-              },
-            ]}
           />
-        </Panel>
-      )}
-      {managing && (
-        <ManageInvestigation
-          row={managing}
-          onClose={() => setManaging(null)}
-          onSaved={() => {
-            setManaging(null);
-            all.reload();
-            work.refreshInvestigations();
-          }}
-        />
-      )}
-      {active === "Workspace" &&
-        (work.investigationId ? (
-          <Embedded>
-            <InvestigationWorkspacePanel
+        )}
+        {active === "All investigations" && (
+          <Panel eyebrow="Investigations" title="Investigations in your organization" source={all}>
+            <Table
+              caption="Investigations"
+              rows={listOf(all.data?.investigations)}
+              rowKey={(row) => String(row.id)}
+              empty={{
+                title: "No investigations yet",
+                detail: "Investigations opened in your organization appear here.",
+              }}
+              columns={[
+                idColumn("Investigation ID", "investigation_identifier"),
+                sourceIdColumn("investigation_identifier"),
+                { key: "question", label: "Question", render: (row) => row.investigation_question ?? "—" },
+                {
+                  key: "status",
+                  label: "Status",
+                  fields: ["status", "workflow_state", "workflow_state_label"],
+                  sortValue: (row) => caseStatusText(row),
+                  render: (row) => <CaseStateBadge row={row} />,
+                },
+                {
+                  key: "priority",
+                  label: "Priority",
+                  sortValue: (row) => priorityRank(row.priority),
+                  render: (row) => <CasePriority priority={row.priority} />,
+                },
+                {
+                  key: "due_at",
+                  label: "Due",
+                  fields: ["due_at", "overdue"],
+                  sortValue: (row) => row.due_at ?? "",
+                  render: (row) => <CaseDue row={row} />,
+                },
+                ...(canOpen
+                  ? [
+                      {
+                        key: "manage",
+                        label: "",
+                        render: (row: any) => (
+                          <button type="button" className="ac-link" onClick={() => setManaging(row)}>
+                            Manage
+                          </button>
+                        ),
+                      },
+                    ]
+                  : []),
+                {
+                  key: "open",
+                  label: "",
+                  render: (row) =>
+                    work.investigations.some((item) => String(item.id) === String(row.id)) ? (
+                      <button type="button" className="ac-link" onClick={() => openCase(String(row.id))}>
+                        Open workspace
+                      </button>
+                    ) : (
+                      <span className="ac-muted" title="Choose its product in the context bar to open it">
+                        Other product
+                      </span>
+                    ),
+                },
+              ]}
+            />
+          </Panel>
+        )}
+        {managing && (
+          <ManageInvestigation
+            row={managing}
+            onClose={() => setManaging(null)}
+            onSaved={() => {
+              setManaging(null);
+              all.reload();
+              work.refreshInvestigations();
+            }}
+          />
+        )}
+        {active === "Workspace" &&
+          (work.investigationId ? (
+            <>
+              <CaseHeader
+                key={work.investigationId}
+                investigationId={work.investigationId}
+                row={selected}
+                onManage={canOpen && selected ? () => setManaging(selected) : undefined}
+                onStep={goToStep}
+                onChanged={() => {
+                  all.reload();
+                  work.refreshInvestigations();
+                }}
+              />
+              <Embedded>
+                <InvestigationWorkspacePanel
+                  investigationId={work.investigationId}
+                  temporalMode={work.mode}
+                  asOf={work.asOf}
+                  onOpenDecision={() => open("Decisions")}
+                  onOpenIntelligence={(view) => {
+                    setIntelView(view);
+                    setActive("Intelligence");
+                  }}
+                />
+              </Embedded>
+            </>
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Intelligence" &&
+          (work.investigationId ? (
+            <CaseIntelligencePanel
+              key={work.investigationId}
               investigationId={work.investigationId}
-              temporalMode={work.mode}
-              asOf={work.asOf}
-              onOpenDecision={() => open("Decisions")}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              view={intelView}
+              onView={setIntelView}
+              readOnly={caseIsClosed(selected)}
             />
-          </Embedded>
-        ) : (
-          <Panel title="No investigation selected">
-            <Empty
-              title="Choose an investigation"
-              detail="Pick one in the context bar above, or open one from the list."
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="Hypotheses, unknowns and failure chains belong to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Scope" &&
+          (work.investigationId ? (
+            <CaseScopePanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseQuestion={selected?.investigation_question ?? undefined}
             />
-          </Panel>
-        ))}
-      {active === "Story" &&
-        (work.investigationId ? (
-          <Embedded>
-            <Stage2Experience mode="story" investigationId={work.investigationId} />
-          </Embedded>
-        ) : (
-          <Panel title="No investigation selected">
-            <Empty
-              title="Choose an investigation"
-              detail="The story follows one investigation from signal to decision."
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The scope belongs to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Reviews" &&
+          (work.investigationId || requestedReview ? (
+            work.investigationId ? (
+              <CaseReviewsPanel
+                key={work.investigationId}
+                investigationId={work.investigationId}
+                caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+                initialReview={work.investigationId === reviewCase ? requestedReview : null}
+                readOnly={caseIsClosed(selected)}
+              />
+            ) : (
+              <ReviewOnly reviewId={requestedReview as string} />
+            )
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="Risk and regulatory reviews belong to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Decision Brief" &&
+          (work.investigationId ? (
+            <CaseDecisionBriefPanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              readOnly={caseIsClosed(selected)}
             />
-          </Panel>
-        ))}
-      {active === "CAPAs" && <Capas />}
-      {selected && active !== "All investigations" && active !== "CAPAs" && (
-        <p className="ac-note">
-          Showing {selected.investigation_identifier} · {selected.status}
-        </p>
-      )}
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The Decision Brief belongs to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Decision" &&
+          (work.investigationId ? (
+            <CaseDecisionPanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
+              initialFollowUp={work.investigationId === reviewCase ? requestedDecision.followUp : null}
+              initialAssessment={work.investigationId === reviewCase ? requestedDecision.assessment : null}
+              onCaseChanged={() => {
+                all.reload();
+                work.refreshInvestigations();
+              }}
+            />
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The decision belongs to one investigation. Pick one in the context bar above, or open one from the list."
+              />
+            </Panel>
+          ))}
+        {active === "Story" &&
+          (work.investigationId ? (
+            <Embedded>
+              <Stage2Experience mode="story" investigationId={work.investigationId} />
+            </Embedded>
+          ) : (
+            <Panel title="No investigation selected">
+              <Empty
+                title="Choose an investigation"
+                detail="The story follows one investigation from signal to decision."
+              />
+            </Panel>
+          ))}
+        {active === "CAPAs" && <Capas />}
+        {selected && active !== "All investigations" && active !== "CAPAs" && (
+          <p className="ac-note">
+            Showing {displayId(selected, "investigation_identifier")} · {caseStateLabel(selected) ?? selected.status}
+          </p>
+        )}
+      </Tabs>
     </>
   );
+}
+
+/** A review opened from a task or the dashboard before any case is chosen: the review alone, in its drawer. */
+function ReviewOnly({ reviewId }: { reviewId: string }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <>
+      <Panel title="No investigation selected">
+        <Empty
+          title="Choose an investigation"
+          detail="Pick the review's case in the context bar above to see all of its reviews."
+        />
+      </Panel>
+      {open && <ReviewDrawer reviewId={reviewId} onClose={() => setOpen(false)} onChanged={() => undefined} />}
+    </>
+  );
+}
+
+/** A closed or cancelled case: its intelligence is shown read-only (the server refuses changes with CASE_CLOSED). */
+function caseIsClosed(row: Record<string, unknown> | null | undefined): boolean {
+  const state = caseState(row);
+  if (state) return state === "CLOSED" || state === "CANCELLED";
+  return /^(closed|cancelled)$/i.test(String(row?.status ?? "").trim());
 }
 
 /** Corrective and preventive actions from the quality system, with the case they came from. */
@@ -151,34 +405,35 @@ function Capas() {
   const capas = useResource<any>("/api/v1/data-plane/capas");
   const cases = useResource<any>("/api/v1/data-plane/investigations?limit=500");
   const caseName = new Map(
-    listOf(cases.data?.records).map((row) => [String(row.id), String(row.investigation_identifier)] as const),
+    listOf(cases.data?.records).map((row) => [String(row.id), displayId(row, "investigation_identifier")] as const),
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   return (
-    <Panel eyebrow="Quality system" title="CAPAs" state={capas.state} error={capas.error}>
+    <Panel eyebrow="Quality system" title="CAPAs" source={capas}>
       <Table
         caption="CAPAs"
         rows={listOf(capas.data?.records)}
         rowKey={(row) => String(row.id)}
-        empty={{ title: "No CAPAs yet", detail: "CAPAs arrive from your quality system through its connection." }}
+        empty={{
+          title: "No CAPAs yet",
+          detail: "Corrective and preventive actions appear here once your quality system is connected or imported.",
+        }}
         columns={[
+          idColumn("CAPA ID", "capa_identifier"),
+          sourceIdColumn("capa_identifier"),
+          { key: "capa", label: "Title", fields: ["title"], render: (row) => <strong>{row.title ?? "—"}</strong> },
           {
-            key: "capa",
-            label: "CAPA",
-            fields: ["capa_identifier", "title"],
-            render: (row) => (
-              <span className="ca-person">
-                <strong>{row.capa_identifier}</strong>
-                <small>{row.title}</small>
-              </span>
-            ),
+            key: "type",
+            label: "Type",
+            fields: ["action_type"],
+            render: (row) => (row.action_type ? titleCase(String(row.action_type)) : "—"),
           },
-          { key: "type", label: "Type", fields: ["action_type"], render: (row) => row.action_type ?? "—" },
           {
             key: "case",
-            label: "From",
-            fields: ["investigation_id", "source_reference"],
-            render: (row) => caseName.get(String(row.investigation_id)) ?? row.source_reference ?? "—",
+            label: "From case",
+            fields: ["investigation_business_id", "source_reference"],
+            render: (row) =>
+              referenceId(row, "investigation", caseName.get(String(row.investigation_id)), row.source_reference),
           },
           { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
           {
@@ -186,7 +441,7 @@ function Capas() {
             label: "Due",
             fields: ["due_at"],
             render: (row) => {
-              const due = row.due_at ? String(row.due_at).slice(0, 10) : "";
+              const due = row.due_at ? localDay(new Date(String(row.due_at))) : "";
               const late = due && due < today && !/closed/i.test(String(row.status));
               return late ? (
                 <span className="uw-flag-critical">{formatDate(row.due_at)} · overdue</span>
@@ -201,14 +456,30 @@ function Capas() {
   );
 }
 
-/** Open a case for one of the organization's products: the question it must answer and the complaints behind it. */
-function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
+/**
+ * Open a case for one of the organization's products: the question it must answer and the complaints behind it.
+ * `prefill` (from a complaint or signal) starts with that complaint ticked and offered, even when the selected
+ * version's list does not hold it.
+ */
+function OpenInvestigation({
+  onOpened,
+  prefill = null,
+}: {
+  onOpened: (id: string) => void;
+  prefill?: OpenInvestigationRequest | null;
+}) {
   const { work, notify } = useWorkspace();
   const [question, setQuestion] = useState("");
-  const [chosen, setChosen] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string[]>(() => (prefill ? [prefill.complaint.id] : []));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const complaints = (work.view?.complaints ?? []) as Array<Record<string, string | null>>;
+  const [search, setSearch] = useState("");
+  const complaints = withRequestedComplaint(
+    (work.view?.complaints ?? []) as Array<Record<string, string | null>>,
+    // Only while the context is still on the complaint's product: a case links complaints of its own product only.
+    prefill && prefill.productId === work.productId ? prefill.complaint : null,
+  );
+  const found = matchingComplaints(complaints, search, chosen);
   const product = work.products.find((item) => item.id === work.productId);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -216,12 +487,16 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
     setBusy(true);
     setError("");
     try {
-      const made = await send<{ id: string; investigation_identifier: string }>("/api/v1/investigations", "POST", {
-        product_id: work.productId,
-        investigation_question: question.trim(),
-        complaint_ids: chosen,
-      });
-      notify(`Investigation ${made.investigation_identifier} opened and assigned to you.`);
+      const made = await send<{ id: string; business_id?: string | null; investigation_identifier: string }>(
+        "/api/v1/investigations",
+        "POST",
+        {
+          product_id: work.productId,
+          investigation_question: question.trim(),
+          complaint_ids: chosen,
+        },
+      );
+      notify(`Investigation ${displayId(made, "investigation_identifier")} opened and assigned to you.`);
       onOpened(made.id);
     } catch (reason) {
       setError(errorText(reason, "The investigation could not be opened."));
@@ -252,11 +527,21 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
           </label>
           <fieldset className="ca-fieldset">
             <legend>Complaints that prompted it (optional)</legend>
+            {complaints.length > 0 && (
+              <SearchBox value={search} onChange={setSearch} label="Search complaints by ID or description" />
+            )}
+            {complaints.length > 0 && (
+              <p className="ac-note" role="status">
+                {chosen.length} selected · showing {found.shown.length} of {found.total}{" "}
+                {found.total === 1 ? "complaint" : "complaints"}
+                {found.total > found.shown.length ? ". Search to find the others." : "."}
+              </p>
+            )}
             {complaints.length ? (
-              complaints.slice(0, 50).map((row) => {
+              found.shown.map((row) => {
                 const id = String(row.id ?? "");
                 return (
-                  <label className="ca-check" key={id || String(row.complaint_identifier)}>
+                  <label className="ca-check" key={id || displayId(row, "complaint_identifier")}>
                     <input
                       type="checkbox"
                       disabled={!id}
@@ -267,7 +552,9 @@ function OpenInvestigation({ onOpened }: { onOpened: (id: string) => void }) {
                         )
                       }
                     />
-                    {row.complaint_identifier ?? id} · {row.description ?? "No description"}
+                    {displayId(row, "complaint_identifier")}
+                    {row.business_id && row.complaint_identifier ? ` (source ${row.complaint_identifier})` : ""} ·{" "}
+                    {row.description ?? "No description"}
                   </label>
                 );
               })
@@ -296,8 +583,15 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
   const { notify } = useWorkspace();
   const people = useResource<Array<{ id: string; display_name: string }>>("/api/v1/investigation-assignees");
   const closed = String(row.status ?? "").toLowerCase() === "closed";
+  // What must be in place before the case can be closed (a signed decision's follow-ups, impact assessments…).
+  const closure = useResource<ClosureCheck>(closed ? null : closureCheckPath(String(row.id)));
+  const closureCheck = closure.state === "ready" ? closure.data : null;
+  const canClose = closureAllowed(closureCheck);
   const [question, setQuestion] = useState(String(row.investigation_question ?? ""));
   const [assignee, setAssignee] = useState("");
+  const [priority, setPriority] = useState(String(row.priority ?? ""));
+  const [dueDay, setDueDay] = useState(() => dayFromDueAt(row.due_at));
+  const planning = planningChange(row, { priority, dueDay });
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -310,17 +604,30 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
       notify(done);
       onSaved();
     } catch (failure) {
-      setError(errorText(failure, "The change was not saved."));
+      if (failure instanceof ApiError && failure.code === "CLOSURE_CRITERIA_NOT_MET") {
+        setError(`${failure.message} The criteria above show what still blocks closing.`);
+        closure.reload();
+      } else setError(errorText(failure, "The change was not saved."));
     } finally {
       setBusy(false);
     }
   };
-  const reasonReady = reason.trim().length >= 10;
+  const reasonReady = reason.trim().length >= REASON_MIN;
+  const label = displayId(row, "investigation_identifier");
   return (
-    <Drawer title={`Manage ${row.investigation_identifier}`} onClose={onClose}>
+    <Drawer title={`Manage ${label}`} onClose={onClose}>
       <label className="ca-field">
         Reason for the change (kept in the audit trail)
-        <textarea rows={2} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} />
+        <textarea
+          rows={2}
+          maxLength={1000}
+          value={reason}
+          aria-describedby="manage-reason-hint"
+          onChange={(event) => setReason(event.target.value)}
+        />
+        <small id="manage-reason-hint" className={reasonReady ? "ac-muted" : "uw-hint"}>
+          {reasonHint(reason)}
+        </small>
       </label>
       {closed ? (
         <div className="ca-action-row">
@@ -328,7 +635,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
             type="button"
             className="ac-primary"
             disabled={!reasonReady || busy}
-            onClick={() => void save({ status: "open" }, `${row.investigation_identifier} reopened.`)}
+            onClick={() => void save({ status: "open" }, `${label} reopened.`)}
           >
             Reopen investigation
           </button>
@@ -373,7 +680,7 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               type="button"
               className="ac-secondary"
               disabled={!reasonReady || busy || !assignee}
-              onClick={() => void save({ assignee_id: assignee }, `${row.investigation_identifier} assigned.`)}
+              onClick={() => void save({ assignee_id: assignee }, `${label} assigned.`)}
             >
               Assign
             </button>
@@ -381,20 +688,49 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
               type="button"
               className="ac-secondary"
               disabled={!reasonReady || busy}
-              onClick={() => void save({ unassign: true }, `${row.investigation_identifier} has no owner now.`)}
+              onClick={() => void save({ unassign: true }, `${label} has no owner now.`)}
             >
               Remove owner
             </button>
           </div>
+          <div className="ca-form-grid">
+            <label className="ca-field">
+              Priority
+              <select value={priority} onChange={(event) => setPriority(event.target.value)}>
+                {!row.priority && <option value="">Not set</option>}
+                {CASE_PRIORITIES.map((item) => (
+                  <option key={item} value={item}>
+                    {casePriorityLabel(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ca-field">
+              Due date
+              <input type="date" value={dueDay} onChange={(event) => setDueDay(event.target.value)} />
+            </label>
+          </div>
+          <div className="ca-action-row">
+            <button
+              type="button"
+              className="ac-secondary"
+              disabled={!reasonReady || busy || !planning}
+              onClick={() => planning && void save(planning, "Priority and due date updated.")}
+            >
+              Save priority and due date
+            </button>
+          </div>
+          <ClosureCriteria check={closureCheck} state={closure.state} />
           <div className="ca-action-row">
             <button
               type="button"
               className="ac-primary"
-              disabled={!reasonReady || busy}
-              onClick={() => void save({ status: "closed" }, `${row.investigation_identifier} closed.`)}
+              disabled={!reasonReady || busy || !canClose}
+              onClick={() => void save({ status: "closed" }, `${label} closed.`)}
             >
               Close investigation
             </button>
+            {!canClose && <span className="uw-hint">Closing is blocked until the criteria above pass.</span>}
           </div>
           <p className="ac-muted">A case with a decision still awaiting its human review cannot be closed.</p>
         </>
@@ -406,4 +742,54 @@ function ManageInvestigation({ row, onClose, onSaved }: { row: any; onClose: () 
       )}
     </Drawer>
   );
+}
+
+// The server refuses a change to a case without a reason of at least this many characters (kept in the audit trail).
+const REASON_MIN = 10;
+
+/** Why the change buttons are not available yet, or that they are. */
+export function reasonHint(reason: string): string {
+  const missing = REASON_MIN - reason.trim().length;
+  return missing > 0
+    ? `Write a reason of at least ${REASON_MIN} characters to enable the changes below (${missing} more).`
+    : "The reason is recorded with the change.";
+}
+
+const COMPLAINT_PAGE = 50;
+
+/**
+ * The complaints the open-investigation form offers, with the one an investigation was requested for (from the
+ * complaint list or a signal) first when the selected version's list does not already hold it.
+ */
+export function withRequestedComplaint(
+  complaints: Array<Record<string, string | null>>,
+  requested: OpenInvestigationRequest["complaint"] | null | undefined,
+): Array<Record<string, string | null>> {
+  if (!requested?.id || complaints.some((row) => String(row.id ?? "") === requested.id)) return complaints;
+  return [{ ...requested }, ...complaints];
+}
+
+/**
+ * The complaints offered in the open-investigation form: those matching the search (MDARIX ID, source number or
+ * description),
+ * at most 50 at a time, with the ones already ticked always kept in view.
+ */
+export function matchingComplaints(
+  complaints: Array<Record<string, string | null>>,
+  search: string,
+  chosen: string[],
+): { shown: Array<Record<string, string | null>>; total: number } {
+  const query = search.trim().toLowerCase();
+  const matches = query
+    ? complaints.filter((row) =>
+        [row.business_id, row.complaint_identifier, row.description].some((value) =>
+          String(value ?? "")
+            .toLowerCase()
+            .includes(query),
+        ),
+      )
+    : complaints;
+  const page = matches.slice(0, COMPLAINT_PAGE);
+  const ticked = complaints.filter((row) => chosen.includes(String(row.id ?? "")) && !page.includes(row));
+  return { shown: [...ticked, ...page], total: matches.length };
 }

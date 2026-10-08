@@ -1,11 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { AREA_SECTIONS, LEGACY_SECTIONS, parseThresholds, previewTemplate, templateVariables } from "./sections";
+import {
+  AREA_SECTIONS,
+  DATA_AND_INTEGRATIONS,
+  DATA_INTEGRATION_GUIDE,
+  DATA_INTEGRATION_SECTIONS,
+  DATA_INTEGRATION_STAGES,
+  DOMAIN_ALIASES,
+  LEGACY_SECTIONS,
+  dataIntegrationStep,
+  parseThresholds,
+  previewTemplate,
+  templateVariables,
+} from "./sections";
 
 describe("platform administrator areas", () => {
-  it("keeps each area short: 29 sections instead of 80", () => {
-    const counts = Object.values(AREA_SECTIONS).map((sections) => sections.length);
-    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(29);
-    expect(Math.max(...counts)).toBeLessThanOrEqual(5);
+  it("keeps each area short: 32 sections instead of 80, a guided sequence only where setup is one", () => {
+    const counts = Object.entries(AREA_SECTIONS).map(([area, sections]) => [area, sections.length] as const);
+    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(32);
+    for (const [area, count] of counts) if (area !== DATA_AND_INTEGRATIONS) expect(count).toBeLessThanOrEqual(6);
+  });
+
+  it("lays out Data & Integrations as stages that cover every step once, in order, each explained", () => {
+    expect(DATA_INTEGRATION_STAGES.flatMap((stage) => [...stage.sections])).toEqual([...DATA_INTEGRATION_SECTIONS]);
+    for (const section of DATA_INTEGRATION_SECTIONS) expect(DATA_INTEGRATION_GUIDE[section]).toBeTruthy();
+    expect(dataIntegrationStep("Data model")).toEqual({ number: 1, total: 10, stage: "Define" });
+    expect(dataIntegrationStep("Reconciliation")).toEqual({ number: 10, total: 10, stage: "Run" });
+    expect(dataIntegrationStep("Plans")).toBeNull();
+  });
+
+  it("sends the former Data & Configuration and Integrations areas to Data & Integrations", () => {
+    expect(DOMAIN_ALIASES["Data & Configuration"]).toBe(DATA_AND_INTEGRATIONS);
+    expect(DOMAIN_ALIASES.Integrations).toBe(DATA_AND_INTEGRATIONS);
+    expect(LEGACY_SECTIONS["API & schemas"]).toBe("Source schemas");
   });
 
   it("sends every old section name to a section that exists", () => {

@@ -103,3 +103,89 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Moving and resizing columns (useColumnControls.tsx). A heading can be dragged onto another; its right edge resizes. */
+.ac-table th[data-col] {
+  position: relative;
+}
+.ac-table th.col-movable {
+  cursor: grab;
+}
+.ac-table th.col-dragging {
+  opacity: 0.55;
+}
+/* Where the dragged column will land: a light teal bar on the heading's left or right side. */
+.ac-table th.col-drop-before {
+  box-shadow: inset 3px 0 0 #73d6cb;
+}
+.ac-table th.col-drop-after {
+  box-shadow: inset -3px 0 0 #73d6cb;
+}
+.col-grip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 9px;
+  cursor: col-resize;
+  touch-action: none;
+}
+.col-grip::after {
+  content: "";
+  position: absolute;
+  top: 25%;
+  bottom: 25%;
+  right: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: rgb(255 255 255 / 28%);
+}
+.col-grip:hover::after,
+.col-grip:focus-visible::after {
+  top: 10%;
+  bottom: 10%;
+  background: #73d6cb;
+}
+.col-grip:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+}
+/* After a resize every column keeps the width set for it; long text wraps inside its column. */
+.ac-table.col-fixed {
+  table-layout: fixed;
+}
+.ac-table.col-fixed th,
+.ac-table.col-fixed td {
+  overflow-wrap: anywhere;
+}
+/* Numeric columns normally keep their text on one line; with fixed widths a narrow numeric heading or value wraps
+   instead of running under the next column. */
+.ac-table.col-fixed .num {
+  white-space: normal;
+}
+.ac-table.col-fixed .table-sort {
+  max-width: 100%;
+}
+.ac-table.col-fixed .table-sort > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A heading the server cannot sort by (a list sorted across all its pages): plain text, no sort arrow. */
+.table-sort-static {
+  display: inline-block;
+  padding: 2px 0;
+}
+/* Pages of a table that pages its own rows (all sorted first). */
+.tc-pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--ac-ink-2, #33434f);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}

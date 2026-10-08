@@ -128,7 +128,7 @@ def test_a_signed_in_user_files_a_report_which_is_stored_audited_and_queued(repo
     response = reports["client_a"].post(BASE, json=body, headers={"User-Agent": "TestBrowser/1.0"})
     assert response.status_code == 201
     created = response.json()
-    assert set(created) == {"id", "created_at"}
+    assert set(created) == {"id", "business_id", "created_at"}
     reports["id_a"] = created["id"]
     row = _report(created["id"])
     assert row.tenant_id == reports["tenant_a"].id and row.user_id == reports["user_a"]
@@ -154,8 +154,9 @@ def test_the_support_team_is_emailed_with_summary_organization_user_path_and_req
     monkeypatch.setattr(
         emailer,
         "_send_email",
-        lambda to, subject, text, html=None, reply_to=None: sent.append({"to": to, "subject": subject, "text": text})
-        or "SENT",
+        lambda to, subject, text, html=None, reply_to=None: (
+            sent.append({"to": to, "subject": subject, "text": text}) or "SENT"
+        ),
     )
     with SessionLocal() as db:
         bind_system(db, "test: deliver the report")
@@ -227,3 +228,46 @@ def test_customer_administrators_cannot_see_or_close_reports_of_the_platform(rep
     assert customer_admin.get(ADMIN).status_code == 403
     response = customer_admin.post(f"{ADMIN}/{reports['id_b']}/close", json={"resolution": "not yours"})
     assert response.status_code == 403 and _report(reports["id_b"]).status == "OPEN"
+
+
+@pytest.fixture
+def extra_reports():
+    """Ids of reports a test files beyond the module's two; deleted afterwards."""
+    ids = []
+    yield ids
+    with SessionLocal() as db:
+        bind_system(db, "test cleanup")
+        made = [uuid.UUID(value) for value in ids]
+        db.query(OutboxEvent).filter(OutboxEvent.aggregate_id.in_(made)).delete(synchronize_session=False)
+        db.query(SupportProblemReport).filter(SupportProblemReport.id.in_(made)).delete(synchronize_session=False)
+        db.commit()
+
+
+def test_lengths_are_capped(reports, extra_reports):
+    client = reports["client_a"]
+    assert client.post(BASE, json={"summary": "s", "details": "d" * 5001}).status_code == 422
+    assert client.post(BASE, json={"summary": "s", "details": "d", "path": "/" + "p" * 512}).status_code == 422
+    assert client.post(BASE, json={"summary": "s", "details": "d", "request_id": "r" * 129}).status_code == 422
+    largest = {
+        "summary": "S" * 200,
+        "details": "D" * 5000,
+        "path": "/" + "p" * 511,
+        "request_id": "r" * 100,  # a plain id longer than the column: dropped, not cut
+    }
+    # 512: the audit record keeps the same user agent, and its column holds 512 (enterprise_audit caps nothing).
+    response = client.post(BASE, json=largest, headers={"User-Agent": "u" * 512})
+    assert response.status_code == 201, response.text
+    extra_reports.append(response.json()["id"])
+    row = _report(response.json()["id"])
+    assert len(row.summary) == 200 and len(row.details) == 5000 and len(row.path) == 512
+    assert len(row.user_agent) == 512 and row.request_id is None
+
+
+def test_nul_characters_are_dropped_instead_of_failing_the_report(reports, extra_reports):
+    response = reports["client_a"].post(
+        BASE, json={"summary": "Broken\u0000 page", "details": "Pasted\u0000 error", "path": "/app/\u0000x"}
+    )
+    assert response.status_code == 201, response.text
+    extra_reports.append(response.json()["id"])
+    row = _report(response.json()["id"])
+    assert row.summary == "Broken page" and row.details == "Pasted error" and row.path == "/app/x"

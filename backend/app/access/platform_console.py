@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import func, or_, text
+from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from auth.emailer import smtp_configuration_status
@@ -21,6 +21,7 @@ from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
 from backend.app.access.schemas import QueueItemsAction
 from backend.app.access.trends import daily as _daily, per_day as _per_day, run_outcome, window
+from backend.app.business_ids import wanted_ids
 from backend.app.db.models.customer_lifecycle import Customer, ProvisioningJob, SupportAccessGrant
 from backend.app.db.models.enterprise import ConnectorRun
 from backend.app.db.models.foundation import (
@@ -34,6 +35,7 @@ from backend.app.db.models.foundation import (
 from backend.app.db.models.stage2 import EmailTemplate, OutboxEvent, ReminderPolicy, SubscriptionLifecycle
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
+from backend.app.sorting import order_query
 from backend.app.worker_status import worker_status
 
 router = APIRouter(prefix="/api/v1", tags=["Platform console"])
@@ -53,17 +55,35 @@ RLS_EXCLUDED_TABLES = [
 
 
 def _tenant_names(db: Session, tenant_ids) -> dict:
-    """Tenant id -> {tenant_key, tenant_name, customer_name} for the given tenants, in one query."""
+    """Tenant id -> {tenant_key, tenant_name, customer_name and both business identifiers} for the given tenants,
+    in one query."""
     ids = {tenant_id for tenant_id in tenant_ids if tenant_id}
     if not ids:
         return {}
     rows = (
-        db.query(Tenant.id, Tenant.tenant_key, Tenant.display_name, Tenant.name, Customer.display_name)
+        db.query(
+            Tenant.id,
+            Tenant.tenant_key,
+            Tenant.display_name,
+            Tenant.name,
+            Customer.display_name,
+            Tenant.business_id,
+            Customer.business_id,
+        )
         .outerjoin(Customer, Customer.id == Tenant.customer_id)
         .filter(Tenant.id.in_(ids))
         .all()
     )
-    return {row[0]: {"tenant_key": row[1], "tenant_name": row[2] or row[3], "customer_name": row[4]} for row in rows}
+    return {
+        row[0]: {
+            "tenant_key": row[1],
+            "tenant_name": row[2] or row[3],
+            "customer_name": row[4],
+            "tenant_business_id": row[5],
+            "customer_business_id": row[6],
+        }
+        for row in rows
+    }
 
 
 def _with_tenant(item: dict, names: dict, tenant_id) -> dict:
@@ -71,9 +91,11 @@ def _with_tenant(item: dict, names: dict, tenant_id) -> dict:
     return {
         **item,
         "tenant_id": str(tenant_id) if tenant_id else None,
+        "tenant_business_id": found.get("tenant_business_id"),
         "tenant_key": found.get("tenant_key"),
         "tenant_name": found.get("tenant_name"),
         "customer_name": found.get("customer_name"),
+        "customer_business_id": found.get("customer_business_id"),
     }
 
 
@@ -83,6 +105,16 @@ def _iso(value) -> str | None:
 
 def _page(page: int, page_size: int) -> tuple[int, int]:
     return max(1, page), min(100, max(1, page_size))
+
+
+def _tenant_name_of(model):
+    """The name a list shows for the tenant of each ``model`` row, as a sortable SQL expression."""
+    return (
+        select(func.coalesce(Tenant.display_name, Tenant.name))
+        .where(Tenant.id == model.tenant_id)
+        .correlate(model)
+        .scalar_subquery()
+    )
 
 
 # Plans & Licensing ---------------------------------------------------------------------------------------------
@@ -109,6 +141,7 @@ def subscription_renewals(request: Request, db: Session = Depends(get_db)):
             _with_tenant(
                 {
                     "subscription_id": str(row.id),
+                    "subscription_business_id": row.business_id,
                     "plan_name": plans.get(row.plan_id),
                     "status": row.status,
                     "starts_at": _iso(row.starts_at),
@@ -184,11 +217,14 @@ def integration_runs(
     reconciled: bool = False,
     page: int = 1,
     page_size: int = 25,
+    sort: str = "",
+    order: str = "",
     db: Session = Depends(get_db),
 ):
     """Connector runs across every tenant, newest first, with a 30-day summary by outcome.
 
-    ``reconciled`` keeps only runs that were reconciled against their source (any result).
+    ``reconciled`` keeps only runs that were reconciled against their source (any result). ``sort``/``order`` order
+    every page by a column instead (backend/app/sorting.py).
     """
     _require_platform_admin(request, db)
     page, page_size = _page(page, page_size)
@@ -214,7 +250,38 @@ def integration_runs(
             or_(func.lower(ConnectorRun.source_system).like(like), func.lower(ConnectorRun.connection_id).like(like))
         )
     total = query.count()
-    rows = query.order_by(ConnectorRun.started_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "when": [ConnectorRun.started_at],
+            "started_at": [ConnectorRun.started_at],
+            "completed_at": [ConnectorRun.completed_at],
+            "tenant": [_tenant_name_of(ConnectorRun)],
+            "tenant_name": [_tenant_name_of(ConnectorRun)],
+            "source": [ConnectorRun.source_system, ConnectorRun.connection_id],
+            "source_system": [ConnectorRun.source_system],
+            "connection_id": [ConnectorRun.connection_id],
+            "run_type": [ConnectorRun.run_type],
+            "records": [ConnectorRun.records_received],
+            "records_received": [ConnectorRun.records_received],
+            "records_accepted": [ConnectorRun.records_accepted],
+            "records_rejected": [ConnectorRun.records_rejected],
+            "records_quarantined": [ConnectorRun.records_quarantined],
+            "records_duplicate": [ConnectorRun.records_duplicate],
+            "retry_attempt": [ConnectorRun.retry_attempt],
+            "status": [ConnectorRun.status],
+            "reconciliation": [ConnectorRun.reconciliation_status],
+            "reconciliation_status": [ConnectorRun.reconciliation_status],
+            "schema_drift_status": [ConnectorRun.schema_drift_status],
+            "failure_category": [ConnectorRun.failure_category],
+            "problem": [ConnectorRun.failure_category, ConnectorRun.schema_drift_status, ConnectorRun.records_rejected],
+        },
+        default=[ConnectorRun.started_at.desc()],
+        tiebreak=[ConnectorRun.id],
+    )
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
     names = _tenant_names(db, [row.tenant_id for row in rows])
     since = datetime.now(timezone.utc) - timedelta(days=30)
     summary = dict(
@@ -324,6 +391,7 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
             _with_tenant(
                 {
                     "id": str(row.id),
+                    "business_id": row.business_id,
                     "at": _iso(row.execution_timestamp),
                     "provider": row.provider,
                     "model": row.model_name,
@@ -346,17 +414,15 @@ def ai_activity(request: Request, days: int = 30, db: Session = Depends(get_db))
 
 
 def _actor_names(db: Session, refs) -> dict:
-    ids = set()
-    for ref in refs:
-        try:
-            ids.add(uuid.UUID(str(ref)))
-        except (TypeError, ValueError):
-            continue
+    """User id -> {name, business_id} for the references that are user ids, in one query."""
+    ids = wanted_ids(refs)
     if not ids:
         return {}
     return {
-        str(row[0]): row[1] or row[2]
-        for row in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username).filter(AuthUser.id.in_(ids))
+        str(row[0]): {"name": row[1] or row[2], "business_id": row[3]}
+        for row in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username, AuthUser.business_id).filter(
+            AuthUser.id.in_(ids)
+        )
     }
 
 
@@ -368,9 +434,12 @@ def platform_audit(
     attention: bool = False,
     page: int = 1,
     page_size: int = 50,
+    sort: str = "",
+    order: str = "",
     db: Session = Depends(get_db),
 ):
-    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values)."""
+    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values).
+    ``sort``/``order`` order every page by a column instead (backend/app/sorting.py)."""
     _require_platform_admin(request, db)
     page, page_size = _page(page, page_size)
     query = db.query(AuditEvent)
@@ -391,12 +460,42 @@ def platform_audit(
             or_(func.lower(AuditEvent.action).like(like), func.lower(AuditEvent.entity_type).like(like))
         )
     total = query.count()
-    rows = query.order_by(AuditEvent.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    actor_name = func.coalesce(
+        select(func.coalesce(AuthUser.display_name, AuthUser.username))
+        .where(cast(AuthUser.id, String) == AuditEvent.actor_ref)
+        .correlate(AuditEvent)
+        .scalar_subquery(),
+        AuditEvent.actor_ref,
+    )
+    reason = func.coalesce(AuditEvent.reason, AuditEvent.details["reason"].astext)
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "when": [AuditEvent.created_at],
+            "at": [AuditEvent.created_at],
+            "tenant": [_tenant_name_of(AuditEvent)],
+            "tenant_name": [_tenant_name_of(AuditEvent)],
+            "who": [actor_name],
+            "actor": [actor_name],
+            "what": [AuditEvent.action, AuditEvent.entity_type],
+            "action": [AuditEvent.action],
+            "entity_type": [AuditEvent.entity_type],
+            "why": [reason],
+            "reason": [reason],
+            "source_ip": [AuditEvent.source_ip],
+        },
+        default=[AuditEvent.created_at.desc()],
+        tiebreak=[AuditEvent.id],
+    )
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
     names = _tenant_names(db, [row.tenant_id for row in rows])
     actors = _actor_names(db, [row.actor_ref for row in rows])
     items = []
     for row in rows:
         details = row.details if isinstance(row.details, dict) else {}
+        actor = actors.get(str(row.actor_ref), {})
         items.append(
             _with_tenant(
                 {
@@ -404,7 +503,8 @@ def platform_audit(
                     "at": _iso(row.created_at),
                     "action": row.action,
                     "entity_type": row.entity_type,
-                    "actor": actors.get(str(row.actor_ref)) or (row.actor_ref if row.actor_ref else None),
+                    "actor": actor.get("name") or (row.actor_ref if row.actor_ref else None),
+                    "actor_business_id": actor.get("business_id"),
                     "reason": row.reason or details.get("reason"),
                     "source": details.get("source"),
                     "source_ip": row.source_ip,
@@ -495,18 +595,22 @@ def support_access_overview(request: Request, db: Session = Depends(get_db)):
     for row in rows:
         status = (row.status or "").upper()
         expired = bool(row.expires_at and row.expires_at <= now)
+        person = people.get(str(row.platform_user_id), {})
+        approver = people.get(str(row.approved_by), {}) if row.approved_by else {}
         items.append(
             _with_tenant(
                 {
                     "id": str(row.id),
-                    "person": people.get(str(row.platform_user_id)),
+                    "person": person.get("name"),
                     "platform_user_id": str(row.platform_user_id),
+                    "platform_user_business_id": person.get("business_id"),
                     "scope": row.scope or {},
                     "reason": row.reason,
                     "status": "EXPIRED" if expired and status in {"PENDING", "ACTIVE", "APPROVED"} else status,
                     "starts_at": _iso(row.starts_at),
                     "expires_at": _iso(row.expires_at),
-                    "approved_by": people.get(str(row.approved_by)) if row.approved_by else None,
+                    "approved_by": approver.get("name"),
+                    "approved_by_business_id": approver.get("business_id"),
                     "can_approve": status == "PENDING" and not expired,
                     "can_revoke": status in {"PENDING", "ACTIVE", "APPROVED"} and not expired,
                 },
@@ -584,8 +688,12 @@ def operations_overview(request: Request, db: Session = Depends(get_db)):
             "present": smtp.get("present", {}),
             "sender_domain_verified": bool(smtp.get("sender_domain_verified")),
             "reminders_pending": pending.filter(OutboxEvent.event_name == "SUBSCRIPTION_REMINDER").count(),
-            # Nothing consumes queued subscription reminders yet, so none are delivered.
-            "reminder_delivery": "NOT_CONNECTED",
+            "reminders_dead_lettered": outbox.filter(
+                OutboxEvent.event_name == "SUBSCRIPTION_REMINDER", OutboxEvent.dead_lettered_at.is_not(None)
+            ).count(),
+            # The outbox worker emails queued reminders (backend/app/notifications.py); without SMTP it acknowledges
+            # them without sending, so delivery is only CONNECTED when email is configured.
+            "reminder_delivery": "CONNECTED" if smtp.get("configured") else "EMAIL_NOT_CONFIGURED",
         },
     }
 

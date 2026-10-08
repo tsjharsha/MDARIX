@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import {
@@ -15,14 +15,19 @@ import {
   Radio,
   Rocket,
   Search,
+  Settings2,
   ShieldCheck,
+  Upload,
   UserRound,
   X,
 } from "lucide-react";
 import "../admin/console/admin-console.css";
 import "../customer-admin/customer-admin.css";
 import "./workspace.css";
-import { signOut, useIdleSignOut } from "../shared/session";
+import { signOut } from "../shared/session";
+import { useFocusOnChange } from "../shared/focus";
+import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import {
   TRIAL_ONLY_SECTIONS,
   WORKSPACE_SECTIONS,
@@ -47,21 +52,101 @@ import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
+import { ImportDataSection } from "./sections/ImportData";
 import { requestJson } from "../../app/apiClient";
+import { rolesSummary } from "../../app/roles";
+import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
+import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
 
-const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; context: boolean }> = {
-  "Getting started": { icon: Rocket, description: "Your free trial, step by step", context: false },
-  Dashboard: { icon: LayoutDashboard, description: "Live quality status", context: false },
-  "My Work": { icon: Briefcase, description: "Assignments and reviews", context: true },
-  Products: { icon: Package, description: "Product 360 and versions", context: true },
-  Signals: { icon: Radio, description: "Complaints and trends", context: true },
-  Investigations: { icon: FileSearch, description: "Cases and workspace", context: true },
-  Evidence: { icon: Search, description: "Library and provenance", context: true },
-  Decisions: { icon: Gavel, description: "Review, sign and verify", context: true },
-  Intelligence: { icon: Bot, description: "Ask, regulatory, risk", context: true },
-  "Trust & Audit": { icon: ShieldCheck, description: "AI assurance and records", context: true },
-  "My Account": { icon: UserRound, description: "Profile, security, access", context: false },
-  "Share feedback": { icon: MessageSquareText, description: "Tell us about your trial", context: false },
+/**
+ * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
+ * under the page heading (what you do here, in plain words).
+ */
+const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; guide: string; context: boolean }> = {
+  "Getting started": {
+    icon: Rocket,
+    description: "Your free trial, step by step",
+    guide: "Set up your trial one step at a time: add your data, invite your team and try a first investigation.",
+    context: false,
+  },
+  Dashboard: {
+    icon: LayoutDashboard,
+    description: "Today's quality status",
+    guide: "What needs attention today across your products, signals, investigations and decisions.",
+    context: false,
+  },
+  "My Work": {
+    icon: Briefcase,
+    description: "Your tasks and reviews",
+    guide: "Everything waiting for you: tasks assigned to you, work your roles can pick up, and evidence requests.",
+    context: true,
+  },
+  Products: {
+    icon: Package,
+    description: "Products, versions and lots",
+    guide: "One view of the selected product version: its parts, lots, suppliers, complaints and known data gaps.",
+    context: true,
+  },
+  Signals: {
+    icon: Radio,
+    description: "Triage complaints and trends",
+    guide:
+      "Review new signals, decide what each needs and follow complaint trends. Signals are recorded observations, not conclusions about cause.",
+    context: true,
+  },
+  Investigations: {
+    icon: FileSearch,
+    description: "Open and work your cases",
+    guide:
+      "Open a case and work through it step by step. MDARIX organizes evidence and possible explanations; it never concludes a root cause for you.",
+    context: true,
+  },
+  Evidence: {
+    icon: Search,
+    description: "Case evidence and sources",
+    guide:
+      "The evidence behind each case and where every record came from. Supporting, contradicting and missing evidence stay visible side by side.",
+    context: true,
+  },
+  Decisions: {
+    icon: Gavel,
+    description: "Approve, sign and verify",
+    guide:
+      "Review decision briefs, record and sign decisions, and verify signatures. Only people with approval authority can sign, and each signature is recorded with the exact content approved.",
+    context: true,
+  },
+  Intelligence: {
+    icon: Bot,
+    description: "Ask questions, regulatory, risk",
+    guide:
+      "Ask questions about your records and check regulatory and risk links. AI answers show their sources and limits and never make the decision for you.",
+    context: true,
+  },
+  "Trust & Audit": {
+    icon: ShieldCheck,
+    description: "Audit trail and AI checks",
+    guide: "The permanent record of who did what and when, and how the AI assistants are checked and limited.",
+    context: true,
+  },
+  "Import data": {
+    icon: Upload,
+    description: "Bring in CSV files",
+    guide:
+      "Bring records from your quality, product and supplier systems in as CSV files. Each file is checked in full and nothing is saved unless every row passes.",
+    context: false,
+  },
+  "My Account": {
+    icon: UserRound,
+    description: "Profile, security, access",
+    guide: "Your profile, sign-in security and the roles you hold in this organization.",
+    context: false,
+  },
+  "Share feedback": {
+    icon: MessageSquareText,
+    description: "Tell us what to improve",
+    guide: "Tell us what works and what to improve.",
+    context: false,
+  },
 };
 
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
@@ -83,9 +168,25 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   "signature-verification": ["Decisions", "Verify a signature"],
 };
 
-export function UserWorkspace({ session, initialView }: { session: SessionContext | null; initialView?: string }) {
-  const work = useWorkContext();
-  const [start] = useState(() => VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"]);
+export function UserWorkspace({
+  session,
+  initialView,
+  onAdminConsole,
+}: {
+  session: SessionContext | null;
+  initialView?: string;
+  /** A customer administrator working here returns to their console (App.tsx). */
+  onAdminConsole?: () => void;
+}) {
+  // A link to a case (/app/investigations?case=INV000147) opens that case, on its product, in the view's section.
+  const [caseLink] = useState(() => caseFromSearch(window.location.search));
+  // A link to a signal (/app/signals?signal=SIG000023) opens that signal in Signals (the case link wins over it).
+  const [signalLink] = useState(() => (caseLink ? null : signalFromSearch(window.location.search)));
+  const work = useWorkContext(caseLink);
+  const [start] = useState(() => {
+    const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
+    return caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
+  });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
     tab: start[1],
@@ -94,7 +195,9 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
-  useIdleSignOut();
+  const idle = useIdleSignOut();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useFocusOnChange(heading, location.key);
 
   useEffect(() => {
     requestJson<TrialStatus>("/api/v1/trial/status")
@@ -106,9 +209,10 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     () =>
       WORKSPACE_SECTIONS.filter(
         (section) =>
-          (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) && sectionAllowed(section, session?.allowed_menu),
+          (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
+          sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
       ),
-    [session?.allowed_menu, trial?.is_trial],
+    [session?.allowed_menu, session?.business_permissions, trial?.is_trial],
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
@@ -120,6 +224,27 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
     [setLocation],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+
+  // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
+  // that could not be opened is said so.
+  const caseLinkState = work.caseLink?.state;
+  useEffect(() => {
+    if (!caseLink || !caseLinkState || caseLinkState === "resolving") return;
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    if (caseLinkState === "not-found")
+      notify(`${caseLink} was not found in your organization, or your role cannot open it.`, "critical");
+    else if (caseLinkState === "failed")
+      notify(`${caseLink} could not be opened right now. Choose it in the context bar above.`, "critical");
+  }, [caseLinkState]);
+
+  // The signal link has been taken into the start screen: it leaves the address, so a reload starts on the inbox.
+  // Signals itself says when the signal cannot be found.
+  useEffect(() => {
+    if (!signalLink) return;
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutSignal(search)}${hash}`);
+  }, [signalLink]);
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {
@@ -158,15 +283,36 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             <span>{tenantName}</span>
           </div>
           {trial?.is_trial && (
-            <button type="button" className="uw-trial-badge" onClick={() => open("Getting started")}>
-              Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+            <button
+              type="button"
+              className="uw-trial-badge"
+              onClick={() => open("Getting started")}
+              aria-label={`Free trial, ${trial.days_left} ${trial.days_left === 1 ? "day" : "days"} left`}
+            >
+              <span className="uw-trial-badge-long" aria-hidden="true">
+                Free trial · {trial.days_left} {trial.days_left === 1 ? "day" : "days"} left
+              </span>
+              <span className="uw-trial-badge-short" aria-hidden="true">
+                Trial · {trial.days_left}d
+              </span>
             </button>
           )}
           <div className="ac-user">
             <span>
               <strong>{session?.display_name ?? "User"}</strong>
-              <small>{session?.active_role ?? "No active role"}</small>
+              <small>{rolesSummary(session)}</small>
             </span>
+            {onAdminConsole && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={onAdminConsole}
+                aria-label="Admin console"
+                title="Back to customer administration"
+              >
+                <Settings2 size={16} aria-hidden="true" /> <span className="ac-hide-sm">Admin console</span>
+              </button>
+            )}
             <SwitchOrganization />
             <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started") : undefined} />
             <button
@@ -210,8 +356,10 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">{tenantName}</p>
-                <h1>{section}</h1>
-                <p>{NAV[section].description}</p>
+                <h1 ref={heading} tabIndex={-1}>
+                  {section}
+                </h1>
+                <p>{NAV[section].guide}</p>
               </div>
             </div>
             {NAV[section].context && <ContextBar />}
@@ -228,23 +376,27 @@ export function UserWorkspace({ session, initialView }: { session: SessionContex
             )}
             {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
             <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
-              <div className="ca-section">
-                {section === "Getting started" && <GettingStartedSection />}
-                {section === "Dashboard" && <DashboardSection />}
-                {section === "My Work" && <MyWorkSection tab={tab} />}
-                {section === "Products" && <ProductsSection tab={tab} />}
-                {section === "Signals" && <SignalsSection tab={tab} />}
-                {section === "Investigations" && <InvestigationsSection tab={tab} />}
-                {section === "Evidence" && <EvidenceSection tab={tab} />}
-                {section === "Decisions" && <DecisionsSection tab={tab} />}
-                {section === "Intelligence" && <IntelligenceSection tab={tab} />}
-                {section === "Trust & Audit" && <TrustSection tab={tab} />}
-                {section === "My Account" && <AccountSection tab={tab} />}
-                {section === "Share feedback" && <FeedbackSection />}
-              </div>
+              <SectionErrorBoundary name={section} resetKey={location.key}>
+                <div className="ca-section">
+                  {section === "Getting started" && <GettingStartedSection />}
+                  {section === "Dashboard" && <DashboardSection />}
+                  {section === "My Work" && <MyWorkSection tab={tab} />}
+                  {section === "Products" && <ProductsSection tab={tab} />}
+                  {section === "Signals" && <SignalsSection tab={tab} />}
+                  {section === "Investigations" && <InvestigationsSection tab={tab} />}
+                  {section === "Evidence" && <EvidenceSection tab={tab} />}
+                  {section === "Decisions" && <DecisionsSection tab={tab} />}
+                  {section === "Intelligence" && <IntelligenceSection tab={tab} />}
+                  {section === "Trust & Audit" && <TrustSection tab={tab} />}
+                  {section === "My Account" && <AccountSection tab={tab} />}
+                  {section === "Import data" && <ImportDataSection />}
+                  {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+                </div>
+              </SectionErrorBoundary>
             </ColumnScopeProvider>
           </main>
         </div>
+        <SessionTimeoutWarning session={idle} />
       </div>
     </WorkspaceContext.Provider>
   );

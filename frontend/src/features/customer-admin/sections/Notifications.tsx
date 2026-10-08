@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
 import { useConsole } from "../context";
 import { LifecycleBadge } from "./Access";
 import { Table, listOf, send, useResource } from "../shared";
+import { recipientLabel } from "../labels";
+import { hideUuid, safeText } from "../../../app/displayId";
 
 const RECIPIENT_TYPES = ["CUSTOMER_ADMIN", "BILLING_CONTACT", "BUSINESS_CONTACT", "ACCOUNT_OWNER"] as const;
 
@@ -31,7 +32,7 @@ export function NotificationsSection() {
 
   return (
     <>
-      <Panel eyebrow="Notifications" title="Subscription reminders" state={preferences.state} error={preferences.error}>
+      <Panel eyebrow="Notifications" title="Subscription reminders" source={preferences}>
         <form
           className="ca-form"
           onSubmit={(event) => {
@@ -39,7 +40,7 @@ export function NotificationsSection() {
             confirm({
               title: "Save reminder settings?",
               body: `Reminders are sent ${parsedThresholds.join(", ")} days before your subscription ends, to: ${types
-                .map(titleCase)
+                .map(recipientLabel)
                 .join(", ")}.`,
               confirmLabel: "Save",
               reason: { label: "Reason for the change", min: 10 },
@@ -58,7 +59,7 @@ export function NotificationsSection() {
         >
           <div className="ca-form-grid">
             <label className="ca-field">
-              Days before expiry
+              Days before the subscription ends
               <input
                 required
                 value={thresholds}
@@ -68,7 +69,12 @@ export function NotificationsSection() {
             </label>
             <label className="ca-field">
               Time zone
-              <input required value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+              <input
+                required
+                value={timezone}
+                placeholder="e.g. Europe/London"
+                onChange={(event) => setTimezone(event.target.value)}
+              />
             </label>
           </div>
           <fieldset className="ca-fieldset">
@@ -84,7 +90,7 @@ export function NotificationsSection() {
                     )
                   }
                 />
-                {titleCase(type)}
+                {recipientLabel(type)}
               </label>
             ))}
           </fieldset>
@@ -96,15 +102,24 @@ export function NotificationsSection() {
         </form>
       </Panel>
 
-      <Panel eyebrow="Notifications" title="Contacts" state={preferences.state} error={preferences.error}>
+      <Panel eyebrow="Notifications" title="Contacts" source={preferences}>
         <Table
           caption="Notification contacts"
           rows={listOf(preferences.data?.recipients)}
           rowKey={(row) => row.id}
           empty={{ title: "No contacts yet", detail: "Add billing or business contacts who should receive reminders." }}
           columns={[
-            { key: "type", label: "Type", render: (row) => titleCase(row.recipient_type ?? "") },
-            { key: "contact", label: "Contact", render: (row) => row.contact_id ?? "—" },
+            { key: "type", label: "Receives reminders as", render: (row) => recipientLabel(row.recipient_type) },
+            {
+              key: "contact",
+              label: "Contact",
+              fields: ["contact_name", "contact_email", "contact_id"],
+              // The contact's name or email when the server sends them; never the contact's UUID.
+              render: (row) =>
+                safeText(row.contact_name) ??
+                safeText(row.contact_email) ??
+                (row.contact_id ? hideUuid(row.contact_id, "Contact on file") : "—"),
+            },
             { key: "status", label: "Status", render: (row) => <LifecycleBadge status={row.status} /> },
           ]}
         />
@@ -115,9 +130,9 @@ export function NotificationsSection() {
               event.preventDefault();
               confirm({
                 title: `Add ${recipient.name} as a contact?`,
-                body: `${recipient.email} will receive subscription reminders as ${titleCase(recipient.recipient_type)}.`,
+                body: `${recipient.email} will receive subscription reminders as ${recipientLabel(recipient.recipient_type).toLowerCase()}.`,
                 confirmLabel: "Add contact",
-                reason: { label: "Reason", min: 10 },
+                reason: { label: "Why should they receive reminders?", min: 10 },
                 done: "Contact added.",
                 run: async (reason) => {
                   await send("/api/v1/admin/notifications/recipients", "POST", { ...recipient, reason });
@@ -136,7 +151,7 @@ export function NotificationsSection() {
                 >
                   {RECIPIENT_TYPES.map((type) => (
                     <option key={type} value={type}>
-                      {titleCase(type)}
+                      {recipientLabel(type)}
                     </option>
                   ))}
                 </select>

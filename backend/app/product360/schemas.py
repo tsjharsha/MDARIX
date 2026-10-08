@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class ProductSummary(BaseModel):
     id: str
+    business_id: str | None = None
     product_identifier: str
     name: str
     product_family: str | None
@@ -21,6 +22,7 @@ class TimelineEvent(BaseModel):
     description: str | None = None
     related_entity_type: str
     related_entity_id: str
+    related_entity_business_id: str | None = None
     event_time: datetime | None = None
     effective_time: datetime | None = None
     recorded_time: datetime | None = None

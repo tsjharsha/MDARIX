@@ -1,4 +1,4 @@
-"""Trial feedback: a trial user answers the questionnaire and chooses how their words may be shown on the website."""
+"""Customer feedback: any signed-in user (trial or not) answers the questionnaire and chooses how their words may be shown on the website."""
 
 import uuid
 
@@ -56,11 +56,32 @@ def _published() -> list:
     return TestClient(app).get("/api/v1/public/testimonials").json()["items"]
 
 
-def test_feedback_is_for_trial_workspaces_only():
+def test_feedback_is_open_to_every_organization_and_announced_to_the_team():
     assert TestClient(app).get("/api/v1/trial/feedback").status_code == 401
+    # A paying organization's user (not a trial) gets the same questionnaire and consent wording.
     regular = _client_with_role("INVESTIGATOR")
-    assert regular.get("/api/v1/trial/feedback").status_code == 404
-    assert regular.post("/api/v1/trial/feedback", json=_answers()).status_code == 404
+    form = regular.get("/api/v1/trial/feedback")
+    assert form.status_code == 200, form.text
+    organization = form.json()["organization_name"]
+    assert organization in form.json()["consent_wording"]["NAMED"]
+    sent = regular.post("/api/v1/trial/feedback", json=_answers(publish_consent="PRIVATE", quote=None))
+    assert sent.status_code == 200, sent.text
+    feedback_id = sent.json()["id"]
+    try:
+        assert sent.json()["publication_status"] == "NOT_REQUESTED"
+        with engine.connect() as conn:
+            events = conn.execute(
+                text("SELECT payload FROM event_outbox WHERE event_name = 'FEEDBACK_SUBMITTED' AND aggregate_id = :id"),
+                {"id": feedback_id},
+            ).all()
+        # One staff alert, carrying identifiers only (the worker reads the response when it sends the email).
+        assert len(events) == 1 and set(events[0][0]) == {"tenant_id", "feedback_id"}
+        assert "@" not in str(events[0][0])
+        assert feedback_id in [item["id"] for item in regular.get("/api/v1/trial/feedback").json()["submissions"]]
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text("DELETE FROM event_outbox WHERE aggregate_id = :id"), {"id": feedback_id})
+            conn.execute(text("DELETE FROM trial_feedback WHERE id = :id"), {"id": feedback_id})
 
 
 def test_named_feedback_is_shown_with_the_company_only_after_review():

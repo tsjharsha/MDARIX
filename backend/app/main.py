@@ -19,6 +19,7 @@ from backend.app.logging_setup import (
     current_request_id,
     request_id_var,
 )
+from backend.app.version import APP_VERSION
 from backend.app.access_router import router as access_router
 from backend.app.ask_router import router as ask_router
 from backend.app.auth_router import router as auth_router
@@ -59,9 +60,22 @@ from backend.app.tenant_export_api import router as tenant_export_router
 from backend.app.data_import_router import router as data_import_router
 from backend.app.investigation_open_router import assignees_router as investigation_assignees_router
 from backend.app.investigation_open_router import router as investigation_open_router
+from backend.app.case_workflow.router import router as case_workflow_router
 from backend.app.complaints_router import router as complaints_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
+from backend.app.risk_router import router as risk_router
+from backend.app.workflow.router import router as workflow_tasks_router
+from backend.app.signals.router import router as signals_triage_router
+from backend.app.evidence_workflow.inventory import router as evidence_inventory_router
+from backend.app.evidence_workflow.requests import router as evidence_requests_router
+from backend.app.case_intelligence.router import router as case_intelligence_router
+from backend.app.case_reviews.next_steps import router as case_next_steps_router
+from backend.app.case_reviews.router import router as case_reviews_router
+from backend.app.decision_brief.router import router as decision_brief_router
+from backend.app.decision_followups.router import router as decision_followups_router
+from backend.app.human_decision.router import router as human_decision_router
+from backend.app.case_audit.router import router as case_audit_router
 from backend.app.workspace_context import router as workspace_context_router
 from backend.app.data_plane_router import router as data_plane_router
 from backend.app.db.data_plane import get_data_plane_db
@@ -90,7 +104,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(
     lifespan=lifespan,
     title="MDARIX R1 API",
-    version="0.8.0",
+    version=APP_VERSION,
     description=(
         "Tenant-scoped medical-device product lifecycle, investigation, evidence, "
         "and governed decision APIs. Authentication and tenant authorization are "
@@ -286,6 +300,8 @@ async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=500, content={"detail": body}, headers={"X-Request-ID": request_id})
 
 
+# First, so its fixed path /api/v1/investigations/mine/summary is matched before any /{investigation_id} route.
+app.include_router(case_workflow_router)  # Case workflow: states, scope, readiness, my cases
 app.include_router(evidence_router)
 app.include_router(investigations_router)
 app.include_router(retrieval_router)
@@ -321,6 +337,18 @@ app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
 app.include_router(client_errors_router)
 app.include_router(support_router)
+app.include_router(risk_router)  # Risk & Traceability
+app.include_router(workflow_tasks_router)  # My Work: workflow tasks and role queues
+app.include_router(signals_triage_router)  # Signals and triage
+app.include_router(evidence_inventory_router)  # Case evidence: inventory, links, review, provenance
+app.include_router(evidence_requests_router)  # Evidence requests to colleagues, roles and suppliers
+app.include_router(case_intelligence_router)  # Case intelligence: hypotheses, unknowns, chains, observations
+app.include_router(case_reviews_router)  # Risk and regulatory reviews: policy, requests, reviewers, dashboard
+app.include_router(case_next_steps_router)  # Next steps of a case (the old decision options as actions)
+app.include_router(decision_brief_router)  # Decision Brief: versions, submission gate, quality review, dashboard
+app.include_router(decision_followups_router)  # After the decision: follow-ups, impact assessments, closure check
+app.include_router(human_decision_router)  # Human decision: queue, decision screen, signing, record
+app.include_router(case_audit_router)  # Trust & audit of a case: timeline, replay, AI runs, integrity, export
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 
@@ -354,7 +382,9 @@ def readiness():
     from backend.app.readiness import readiness_report
 
     report = readiness_report()
-    return JSONResponse(status_code=200 if report["status"] == "ready" else 503, content=report)
+    # Degraded (a worker, scheduler, plane or mail check failing) keeps the API in rotation, as /health/status does:
+    # only a database that does not answer, or a schema this code was not built for, takes it out (503).
+    return JSONResponse(status_code=503 if report["status"] == "not_ready" else 200, content=report)
 
 
 @app.get("/health/status")
@@ -476,11 +506,16 @@ def list_product_investigations(
     product_id: str,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     data_db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
 ) -> list[dict]:
+    from backend.app.case_workflow.states import with_owner_names
+
     try:
-        return product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=scoped_bind(data_db))
+        rows = product360_service.list_product_investigations(product_id, ctx.tenant_id, db_engine=scoped_bind(data_db))
     except Product360Error as exc:
         raise product_error(exc) from exc
+    # Each case's owner by name, next to its workflow state (backend/app/case_workflow/states.py).
+    return with_owner_names(control_db, ctx.tenant_id, rows)
 
 
 def _product360_audit(

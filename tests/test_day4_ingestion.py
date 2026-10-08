@@ -13,6 +13,22 @@ def scalar(sql, **params):
         return conn.execute(text(sql), params).scalar_one()
 
 
+def test_evidence_source_identity_is_not_its_investigation_owner():
+    source = SourceFile(
+        path=Path("evidence_metadata.json"),
+        source_system="EVIDENCE",
+        source_type="evidence",
+        record_type="evidence_metadata",
+        mapping_name="generic_source_v1.json",
+    )
+    record_id = IngestionService(GOLDEN_SOURCE).source_record_id(
+        source,
+        {"evidence_id": "EV-VS002-001", "investigation_id": "INV-002"},
+        1,
+    )
+    assert record_id == "EV-VS002-001"
+
+
 def test_full_ingestion_preserves_source_layers():
     result = IngestionService(GOLDEN_SOURCE).ingest_all()
     assert result["files_discovered"] >= 52

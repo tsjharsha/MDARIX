@@ -11,6 +11,7 @@ from ingestion.normalization.service import (
     normalize_revision,
     normalize_status,
 )
+from ingestion.services.ingestion_service import GOLDEN_SOURCE, IngestionService
 
 
 def scalar(sql, **params):
@@ -20,6 +21,9 @@ def scalar(sql, **params):
 
 @pytest.fixture(scope="module")
 def normalized():
+    # Reconcile an existing test database with the repository's current source
+    # revision before normalization (not only when the database is empty).
+    IngestionService(GOLDEN_SOURCE).ingest_all()
     return NormalizationService().normalize_all()
 
 
@@ -172,6 +176,35 @@ def test_idempotent_second_run(normalized):
     NormalizationService().normalize_all()
     after = scalar("SELECT count(*) FROM products")
     assert after == before
+
+
+def test_evidence_upsert_repairs_stale_investigation_ownership(normalized):
+    """Re-ingestion must repair canonical ownership, not leave a stale cross-investigation reference."""
+    with engine.begin() as conn:
+        tenant_id = conn.execute(text("SELECT id FROM tenants WHERE tenant_key='ACME_CARE_SYNTHETIC'")).scalar_one()
+        wrong_investigation_id = conn.execute(
+            text("SELECT id FROM investigations WHERE tenant_id=:tenant_id AND investigation_identifier='INV-001'"),
+            {"tenant_id": tenant_id},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "UPDATE evidence SET investigation_id=:investigation_id "
+                "WHERE tenant_id=:tenant_id AND evidence_identifier='EV-VS002-001'"
+            ),
+            {"tenant_id": tenant_id, "investigation_id": wrong_investigation_id},
+        )
+
+    NormalizationService().normalize_all()
+
+    assert (
+        scalar(
+            "SELECT count(*) FROM evidence e "
+            "JOIN investigations i ON i.tenant_id=e.tenant_id AND i.id=e.investigation_id "
+            "WHERE e.evidence_identifier='EV-VS002-001' "
+            "AND i.investigation_identifier='INV-002'"
+        )
+        == 1
+    )
 
 
 def test_order_independence_for_product_version_aliases():

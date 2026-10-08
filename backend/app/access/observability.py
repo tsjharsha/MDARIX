@@ -14,6 +14,7 @@ from auth.emailer import (
     smtp_configuration_status,
 )
 from backend.app import csv_safe
+from backend.app.business_ids import business_id_map, business_id_of
 from backend.app.db.models.foundation import (
     AuditEvent,
     AuthUser,
@@ -23,6 +24,7 @@ from backend.app.db.models.foundation import (
     MappingConfiguration,
     Product,
     AIExecution,
+    Tenant,
 )
 from backend.app.db.models.enterprise import ConnectorRun, ReconciliationRecord
 from backend.app.db.models.stage2 import (
@@ -75,6 +77,7 @@ def audit_history(
         query = query.filter(AuditEvent.entity_type == entity_type)
     rows = query.order_by(AuditEvent.created_at.desc()).limit(200).all()
     # Actions by MDARIX staff stay visible to the customer, attributed to the platform rather than to a person.
+    actor_business_ids = business_id_map(db, AuthUser, (row.actor_ref for row in rows))
     platform_actors = (
         set()
         if _is_platform_admin(admin)
@@ -90,6 +93,9 @@ def audit_history(
             "id": str(row.id),
             "tenant_id": str(row.tenant_id),
             "actor_ref": None if str(row.actor_ref) in platform_actors else row.actor_ref,
+            "actor_business_id": None
+            if str(row.actor_ref) in platform_actors
+            else actor_business_ids.get(str(row.actor_ref)),
             "actor_label": PLATFORM_ACTOR_LABEL if str(row.actor_ref) in platform_actors else None,
             "action": row.action,
             "entity_type": row.entity_type,
@@ -369,6 +375,7 @@ def tenant_dashboard(request: Request, db: Session = Depends(get_db)):
     return {
         "tenant": {
             "id": str(tenant_id),
+            "business_id": business_id_of(db, Tenant, tenant_id),
             "name": admin.company or admin.display_name or "Authenticated tenant",
             "environment": environment(),
         },
@@ -612,6 +619,7 @@ def admin_integration_credentials(request: Request, db: Session = Depends(get_db
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(row.tenant_id),
             "code": row.code,
             "connector_type": row.connector_type,
@@ -637,12 +645,15 @@ def admin_ai_executions(request: Request, db: Session = Depends(get_db)):
             .limit(200)
             .all()
         )
+        investigation_business_ids = business_id_map(data, Investigation, (row.investigation_id for row in rows))
         data.expunge_all()
     return [
         {
             "id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(row.tenant_id),
             "investigation_id": str(row.investigation_id) if row.investigation_id else None,
+            "investigation_business_id": investigation_business_ids.get(str(row.investigation_id)),
             "provider": row.provider,
             "model_name": row.model_name,
             "model_version": row.model_version,

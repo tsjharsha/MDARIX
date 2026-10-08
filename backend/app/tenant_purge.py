@@ -209,7 +209,7 @@ def erase_person(
             )
         )
     }
-    for table in (*PERSONAL_ACCOUNT_TABLES, "role_assignments", "persona_assignments"):
+    for table in (*PERSONAL_ACCOUNT_TABLES, "role_assignments", "user_additional_roles", "persona_assignments"):
         if table in present:
             count = db.execute(text(f'DELETE FROM "{table}" WHERE user_id = :user'), {"user": user.id}).rowcount
             if count:
@@ -366,9 +366,14 @@ def complete_purge(
     log = _pending_purge(db, tenant_id)
     if log is None or str(tenant.status).upper() != "PURGING":
         raise PurgeFailed("NO_PENDING_PURGE")
+    # A hold set while the purge was unfinished preserves what is left (the stored files, a dedicated plane).
+    _require_no_legal_hold(tenant)
     details = dict(log.details or {})
-    result = {key: details.get(key) for key in ("deleted_records", "audit_events_deleted", "users_pseudonymized")}
-    result["deleted_records"] = dict(result["deleted_records"] or {})
+    # What stage one recorded (counts and the export evidence) goes into the final deletion record and the response;
+    # the bookkeeping of earlier attempts does not.
+    bookkeeping = {"completed", "completed_at", "incomplete", "last_attempt_at", "status", "files_deleted"}
+    result = {key: value for key, value in details.items() if key not in bookkeeping}
+    result["deleted_records"] = dict(result.get("deleted_records") or {})
     result["not_deleted_tables"] = []
     errors: dict[str, str] = {}
 
@@ -390,6 +395,14 @@ def complete_purge(
     bind_system(db, f"complete purge of tenant {tenant_id}: record the outcome")
     tenant = db.get(Tenant, tenant_id)
     log = db.get(ErasureLog, log.id)
+    # ARCHIVED means nothing is left: rows written for the organization after stage one (a late background job)
+    # are deleted now, and if any table still cannot be emptied the purge stays PURGING like a failed file step.
+    if tenant_has_rows(db, tenant_id):
+        late, remaining = delete_rows(db, tenant_tables(db), tenant_id)
+        if late:
+            result["deleted_after_first_stage"] = late
+        if remaining:
+            errors["rows"] = f"ROWS_REMAIN:{','.join(sorted(remaining))}"
     if errors:
         result["status"] = "PURGING"
         result["incomplete"] = errors
@@ -527,21 +540,177 @@ def tenants_purging(db: Session) -> list[Tenant]:
     ]
 
 
-def reapply_erasures(
-    db: Session, actor_ref: str, *, dry_run: bool = False, storage=None, now: datetime | None = None
+def complete_pending_purges(
+    db: Session,
+    actor_ref: str,
+    *,
+    dry_run: bool = False,
+    tenant_ids=None,
+    storage=None,
+    now: datetime | None = None,
+    attempts: int = COMPLETION_ATTEMPTS,
 ) -> dict:
-    """After a restore from backup, repeat every erasure and purge the log records whose subject has personal data
-    again (scripts/reapply_erasures.py). Each re-applied log row gets ``reapplied_at``. Commits per subject unless
-    ``dry_run``. Subjects under a legal hold are reported, not touched."""
+    """Finish every purge left PURGING (scripts/complete_tenant_purge.py): delete the stored files and dedicated
+    plane rows that stage two could not, and archive the organization once nothing is left. ``tenant_ids`` limits
+    the run to those organizations. A dry run only reports what remains (files still stored, whether a dedicated
+    plane is involved, the last recorded error). Organizations under a legal hold are reported, not touched."""
     from backend.app.db.tenant_scope import bind_system
 
+    if storage is None:
+        from object_storage.service import ObjectStorageService
+
+        storage = ObjectStorageService()
+    bind_system(db, "complete pending purges")
+    wanted = {uuid.UUID(str(value)) for value in tenant_ids} if tenant_ids else None
+    pending = [
+        (tenant.id, tenant.tenant_key, bool(tenant.legal_hold))
+        for tenant in tenants_purging(db)
+        if wanted is None or tenant.id in wanted
+    ]
+    summary: dict = {"dry_run": dry_run, "pending": [], "archived": [], "incomplete": [], "skipped": [], "failed": []}
+    for tenant_id, tenant_key, held in pending:
+        bind_system(db, "complete pending purges")
+        log = _pending_purge(db, tenant_id)
+        item = {
+            "tenant_id": str(tenant_id),
+            "tenant_key": tenant_key,
+            "rows_deleted_at": log.performed_at.isoformat() if log is not None and log.performed_at else None,
+            "last_error": (log.details or {}).get("incomplete") if log is not None else None,
+        }
+        if held:
+            summary["skipped"].append({**item, "why": "LEGAL_HOLD"})
+            continue
+        if dry_run:
+            item["files_remaining"] = len(storage.list_tenant_objects(str(tenant_id)))
+            item["dedicated_plane"] = _dedicated_plane(db, tenant_id) is not None
+            summary["pending"].append(item)
+            continue
+        try:
+            outcome = complete_purge(db, tenant_id, actor_ref, storage=storage, now=now, attempts=attempts)
+        except PurgeFailed as exc:
+            db.rollback()
+            summary["failed"].append({**item, "error": str(exc)})
+            continue
+        if outcome["status"] == "ARCHIVED":
+            summary["archived"].append({**item, "files_deleted": outcome.get("files_deleted")})
+        else:
+            summary["incomplete"].append({**item, "incomplete": outcome.get("incomplete")})
+    return summary
+
+
+# --------------------------------------------------------------------------------- after a restore from backup
+
+ERASURE_LOG_COLUMNS = ("id", "tenant_id", "kind", "subject_ref", "performed_by", "reason", "details", "performed_at")
+REAPPLY_SCOPE = "re-apply erasures after restore"
+
+
+def _json_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return value
+
+
+def export_erasure_log(db: Session) -> list[dict]:
+    """Every erasure-log row as plain JSON values, oldest first. Taken from the newest copy of the database (the
+    instance being replaced, or the newest backup) and loaded into the restored one with ``import_erasure_log``:
+    a restored database only knows the erasures made before its backup was taken."""
+    from backend.app.db.tenant_scope import bind_system
+
+    bind_system(db, "export the erasure log")
+    rows = db.query(ErasureLog).order_by(ErasureLog.performed_at, ErasureLog.id).all()
+    return [{column: _json_value(getattr(row, column)) for column in ERASURE_LOG_COLUMNS} for row in rows]
+
+
+def import_erasure_log(db: Session, rows: list[dict], *, commit: bool = True) -> int:
+    """Add the erasure-log rows the restored database does not have yet (matched by id; existing rows are never
+    changed). Returns how many were added. Commits unless ``commit`` is false (a dry run flushes them, so the same
+    session sees them, and rolls back afterwards)."""
+    from backend.app.db.tenant_scope import bind_system
+
+    bind_system(db, "import the erasure log after restore")
+    added = 0
+    for row in rows:
+        row_id = uuid.UUID(str(row["id"]))
+        if db.get(ErasureLog, row_id) is not None:
+            continue
+        db.add(
+            ErasureLog(
+                id=row_id,
+                tenant_id=uuid.UUID(str(row["tenant_id"])),
+                kind=row["kind"],
+                subject_ref=row["subject_ref"],
+                performed_by=row["performed_by"],
+                reason=row.get("reason"),
+                details=row.get("details"),
+                performed_at=datetime.fromisoformat(row["performed_at"]),
+            )
+        )
+        added += 1
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    return added
+
+
+def _reapply_reason(log: ErasureLog) -> str:
+    return f"Re-applied after restore: {log.reason or ''}".strip()
+
+
+def _organization_data_present(db: Session, tenant: Tenant, storage) -> dict | None:
+    """What of a purged organization is back after a restore (rows, identifiable accounts, stored files, a status
+    other than ARCHIVED), or None when the purge still holds."""
+    tables = tenant_has_rows(db, tenant.id)
+    users = db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id).all()
+    accounts = sum(1 for user in users if not person_is_pseudonymized(db, user))
+    files = len(storage.list_tenant_objects(str(tenant.id)))
+    if str(tenant.status).upper() == "ARCHIVED" and not tables and not accounts and not files:
+        return None
+    return {"tables": tables, "accounts": accounts, "files": files, "status": tenant.status}
+
+
+def reapply_erasures(
+    db: Session,
+    actor_ref: str,
+    *,
+    dry_run: bool = False,
+    tenant_ids=None,
+    storage=None,
+    now: datetime | None = None,
+) -> dict:
+    """After a restore from backup, repeat every erasure and purge in the log whose subject has personal data again
+    (scripts/reapply_erasures.py): ``erase_person`` for a PERSON_ERASED account that is identifiable again,
+    ``purge_tenant`` for a TENANT_PURGED organization whose rows, accounts or files are back. Each re-applied log
+    row gets ``reapplied_at`` (and the re-application writes its own log row and audit record). Commits per subject
+    unless ``dry_run``, which only lists what would be re-applied. ``tenant_ids`` limits the run to those
+    organizations. Subjects under a legal hold are reported, not touched: the hold is the newer instruction."""
+    from backend.app.db.tenant_scope import bind_system
+
+    if storage is None:
+        from object_storage.service import ObjectStorageService
+
+        storage = ObjectStorageService()
     now = now or datetime.now(timezone.utc)
-    bind_system(db, "re-apply erasures after restore")
+    wanted = {uuid.UUID(str(value)) for value in tenant_ids} if tenant_ids else None
+    bind_system(db, REAPPLY_SCOPE)
+    query = db.query(ErasureLog.id).order_by(ErasureLog.performed_at, ErasureLog.id)
+    if wanted is not None:
+        query = query.filter(ErasureLog.tenant_id.in_(wanted))
+    log_ids = [row_id for (row_id,) in query.all()]
     summary: dict = {"checked": 0, "reapplied": [], "pending": [], "skipped": [], "failed": [], "dry_run": dry_run}
-    rows = db.query(ErasureLog).order_by(ErasureLog.performed_at).all()
-    for log in rows:
+    for log_id in log_ids:
+        bind_system(db, REAPPLY_SCOPE)
+        log = db.get(ErasureLog, log_id)
         summary["checked"] += 1
-        item = {"log_id": str(log.id), "kind": log.kind, "subject_ref": log.subject_ref, "tenant_id": str(log.tenant_id)}
+        item = {
+            "log_id": str(log.id),
+            "kind": log.kind,
+            "subject_ref": log.subject_ref,
+            "tenant_id": str(log.tenant_id),
+        }
+        tenant = db.get(Tenant, log.tenant_id)
         if log.kind == "PERSON_ERASED":
             try:
                 user = db.get(AuthUser, uuid.UUID(log.subject_ref))
@@ -553,35 +722,37 @@ def reapply_erasures(
             if person_is_pseudonymized(db, user):
                 summary["skipped"].append({**item, "why": "ALREADY_ERASED"})
                 continue
+            if tenant is not None and tenant.legal_hold:
+                summary["skipped"].append({**item, "why": "LEGAL_HOLD"})
+                continue
             if dry_run:
                 summary["pending"].append(item)
                 continue
             try:
-                erase_person(db, user, actor_ref, f"Re-applied after restore: {log.reason or ''}".strip(), now, reapply=True)
-            except PurgeFailed as exc:
+                erase_person(db, user, actor_ref, _reapply_reason(log), now, reapply=True)
+                db.get(ErasureLog, log.id).reapplied_at = now
+                db.commit()
+            except Exception as exc:  # one subject's failure must not stop the others; it is reported
                 db.rollback()
-                bind_system(db, "re-apply erasures after restore")
-                summary["failed"].append({**item, "error": str(exc)})
+                summary["failed"].append({**item, "error": str(exc) or type(exc).__name__})
                 continue
-            db.get(ErasureLog, log.id).reapplied_at = now
-            db.commit()
             summary["reapplied"].append(item)
         elif log.kind == "TENANT_PURGED":
-            tenant = db.get(Tenant, log.tenant_id)
             if tenant is None:
                 summary["skipped"].append({**item, "why": "TENANT_NOT_PRESENT"})
                 continue
-            if not (log.details or {}).get("completed") and str(tenant.status).upper() == "PURGING":
+            if str(tenant.status).upper() == "PURGING" and _pending_purge(db, tenant.id) is not None:
+                # Rows already deleted, files or plane outstanding: scripts/complete_tenant_purge.py finishes it.
                 summary["skipped"].append({**item, "why": "PURGE_IN_PROGRESS"})
                 continue
-            present = tenant_has_rows(db, tenant.id)
-            people = [
-                user for user in db.query(AuthUser).filter(AuthUser.tenant_id == tenant.id) if not person_is_pseudonymized(db, user)
-            ]
-            if str(tenant.status).upper() == "ARCHIVED" and not present and not people:
+            present = _organization_data_present(db, tenant, storage)
+            if present is None:
                 summary["skipped"].append({**item, "why": "ALREADY_PURGED"})
                 continue
-            item["data_present"] = {"tables": present, "accounts": len(people), "status": tenant.status}
+            item["data_present"] = present
+            if tenant.legal_hold:
+                summary["skipped"].append({**item, "why": "LEGAL_HOLD"})
+                continue
             if dry_run:
                 summary["pending"].append(item)
                 continue
@@ -590,20 +761,23 @@ def reapply_erasures(
                     db,
                     tenant.id,
                     actor_ref,
-                    reason=f"Re-applied after restore: {log.reason or ''}".strip(),
+                    reason=_reapply_reason(log),
                     storage=storage,
                     now=now,
                     evidence={"reapplied_log_id": str(log.id)},
                 )
             except PurgeFailed as exc:
                 db.rollback()
-                bind_system(db, "re-apply erasures after restore")
                 summary["failed"].append({**item, "error": str(exc)})
                 continue
-            bind_system(db, "re-apply erasures after restore")
+            bind_system(db, REAPPLY_SCOPE)
             db.get(ErasureLog, log.id).reapplied_at = now
             db.commit()
-            summary["reapplied"].append({**item, "status": outcome["status"]})
+            if outcome["status"] == "ARCHIVED":
+                summary["reapplied"].append({**item, "status": outcome["status"]})
+            else:
+                incomplete = ",".join(sorted(outcome.get("incomplete") or {}))
+                summary["failed"].append({**item, "error": f"INCOMPLETE:{incomplete}"})
         else:
             summary["skipped"].append({**item, "why": "UNKNOWN_KIND"})
     return summary

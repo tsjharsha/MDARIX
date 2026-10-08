@@ -356,7 +356,7 @@
 .ca-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 55;
   display: flex;
   justify-content: flex-end;
   background: rgb(16 32 47 / 35%);
@@ -410,4 +410,22 @@
   gap: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--ac-line);
+}
+
+/* Optional, rarely needed form fields and the summary charts are folded away until asked for. */
+.ca-advanced,
+.ca-summary-charts {
+  display: grid;
+  gap: 10px;
+}
+.ca-advanced > summary,
+.ca-summary-charts > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--ac-navy);
+  font-size: 13px;
+  font-weight: 600;
+}
+.ca-summary-charts[open] > summary {
+  margin-bottom: 6px;
 }

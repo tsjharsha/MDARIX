@@ -49,6 +49,9 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
   const aside = ASIDE[mode] ?? ASIDE.security;
   return (
     <div className="auth-page">
+      <a className="app-skip" href="#auth-main">
+        Skip to content
+      </a>
       <header className="auth-page-top">
         <a className="auth-brand" href="/" aria-label="MDARIX home">
           <span className="auth-logo" aria-hidden="true">
@@ -78,7 +81,9 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
             ))}
           </ul>
         </section>
-        {children}
+        <div id="auth-main" tabIndex={-1} className="auth-page-main">
+          {children}
+        </div>
       </main>
       <footer className="auth-page-foot">
         <span>MDARIX · System of Intelligence, not System of Record</span>
@@ -90,10 +95,35 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
   );
 }
 
-/** Where to go after signing in: a page inside the app the person was on, never another site. */
-export function safeReturnTo(value: string | null): string {
-  if (!value || !value.startsWith("/app") || value.startsWith("//") || value.includes("\\")) return "/app";
-  return value;
+const APP_ROOTS = ["/app", "/platform-admin"];
+
+/**
+ * Where to go after signing in: the page inside the application the person was on, never another site. Only a
+ * same-origin path under /app or /platform-admin is accepted (no scheme, no "//host", no backslash tricks); anything
+ * else opens /app.
+ */
+export function safeReturnTo(value: string | null, origin = "https://mdarix.invalid"): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/app";
+  // Control characters (a tab or newline hidden in the address) are never part of a page the app links to.
+  if (/[\u0000-\u001f\u007f]/.test(value)) return "/app";
+  let url: URL;
+  try {
+    url = new URL(value, origin);
+  } catch {
+    return "/app";
+  }
+  if (url.origin !== new URL(origin).origin) return "/app";
+  if (!APP_ROOTS.some((root) => url.pathname === root || url.pathname.startsWith(`${root}/`))) return "/app";
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Why the person is on the sign-in page, from the address (`reason=idle|expired`; `expired=1` from older links). */
+export function signInNotice(query: URLSearchParams): string {
+  const reason = query.get("reason");
+  if (reason === "idle" || query.get("expired") === "1")
+    return "You were signed out after 30 minutes without activity, to protect your organization's data. Sign in again to continue where you left off.";
+  if (reason === "expired") return "Your session has ended. Sign in again to continue where you left off.";
+  return "";
 }
 
 const MESSAGES: Record<string, string> = {
@@ -102,7 +132,9 @@ const MESSAGES: Record<string, string> = {
     "Too many failed sign-in attempts. Wait 15 minutes, then try again or reset your password.",
   INVALID_CREDENTIALS: "That email and password do not match an active account.",
   INVALID_RESET: "This reset link has expired or was already used. Request a new one below.",
-  INVALID_ACTIVATION: "This invitation link has expired or was already used. Ask your administrator to send a new one.",
+  // Anyone with an invitation (a trial owner too) can get a fresh link themselves: "Forgot password?" sends one.
+  INVALID_ACTIVATION:
+    'This invitation link has expired or was already used. Request a new link from the sign-in page with "Forgot password?", or ask your administrator to send a new invitation.',
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
 };
 
@@ -114,10 +146,8 @@ function problemMessage(data: { detail?: { code?: string; message?: string } } |
 
 export function AuthPage({ mode }: { mode: string }) {
   const query = new URLSearchParams(window.location.search);
-  const returnTo = safeReturnTo(query.get("returnTo"));
-  const [message, setMessage] = useState(
-    query.get("expired") === "1" ? "You were signed out after a period of inactivity. Sign in again to continue." : "",
-  );
+  const returnTo = safeReturnTo(query.get("returnTo"), window.location.origin);
+  const [message, setMessage] = useState(() => signInNotice(query));
   const [email, setEmail] = useState(query.get("email") ?? "");
   // The email and password open accounts in several organizations: the person picks one.
   const [organizations, setOrganizations] = useState<Array<{ tenant_id: string; tenant_name: string }>>([]);
@@ -158,11 +188,17 @@ export function AuthPage({ mode }: { mode: string }) {
     if (isMfa) {
       // Setting up: confirm the new authenticator with its first code. Signing in: the current code, or a
       // one-time recovery code when the phone is not at hand.
-      const response = await fetch(mfaEnrollment ? "/api/v1/auth/mfa/verify-enrollment" : "/api/v1/auth/mfa/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: mfaCode.trim() }),
-      });
+      let response: Response;
+      try {
+        response = await fetch(mfaEnrollment ? "/api/v1/auth/mfa/verify-enrollment" : "/api/v1/auth/mfa/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: mfaCode.trim() }),
+        });
+      } catch {
+        setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
+        return;
+      }
       const data = await response.json().catch(() => ({}));
       if (response.ok && mfaEnrollment && Array.isArray(data.recovery_codes)) {
         setRecoveryCodes(data.recovery_codes);
@@ -244,11 +280,17 @@ export function AuthPage({ mode }: { mode: string }) {
     }
   };
   const openOrganization = async (tenantId: string) => {
-    const response = await fetch("/api/v1/auth/signin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, tenant_id: tenantId }),
-    });
+    let response: Response;
+    try {
+      response = await fetch("/api/v1/auth/signin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, tenant_id: tenantId }),
+      });
+    } catch {
+      setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
+      return;
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setMessage(problemMessage(data, "Sign-in could not be completed."));
@@ -325,7 +367,11 @@ export function AuthPage({ mode }: { mode: string }) {
                 className="secondary-link"
                 type="button"
                 onClick={async () => {
-                  const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" });
+                  const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" }).catch(() => null);
+                  if (!response) {
+                    setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
+                    return;
+                  }
                   const data = await response.json().catch(() => ({}));
                   setMfaSecret(data.secret ?? "");
                   setMfaUri(data.otpauth_uri ?? "");
@@ -518,6 +564,12 @@ export function AuthPage({ mode }: { mode: string }) {
         ) : (
           <p className="auth-links">
             <a href="/signin">Return to sign in</a>
+            {mode === "activate-account" && (
+              <>
+                {" "}
+                · <a href="/forgot-password">Request a new link</a>
+              </>
+            )}
             {mode === "reset-password" && (
               <>
                 {" "}

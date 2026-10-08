@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { requestJson } from "../../../app/apiClient";
+import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { describeError, requestJson } from "../../../app/apiClient";
 
 /** Import customers from a CSV file: a dry run shows what would be created, then the import runs. */
 export function CustomerImportDialog({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
@@ -54,13 +55,14 @@ export function CustomerImportDialog({ onClose, onImported }: { onClose: () => v
         onImported();
       }
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Customer import failed.");
+      setError(describeError(reason, "Customer import failed."));
     } finally {
       setBusy(false);
     }
   };
   return (
     <div className="customer-import-dialog" role="dialog" aria-modal="true" aria-labelledby="customer-import-title">
+      <DialogBehaviour onClose={onClose} />
       <div className="customer-import-panel">
         <div className="platform-admin-card-title">
           <div>

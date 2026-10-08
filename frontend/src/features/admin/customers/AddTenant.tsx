@@ -2,6 +2,8 @@ import { useState } from "react";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { ENVIRONMENT_TYPES, titleCase, type Plan } from "./model";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
+import { safeText } from "../../../app/displayId";
+import { REGIONS } from "../onboardingModel";
 
 /**
  * Add a tenant to an existing customer: another region, business unit or validation workspace. The tenant is a
@@ -55,7 +57,10 @@ export function AddTenant({
         result.email_delivery === "NOT_CONFIGURED"
           ? "Email is not configured here, so no invitation was delivered."
           : `${result.administrator?.email} is invited by email.`;
-      onAdded(`Tenant ${result.tenant?.display_name ?? form.tenant_name} added to ${customerName}. ${invited}`);
+      const tenantId = safeText(result.tenant?.business_id ?? result.tenant_business_id);
+      onAdded(
+        `Tenant ${result.tenant?.display_name ?? form.tenant_name}${tenantId ? ` (${tenantId})` : ""} added to ${customerName}. ${invited}`,
+      );
     } catch (reason) {
       setError(errorText(reason, "The tenant was not added."));
       setBusy(false);
@@ -109,13 +114,15 @@ export function AddTenant({
           </label>
           <label className="ca-field">
             Data region
-            <input
-              required
-              minLength={2}
-              value={form.data_region}
-              onChange={set("data_region")}
-              placeholder="e.g. eu-central-1"
-            />
+            {/* The same regions as the new-customer wizard (the server accepts any region name). */}
+            <select required value={form.data_region} onChange={set("data_region")}>
+              <option value="">Choose a region</option>
+              {REGIONS.map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
         <label className="ca-field">

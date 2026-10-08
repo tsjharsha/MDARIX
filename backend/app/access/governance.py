@@ -17,13 +17,25 @@ from backend.app.db.session import get_db
 from backend.app.access.schemas import AuthorityRequest, SodRequest, StatusRequest
 from backend.app.access.authz import _admin_tenant
 from backend.app.access.common import _audit_configuration
+from backend.app.role_codes import is_administrator_role
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+
+def _refuse_administrator_authority(role_name: str | None) -> None:
+    """Administrators manage people and settings; they never approve (separation of duties). Signing refuses them
+    whatever authority exists (governance_router.approval_denial); this keeps such an authority from being made."""
+    if is_administrator_role(role_name):
+        raise HTTPException(
+            422,
+            detail={"code": "ROLE_CANNOT_APPROVE", "message": "Administrator roles cannot hold approval authority"},
+        )
 
 
 @router.post("/admin/governance/approval-authorities")
 def create_authority(payload: AuthorityRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
+    _refuse_administrator_authority(payload.role_name)
     now = datetime.now(timezone.utc)
     row = ApprovalAuthority(
         id=uuid.uuid4(),
@@ -145,6 +157,8 @@ def activate_policy(
         raise HTTPException(
             404, detail={"code": "POLICY_NOT_FOUND", "message": "Policy is not available for this tenant"}
         )
+    if model is ApprovalAuthority and str(payload.status).upper() == "ACTIVE":
+        _refuse_administrator_authority(row.role_name)
     row.status = payload.status
     row.updated_at = datetime.now(timezone.utc)
     _audit_configuration(db, admin, "GOVERNANCE_POLICY_STATUS_CHANGED", entity, row.id, row.version)

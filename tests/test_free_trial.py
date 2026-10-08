@@ -23,6 +23,12 @@ PASSWORD = "Trial password 2026!"
 # Business tables a trial workspace writes to, children first. Other tests count rows in some of these across the
 # whole test database, so trial workspaces created here must not leave business data behind.
 _TRIAL_BUSINESS_TABLES = (
+    # Signals detected from imported complaints (md28) reference complaints, products and cases.
+    "signal_events",
+    "signal_complaints",
+    "investigation_signals",
+    "signals",
+    "signal_rules",
     "retrieval_queries",  # Ask logs its evidence search against the investigation
     "evidence_entity_links",  # imported records are linked to their evidence for AI search
     "evidence_chunk_embeddings",
@@ -130,7 +136,7 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     try:
         tenant_id = uuid.UUID(approval["tenant_id"])
         account = db.query(AuthUser).filter(AuthUser.username == email).one()
-        assert account.tenant_id == tenant_id and account.role == "Leader" and account.status == "ACTIVE"
+        assert account.tenant_id == tenant_id and account.role == "LEADER" and account.status == "ACTIVE"
         subscription = trial_subscription(db, tenant_id)
         assert 29 <= (subscription.expires_at - datetime.now(timezone.utc)).days <= 30
         plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()

@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuditEvent, Decision, HumanReview, AIExecution, Investigation
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
-from investigation_workspace.service import InvestigationWorkspaceService, InvestigationWorkspaceError
+from investigation_workspace.service import (
+    InvestigationWorkspaceService,
+    InvestigationWorkspaceError,
+    with_business_ids,
+)
 from decision_center.schemas import AdvisoryRequest, DecisionContextRequest, DecisionCreateRequest, ReviewCreateRequest
 from backend.app.db.tenant_scope import scoped_bind
 
@@ -88,6 +92,9 @@ class DecisionCenterService:
             )
         except InvestigationWorkspaceError as exc:
             raise DecisionCenterError(exc.code, exc.message) from exc
+        # The investigation, its product and its evidence carry their MDARIX IDs; the AI advisory and the decision's
+        # snapshot use neither the investigation header nor the evidence records, so they are unchanged.
+        workspace = with_business_ids(db, workspace)
         analysis = self._latest(db, tenant_id, investigation_id, "R1-Day11")
         hypotheses = self._latest(db, tenant_id, investigation_id, "R1-Day12")
         challenges = self._latest(db, tenant_id, investigation_id, "R1-Day13")
@@ -131,6 +138,7 @@ class DecisionCenterService:
         return {
             "investigation": {
                 "id": str(investigation.id),
+                "business_id": investigation.business_id,
                 "identifier": investigation.investigation_identifier,
                 "question": investigation.investigation_question,
                 "status": investigation.status,
@@ -138,6 +146,7 @@ class DecisionCenterService:
             "product_context": {
                 **workspace.product_context,
                 "product_id": product.get("id") or str(investigation.product_id),
+                "product_business_id": workspace.investigation.get("product_business_id"),
                 "product_version_id": selected_version.get("id"),
                 "product": product,
                 "selected_version": selected_version,
@@ -294,8 +303,10 @@ class DecisionCenterService:
         decision = db.query(Decision).filter(Decision.tenant_id == tenant_id, Decision.id == decision_id).first()
         if not decision:
             raise DecisionCenterError("DECISION_NOT_FOUND", "Decision is not available for this tenant")
-        if str(decision.decision_status or "").upper() in SIGNED_STATUSES:
-            # A signed decision is a closed record: reopening it needs a new decision, never a review.
+        signed_on_brief = str(getattr(decision, "decision_kind", None) or "").upper() == "BRIEF"
+        if str(decision.decision_status or "").upper() in SIGNED_STATUSES or signed_on_brief:
+            # A signed decision is a closed record: reopening it needs a new decision, never a review. A decision
+            # signed on a Decision Brief (backend/app/human_decision) is superseded by a new one, never reviewed.
             raise DecisionCenterError("DECISION_LOCKED", "This decision is signed and can no longer be reviewed")
         review = HumanReview(
             id=uuid.uuid4(),

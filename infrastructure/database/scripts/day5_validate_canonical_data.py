@@ -38,6 +38,16 @@ def main() -> int:
         if not run:
             fail("No completed Day 5 normalization run found.")
         run_id = run["id"]
+        latest_source_records = scalar(
+            conn,
+            "SELECT count(*) FROM ("
+            "SELECT 1 FROM staged_source_records WHERE tenant_id=:tenant_id "
+            "GROUP BY source_system, record_type, "
+            "CASE WHEN record_type='evidence_metadata' "
+            "THEN COALESCE(raw_payload->>'evidence_id', source_record_id) ELSE source_record_id END"
+            ") authoritative",
+            tenant_id=tenant_id,
+        )
 
         checks = {
             "products": scalar(conn, "SELECT count(*) FROM products WHERE tenant_id=:tenant_id", tenant_id=tenant_id),
@@ -100,7 +110,6 @@ def main() -> int:
             "complaints": 120,
             "investigations": 10,
             "evidence": 38,
-            "links": 337,
             "rules": 12,
             "relationships": 18,
             "product_components": 16,
@@ -109,6 +118,11 @@ def main() -> int:
         for key, expected in minimums.items():
             if checks[key] < expected:
                 fail(f"{key} expected >= {expected}; observed {checks[key]}")
+        if checks["links"] < latest_source_records:
+            fail(
+                f"links expected >= {latest_source_records} authoritative latest source records; "
+                f"observed {checks['links']}"
+            )
         if checks["ground_truth_links"] != 0:
             fail("Ground Truth appeared in normalization provenance.")
 

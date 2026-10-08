@@ -100,8 +100,79 @@ DB_MODULES = {
     "test_admin_route_walk",
     "test_ai_controls",
     "test_audit_hash_chain",
+    "test_replay_outbox_script",
+    "test_approval_authority_roles",
+    "test_customer_lifecycle_subscription",
+    "test_business_ids",
     "test_connector_sync",
     "test_tenant_data",
+    "test_role_canonicalization",
+    "test_erasure_reapply",
+    "test_legal_hold",
+    "test_person_export",
+    "test_retention_audit",
+    "test_infra_break_glass",
+    "test_infra_backup_role",
+    "test_activation_link",
+    "test_identity_invitation_delivery",
+    "test_customer_admin_workspace",
+    "test_csv_safe",
+    "test_auth_limits",
+    "test_auth_session_lifecycle",
+    "test_auth_audit_events",
+    "test_auth_signup_acknowledgement",
+    "test_customer_admin_erasure_hold",
+    # product-reports: seed tagged cases in the golden organization (tests/reports_seed.py).
+    "test_reports_content",
+    "test_investigation_record",
+    "test_stage3_story",
+    "test_risk_router",
+    "test_regulatory_copilot",
+    "test_evaluation_router",
+    "test_supplier_reply",
+    "test_stage3_refusals",
+    # bizid-api: API responses carry each record's business identifier (md26).
+    "test_business_ids_platform_api",
+    "test_business_ids_ops_api",
+    "test_business_ids_custadmin_api",
+    "test_business_ids_workspace_api",
+    "test_business_ids_reports_api",
+    # Phase 1: additional workflow roles (customer-admin API, session, union of permissions) and case deep links.
+    "test_additional_roles",
+    # Phase 1: workflow tasks (My Work): hooks of existing actions, the task API and the backfill.
+    "test_workflow_tasks",
+    # Phase 2: signals and triage: the triage API, detection, cases from signals and their lifecycle.
+    "test_signals_triage",
+    # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
+    "test_case_workflow",
+    # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.
+    "test_evidence_workflow",
+    # Phase 4: case intelligence (hypotheses judged and added by people, unknowns, failure chains, observations).
+    "test_case_intelligence",
+    # Phase 4: Ask MDARIX's structured answer (record-based with AI off, checked model sections) and the AI status.
+    "test_ask_structured",
+    # Phase 5: risk and regulatory reviews (policy, requests, reviewers, readiness, scope restart) and next steps.
+    "test_case_reviews",
+    # Phase 5: the controlled Decision Brief (versions, submission gate, quality review, return loops, dashboard).
+    "test_decision_brief",
+    # Phase 6: the human decision (queue, decision screen, signing, verification, superseding, return, legacy).
+    "test_human_decision",
+    # Phase 6: follow-ups, late-evidence impact assessments (hooks and the sweep) and the closure criteria of a case.
+    "test_decision_followups",
+    # Phase 7: trust and audit of a case (timeline, replay, AI runs, integrity, audited export).
+    "test_case_audit",
+    # Phase 7: the 25 workflow scenarios end to end through the API (fresh organizations, six workflow roles).
+    "test_e2e_workflow_scenarios",
+    # Customer and tenant administration (edit, activate, suspend; a suspended customer blocks its tenants).
+    "test_customer_tenant_admin_workflows",
+    # Platform administration lists accounts apart: platform users, customer administrators, customer users.
+    "test_platform_accounts",
+    # Column sorting of the platform administration lists across every page (sort/order on each list endpoint).
+    "test_list_sorting_admin",
+    # Column sorting of the workspace lists across every page (signals, complaints, My Work, requests, risks).
+    "test_list_sorting_workspace",
+    # Every organization-owned table is protected by forced row-level security (md05/md15/md34).
+    "test_rls_coverage",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}
@@ -193,6 +264,7 @@ LEGACY_PROTECTED = {
     "test_day15_decision_center",
     "test_day17_briefs",
     "test_day18_trust_assurance",
+    "test_business_ids_reports_api",
 }
 
 
@@ -209,7 +281,7 @@ def _ensure_legacy_user(db, tenant):
             display_name="Legacy Test Auth",
             company="Test",
             password_hash=_hash("LegacyTestPassword123!"),
-            role="Administrator",
+            role="PLATFORM_ADMIN",
             status="ACTIVE",
             email_verified=True,
             created_at=now,
@@ -266,3 +338,13 @@ def authenticate_legacy_module(request):
         yield
     finally:
         db.close()
+
+
+def with_signing_plan(db, tenant) -> None:
+    """Give a fresh test organization what every real one has: an active plan with controlled signatures, approval
+    authority for Approvers and Leaders, and separation of duties (governance_router.bootstrap and its defaults).
+    Without an active plan an organization has no features (access/plan_features.py), so it cannot sign."""
+    from backend.app.governance_router import bootstrap, ensure_governance_defaults
+
+    bootstrap(db, tenant)
+    ensure_governance_defaults(db, tenant)

@@ -27,10 +27,18 @@ OPENAI_COMPATIBLE = {
     # Free OpenRouter models come and go; check https://openrouter.ai/models?max_price=0 when this one stops answering.
     "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "nvidia/nemotron-3-super-120b-a12b:free"),
     "mistral": ("https://api.mistral.ai/v1/chat/completions", "mistral-small-latest"),
-    # Anthropic's OpenAI-compatible endpoint; for production use under a commercial agreement (genai/policy.py).
-    "anthropic": ("https://api.anthropic.com/v1/chat/completions", "claude-sonnet-5-5"),
+    # Anthropic is called through its own Messages API (ANTHROPIC_MESSAGES_API below), not the OpenAI-compatible
+    # shim, which Anthropic does not offer for production use. For production under a commercial agreement only
+    # (genai/policy.py, docs/compliance/AI_PROVIDER_REGISTER.md).
+    "anthropic": ("https://api.anthropic.com/v1/messages", "claude-sonnet-5-5"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
 }
+# Providers in OPENAI_COMPATIBLE that speak their own Messages API instead of chat completions.
+ANTHROPIC_MESSAGES_API = frozenset({"anthropic"})
+ANTHROPIC_VERSION = "2023-06-01"
+# Anthropic models that accept an effort setting. Short advisory answers ask for low effort, so the model's thinking
+# does not use up the output allowance before the answer is written.
+ANTHROPIC_EFFORT_MODELS = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-opus-4-8", "claude-opus-4-7")
 
 
 def default_model(name: str) -> str | None:
@@ -50,8 +58,95 @@ SENSITIVE = re.compile(r"(?i)(password|token|secret|cookie|authorization|api[_-]
 logger = logging.getLogger(__name__)
 
 
+class InvalidStructuredOutput(ValueError):
+    """A provider returned an empty or non-JSON response to a structured request."""
+
+
+STRICT_JSON_SCHEMA_MODELS = {
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+}
+
+
+# Why no model answered, as a stable code with the sentence a user sees. Callers show the sentence and fall back to
+# rules; the detailed reason (str(exc)) stays in logs and provenance.
+REFUSAL_MESSAGES = {
+    "GENAI_MONTHLY_BUDGET_REACHED": (
+        "Your organization's monthly AI allowance is used up; an administrator can raise it."
+    ),
+    "GENAI_DISABLED_FOR_ORGANIZATION": (
+        "AI processing is switched off for your organization; an administrator can enable it under "
+        "Security › AI processing."
+    ),
+    "GENAI_PROVIDER_NOT_ALLOWED": (
+        "No AI service approved for customer data is configured here, so MDARIX answered from its rules; "
+        "please contact MDARIX support."
+    ),
+    "GENAI_UNAVAILABLE": (
+        "The AI service is not available right now, so MDARIX answered from its rules; please try again in a "
+        "few minutes."
+    ),
+}
+
+
+def refusal_code(reason: str) -> str:
+    """The stable code for a detailed reason ("GENAI_PROVIDER_UNAVAILABLE: URLError" -> GENAI_UNAVAILABLE)."""
+    head = str(reason or "").split(":", 1)[0].strip().upper()
+    return head if head in REFUSAL_MESSAGES else "GENAI_UNAVAILABLE"
+
+
 class GenAIUnavailable(RuntimeError):
-    pass
+    """No model may or can answer this request. ``reason`` is the detailed cause; ``code`` and ``user_message`` are
+    the stable refusal shown to people (REFUSAL_MESSAGES)."""
+
+    def __init__(self, reason: str = "GENAI_UNAVAILABLE"):
+        super().__init__(reason)
+        self.reason = str(reason)
+        self.code = refusal_code(self.reason)
+        self.user_message = REFUSAL_MESSAGES[self.code]
+
+    def refusal(self) -> dict:
+        """The refusal as an API answer: {status: REFUSED, code, user_message}."""
+        return {"status": "REFUSED", "code": self.code, "user_message": self.user_message}
+
+
+# Grounded material is sent inside delimiters, so the model can tell the request from the records: the context as
+# JSON in <context>, each evidence record in <evidence id="...">. Text inside a record that looks like one of these
+# tags is defused so a record cannot close its own block and pose as an instruction.
+_DELIMITER_TAG = re.compile(r"(?i)<(\s*/?\s*(?:evidence|context)\b)")
+_ATTRIBUTE_UNSAFE = re.compile(r"[^A-Za-z0-9._:-]")
+
+
+def _defuse(text: str) -> str:
+    return _DELIMITER_TAG.sub(r"&lt;\1", text)
+
+
+def _evidence_body(item: dict) -> str:
+    text = item.get("text")
+    if isinstance(text, str):
+        header = {key: value for key, value in item.items() if key not in {"id", "text"} and value not in (None, "")}
+        return (json.dumps(header, default=str) + "\n" if header else "") + text
+    return json.dumps({key: value for key, value in item.items() if key != "id"}, default=str)
+
+
+def user_content(prompt: str, context: dict, evidence: list[dict] | None = None) -> str:
+    """The user message: the request, then the context and each evidence record in their own delimited block."""
+    parts = [prompt, "", "<context>", _defuse(json.dumps(context, default=str)), "</context>"]
+    for item in evidence or []:
+        identifier = _ATTRIBUTE_UNSAFE.sub("", str(item.get("id") or item.get("evidence_identifier") or "unknown"))
+        parts += [f'<evidence id="{identifier[:80]}">', _defuse(_evidence_body(item)), "</evidence>"]
+    return "\n".join(parts)
+
+
+def _strip_code_fence(answer: str) -> str:
+    """Some models wrap a JSON reply in a Markdown code fence; the JSON inside is the reply."""
+    cleaned = answer.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else ""
+        if cleaned.rstrip().endswith("```"):
+            cleaned = cleaned.rstrip()[:-3]
+    return cleaned.strip()
 
 
 @dataclass(frozen=True)
@@ -162,18 +257,26 @@ class GenAIProvider:
         *,
         system: str | None = None,
         json_output: bool = False,
+        response_schema: dict | None = None,
         max_output_tokens: int | None = None,
+        evidence: list[dict] | None = None,
     ) -> GenAIResult:
-        """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request."""
+        """system/json_output/max_output_tokens are for structured analysis; defaults keep the plain request.
+
+        ``evidence`` (records with an ``id`` and ``text`` or fields) is sent in delimited ``<evidence id="...">``
+        blocks after the context (``user_content``), masked and redacted like the context."""
         from genai import pii
 
         safe_prompt = SENSITIVE.sub(lambda m: m.group(1) + ": [REDACTED]", prompt)
         safe_context = redact_context(context or {})
+        safe_evidence = redact_context(list(evidence or []))
         if pii.enabled():
             # Personal information never leaves for a model (genai/pii.py); identifiers of records are kept.
             safe_prompt = pii.mask_text(safe_prompt)
             safe_context = pii.mask(safe_context)
-        input_tokens = max(1, (len(safe_prompt) + len(json.dumps(safe_context, default=str)) + len(system or "")) // 4)
+            safe_evidence = pii.mask(safe_evidence)
+        sizes = len(safe_prompt) + len(json.dumps(safe_context, default=str)) + len(system or "")
+        input_tokens = max(1, (sizes + len(json.dumps(safe_evidence, default=str))) // 4)
         if input_tokens > self.max_input:
             raise GenAIUnavailable("GENAI_INPUT_TOKEN_LIMIT")
         started = time.monotonic()
@@ -218,8 +321,10 @@ class GenAIProvider:
                 result = item._send(
                     safe_prompt,
                     safe_context,
+                    evidence=safe_evidence,
                     system=system,
                     json_output=json_output,
+                    response_schema=response_schema,
                     max_output_tokens=max_output_tokens,
                     input_tokens=input_tokens,
                     started=started,
@@ -237,8 +342,10 @@ class GenAIProvider:
         safe_prompt: str,
         safe_context: dict,
         *,
+        evidence: list[dict] | None = None,
         system: str | None,
         json_output: bool,
+        response_schema: dict | None,
         max_output_tokens: int | None,
         input_tokens: int,
         started: float,
@@ -246,26 +353,52 @@ class GenAIProvider:
     ) -> GenAIResult:
         """One provider: the request with its retries. With other providers to fall back to (fail_fast), a rate
         limit moves on at once and the provider rests for a while instead of being waited on."""
-        if self.provider_name in OPENAI_COMPATIBLE:
+        content = user_content(safe_prompt, safe_context, evidence)
+        if self.provider_name in ANTHROPIC_MESSAGES_API:
+            # Anthropic Messages API: the system prompt is a top-level field, and current models refuse sampling
+            # parameters such as temperature, so none is sent.
             body = {
                 "model": self.model,
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": safe_prompt + "\n\nAuthorized context:\n" + json.dumps(safe_context, default=str),
-                    }
-                ],
                 "max_tokens": max_output_tokens or self.max_output,
-                "temperature": 0,
+                "messages": [{"role": "user", "content": content}],
             }
             if system:
+                body["system"] = system
+            if self.model.startswith(ANTHROPIC_EFFORT_MODELS):
+                body["output_config"] = {"effort": "low"}
+            payload = json.dumps(body).encode()
+        elif self.provider_name in OPENAI_COMPATIBLE:
+            body = {
+                "model": self.model,
+                "messages": [{"role": "user", "content": content}],
+                "temperature": 0,
+            }
+            if self.provider_name == "groq":
+                body["max_completion_tokens"] = max_output_tokens or self.max_output
+            else:
+                body["max_tokens"] = max_output_tokens or self.max_output
+            if system:
                 body["messages"].insert(0, {"role": "system", "content": system})
-            if json_output:
+            if response_schema and self.provider_name == "groq" and self.model in STRICT_JSON_SCHEMA_MODELS:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "mdarix_investigation_analysis",
+                        "strict": True,
+                        "schema": response_schema,
+                    },
+                }
+                # GPT-OSS can spend the entire completion budget on reasoning. Low, hidden reasoning leaves a
+                # deterministic structured answer while retaining enough analysis for this evidence-review task.
+                body["reasoning_effort"] = "low"
+                body["reasoning_format"] = "hidden"
+            elif json_output:
                 body["response_format"] = {"type": "json_object"}
             payload = json.dumps(body).encode()
         else:
+            context = {**safe_context, "evidence": evidence} if evidence else safe_context
             payload = json.dumps(
-                {"model": self.model, "prompt": safe_prompt, "context": safe_context, "max_tokens": self.max_output}
+                {"model": self.model, "prompt": safe_prompt, "context": context, "max_tokens": self.max_output}
             ).encode()
         error = None
         for attempt in range(self.retries + 1):
@@ -278,11 +411,26 @@ class GenAIProvider:
                         "User-Agent": "MDARIX-R1/1.0",
                     },
                 )
-                if self.api_key:
+                if self.provider_name in ANTHROPIC_MESSAGES_API:
+                    req.add_header("x-api-key", self.api_key or "")
+                    req.add_header("anthropic-version", ANTHROPIC_VERSION)
+                elif self.api_key:
                     req.add_header("Authorization", f"Bearer {self.api_key}")
                 with request.urlopen(req, timeout=self.timeout) as response:
                     raw = json.loads(response.read())
-                if self.provider_name in OPENAI_COMPATIBLE:
+                if self.provider_name in ANTHROPIC_MESSAGES_API:
+                    if raw.get("stop_reason") == "refusal":
+                        raise InvalidStructuredOutput("the model declined the request")
+                    texts = [
+                        block.get("text") or ""
+                        for block in raw.get("content") or []
+                        if isinstance(block, dict) and block.get("type") == "text"
+                    ]
+                    answer = "".join(texts) or None
+                    usage = raw.get("usage") or {}
+                    output_tokens = int(usage.get("output_tokens") or max(1, len(str(answer or "")) // 4))
+                    input_tokens = int(usage.get("input_tokens") or input_tokens)
+                elif self.provider_name in OPENAI_COMPATIBLE:
                     answer = ((raw.get("choices") or [{}])[0].get("message") or {}).get("content")
                     usage = raw.get("usage") or {}
                     output_tokens = int(usage.get("completion_tokens") or max(1, len(str(answer or "")) // 4))
@@ -290,6 +438,16 @@ class GenAIProvider:
                 else:
                     answer = raw.get("answer", raw.get("output", raw.get("text")))
                     output_tokens = min(self.max_output, max(1, len(str(answer or "")) // 4))
+                if json_output:
+                    if not isinstance(answer, str) or not answer.strip():
+                        raise InvalidStructuredOutput("empty structured response")
+                    answer = _strip_code_fence(answer)
+                    try:
+                        structured = json.loads(answer)
+                    except (TypeError, ValueError) as exc:
+                        raise InvalidStructuredOutput("invalid structured response") from exc
+                    if not isinstance(structured, dict):
+                        raise InvalidStructuredOutput("structured response is not an object")
                 output = {
                     "answer": answer,
                     "limitations": ["Provider output requires human review."],
@@ -317,7 +475,7 @@ class GenAIProvider:
                     status,
                     type(exc).__name__,
                 )
-                if fail_fast and status == 429:
+                if fail_fast and status == 429 and not json_output:
                     _rest(
                         self.provider_name,
                         float(os.getenv("MDARIX_GENAI_RATE_LIMIT_REST_SECONDS", "900")),

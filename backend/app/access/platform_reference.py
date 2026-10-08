@@ -160,6 +160,7 @@ def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: S
             .all()
         )
         data.expunge_all()
+    product_business_ids = {item.id: item.business_id for item in products}
     connectors = (
         db.query(ConnectorConfiguration)
         .filter(ConnectorConfiguration.tenant_id == tenant_id)
@@ -173,10 +174,17 @@ def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: S
         .all()
     )
     return {
-        "tenant": {"id": str(tenant.id), "tenant_key": tenant.tenant_key, "name": tenant.name, "status": tenant.status},
+        "tenant": {
+            "id": str(tenant.id),
+            "business_id": tenant.business_id,
+            "tenant_key": tenant.tenant_key,
+            "name": tenant.name,
+            "status": tenant.status,
+        },
         "products": [
             {
                 "id": str(item.id),
+                "business_id": item.business_id,
                 "identifier": item.product_identifier,
                 "name": item.name,
                 "status": item.lifecycle_status,
@@ -189,7 +197,9 @@ def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: S
         "versions": [
             {
                 "id": str(item.id),
+                "business_id": item.business_id,
                 "product_id": str(item.product_id),
+                "product_business_id": product_business_ids.get(item.product_id),
                 "identifier": item.version_identifier,
                 "status": item.lifecycle_status,
                 "release_timestamp": item.release_timestamp.isoformat() if item.release_timestamp else None,
@@ -242,6 +252,7 @@ def platform_create_product(payload: PlatformProductRequest, request: Request, d
         data.commit()
         result = {
             "id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(payload.tenant_id),
             "product_identifier": row.product_identifier,
             "name": row.name,
@@ -278,6 +289,7 @@ def platform_update_product(
         data.commit()
         result = {
             "id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(tenant_id),
             "product_identifier": row.product_identifier,
             "name": row.name,
@@ -342,8 +354,10 @@ def platform_create_product_version(
         data.commit()
         result = {
             "id": str(row.id),
+            "business_id": row.business_id,
             "tenant_id": str(payload.tenant_id),
             "product_id": str(row.product_id),
+            "product_business_id": product.business_id,
             "version_identifier": row.version_identifier,
             "status": row.lifecycle_status,
         }

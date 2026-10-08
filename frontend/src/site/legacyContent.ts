@@ -494,7 +494,7 @@ export const lifecycleContent: Record<string, { eyebrow: string; title: string; 
   regulatory: {
     eyebrow: "Product lifecycle · Release",
     title: "Prepare a traceable regulatory evidence story.",
-    copy: "Organize submissions, commitments, standards, approvals, findings, and market-specific obligations around the exact product version and evidence scope.",
+    copy: "Draft regulatory narratives from the evidence of the exact product version, with every statement citing its source. MDARIX drafts for your team to review and approve; it does not submit anything to a regulator.",
   },
   manufacturing: {
     eyebrow: "Product lifecycle · Build",

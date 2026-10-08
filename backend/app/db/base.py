@@ -26,3 +26,9 @@ from backend.app.db.models.stage3 import *
 from backend.app.db.models.reporting import *
 from backend.app.db.models.regulatory import *
 from backend.app.db.models.master import *
+from backend.app.db.models.workflow import *
+from backend.app.db.models.signals import *
+from backend.app.db.models.case_scope import *
+from backend.app.db.models.intelligence import *
+from backend.app.db.models.reviews import *
+from backend.app.db.models.decision_outcomes import *

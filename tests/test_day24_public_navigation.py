@@ -54,8 +54,11 @@ def test_public_story_preserves_system_of_record_and_human_authority_boundaries(
 
 
 def test_private_application_routes_require_authenticated_session():
-    assert 'fetch("/api/v1/auth/session")' in MAIN
-    assert "window.location.replace(`/signin?returnTo=" in MAIN
+    # The gate asks the server for the session itself (no automatic "expired" redirect for a first visit) and sends
+    # anyone without one to sign-in, coming back to the same page afterwards.
+    assert compact('requestJson<{ mfa_state?: string | null }>("/api/v1/auth/session"') in compact(MAIN)
+    assert "redirectOnUnauthorized: false" in MAIN
+    assert "window.location.replace(signInPath(" in MAIN
     assert "Customer application routes require an authenticated session" in MAIN
 
 
@@ -66,8 +69,12 @@ def test_mega_menu_supports_escape_and_responsive_navigation():
 
 
 def test_authenticated_home_tells_and_connects_the_workflow_story():
-    # Signed-in business users land on the user workspace; it opens on a live Dashboard.
-    assert compact("if (!isPlatformAdmin && !isCustomerAdmin) return (<><UserWorkspace") in compact(MAIN)
+    # Signed-in business users (and a customer administrator who switched into it) land on the user workspace,
+    # which opens on a live Dashboard.
+    assert compact(
+        'if ((!isPlatformAdmin && !isCustomerAdmin) || (isCustomerAdmin && adminMode === "workspace"))'
+    ) in compact(MAIN)
+    assert "<UserWorkspace" in MAIN
     # The workflow story is the navigation itself, in order: product -> signal -> case -> evidence -> decision -> trust.
     order = ["Products", "Signals", "Investigations", "Evidence", "Decisions", "Trust & Audit"]
     positions = [WORKSPACE_CONTEXT.index(f'"{name}"') for name in order]

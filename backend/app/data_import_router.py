@@ -1,8 +1,12 @@
 """Workspace data import: products, lots and complaints from CSV into the tenant's own records (Product 360).
 
 The same validated import the free trial uses (backend/app/trial/imports.py): the whole file is checked first and
-nothing is written unless every row passes. Needs permission to change records. Free-trial workspaces keep their row
-and file limits; other workspaces use the workspace policy. Each import is audited.
+nothing is written unless every row passes. Open to every organization: it needs only the permission to change
+records. Free-trial workspaces keep their row and file limits; other workspaces use the workspace policy. Each
+import is audited.
+
+The file is sent as bytes, either as the raw body (``text/csv``) or as the ``file`` field of a multipart form, and
+must be UTF-8; ``?date_format=DMY`` or ``MDY`` declares the order of day and month in dates that are not YYYY-MM-DD.
 """
 
 from __future__ import annotations
@@ -10,10 +14,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
-from backend.app.request_body import read_limited
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
@@ -23,6 +26,7 @@ from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports
 from backend.app.trial.service import trial_subscription
+from backend.app.signals import hooks as signal_hooks
 
 from backend.app.db.data_plane import open_tenant_data_session
 from retrieval.record_evidence import embed_tenant_evidence
@@ -36,7 +40,7 @@ def _policy(db: Session, ctx: AuthenticatedRequestContext) -> imports.ImportPoli
 
 
 async def _body(request: Request, policy: imports.ImportPolicy) -> bytes:
-    return await read_limited(request, policy.file_limit_bytes, message=policy.file_too_large)
+    return await imports.read_upload(request, policy.file_limit_bytes, policy.file_too_large)
 
 
 @router.get("/templates")
@@ -69,10 +73,12 @@ def import_template(entity: str, ctx: AuthenticatedRequestContext = Depends(get_
     )
 
 
-def _import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, policy: imports.ImportPolicy) -> dict:
+def _import_and_audit(
+    db, data, ctx, tenant_id, entity: str, raw: bytes, policy: imports.ImportPolicy, date_format: str = "ISO"
+) -> dict:
     """All-or-nothing import, then its audit record (runs in the thread pool)."""
     try:
-        result = imports.import_file(data, tenant_id, entity, raw, policy)
+        result = imports.import_file(data, tenant_id, entity, raw, policy, date_format)
         data.commit()
     except HTTPException:
         data.rollback()
@@ -94,6 +100,9 @@ def _import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, policy:
         )
     )
     db.commit()
+    if signal_hooks.imported_complaints(result):
+        # Signals from the new complaints (backend/app/signals/detection.py); never fails or undoes the import.
+        signal_hooks.after_complaints_saved(data, tenant_id, source="CSV import")
     return result
 
 
@@ -101,14 +110,16 @@ def _import_and_audit(db, data, ctx, tenant_id, entity: str, raw: bytes, policy:
 async def check_import(
     entity: str,
     request: Request,
+    date_format: str = Query(default="ISO", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    order = imports.date_format_or_422(date_format)
     policy = await run_in_threadpool(_policy, db, ctx)
     raw = await _body(request, policy)
     # Parsing and checking query the database: off the event loop, so other requests are not held up.
-    return await run_in_threadpool(imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy)
+    return await run_in_threadpool(imports.check_file, data, uuid.UUID(str(ctx.tenant_id)), entity, raw, policy, order)
 
 
 @router.post("/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
@@ -116,14 +127,16 @@ async def run_import(
     entity: str,
     request: Request,
     background: BackgroundTasks,
+    date_format: str = Query(default="ISO", max_length=8),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
+    order = imports.date_format_or_422(date_format)
     policy = await run_in_threadpool(_policy, db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request, policy)
-    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy)
+    result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order)
     if result.get("rows"):
         # Semantic search over the imported records, after the response (their text is already searchable).
         background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)

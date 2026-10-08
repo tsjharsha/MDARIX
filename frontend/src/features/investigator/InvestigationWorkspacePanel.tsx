@@ -14,7 +14,35 @@ import {
   ChallengeSet,
 } from "../../app/types";
 import { api } from "../../app/api";
+import { AI_TIMEOUT_MS, describeError, postJson } from "../../app/apiClient";
 import { useCan } from "../workspace/workspaceContext";
+import { CaseRecordDownload } from "../reports/CaseRecordDownload";
+import { displayId } from "../../app/displayId";
+import { hasSavedResults, loadSavedResults } from "./savedResults";
+import { AiInterpretationNote } from "../shared/StatementKind";
+import { useAiBanner } from "../workspace/useAiStatus";
+import { aiNoticeOf, epistemicOf, type IntelligenceView } from "../workspace/intelligence";
+
+type AiBlock = "analysis" | "hypotheses" | "challenges" | "unknowns" | "failureChains" | "counterfactual" | "brief";
+type AiBlockLabel = { note: string | null; notice: { message: string; manual: string | null } | null };
+
+/**
+ * The label every block of AI output carries (an AI interpretation to review), the reason rules wrote it when AI
+ * could not, and the way to judge it where people record their judgements.
+ */
+function AiBlockNote({ label, onJudge }: { label?: AiBlockLabel; onJudge?: () => void }) {
+  return (
+    <>
+      <AiInterpretationNote note={label?.note} onJudge={onJudge} />
+      {label?.notice && (
+        <p className="ac-muted" role="note">
+          {label.notice.message}
+          {label.notice.manual ? ` ${label.notice.manual}` : ""}
+        </p>
+      )}
+    </>
+  );
+}
 
 export function InvestigationTabSummary({
   activeTab,
@@ -129,11 +157,14 @@ export function InvestigationWorkspacePanel({
   temporalMode: mode,
   asOf,
   onOpenDecision,
+  onOpenIntelligence,
 }: {
   investigationId: string;
   temporalMode: TemporalMode;
   asOf: string;
   onOpenDecision: () => void;
+  /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
+  onOpenIntelligence?: (view: IntelligenceView) => void;
 }) {
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
   const [analysis, setAnalysis] = useState<InvestigationAnalysis | null>(null);
@@ -156,66 +187,113 @@ export function InvestigationWorkspacePanel({
   >("overview");
   const [brief, setBrief] = useState<InvestigationBrief | null>(null);
   const [counterfactual, setCounterfactual] = useState<any>(null);
-  const [counterfactualTarget, setCounterfactualTarget] = useState("Component Rev B");
+  const [counterfactualTarget, setCounterfactualTarget] = useState("");
   const [counterfactualType, setCounterfactualType] = useState("REMOVE_CHANGE");
-  const [counterfactualStatus, setCounterfactualStatus] = useState("IDLE");
+  const [counterfactualStatus, setCounterfactualStatus] = useState("Not run yet");
   const [error, setError] = useState("");
   const [actionStatus, setActionStatus] = useState("");
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const requestSequence = useRef(0);
+  // Set once a scenario is run for this case, so a saved scenario arriving later never replaces it.
+  const counterfactualRequested = useRef(false);
   // Viewers can read every result; only roles allowed to run AI see the run buttons (the server enforces it too).
   const canRun = useCan("ai.run");
+  // When AI is off, unavailable or over its allowance, say so and offer the manual way; otherwise nothing changes.
+  const aiBanner = useAiBanner();
+  const aiBlocked = Boolean(aiBanner);
+  const runTitle = aiBanner ? aiBanner.disabledReason : undefined;
+  const runDescribedBy = aiBanner ? "ai-status-banner" : undefined;
+  // What each AI response says it is (an AI interpretation) and, when rules wrote it, why.
+  const [labels, setLabels] = useState<Partial<Record<AiBlock, AiBlockLabel>>>({});
+  const remember = (block: AiBlock, payload: unknown) =>
+    setLabels((current) => ({
+      ...current,
+      [block]: { note: epistemicOf(payload)?.note ?? null, notice: aiNoticeOf(payload) },
+    }));
+  const judge = (view: IntelligenceView) => (onOpenIntelligence ? () => onOpenIntelligence(view) : undefined);
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
+    const current = () => sequence === requestSequence.current;
+    // A different case or point in time starts clean: nothing from the previous one stays on screen.
+    setWorkspace(null);
+    setAnalysis(null);
+    setHypothesisSet(null);
+    setUnknownSet(null);
+    setFailureChains(null);
+    setChallengeSet(null);
+    setBrief(null);
+    setCounterfactual(null);
+    setCounterfactualStatus("Not run yet");
+    counterfactualRequested.current = false;
+    setLabels({});
+    setError("");
+    setActionStatus("");
+    setPendingAction(null);
     const params = new URLSearchParams({ temporal_mode: mode, retrieval_top_k: "8" });
     if (mode !== "current") params.set("as_of", `${asOf}T00:00:00Z`);
     api<InvestigationWorkspace>(`/api/v1/investigations/${investigationId}/workspace?${params}`)
       .then((item) => {
-        if (sequence !== requestSequence.current) return;
+        if (!current()) return;
         setWorkspace(item);
-        setAnalysis(null);
-        setHypothesisSet(null);
-        setUnknownSet(null);
-        setFailureChains(null);
-        setChallengeSet(null);
-        setError("");
-        setActionStatus("");
-        setPendingAction(null);
       })
       .catch((err) => {
-        if (sequence === requestSequence.current) {
-          setError(err.message);
+        if (current()) {
+          setError(describeError(err, "The investigation could not be loaded."));
           setActionStatus("BACKEND ERROR: Investigation context could not be loaded.");
           setPendingAction(null);
         }
       });
+    // Show the latest saved AI results instead of making people pay for the same runs again. A result produced by
+    // an action started meanwhile is newer, so it is kept (each setter only fills what is still empty).
+    loadSavedResults(investigationId, api).then((saved) => {
+      if (!current()) return;
+      setAnalysis((shown) => shown ?? saved.analysis);
+      setHypothesisSet((shown) => shown ?? saved.hypothesisSet);
+      setChallengeSet((shown) => shown ?? saved.challengeSet);
+      setUnknownSet((shown) => shown ?? saved.unknownSet);
+      setFailureChains((shown) => shown ?? saved.failureChains);
+      setBrief((shown) => shown ?? saved.brief);
+      if (saved.counterfactual && !counterfactualRequested.current) {
+        setCounterfactual(saved.counterfactual.result);
+        setCounterfactualStatus(saved.counterfactual.status);
+      }
+      if (hasSavedResults(saved))
+        setActionStatus(
+          (status) =>
+            status ||
+            "SAVED RESULTS: Showing the latest saved AI results for this investigation. Run a step again to refresh it.",
+        );
+    });
   }, [investigationId, mode, asOf]);
+
+  // AI actions can take a while; each waits up to a minute, then says so instead of spinning forever.
+  const ai = <T,>(path: string, body: unknown) =>
+    postJson<T>(`/api/v1/investigations/${investigationId}/${path}`, body, { timeoutMs: AI_TIMEOUT_MS });
+  const failed = (sequence: number, what: string, err: unknown) => {
+    if (sequence !== requestSequence.current) return;
+    const text = describeError(err, `${what} could not be completed.`);
+    setError(text);
+    setActionStatus(`BACKEND ERROR: ${what} could not be completed. ${text}`);
+    setPendingAction(null);
+  };
+  const temporal = () => ({ temporal_mode: mode, as_of: mode === "current" ? null : `${asOf}T00:00:00Z` });
 
   const runAnalysis = () => {
     const sequence = requestSequence.current;
     setPendingAction("Run Analysis");
     setActionStatus("RUNNING: AI Investigator analysis...");
     setError("");
-    const body = {
+    ai<any>("analysis", {
       investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
+      ...temporal(),
       analysis_mode: "standard",
       retrieval_top_k: 8,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/analysis`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setAnalysis(payload.analysis);
+        remember("analysis", payload);
         setActionStatus(
           payload.analysis?.observations?.length
             ? "SUCCESS: Analysis results are displayed below."
@@ -224,13 +302,7 @@ export function InvestigationWorkspacePanel({
         setPendingAction(null);
         setError("");
       })
-      .catch((err) => {
-        if (sequence === requestSequence.current) {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Analysis could not be completed (${err.message}).`);
-          setPendingAction(null);
-        }
-      });
+      .catch((err) => failed(sequence, "Analysis", err));
   };
 
   const runHypotheses = () => {
@@ -238,26 +310,17 @@ export function InvestigationWorkspacePanel({
     setPendingAction("Generate Hypotheses");
     setActionStatus("RUNNING: Generating competing hypotheses...");
     setError("");
-    const body = {
+    ai<any>("hypotheses", {
       investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
+      ...temporal(),
       investigator_question: "Generate competing hypotheses from the validated investigation analysis.",
       // Build on the analysis on screen instead of running it again.
       source_analysis_id: analysis?.analysis_id ?? null,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/hypotheses`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
     })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setHypothesisSet(payload.hypothesis_set);
+        remember("hypotheses", payload);
         const count = payload.hypothesis_set?.hypotheses?.length ?? 0;
         setActionStatus(
           count
@@ -267,130 +330,94 @@ export function InvestigationWorkspacePanel({
         setPendingAction(null);
         setError("");
       })
-      .catch((err) => {
-        if (sequence === requestSequence.current) {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Hypotheses could not be generated (${err.message}).`);
-          setPendingAction(null);
-        }
-      });
+      .catch((err) => failed(sequence, "Hypothesis generation", err));
   };
 
-  const runDay14 = () => {
+  const runDay14 = async () => {
     const sequence = requestSequence.current;
+    const current = () => sequence === requestSequence.current;
     setPendingAction("Run Unknowns & Chain");
     setActionStatus("RUNNING: Evaluating Unknowns Radar and Failure Chain...");
     setError("");
-    const body = {
-      investigation_id: investigationId,
-      temporal_mode: mode,
-      as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
-    };
-    fetch(`/api/v1/investigations/${investigationId}/challenges`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const body = { investigation_id: investigationId, ...temporal() };
+    try {
       // Challenge the hypotheses on screen instead of regenerating them.
-      body: JSON.stringify({ ...body, hypothesis_set_id: hypothesisSet?.hypothesis_set_id ?? null }),
-    })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return Promise.reject(new Error("STALE_CONTEXT"));
-        setChallengeSet(payload.challenge_set);
-        return fetch(`/api/v1/investigations/${investigationId}/unknowns`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return Promise.reject(new Error("STALE_CONTEXT"));
-        setUnknownSet(payload.unknown_set);
-        return fetch(`/api/v1/investigations/${investigationId}/failure-chains`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-      })
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json();
-      })
-      .then((payload) => {
-        if (sequence !== requestSequence.current) return;
-        setFailureChains(payload.failure_chain_set);
-        setActionStatus(
-          payload.failure_chain_set?.chains?.length
-            ? "SUCCESS: Unknowns and Failure Chain results are displayed below."
-            : "INSUFFICIENT EVIDENCE: No supportable failure chain is available; the controlled result remains unresolved.",
-        );
-        setPendingAction(null);
-        setError("");
-      })
-      .catch((err) => {
-        if (sequence === requestSequence.current && err.message !== "STALE_CONTEXT") {
-          setError(err.message);
-          setActionStatus(`BACKEND ERROR: Unknowns and Failure Chain could not be completed (${err.message}).`);
-          setPendingAction(null);
-        }
+      const challenges = await ai<any>("challenges", {
+        ...body,
+        hypothesis_set_id: hypothesisSet?.hypothesis_set_id ?? null,
       });
+      if (!current()) return;
+      setChallengeSet(challenges.challenge_set);
+      remember("challenges", challenges);
+      const unknowns = await ai<any>("unknowns", body);
+      if (!current()) return;
+      setUnknownSet(unknowns.unknown_set);
+      remember("unknowns", unknowns);
+      const chains = await ai<any>("failure-chains", body);
+      if (!current()) return;
+      setFailureChains(chains.failure_chain_set);
+      remember("failureChains", chains);
+      setActionStatus(
+        chains.failure_chain_set?.chains?.length
+          ? "SUCCESS: Unknowns and Failure Chain results are displayed below."
+          : "INSUFFICIENT EVIDENCE: No supportable failure chain is available; the controlled result remains unresolved.",
+      );
+      setPendingAction(null);
+      setError("");
+    } catch (err) {
+      failed(sequence, "Unknowns and Failure Chain", err);
+    }
   };
   const runCounterfactual = () => {
     const sequence = requestSequence.current;
+    const target = counterfactualTarget.trim();
+    if (!target) {
+      setCounterfactualStatus("Name the change, component or link to take away first.");
+      return;
+    }
+    counterfactualRequested.current = true;
     setCounterfactualStatus("VALIDATING");
     setCounterfactual(null);
-    fetch(`/api/v1/investigations/${investigationId}/counterfactuals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        temporal_mode: mode,
-        as_of: mode === "current" ? null : `${asOf}T00:00:00Z`,
-        intervention_type: counterfactualType,
-        intervention_target: counterfactualTarget,
-        intervention_description: `Explore the constrained alternative condition where ${counterfactualTarget} is removed from the candidate explanation.`,
-      }),
+    ai<any>("counterfactuals", {
+      ...temporal(),
+      intervention_type: counterfactualType,
+      intervention_target: target,
+      intervention_description: `Explore the constrained alternative condition where ${target} is removed from the candidate explanation.`,
     })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail?.message ?? response.statusText);
-        return payload;
-      })
       .then((payload) => {
         if (sequence !== requestSequence.current) return;
         setCounterfactual(payload.result);
+        remember("counterfactual", payload);
         setCounterfactualStatus(payload.status ?? "SUCCESS");
       })
       .catch((err) => {
         if (sequence === requestSequence.current)
           setCounterfactualStatus(
-            err.message.includes("INSUFFICIENT") ? "INSUFFICIENT EVIDENCE" : `ERROR: ${err.message}`,
+            err instanceof Error && err.message.includes("INSUFFICIENT")
+              ? "INSUFFICIENT EVIDENCE"
+              : `ERROR: ${describeError(err, "The scenario could not be run.")}`,
           );
       });
   };
   const generateBrief = () => {
+    const sequence = requestSequence.current;
+    setPendingAction("Generate Investigation Brief");
     setActionStatus("RUNNING: Generating Investigation Brief...");
-    fetch(`/api/v1/investigations/${investigationId}/briefs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ temporal_mode: mode, as_of: mode === "current" ? null : `${asOf}T00:00:00Z` }),
-    })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail?.message ?? response.statusText);
-        return payload;
-      })
+    setError("");
+    ai<InvestigationBrief>("briefs", temporal())
       .then((payload) => {
+        if (sequence !== requestSequence.current) return;
         setBrief(payload);
+        remember("brief", payload);
         setActiveTab("brief");
         setActionStatus(`SUCCESS: Investigation Brief v${payload.brief_version} generated for review.`);
+        setPendingAction(null);
       })
-      .catch((err) => setActionStatus(`BACKEND ERROR: Brief could not be generated (${err.message}).`));
+      .catch((err) => {
+        if (sequence !== requestSequence.current) return;
+        setActionStatus(`BACKEND ERROR: Brief could not be generated. ${describeError(err, "Try again.")}`);
+        setPendingAction(null);
+      });
   };
 
   return (
@@ -400,8 +427,18 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <ClipboardList size={18} /> Investigation Workspace
           </div>
-          <h2>{workspace?.investigation.investigation_identifier ?? "Investigation context"}</h2>
-          <p>{workspace?.investigation.investigation_question ?? "Loading deterministic investigation context."}</p>
+          <h2>
+            {workspace
+              ? displayId(workspace.investigation, "investigation_identifier", "Investigation context")
+              : "Investigation context"}
+          </h2>
+          <p>{workspace?.investigation.investigation_question ?? "Loading this investigation…"}</p>
+          <CaseRecordDownload
+            investigationId={investigationId}
+            label={
+              workspace ? displayId(workspace.investigation, "investigation_identifier", "") || undefined : undefined
+            }
+          />
         </div>
         <div className="toolbar compact">
           <span className="context-summary">
@@ -416,20 +453,46 @@ export function InvestigationWorkspacePanel({
           </div>
           {canRun ? (
             <>
-              <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action"
+                onClick={runAnalysis}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
               </button>
-              <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action secondary"
+                onClick={runHypotheses}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
               </button>
-              <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+              <button
+                className="primary-action secondary"
+                onClick={runDay14}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
                 {" "}
                 {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
               </button>
-              <button className="primary-action" onClick={generateBrief}>
-                Generate Investigation Brief
+              <button
+                className="primary-action"
+                onClick={generateBrief}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
+                {pendingAction === "Generate Investigation Brief"
+                  ? "Generating Brief…"
+                  : "Generate Investigation Brief"}
               </button>
             </>
           ) : (
@@ -439,6 +502,28 @@ export function InvestigationWorkspacePanel({
           )}
         </div>
       </div>
+      {aiBanner && (
+        <div id="ai-status-banner" className="ac-message tone-warning ai-status-banner" role="status">
+          <div>
+            <strong>{aiBanner.title}.</strong> {aiBanner.message} The AI run buttons are off; you can do the same work
+            by hand.
+          </div>
+          {onOpenIntelligence && (
+            <div className="ai-status-manual">
+              {aiBanner.manual.map((path) => (
+                <button
+                  type="button"
+                  key={path.view}
+                  className="primary-action secondary"
+                  onClick={() => onOpenIntelligence(path.view)}
+                >
+                  {path.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div className="workflow-tabs" role="tablist" aria-label="Investigation workflow">
         {(
           [
@@ -519,7 +604,7 @@ export function InvestigationWorkspacePanel({
             <div className="evidence-list">
               {workspace.evidence_context.slice(0, 6).map((item) => (
                 <article key={item.evidence_identifier}>
-                  <strong>{item.evidence_identifier}</strong>
+                  <strong>{displayId(item, "evidence_identifier")}</strong>
                   <span>{item.title}</span>
                   <small>
                     {item.evidence_type} | {item.reliability_status} | anchors{" "}
@@ -554,17 +639,34 @@ export function InvestigationWorkspacePanel({
         <h3>Analysis</h3>
         <p>Grounded observations and possible explanations for the selected context.</p>
         {canRun && (
-          <button className="primary-action" onClick={runAnalysis} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action"
+            onClick={runAnalysis}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Run Analysis" ? "Running Analysis…" : "Run Analysis"}
           </button>
         )}
       </section>
-      {analysis && <AnalysisVisual analysis={analysis} />}
+      {analysis && (
+        <>
+          <AiBlockNote label={labels.analysis} onJudge={judge("Observations")} />
+          <AnalysisVisual analysis={analysis} />
+        </>
+      )}
       <section id="workflow-hypotheses" className="workflow-action">
         <h3>Competing hypotheses</h3>
         <p>Preserves support, contradiction, gaps, and falsification conditions without choosing a winner.</p>
         {canRun && (
-          <button className="primary-action secondary" onClick={runHypotheses} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action secondary"
+            onClick={runHypotheses}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Generate Hypotheses" ? "Generating…" : "Generate Hypotheses"}
           </button>
         )}
@@ -574,6 +676,7 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <GitBranch size={18} /> Competing Hypotheses
           </div>
+          <AiBlockNote label={labels.hypotheses} onJudge={judge("Hypotheses")} />
           <HypothesisBoard set={hypothesisSet} />
         </div>
       )}
@@ -581,7 +684,13 @@ export function InvestigationWorkspacePanel({
         <h3>Challenger, unknowns, and failure chain</h3>
         <p>Surfaces challenges and material unknowns. An unresolved failure chain is a valid controlled result.</p>
         {canRun && (
-          <button className="primary-action secondary" onClick={runDay14} disabled={Boolean(pendingAction)}>
+          <button
+            className="primary-action secondary"
+            onClick={runDay14}
+            disabled={Boolean(pendingAction) || aiBlocked}
+            title={runTitle}
+            aria-describedby={runDescribedBy}
+          >
             {pendingAction === "Run Unknowns & Chain"
               ? "Running controlled checks…"
               : "Run Challenger, Unknowns & Chain"}
@@ -593,16 +702,19 @@ export function InvestigationWorkspacePanel({
           <div className="section-title">
             <ShieldCheck size={18} /> Challenger review
           </div>
+          <AiBlockNote label={labels.challenges} onJudge={judge("Contradictions")} />
           <ChallengeBoard set={challengeSet} />
         </div>
       )}
       {unknownSet && (
         <div id="workflow-unknowns" className="analysis-grid">
           <Panel title="Unknowns Radar" icon={<AlertTriangle />}>
+            <AiBlockNote label={labels.unknowns} onJudge={judge("Unknowns")} />
             <UnknownsBoard set={unknownSet} />
           </Panel>
           <div id="workflow-failure-chain">
             <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
+              <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
               <div className="analysis-list">
                 {!failureChains?.chains.length && (
                   <p className="empty">
@@ -656,13 +768,15 @@ export function InvestigationWorkspacePanel({
             value={counterfactualTarget}
             onChange={(event) => setCounterfactualTarget(event.target.value)}
             aria-label="Counterfactual target"
-            placeholder="Readable target, e.g. Component Rev B"
+            placeholder="What to take away, e.g. a component revision or supplier change"
           />
           {canRun && (
             <button
               className="primary-action"
               onClick={runCounterfactual}
-              disabled={counterfactualStatus === "VALIDATING"}
+              disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim() || aiBlocked}
+              title={runTitle}
+              aria-describedby={runDescribedBy}
             >
               {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
             </button>
@@ -673,6 +787,7 @@ export function InvestigationWorkspacePanel({
         </p>
         {counterfactual && (
           <div className="counterfactual-result">
+            <AiBlockNote label={labels.counterfactual} />
             <strong>{counterfactual.label}</strong>
             <h3>What stays the same</h3>
             <ul>
@@ -712,14 +827,23 @@ export function InvestigationWorkspacePanel({
           <>
             <p>Assemble a versioned, evidence-grounded package for human review.</p>
             {canRun && (
-              <button className="primary-action" onClick={generateBrief}>
-                Generate Investigation Brief
+              <button
+                className="primary-action"
+                onClick={generateBrief}
+                disabled={Boolean(pendingAction) || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
+                {pendingAction === "Generate Investigation Brief"
+                  ? "Generating Brief…"
+                  : "Generate Investigation Brief"}
               </button>
             )}
           </>
         ) : (
           <>
             <h2>{brief.title}</h2>
+            <AiBlockNote label={labels.brief} />
             <BriefVisual brief={brief} />
           </>
         )}

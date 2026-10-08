@@ -54,7 +54,16 @@ class TwoStepModel(FakeModel):
         super().__init__(_good_reply)
         self.tag, self.hypotheses = tag, hypotheses
 
-    def complete(self, prompt, context=None, *, system=None, json_output=False, max_output_tokens=None):
+    def complete(
+        self,
+        prompt,
+        context=None,
+        *,
+        system=None,
+        json_output=False,
+        response_schema=None,
+        max_output_tokens=None,
+    ):
         if "competing explanations" not in (system or ""):
             return super().complete(
                 prompt, context, system=system, json_output=json_output, max_output_tokens=max_output_tokens

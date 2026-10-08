@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Activity, AlertTriangle, Bot, CheckCircle2, CircleSlash, Gauge, ShieldCheck } from "lucide-react";
-import { BarList, Panel, StatTile } from "../console/charts";
+import { BarList, Empty, Panel, StatTile } from "../console/charts";
 import type { Slice } from "../console/dashboardModel";
 import { Table, formatDate, useResource } from "../../customer-admin/shared";
 import { TrustEvaluation } from "../../workspace/sections/TrustEvaluation";
-import { titleCase } from "../customers/model";
+import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
-import { Intro, Pager, TenantCell } from "./common";
+import { Intro, TenantCell } from "./common";
 
 type Model = {
   provider: string;
@@ -44,7 +44,7 @@ type AiActivity = {
 
 export function AiControlCenter({ section }: { section: string }) {
   if (section === "Evaluations") return <TrustEvaluation />;
-  if (section === "Executions") return <Executions />;
+  if (section === "AI runs") return <Executions />;
   if (section === "Agents & guardrails") return <Agents />;
   return <Overview />;
 }
@@ -91,7 +91,9 @@ function Overview() {
         <StatTile
           label="Model"
           value={model ? model.model : null}
-          detail={model ? `${model.provider} · ${model.configured ? "connected" : "not connected"}` : "Loading"}
+          detail={
+            model ? `${displayCode(model.provider)} · ${model.configured ? "connected" : "not connected"}` : "Loading"
+          }
           icon={<Bot size={18} />}
           tone={model ? (model.configured ? "good" : "warning") : undefined}
         />
@@ -109,27 +111,27 @@ function Overview() {
           tone={data ? (data.failed ? "warning" : "good") : undefined}
         />
         <StatTile
-          label="Slowest 5%"
+          label="Slowest responses (1 in 20)"
           value={data ? seconds(data.p95_latency_ms) : null}
-          detail="95th percentile response time"
+          detail="19 in 20 answers are faster than this"
           icon={<Gauge size={18} />}
         />
       </section>
       <div className="ac-grid two">
-        <Panel eyebrow="Last 30 days" title="AI runs by tenant" state={activity.state} error={activity.error}>
+        <Panel eyebrow="Last 30 days" title="AI runs by tenant" source={activity}>
           {byTenant.length ? <BarList items={byTenant} colour="series" /> : <p className="ac-muted">No AI runs yet.</p>}
         </Panel>
-        <Panel eyebrow="Last 30 days" title="Answer checks" state={activity.state} error={activity.error}>
+        <Panel eyebrow="Last 30 days" title="Answer checks" source={activity}>
           <Intro>Every AI answer is checked against its evidence before it is shown.</Intro>
           {byValidation.length ? <BarList items={byValidation} /> : <p className="ac-muted">No AI runs yet.</p>}
         </Panel>
       </div>
-      <Panel eyebrow="Configuration" title="Model in use" state={models.state} error={models.error}>
+      <Panel eyebrow="Configuration" title="Model in use" source={models}>
         {model ? (
           <dl className="cc-details">
             <div>
               <dt>Provider</dt>
-              <dd>{model.provider}</dd>
+              <dd>{displayCode(model.provider)}</dd>
             </div>
             <div>
               <dt>Model</dt>
@@ -140,43 +142,45 @@ function Overview() {
               <dd>{model.configured ? "Connected" : "Not connected (rule-based fallback is used)"}</dd>
             </div>
             <div>
-              <dt>Configuration version</dt>
-              <dd>{model.configuration_version ?? "—"}</dd>
-            </div>
-            <div>
               <dt>Human review</dt>
               <dd>{model.human_review_required ? "Required for every decision" : "Not required"}</dd>
-            </div>
-            <div>
-              <dt>Hidden reasoning stored</dt>
-              <dd>{model.hidden_chain_of_thought_persisted ? "Yes" : "No"}</dd>
             </div>
           </dl>
         ) : (
           <p className="ac-muted">No model is configured.</p>
         )}
+        {model && (
+          <>
+            <h4 className="ar-subhead">Technical detail</h4>
+            <dl className="cc-details">
+              <div>
+                <dt>Configuration version</dt>
+                <dd>{model.configuration_version ?? "—"}</dd>
+              </div>
+              <div>
+                <dt>Model&apos;s hidden reasoning stored</dt>
+                <dd>{model.hidden_chain_of_thought_persisted ? "Yes" : "No"}</dd>
+              </div>
+            </dl>
+          </>
+        )}
       </Panel>
-      <Panel
-        eyebrow="When the model is limited or down"
-        title="Fallback providers"
-        state={models.state}
-        error={models.error}
-      >
+      <Panel eyebrow="When the model is limited or down" title="Backup AI providers" source={models}>
         <Intro>
           If the model in use hits its limit or does not answer, the next provider below answers instead, in this order;
           if none can, MDARIX gives its rule-based answer. Free tiers suit demonstrations on synthetic data only.
         </Intro>
         <Table
-          caption="Fallback providers"
+          caption="Backup AI providers"
           rows={fallbackRows}
           rowKey={(row) => row.provider}
           empty={{
-            title: "No fallback configured",
-            detail: "Set MDARIX_GENAI_FALLBACKS and each provider's key on the server (see the AI provider runbook).",
+            title: "No backup AI provider",
+            detail: "No backup AI provider is set up. Ask your technical team to add one.",
           }}
           columns={[
             { key: "order", label: "Order", numeric: true, render: (row) => row.order ?? "—" },
-            { key: "provider", label: "Provider", render: (row) => <strong>{titleCase(row.provider)}</strong> },
+            { key: "provider", label: "Provider", render: (row) => <strong>{displayCode(row.provider)}</strong> },
             { key: "model", label: "Model", render: (row) => row.model },
             {
               key: "state",
@@ -211,29 +215,18 @@ function Overview() {
 function Executions() {
   const activity = useResource<AiActivity>("/api/v1/platform-admin/console/ai-activity");
   const [failedOnly, setFailedOnly] = useState(false);
-  const [page, setPage] = useState(1);
-  const all = (activity.data?.latest ?? []).filter((row) => !failedOnly || row.failed);
-  const pages = Math.max(1, Math.ceil(all.length / 15));
-  const rows = all.slice((Math.min(page, pages) - 1) * 15, Math.min(page, pages) * 15);
+  const rows = (activity.data?.latest ?? []).filter((row) => !failedOnly || row.failed);
   return (
-    <Panel eyebrow="Latest 50 across all tenants" title="AI runs" state={activity.state} error={activity.error}>
+    <Panel eyebrow="Latest 50 across all tenants" title="AI runs" source={activity}>
       <Intro>
         What ran, for which tenant, and how it went. The questions asked and the answers given stay with the tenant and
         are not shown here.
       </Intro>
       <div className="ca-chips" role="group" aria-label="Show runs">
-        <button
-          type="button"
-          className={failedOnly ? "" : "selected"}
-          onClick={() => (setFailedOnly(false), setPage(1))}
-        >
+        <button type="button" className={failedOnly ? "" : "selected"} onClick={() => setFailedOnly(false)}>
           All
         </button>
-        <button
-          type="button"
-          className={failedOnly ? "selected" : ""}
-          onClick={() => (setFailedOnly(true), setPage(1))}
-        >
+        <button type="button" className={failedOnly ? "selected" : ""} onClick={() => setFailedOnly(true)}>
           Failed only
         </button>
       </div>
@@ -241,12 +234,15 @@ function Executions() {
         caption="AI runs"
         rows={rows}
         rowKey={(row) => row.id}
+        pageSize={15}
+        pageNoun="run"
         empty={{ title: failedOnly ? "No failed runs" : "No AI runs yet", detail: "Runs appear as people use AI." }}
+        // The AI run's ID is not shown by default; it can be added from the field chooser.
         columns={[
           { key: "when", fields: ["at"], label: "When", render: (row) => formatDate(row.at) },
           {
             key: "tenant",
-            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+            fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
             label: "Tenant",
             render: (row) => <TenantCell row={row} />,
           },
@@ -257,7 +253,7 @@ function Executions() {
             render: (row) => (
               <span className="cc-stack">
                 <strong>{row.model}</strong>
-                <small>{row.provider}</small>
+                <small>{displayCode(row.provider)}</small>
               </span>
             ),
           },
@@ -292,7 +288,6 @@ function Executions() {
           },
         ]}
       />
-      <Pager page={Math.min(page, pages)} pages={pages} total={all.length} noun="run" onPage={setPage} />
     </Panel>
   );
 }
@@ -304,19 +299,19 @@ function Agents() {
   const catalog = useResource<{ agents: Agent[]; human_authority_required?: boolean }>("/api/v1/ai/agents/catalog");
   const agents = catalog.data?.agents ?? [];
   return (
-    <Panel eyebrow="Agents and their limits" title="Agents & guardrails" state={catalog.state} error={catalog.error}>
+    <Panel eyebrow="Agents and their limits" title="Agents & guardrails" source={catalog}>
       <p className="ar-notice" role="note">
         <ShieldCheck size={16} aria-hidden="true" /> AI suggests; people decide. No agent can approve, reject or declare
         a root cause{catalog.data?.human_authority_required ? ": a person with authority always does" : ""}.
       </p>
+      {catalog.data && !agents.length && (
+        <Empty title="No AI agents yet" detail="The AI assistants and their limits appear here once they are set up." />
+      )}
       <div className="ar-cards">
         {agents.map((agent) => (
           <article key={agent.code} className="ar-card">
             <header>
-              <span className="cc-stack">
-                <strong>{agent.label}</strong>
-                <small>{agent.code}</small>
-              </span>
+              <strong>{agent.label || displayCode(agent.code)}</strong>
             </header>
             <h4>May</h4>
             <ul className="ar-chips">

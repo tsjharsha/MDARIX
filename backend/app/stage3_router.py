@@ -5,15 +5,17 @@ not invent conclusions or move business data into the browser; all results
 are scoped by the authenticated request context.
 """
 
+import uuid
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import text
+from sqlalchemy import func, or_, text
 from sqlalchemy.orm import Session
 
 from backend.app.access.trends import daily, window
 from backend.app.db.models.foundation import AIExecution
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
 router = APIRouter(prefix="/api/v1", tags=["Stage 3 Experience"])
@@ -147,7 +149,7 @@ def signals_summary(
     rows = _rows(
         db,
         """
-        SELECT complaint_identifier AS signal_id, description, NULL AS severity, status, event_timestamp
+        SELECT complaint_identifier AS signal_id, business_id, description, severity, status, event_timestamp
         FROM complaints WHERE tenant_id = :tenant_id
         ORDER BY event_timestamp DESC NULLS LAST LIMIT 100
     """,
@@ -174,14 +176,15 @@ def signal_detail(
     complaint = _rows(
         db,
         """
-        SELECT c.id, c.complaint_identifier AS signal_id, c.description, c.status,
+        SELECT c.id, c.business_id, c.complaint_identifier AS signal_id, c.description, c.severity, c.status,
                c.event_timestamp, c.complaint_timestamp, c.product_id, c.product_version_id,
-               p.product_identifier, p.name AS product_name,
-               pv.version_identifier
+               p.business_id AS product_business_id, p.product_identifier, p.name AS product_name,
+               pv.business_id AS product_version_business_id, pv.version_identifier
         FROM complaints c
         LEFT JOIN products p ON p.tenant_id = c.tenant_id AND p.id = c.product_id
         LEFT JOIN product_versions pv ON pv.tenant_id = c.tenant_id AND pv.id = c.product_version_id
-        WHERE c.tenant_id = :tenant_id AND (c.id::text = :signal_id OR c.complaint_identifier = :signal_id)
+        WHERE c.tenant_id = :tenant_id
+          AND (c.id::text = :signal_id OR c.complaint_identifier = :signal_id OR c.business_id = upper(:signal_id))
         LIMIT 1
     """,
         {"tenant_id": ctx.tenant_id, "signal_id": signal_id},
@@ -197,7 +200,7 @@ def signal_detail(
     related = _rows(
         db,
         """
-        SELECT investigation_identifier, status, investigation_question
+        SELECT business_id, investigation_identifier, status, investigation_question
         FROM investigations WHERE tenant_id = :tenant_id
           AND (product_id = :product_id OR (:product_id IS NULL AND false))
         ORDER BY created_at DESC NULLS LAST LIMIT 20
@@ -219,6 +222,23 @@ def signal_detail(
     }
 
 
+# Investigations and evidence carry no product version of their own. A version's investigations are those linked
+# (investigation_complaints) to complaints on that version; its evidence is what those investigations hold, directly
+# (evidence.investigation_id) or linked (investigation_evidence), as the case story counts it (_story_counts). Fixed SQL:
+# the tenant and the version are always parameters, and every subquery is scoped to the same tenant.
+_VERSION_INVESTIGATIONS = (
+    "SELECT ic.investigation_id FROM investigation_complaints ic "
+    "JOIN complaints c ON c.tenant_id = ic.tenant_id AND c.id = ic.complaint_id "
+    "WHERE ic.tenant_id = :tenant_id AND c.product_version_id = :version_id"
+)
+_VERSION_INVESTIGATION_CLAUSE = f"id IN ({_VERSION_INVESTIGATIONS})"
+_VERSION_EVIDENCE_CLAUSE = (
+    f"(investigation_id IN ({_VERSION_INVESTIGATIONS}) OR id IN ("
+    "SELECT ie.evidence_id FROM investigation_evidence ie "
+    f"WHERE ie.tenant_id = :tenant_id AND ie.investigation_id IN ({_VERSION_INVESTIGATIONS})))"
+)
+
+
 @router.get("/products/{product_id}/versions/{version_id}/story")
 def product_version_story(
     product_id: str,
@@ -230,8 +250,8 @@ def product_version_story(
     version = _rows(
         db,
         """
-        SELECT pv.id, pv.product_id, pv.version_identifier, pv.description, pv.lifecycle_status, pv.release_timestamp,
-               p.product_identifier, p.name AS product_name
+        SELECT pv.id, pv.business_id, pv.product_id, pv.version_identifier, pv.description, pv.lifecycle_status,
+               pv.release_timestamp, p.business_id AS product_business_id, p.product_identifier, p.name AS product_name
         FROM product_versions pv JOIN products p ON p.tenant_id = pv.tenant_id AND p.id = pv.product_id
         WHERE pv.tenant_id = :tenant_id AND pv.id = :version_id AND pv.product_id = :product_id LIMIT 1
     """,
@@ -246,22 +266,24 @@ def product_version_story(
         "version": version[0],
         "counts": {
             "complaints": _tenant_count_where(db, "complaints", "product_version_id = :version_id", params),
-            "investigations": _tenant_count_where(db, "investigations", "product_version_id = :version_id", params),
-            "evidence": _tenant_count_where(db, "evidence", "product_version_id = :version_id", params),
+            "investigations": _tenant_count_where(db, "investigations", _VERSION_INVESTIGATION_CLAUSE, params),
+            "evidence": _tenant_count_where(db, "evidence", _VERSION_EVIDENCE_CLAUSE, params),
         },
         "complaints": _rows(
             db,
-            "SELECT complaint_identifier, description, status, event_timestamp FROM complaints WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY event_timestamp DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, complaint_identifier, description, status, event_timestamp FROM complaints WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY event_timestamp DESC NULLS LAST LIMIT 50",
             params,
         ),
         "investigations": _rows(
             db,
-            "SELECT investigation_identifier, status, investigation_question FROM investigations WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, investigation_identifier, status, investigation_question FROM investigations "
+            f"WHERE tenant_id=:tenant_id AND {_VERSION_INVESTIGATION_CLAUSE} ORDER BY created_at DESC NULLS LAST LIMIT 50",
             params,
         ),
         "evidence": _rows(
             db,
-            "SELECT evidence_identifier, title, evidence_type, reliability_status FROM evidence WHERE tenant_id=:tenant_id AND product_version_id=:version_id ORDER BY created_at DESC NULLS LAST LIMIT 50",
+            "SELECT business_id, evidence_identifier, title, evidence_type, reliability_status FROM evidence "
+            f"WHERE tenant_id=:tenant_id AND {_VERSION_EVIDENCE_CLAUSE} ORDER BY created_at DESC NULLS LAST LIMIT 50",
             params,
         ),
         "limitations": [
@@ -273,17 +295,39 @@ def product_version_story(
 
 @router.get("/analytics/investigations")
 def investigations_summary(
-    db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    control_db: Session = Depends(get_db),
 ):
+    from backend.app.case_workflow.states import effective_state, state_label, with_owner_names
+
     rows = _rows(
         db,
         """
-        SELECT id, investigation_identifier, status, investigation_question
+        SELECT id, business_id, investigation_identifier, status, investigation_question,
+               workflow_state, priority, due_at, owner_ref
         FROM investigations WHERE tenant_id = :tenant_id
         ORDER BY created_at DESC NULLS LAST LIMIT 100
     """,
         {"tenant_id": ctx.tenant_id},
     )
+    if not rows:
+        # An organization database without the case workflow columns yet still lists its cases.
+        rows = _rows(
+            db,
+            """
+            SELECT id, business_id, investigation_identifier, status, investigation_question
+            FROM investigations WHERE tenant_id = :tenant_id
+            ORDER BY created_at DESC NULLS LAST LIMIT 100
+        """,
+            {"tenant_id": ctx.tenant_id},
+        )
+    for row in rows:
+        if "workflow_state" in row:
+            row["workflow_state"] = effective_state(row["workflow_state"], row.get("status"))
+            row["workflow_state_label"] = state_label(row["workflow_state"])
+    if rows and "owner_ref" in rows[0]:
+        with_owner_names(control_db, ctx.tenant_id, rows)
     return {
         "tenant_id": ctx.tenant_id,
         "investigations": rows,
@@ -298,7 +342,7 @@ def evidence_summary(
     rows = _rows(
         db,
         """
-        SELECT id, evidence_identifier, evidence_type, title, reliability_status, source_system
+        SELECT id, business_id, evidence_identifier, evidence_type, title, reliability_status, source_system
         FROM evidence WHERE tenant_id = :tenant_id ORDER BY created_at DESC NULLS LAST LIMIT 100
     """,
         {"tenant_id": ctx.tenant_id},
@@ -341,77 +385,171 @@ def persona_dashboard(
     }
 
 
+STORY_STAGES = (
+    ("product", "Product"),
+    ("product_version", "ProductVersion"),
+    ("signal", "Signal"),
+    ("investigation", "Investigation"),
+    ("evidence", "Evidence"),
+    ("analysis", "Analysis"),
+    ("hypotheses", "Hypotheses"),
+    ("unknowns", "Unknowns"),
+    ("failure_chain", "Failure Chain"),
+    ("scenario", "Scenario"),
+    ("decision", "Decision"),
+    ("assurance", "AI Assurance"),
+    ("audit", "Audit"),
+)
+
+
+def _story_counts(db: Session, control_db: Session, tenant_id: uuid.UUID, case) -> dict[str, int]:
+    """How many records of each story stage the case has, read from the tenant's own data (signed decisions and the
+    audit trail from the control plane)."""
+    from backend.app.db.models.foundation import (
+        AssuranceResult,
+        AuditEvent,
+        Complaint,
+        Decision,
+        Evidence,
+        FailureChain,
+        Hypothesis,
+        InvestigationComplaint,
+        InvestigationEvidence,
+        Product,
+        Scenario,
+        SignedApprovalRecord,
+        Unknown,
+    )
+
+    complaint_ids = db.query(InvestigationComplaint.complaint_id).filter(
+        InvestigationComplaint.tenant_id == tenant_id, InvestigationComplaint.investigation_id == case.id
+    )
+    linked_evidence = db.query(InvestigationEvidence.evidence_id).filter(
+        InvestigationEvidence.tenant_id == tenant_id, InvestigationEvidence.investigation_id == case.id
+    )
+    executions = db.query(AIExecution.id).filter(
+        AIExecution.tenant_id == tenant_id, AIExecution.investigation_id == case.id, AIExecution.error_state.is_(None)
+    )
+    decision_ids = [
+        row.id
+        for row in db.query(Decision.id).filter(Decision.tenant_id == tenant_id, Decision.investigation_id == case.id)
+    ]
+    signed = (
+        control_db.query(func.count(func.distinct(SignedApprovalRecord.object_id)))
+        .filter(
+            SignedApprovalRecord.tenant_id == tenant_id,
+            SignedApprovalRecord.object_id.in_(decision_ids),
+            SignedApprovalRecord.status == "SIGNED",
+        )
+        .scalar()
+        if decision_ids
+        else 0
+    )
+    product = (
+        db.query(Product.id).filter(Product.tenant_id == tenant_id, Product.id == case.product_id).count()
+        if case.product_id
+        else 0
+    )
+    return {
+        "product": product,
+        "product_version": db.query(func.count(func.distinct(Complaint.product_version_id)))
+        .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(complaint_ids))
+        .scalar()
+        or 0,
+        "signal": complaint_ids.count(),
+        "investigation": 1,
+        "evidence": db.query(Evidence.id)
+        .filter(
+            Evidence.tenant_id == tenant_id, or_(Evidence.investigation_id == case.id, Evidence.id.in_(linked_evidence))
+        )
+        .count(),
+        "analysis": executions.count(),
+        "hypotheses": db.query(Hypothesis.id)
+        .filter(Hypothesis.tenant_id == tenant_id, Hypothesis.investigation_id == case.id)
+        .count(),
+        "unknowns": db.query(Unknown.id)
+        .filter(Unknown.tenant_id == tenant_id, Unknown.investigation_id == case.id)
+        .count(),
+        "failure_chain": db.query(FailureChain.id)
+        .filter(FailureChain.tenant_id == tenant_id, FailureChain.investigation_id == case.id)
+        .count(),
+        "scenario": db.query(Scenario.id)
+        .filter(Scenario.tenant_id == tenant_id, Scenario.investigation_id == case.id)
+        .count(),
+        "decision": len(decision_ids),
+        "decision_signed": int(signed or 0),
+        "assurance": db.query(AssuranceResult.id)
+        .filter(AssuranceResult.tenant_id == tenant_id, AssuranceResult.ai_execution_id.in_(executions))
+        .count(),
+        "audit": control_db.query(AuditEvent.id)
+        .filter(AuditEvent.tenant_id == tenant_id, AuditEvent.entity_id.in_([case.id, *decision_ids]))
+        .count(),
+    }
+
+
+def _stage_status(key: str, counts: dict[str, int]) -> str:
+    """COMPLETE only for a decision with a valid signature; AVAILABLE when the stage has records; PENDING otherwise."""
+    if key == "decision" and counts.get("decision_signed"):
+        return "COMPLETE"
+    return "AVAILABLE" if counts.get(key) else "PENDING"
+
+
 @router.get("/story/{investigation_id}")
 def story_view(
     investigation_id: str,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    exists = db.execute(
-        text("SELECT 1 FROM investigations WHERE id = :id AND tenant_id = :tenant_id"),
-        {"id": investigation_id, "tenant_id": ctx.tenant_id},
-    ).first()
-    if not exists:
+    """The case's story, stage by stage, with each stage's status computed from the case's records: AVAILABLE when
+    it has records (evidence, an analysis, hypotheses, ...), COMPLETE for a signed decision, PENDING otherwise."""
+    from backend.app.db.models.foundation import Investigation
+
+    try:
+        case_id = uuid.UUID(str(investigation_id))
+    except ValueError:
+        case_id = None  # not an id at all: the same answer as an unknown or foreign case
+    tenant_id = uuid.UUID(str(ctx.tenant_id)) if case_id else None
+    case = (
+        db.query(Investigation).filter(Investigation.id == case_id, Investigation.tenant_id == tenant_id).first()
+        if case_id
+        else None
+    )
+    if case is None:
         return {
             "status": "NOT_FOUND",
             "investigation_id": investigation_id,
             "tenant_id": ctx.tenant_id,
             "message": "Investigation is not available for this tenant.",
         }
+    counts = _story_counts(db, control_db, tenant_id, case)
     return {
         "status": "READY_FOR_REVIEW",
         "investigation_id": investigation_id,
+        "investigation_business_id": case.business_id,
         "tenant_id": ctx.tenant_id,
         "stages": [
-            {
-                "key": key,
-                "label": label,
-                "status": "AVAILABLE"
-                if key in {"product", "investigation", "evidence", "analysis"}
-                else "REVIEW_REQUIRED",
-            }
-            for key, label in [
-                ("product", "Product"),
-                ("product_version", "ProductVersion"),
-                ("signal", "Signal"),
-                ("investigation", "Investigation"),
-                ("evidence", "Evidence"),
-                ("analysis", "Analysis"),
-                ("hypotheses", "Hypotheses"),
-                ("unknowns", "Unknowns"),
-                ("failure_chain", "Failure Chain"),
-                ("scenario", "Scenario"),
-                ("decision", "Decision"),
-                ("assurance", "AI Assurance"),
-                ("audit", "Audit"),
-            ]
+            {"key": key, "label": label, "status": _stage_status(key, counts), "count": counts.get(key, 0)}
+            for key, label in STORY_STAGES
         ],
         "human_review_required": True,
         "causality_state": "NOT_ESTABLISHED",
-        "limitations": ["The story view is a traceability view; relationships are not causal conclusions."],
+        "limitations": [
+            "The story view is a traceability view; relationships are not causal conclusions.",
+            "A stage is AVAILABLE when the case has records for it; only a signed decision is COMPLETE.",
+        ],
     }
 
 
 @router.get("/reports/catalog")
 def reports_catalog(ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+    """The twelve governed reports (reports/service.py:REPORTS), each with the organization's own records."""
+    from reports.service import REPORTS
+
     return {
         "tenant_id": ctx.tenant_id,
         "reports": [
-            {"code": code, "label": label, "formats": ["JSON", "CSV", "PDF"]}
-            for code, label in [
-                ("PRODUCT_INTELLIGENCE", "Product Intelligence Report"),
-                ("PRODUCT_VERSION_IMPACT", "ProductVersion Impact Report"),
-                ("COMPLAINT_TREND", "Complaint Trend Report"),
-                ("SIGNAL_ASSESSMENT", "Signal Assessment Report"),
-                ("INVESTIGATION", "Investigation Report"),
-                ("EVIDENCE_PROVENANCE", "Evidence & Provenance Report"),
-                ("RISK_IMPACT", "Risk Impact Report"),
-                ("SCENARIO_COMPARISON", "Scenario Comparison Report"),
-                ("DECISION_BRIEF", "Decision Brief"),
-                ("AI_ASSURANCE", "AI Assurance Report"),
-                ("AUDIT_APPROVAL", "Audit & Approval Report"),
-                ("EXECUTIVE_QUALITY_REVIEW", "Executive Quality Review"),
-            ]
+            {"code": code, "label": label, "formats": ["JSON", "CSV", "PDF"]} for code, label in REPORTS.items()
         ],
         "human_review_required": True,
     }
@@ -444,12 +582,33 @@ def agent_catalog(ctx: AuthenticatedRequestContext = Depends(get_request_context
 
 
 @router.get("/ai/assurance/summary")
-def assurance_summary(ctx: AuthenticatedRequestContext = Depends(get_request_context)):
+def assurance_summary(
+    db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
+):
+    """The organization's AI executions and how MDARIX's assurance checks judged them (AssuranceResult records)."""
+    from backend.app.db.models.foundation import AssuranceResult
+
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    by_status = dict(
+        db.query(AssuranceResult.status, func.count())
+        .filter(AssuranceResult.tenant_id == tenant_id)
+        .group_by(AssuranceResult.status)
+        .all()
+    )
     return {
         "tenant_id": ctx.tenant_id,
-        "metrics": {"total_executions": 0, "pass": 0, "pass_with_limitations": 0, "blocked": 0},
+        "metrics": {
+            "total_executions": db.query(AIExecution.id).filter(AIExecution.tenant_id == tenant_id).count(),
+            "assessed": sum(int(count) for count in by_status.values()),
+            "pass": int(by_status.get("PASS", 0)),
+            "pass_with_limitations": int(by_status.get("PASS_WITH_LIMITATIONS", 0)),
+            "blocked": int(by_status.get("BLOCKED", 0)),
+        },
         "guardrails": {"tenant_scope": "ENFORCED", "causality_restraint": "ENFORCED", "human_review": "REQUIRED"},
-        "limitations": ["Execution metrics are populated from persisted AIExecution records when present."],
+        "limitations": [
+            "Metrics count the organization's persisted AI executions and their assurance results; an execution "
+            "without an assurance result is not counted as passed."
+        ],
     }
 
 

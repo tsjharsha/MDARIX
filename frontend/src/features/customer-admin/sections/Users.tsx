@@ -1,10 +1,100 @@
 import { useMemo, useState } from "react";
-import { KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
+import { Download, KeyRound, Mail, ShieldOff, UserPlus } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
-import { titleCase } from "../../admin/console/dashboardModel";
-import { userTone, type TenantUser } from "../customerAdminModel";
+import { readable } from "../labels";
+import { userStatusLabel, userTone, type TenantUser } from "../customerAdminModel";
 import { ASSIGNABLE_ROLES, useConsole } from "../context";
-import { Drawer, SearchBox, Table, Tabs, errorText, listOf, matches, send, useResource } from "../shared";
+import {
+  Drawer,
+  SearchBox,
+  Table,
+  Tabs,
+  errorText,
+  formatDate,
+  idColumn,
+  listOf,
+  matches,
+  send,
+  useResource,
+  type Confirmation,
+} from "../shared";
+import { downloadFile } from "../../reports/download";
+import { safeText } from "../../../app/displayId";
+import { roleLabel } from "../../../app/roles";
+
+/** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
+ * the email could not be delivered (201, delivery FAILED), MDARIX support issues an activation link to pass on. */
+export function invitationNotice(
+  result: { email_delivery?: string; delivery?: string; invitation_status?: string; message?: string } | null,
+  email: string,
+): { text: string; tone: "good" | "critical" } {
+  if (result?.delivery === "FAILED" || result?.invitation_status === "NOT_SENT")
+    return {
+      tone: "critical",
+      text:
+        result.message ||
+        "The account was created, but the invitation email could not be delivered. Ask MDARIX support for an activation link to pass on to the person.",
+    };
+  if (result?.email_delivery === "SENT")
+    return { tone: "good", text: `Invitation sent to ${email}. They will create their own password.` };
+  return {
+    tone: "good",
+    text: `Invitation created. Email delivery: ${readable(result?.email_delivery ?? "NOT_CONFIGURED").toLowerCase()}.`,
+  };
+}
+
+/** The file a person's data export is saved as when the server does not name it: after their User ID, never the UUID. */
+export const personExportName = (user: { business_id?: string | null }) =>
+  `mdarix-person-${safeText(user.business_id) ?? "export"}.json`;
+
+/** A person's account role as people read it: the server's label, else the known label for the code. */
+export const accountRoleText = (user: { role?: string | null; role_label?: string | null }) =>
+  user.role || user.role_label ? roleLabel(user.role, user.role_label) : "—";
+
+/** GET/PUT /api/v1/admin/identity/users/{id}/roles: the account role and the additional workflow roles. */
+export type UserWorkflowRoles = {
+  user_id: string;
+  business_id?: string | null;
+  account_role?: { code: string; label?: string | null } | null;
+  additional_roles?: Array<{
+    code: string;
+    label?: string | null;
+    granted_at?: string | null;
+    granted_by_name?: string | null;
+  }>;
+  available_roles?: Array<{ code: string; label?: string | null }>;
+};
+
+export const WORKFLOW_REASON_MIN = 10;
+export const WORKFLOW_REASON_MAX = 500;
+
+/** The roles that can be added on top of the account role (the account role itself is never offered twice). */
+export function workflowRoleChoices(data: UserWorkflowRoles | null | undefined) {
+  const account = data?.account_role?.code;
+  return (data?.available_roles ?? []).filter((role) => role.code && role.code !== account);
+}
+
+/** Whether the chosen workflow roles differ from the ones the person holds now (order does not matter). */
+export function workflowRolesChanged(current: string[], chosen: string[]) {
+  const a = [...new Set(current)].sort();
+  const b = [...new Set(chosen)].sort();
+  return a.length !== b.length || a.some((code, index) => code !== b[index]);
+}
+
+/** Why the change cannot be saved yet, or null; the server checks the same rules (and which roles are allowed). */
+export function workflowRolesProblem(current: string[], chosen: string[], reason: string): string | null {
+  if (!workflowRolesChanged(current, chosen)) return "Change at least one role.";
+  const text = reason.trim();
+  if (text.length < WORKFLOW_REASON_MIN) return `Give a reason of at least ${WORKFLOW_REASON_MIN} characters.`;
+  if (text.length > WORKFLOW_REASON_MAX) return `Keep the reason to ${WORKFLOW_REASON_MAX} characters.`;
+  return null;
+}
+
+/** The body of PUT .../roles: the complete list of additional roles (without repeats) and the reason. */
+export const workflowRolesBody = (chosen: string[], reason: string) => ({
+  additional_roles: [...new Set(chosen)],
+  reason: reason.trim(),
+});
 
 const FILTERS = ["All", "Active", "Invited", "Suspended", "Offboarded"] as const;
 // Same role spellings the server treats as MDARIX platform roles; those accounts are managed by MDARIX only.
@@ -18,6 +108,8 @@ const isPlatformRole = (role: unknown) =>
   );
 type Filter = (typeof FILTERS)[number];
 const TABS = ["People", "Invite"] as const;
+// What the confirmation says once a status change is made.
+const STATUS_DONE = { ACTIVE: "can sign in again", SUSPENDED: "is suspended", OFFBOARDED: "is offboarded" } as const;
 type Tab = (typeof TABS)[number];
 
 export function UsersSection({ tab = "People" }: { tab?: string }) {
@@ -25,17 +117,18 @@ export function UsersSection({ tab = "People" }: { tab?: string }) {
   const users = useResource<TenantUser[]>("/api/v1/admin/identity/users");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Users sections" />
-      {active === "People" ? (
-        <People users={users} />
-      ) : (
-        <InviteForm
-          onInvited={() => {
-            users.reload();
-            setActive("People");
-          }}
-        />
-      )}
+      <Tabs tabs={TABS} active={active} onChange={setActive} label="Users sections">
+        {active === "People" ? (
+          <People users={users} />
+        ) : (
+          <InviteForm
+            onInvited={() => {
+              users.reload();
+              setActive("People");
+            }}
+          />
+        )}
+      </Tabs>
     </>
   );
 }
@@ -53,9 +146,9 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
     [users.data, filter, query],
   );
   return (
-    <Panel eyebrow="People" title="Users in your organization" state={users.state} error={users.error}>
+    <Panel eyebrow="People" title="Users in your organization" source={users}>
       <div className="ca-toolbar">
-        <SearchBox value={query} onChange={setQuery} label="Search name, email or role" />
+        <SearchBox value={query} onChange={setQuery} label="Search name, email, ID or role" />
         <div className="ca-chips" role="group" aria-label="Filter by status">
           {FILTERS.map((option) => (
             <button
@@ -76,6 +169,7 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
         rowKey={(row) => row.id}
         empty={{ title: "No matching users", detail: "Change the filter or invite someone new." }}
         columns={[
+          idColumn("User ID"),
           {
             key: "name",
             label: "Name",
@@ -86,11 +180,17 @@ function People({ users }: { users: ReturnType<typeof useResource<TenantUser[]>>
               </span>
             ),
           },
-          { key: "role", label: "Base role", render: (row) => (row.role ? titleCase(row.role) : "—") },
+          {
+            key: "role",
+            label: "Base role",
+            fields: ["role", "role_label"],
+            sortValue: (row) => accountRoleText(row),
+            render: (row) => accountRoleText(row),
+          },
           {
             key: "status",
             label: "Status",
-            render: (row) => <ToneBadge tone={userTone(row.status)} label={titleCase(row.status ?? "Unknown")} />,
+            render: (row) => <ToneBadge tone={userTone(row.status)} label={userStatusLabel(row.status)} />,
           },
           {
             key: "manage",
@@ -161,7 +261,7 @@ function UserDrawer({
       body,
       confirmLabel: verb,
       danger: next !== "ACTIVE",
-      done: `${name}: ${verb.toLowerCase()} complete.`,
+      done: `${name} ${STATUS_DONE[next]}.`,
       run: async () => {
         await send(`/api/v1/admin/identity/users/${user.id}/status`, "PATCH", { status: next });
         onChanged();
@@ -174,10 +274,22 @@ function UserDrawer({
       notify(
         result.email_delivery === "SENT"
           ? `Password reset email sent to ${user.email}.`
-          : `Reset requested. Email delivery: ${titleCase(result.email_delivery ?? "not configured")}.`,
+          : `Reset requested. Email delivery: ${readable(result.email_delivery ?? "NOT_CONFIGURED").toLowerCase()}.`,
       );
     } catch (reason) {
       notify(errorText(reason, "Password reset could not be requested."), "critical");
+    }
+  };
+
+  // Answers a person's access request: their account, memberships, sign-in history, audit events and feedback.
+  const exportPerson = async () => {
+    try {
+      const file = await downloadFile(`/api/v1/admin/people/${user.id}/export`, {
+        fallbackName: personExportName(user),
+      });
+      notify(`${name}'s data was exported as ${file}. The export is recorded in the audit trail.`);
+    } catch (reason) {
+      notify(errorText(reason, "The export could not be prepared."), "critical");
     }
   };
 
@@ -191,12 +303,12 @@ function UserDrawer({
         <div>
           <dt>Status</dt>
           <dd>
-            <ToneBadge tone={userTone(user.status)} label={titleCase(user.status ?? "Unknown")} />
+            <ToneBadge tone={userTone(user.status)} label={userStatusLabel(user.status)} />
           </dd>
         </div>
         <div>
           <dt>Base role</dt>
-          <dd>{user.role ? titleCase(user.role) : "—"}</dd>
+          <dd>{accountRoleText(user)}</dd>
         </div>
       </dl>
 
@@ -213,21 +325,23 @@ function UserDrawer({
       )}
 
       <section className="ca-drawer-section">
-        <h3>Effective access</h3>
+        <h3>What they can access now</h3>
         {access.state === "ready" ? (
           <ul className="ca-pill-list">
             {listOf(access.data?.roles).map((role) => (
               <li key={role.id}>Role · {role.name}</li>
             ))}
             {listOf(access.data?.personas).map((persona) => (
-              <li key={persona.code}>Persona · {titleCase(persona.code)}</li>
+              <li key={persona.code}>Persona · {readable(persona.code)}</li>
             ))}
             {!listOf(access.data?.roles).length && !listOf(access.data?.personas).length && (
-              <li className="ac-muted">Base role only — no assigned roles or personas.</li>
+              <li className="ac-muted">Their base role only. No extra roles or personas.</li>
             )}
           </ul>
         ) : (
-          <p className="ac-muted">{access.state === "loading" ? "Loading…" : "Effective access is unavailable."}</p>
+          <p className="ac-muted">
+            {access.state === "loading" ? "Loading…" : "This could not be loaded. Try again later."}
+          </p>
         )}
       </section>
 
@@ -249,9 +363,9 @@ function UserDrawer({
               onClick={() =>
                 confirm({
                   title: `Change ${name}'s base role?`,
-                  body: `The base role becomes ${titleCase(baseRole)}. It applies at their next request.`,
+                  body: `The base role becomes ${roleLabel(baseRole)}. It applies at their next request.`,
                   confirmLabel: "Change role",
-                  done: `${name} now has the ${titleCase(baseRole)} base role.`,
+                  done: `${name} now has the ${roleLabel(baseRole)} base role.`,
                   run: async () => {
                     await send(`/api/v1/admin/control-plane/users/${user.id}`, "PATCH", { values: { role: baseRole } });
                     onChanged();
@@ -265,10 +379,12 @@ function UserDrawer({
         </section>
       )}
 
+      {!managedByMdarix && <WorkflowRoles user={user} name={name} />}
+
       {!managedByMdarix && (
         <>
           <section className="ca-drawer-section">
-            <h3>Assigned roles</h3>
+            <h3>Custom roles</h3>
             <ul className="ca-assignment-list">
               {myRoleAssignments.map((row) => (
                 <li key={row.id}>
@@ -296,7 +412,7 @@ function UserDrawer({
                   </button>
                 </li>
               ))}
-              {!myRoleAssignments.length && <li className="ac-muted">No roles assigned.</li>}
+              {!myRoleAssignments.length && <li className="ac-muted">None assigned.</li>}
             </ul>
             <div className="ca-inline-form">
               <select aria-label="Role to assign" value={roleId} onChange={(event) => setRoleId(event.target.value)}>
@@ -336,7 +452,7 @@ function UserDrawer({
             <ul className="ca-assignment-list">
               {myPersonaAssignments.map((row) => (
                 <li key={row.id}>
-                  <span>{titleCase(row.persona_code)}</span>
+                  <span>{readable(row.persona_code)}</span>
                   <button
                     type="button"
                     className="ac-link"
@@ -356,7 +472,7 @@ function UserDrawer({
                   </button>
                 </li>
               ))}
-              {!myPersonaAssignments.length && <li className="ac-muted">No personas assigned.</li>}
+              {!myPersonaAssignments.length && <li className="ac-muted">None assigned.</li>}
             </ul>
             <div className="ca-inline-form">
               <select
@@ -397,6 +513,11 @@ function UserDrawer({
           <section className="ca-drawer-section">
             <h3>Account actions</h3>
             <div className="ca-action-row">
+              {status !== "ERASED" && (
+                <button type="button" className="ac-secondary" onClick={() => void exportPerson()}>
+                  <Download size={15} /> Export this person&apos;s data
+                </button>
+              )}
               {user.email && (status === "ACTIVE" || status === "SUSPENDED") && (
                 <button type="button" className="ac-secondary" onClick={() => void resetPassword()}>
                   <KeyRound size={15} /> Send password reset
@@ -466,18 +587,22 @@ function UserDrawer({
                 <button
                   type="button"
                   className="ac-secondary"
-                  onClick={() =>
-                    confirm({
+                  onClick={() => {
+                    const request: Confirmation = {
                       title: `Re-invite ${name}?`,
                       body: "A new activation email is sent. They set a new password; the old one no longer works.",
                       confirmLabel: "Re-invite",
                       done: `${name} has been re-invited.`,
                       run: async () => {
-                        await send(`/api/v1/admin/identity/users/${user.id}/reactivate`, "POST");
+                        const result = await send<any>(`/api/v1/admin/identity/users/${user.id}/reactivate`, "POST");
+                        // The dialog reports `done` once this returns: say so when the email did not go out.
+                        const notice = invitationNotice(result, user.email ?? name);
+                        if (notice.tone === "critical") request.done = `${name} has been re-invited. ${notice.text}`;
                         onChanged();
                       },
-                    })
-                  }
+                    };
+                    confirm(request);
+                  }}
                 >
                   <Mail size={15} /> Re-invite
                 </button>
@@ -512,6 +637,121 @@ function UserDrawer({
   );
 }
 
+/** The additional workflow roles a person holds on top of their account role, and the editor to change them. */
+function WorkflowRoles({ user, name }: { user: TenantUser; name: string }) {
+  const { notify } = useConsole();
+  const path = `/api/v1/admin/identity/users/${encodeURIComponent(user.id)}/roles`;
+  const roles = useResource<UserWorkflowRoles>(path);
+  const [editing, setEditing] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const held = roles.data?.additional_roles ?? [];
+  const current = held.map((role) => role.code);
+  const choices = workflowRoleChoices(roles.data);
+  const problem = workflowRolesProblem(current, chosen, reason);
+  const account = roles.data?.account_role;
+  const toggle = (code: string) =>
+    setChosen((list) => (list.includes(code) ? list.filter((item) => item !== code) : [...list, code]));
+  const startEditing = () => {
+    setChosen(current);
+    setReason("");
+    setError("");
+    setEditing(true);
+  };
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (problem) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send(path, "PUT", workflowRolesBody(chosen, reason));
+      notify(`${name}: workflow roles updated. They apply at their next request.`);
+      setEditing(false);
+      roles.reload();
+    } catch (failure) {
+      setError(errorText(failure, "The workflow roles could not be changed."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <section className="ca-drawer-section">
+      <h3>Workflow roles</h3>
+      <p className="ac-muted">
+        Additional roles route work (triage, investigations, reviews and decisions) to this person on top of their base
+        role{account ? ` (${roleLabel(account.code, account.label)})` : ""}.
+      </p>
+      {roles.state === "ready" ? (
+        <ul className="ca-assignment-list">
+          {held.map((role) => (
+            <li key={role.code}>
+              <span className="ca-person">
+                <strong>{roleLabel(role.code, role.label)}</strong>
+                <small>
+                  Granted {formatDate(role.granted_at)}
+                  {safeText(role.granted_by_name) ? ` by ${role.granted_by_name}` : ""}
+                </small>
+              </span>
+            </li>
+          ))}
+          {!held.length && <li className="ac-muted">No additional roles.</li>}
+        </ul>
+      ) : (
+        <p className="ac-muted">
+          {roles.state === "loading" ? "Loading…" : (roles.error ?? "Workflow roles are unavailable.")}
+        </p>
+      )}
+      {roles.state === "ready" && !editing && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" onClick={startEditing} disabled={!choices.length}>
+            Change workflow roles
+          </button>
+        </div>
+      )}
+      {roles.state === "ready" && editing && (
+        <form className="ca-form" onSubmit={save}>
+          <fieldset className="ca-fieldset">
+            <legend>Additional roles</legend>
+            {choices.map((role) => (
+              <label key={role.code} className="ca-check">
+                <input type="checkbox" checked={chosen.includes(role.code)} onChange={() => toggle(role.code)} />
+                {roleLabel(role.code, role.label)}
+              </label>
+            ))}
+          </fieldset>
+          <label className="ca-field">
+            Why are the roles changing?
+            <textarea
+              required
+              rows={3}
+              minLength={WORKFLOW_REASON_MIN}
+              maxLength={WORKFLOW_REASON_MAX}
+              value={reason}
+              placeholder={`At least ${WORKFLOW_REASON_MIN} characters, recorded in the audit trail`}
+              onChange={(event) => setReason(event.target.value)}
+            />
+          </label>
+          {error && (
+            <p className="ca-inline-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="ca-action-row">
+            <button type="button" className="ac-secondary" onClick={() => setEditing(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+              {busy ? "Saving…" : "Save workflow roles"}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
 function InviteForm({ onInvited }: { onInvited: () => void }) {
   const { context, notify } = useConsole();
   const [invite, setInvite] = useState({
@@ -536,11 +776,8 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
         company: invite.company.trim(),
         role: invite.role,
       });
-      notify(
-        result?.email_delivery === "SENT"
-          ? `Invitation sent to ${invite.email}. They will create their own password.`
-          : `Invitation created. Email delivery: ${titleCase(result?.email_delivery ?? "not configured")}.`,
-      );
+      const notice = invitationNotice(result, invite.email);
+      notify(notice.text, notice.tone);
       onInvited();
     } catch (reason) {
       setError(errorText(reason, "The invitation could not be sent."));
@@ -553,7 +790,7 @@ function InviteForm({ onInvited }: { onInvited: () => void }) {
     <Panel eyebrow="People" title="Invite a user">
       <form className="ca-form" onSubmit={submitInvite}>
         <p className="ac-muted">
-          The user receives an activation email and sets their own password. You never see or type it.
+          They receive an email to activate their account and choose their own password. You never see or type it.
         </p>
         <div className="ca-form-grid">
           <label className="ca-field">

@@ -1,8 +1,9 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Literal
-from pydantic import BaseModel, Field
-from investigator.schemas import SourceReference, TemporalMode
+from pydantic import BaseModel, Field, model_validator
+from genai.epistemic import AIEpistemicLabel, AIFallbackNotice, ai_label_field, fallback_notice
+from investigator.schemas import SourceReference, TemporalMode, business_id_field
 
 LinkStatus = Literal[
     "OBSERVED_SOURCE_SUPPORTED", "DETERMINISTICALLY_DERIVED", "HYPOTHESIZED", "CONTRADICTED", "UNKNOWN_GAP"
@@ -28,6 +29,7 @@ class FailureChainLink(BaseModel):
 
 class FailureChain(BaseModel):
     chain_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    business_id: str | None = business_id_field()
     investigation_id: uuid.UUID
     hypothesis_id: uuid.UUID | None = None
     chain_statement: str
@@ -76,3 +78,13 @@ class FailureChainResponse(BaseModel):
     failure_chain_set: FailureChainSet
     persisted: bool
     ai_execution_id: uuid.UUID | None = None
+    # Phase 4 (additive): what this result is, and why AI did not contribute when rules produced it. On the response
+    # only - the result itself is the stored AI output and model context, which stay unchanged.
+    epistemic: AIEpistemicLabel = ai_label_field()
+    ai_notice: AIFallbackNotice | None = None
+
+    @model_validator(mode="after")
+    def _ai_notice(self):
+        if self.ai_notice is None:
+            self.ai_notice = fallback_notice("failure_chain", self.failure_chain_set.provenance)
+        return self

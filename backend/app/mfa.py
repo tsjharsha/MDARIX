@@ -19,20 +19,17 @@ from auth import totp
 from backend.app.db.models.stage2 import LoginThrottle
 from backend.app.runtime_env import is_development, is_local
 from security.mfa_recovery import consume_recovery_code, hash_recovery_codes, issue_recovery_codes
+from backend.app.role_codes import PLATFORM_ADMIN, role_code
 
 MAX_FAILURES = 5
 LOCK_MINUTES = 15
-PLATFORM_ROLES = {"PLATFORM_ADMIN", "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"}
 
 
 def _normalize(role) -> str:
-    from backend.app.access.permissions import normalize_role
-
-    value = normalize_role(role)
-    return "PLATFORM_ADMIN" if value in PLATFORM_ROLES else value
+    return role_code(role)
 
 
-DEFAULT_REQUIRED_ROLES = "PLATFORM_ADMIN,CUSTOMER_ADMIN,LEADER,APPROVER"
+DEFAULT_REQUIRED_ROLES = f"{PLATFORM_ADMIN},CUSTOMER_ADMIN,LEADER,APPROVER"
 
 
 def required_roles() -> set[str]:

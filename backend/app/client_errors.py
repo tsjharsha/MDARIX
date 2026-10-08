@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from auth.cookies import read_session_token
 from auth.durable import hash_token
+from backend.app.version import release
 from backend.app.client_ip import client_ip
 from backend.app.db.models.pilot_support import ClientErrorReport
 from backend.app.db.models.stage2 import AuthSession
@@ -33,14 +34,20 @@ router = APIRouter(prefix="/api/v1", tags=["Client errors"])
 # A stack trace with source maps is a few kilobytes; anything near this is not an error report.
 MAX_BODY_BYTES = 64 * 1024
 MAX_STACK_CHARS = 20_000
+# The column holds 64 characters; a longer id is not ours and is dropped rather than cut (a cut id matches nothing).
+MAX_REQUEST_ID_CHARS = 64
 
 
 class ClientErrorIn(BaseModel):
-    path: str = Field(min_length=1, max_length=512)
-    message: str = Field(min_length=1, max_length=1000)
-    stack: str | None = Field(default=None, max_length=MAX_STACK_CHARS)
-    component: str | None = Field(default=None, max_length=200)
-    request_id: str | None = Field(default=None, max_length=128)
+    """What the browser sends. Only the body cap bounds the values: a long message or stack is cut to its column
+    when stored (path 512, message 1000, stack MAX_STACK_CHARS, component 200, user agent 512), not refused, because
+    a refused report is a lost one."""
+
+    path: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    stack: str | None = None
+    component: str | None = None
+    request_id: str | None = None
 
 
 def _session_identity(request: Request) -> tuple[uuid.UUID | None, uuid.UUID | None]:
@@ -66,8 +73,28 @@ def _session_identity(request: Request) -> tuple[uuid.UUID | None, uuid.UUID | N
         db.close()
 
 
+def _text(value: str | None) -> str:
+    """Postgres text cannot hold NUL characters; a report quoting one must still be stored, so they are dropped."""
+    return (value or "").replace("\x00", "")
+
+
+def _request_id(value: str | None) -> str | None:
+    accepted = accept_request_id(value)
+    return accepted if accepted and len(accepted) <= MAX_REQUEST_ID_CHARS else None
+
+
+async def _capped_body(request: Request) -> bytes | None:
+    """The request body, or None once it passes MAX_BODY_BYTES: read in chunks, so a body sent without (or with a
+    false) Content-Length is never held in memory beyond the cap."""
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > MAX_BODY_BYTES:
+            return None
+    return bytes(body)
+
+
 def _store(report: ClientErrorIn, request: Request, tenant_id, user_id) -> uuid.UUID:
-    import os
 
     db = SessionLocal()
     try:
@@ -77,13 +104,13 @@ def _store(report: ClientErrorIn, request: Request, tenant_id, user_id) -> uuid.
             id=uuid.uuid4(),
             tenant_id=tenant_id,
             user_id=user_id,
-            path=report.path.strip()[:512],
-            message=" ".join(report.message.split())[:1000],
-            stack=(report.stack or "").strip()[:MAX_STACK_CHARS] or None,
-            component=(report.component or "").strip()[:200] or None,
-            user_agent=(request.headers.get("user-agent") or "")[:512] or None,
-            request_id=accept_request_id(report.request_id),
-            release=(os.getenv("MDARIX_RELEASE") or "").strip()[:80] or None,
+            path=_text(report.path).strip()[:512] or "-",
+            message=" ".join(_text(report.message).split())[:1000] or "-",
+            stack=_text(report.stack).strip()[:MAX_STACK_CHARS] or None,
+            component=_text(report.component).strip()[:200] or None,
+            user_agent=_text(request.headers.get("user-agent"))[:512] or None,
+            request_id=_request_id(report.request_id),
+            release=release(),
             created_at=datetime.now(timezone.utc),
         )
         db.add(row)
@@ -103,8 +130,8 @@ async def report_client_error(request: Request):
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
         raise HTTPException(413, detail={"code": "REPORT_TOO_LARGE", "message": "The error report is too large"})
-    body = await request.body()
-    if len(body) > MAX_BODY_BYTES:
+    body = await _capped_body(request)
+    if body is None:
         raise HTTPException(413, detail={"code": "REPORT_TOO_LARGE", "message": "The error report is too large"})
     try:
         report = ClientErrorIn.model_validate_json(body)
@@ -118,7 +145,7 @@ async def report_client_error(request: Request):
             "client error reported id=%s path=%s component=%s signed_in=%s",
             report_id,
             report.path[:200],
-            report.component,
+            (report.component or "")[:200],
             user_id is not None,
         )
     except Exception:  # the browser is already in an error state; never add a failed report on top

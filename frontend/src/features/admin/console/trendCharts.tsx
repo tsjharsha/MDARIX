@@ -1,5 +1,6 @@
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
+import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { ToneIcon } from "./charts";
 import type { Tone } from "./dashboardModel";
 import { AnimatedNumber } from "./motion";
@@ -82,7 +83,7 @@ export function Sparkline({ values, label }: { values: number[]; label: string }
       {values.length > 1 && (
         <>
           <path className="ac-spark-area" d={`${path} L100,30 L0,30 Z`} fill={`url(#${gradient})`} />
-          <path className="ac-spark-line" d={path} pathLength={1} vectorEffect="non-scaling-stroke" />
+          <path className="ac-spark-line" d={path} vectorEffect="non-scaling-stroke" />
         </>
       )}
     </svg>
@@ -173,14 +174,20 @@ export function TrendChart({
   primaryLabel,
   secondaryLabel,
   unit,
+  summary = "total",
 }: {
   data: TrendPoint[];
   primaryLabel: string;
   secondaryLabel?: string;
   unit: string;
+  /** The headline figure: the period's total (counts per day) or the latest value (a running count). */
+  summary?: "total" | "last";
 }) {
   const [active, setActive] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
+  const table = useSortedRows(data, (row, key) =>
+    key === "date" ? row.date : key === "secondary" ? (row.secondary ?? 0) : row.primary,
+  );
   const gradient = useId();
   const primary = data.map((point) => point.primary);
   const secondary = secondaryLabel ? data.map((point) => point.secondary ?? 0) : null;
@@ -189,7 +196,8 @@ export function TrendChart({
   const height = 160;
   const primaryPath = useMemo(() => linePath(primary, width, height, top), [primary, top]);
   const secondaryPath = useMemo(() => (secondary ? linePath(secondary, width, height, top) : ""), [secondary, top]);
-  const total = primary.reduce((sum, value) => sum + value, 0);
+  const total =
+    summary === "last" ? (primary[primary.length - 1] ?? 0) : primary.reduce((sum, value) => sum + value, 0);
   const secondaryTotal = secondary?.reduce((sum, value) => sum + value, 0) ?? 0;
   const point = active === null ? null : data[active];
   const left = active === null ? 0 : data.length > 1 ? (active / (data.length - 1)) * 100 : 50;
@@ -219,19 +227,27 @@ export function TrendChart({
           <table className="ac-table">
             <thead>
               <tr>
-                <th scope="col">Day</th>
-                <th scope="col" className="num">
-                  {primaryLabel}
-                </th>
+                <SortableHeader label="Day" sortKey="date" sort={table.sort} onSort={table.toggle} />
+                <SortableHeader
+                  label={primaryLabel}
+                  sortKey="primary"
+                  sort={table.sort}
+                  onSort={table.toggle}
+                  className="num"
+                />
                 {secondaryLabel && (
-                  <th scope="col" className="num">
-                    {secondaryLabel}
-                  </th>
+                  <SortableHeader
+                    label={secondaryLabel}
+                    sortKey="secondary"
+                    sort={table.sort}
+                    onSort={table.toggle}
+                    className="num"
+                  />
                 )}
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => (
+              {table.sorted.map((row) => (
                 <tr key={row.date}>
                   <td>{row.label}</td>
                   <td className="num">{row.primary}</td>
@@ -268,12 +284,12 @@ export function TrendChart({
                 d={`${primaryPath} L${width},${height} L0,${height} Z`}
                 fill={`url(#${gradient})`}
               />
-              <path className="ac-trend-line" d={primaryPath} pathLength={1} vectorEffect="non-scaling-stroke" />
+              <path className="ac-trend-line" d={primaryPath} vectorEffect="non-scaling-stroke" />
               {secondary && (
                 <path
                   className="ac-trend-line secondary"
                   d={secondaryPath}
-                  pathLength={1}
+
                   vectorEffect="non-scaling-stroke"
                 />
               )}

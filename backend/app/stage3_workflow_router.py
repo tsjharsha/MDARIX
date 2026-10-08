@@ -9,10 +9,13 @@ from fastapi import (
     File,
     Header,
     HTTPException,
+    Query,
     Request,
     Response,
     UploadFile,
 )
+from fastapi.routing import APIRoute
+from backend.app.business_ids import business_id_map
 from backend.app.request_body import WEBHOOK_LIMIT_BYTES, read_limited
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func
@@ -30,6 +33,7 @@ from backend.app.db.models.stage3 import (
 )
 from backend.app.db.session import get_db
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from communication.email.inbound import classify_inbound_event, verify_resend_webhook
 from object_storage.service import ObjectStorageService
@@ -54,6 +58,9 @@ class FeedbackRequest(BaseModel):
     comment: str | None = Field(default=None, max_length=4000)
 
 
+# Requests to colleagues and roles (md29, backend/app/evidence_workflow) share supplier_evidence_requests; the
+# supplier endpoints below see only supplier requests (every request made before md29 is one).
+SUPPLIER_KIND = "SUPPLIER"
 _EMAIL = re.compile(r"^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,63}$")
 _LINK = re.compile(r"(?i)(https?://|www\.|\]\(|<a\s)")
 
@@ -94,6 +101,8 @@ class SupplierEvidenceRequestPayload(BaseModel):
 
 # Ask MDARIX wraps the user's question with the same guardrails as the other advisory workflows, and asks for a
 # short, consistently structured Markdown answer that cites evidence identifiers. The stored prompt stays as typed.
+# Since Phase 4 the model is asked for the same sections as JSON (genai/structured_answer.py) and this Markdown form
+# is rendered from them; ASK_INSTRUCTIONS and ask_prompt are kept for anything that still uses the plain form.
 ASK_INSTRUCTIONS = (
     "You are MDARIX, an investigation assistant for medical-device quality teams. Answer the user's question using "
     "only the authorized context provided. Write at most 250 words of Markdown with exactly these sections: "
@@ -108,6 +117,24 @@ ASK_INSTRUCTIONS = (
 
 def ask_prompt(question: str) -> str:
     return f"{ASK_INSTRUCTIONS}\n\nUser question: {question}"
+
+
+# Shown when no provider is configured at all (controlled mode): no model was asked, so nothing was refused by genai.
+PROVIDER_NOT_CONFIGURED = {
+    "code": "GENAI_PROVIDER_NOT_CONFIGURED",
+    "user_message": "No AI service is configured for MDARIX here, so the answer comes from its rules only.",
+}
+
+
+def genai_refusal(exc) -> dict:
+    """``{status: "REFUSED", code, user_message}`` for a GenAI failure (``genai.ask.refusal``).
+
+    genai gives every refusal a stable code (GENAI_DISABLED_FOR_ORGANIZATION, GENAI_MONTHLY_BUDGET_REACHED,
+    GENAI_PROVIDER_NOT_ALLOWED, GENAI_UNAVAILABLE) and the sentence a user sees; provider error detail never reaches
+    the screen."""
+    from genai.ask import refusal
+
+    return refusal(exc)
 
 
 MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -164,8 +191,15 @@ def create_interaction(
         "human_review_required": True,
     }
     from genai.provider import GenAIProvider, GenAIUnavailable
+    from genai.structured_answer import ASK_MAX_OUTPUT_TOKENS, read_model_reply, structured_ask_prompt
 
     provider = GenAIProvider()
+    # The structured answer (genai/structured_answer.py) is built after the model call, from what it gathered.
+    grounded: dict | None = None
+    search: dict | None = None
+    reading = None
+    ai_note: str | None = None
+    reason_code: str | None = None
     try:
         grounded = {
             "page_context": payload.page_context,
@@ -196,7 +230,8 @@ def create_interaction(
             as_of=payload.temporal_cutoff,
         )
         grounded = {**grounded, "retrieved_evidence": search["evidence"]}
-        prompt = ask_prompt(payload.prompt)
+        # The model is asked for the structured sections as JSON; its Markdown answer is rendered from them.
+        prompt = structured_ask_prompt(payload.prompt)
         # Fit the provider's input limit: keep the facts, drop internal detail (never fail on a large case).
         import json
 
@@ -206,10 +241,11 @@ def create_interaction(
         model_context = grounded
         if len(json.dumps(grounded, default=str)) > budget:
             model_context = compact_context(grounded, budget)
-        result = provider.complete(prompt, model_context)
+        result = provider.complete(prompt, model_context, max_output_tokens=ASK_MAX_OUTPUT_TOKENS)
         from genai.ask import normalize_answer
+        from genai.structured_answer import evidence_texts, render_markdown
 
-        response["provider_output"] = {**result.output, "answer": normalize_answer(result.output.get("answer"))}
+        raw_answer = normalize_answer(result.output.get("answer"))
         sources = list(search["sources"])
         if payload.investigation_id:
             from genai.grounding import source_provenance
@@ -222,7 +258,18 @@ def create_interaction(
             ]
         response["sources_provenance"] = sources
         known = {source["evidence_identifier"] for source in sources}
-        answer_check = check_answer(response["provider_output"]["answer"], known)
+        reading = read_model_reply(raw_answer, known, evidence_texts(search, grounded))
+        if reading.status == "OK":
+            # A valid structured reply: the answer is its checked sections in Ask's Markdown form; the checks below
+            # still see every citation the model made.
+            answer, checked_text = render_markdown(reading), reading.check_text
+        elif reading.status == "INVALID":
+            # JSON that is not the requested form is never shown as text; the record-based answer stands in.
+            answer, checked_text = None, raw_answer
+        else:
+            answer, checked_text = raw_answer, raw_answer
+        response["provider_output"] = {**result.output, "answer": answer}
+        answer_check = check_answer(checked_text, known)
         response["answer_check"] = answer_check
         response["search"] = {
             "status": search["status"],
@@ -239,6 +286,10 @@ def create_interaction(
             "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
         }
         response["limitations"] = result.output.get("limitations", []) + answer_check["notes"]
+        if reading.status == "INVALID":
+            from genai.structured_answer import AI_NOTE_INVALID
+
+            response["limitations"].append(AI_NOTE_INVALID)
         provenance = {
             "provider": result.provider,
             "model": result.model,
@@ -249,13 +300,43 @@ def create_interaction(
             "audit": provider.audit_details(result),
         }
     except GenAIUnavailable as exc:
-        response["limitations"] = ["GenAI provider is temporarily unavailable; deterministic review output retained."]
+        # Why no model answered, with what the user can do about it (AI switched off, allowance used up, ...).
+        refusal = genai_refusal(exc)
+        response["refusal"] = refusal
+        response["limitations"] = [refusal["user_message"]]
         provenance = {
             "provider": "unavailable",
             "error_state": type(exc).__name__,
+            "refusal_code": refusal["code"],
             "human_review_required": True,
             "hidden_chain_of_thought_persisted": False,
         }
+        from genai.epistemic import reason_code_for
+
+        ai_note = f"{refusal['user_message']} This answer comes from your records only."
+        reason_code = reason_code_for(refusal["code"])
+    # Phase 4: the structured answer - record-based sections always, the model's checked sections when it answered.
+    from genai import structured_answer as structured_module
+
+    if reading is not None and reading.status != "OK" and ai_note is None:
+        if (response.get("provider_output") or {}).get("status") == "PROVIDER_NOT_CONFIGURED":
+            ai_note, reason_code = structured_module.AI_NOTE_NOT_CONFIGURED, "PROVIDER_UNAVAILABLE"
+        else:
+            ai_note = {
+                "NOT_JSON": structured_module.AI_NOTE_NOT_SECTIONED,
+                "INVALID": structured_module.AI_NOTE_INVALID,
+            }.get(reading.status, structured_module.AI_NOTE_EMPTY)
+    response["structured"] = structured_module.structured_answer(
+        db,
+        tenant_id=uuid.UUID(ctx.tenant_id),
+        investigation_id=payload.investigation_id,
+        search=search,
+        grounded=grounded if payload.investigation_id else None,
+        reading=reading,
+        ai_note=ai_note or structured_module.AI_NOTE_UNAVAILABLE,
+        reason_code=reason_code,
+        temporal_mode=payload.temporal_mode,
+    )
     row = AIInteraction(
         id=uuid.uuid4(),
         tenant_id=ctx.tenant_id,
@@ -292,12 +373,21 @@ def create_interaction(
         )
     )
     db.commit()
-    return {
+    result = {
         "interaction_id": str(row.id),
         "session_id": str(session.id),
         "status": "READY_FOR_REVIEW",
         "response": response,
+        # Phase 4 (additive): the structured answer, also stored in response["structured"].
+        "structured": response["structured"],
     }
+    if provenance.get("refusal_code"):
+        # The organization's AI switch, budget or provider policy refused the model (or no provider answered): say
+        # which, so the screen can explain it instead of showing a generic outage.
+        result.update(
+            {"status": "REFUSED", "code": provenance["refusal_code"], "user_message": response["limitations"][0]}
+        )
+    return result
 
 
 @router.post("/interactions/{interaction_id}/feedback")
@@ -347,6 +437,12 @@ def list_interactions(
             "response": r.response,
             "created_at": r.created_at,
             "investigation_id": r.investigation_id,
+            # Phase 4 (additive): the structured answer, for conversations that have one.
+            **(
+                {"structured": r.response["structured"]}
+                if isinstance(r.response, dict) and r.response.get("structured") is not None
+                else {}
+            ),
         }
         for r in rows
     ]
@@ -358,7 +454,10 @@ def _limit_supplier_requests(db: Session, ctx: AuthenticatedRequestContext, now)
 
     per_day = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_DAY", "50"))
     per_hour = int(os.getenv("MDARIX_SUPPLIER_REQUESTS_PER_HOUR", "10"))
-    recent = db.query(SupplierEvidenceRequest).filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+    # Requests to colleagues (md29) share the table but send no email; they do not count against these limits.
+    recent = db.query(SupplierEvidenceRequest).filter(
+        SupplierEvidenceRequest.tenant_id == ctx.tenant_id, SupplierEvidenceRequest.request_kind == SUPPLIER_KIND
+    )
     if recent.filter(SupplierEvidenceRequest.created_at >= now - timedelta(days=1)).count() >= per_day:
         raise HTTPException(
             429, detail={"code": "SUPPLIER_REQUEST_LIMIT", "message": f"Your organization can send {per_day} a day"}
@@ -448,30 +547,51 @@ def request_supplier_evidence(
         )
     )
     db.commit()
-    return {"id": str(row.id), "tenant_id": ctx.tenant_id, "status": row.status, "email_delivery": delivery}
+    result = {
+        "id": str(row.id),
+        "business_id": row.business_id,
+        "tenant_id": ctx.tenant_id,
+        "status": row.status,
+        "email_delivery": delivery,
+    }
+    # The requester's task waits for the supplier's reply. Saved after the request; never undoes it.
+    from backend.app.workflow.hooks import on_supplier_request_created
+
+    on_supplier_request_created(db, control_db, row, actor_user_id=ctx.user_id)
+    return result
 
 
 @router.get("/supplier-evidence-requests")
 def list_supplier_evidence_requests(
     db: Session = Depends(get_data_plane_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)
 ):
+    from backend.app.db.models.foundation import Investigation, Supplier
+
     rows = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id, SupplierEvidenceRequest.request_kind == SUPPLIER_KIND
+        )
         .order_by(SupplierEvidenceRequest.created_at.desc())
         .limit(100)
         .all()
     )
+    suppliers = business_id_map(db, Supplier, (r.supplier_id for r in rows))
+    investigations = business_id_map(db, Investigation, (r.investigation_id for r in rows))
     return [
         {
             "id": str(r.id),
+            "business_id": r.business_id,
             "recipient": r.recipient,
             "title": r.title,
             "status": r.status,
             "requested_items": r.requested_items,
             "supplier_id": str(r.supplier_id) if r.supplier_id else None,
+            "supplier_business_id": suppliers.get(str(r.supplier_id)),
             "investigation_id": str(r.investigation_id) if r.investigation_id else None,
+            "investigation_business_id": investigations.get(str(r.investigation_id)),
             "created_at": r.created_at.isoformat() if r.created_at else None,
+            "replies": [_reply_view(item) for item in (r.requested_items or {}).get("replies") or []],
         }
         for r in rows
     ]
@@ -506,18 +626,46 @@ def _content_matches_type(content: bytes, content_type: str) -> bool:
     return False
 
 
-@router.post(
-    "/supplier-evidence-requests/{request_id}/attachments", dependencies=[Depends(require_permission(RECORDS_WRITE))]
-)
-async def upload_supplier_attachment(
+# A multipart body is the file plus its form framing; anything declared larger than this cannot hold an allowed file.
+MAX_UPLOAD_REQUEST_BYTES = MAX_ATTACHMENT_BYTES + 64 * 1024
+
+
+class _DeclaredSizeLimitedRoute(APIRoute):
+    """Refuses a request whose declared Content-Length is over the upload limit before the body is read.
+
+    FastAPI parses (and spools) the whole multipart form before a handler runs, so a check inside the handler comes
+    too late; this one runs first. A body without a declared length is still capped by the handler's bounded read.
+    """
+
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def limited(request: Request):
+            declared = request.headers.get("content-length")
+            if declared and declared.isdigit() and int(declared) > MAX_UPLOAD_REQUEST_BYTES:
+                raise HTTPException(
+                    413, detail={"code": "ATTACHMENT_TOO_LARGE", "message": "Attachment exceeds the permitted size"}
+                )
+            return await handler(request)
+
+        return limited
+
+
+def upload_supplier_attachment(
     request_id: uuid.UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    """Store one supplier attachment. A plain ``def``: the database, the malware scan and the storage write all block,
+    so FastAPI runs it in its thread pool instead of on the event loop."""
     row = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
         .first()
     )
     if not row:
@@ -529,7 +677,7 @@ async def upload_supplier_attachment(
         raise HTTPException(
             415, detail={"code": "UNSUPPORTED_ATTACHMENT_TYPE", "message": "Attachment type is not permitted"}
         )
-    content = await file.read(MAX_ATTACHMENT_BYTES + 1)
+    content = file.file.read(MAX_ATTACHMENT_BYTES + 1)
     if len(content) > MAX_ATTACHMENT_BYTES:
         raise HTTPException(
             413, detail={"code": "ATTACHMENT_TOO_LARGE", "message": "Attachment exceeds the permitted size"}
@@ -587,6 +735,134 @@ async def upload_supplier_attachment(
     return {"id": str(attachment.id), **metadata, "filename": attachment.filename}
 
 
+router.add_api_route(
+    "/supplier-evidence-requests/{request_id}/attachments",
+    upload_supplier_attachment,
+    methods=["POST"],
+    dependencies=[Depends(require_permission(RECORDS_WRITE))],
+    route_class_override=_DeclaredSizeLimitedRoute,
+)
+
+
+class SupplierReplyPayload(BaseModel):
+    """What the supplier answered, as recorded by the person who received it (and, optionally, the file they sent,
+    uploaded first as an attachment of the same request)."""
+
+    note: str = Field(min_length=1, max_length=4000)
+    attachment_id: uuid.UUID | None = None
+
+    @field_validator("note")
+    @classmethod
+    def _note(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Describe the supplier's reply")
+        return value.strip()
+
+
+def _reply_view(reply: dict) -> dict:
+    return {key: reply.get(key) for key in ("id", "note", "attachment_id", "recorded_by", "recorded_at")}
+
+
+@router.post("/supplier-requests/{request_id}/reply", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+@router.post(
+    "/supplier-evidence-requests/{request_id}/reply", dependencies=[Depends(require_permission(RECORDS_WRITE))]
+)
+def record_supplier_reply(
+    request_id: uuid.UUID,
+    payload: SupplierReplyPayload,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    control_db: Session = Depends(get_db),
+):
+    """Record a supplier's reply to an evidence request and link the file it came with.
+
+    Replies are kept on the request itself (``requested_items.replies``, oldest first) so the request carries its
+    whole exchange; the request becomes REPLIED. The attachment must be one uploaded to this same request of this
+    organization. Supplier material is never accepted as evidence automatically: the reply is recorded for review.
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    row = (
+        db.query(SupplierEvidenceRequest)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            404, detail={"code": "EVIDENCE_REQUEST_NOT_FOUND", "message": "Evidence request is not available"}
+        )
+    attachment = None
+    if payload.attachment_id is not None:
+        attachment = (
+            db.query(EvidenceAttachment)
+            .filter(
+                EvidenceAttachment.id == payload.attachment_id,
+                EvidenceAttachment.tenant_id == ctx.tenant_id,
+                EvidenceAttachment.request_id == row.id,
+            )
+            .first()
+        )
+        if attachment is None:
+            raise HTTPException(
+                404,
+                detail={
+                    "code": "ATTACHMENT_NOT_FOUND",
+                    "message": "Upload the file to this request first, then record the reply",
+                },
+            )
+    now = NOW()
+    reply = {
+        "id": str(uuid.uuid4()),
+        "note": payload.note,
+        "attachment_id": str(attachment.id) if attachment else None,
+        "recorded_by": str(ctx.user_id),
+        "recorded_at": now.isoformat(),
+    }
+    document = dict(row.requested_items or {})
+    document["replies"] = [*(document.get("replies") or []), reply]
+    row.requested_items = document
+    flag_modified(row, "requested_items")
+    previous = row.status
+    row.status = "REPLIED"
+    row.updated_at = now
+    db.add(
+        make_audit_event(
+            tenant_id=ctx.tenant_id,
+            actor_ref=ctx.user_id,
+            action="SUPPLIER_REPLY_RECORDED",
+            entity_type="SupplierEvidenceRequest",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            details={
+                "reply_id": reply["id"],
+                "attachment_id": reply["attachment_id"],
+                "previous_status": previous,
+                "note_length": len(payload.note),
+            },
+            created_at=now,
+        )
+    )
+    db.commit()
+    result = {
+        "id": str(row.id),
+        "business_id": row.business_id,
+        "status": row.status,
+        "reply": _reply_view(reply),
+        "replies": [_reply_view(item) for item in document["replies"]],
+        "evidence_acceptance": "NEVER_AUTOMATIC",
+    }
+    # The reply ends the requester's waiting task and asks them to review it. Saved after the reply; never undoes it.
+    from backend.app.workflow.hooks import on_supplier_reply_recorded
+
+    on_supplier_reply_recorded(db, control_db, row, actor_user_id=ctx.user_id)
+    return result
+
+
 @router.get("/supplier-evidence-requests/{request_id}/attachments")
 def list_supplier_attachments(
     request_id: uuid.UUID,
@@ -595,7 +871,11 @@ def list_supplier_attachments(
 ):
     row = (
         db.query(SupplierEvidenceRequest)
-        .filter(SupplierEvidenceRequest.id == request_id, SupplierEvidenceRequest.tenant_id == ctx.tenant_id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
         .first()
     )
     if not row:
@@ -634,6 +914,18 @@ def download_supplier_attachment(
         )
         .first()
     )
+    # Files of requests to colleagues are opened through /api/v1/evidence-requests, which checks who may see them.
+    if attachment and (
+        db.query(SupplierEvidenceRequest.id)
+        .filter(
+            SupplierEvidenceRequest.id == request_id,
+            SupplierEvidenceRequest.tenant_id == ctx.tenant_id,
+            SupplierEvidenceRequest.request_kind == SUPPLIER_KIND,
+        )
+        .first()
+        is None
+    ):
+        attachment = None
     if not attachment:
         raise HTTPException(404, detail={"code": "ATTACHMENT_NOT_FOUND", "message": "Attachment is not available"})
     try:
@@ -723,6 +1015,27 @@ def stage3_genai_health(ctx: AuthenticatedRequestContext = Depends(get_request_c
     return {"tenant_id": ctx.tenant_id, **GenAIProvider().health()}
 
 
+def _organization_name(db: Session, tenant_id) -> str | None:
+    from backend.app.db.models.foundation import Tenant
+
+    tenant = db.query(Tenant).filter(Tenant.id == uuid.UUID(str(tenant_id))).first()
+    return (tenant.display_name or tenant.name) if tenant else None
+
+
+def _file_response(content, media_type: str, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-MDARIX-Human-Review": "required",
+        },
+    )
+
+
+_EXTENSIONS = {"WORD": "doc", "DOC": "doc", "ESTAR_XML": "xml"}
+
+
 @router.post("/reports/{report_code}", dependencies=[Depends(require_permission(DATA_EXPORT))])
 def generate_report(
     report_code: str,
@@ -731,34 +1044,49 @@ def generate_report(
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    """One governed report with the organization's own records (reports/content.py), read from its data plane, with
+    signatures and the audit trail from the control plane. JSON returns the report document; CSV and PDF download
+    the file. Every generation is audited."""
+    from reports.content import build_report_context
+    from reports.service import FORMATS, REPORTS
     from reports.service import generate_report as build_report
 
-    try:
-        result = build_report(
-            report_code.upper(),
-            ctx.tenant_id,
-            output_format=output_format,
-            context={"correlation_id": ctx.correlation_id},
+    code, fmt = report_code.upper(), output_format.upper()
+    if code not in REPORTS:
+        raise HTTPException(
+            400, detail={"code": "REPORT_TYPE_NOT_SUPPORTED", "message": "Report type is not supported"}
         )
-        db.add(
-            AuditEvent(
-                id=uuid.uuid4(),
-                tenant_id=ctx.tenant_id,
-                actor_ref=ctx.user_id,
-                action="REPORT_GENERATED",
-                entity_type="Report",
-                details={
-                    "report_code": report_code.upper(),
-                    "format": result["format"],
-                    "report_version": result["report_version"],
-                },
-                created_at=NOW(),
-            )
+    if fmt not in FORMATS:
+        raise HTTPException(400, detail={"code": "REPORT_FORMAT_NOT_SUPPORTED", "message": "Use JSON, CSV or PDF"})
+    content = build_report_context(data_db, ctx.tenant_id, code, control_db=db)
+    result = build_report(
+        code, ctx.tenant_id, output_format=fmt, context=content, tenant_name=_organization_name(db, ctx.tenant_id)
+    )
+    db.add(
+        make_audit_event(
+            tenant_id=ctx.tenant_id,
+            actor_ref=ctx.user_id,
+            action="REPORT_GENERATED",
+            entity_type="Report",
+            correlation_id=ctx.correlation_id,
+            details={
+                "report_code": code,
+                "format": result["format"],
+                "report_version": result["report_version"],
+                "data_cut_off": result["data_cut_off"],
+            },
+            created_at=NOW(),
         )
-        db.commit()
+    )
+    db.commit()
+    if fmt == "JSON":
         return result
-    except ValueError as exc:
-        raise HTTPException(400, detail={"code": str(exc), "message": "Report type is not supported"})
+    stamp = result["generated_at"][:10]
+    return _file_response(
+        result["content"],
+        result["content_type"],
+        f"mdarix-{code.lower().replace('_', '-')}-{stamp}.{_EXTENSIONS.get(fmt, fmt.lower())}",
+    )
 
 
 @router.get("/compliance-report")
@@ -769,12 +1097,14 @@ def compliance_report(
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Generate a tenant-scoped audit and signature verification report.
+    """Generate a tenant-scoped audit and signature verification report (the evidence package).
 
     The report carries the full audit trail (source IPs, before/after values), so it is limited to the
-    same administrators who can read the audit history.
+    same administrators who can read the audit history. Every listed audit event and signature is rendered in every
+    format, including the paginated PDF.
     """
     from backend.app.access.authz import _require_administrator
+    from reports.content import audit_event_rows, signature_verification_rows, with_decision_business_ids
 
     _require_administrator(request, db)
     fmt = output_format.upper()
@@ -786,68 +1116,13 @@ def compliance_report(
                 "message": "Use JSON, CSV, PDF, Word, or the controlled eSTAR XML handoff",
             },
         )
-    rows = (
-        db.query(AuditEvent)
-        .filter(AuditEvent.tenant_id == ctx.tenant_id)
-        .order_by(AuditEvent.created_at.desc())
-        .limit(1000)
-        .all()
-    )
-    signatures = (
-        db.query(SignedApprovalRecord)
-        .filter(SignedApprovalRecord.tenant_id == ctx.tenant_id)
-        .order_by(SignedApprovalRecord.signed_at.desc())
-        .limit(500)
-        .all()
-    )
-    signature_rows = []
-    for item in signatures:
-        material = {
-            "decision_id": str(item.object_id),
-            "version": item.object_version,
-            "type": item.decision_type,
-            "decision": item.decision,
-            "remarks": item.remarks,
-        }
-        fingerprint = (
-            __import__("hashlib").sha256(__import__("json").dumps(material, sort_keys=True).encode()).hexdigest()
-        )
-        expected = (
-            __import__("hashlib").sha256((fingerprint + item.signer_user_id + item.object_version).encode()).hexdigest()
-        )
-        signature_rows.append(
-            {
-                "signature_id": str(item.id),
-                "decision": item.decision,
-                "valid": fingerprint == item.content_fingerprint
-                and expected == item.signature_hash
-                and item.status == "SIGNED",
-                "signer_role": item.signer_role,
-                "object_version": item.object_version,
-                "signed_at": item.signed_at,
-            }
-        )
+    tenant = uuid.UUID(str(ctx.tenant_id))
+    events = audit_event_rows(db, tenant, limit=1000)
+    # Signatures are in the control plane, their decisions in the organization's data plane.
+    signature_rows = with_decision_business_ids(data_db, signature_verification_rows(db, tenant, limit=500))
     context = {
-        "audit_events": [
-            {
-                "action": r.action,
-                "entity_type": r.entity_type,
-                "entity_id": str(r.entity_id) if r.entity_id else None,
-                "actor_ref": r.actor_ref,
-                "correlation_id": r.correlation_id,
-                "source_ip": r.source_ip,
-                "user_agent": r.user_agent,
-                "reason": r.reason,
-                "old_values": r.old_values,
-                "new_values": r.new_values,
-                "created_at": r.created_at,
-                "retention_until": r.retention_until,
-            }
-            for r in rows
-        ],
-        "signature_verification": signature_rows,
         "counts": {
-            "audit_events": len(rows),
+            "audit_events": len(events),
             "signatures": len(signature_rows),
             "valid_signatures": sum(1 for item in signature_rows if item["valid"]),
             # The report lists the most recent records; these are the organization's totals.
@@ -857,16 +1132,21 @@ def compliance_report(
             .count(),
         },
         "scope": "The latest 1,000 audit events and 500 signatures; the complete trail is in the audit export.",
+        "signature_verification": signature_rows,
+        "audit_events": events,
+        "data_cut_off": NOW().isoformat(),
     }
     from reports.service import generate_report as build_report
 
+    name = _organization_name(db, ctx.tenant_id)
     try:
         result = build_report(
             "AUDIT_APPROVAL",
             ctx.tenant_id,
             output_format=fmt,
             context=context,
-            watermark=f"MDARIX COMPLIANCE CONTROLLED COPY · {ctx.tenant_id}",
+            watermark=f"MDARIX COMPLIANCE CONTROLLED COPY · {name or ctx.tenant_id}",
+            tenant_name=name,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -883,7 +1163,7 @@ def compliance_report(
             details={
                 "format": fmt,
                 "report_version": result["report_version"],
-                "audit_count": len(rows),
+                "audit_count": len(events),
                 "signature_count": len(signature_rows),
             },
             created_at=now,
@@ -892,7 +1172,7 @@ def compliance_report(
     db.commit()
     if fmt == "JSON":
         return result
-    extension = {"WORD": "doc", "DOC": "doc", "ESTAR_XML": "xml"}.get(fmt, fmt.lower())
+    extension = _EXTENSIONS.get(fmt, fmt.lower())
     return Response(
         content=result["content"],
         media_type=result["content_type"],
@@ -908,11 +1188,19 @@ def queue_report(
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    """A report rendered as a stored job (download it from /reports/jobs/{id}/download). The content is the same as
+    the direct report; signatures and the audit trail are included because the request has the control plane."""
     from reports.service import submit_report_job
 
     try:
         job = submit_report_job(
-            report_code.upper(), ctx.tenant_id, actor_id=ctx.user_id, output_format=output_format, db=data_db
+            report_code.upper(),
+            ctx.tenant_id,
+            actor_id=ctx.user_id,
+            output_format=output_format,
+            db=data_db,
+            control_db=db,
+            tenant_name=_organization_name(db, ctx.tenant_id),
         )
     except ValueError as exc:
         raise HTTPException(
@@ -930,12 +1218,57 @@ def queue_report(
                 "report_code": report_code.upper(),
                 "format": job["format"],
                 "report_version": job["report_version"],
+                "status": job["status"],
             },
             created_at=NOW(),
         )
     )
     db.commit()
     return {key: value for key, value in job.items() if key not in {"context", "hidden_fields"}}
+
+
+@router.get("/investigations/{investigation_id}/record", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def investigation_record_export(
+    investigation_id: uuid.UUID,
+    format: str = Query(default="json", pattern="^(?i:json|csv|pdf)$"),
+    db: Session = Depends(get_db),
+    data_db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Everything recorded about one case: its fields, linked complaints, evidence with provenance, hypotheses,
+    unknowns, decisions with reviews and verified signatures, and the audit events about it. Only the signed-in
+    organization's case (404 otherwise); every export is audited ``INVESTIGATION_RECORD_EXPORTED``."""
+    from reports.content import investigation_record
+    from reports.service import render_investigation_record
+
+    record = investigation_record(data_db, ctx.tenant_id, investigation_id, control_db=db)
+    if record is None:
+        raise HTTPException(
+            404, detail={"code": "INVESTIGATION_NOT_FOUND", "message": "Investigation is not available"}
+        )
+    fmt = format.upper()
+    result = render_investigation_record(
+        record, ctx.tenant_id, output_format=fmt, tenant_name=_organization_name(db, ctx.tenant_id)
+    )
+    db.add(
+        make_audit_event(
+            tenant_id=ctx.tenant_id,
+            actor_ref=ctx.user_id,
+            action="INVESTIGATION_RECORD_EXPORTED",
+            entity_type="Investigation",
+            entity_id=investigation_id,
+            correlation_id=ctx.correlation_id,
+            details={"format": fmt, "report_version": result["report_version"], "counts": record["counts"]},
+            created_at=NOW(),
+        )
+    )
+    db.commit()
+    if fmt == "JSON":
+        return result
+    identifier = record["investigation"].get("investigation_identifier") or str(investigation_id)
+    return _file_response(
+        result["content"], result["content_type"], f"{safe_filename(identifier)}-record.{fmt.lower()}"
+    )
 
 
 @router.get("/reports/jobs/{job_id}")

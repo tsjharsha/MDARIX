@@ -14,6 +14,8 @@ from __future__ import annotations
 import html
 import os
 import smtplib
+import ssl
+import urllib.parse
 from dataclasses import dataclass
 from email.message import EmailMessage
 from email.utils import make_msgid, parseaddr
@@ -178,14 +180,17 @@ def _send_email(
     if html_body:
         email.add_alternative(html_body, subtype="html")
     port = int(os.getenv("MDARIX_SMTP_PORT", "587"))
+    # Without an explicit context smtplib encrypts but verifies neither the certificate nor the host name, so anyone
+    # on the path could read the login and the mail. The default context checks both against the system CA store.
+    tls = ssl.create_default_context()
     try:
         if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=15) as client:
+            with smtplib.SMTP_SSL(host, port, timeout=15, context=tls) as client:
                 client.login(username, password)
                 client.send_message(email)
         else:
             with smtplib.SMTP(host, port, timeout=15) as client:
-                client.starttls()
+                client.starttls(context=tls)
                 client.login(username, password)
                 client.send_message(email)
     except (smtplib.SMTPException, OSError) as exc:
@@ -329,19 +334,38 @@ def send_trial_ended(recipient: str, organization: str, *, delete_on: str) -> st
 # ------------------------------------------------------------------------------------------- customer administrators
 
 
-def send_subscription_reminder(recipient: str, organization: str, *, expires_on: str, days_left: int) -> str:
+def send_subscription_reminder(
+    recipient: str,
+    organization: str,
+    *,
+    expires_on: str,
+    days_left: int,
+    template: tuple[str, str] | None = None,
+) -> str:
+    """The renewal reminder. ``template`` is the organization's own (subject, body) with its values already filled in
+    (backend/app/notifications.py); without one, the standard wording is used. Either way the layout, the footer and
+    the escaping are the same, so a template can change the words but never inject markup."""
     when = "today" if days_left <= 0 else f"in {days_left} days"
+    if template:
+        subject, body = template
+        paragraphs = tuple(" ".join(part.split()) for part in body.split("\n\n") if part.strip())
+        heading = subject
+    else:
+        subject = f"Your MDARIX subscription for {organization} expires {when}"
+        heading = "Subscription renewal"
+        paragraphs = (
+            f"The MDARIX subscription for {organization} expires on {expires_on}. Reply to this email or contact "
+            "your MDARIX account team to renew, so access continues without interruption.",
+        )
     return _send(
         recipient,
         Message(
-            subject=f"Your MDARIX subscription for {organization} expires {when}",
-            heading="Subscription renewal",
-            paragraphs=(
-                f"The MDARIX subscription for {organization} expires on {expires_on}. Reply to this email or contact "
-                "your MDARIX account team to renew, so access continues without interruption.",
-            ),
-            button=("Open Customer Administration", f"{company().app_url}/app"),
-            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+            subject=subject,
+            heading=heading,
+            paragraphs=paragraphs,
+            button=("Open MDARIX", f"{company().app_url}/app"),
+            reason=f"You are receiving this email because {organization} lists you to receive MDARIX subscription "
+            "reminders.",
         ),
     )
 
@@ -426,5 +450,269 @@ def send_operations_alert(recipient: str, subject: str, body: str) -> str:
             heading=subject,
             paragraphs=tuple(line for line in body.split("\n") if line.strip()),
             reason="You are receiving this email because you are on the MDARIX operations alert list.",
+        ),
+    )
+
+
+def send_feedback_alert(
+    recipient: str,
+    *,
+    organization: str,
+    rating: int,
+    recommend_score: int | None,
+    consent: str,
+    contact_ok: bool,
+) -> str:
+    """Tell the MDARIX team that a customer sent product feedback. The answers themselves stay in Platform Admin."""
+    consents = {
+        "NAMED": "may be quoted with the company's name, after review",
+        "ANONYMOUS": "may be quoted anonymously, after review",
+        "PRIVATE": "for the MDARIX team only",
+    }
+    return _send(
+        recipient,
+        Message(
+            subject=f"New MDARIX feedback from {organization}",
+            heading="A customer sent feedback",
+            details=(
+                ("Organization", organization),
+                ("Overall rating", f"{rating} of 5"),
+                ("Would recommend", f"{recommend_score} of 10" if recommend_score is not None else "not answered"),
+                ("Quote", consents.get(consent, consent.lower())),
+                ("May be contacted", "yes" if contact_ok else "no"),
+            ),
+            button=("Read it in Platform Admin", f"{company().app_url}/app/admin"),
+            reason="You are receiving this email because you handle MDARIX customer feedback.",
+        ),
+    )
+
+
+# ------------------------------------------------------------------------------------------- people who asked us
+
+
+def send_demo_request_acknowledgement(recipient: str, *, display_name: str) -> str:
+    """Confirm to a website visitor that their demo request arrived and what happens next."""
+    return _send(
+        recipient,
+        Message(
+            subject="We received your MDARIX demo request",
+            heading=f"Thank you, {display_name}",
+            paragraphs=(
+                "We received your request for an MDARIX demo. Someone from our team will contact you, usually "
+                "within one business day, to agree a time.",
+                "You do not need to do anything else. If you did not ask for a demo, you can ignore this email; we "
+                "will not contact you unless you reply.",
+            ),
+            reason="You are receiving this email because this address was entered on the MDARIX demo request form.",
+        ),
+    )
+
+
+def send_trial_request_acknowledgement(recipient: str, *, display_name: str, organization: str) -> str:
+    """Confirm to the requester that their free-trial request is waiting for review."""
+    return _send(
+        recipient,
+        Message(
+            subject="We received your MDARIX free trial request",
+            heading=f"Thank you, {display_name}",
+            paragraphs=(
+                f"We received your request for a free MDARIX trial for {organization}. We review every request, "
+                "usually within one business day.",
+                "Once it is approved you will receive a second email with a link to activate your account. The link "
+                "works once, so keep that email.",
+            ),
+            closing=("If you did not ask for a trial, you can ignore this email.",),
+            reason="You are receiving this email because this address was entered on the MDARIX free trial form.",
+        ),
+    )
+
+
+def send_trial_request_declined(recipient: str, *, display_name: str, organization: str) -> str:
+    """Tell the requester, politely, that their free-trial request was not approved, and how to reach us.
+
+    The administrator's reason is an internal note and is deliberately not included.
+    """
+    support = company().support_email
+    contact = f"write to {support}" if support else "reply to this email"
+    return _send(
+        recipient,
+        Message(
+            subject="Your MDARIX free trial request",
+            heading=f"Thank you for your interest, {display_name}",
+            paragraphs=(
+                f"We have reviewed your request for a free MDARIX trial for {organization} and are not able to "
+                "offer a trial at this time.",
+                "Trials are currently limited to organizations we can support closely during the evaluation. This "
+                "is not a judgement on your organization, and it may change.",
+            ),
+            closing=(f"If you would like to talk about MDARIX, {contact} and we will gladly help.",),
+            reason="You are receiving this email because this address was entered on the MDARIX free trial form.",
+        ),
+    )
+
+
+# ------------------------------------------------------------------------------------------- workspace work
+
+
+def _work_reason(organization: str) -> str:
+    return f"You are receiving this email because of your work in MDARIX for {organization}."
+
+
+def _case_link(view: str, case: str | None) -> str | None:
+    """A deep link that opens one investigation on a screen (/app/<view>?case=INV000147), or None without a case."""
+    case = str(case or "").strip()
+    if not case:
+        return None
+    return f"{company().app_url}/app/{view}?case={urllib.parse.quote(case, safe='')}"
+
+
+def send_assignment_notice(
+    recipient: str, *, organization: str, reference: str, assigned_by: str | None, case: str | None = None
+) -> str:
+    """An investigation was assigned to the recipient. With ``case`` (the investigation's business id) the button
+    opens that investigation; without it, My work."""
+    case_url = _case_link("investigations", case)
+    return _send(
+        recipient,
+        Message(
+            subject=f"Investigation {reference} is assigned to you",
+            heading=f"Investigation {reference} is assigned to you",
+            paragraphs=(
+                (f"{assigned_by} assigned you" if assigned_by else "You were assigned")
+                + f" investigation {reference} in MDARIX for {organization}.",
+            ),
+            button=("Open the investigation", case_url)
+            if case_url
+            else ("Open My work", f"{company().app_url}/app/my-work"),
+            reason=_work_reason(organization),
+        ),
+    )
+
+
+def send_review_pending_notice(
+    recipient: str, *, organization: str, reference: str, submitted_by: str | None, case: str | None = None
+) -> str:
+    """A decision is waiting for the recipient's approval. With ``case`` (the investigation's business id) the
+    button opens that case's decision."""
+    case_url = _case_link("decision", case)
+    return _send(
+        recipient,
+        Message(
+            subject=f"A decision on {reference} is waiting for your approval",
+            heading="A decision is waiting for your approval",
+            paragraphs=(
+                (f"{submitted_by} submitted" if submitted_by else "Someone submitted")
+                + f" a decision on {reference} for approval in MDARIX for {organization}.",
+                "Approving or rejecting it needs your password and authenticator code.",
+            ),
+            # The Decisions screen, where the decision is reviewed and signed (frontend route /app/decision).
+            button=("Open Decisions", case_url or f"{company().app_url}/app/decision"),
+            reason=_work_reason(organization),
+        ),
+    )
+
+
+def send_signoff_completed_notice(
+    recipient: str,
+    *,
+    organization: str,
+    reference: str,
+    signed_by: str | None,
+    decision: str | None = None,
+    case: str | None = None,
+) -> str:
+    """A decision on a case the recipient owns was signed: approved, rejected, or (outcome unknown) signed off. With
+    ``case`` (the investigation's business id) the button opens that case's decision."""
+    case_url = _case_link("decision", case)
+    done = {"APPROVE": "approved", "REJECT": "rejected"}.get(str(decision or "").upper(), "signed off")
+    return _send(
+        recipient,
+        Message(
+            subject=f"The decision on {reference} was {done}",
+            heading=f"The decision on {reference} was {done}",
+            paragraphs=(
+                f"The decision on {reference}, which you own, was {done} with an electronic signature"
+                + (f" by {signed_by}" if signed_by else "")
+                + f" in MDARIX for {organization}. The signature is recorded in the audit trail.",
+            ),
+            button=("Open the decision", case_url)
+            if case_url
+            else ("Open investigations", f"{company().app_url}/app/investigations"),
+            reason=_work_reason(organization),
+        ),
+    )
+
+
+def send_risk_review_requested_notice(
+    recipient: str, *, organization: str, reference: str, requested_by: str | None
+) -> str:
+    """Someone asked the recipient to review a risk."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"Risk review requested: {reference}",
+            heading="A risk review is requested",
+            paragraphs=(
+                (f"{requested_by} asked" if requested_by else "You were asked")
+                + f" for a review of risk {reference} in MDARIX for {organization}.",
+            ),
+            button=("Open Risk & Traceability", f"{company().app_url}/app/risk-traceability"),
+            reason=_work_reason(organization),
+        ),
+    )
+
+
+# ------------------------------------------------------------------------------------------- organization health
+
+
+def send_connector_sync_failed_notice(recipient: str, *, organization: str, connection: str, failure: str) -> str:
+    """A scheduled read of a customer system failed; nothing from that run was imported."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"MDARIX could not sync {connection}",
+            heading=f"The scheduled sync of {connection} failed",
+            paragraphs=(
+                "Nothing from this run was imported; the records already in MDARIX are unchanged. The next "
+                "scheduled run tries again, and you will not get another email while the problem continues.",
+            ),
+            details=(("Connection", connection), ("Problem", failure)),
+            button=("Open Customer Administration", f"{company().app_url}/app/customer-admin"),
+            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+        ),
+    )
+
+
+def send_ai_budget_notice(
+    recipient: str, *, organization: str, percent: int, month: str, tokens_used: int | None, budget: int | None
+) -> str:
+    """The organization used 80% or all of its monthly AI budget."""
+    reached = percent >= 100
+    details: tuple[tuple[str, str], ...] = (("Month", month),)
+    if tokens_used is not None and budget is not None:
+        details += (("Used", f"{tokens_used:,} of {budget:,} tokens"),)
+    if reached:
+        subject = f"{organization} has used its MDARIX AI budget for {month}"
+        heading = "The AI budget is used up"
+        explanation = (
+            "AI features (drafting, Ask MDARIX, the AI investigator) are paused until next month or until the "
+            "budget is raised. Everything else keeps working."
+        )
+    else:
+        subject = f"{organization} has used {percent}% of its MDARIX AI budget for {month}"
+        heading = f"{percent}% of the AI budget is used"
+        explanation = (
+            "When the budget is used up, AI features pause until next month; everything else keeps working. "
+            "Your MDARIX account team can raise the budget."
+        )
+    return _send(
+        recipient,
+        Message(
+            subject=subject,
+            heading=heading,
+            paragraphs=(explanation,),
+            details=details,
+            button=("Open Customer Administration", f"{company().app_url}/app/customer-admin"),
+            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
         ),
     )

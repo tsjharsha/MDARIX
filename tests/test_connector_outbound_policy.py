@@ -56,7 +56,18 @@ def test_redirects_are_never_followed(monkeypatch, local_server):
 
 def test_summary_never_reveals_whether_non_connector_secrets_exist(monkeypatch):
     monkeypatch.setenv("POSTGRES_PASSWORD", "present")
-    row = type("Row", (), {"id": "c1", "code": "x", "connector_type": "REST", "version": "1", "status": "DRAFT"})()
+    row = type(
+        "Row",
+        (),
+        {
+            "id": "c1",
+            "business_id": "CNX000001",
+            "code": "x",
+            "connector_type": "REST",
+            "version": "1",
+            "status": "DRAFT",
+        },
+    )()
     row.configuration = {"credential_ref": "POSTGRES_PASSWORD"}
     assert _safe_connector_summary(row)["credential_configured"] is False
 

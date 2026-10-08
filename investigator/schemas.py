@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from genai.epistemic import AIEpistemicLabel, AIFallbackNotice, ai_label_field, fallback_notice
 
 
 StatementType = Literal[
@@ -26,6 +28,15 @@ AnalysisMode = Literal["standard", "leading_question_resistant", "abstention_che
 TemporalMode = Literal["current", "event", "known"]
 
 
+def business_id_field():
+    """An MDARIX ID (``business_id``) on an AI result, filled only for the API response (investigator/business_ids.py).
+
+    Left out of the serialized result while it is empty, so the AI grounding context and the stored AI output, which
+    are serialized from the same models before any ID is filled, stay exactly as they were.
+    """
+    return Field(default=None, exclude_if=lambda value: value is None)
+
+
 class SourceReference(BaseModel):
     reference_type: Literal[
         "EVIDENCE",
@@ -37,6 +48,7 @@ class SourceReference(BaseModel):
     ]
     evidence_id: str | None = None
     evidence_identifier: str | None = None
+    evidence_business_id: str | None = business_id_field()
     chunk_id: str | None = None
     observation_id: str | None = None
     retrieval_result_id: str | None = None
@@ -115,3 +127,13 @@ class InvestigationAnalysisResponse(BaseModel):
     analysis: InvestigationAnalysis
     persisted: bool
     ai_execution_id: uuid.UUID | None = None
+    # Phase 4 (additive): what this result is, and why AI did not contribute when rules produced it. On the response
+    # only - the analysis itself is the stored AI output and model context, which stay unchanged.
+    epistemic: AIEpistemicLabel = ai_label_field()
+    ai_notice: AIFallbackNotice | None = None
+
+    @model_validator(mode="after")
+    def _ai_notice(self):
+        if self.ai_notice is None:
+            self.ai_notice = fallback_notice("analysis", self.analysis.model_provenance, author_key="analysis_author")
+        return self

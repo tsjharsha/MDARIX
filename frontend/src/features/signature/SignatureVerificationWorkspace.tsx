@@ -1,36 +1,141 @@
-import { useState } from "react";
-import { requestJson } from "../../app/apiClient";
+import { useContext, useEffect, useState } from "react";
+import { describeError, requestJson } from "../../app/apiClient";
 import { formatDateTime, formatUtc } from "../../app/dates";
+import { titleCase } from "../admin/console/dashboardModel";
+import { WorkspaceContext } from "../workspace/workspaceContext";
+import { displayId, safeText } from "../../app/displayId";
+import { isCaseDecision } from "../workspace/humanDecision";
+import { DecisionRecordDrawer } from "../workspace/sections/DecisionRecord";
+
+type Decision = {
+  id: string;
+  business_id?: string | null;
+  decision_identifier?: string;
+  decision_status?: string;
+  selected_action?: string;
+  decision_timestamp?: string;
+  updated_at?: string;
+};
+type Person = { id: string; display_name: string };
+
+/**
+ * Who signed, in words: "you", a colleague's name (from the organization's list of people who work on cases), or —
+ * when the signer is not on that list (for example an approver who does not work cases) — their role.
+ */
+export function signerLabel(
+  signerId: string,
+  role: string | undefined,
+  people: Person[],
+  currentUserId: string | undefined,
+): string {
+  const roleText = role ? titleCase(role) : "";
+  if (currentUserId && signerId === currentUserId) return roleText ? `You (${roleText})` : "You";
+  const person = people.find((item) => item.id === signerId);
+  if (person) return roleText ? `${person.display_name} (${roleText})` : person.display_name;
+  return roleText ? `A colleague with the ${roleText} role` : "A colleague in your organization";
+}
+
+/** One line to choose a decision by: its Decision ID, the option chosen, its status and when it was made. */
+export function decisionLabel(decision: Decision): string {
+  return [
+    displayId(decision, "decision_identifier", "Decision"),
+    decision.selected_action ? titleCase(decision.selected_action) : null,
+    decision.decision_status ? titleCase(decision.decision_status) : null,
+    decision.decision_timestamp ? formatDateTime(decision.decision_timestamp) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * The overall result of a verification report in words: every signature valid, at least one that no longer matches
+ * what was signed (a problem, never shown as merely unsigned), or no signature yet.
+ */
+export function verificationSummary(status: unknown): { label: string; tone: "good" | "neutral" | "problem" } {
+  switch (String(status ?? "").toUpperCase()) {
+    case "VALID":
+      return { label: "All signatures valid", tone: "good" };
+    case "INVALID":
+      return { label: "Invalid — at least one signature does not match the signed version", tone: "problem" };
+    case "NOT_SIGNED":
+    case "":
+      return { label: "Not signed", tone: "neutral" };
+    default:
+      return { label: titleCase(String(status)), tone: "problem" };
+  }
+}
+
+const SUMMARY_BADGE = {
+  good: "platform-admin-badge success",
+  neutral: "platform-admin-badge",
+  problem: "platform-admin-badge warning",
+};
 
 export function SignatureVerificationWorkspace() {
+  // Inside the workspace the case chosen in the context bar is used; on its own the person chooses a case here.
+  const workspace = useContext(WorkspaceContext);
+  const contextCase = workspace?.work.investigationId ?? "";
+  const [cases, setCases] = useState<
+    Array<{ id: string; business_id?: string | null; investigation_identifier?: string }>
+  >([]);
+  const [caseId, setCaseId] = useState(contextCase);
+  const [decisions, setDecisions] = useState<Decision[] | null>(null);
   const [decisionId, setDecisionId] = useState("");
-  const [code, setCode] = useState("");
+  const [people, setPeople] = useState<Person[]>([]);
+  const [me, setMe] = useState<string | undefined>(undefined);
   const [report, setReport] = useState<any>(null);
   const [message, setMessage] = useState("");
-  const issueChallenge = async () => {
+  const [busy, setBusy] = useState(false);
+  // The full signed record of a case decision (Phase 6), opened from here.
+  const [recordOpen, setRecordOpen] = useState(false);
+
+  useEffect(() => setCaseId(contextCase), [contextCase]);
+  useEffect(() => {
+    requestJson<{ user_id?: string }>("/api/v1/auth/session", { retries: 0 })
+      .then((session) => setMe(session.user_id))
+      .catch(() => undefined);
+    requestJson<Person[]>("/api/v1/investigation-assignees")
+      .then((rows) => setPeople(Array.isArray(rows) ? rows : []))
+      .catch(() => setPeople([]));
+    if (!contextCase)
+      requestJson<any>("/api/v1/analytics/investigations")
+        .then((data) => setCases(Array.isArray(data?.investigations) ? data.investigations : []))
+        .catch((error) => setMessage(describeError(error, "Investigations could not be loaded.")));
+  }, []);
+  useEffect(() => {
+    setDecisions(null);
+    setDecisionId("");
+    setReport(null);
+    if (!caseId) return;
+    requestJson<Decision[]>(`/api/v1/investigations/${encodeURIComponent(caseId)}/decisions`)
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : [];
+        setDecisions(list);
+        setDecisionId(list[0]?.id ? String(list[0].id) : "");
+      })
+      .catch((error) => setMessage(describeError(error, "The decisions of this case could not be loaded.")));
+  }, [caseId]);
+
+  const verify = async () => {
+    if (!decisionId) return;
+    setBusy(true);
+    setMessage("");
     try {
-      const result = await requestJson<any>("/api/v1/auth/mfa/challenge", { method: "POST" });
-      setMessage(
-        result.development_code
-          ? `Development server code: ${result.development_code}`
-          : "MFA challenge issued. Enter the code from your authenticator.",
+      setReport(
+        await requestJson<any>(`/api/v1/governance/decisions/${encodeURIComponent(decisionId)}/signature-verification`),
       );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "MFA challenge could not be issued.");
+      setReport(null);
+      setMessage(describeError(error, "The verification report is unavailable."));
+    } finally {
+      setBusy(false);
     }
   };
-  const verify = async () => {
-    if (!decisionId.trim()) {
-      setMessage("Decision ID is required.");
-      return;
-    }
-    try {
-      setReport(await requestJson<any>(`/api/v1/governance/decisions/${decisionId.trim()}/signature-verification`));
-      setMessage("Signature verification report loaded.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Verification report unavailable.");
-    }
-  };
+
+  const summary = report ? verificationSummary(report.verification_status) : null;
+  const selected = decisions?.find((decision) => String(decision.id) === decisionId) ?? null;
+  const caseDecision = !!selected && isCaseDecision(selected as unknown as Record<string, unknown>, report);
+
   return (
     <div className="content governance-view signature-workspace">
       <section className="governance-hero">
@@ -38,33 +143,57 @@ export function SignatureVerificationWorkspace() {
           <span className="eyebrow">Governed approval · signature evidence</span>
           <h1>Signature verification</h1>
           <p>
-            Re-authentication, MFA, object-version binding, duplicate-signature rejection, and human intent are required
-            for high-impact decisions.
+            Check that every signature on a decision still matches the exact decision version that was signed. Signing
+            itself needs your password and authenticator code, and is done in Decisions.
           </p>
         </div>
         <span className="platform-admin-badge warning">Human approval only</span>
       </section>
       <section className="panel signature-controls">
+        {!contextCase && (
+          <label>
+            Investigation
+            <select value={caseId} onChange={(event) => setCaseId(event.target.value)}>
+              <option value="">Choose an investigation</option>
+              {cases.map((item) => (
+                <option key={item.id} value={String(item.id)}>
+                  {displayId(item, "investigation_identifier", "Investigation")}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
-          Decision ID
-          <input value={decisionId} onChange={(e) => setDecisionId(e.target.value)} placeholder="Decision UUID" />
-        </label>
-        <label>
-          MFA code
-          <input
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            placeholder="Required when policy enabled"
-          />
+          Decision
+          <select
+            value={decisionId}
+            onChange={(event) => {
+              setDecisionId(event.target.value);
+              setReport(null);
+            }}
+            disabled={!decisions?.length}
+          >
+            {!decisions?.length && (
+              <option value="">
+                {!caseId ? "Choose an investigation first" : decisions ? "No decisions recorded yet" : "Loading…"}
+              </option>
+            )}
+            {decisions?.map((decision) => (
+              <option key={decision.id} value={String(decision.id)}>
+                {decisionLabel(decision)}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="toolbar">
-          <button onClick={() => void issueChallenge()}>Issue MFA challenge</button>
-          <button className="primary-action" onClick={() => void verify()}>
-            Load verification report
+          <button className="primary-action" onClick={() => void verify()} disabled={!decisionId || busy}>
+            {busy ? "Checking…" : "Check signatures"}
           </button>
+          {caseDecision && (
+            <button className="primary-action secondary" onClick={() => setRecordOpen(true)}>
+              Open the signed decision record
+            </button>
+          )}
         </div>
       </section>
       {message && (
@@ -75,27 +204,41 @@ export function SignatureVerificationWorkspace() {
       {report && (
         <section className="panel">
           <div className="section-title">Verification report</div>
-          <div className="platform-admin-badge">{report.verification_status}</div>
+          {summary && (
+            <div className={SUMMARY_BADGE[summary.tone]} role={summary.tone === "problem" ? "alert" : undefined}>
+              {summary.label}
+            </div>
+          )}
           <div className="signature-report-grid">
             {(report.signatures ?? []).map((item: any) => (
               <article key={String(item.signature_id)}>
                 <strong>
-                  {item.decision} · {item.valid ? "VALID" : "INVALID"}
+                  {titleCase(String(item.decision ?? "Signature"))} ·{" "}
+                  {item.valid ? "Valid" : "Does not match the signed version"}
                 </strong>
-                <span>Signature: {item.signature_id}</span>
+                {safeText(item.business_id ?? item.signature_business_id) && (
+                  <span>Signature ID: {safeText(item.business_id ?? item.signature_business_id)}</span>
+                )}
+                <span>Signed by: {signerLabel(String(item.signer_user_id), item.signer_role, people, me)}</span>
                 <span>
-                  Signer: {item.signer_user_id} · {item.signer_role}
+                  Decision version of {formatDateTime(item.object_version, String(item.object_version ?? "—"))}
                 </span>
-                <span>Object version: {item.object_version}</span>
                 <span>
                   Signed: {formatUtc(item.signed_at)} ({formatDateTime(item.signed_at)})
                 </span>
                 <small>{item.meaning}</small>
               </article>
             ))}
-            {!report.signatures?.length && <p className="muted">No signatures recorded for this decision version.</p>}
+            {!report.signatures?.length && <p className="muted">No signatures recorded for this decision yet.</p>}
           </div>
         </section>
+      )}
+      {recordOpen && selected && (
+        <DecisionRecordDrawer
+          key={String(selected.id)}
+          decisionId={String(selected.id)}
+          onClose={() => setRecordOpen(false)}
+        />
       )}
       <section className="panel advisory-box">
         <strong>What a signature records</strong>

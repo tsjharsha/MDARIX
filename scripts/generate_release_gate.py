@@ -10,9 +10,14 @@ from pathlib import Path
 def main() -> int:
     root = Path("artifacts")
     stack = root / "local-stack-validation.json"
+    qualification = root / "ai-golden-dataset-qualification.json"
     data = json.loads(stack.read_text(encoding="utf-8")) if stack.exists() else {}
-    ready = bool(data.get("http", {}).get("frontend", {}).get("reachable")) and bool(
-        data.get("http", {}).get("backend_live", {}).get("reachable")
+    ai_data = json.loads(qualification.read_text(encoding="utf-8")) if qualification.exists() else {}
+    ai_ready = ai_data.get("status") == "PASS" and ai_data.get("qualification_status") == "QUALIFIED_FOR_INTERNAL_MVP"
+    ready = (
+        ai_ready
+        and bool(data.get("http", {}).get("frontend", {}).get("reachable"))
+        and bool(data.get("http", {}).get("backend_live", {}).get("reachable"))
     )
     status = "GO_FOR_CONTROLLED_LOCAL_DEMO" if ready else "NO_GO"
     root.mkdir(exist_ok=True)
@@ -31,6 +36,7 @@ This is a controlled local validation decision only, not a production-readiness 
 
 - Local stack report: {"present" if stack.exists() else "missing"}
 - Backend/frontend readiness: {"PASS" if ready else "PENDING"}
+- Qualified AI golden dataset: {"PASS" if ai_ready else "PENDING"}
 
 ## External gates
 

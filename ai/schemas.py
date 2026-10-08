@@ -48,3 +48,8 @@ class EvidenceExtractionResult(BaseModel):
     candidate_conflicts: List[str] = Field(default_factory=list)
     extraction_status: str = Field("COMPLETED", description="COMPLETED, COMPLETED_WITH_LIMITATIONS, EXTRACTION_FAILED")
     warnings: List[str] = Field(default_factory=list)
+    # Who wrote the observations: GENAI (a language model) or DETERMINISTIC (the rule-based fallback). Set by the
+    # extractor, never taken from the model's reply.
+    extraction_method: str = Field("DETERMINISTIC", description="GENAI or DETERMINISTIC")
+    # The real provider, model and model version that wrote a GENAI extraction; RULES for the fallback.
+    model_provenance: dict[str, Any] = Field(default_factory=dict)

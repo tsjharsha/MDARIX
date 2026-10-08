@@ -31,10 +31,28 @@ from backend.app.db.models.foundation import (
 from backend.app.access.schemas import CustomerProvisionRequest
 from backend.app.access.authz import _is_platform_admin, platform_account_clause
 from backend.app.runtime_env import is_development
+from backend.app.role_codes import is_customer_admin_role
 
 
 def _development_token(token: str | None) -> str | None:
     return token if is_development() else None
+
+
+def erasure_refused(reason: str) -> HTTPException:
+    """The answer when ``tenant_purge.erase_person`` refuses (``PurgeFailed``): a legal hold on the organization is
+    said as such, so an administrator is not told to offboard a person who already is."""
+    if reason == "LEGAL_HOLD":
+        return HTTPException(
+            409,
+            detail={
+                "code": "LEGAL_HOLD",
+                "message": "This organization is under a legal hold; personal data cannot be erased until the hold "
+                "is lifted.",
+            },
+        )
+    return HTTPException(
+        409, detail={"code": "USER_NOT_OFFBOARDED", "message": "Offboard the user before erasing their data"}
+    )
 
 
 def _audit_configuration(
@@ -176,7 +194,7 @@ def _seat_counts(db: Session, tenant_id: uuid.UUID) -> dict:
         )
         .all()
     )
-    admins = [user for user in users if (user.role or "").upper() == "CUSTOMER_ADMIN"]
+    admins = [user for user in users if is_customer_admin_role(user.role)]
     return {"allocated_users": len(users), "allocated_customer_admins": len(admins)}
 
 
@@ -196,7 +214,7 @@ def _enforce_invite_limits(db: Session, tenant_id: uuid.UUID, role: str):
                 "available": 0,
             },
         )
-    if role.strip().upper() == "CUSTOMER_ADMIN" and counts["allocated_customer_admins"] >= admin_limit:
+    if is_customer_admin_role(role) and counts["allocated_customer_admins"] >= admin_limit:
         raise HTTPException(
             409,
             detail={
@@ -392,6 +410,7 @@ def _safe_connector_summary(row: ConnectorConfiguration) -> dict:
     configuration = row.configuration or {}
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "code": row.code,
         "connector_type": row.connector_type,
         "version": row.version,

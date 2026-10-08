@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bell,
+  Briefcase,
   Building2,
   Database,
   FileClock,
@@ -16,7 +17,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { signOut, useIdleSignOut } from "../shared/session";
+import { signOut } from "../shared/session";
+import { useFocusOnChange } from "../shared/focus";
+import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
+import { SectionErrorBoundary } from "../../app/ErrorBoundary";
 import "../admin/console/admin-console.css";
 import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
@@ -34,26 +38,70 @@ import { NotificationsSection } from "./sections/Notifications";
 import { AuditSection } from "./sections/Audit";
 import { OrganizationSection } from "./sections/Organization";
 
-const NAV: Record<Section, { icon: typeof Users; description: string }> = {
-  Dashboard: { icon: LayoutDashboard, description: "Live organization status" },
-  Users: { icon: Users, description: "People, invitations, access" },
-  "Roles & Access": { icon: KeyRound, description: "Roles, permission sets, approvals" },
-  Integrations: { icon: Plug, description: "Connections and syncs" },
-  "Data Mapping": { icon: Database, description: "Mappings and releases" },
-  "Plan & Subscription": { icon: WalletCards, description: "Plan, seats, renewal" },
-  Security: { icon: ShieldCheck, description: "MFA, single sign-on, events" },
-  Notifications: { icon: Bell, description: "Reminders and contacts" },
-  Audit: { icon: FileClock, description: "Audit trail and exports" },
-  Organization: { icon: Building2, description: "Profile and products" },
+// `description` is the short line in the side navigation; `purpose` is the one-line explanation under the page heading.
+const NAV: Record<Section, { icon: typeof Users; description: string; purpose: string }> = {
+  Dashboard: {
+    icon: LayoutDashboard,
+    description: "Live organization status",
+    purpose: "What needs your attention today, and how your organization is using MDARIX.",
+  },
+  Users: {
+    icon: Users,
+    description: "People, invitations, access",
+    purpose: "Invite people, choose what they can do, and suspend or remove access when they leave.",
+  },
+  "Roles & Access": {
+    icon: KeyRound,
+    description: "Roles, permission sets, approvals",
+    purpose: "Build your own roles from permission sets, and decide who may approve decisions.",
+  },
+  Integrations: {
+    icon: Plug,
+    description: "Connections and syncs",
+    purpose: "Connect the systems your records come from, and check that each sync arrived complete.",
+  },
+  "Data Mapping": {
+    icon: Database,
+    description: "Mappings and releases",
+    purpose: "Decide how fields from your systems become MDARIX records. Every change is approved before use.",
+  },
+  "Plan & Subscription": {
+    icon: WalletCards,
+    description: "Plan, seats, renewal",
+    purpose: "Your plan, how many seats are in use, and when your subscription renews.",
+  },
+  Security: {
+    icon: ShieldCheck,
+    description: "MFA, AI processing, events",
+    purpose: "How sign-in is protected, whether AI may be used, and recent security events.",
+  },
+  Notifications: {
+    icon: Bell,
+    description: "Reminders and contacts",
+    purpose: "Who is reminded before your subscription ends, and when.",
+  },
+  Audit: {
+    icon: FileClock,
+    description: "Audit trail and exports",
+    purpose: "A permanent record of every administrative change, which you can search and download.",
+  },
+  Organization: {
+    icon: Building2,
+    description: "Profile and products",
+    purpose: "Your organization's details, your products, and a full copy of your data.",
+  },
 };
 
 export function CustomerAdminControlPlane({
   securityContext,
+  onOpenWorkspace,
 }: {
   securityContext: TenantContext | null;
   products?: unknown[];
   investigations?: unknown[];
   onNavigate?: (view: any) => void;
+  /** Switch into the investigation workspace with an Investigator's rights (same account, App.tsx decides). */
+  onOpenWorkspace?: () => void;
 }) {
   const [location, setLocation] = useState<{ section: Section; tab?: string; key: number }>({
     section: "Dashboard",
@@ -62,7 +110,9 @@ export function CustomerAdminControlPlane({
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
-  useIdleSignOut();
+  const idle = useIdleSignOut();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useFocusOnChange(heading, location.key);
 
   const open = useCallback((section: Section, tab?: string) => {
     setLocation((current) => ({ section, tab, key: current.key + 1 }));
@@ -111,6 +161,17 @@ export function CustomerAdminControlPlane({
               <strong>{securityContext?.display_name ?? "Customer Administrator"}</strong>
               <small>Customer Administrator</small>
             </span>
+            {onOpenWorkspace && (
+              <button
+                type="button"
+                className="ac-secondary"
+                onClick={onOpenWorkspace}
+                aria-label="Open workspace"
+                title="Work on investigations with an Investigator's rights"
+              >
+                <Briefcase size={16} aria-hidden="true" /> <span className="ac-hide-sm">Open workspace</span>
+              </button>
+            )}
             <SwitchOrganization />
             <HelpMenu />
             <button
@@ -146,7 +207,7 @@ export function CustomerAdminControlPlane({
               );
             })}
             <p className="ca-nav-scope">
-              Every page shows only {tenantName}. Your organization is set by your sign-in, never by the browser.
+              Everything here belongs to {tenantName} only. No other organization can see it.
             </p>
           </nav>
 
@@ -154,8 +215,10 @@ export function CustomerAdminControlPlane({
             <div className="ac-page-head">
               <div>
                 <p className="ac-eyebrow">Customer administration</p>
-                <h1>{section}</h1>
-                <p>{NAV[section].description}</p>
+                <h1 ref={heading} tabIndex={-1}>
+                  {section}
+                </h1>
+                <p>{NAV[section].purpose}</p>
               </div>
             </div>
             {message && (
@@ -168,23 +231,26 @@ export function CustomerAdminControlPlane({
             )}
             {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
             <ColumnScopeProvider key={location.key} scope={`customer-admin:${section}`}>
-              <div className="ca-section">
-                <SectionSummary section={section} />
-                {section === "Dashboard" && <Dashboard />}
-                {section === "Users" && <UsersSection tab={tab} />}
-                {section === "Roles & Access" && <AccessSection tab={tab} />}
-                {section === "Integrations" && <IntegrationsSection tab={tab} />}
-                {section === "Data Mapping" && <DataMappingSection tab={tab} />}
-                {section === "Plan & Subscription" && <SubscriptionSection />}
-                {section === "Security" && <SecuritySection tab={tab} />}
-                {section === "Notifications" && <NotificationsSection />}
-                {section === "Audit" && <AuditSection />}
-                {section === "Organization" && <OrganizationSection />}
-              </div>
+              <SectionErrorBoundary name={section} resetKey={location.key}>
+                <div className="ca-section">
+                  <SectionSummary section={section} />
+                  {section === "Dashboard" && <Dashboard />}
+                  {section === "Users" && <UsersSection tab={tab} />}
+                  {section === "Roles & Access" && <AccessSection tab={tab} />}
+                  {section === "Integrations" && <IntegrationsSection tab={tab} />}
+                  {section === "Data Mapping" && <DataMappingSection tab={tab} />}
+                  {section === "Plan & Subscription" && <SubscriptionSection />}
+                  {section === "Security" && <SecuritySection tab={tab} />}
+                  {section === "Notifications" && <NotificationsSection />}
+                  {section === "Audit" && <AuditSection />}
+                  {section === "Organization" && <OrganizationSection />}
+                </div>
+              </SectionErrorBoundary>
             </ColumnScopeProvider>
           </main>
         </div>
 
+        <SessionTimeoutWarning session={idle} />
         <ConfirmDialog
           request={confirmation}
           onClose={() => setConfirmation(null)}

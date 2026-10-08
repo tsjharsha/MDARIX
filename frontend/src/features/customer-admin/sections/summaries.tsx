@@ -25,16 +25,17 @@ import {
   WalletCards,
 } from "lucide-react";
 import { BarList, Empty, Panel } from "../../admin/console/charts";
-import { titleCase, type Slice } from "../../admin/console/dashboardModel";
+import { type Slice } from "../../admin/console/dashboardModel";
 import { KpiTile, TrendChart, toPoints, type DailyRow } from "../../admin/console/trendCharts";
 import { roleMix, seatUsage, userStatusSlices, type TenantUser } from "../customerAdminModel";
 import { licensedSeatLimit, useConsole, type Section } from "../context";
 import { listOf, useResource } from "../shared";
+import { readable, recipientLabel } from "../labels";
 
 /*
  * A visual summary at the top of each customer administration page: four key figures (with a 30-day trend line
- * where the server keeps one) and charts of the page's data. Everything is read from the same tenant-scoped
- * endpoints the page uses; nothing here changes data.
+ * where the server keeps one) and, folded away until asked for, charts of the page's data. Everything is read from
+ * the same tenant-scoped endpoints the page uses; nothing here changes data.
  */
 
 type Trends = {
@@ -54,7 +55,11 @@ const countWhere = (rows: any[], test: (row: any) => boolean) => rows.filter(tes
 const isActive = (row: any) => ["ACTIVE", "RELEASED", "PUBLISHED", "ENABLED"].includes(upper(row?.status));
 
 /** Rows counted by one field (ignoring case), largest first; beyond the sixth, the rest are folded into "Other". */
-export function slicesBy(rows: any[], field: (row: any) => unknown, rename = titleCase): Slice[] {
+export function slicesBy(
+  rows: any[],
+  field: (row: any) => unknown,
+  rename = (value: string) => readable(value),
+): Slice[] {
   const counts = new Map<string, { label: string; count: number }>();
   for (const row of rows) {
     const value = String(field(row) ?? "").trim() || "Not set";
@@ -82,7 +87,12 @@ function Layout({ label, tiles, charts }: { label: string; tiles: ReactNode; cha
       <section className="ac-kpis" aria-label="Key figures">
         {tiles}
       </section>
-      {charts && <section className="ac-grid three">{charts}</section>}
+      {charts && (
+        <details className="ca-summary-charts">
+          <summary>Show charts</summary>
+          <section className="ac-grid three">{charts}</section>
+        </details>
+      )}
     </div>
   );
 }
@@ -173,7 +183,7 @@ function UsersSummary() {
             state={users.state}
             empty="Roles appear once people are invited."
           />
-          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" source={trends}>
             <TrendChart data={signIns} primaryLabel="sign-ins" unit="sign-ins" />
           </Panel>
         </>
@@ -290,7 +300,7 @@ function IntegrationsSummary() {
             icon={<Database size={18} />}
           />
           <KpiTile
-            label="Unreconciled records"
+            label="Records to check"
             value={ready(records) ? unresolved : null}
             detail={unresolved ? "Source and MDARIX counts differ" : "Source and MDARIX counts match"}
             tone={ready(records) ? (unresolved ? "warning" : "good") : undefined}
@@ -300,7 +310,7 @@ function IntegrationsSummary() {
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Sync runs" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sync runs" source={trends}>
             <TrendChart data={daily} primaryLabel="runs" secondaryLabel="failed" unit="sync runs" />
           </Panel>
           <Bars
@@ -504,17 +514,17 @@ function SecuritySummary() {
           <KpiTile
             label="Policy denials"
             value={ready(summary) ? (summary.data?.metrics?.policy_denials ?? 0) : null}
-            detail="Requests the server refused"
+            detail="Requests that were refused"
             icon={<ShieldCheck size={18} />}
           />
         </>
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Sign-ins" source={trends}>
             <TrendChart data={signIns} primaryLabel="sign-ins" unit="sign-ins" />
           </Panel>
-          <Panel eyebrow={`Last ${days} days`} title="Audit events" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Audit events" source={trends}>
             <TrendChart data={events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
           </Panel>
           <Bars
@@ -555,14 +565,14 @@ function NotificationsSummary() {
           <KpiTile
             label="First reminder"
             value={ready(preferences) && thresholds.length ? Math.max(...thresholds) : null}
-            suffix=" days"
+            suffix={Math.max(...thresholds) === 1 ? " day" : " days"}
             detail="Before the subscription ends"
             icon={<FileClock size={18} />}
           />
           <KpiTile
             label="Recipient groups"
             value={ready(preferences) ? listOf(policy?.recipient_types).length : null}
-            detail={listOf(policy?.recipient_types).map(titleCase).join(", ") || "Customer administrators"}
+            detail={listOf(policy?.recipient_types).map(recipientLabel).join(", ") || "Customer administrators"}
             icon={<Users size={18} />}
           />
         </>
@@ -572,7 +582,7 @@ function NotificationsSummary() {
           <Bars
             eyebrow="Contacts"
             title="Contacts by type"
-            items={slicesBy(contacts, (row) => row.recipient_type)}
+            items={slicesBy(contacts, (row) => row.recipient_type, recipientLabel)}
             state={preferences.state}
             empty="Add billing or business contacts."
           />
@@ -635,7 +645,7 @@ function AuditSummary() {
       }
       charts={
         <>
-          <Panel eyebrow={`Last ${days} days`} title="Audit events" state={trends.state} error={trends.error}>
+          <Panel eyebrow={`Last ${days} days`} title="Audit events" source={trends}>
             <TrendChart data={events} primaryLabel="events" secondaryLabel="refused" unit="audit events" />
           </Panel>
           <Bars
@@ -664,7 +674,7 @@ function OrganizationSummary() {
   const rows = listOf(products.data);
   const investigations = (trends.data?.investigations_by_status ?? []).map((row) => ({
     key: row.label,
-    label: titleCase(row.label),
+    label: readable(row.label),
     count: row.count,
     tone: "neutral" as const,
   }));

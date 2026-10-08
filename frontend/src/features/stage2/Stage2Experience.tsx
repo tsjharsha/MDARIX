@@ -1,4 +1,11 @@
 import { useEffect, useState } from "react";
+import { describeError, requestJson } from "../../app/apiClient";
+import { formatDateTime } from "../../app/dates";
+import { ToneBadge } from "../admin/console/charts";
+import { storyStage, storySummary, type StoryStage } from "./storyModel";
+import "./story.css";
+import { displayId, referenceId } from "../../app/displayId";
+import { investigationRequestFor, useOpenInvestigation } from "../workspace/workspaceContext";
 
 type Stage2Mode = "signals" | "story" | "evidence" | "persona";
 
@@ -25,12 +32,9 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
               : "";
     if (!path) return;
     setError("");
-    fetch(path)
-      .then((response) =>
-        response.ok ? response.json() : Promise.reject(new Error(`${response.status} ${response.statusText}`)),
-      )
+    requestJson<any>(path)
       .then(setData)
-      .catch((reason) => setError(reason.message));
+      .catch((reason) => setError(describeError(reason, "This view could not be loaded.")));
   }, [mode, investigationId, persona, signalId]);
 
   const content =
@@ -103,7 +107,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
                       window.dispatchEvent(new PopStateEvent("popstate"));
                     }}
                   >
-                    <strong>{item.signal_id ?? "Complaint"}</strong>
+                    <strong>{displayId(item, "signal_id", "Complaint")}</strong>
                     <span>{item.description ?? "Description not recorded"}</span>
                     <small>
                       {item.severity ?? "Severity not recorded"} · {item.status ?? "Status not recorded"}
@@ -116,7 +120,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
               <div className="evidence-list">
                 {(data.evidence ?? []).map((item: any) => (
                   <article key={item.id}>
-                    <strong>{item.evidence_identifier}</strong>
+                    <strong>{displayId(item, "evidence_identifier")}</strong>
                     <span>{item.title ?? "Title not recorded"}</span>
                     <small>
                       {item.evidence_type} · {item.reliability_status ?? "Reliability not recorded"}
@@ -125,16 +129,7 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
                 ))}
               </div>
             )}
-            {mode === "story" && (
-              <div className="evidence-list">
-                {(data.stages ?? []).map((item: any) => (
-                  <article key={item.key}>
-                    <strong>{item.label}</strong>
-                    <span>{item.status}</span>
-                  </article>
-                ))}
-              </div>
-            )}
+            {mode === "story" && <StoryStages stages={data.stages ?? []} />}
             {mode === "persona" && (
               <div className="home-insight-grid">
                 <article>
@@ -167,8 +162,34 @@ export function Stage2Experience({ mode, investigationId }: { mode: Stage2Mode; 
   );
 }
 
+/** Each stage of the case with its state (records available, complete, pending) and how many records it has. */
+function StoryStages({ stages }: { stages: StoryStage[] }) {
+  return (
+    <>
+      <p className="muted">{storySummary(stages)}</p>
+      <ol className="evidence-list story-stages">
+        {stages.map((item) => {
+          const view = storyStage(item);
+          return (
+            <li key={item.key}>
+              <article>
+                <strong>{item.label}</strong>
+                <ToneBadge tone={view.tone} label={view.label} />
+                <small>{view.records}</small>
+              </article>
+            </li>
+          );
+        })}
+      </ol>
+    </>
+  );
+}
+
 function SignalDetail({ data }: { data: any }) {
   const signal = data.signal ?? {};
+  // Only inside the workspace, for a role that may change records (null otherwise, so no button).
+  const openInvestigation = useOpenInvestigation();
+  const request = investigationRequestFor(signal);
   return (
     <section className="panel stage2-results signal-detail">
       <button
@@ -180,17 +201,17 @@ function SignalDetail({ data }: { data: any }) {
       >
         ← Back to signals
       </button>
-      <div className="section-title">Signal detail · {signal.signal_id}</div>
+      <div className="section-title">Signal detail · {displayId(signal, "signal_id")}</div>
       <div className="home-insight-grid">
         <article>
           <span className="eyebrow">Product</span>
           <strong>{signal.product_name ?? "Not recorded"}</strong>
-          <p>{signal.product_identifier ?? "Product identifier unavailable"}</p>
+          <p>{referenceId(signal, "product", signal.product_identifier, "Product ID unavailable")}</p>
         </article>
         <article>
           <span className="eyebrow">Product version</span>
           <strong>{signal.version_identifier ?? "Not recorded"}</strong>
-          <p>{signal.event_timestamp ?? signal.complaint_timestamp ?? "Event time unavailable"}</p>
+          <p>{formatDateTime(signal.event_timestamp ?? signal.complaint_timestamp, "Event time unavailable")}</p>
         </article>
         <article>
           <span className="eyebrow">Review state</span>
@@ -199,11 +220,17 @@ function SignalDetail({ data }: { data: any }) {
         </article>
       </div>
       <p>{signal.description ?? "No source description recorded."}</p>
+      <p className="muted">Recorded severity · {signal.severity ?? "Not recorded"}</p>
+      {openInvestigation && request && (
+        <button type="button" className="text-button" onClick={() => openInvestigation(request)}>
+          Open investigation for this signal
+        </button>
+      )}
       <h3>Related investigations</h3>
       <div className="evidence-list">
         {(data.related_investigations ?? []).map((item: any) => (
-          <article key={item.investigation_identifier}>
-            <strong>{item.investigation_identifier}</strong>
+          <article key={item.id ?? item.investigation_identifier}>
+            <strong>{displayId(item, "investigation_identifier")}</strong>
             <span>{item.investigation_question ?? "Question not recorded"}</span>
             <small>{item.status ?? "Status not recorded"}</small>
           </article>

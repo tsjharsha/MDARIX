@@ -11,30 +11,32 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.request_context import get_request_context
 from backend.app.db.tenant_scope import bind_system
+from backend.app.role_codes import (
+    PLATFORM_ADMIN_ALIASES,
+    is_administrator_role,
+    is_customer_admin_role,
+    is_platform_admin_role,
+    is_strict_platform_admin_role,
+    role_code,
+)
 
 
 def _require_administrator(request: Request, db: Session) -> AuthUser:
     user = _authenticated_user(request, db)
-    if (user.role or "").upper() not in {
-        "ADMINISTRATOR",
-        "ADMIN",
-        "MDARIX ADMINISTRATOR",
-        "PLATFORM_ADMIN",
-        "CUSTOMER_ADMIN",
-    }:
+    if not is_administrator_role(user.role):
         raise HTTPException(403, detail={"code": "ADMINISTRATOR_REQUIRED", "message": "Administrator role required"})
     return user
 
 
 def _role_code(user: AuthUser) -> str:
-    return (user.role or "").strip().upper().replace(" ", "_")
+    return role_code(user.role)
 
 
-PLATFORM_ROLE_CODES = frozenset({"PLATFORM_ADMIN", "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"})
+PLATFORM_ROLE_CODES = PLATFORM_ADMIN_ALIASES
 
 
 def _is_platform_role(role: str | None) -> bool:
-    return (role or "").strip().upper().replace(" ", "_") in PLATFORM_ROLE_CODES
+    return is_platform_admin_role(role)
 
 
 def _is_platform_admin(user: AuthUser) -> bool:
@@ -43,7 +45,7 @@ def _is_platform_admin(user: AuthUser) -> bool:
 
 def platform_account_clause():
     """SQL: the AuthUser row is a platform (MDARIX staff) account, with the same normalization as _is_platform_role."""
-    normalized = func.upper(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"))
+    normalized = func.upper(func.replace(func.replace(func.trim(func.coalesce(AuthUser.role, "")), " ", "_"), "-", "_"))
     return normalized.in_(sorted(PLATFORM_ROLE_CODES))
 
 
@@ -107,12 +109,14 @@ def _guard_user_administration(
 
 
 def _is_customer_admin(user: AuthUser) -> bool:
-    return _role_code(user) == "CUSTOMER_ADMIN"
+    return is_customer_admin_role(user.role)
 
 
 def _require_platform_admin(request: Request, db: Session) -> AuthUser:
     user = _authenticated_user(request, db)
-    if not _is_platform_admin(user):
+    # Only PLATFORM_ADMIN (or MDARIX_ADMINISTRATOR) opens platform administration; a generic "Admin" or
+    # "Administrator" role does not.
+    if not is_strict_platform_admin_role(user.role):
         raise HTTPException(
             403, detail={"code": "PLATFORM_ADMIN_REQUIRED", "message": "Platform administrator role required"}
         )

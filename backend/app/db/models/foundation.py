@@ -15,10 +15,12 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 from sqlalchemy.types import UserDefinedType
 
 from backend.app.db.base import Base
+from backend.app.db.business_id import business_id_column
+from backend.app.role_codes import canonical_stored_role
 
 
 class Vector(UserDefinedType):
@@ -46,6 +48,7 @@ def tz(nullable: bool = True) -> Mapped[object]:
 
 class Tenant(Base):
     __tablename__ = "tenants"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     customer_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
     tenant_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
@@ -135,6 +138,7 @@ class TenantOwned:
 
 class Product(TenantOwned, Base):
     __tablename__ = "products"
+    business_id: Mapped[str] = business_id_column()
     product_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -149,6 +153,7 @@ class Product(TenantOwned, Base):
 
 class ProductVersion(TenantOwned, Base):
     __tablename__ = "product_versions"
+    business_id: Mapped[str] = business_id_column()
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     version_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -165,6 +170,7 @@ class ProductVersion(TenantOwned, Base):
 
 class Component(TenantOwned, Base):
     __tablename__ = "components"
+    business_id: Mapped[str] = business_id_column()
     component_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     revision: Mapped[str | None] = mapped_column(String(80))
@@ -180,6 +186,7 @@ class Component(TenantOwned, Base):
 
 class Supplier(TenantOwned, Base):
     __tablename__ = "suppliers"
+    business_id: Mapped[str] = business_id_column()
     supplier_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
@@ -191,6 +198,7 @@ class Supplier(TenantOwned, Base):
 
 class ManufacturingSite(TenantOwned, Base):
     __tablename__ = "manufacturing_sites"
+    business_id: Mapped[str] = business_id_column()
     site_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     location: Mapped[str | None] = mapped_column(String(255))
@@ -203,6 +211,7 @@ class ManufacturingSite(TenantOwned, Base):
 
 class LotBatch(TenantOwned, Base):
     __tablename__ = "lot_batches"
+    business_id: Mapped[str] = business_id_column()
     lot_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     manufacturing_site_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -221,6 +230,7 @@ class LotBatch(TenantOwned, Base):
 
 class Requirement(TenantOwned, Base):
     __tablename__ = "requirements"
+    business_id: Mapped[str] = business_id_column()
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     requirement_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -239,6 +249,7 @@ class Requirement(TenantOwned, Base):
 
 class Change(TenantOwned, Base):
     __tablename__ = "changes"
+    business_id: Mapped[str] = business_id_column()
     change_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     change_type: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -251,6 +262,7 @@ class Change(TenantOwned, Base):
 
 class Complaint(TenantOwned, Base):
     __tablename__ = "complaints"
+    business_id: Mapped[str] = business_id_column()
     complaint_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -286,6 +298,7 @@ class Complaint(TenantOwned, Base):
 
 class Investigation(TenantOwned, Base):
     __tablename__ = "investigations"
+    business_id: Mapped[str] = business_id_column()
     investigation_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     investigation_question: Mapped[str] = mapped_column(Text, nullable=False)
@@ -293,10 +306,21 @@ class Investigation(TenantOwned, Base):
     opened_at = tz()
     closed_at = tz()
     owner_ref: Mapped[str | None] = mapped_column(String(255))
+    # Where the case is in the workflow (md29). ``status`` stays "open"/"closed" for everything that reads it today;
+    # CLOSED and CANCELLED keep it "closed", every other state "open".
+    workflow_state: Mapped[str] = mapped_column(String(30), nullable=False, server_default="OPEN")
+    priority: Mapped[str] = mapped_column(String(20), nullable=False, server_default="MEDIUM")
+    due_at = tz()
+    state_changed_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "product_id"], ["products.tenant_id", "products.id"]),
         UniqueConstraint("tenant_id", "investigation_identifier", name="uq_investigations_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_investigations_tenant_id_id"),
+        CheckConstraint(
+            "workflow_state IN ('OPEN', 'IN_PROGRESS', 'ON_HOLD', 'BRIEF_IN_REVIEW', 'READY_FOR_DECISION', 'DECIDED', 'CLOSED', 'CANCELLED')",
+            name="workflow_state_known",
+        ),
+        CheckConstraint("priority IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')", name="priority_known"),
     )
 
 
@@ -304,6 +328,7 @@ class Capa(TenantOwned, Base):
     """A corrective or preventive action from the customer's quality system."""
 
     __tablename__ = "capas"
+    business_id: Mapped[str] = business_id_column()
     capa_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     action_type: Mapped[str | None] = mapped_column(String(40))
@@ -325,6 +350,7 @@ class Capa(TenantOwned, Base):
 
 class Risk(TenantOwned, Base):
     __tablename__ = "risks"
+    business_id: Mapped[str] = business_id_column()
     risk_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -342,6 +368,7 @@ class Risk(TenantOwned, Base):
 
 class FailureMode(TenantOwned, Base):
     __tablename__ = "failure_modes"
+    business_id: Mapped[str] = business_id_column()
     failure_mode_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
@@ -353,6 +380,7 @@ class FailureMode(TenantOwned, Base):
 
 class Control(TenantOwned, Base):
     __tablename__ = "controls"
+    business_id: Mapped[str] = business_id_column()
     control_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     control_type: Mapped[str | None] = mapped_column(String(80))
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -365,6 +393,7 @@ class Control(TenantOwned, Base):
 
 class Evidence(TenantOwned, Base):
     __tablename__ = "evidence"
+    business_id: Mapped[str] = business_id_column()
     evidence_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     evidence_type: Mapped[str] = mapped_column(String(80), nullable=False)
@@ -387,11 +416,19 @@ class Evidence(TenantOwned, Base):
 
 class Hypothesis(TenantOwned, Base):
     __tablename__ = "hypotheses"
+    business_id: Mapped[str] = business_id_column()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     statement: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="proposed")
     origin: Mapped[str] = mapped_column(String(20), nullable=False)
     reviewer_disposition: Mapped[str | None] = mapped_column(String(80))
+    # A person's judgement of the hypothesis (md30), kept apart from the AI's own status: PROPOSED, HYPOTHESIZED,
+    # PARTIALLY_SUPPORTED, STRONGLY_SUPPORTED, WEAKLY_SUPPORTED, CONTRADICTED or RETIRED, with the reason.
+    human_status: Mapped[str | None] = mapped_column(String(30))
+    status_reason: Mapped[str | None] = mapped_column(Text)
+    status_changed_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_at = tz()
+    created_by: Mapped[str | None] = mapped_column(String(255))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         CheckConstraint("origin in ('ai','human','system')", name="hypothesis_origin_allowed"),
@@ -401,6 +438,7 @@ class Hypothesis(TenantOwned, Base):
 
 class Unknown(Base):
     __tablename__ = "unknowns"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -412,6 +450,12 @@ class Unknown(Base):
     resolution: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
     updated_at = tz(False)
+    # md30: where the unknown came from (system/ai or a person) and who last changed its status. Statuses: open,
+    # in_progress, resolved, accepted_limitation, superseded.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_by: Mapped[str | None] = mapped_column(String(255))
+    status_changed_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         ForeignKeyConstraint(["tenant_id", "hypothesis_id"], ["hypotheses.tenant_id", "hypotheses.id"]),
@@ -421,6 +465,7 @@ class Unknown(Base):
 
 class FailureChain(Base):
     __tablename__ = "failure_chains"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -428,6 +473,10 @@ class FailureChain(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="draft")
     created_at = tz(False)
     updated_at = tz(False)
+    # md30: a chain a person built or adopted from an AI run (source_ai_execution_id), and who last changed it.
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, server_default="system")
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    source_ai_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "id", name="uq_failure_chains_tenant_id_id"),
@@ -436,6 +485,7 @@ class FailureChain(Base):
 
 class Scenario(TenantOwned, Base):
     __tablename__ = "scenarios"
+    business_id: Mapped[str] = business_id_column()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     scenario_identifier: Mapped[str] = mapped_column(String(120), nullable=False)
     question: Mapped[str] = mapped_column(Text, nullable=False)
@@ -451,6 +501,7 @@ class Scenario(TenantOwned, Base):
 
 class AIExecution(Base):
     __tablename__ = "ai_executions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -479,6 +530,7 @@ class AIExecution(Base):
 
 class Decision(Base):
     __tablename__ = "decisions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -500,10 +552,38 @@ class Decision(Base):
     decision_timestamp = tz(False)
     authorized_by_ref: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at = tz(False)
+    # md33: the signed human decision on an approved Decision Brief version (decision_kind BRIEF; earlier decisions
+    # are LEGACY). The outcome and follow-ups are chosen while signing; the decision is bound to the brief version's
+    # content hash, the evidence set and a context snapshot, and is never edited: a correction is a new decision that
+    # supersedes it.
+    decision_kind: Mapped[str] = mapped_column(String(20), nullable=False, server_default="LEGACY")
+    brief_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    outcome: Mapped[str | None] = mapped_column(String(40))
+    conditions: Mapped[str | None] = mapped_column(Text)
+    follow_up_actions: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    residual_unknowns: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_under_role: Mapped[str | None] = mapped_column(String(60))
+    approval_authority_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_at = tz()
+    brief_content_hash: Mapped[str | None] = mapped_column(String(64))
+    evidence_set_hash: Mapped[str | None] = mapped_column(String(64))
+    context_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    ai_execution_refs: Mapped[list] = mapped_column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
+    supersedes_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    superseded_by_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    superseded_at = tz()
+    supersede_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "decision_identifier", name="uq_decisions_tenant_identifier"),
         UniqueConstraint("tenant_id", "id", name="uq_decisions_tenant_id_id"),
+        CheckConstraint("decision_kind IN ('LEGACY', 'BRIEF')", name="decision_kind_known"),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN ('ACCEPT_CONCLUSION', 'ACCEPT_WITH_CONDITIONS', 'REJECT_CONCLUSION', "
+            "'CLOSE_NO_FURTHER_ACTION')",
+            name="outcome_known",
+        ),
     )
 
 
@@ -542,7 +622,7 @@ class AuditEvent(Base):
     old_values: Mapped[dict | None] = mapped_column(JSONB)
     new_values: Mapped[dict | None] = mapped_column(JSONB)
     # Set by the database when the row is inserted (migration md18); anything the application sets is replaced.
-    chain_seq: Mapped[int | None] = mapped_column(BigInteger)
+    chain_seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
     previous_hash: Mapped[str | None] = mapped_column(String(64))
     event_hash: Mapped[str | None] = mapped_column(String(64))
     retention_until = tz(True)
@@ -553,6 +633,7 @@ class InvestigationBrief(Base):
     """Immutable, versioned investigation brief snapshot."""
 
     __tablename__ = "investigation_briefs"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     investigation_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
@@ -630,6 +711,7 @@ class AssuranceCheck(Base):
 
 class EvaluationRun(Base):
     __tablename__ = "evaluation_runs"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     suite_version: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -639,7 +721,7 @@ class EvaluationRun(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False)
     results: Mapped[dict] = mapped_column(JSONB, nullable=False)
     started_at = tz(False)
-    completed_at = tz(False)
+    completed_at = tz()
     created_at = tz(False)
     __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_evaluation_runs_tenant_id_id"),)
 
@@ -668,6 +750,7 @@ class ReleaseAssuranceResult(Base):
 
 class AuthUser(Base):
     __tablename__ = "auth_users"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     username: Mapped[str] = mapped_column(String(254), nullable=False)
@@ -690,9 +773,18 @@ class AuthUser(Base):
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (
-        UniqueConstraint("tenant_id", "username", name="uq_auth_users_tenant_username"),
         UniqueConstraint("tenant_id", "id", name="uq_auth_users_tenant_id_id"),
+        CheckConstraint(
+            "upper(replace(replace(btrim(role), ' ', '_'), '-', '_')) not in "
+            "('PLATFORM_ADMIN','MDARIX_ADMINISTRATOR','ADMINISTRATOR','ADMIN','CUSTOMER_ADMIN',"
+            "'CUSTOMER_ADMINISTRATOR') or role in ('PLATFORM_ADMIN','CUSTOMER_ADMIN')",
+            name="auth_user_administrator_role_canonical",
+        ),
     )
+
+    @validates("role")
+    def _canonicalize_role(self, _key: str, value: str) -> str:
+        return canonical_stored_role(value)
 
 
 class TenantMembership(Base):
@@ -797,6 +889,7 @@ class RoleAssignment(Base):
 
 class PlanDefinition(Base):
     __tablename__ = "plan_definitions"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     code: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -874,6 +967,7 @@ class SegregationOfDutiesPolicy(Base):
 
 class SignedApprovalRecord(Base):
     __tablename__ = "signed_approval_records"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     object_type: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -998,10 +1092,28 @@ class InvestigationEvidence(Base):
     evidence_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     relevance: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
+    # The case's review of this evidence (md29): its quality (review_status) and what it means for the case
+    # (relationship) are separate judgements. Every change is kept in evidence_review_events.
+    review_status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="UNREVIEWED")
+    relationship: Mapped[str] = mapped_column(String(30), nullable=False, server_default="UNREVIEWED")
+    review_reason: Mapped[str | None] = mapped_column(Text)
+    limitation: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at = tz()
+    linked_by: Mapped[str | None] = mapped_column(String(255))
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
         UniqueConstraint("tenant_id", "investigation_id", "evidence_id", name="uq_investigation_evidence_pair"),
+        CheckConstraint(
+            "review_status IN ('UNREVIEWED', 'ACCEPTED', 'ACCEPTED_WITH_LIMITATION', 'REJECTED', 'QUARANTINED', "
+            "'SUPERSEDED')",
+            name="review_status_known",
+        ),
+        CheckConstraint(
+            "relationship IN ('SUPPORTING', 'CONTRADICTING', 'CONTEXTUAL', 'UNRESOLVED', 'UNRELATED', 'UNREVIEWED')",
+            name="relationship_known",
+        ),
     )
 
 
@@ -1015,10 +1127,18 @@ class HypothesisEvidence(Base):
     rationale: Mapped[str | None] = mapped_column(Text)
     created_by_type: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at = tz(False)
+    # md30: who linked it (a person, or the system for AI links), and a withdrawal instead of a deletion.
+    created_by: Mapped[str | None] = mapped_column(String(255))
+    retracted_at = tz()
+    retracted_by: Mapped[str | None] = mapped_column(String(255))
+    retraction_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "hypothesis_id"], ["hypotheses.tenant_id", "hypotheses.id"]),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
-        CheckConstraint("relation_type in ('support','contradict')", name="hypothesis_evidence_relation_allowed"),
+        CheckConstraint(
+            "relation_type in ('support','contradict','contextual','unresolved')",
+            name="hypothesis_evidence_relation_allowed",
+        ),
         CheckConstraint("created_by_type in ('ai','human','system')", name="hypothesis_evidence_creator_allowed"),
     )
 
@@ -1054,6 +1174,9 @@ class FailureChainEdge(Base):
     evidence_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     rationale: Mapped[str | None] = mapped_column(Text)
     created_at = tz(False)
+    # md30: link states SUPPORTED, PARTIALLY_SUPPORTED, HYPOTHESIZED, UNKNOWN, CONTRADICTED; who set them.
+    updated_by: Mapped[str | None] = mapped_column(String(255))
+    updated_at = tz()
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "failure_chain_id"], ["failure_chains.tenant_id", "failure_chains.id"]),
         ForeignKeyConstraint(
@@ -1068,7 +1191,9 @@ class FailureChainEdge(Base):
         ),
         ForeignKeyConstraint(["tenant_id", "evidence_id"], ["evidence.tenant_id", "evidence.id"]),
         CheckConstraint(
-            "edge_status in ('established_fact','hypothesized','contradicted')",
+            # md31 adds the link states people and adopted AI chains use; the original three stay valid.
+            "edge_status in ('established_fact','hypothesized','contradicted',"
+            "'SUPPORTED','PARTIALLY_SUPPORTED','HYPOTHESIZED','UNKNOWN','CONTRADICTED')",
             name="failure_chain_edge_status_allowed",
         ),
     )
@@ -1113,6 +1238,7 @@ class EvidenceEmbedding(Base):
 
 class ConnectorConfiguration(Base):
     __tablename__ = "connector_configurations"
+    business_id: Mapped[str] = business_id_column()
     id = uuid_pk()
     tenant_id = tenant_fk()
     code: Mapped[str] = mapped_column(String(100), nullable=False)

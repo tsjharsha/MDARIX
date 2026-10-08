@@ -1,6 +1,7 @@
 import React from "react";
 import { ClipboardList } from "lucide-react";
 import { fmt } from "./format";
+import { SortableHeader, useSortedRows } from "./tableSort";
 
 export type AnalysisItem = {
   item_id: string;
@@ -51,18 +52,25 @@ export function Panel({ title, icon, children }: { title: string; icon: React.Re
 }
 
 export function DenseTable({ rows, columns }: { rows: Array<Record<string, string | null>>; columns: string[] }) {
+  const { sorted, sort, toggle } = useSortedRows(rows, (row, key) => row[key]);
   if (!rows.length) return <p className="empty">No records for this view.</p>;
   return (
     <table>
       <thead>
         <tr>
           {columns.map((column) => (
-            <th key={column}>{column.replace(/_/g, " ")}</th>
+            <SortableHeader
+              key={column}
+              label={column.replace(/_/g, " ")}
+              sortKey={column}
+              sort={sort}
+              onSort={toggle}
+            />
           ))}
         </tr>
       </thead>
       <tbody>
-        {rows.map((row, index) => (
+        {sorted.map((row, index) => (
           <tr key={index}>
             {columns.map((column) => (
               <td key={column}>{fmt(row[column]) === "Not recorded" ? (row[column] ?? "—") : fmt(row[column])}</td>

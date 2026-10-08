@@ -10,9 +10,14 @@ import {
   saveSelection,
 } from "./columnModel";
 
+const UUID_1 = "6f1c2a9e-4b3d-4c8a-9f2e-1a2b3c4d5e6f";
+const UUID_2 = "7a2d3b0f-5c4e-4d9b-8a3f-2b3c4d5e6f70";
+
 const CUSTOMERS = [
   {
-    id: "1",
+    id: UUID_1,
+    business_id: "CUST000001",
+    plan_id: UUID_2,
     name: "Apex",
     customer_identifier: "CUS0001",
     country: "IN",
@@ -27,13 +32,20 @@ const CUSTOMERS = [
     _internal: 1,
     notes: null,
   },
-  { id: "2", name: "Beacon", customer_identifier: "CUS0002", country: null, notes: "VIP" },
+  {
+    id: UUID_2,
+    business_id: "CUST000002",
+    name: "Beacon",
+    customer_identifier: "CUS0002",
+    country: null,
+    notes: "VIP",
+  },
 ];
 
 describe("fields a list can offer", () => {
-  it("offers plain fields and lists of plain values, never nested records, secrets or internal keys", () => {
+  it("offers plain fields and lists of plain values, never nested records, secrets, internal keys or UUIDs", () => {
     expect(availableFieldKeys(CUSTOMERS, ["name"])).toEqual([
-      "id",
+      "business_id",
       "customer_identifier",
       "country",
       "created_at",
@@ -43,7 +55,24 @@ describe("fields a list can offer", () => {
     ]);
   });
 
+  it("never offers a field that holds UUIDs, but keeps business IDs and readable keys", () => {
+    const rows = [
+      {
+        id: UUID_1,
+        tenant_id: UUID_2,
+        tenant_business_id: "TEN000003",
+        actor: UUID_2,
+        source_id: "QMS-7",
+        member_ids: [UUID_1],
+        notes: "x",
+      },
+    ];
+    expect(availableFieldKeys(rows)).toEqual(["tenant_business_id", "source_id", "notes"]);
+  });
+
   it("names fields in words", () => {
+    expect(fieldLabel("business_id")).toBe("ID");
+    expect(fieldLabel("tenant_business_id")).toBe("Tenant ID");
     expect(fieldLabel("customer_identifier")).toBe("Customer identifier");
     expect(fieldLabel("created_at")).toBe("Created");
     expect(fieldLabel("tenant_id")).toBe("Tenant ID");
@@ -52,6 +81,8 @@ describe("fields a list can offer", () => {
 
   it("shows values as a reader expects", () => {
     expect(formatFieldValue(null)).toBe("—");
+    expect(formatFieldValue(UUID_1)).toBe("—");
+    expect(formatFieldValue("CMP000002")).toBe("CMP000002");
     expect(formatFieldValue(true)).toBe("Yes");
     expect(formatFieldValue(["EU", "IN"])).toBe("EU, IN");
     expect(formatFieldValue("READY_FOR_APPROVAL")).toBe("Ready for approval");

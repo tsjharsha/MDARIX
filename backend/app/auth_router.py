@@ -72,6 +72,8 @@ LOCK_MINUTES = 15
 # (scripts/create_platform_admin.py creates it), so guessing against unknown names is visible to the platform team.
 PLATFORM_TENANT_KEY = "MDARIX_PLATFORM"
 ANONYMOUS_ACTOR = "ANONYMOUS"
+# audit_events.user_agent is varchar(512).
+AUDIT_USER_AGENT_CHARS = 512
 
 
 class Signup(BaseModel):
@@ -195,19 +197,22 @@ def _audit(
     """Add one authentication audit event to the current transaction (the caller commits).
 
     ``details`` carry ids and outcomes only; ``make_audit_event`` redacts secret-named keys as a second line.
+    The client's User-Agent is cut to its column: an over-long header must not fail the insert, because a failed
+    sign-in whose audit cannot be written would roll back its lockout count with it.
     """
-    db.add(
-        make_audit_event(
-            tenant_id=tenant_id,
-            actor_ref=actor_ref,
-            action=action,
-            entity_type="AuthUser",
-            entity_id=entity_id,
-            details=details,
-            request=request,
-            created_at=now,
-        )
+    event = make_audit_event(
+        tenant_id=tenant_id,
+        actor_ref=actor_ref,
+        action=action,
+        entity_type="AuthUser",
+        entity_id=entity_id,
+        details=details,
+        request=request,
+        created_at=now,
     )
+    if event.user_agent:
+        event.user_agent = event.user_agent[:AUDIT_USER_AGENT_CHARS]
+    db.add(event)
 
 
 def _audit_user(db: Session, user, action: str, request: Request, details: dict | None = None, now=None) -> None:
@@ -484,6 +489,11 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
         db.add(row)
         db.commit()
         background.add_task(_alert_trial_request, row.organization, row.display_name, email)
+        # Only a newly stored request is acknowledged (a known email returned above, with the same answer), and
+        # after the response, so neither the body nor its timing reveals which emails MDARIX already knows.
+        from backend.app.trial.service import acknowledge_trial_request
+
+        background.add_task(acknowledge_trial_request, row.organization, row.display_name, email)
         return dict(SIGNUP_ACCEPTED)
     except HTTPException:
         raise
@@ -644,6 +654,7 @@ def _clear_throttle(db: Session, email: str, address: str | None) -> None:
 def _signin_response(row) -> dict:
     return {
         "user_id": str(row.id),
+        "business_id": row.business_id,
         "display_name": row.display_name,
         "email": row.username,
         "tenant_id": str(row.tenant_id),
@@ -782,13 +793,22 @@ def session(request: Request, response: Response, db: Session = Depends(get_db))
         db.commit()
         raise HTTPException(401, detail={"code": "SESSION_IDLE_TIMEOUT", "message": "Signed out after inactivity"})
     row.last_seen_at = now
-    renew_session_if_due(row, now, response, token)
+    renew_session_if_due(row, now, None, None)
+    if not row.mfa_state:
+        # Re-issued on every check, not only when this call renewed: routes that resolve the session without a
+        # response at hand (get_request_context called directly) extend the window on the server only, and the
+        # browser's watcher calls here before its deadline, so the cookie always catches up with the server.
+        set_session_cookie(response, token, max_age=max(1, int((row.expires_at - now).total_seconds())))
     db.commit()
+    from backend.app.access.session import organization_business_ids
+
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "display_name": user.display_name,
         "email": user.username,
         "tenant_id": str(user.tenant_id),
+        **organization_business_ids(db, user.tenant_id),
         "active_role": user.role,
         # VERIFY: a code is still due; ENROLL: MFA must be set up first; None: fully signed in.
         "mfa_state": row.mfa_state,
@@ -967,4 +987,4 @@ def activate(data: Reset, request: Request, background: BackgroundTasks, db: Ses
     background.add_task(
         _send_welcome_quietly, row.username, _organization_name(db, row.tenant_id) or "your organization"
     )
-    return {"status": "ACTIVE", "user_id": str(row.id), "email": row.username}
+    return {"status": "ACTIVE", "user_id": str(row.id), "business_id": row.business_id, "email": row.username}

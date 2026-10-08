@@ -1,22 +1,27 @@
 import { useMemo, useState } from "react";
 import { AlarmClock, CalendarClock, CalendarX2, CheckCircle2, Mail } from "lucide-react";
-import { Panel, StatTile } from "../console/charts";
+import { Empty, Panel, StatTile } from "../console/charts";
 import {
   Drawer,
   SearchBox,
   Table,
   errorText,
   formatDate,
+  idColumn,
+  referenceIdColumn,
   send,
   useResource,
   type Resource,
 } from "../../customer-admin/shared";
 import { ChangeSubscription } from "../customers/CustomerPage";
 import { titleCase } from "../customers/model";
+import { featureLabel } from "../onboardingModel";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { parseThresholds, previewTemplate, templateVariables } from "./sections";
 import { formatDay } from "../../../app/dates";
+import { safeText } from "../../../app/displayId";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
@@ -29,6 +34,7 @@ export function PlansLicensing({ section, onMessage }: { section: string; onMess
 
 type Plan = {
   id: string;
+  business_id?: string | null;
   code: string;
   name: string;
   description?: string | null;
@@ -66,9 +72,7 @@ function Plans() {
                 <header>
                   <span className="cc-stack">
                     <strong>{plan.name}</strong>
-                    <small>
-                      {plan.code} · {plan.version ?? "v1"}
-                    </small>
+                    {safeText(plan.business_id) && <small>{safeText(plan.business_id)}</small>}
                   </span>
                   <StatusBadge status={plan.status} />
                 </header>
@@ -77,7 +81,7 @@ function Plans() {
                 {features.length ? (
                   <ul className="ar-chips">
                     {features.map(([feature]) => (
-                      <li key={feature}>{titleCase(feature)}</li>
+                      <li key={feature}>{featureLabel(feature)}</li>
                     ))}
                   </ul>
                 ) : (
@@ -101,7 +105,7 @@ function Plans() {
           })}
         </div>
       ) : (
-        <p className="ac-muted">No plans yet.</p>
+        <Empty title="No plans yet" detail="Plans appear here once they are set up for the platform." />
       )}
     </Panel>
   );
@@ -109,6 +113,7 @@ function Plans() {
 
 type TenantRow = {
   id: string;
+  business_id?: string | null;
   name?: string | null;
   tenant_key?: string | null;
   plan_code?: string | null;
@@ -119,13 +124,31 @@ type TenantRow = {
   status?: string | null;
 };
 
+/** Columns the server can order every page by (backend platform_customers.py _subscription_sort_columns). */
+const SUBSCRIPTION_SORT_KEYS = [
+  "business_id",
+  "tenant",
+  "plan",
+  "period",
+  "seats",
+  "status",
+  "tenant_key",
+  "plan_name",
+  "plan_code",
+  "license_start",
+  "expires_at",
+  "seat_usage",
+  "created_at",
+] as const;
+
 /** Every tenant's plan and license period, with Change subscription on each row. */
 function Subscriptions({ onMessage }: { onMessage: Notify }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [changing, setChanging] = useState<TenantRow | null>(null);
   const [limiting, setLimiting] = useState<TenantRow | null>(null);
-  const params = new URLSearchParams({ page: String(page), page_size: "25", sort: "name" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "25", sort: "name", ...sortParams(sort) });
   if (query.trim()) params.set("q", query.trim());
   const tenants = useResource<{ items: TenantRow[]; total: number; pages: number }>(
     `/api/v1/platform-admin/customers?${params}`,
@@ -140,25 +163,22 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
             setQuery(value);
             setPage(1);
           }}
-          label="Search customer or tenant"
+          label="Search customer, tenant or ID"
         />
       </div>
       <Table
         caption="Subscriptions"
         rows={tenants.data?.items ?? []}
         rowKey={(row) => row.id}
+        serverSort={{ sort, onSort, keys: SUBSCRIPTION_SORT_KEYS }}
         empty={{ title: "No matching tenants", detail: "Change the search." }}
         columns={[
+          idColumn("Tenant ID", "tenant_key"),
           {
             key: "tenant",
-            fields: ["name", "tenant_key"],
+            fields: ["name"],
             label: "Tenant",
-            render: (row) => (
-              <span className="cc-stack">
-                <strong>{row.name ?? "—"}</strong>
-                <small>{row.tenant_key}</small>
-              </span>
-            ),
+            render: (row) => <strong>{row.name ?? "—"}</strong>,
           },
           {
             key: "plan",
@@ -183,10 +203,10 @@ function Subscriptions({ onMessage }: { onMessage: Notify }) {
             render: (row) => (
               <span className="ca-action-row">
                 <button type="button" className="ac-link" onClick={() => setChanging(row)}>
-                  Change
+                  Change plan
                 </button>
                 <button type="button" className="ac-link" onClick={() => setLimiting(row)}>
-                  Limits
+                  Edit limits
                 </button>
               </span>
             ),
@@ -303,6 +323,8 @@ function TenantLimits({ tenant, onClose, onSaved }: { tenant: TenantRow; onClose
 
 type Renewal = {
   subscription_id: string;
+  subscription_business_id?: string | null;
+  tenant_business_id?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
@@ -313,13 +335,19 @@ type Renewal = {
   reminders_queued: number;
 };
 
+// Each license is in exactly one period; a license without an end date is in none of the date periods.
 const WINDOWS = [
-  { key: "expired", label: "Ended", test: (days: number) => days < 0 },
-  { key: "7", label: "Within 7 days", test: (days: number) => days >= 0 && days <= 7 },
-  { key: "30", label: "Within 30 days", test: (days: number) => days > 7 && days <= 30 },
-  { key: "90", label: "Within 90 days", test: (days: number) => days > 30 && days <= 90 },
-  { key: "later", label: "Later", test: (days: number) => days > 90 },
+  { key: "expired", label: "Ended", test: (days: number | null) => days !== null && days < 0 },
+  { key: "7", label: "Within 7 days", test: (days: number | null) => days !== null && days >= 0 && days <= 7 },
+  { key: "30", label: "Within 30 days", test: (days: number | null) => days !== null && days > 7 && days <= 30 },
+  { key: "later", label: "Later than 30 days", test: (days: number | null) => days !== null && days > 30 },
+  { key: "none", label: "No end date", test: (days: number | null) => days === null },
 ] as const;
+
+const dayCount = (days: number) => `${days} day${days === 1 ? "" : "s"}`;
+/** "in 3 days", "today", "1 day ago". */
+const endsIn = (days: number | null) =>
+  days === null ? "" : days === 0 ? "today" : days < 0 ? `${dayCount(-days)} ago` : `in ${dayCount(days)}`;
 
 /** Licenses by how soon they end, so renewals are handled before access stops. */
 function Renewals() {
@@ -327,9 +355,9 @@ function Renewals() {
   const [period, setPeriod] = useState<string>("");
   const rows = renewals.data?.items ?? [];
   const count = (key: string) =>
-    rows.filter((row) => WINDOWS.find((item) => item.key === key)!.test(row.days_remaining ?? 0)).length;
+    rows.filter((row) => WINDOWS.find((item) => item.key === key)!.test(row.days_remaining ?? null)).length;
   const shown = period
-    ? rows.filter((row) => WINDOWS.find((item) => item.key === period)!.test(row.days_remaining ?? 0))
+    ? rows.filter((row) => WINDOWS.find((item) => item.key === period)!.test(row.days_remaining ?? null))
     : rows;
   return (
     <div className="ac-grid">
@@ -337,7 +365,7 @@ function Renewals() {
         <StatTile
           label="Ended"
           value={renewals.data ? count("expired") : null}
-          detail="Grace period or suspended"
+          detail="Past the end date: renew or close"
           icon={<CalendarX2 size={18} />}
           tone={count("expired") ? "critical" : "good"}
           onOpen={() => setPeriod("expired")}
@@ -359,12 +387,12 @@ function Renewals() {
           onOpen={() => setPeriod("30")}
         />
         <StatTile
-          label="Later"
-          value={renewals.data ? count("90") + count("later") : null}
+          label="Later than 30 days"
+          value={renewals.data ? count("later") : null}
           detail="Nothing to do yet"
           icon={<CheckCircle2 size={18} />}
           tone="good"
-          onOpen={() => setPeriod("")}
+          onOpen={() => setPeriod("later")}
         />
       </section>
       <Panel eyebrow="Renewals" title="Licenses by end date" state={renewals.state} error={renewals.error}>
@@ -392,9 +420,10 @@ function Renewals() {
             detail: rows.length ? "Choose another period." : "Licenses with an end date appear here.",
           }}
           columns={[
+            referenceIdColumn("Subscription ID", "subscription"),
             {
               key: "tenant",
-              fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+              fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
               label: "Tenant",
               render: (row) => <TenantCell row={row} />,
             },
@@ -406,13 +435,7 @@ function Renewals() {
               render: (row) => (
                 <span className="cc-stack">
                   <strong>{row.expires_at ? formatDay(row.expires_at) : "—"}</strong>
-                  <small>
-                    {row.days_remaining === null
-                      ? ""
-                      : row.days_remaining < 0
-                        ? `${-row.days_remaining} days ago`
-                        : `in ${row.days_remaining} days`}
-                  </small>
+                  <small>{endsIn(row.days_remaining ?? null)}</small>
                 </span>
               ),
             },
@@ -420,7 +443,7 @@ function Renewals() {
             {
               key: "reminders",
               fields: ["reminders_queued"],
-              label: "Reminders queued",
+              label: "Reminder emails waiting",
               numeric: true,
               render: (row) => row.reminders_queued,
             },
@@ -478,8 +501,10 @@ function Reminders({ onMessage }: { onMessage: Notify }) {
         </Intro>
         <TenantPicker value={tenantId} onChange={setTenantId} />
         <p className="ar-notice" role="note">
-          <Mail size={16} aria-hidden="true" /> Reminders are queued on the chosen days, but sending them by email is
-          not connected yet, so customers do not receive them today.
+          <Mail size={16} aria-hidden="true" /> Reminders are emailed on the chosen days to the tenant&apos;s Customer
+          Administrators and the contacts in its notification settings. The newest saved email for each stage is the one
+          sent; without one, the standard wording is used. Operations, Email &amp; notifications shows whether email is
+          configured.
         </p>
       </Panel>
       {tenantId && (
@@ -592,7 +617,7 @@ function TemplateEditor({
         body: form.body.trim(),
         allowed_variables: used,
       });
-      onMessage("Reminder email saved as a draft.");
+      onMessage("Reminder email saved. It is used for the next reminders at this stage.");
       settings.reload();
     } catch (reason) {
       setError(errorText(reason, "The email was not saved."));
@@ -651,7 +676,7 @@ function TemplateEditor({
           </p>
         )}
         <button type="submit" className="ac-primary" disabled={busy}>
-          {busy ? "Saving…" : "Save as draft"}
+          {busy ? "Saving…" : "Save email"}
         </button>
       </form>
       {templates.length > 0 && (

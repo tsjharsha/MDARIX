@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from backend.app.business_ids import business_id_map
 from backend.app.db.models.foundation import (
     AIExecution,
     AssuranceCheck,
@@ -78,6 +79,22 @@ def _versions(db: Session, tenant_id) -> dict:
     return {row.id: row for row in db.query(ProductVersion).filter(ProductVersion.tenant_id == tenant_id).all()}
 
 
+def _investigation_labels(db: Session, tenant_id) -> dict:
+    """{investigation id: (source identifier, business identifier)}, for labelling records that belong to a case."""
+    return {
+        row.id: (row.investigation_identifier, row.business_id)
+        for row in db.query(Investigation.id, Investigation.investigation_identifier, Investigation.business_id).filter(
+            Investigation.tenant_id == tenant_id
+        )
+    }
+
+
+def _case_labels(investigations: dict, investigation_id) -> dict:
+    """The ``investigation_identifier`` / ``investigation_business_id`` cells of a record's case."""
+    identifier, business_id = investigations.get(investigation_id, (None, None))
+    return {"investigation_identifier": identifier, "investigation_business_id": business_id}
+
+
 def _count_by(db: Session, column, tenant_column, tenant_id, *filters) -> dict:
     rows = (
         db.query(column, func.count())
@@ -117,6 +134,7 @@ def signature_verification_rows(control_db: Session, tenant_id, *, limit: int = 
         expected = hashlib.sha256((fingerprint + item.signer_user_id + item.object_version).encode()).hexdigest()
         result.append(
             {
+                "business_id": item.business_id,
                 "signature_id": str(item.id),
                 "decision_id": str(item.object_id),
                 "decision": item.decision,
@@ -132,6 +150,15 @@ def signature_verification_rows(control_db: Session, tenant_id, *, limit: int = 
             }
         )
     return result
+
+
+def with_decision_business_ids(db: Session, signatures: list[dict]) -> list[dict]:
+    """``signatures`` (from ``signature_verification_rows``) with each signed decision's business identifier.
+
+    Signatures live in the control plane and decisions in the organization's data plane, so ``db`` is the data-plane
+    session; a decision it does not hold gets None."""
+    known = business_id_map(db, Decision, (item["decision_id"] for item in signatures))
+    return [{**item, "decision_business_id": known.get(item["decision_id"])} for item in signatures]
 
 
 def audit_event_rows(db: Session, tenant_id, *, limit: int = 1000, entity_ids=None, actions=None) -> list[dict]:
@@ -192,6 +219,7 @@ def product_intelligence(db: Session, tenant_id, control_db=None) -> dict:
     capas = _count_by(db, Capa.product_id, Capa.tenant_id, tenant_id, func.lower(Capa.status).notin_(CLOSED_STATUSES))
     rows = [
         {
+            "business_id": product.business_id,
             "product_identifier": product.product_identifier,
             "name": product.name,
             "product_family": product.product_family,
@@ -250,6 +278,8 @@ def product_version_impact(db: Session, tenant_id, control_db=None) -> dict:
         product = products.get(version.product_id)
         rows.append(
             {
+                "business_id": version.business_id,
+                "product_business_id": product.business_id if product else None,
                 "product_identifier": product.product_identifier if product else None,
                 "product_name": product.name if product else None,
                 "version_identifier": version.version_identifier,
@@ -265,7 +295,10 @@ def product_version_impact(db: Session, tenant_id, control_db=None) -> dict:
             }
         )
     return {
-        "summary": {"product_versions": len(rows), "versions_with_open_complaints": sum(1 for r in rows if r["complaints_open"])},
+        "summary": {
+            "product_versions": len(rows),
+            "versions_with_open_complaints": sum(1 for r in rows if r["complaints_open"]),
+        },
         "versions": rows,
         "limitations": [
             "Investigations are attributed to a version through the complaints linked to them; MDARIX does not "
@@ -340,8 +373,12 @@ def signal_assessment(db: Session, tenant_id, control_db=None) -> dict:
             lag_days = (row.awareness_timestamp - row.event_timestamp).days
         items.append(
             {
+                "business_id": row.business_id,
                 "complaint_identifier": row.complaint_identifier,
-                "product_identifier": products[row.product_id].product_identifier if row.product_id in products else None,
+                "product_business_id": products[row.product_id].business_id if row.product_id in products else None,
+                "product_identifier": products[row.product_id].product_identifier
+                if row.product_id in products
+                else None,
                 "status": row.status,
                 "severity": row.severity,
                 "event_timestamp": _iso(row.event_timestamp),
@@ -386,17 +423,31 @@ def _investigation_rows(db: Session, tenant_id, control_db=None, *, investigatio
     if not ids:
         return rows, total, products, {}, {}, {}, {}, {}, {}
     complaints = _count_by(
-        db, InvestigationComplaint.investigation_id, InvestigationComplaint.tenant_id, tenant_id,
+        db,
+        InvestigationComplaint.investigation_id,
+        InvestigationComplaint.tenant_id,
+        tenant_id,
         InvestigationComplaint.investigation_id.in_(ids),
     )
-    direct_evidence = _count_by(db, Evidence.investigation_id, Evidence.tenant_id, tenant_id, Evidence.investigation_id.in_(ids))
+    direct_evidence = _count_by(
+        db, Evidence.investigation_id, Evidence.tenant_id, tenant_id, Evidence.investigation_id.in_(ids)
+    )
     linked_evidence = _count_by(
-        db, InvestigationEvidence.investigation_id, InvestigationEvidence.tenant_id, tenant_id,
+        db,
+        InvestigationEvidence.investigation_id,
+        InvestigationEvidence.tenant_id,
+        tenant_id,
         InvestigationEvidence.investigation_id.in_(ids),
     )
-    hypotheses = _count_by(db, Hypothesis.investigation_id, Hypothesis.tenant_id, tenant_id, Hypothesis.investigation_id.in_(ids))
+    hypotheses = _count_by(
+        db, Hypothesis.investigation_id, Hypothesis.tenant_id, tenant_id, Hypothesis.investigation_id.in_(ids)
+    )
     unknowns = _count_by(
-        db, Unknown.investigation_id, Unknown.tenant_id, tenant_id, Unknown.investigation_id.in_(ids),
+        db,
+        Unknown.investigation_id,
+        Unknown.tenant_id,
+        tenant_id,
+        Unknown.investigation_id.in_(ids),
         func.lower(Unknown.status).notin_(CLOSED_STATUSES),
     )
     decisions = defaultdict(Counter)
@@ -404,7 +455,10 @@ def _investigation_rows(db: Session, tenant_id, control_db=None, *, investigatio
         Decision.tenant_id == tenant_id, Decision.investigation_id.in_(ids)
     ):
         decisions[investigation_id][status or "UNKNOWN"] += 1
-    evidence = {key: direct_evidence.get(key, 0) + linked_evidence.get(key, 0) for key in set(direct_evidence) | set(linked_evidence)}
+    evidence = {
+        key: direct_evidence.get(key, 0) + linked_evidence.get(key, 0)
+        for key in set(direct_evidence) | set(linked_evidence)
+    }
     return rows, total, products, complaints, evidence, hypotheses, unknowns, decisions, {}
 
 
@@ -420,11 +474,15 @@ def investigation_report(db: Session, tenant_id, control_db=None) -> dict:
                 Decision.tenant_id == tenant_id, Decision.investigation_id.in_([row.id for row in rows])
             )
         ]
-        owner = dict(
-            db.query(Decision.id, Decision.investigation_id).filter(
-                Decision.tenant_id == tenant_id, Decision.id.in_(decision_ids)
+        owner = (
+            dict(
+                db.query(Decision.id, Decision.investigation_id).filter(
+                    Decision.tenant_id == tenant_id, Decision.id.in_(decision_ids)
+                )
             )
-        ) if decision_ids else {}
+            if decision_ids
+            else {}
+        )
         for item in signature_verification_rows(control_db, tenant_id, limit=5000, decision_ids=decision_ids):
             if item["valid"]:
                 signatures[owner.get(uuid.UUID(item["decision_id"]))] += 1
@@ -437,10 +495,12 @@ def investigation_report(db: Session, tenant_id, control_db=None) -> dict:
             days_open = (end - row.opened_at).days
         cases.append(
             {
+                "business_id": row.business_id,
                 "investigation_identifier": row.investigation_identifier,
                 "investigation_question": row.investigation_question,
                 "status": row.status,
                 "owner_ref": row.owner_ref,
+                "product_business_id": product.business_id if product else None,
                 "product_identifier": product.product_identifier if product else None,
                 "opened_at": _iso(row.opened_at),
                 "closed_at": _iso(row.closed_at),
@@ -474,20 +534,16 @@ def investigation_report(db: Session, tenant_id, control_db=None) -> dict:
 
 def evidence_provenance(db: Session, tenant_id, control_db=None) -> dict:
     rows, total = _bounded(db.query(Evidence).filter(Evidence.tenant_id == tenant_id), Evidence.created_at.desc())
-    investigations = {
-        row.id: row.investigation_identifier
-        for row in db.query(Investigation.id, Investigation.investigation_identifier).filter(
-            Investigation.tenant_id == tenant_id
-        )
-    }
+    investigations = _investigation_labels(db, tenant_id)
     items = [
         {
+            "business_id": row.business_id,
             "evidence_identifier": row.evidence_identifier,
             "title": row.title,
             "evidence_type": row.evidence_type,
             "fact_type": row.fact_type,
             "reliability_status": row.reliability_status,
-            "investigation_identifier": investigations.get(row.investigation_id),
+            **_case_labels(investigations, row.investigation_id),
             "source_system": row.source_system,
             "source_identifier": row.source_identifier,
             "source_reference": row.source_reference,
@@ -522,9 +578,11 @@ def risk_impact(db: Session, tenant_id, control_db=None) -> dict:
     trace = traceability(db, tenant_id)
     rows = [
         {
+            "business_id": item["business_id"],
             "risk_identifier": item["risk_identifier"],
             "description": item["description"],
             "status": item["status"],
+            "product_business_id": item["product"]["business_id"] if item["product"] else None,
             "product_identifier": item["product"]["product_identifier"] if item["product"] else None,
             "residual_risk_state": item["residual_risk"]["state"],
             "failure_modes": [row["failure_mode_identifier"] for row in item["failure_modes"]],
@@ -546,25 +604,25 @@ def risk_impact(db: Session, tenant_id, control_db=None) -> dict:
         },
         "risks": rows,
         "unlinked": trace["unlinked"],
+        "unlinked_business_ids": trace["unlinked_business_ids"],
         "fields_not_captured": full["fields_not_captured"],
-        "limitations": [full["data_notice"], "Open complaints on a product are context, not evidence that a risk occurred."],
+        "limitations": [
+            full["data_notice"],
+            "Open complaints on a product are context, not evidence that a risk occurred.",
+        ],
     }
 
 
 def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
-    investigations = {
-        row.id: row.investigation_identifier
-        for row in db.query(Investigation.id, Investigation.investigation_identifier).filter(
-            Investigation.tenant_id == tenant_id
-        )
-    }
+    investigations = _investigation_labels(db, tenant_id)
     scenarios, scenario_total = _bounded(
         db.query(Scenario).filter(Scenario.tenant_id == tenant_id), Scenario.created_at.desc()
     )
     if scenarios:
         rows = [
             {
-                "investigation_identifier": investigations.get(row.investigation_id),
+                "business_id": row.business_id,
+                **_case_labels(investigations, row.investigation_id),
                 "scenario_identifier": row.scenario_identifier,
                 "question": row.question,
                 "assumptions": row.assumptions,
@@ -574,7 +632,10 @@ def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
             for row in scenarios
         ]
         return {
-            "summary": {"scenarios": scenario_total, "investigations_with_scenarios": len({r["investigation_identifier"] for r in rows})},
+            "summary": {
+                "scenarios": scenario_total,
+                "investigations_with_scenarios": len({r["investigation_identifier"] for r in rows}),
+            },
             "basis": "SCENARIO_RECORDS",
             "scenarios": rows,
             "truncated": [_truncation("scenarios", len(rows), scenario_total)] if scenario_total > len(rows) else [],
@@ -582,16 +643,23 @@ def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
         }
     # No scenario records exist for this organization: the competing explanations under investigation are its
     # hypotheses, which the report lists as such (and says so).
-    hypotheses, total = _bounded(db.query(Hypothesis).filter(Hypothesis.tenant_id == tenant_id), Hypothesis.created_at.desc())
+    hypotheses, total = _bounded(
+        db.query(Hypothesis).filter(Hypothesis.tenant_id == tenant_id), Hypothesis.created_at.desc()
+    )
     relations = defaultdict(Counter)
     if hypotheses:
-        for hypothesis_id, relation in db.query(HypothesisEvidence.hypothesis_id, HypothesisEvidence.relation_type).filter(
-            HypothesisEvidence.tenant_id == tenant_id, HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses])
+        for hypothesis_id, relation in db.query(
+            HypothesisEvidence.hypothesis_id, HypothesisEvidence.relation_type
+        ).filter(
+            HypothesisEvidence.tenant_id == tenant_id,
+            HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses]),
+            HypothesisEvidence.retracted_at.is_(None),  # withdrawn links no longer count
         ):
             relations[hypothesis_id][relation] += 1
     rows = [
         {
-            "investigation_identifier": investigations.get(row.investigation_id),
+            "business_id": row.business_id,
+            **_case_labels(investigations, row.investigation_id),
             "statement": row.statement,
             "status": row.status,
             "origin": row.origin,
@@ -602,7 +670,11 @@ def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
         for row in hypotheses
     ]
     return {
-        "summary": {"scenarios": 0, "hypotheses": total, "investigations_with_hypotheses": len({r["investigation_identifier"] for r in rows})},
+        "summary": {
+            "scenarios": 0,
+            "hypotheses": total,
+            "investigations_with_hypotheses": len({r["investigation_identifier"] for r in rows}),
+        },
         "basis": "COMPETING_HYPOTHESES",
         "hypotheses": rows,
         "truncated": [_truncation("hypotheses", len(rows), total)] if total > len(rows) else [],
@@ -614,12 +686,7 @@ def scenario_comparison(db: Session, tenant_id, control_db=None) -> dict:
 
 
 def decision_brief(db: Session, tenant_id, control_db=None) -> dict:
-    investigations = {
-        row.id: row.investigation_identifier
-        for row in db.query(Investigation.id, Investigation.investigation_identifier).filter(
-            Investigation.tenant_id == tenant_id
-        )
-    }
+    investigations = _investigation_labels(db, tenant_id)
     rows, total = _bounded(
         db.query(Decision).filter(Decision.tenant_id == tenant_id),
         func.coalesce(Decision.decision_timestamp, Decision.created_at).desc(),
@@ -636,8 +703,9 @@ def decision_brief(db: Session, tenant_id, control_db=None) -> dict:
             reviews[decision_id] += 1
     items = [
         {
+            "business_id": row.business_id,
             "decision_identifier": row.decision_identifier,
-            "investigation_identifier": investigations.get(row.investigation_id),
+            **_case_labels(investigations, row.investigation_id),
             "decision_type": row.decision_type,
             "selected_action": row.selected_action or row.disposition,
             "decision_status": row.decision_status,
@@ -648,10 +716,18 @@ def decision_brief(db: Session, tenant_id, control_db=None) -> dict:
             "updated_at": _iso(row.updated_at),
             "human_reviews": reviews.get(row.id, 0),
             "signatures": [
-                {"signer_user_id": s["signer_user_id"], "decision": s["decision"], "valid": s["valid"], "signed_at": s["signed_at"]}
+                {
+                    "business_id": s["business_id"],
+                    "signer_user_id": s["signer_user_id"],
+                    "decision": s["decision"],
+                    "valid": s["valid"],
+                    "signed_at": s["signed_at"],
+                }
                 for s in signatures.get(str(row.id), [])
             ],
-            "limitations": (row.limitations or {}).get("items") if isinstance(row.limitations, dict) else row.limitations,
+            "limitations": (row.limitations or {}).get("items")
+            if isinstance(row.limitations, dict)
+            else row.limitations,
         }
         for row in rows
     ]
@@ -666,7 +742,11 @@ def decision_brief(db: Session, tenant_id, control_db=None) -> dict:
         "decisions": items,
         "truncated": [_truncation("decisions", len(items), total)] if total > len(items) else [],
         "limitations": ["A decision brief records what people decided and why; MDARIX never decides."]
-        + ([] if control_db is not None else ["Signatures need the control-plane session; a worker-rendered report shows none."]),
+        + (
+            []
+            if control_db is not None
+            else ["Signatures need the control-plane session; a worker-rendered report shows none."]
+        ),
     }
 
 
@@ -680,6 +760,7 @@ def ai_assurance(db: Session, tenant_id, control_db=None) -> dict:
     latencies = sorted(row.latency_ms for row in recent if row.latency_ms is not None)
     results = db.query(AssuranceResult).filter(AssuranceResult.tenant_id == tenant_id)
     result_rows = results.order_by(AssuranceResult.generated_at.desc()).limit(MAX_ROWS).all()
+    execution_ids = business_id_map(db, AIExecution, (row.ai_execution_id for row in result_rows[:100]))
     checks = (
         db.query(AssuranceCheck.check_type, AssuranceCheck.status, func.count())
         .filter(AssuranceCheck.tenant_id == tenant_id)
@@ -706,6 +787,7 @@ def ai_assurance(db: Session, tenant_id, control_db=None) -> dict:
         "recent_assurance_results": [
             {
                 "ai_execution_id": str(row.ai_execution_id),
+                "ai_execution_business_id": execution_ids.get(str(row.ai_execution_id)),
                 "output_type": row.output_type,
                 "status": row.status,
                 "trust_policy_version": row.trust_policy_version,
@@ -731,6 +813,7 @@ def audit_approval(db: Session, tenant_id, control_db=None) -> dict:
     source = control_db if control_db is not None else db
     events = audit_event_rows(source, tenant_id, limit=1000)
     signatures = signature_verification_rows(source, tenant_id, limit=500) if control_db is not None else []
+    signatures = with_decision_business_ids(db, signatures)
     return {
         "audit_events": events,
         "signature_verification": signatures,
@@ -739,7 +822,9 @@ def audit_approval(db: Session, tenant_id, control_db=None) -> dict:
             "signatures": len(signatures),
             "valid_signatures": sum(1 for item in signatures if item["valid"]),
             "audit_events_total": source.query(AuditEvent).filter(AuditEvent.tenant_id == tenant_id).count(),
-            "signatures_total": source.query(SignedApprovalRecord).filter(SignedApprovalRecord.tenant_id == tenant_id).count()
+            "signatures_total": source.query(SignedApprovalRecord)
+            .filter(SignedApprovalRecord.tenant_id == tenant_id)
+            .count()
             if control_db is not None
             else None,
         },
@@ -785,8 +870,12 @@ def executive_quality_review(db: Session, tenant_id, control_db=None) -> dict:
             "complaints_serious_injury_or_death": complaints.filter(
                 or_(Complaint.serious_injury.is_(True), Complaint.death.is_(True))
             ).count(),
-            "investigations_open": investigations.filter(func.lower(Investigation.status).notin_(CLOSED_STATUSES)).count(),
-            "investigations_closed": investigations.filter(func.lower(Investigation.status).in_(CLOSED_STATUSES)).count(),
+            "investigations_open": investigations.filter(
+                func.lower(Investigation.status).notin_(CLOSED_STATUSES)
+            ).count(),
+            "investigations_closed": investigations.filter(
+                func.lower(Investigation.status).in_(CLOSED_STATUSES)
+            ).count(),
             "median_days_to_close": sorted(days_to_close)[len(days_to_close) // 2] if days_to_close else None,
             "decisions_by_status": decisions,
             "signed_approvals": signed,
@@ -806,7 +895,11 @@ def executive_quality_review(db: Session, tenant_id, control_db=None) -> dict:
             "Key figures are counts of the organization's records in MDARIX at the data cut-off.",
             "Trends and attention items need a person's judgement; nothing here ranks products or decides actions.",
         ]
-        + ([] if control_db is not None else ["Signed approvals need the control-plane session and are not counted here."]),
+        + (
+            []
+            if control_db is not None
+            else ["Signed approvals need the control-plane session and are not counted here."]
+        ),
     }
 
 
@@ -869,7 +962,9 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
     )
     evidence = (
         db.query(Evidence)
-        .filter(Evidence.tenant_id == tenant, or_(Evidence.investigation_id == case.id, Evidence.id.in_(linked_evidence)))
+        .filter(
+            Evidence.tenant_id == tenant, or_(Evidence.investigation_id == case.id, Evidence.id.in_(linked_evidence))
+        )
         .order_by(Evidence.evidence_identifier)
         .all()
     )
@@ -883,11 +978,14 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
     relations = defaultdict(list)
     if hypotheses:
         for row in db.query(HypothesisEvidence).filter(
-            HypothesisEvidence.tenant_id == tenant, HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses])
+            HypothesisEvidence.tenant_id == tenant,
+            HypothesisEvidence.hypothesis_id.in_([h.id for h in hypotheses]),
+            HypothesisEvidence.retracted_at.is_(None),  # withdrawn links no longer count
         ):
             linked = evidence_by_id.get(row.evidence_id)
             relations[row.hypothesis_id].append(
                 {
+                    "evidence_business_id": linked.business_id if linked else None,
                     "evidence_identifier": linked.evidence_identifier if linked else str(row.evidence_id),
                     "relation_type": row.relation_type,
                     "rationale": row.rationale,
@@ -895,7 +993,9 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
                 }
             )
     unknowns = db.query(Unknown).filter(Unknown.tenant_id == tenant, Unknown.investigation_id == case.id).all()
-    chains = db.query(FailureChain).filter(FailureChain.tenant_id == tenant, FailureChain.investigation_id == case.id).all()
+    chains = (
+        db.query(FailureChain).filter(FailureChain.tenant_id == tenant, FailureChain.investigation_id == case.id).all()
+    )
     scenarios = db.query(Scenario).filter(Scenario.tenant_id == tenant, Scenario.investigation_id == case.id).all()
     decisions = (
         db.query(Decision)
@@ -916,11 +1016,18 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
     signatures = defaultdict(list)
     audit_events: list[dict] = []
     if control_db is not None:
-        for item in signature_verification_rows(control_db, tenant, limit=5000, decision_ids=[d.id for d in decisions]):
+        decision_ids = [d.id for d in decisions]
+        for item in with_decision_business_ids(
+            db, signature_verification_rows(control_db, tenant, limit=5000, decision_ids=decision_ids)
+        ):
             signatures[item["decision_id"]].append(item)
         related_ids = {case.id, *[d.id for d in decisions], *[e.id for e in evidence], *[h.id for h in hypotheses]}
         audit_events = audit_event_rows(control_db, tenant, limit=1000, entity_ids=related_ids)
-    plane_events = audit_event_rows(db, tenant, limit=1000, entity_ids={case.id, *[d.id for d in decisions]}) if control_db is not db else []
+    plane_events = (
+        audit_event_rows(db, tenant, limit=1000, entity_ids={case.id, *[d.id for d in decisions]})
+        if control_db is not db
+        else []
+    )
     seen = {event["id"] for event in audit_events}
     audit_events += [event for event in plane_events if event["id"] not in seen]
     audit_events.sort(key=lambda event: event["created_at"] or "", reverse=True)
@@ -940,6 +1047,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
     return {
         "investigation": {
             "id": str(case.id),
+            "business_id": case.business_id,
             "investigation_identifier": case.investigation_identifier,
             "investigation_question": case.investigation_question,
             "status": case.status,
@@ -949,12 +1057,18 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
             "source_system": case.source_system,
             "source_identifier": case.source_identifier,
             "recorded_timestamp": _iso(case.recorded_timestamp),
-            "product": {"id": str(product.id), "product_identifier": product.product_identifier, "name": product.name}
+            "product": {
+                "id": str(product.id),
+                "business_id": product.business_id,
+                "product_identifier": product.product_identifier,
+                "name": product.name,
+            }
             if product
             else None,
         },
         "complaints": [
             {
+                "business_id": row.business_id,
                 "complaint_identifier": row.complaint_identifier,
                 "description": row.description,
                 "status": row.status,
@@ -971,6 +1085,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         ],
         "evidence": [
             {
+                "business_id": row.business_id,
                 "evidence_identifier": row.evidence_identifier,
                 "title": row.title,
                 "evidence_type": row.evidence_type,
@@ -989,6 +1104,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         "hypotheses": [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "statement": row.statement,
                 "status": row.status,
                 "origin": row.origin,
@@ -999,6 +1115,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         ],
         "unknowns": [
             {
+                "business_id": row.business_id,
                 "category": row.category,
                 "description": row.description,
                 "evidence_needed": row.evidence_needed,
@@ -1007,9 +1124,10 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
             }
             for row in unknowns
         ],
-        "failure_chains": [{"name": row.name, "status": row.status} for row in chains],
+        "failure_chains": [{"business_id": row.business_id, "name": row.name, "status": row.status} for row in chains],
         "scenarios": [
             {
+                "business_id": row.business_id,
                 "scenario_identifier": row.scenario_identifier,
                 "question": row.question,
                 "assumptions": row.assumptions,
@@ -1021,6 +1139,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         "decisions": [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "decision_identifier": row.decision_identifier,
                 "decision_type": row.decision_type,
                 "selected_action": row.selected_action or row.disposition,
@@ -1038,6 +1157,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
             for row in decisions
         ],
         "latest_brief": {
+            "business_id": brief.business_id,
             "brief_version": brief.brief_version,
             "title": brief.title,
             "status": brief.status,
@@ -1050,6 +1170,7 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
         "ai_executions": [
             {
                 "id": str(row.id),
+                "business_id": row.business_id,
                 "provider": row.provider,
                 "model_name": row.model_name,
                 "validation_status": row.validation_status,
@@ -1073,5 +1194,9 @@ def investigation_record(db: Session, tenant_id, investigation_id, *, control_db
             "The record lists what is stored about the case; relationships are traceability, not causal conclusions.",
             "AI output in the record is advisory and was subject to human review.",
         ]
-        + ([] if control_db is not None else ["Signatures and the control-plane audit trail were not available in this rendering."]),
+        + (
+            []
+            if control_db is not None
+            else ["Signatures and the control-plane audit trail were not available in this rendering."]
+        ),
     }

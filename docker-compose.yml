@@ -62,8 +62,8 @@ services:
       MDARIX_OUTBOX_BATCH_SIZE: ${MDARIX_OUTBOX_BATCH_SIZE:-50}
       MDARIX_OUTBOX_MAX_ATTEMPTS: ${MDARIX_OUTBOX_MAX_ATTEMPTS:-5}
       MDARIX_OUTBOX_PUBLISHER: ${MDARIX_OUTBOX_PUBLISHER:-noop}
-      MDARIX_OUTBOX_ALERT_WEBHOOK: ${MDARIX_OUTBOX_ALERT_WEBHOOK:-}
-      MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS: ${MDARIX_OUTBOX_ALERT_TIMEOUT_SECONDS:-5}
+      # Dead letters and other operational alerts (backend/app/alerts.py); empty locally = logged only.
+      MDARIX_ALERT_WEBHOOK: ${MDARIX_ALERT_WEBHOOK:-}
       MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
       MDARIX_DATA_PLANE_R1_TENANT_1_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-a-data:5432/mdarix_tenant_a
       MDARIX_DATA_PLANE_R1_TENANT_2_DATABASE_URL: postgresql+pg8000://mdarix_data:${MDARIX_DATA_PLANE_PASSWORD:-change-this-local-secret}@tenant-b-data:5432/mdarix_tenant_b

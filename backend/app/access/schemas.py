@@ -43,6 +43,13 @@ class RolePermissionRequest(BaseModel):
     permission_set_id: uuid.UUID
 
 
+class AdditionalRolesRequest(BaseModel):
+    # The complete set of workflow roles the person holds besides their account role (role codes).
+    additional_roles: list[str] = Field(default_factory=list, max_length=20)
+    # Why the roles change; kept in the audit trail.
+    reason: str = Field(min_length=10, max_length=500)
+
+
 class MfaResetRequest(BaseModel):
     # Why the authenticator is being removed; kept in the audit trail.
     reason: str = Field(min_length=5, max_length=500)
@@ -135,6 +142,9 @@ class CustomerProvisionRequest(BaseModel):
     customer_admin_company: str = Field(default="Customer", min_length=1, max_length=160)
     invitation_required: bool = True
     environment_type: str = Field(default="PRODUCTION", pattern="^(PRODUCTION|SANDBOX|VALIDATION|UAT|DEMO)$")
+    # Why the customer is being provisioned (kept in the audit trail) and its reference in the CRM; both optional.
+    reason: str | None = Field(default=None, max_length=1000)
+    customer_reference: str | None = Field(default=None, max_length=120)
 
 
 class OnboardingDraftRequest(BaseModel):
@@ -380,11 +390,95 @@ class TenantAddRequest(BaseModel):
 
 
 class CustomerLifecycleRequest(BaseModel):
-    """Suspend or reactivate a whole customer (every tenant it owns). Re-authentication is required."""
+    """Activate or suspend a customer (its own standing only; its tenants keep their own status, but a suspended
+    customer blocks access to all of them). Re-authentication is required."""
 
     status: str = Field(pattern="^(ACTIVE|SUSPENDED)$")
-    reason: str = Field(min_length=5, max_length=1000)
+    reason: str = Field(min_length=10, max_length=1000)
     password: str = Field(min_length=1, max_length=512)
+    lock_version: int | None = None
+
+
+EMAIL_PATTERN = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+class ContactDetails(BaseModel):
+    """A person to contact at the customer (business or billing)."""
+
+    name: str | None = Field(default=None, max_length=160)
+    email: str | None = Field(default=None, max_length=254)
+    phone: str | None = Field(default=None, max_length=40)
+
+    @field_validator("name", "email", "phone")
+    @classmethod
+    def _strip(cls, value: str | None) -> str | None:
+        value = (value or "").strip()
+        return value or None
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, value: str | None) -> str | None:
+        import re
+
+        if value is not None and not re.match(EMAIL_PATTERN, value):
+            raise ValueError("must be a valid email address")
+        return value.lower() if value else value
+
+
+class CustomerUpdateRequest(BaseModel):
+    """Edit a customer's details (platform administrators only). Omitted fields stay as they are; identifiers are
+    never editable. ``lock_version`` must match the record the editor loaded."""
+
+    legal_name: str | None = Field(default=None, min_length=1, max_length=255)
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    trading_name: str | None = Field(default=None, max_length=255)
+    customer_type: str | None = Field(default=None, min_length=1, max_length=80)
+    industry: str | None = Field(default=None, max_length=120)
+    company_size: str | None = Field(default=None, max_length=80)
+    country: str | None = Field(default=None, min_length=1, max_length=80)
+    state_province: str | None = Field(default=None, max_length=120)
+    headquarters: str | None = Field(default=None, max_length=255)
+    website: str | None = Field(default=None, max_length=500)
+    crm_reference: str | None = Field(default=None, max_length=160)
+    primary_business_contact: ContactDetails | None = None
+    billing_contact: ContactDetails | None = None
+    internal_account_owner: str | None = Field(default=None, max_length=160)
+    implementation_manager: str | None = Field(default=None, max_length=160)
+    reason: str = Field(min_length=10, max_length=1000)
+    lock_version: int
+
+    @field_validator("website")
+    @classmethod
+    def _website(cls, value: str | None) -> str | None:
+        value = (value or "").strip()
+        if value and (" " in value or "." not in value):
+            raise ValueError("must be a web address such as https://example.com")
+        return value or None
+
+
+class TenantUpdateRequest(BaseModel):
+    """Edit a tenant's metadata (platform administrators only). Omitted fields stay as they are."""
+
+    display_name: str | None = Field(default=None, min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    tenant_type: str | None = Field(default=None, pattern="^(STANDARD|ENTERPRISE|PRIVATE_DEPLOYMENT)$")
+    deployment_model: str | None = Field(default=None, min_length=1, max_length=60)
+    primary_region: str | None = Field(default=None, min_length=1, max_length=80)
+    residency_region: str | None = Field(default=None, min_length=1, max_length=80)
+    database_region: str | None = Field(default=None, max_length=80)
+    storage_region: str | None = Field(default=None, max_length=80)
+    configuration_version: str | None = Field(default=None, max_length=80)
+    reason: str = Field(min_length=10, max_length=1000)
+    lock_version: int
+
+
+class TenantLifecycleRequest(BaseModel):
+    """Move a tenant to another lifecycle status. Re-authentication is required."""
+
+    status: str = Field(min_length=1, max_length=40)
+    reason: str = Field(min_length=10, max_length=1000)
+    password: str = Field(min_length=1, max_length=512)
+    lock_version: int | None = None
 
 
 class EnvironmentCreateRequest(BaseModel):

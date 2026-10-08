@@ -146,6 +146,18 @@ def get_customer_notification_preferences(request: Request, db: Session = Depend
         .all()
     )
     recipients = db.query(ReminderPolicyRecipient).filter(ReminderPolicyRecipient.tenant_id == admin.tenant_id).all()
+    # The screen names each recipient by the contact this administrator chose, never by its id.
+    contact_ids = {row.contact_id for row in recipients if row.contact_id}
+    contacts = (
+        {
+            row.id: row
+            for row in db.query(CustomerContact.id, CustomerContact.name, CustomerContact.email).filter(
+                CustomerContact.id.in_(contact_ids)
+            )
+        }
+        if contact_ids
+        else {}
+    )
     return {
         "tenant_id": str(admin.tenant_id),
         "policies": [
@@ -166,6 +178,8 @@ def get_customer_notification_preferences(request: Request, db: Session = Depend
                 "policy_id": str(row.reminder_policy_id),
                 "recipient_type": row.recipient_type,
                 "contact_id": str(row.contact_id) if row.contact_id else None,
+                "contact_name": contacts[row.contact_id].name if row.contact_id in contacts else None,
+                "contact_email": contacts[row.contact_id].email if row.contact_id in contacts else None,
                 "status": row.status,
             }
             for row in recipients
@@ -314,7 +328,8 @@ def add_customer_notification_recipient(
         row.id,
         policy.version,
         request=request,
-        after={"email": payload.email, "recipient_type": payload.recipient_type},
+        # Audit rows are immutable and outlive an erasure, so they name the contact by id, never by address or name.
+        after={"contact_id": str(contact.id), "recipient_type": payload.recipient_type},
         reason=payload.reason,
     )
     db.commit()
@@ -333,11 +348,29 @@ def get_customer_lifecycle(request: Request, db: Session = Depends(get_db)):
     tenant = db.query(Tenant).filter(Tenant.id == admin.tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    # The current subscription (latest end date) so the Plan screen can show when it ends and how many days remain.
+    subscription = (
+        db.query(SubscriptionLifecycle)
+        .filter(SubscriptionLifecycle.tenant_id == tenant.id)
+        .order_by(SubscriptionLifecycle.expires_at.desc())
+        .first()
+    )
     return {
         "tenant_id": str(tenant.id),
+        "tenant_business_id": tenant.business_id,
         "status": tenant.status,
         "lifecycle_status": tenant.status,  # the tenant status column is its lifecycle status
         "lock_version": tenant.lock_version,
+        "subscription": (
+            {
+                "business_id": subscription.business_id,
+                "status": subscription.status,
+                "expires_at": subscription.expires_at.isoformat(),
+                "grace_ends_at": subscription.grace_ends_at.isoformat() if subscription.grace_ends_at else None,
+            }
+            if subscription is not None
+            else None
+        ),
         "customer_admin_actions": ["REQUEST_RENEWAL"],
         "platform_controlled_actions": ["SUSPEND", "REACTIVATE", "TERMINATE", "ARCHIVE"],
     }
@@ -366,7 +399,12 @@ def request_customer_renewal(payload: RenewalRequestPayload, request: Request, d
         .first()
     )
     if existing:
-        return {"id": str(existing.id), "status": existing.status, "idempotent": True}
+        return {
+            "id": str(existing.id),
+            "status": existing.status,
+            "subscription_business_id": subscription.business_id,
+            "idempotent": True,
+        }
     now = datetime.now(timezone.utc)
     row = RenewalRequest(
         id=uuid.uuid4(),
@@ -392,4 +430,10 @@ def request_customer_renewal(payload: RenewalRequestPayload, request: Request, d
         )
     )
     db.commit()
-    return {"id": str(row.id), "status": row.status, "subscription_id": str(subscription.id), "idempotent": False}
+    return {
+        "id": str(row.id),
+        "status": row.status,
+        "subscription_id": str(subscription.id),
+        "subscription_business_id": subscription.business_id,
+        "idempotent": False,
+    }

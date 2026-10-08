@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from genai.epistemic import AIEpistemicLabel, ai_label_field
+
 
 SUPPORTED_INTERVENTIONS = (
     "REMOVE_CHANGE",
@@ -44,7 +46,11 @@ class CounterfactualRequest(BaseModel):
 
 class CounterfactualResponse(BaseModel):
     id: UUID
+    business_id: str | None = None
     investigation_id: UUID
     status: str
     result: dict[str, Any]
     created_at: datetime | None
+    # Phase 4 (additive): what this result is. A counterfactual is worked out by MDARIX rules on hypotheses; it is
+    # an interpretation for a person to review, never a finding.
+    epistemic: AIEpistemicLabel = ai_label_field()

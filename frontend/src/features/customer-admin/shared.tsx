@@ -1,8 +1,19 @@
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { AlertTriangle, Search, X } from "lucide-react";
-import { ApiError, requestJson } from "../../app/apiClient";
+import { SortableHeader, nodeText, useSortedRows, type SortState } from "../../app/tableSort";
+import { ApiError, describeError, requestJson } from "../../app/apiClient";
 import { Empty, Panel, type PanelState } from "../admin/console/charts";
 import { ColumnChooser, ColumnScope } from "../tables/ColumnChooser";
+import { useColumnControls, useColumnLayout } from "../tables/useColumnControls";
 import {
   availableFieldKeys,
   fieldLabel,
@@ -12,12 +23,23 @@ import {
   saveSelection,
 } from "../tables/columnModel";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
-import { formatDateTime } from "../../app/dates";
+import { nextTabIndex } from "../shared/focus";
+import { formatDateTime, formatDay, isDateOnly } from "../../app/dates";
+import { businessId, hideUuid, referenceId } from "../../app/displayId";
 
 // Every call goes through requestJson: same-origin session cookie, no tenant id from the browser.
 // The server derives the tenant from the authenticated session for every request.
 
-export type Resource<T> = { state: PanelState; data: T | null; error?: string; reload: () => void };
+export type Resource<T> = {
+  state: PanelState;
+  data: T | null;
+  error?: string;
+  /** The server's error code, e.g. TRIAL_ENDED (a 403 that is not about the person's role). */
+  code?: string;
+  /** The id the server logged a failure under, shown with the error for a problem report. */
+  requestId?: string;
+  reload: () => void;
+};
 
 export function useResource<T>(path: string | null): Resource<T> {
   const [version, setVersion] = useState(0);
@@ -35,6 +57,8 @@ export function useResource<T>(path: string | null): Resource<T> {
             state: reason instanceof ApiError && reason.status === 403 ? "forbidden" : "error",
             data: null,
             error: reason instanceof Error ? reason.message : undefined,
+            code: reason instanceof ApiError ? reason.code : undefined,
+            requestId: reason instanceof ApiError ? reason.requestId : undefined,
           }),
       );
     return () => {
@@ -52,7 +76,8 @@ export async function send<T = any>(path: string, method: "POST" | "PUT" | "PATC
   return requestJson<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
-export const errorText = (reason: unknown, fallback: string) => (reason instanceof Error ? reason.message : fallback);
+/** The server's message for a failed change, with the reference to quote to support when there is one. */
+export const errorText = (reason: unknown, fallback: string) => describeError(reason, fallback);
 
 export const humanize = (value: unknown) =>
   value === null || value === undefined || value === ""
@@ -62,10 +87,11 @@ export const humanize = (value: unknown) =>
         .replace(/_/g, " ")
         .replace(/^\w/, (letter) => letter.toUpperCase());
 
-/** A date and time with its time zone (app/dates.ts); an unreadable value is shown as it is. */
+/** A date and time with its time zone (app/dates.ts); a calendar date alone ("2026-03-04") as a day, without an
+ * invented midnight; an unreadable value is shown as it is. */
 export const formatDate = (value: unknown) => {
   if (!value) return "—";
-  return formatDateTime(String(value), String(value));
+  return isDateOnly(value) ? formatDay(String(value), String(value)) : formatDateTime(String(value), String(value));
 };
 
 /** Section card bound to one resource: shows loading / error / forbidden, then the content. */
@@ -83,7 +109,7 @@ export function ResourcePanel<T>({
   children: (data: T) => ReactNode;
 }) {
   return (
-    <Panel title={title} eyebrow={eyebrow} state={resource.state} error={resource.error} action={action}>
+    <Panel title={title} eyebrow={eyebrow} source={resource} action={action}>
       {resource.data !== null && children(resource.data)}
     </Panel>
   );
@@ -96,7 +122,65 @@ export type Column<T> = {
   numeric?: boolean;
   // The data fields this column already shows (so the field chooser does not offer them again).
   fields?: string[];
+  // What the column sorts by when its heading is clicked; by default the row's field of the same key, then the
+  // first of `fields`, then the text the cell shows. Columns without a heading (row actions) never sort.
+  sortValue?: (row: T) => unknown;
 };
+
+/** The value a column sorts by (see Column.sortValue). */
+export function columnSortValue<T>(column: Column<T>, row: T): unknown {
+  if (column.sortValue) return column.sortValue(row);
+  const record = row as unknown as Record<string, unknown> | null;
+  for (const key of [column.key, ...(column.fields ?? [])]) {
+    const value = record && typeof record === "object" ? record[key] : undefined;
+    if (value !== undefined && (value === null || typeof value !== "object" || value instanceof Date)) return value;
+  }
+  return nodeText(column.render(row));
+}
+
+/**
+ * The first identifying column of a list: the record's MDARIX ID (business_id), labelled for the object ("Customer
+ * ID", "Complaint ID"). Until a response carries business_id it shows the record's source number (`sourceKey`), never
+ * the UUID. Business IDs sort naturally (CMP000002 before CMP000010). T defaults to any so the column fits whichever
+ * row type the list infers from its rows.
+ */
+export function idColumn<T = any>(label: string, sourceKey?: string): Column<T> {
+  return {
+    key: "business_id",
+    label,
+    fields: ["business_id"],
+    render: (row) => businessId(row as object, sourceKey) ?? "—",
+    sortValue: (row) => businessId(row as object, sourceKey),
+  };
+}
+
+/**
+ * The ID column of a list whose rows describe another record (a license row for a subscription): that record's
+ * `<role>_business_id`, else the row's own fields named in `fallbackKeys`, never a UUID.
+ */
+export function referenceIdColumn<T = any>(label: string, role: string, ...fallbackKeys: string[]): Column<T> {
+  const value = (row: T) => {
+    const record = row as unknown as Record<string, unknown>;
+    return referenceId(record, role, ...fallbackKeys.map((key) => record?.[key]));
+  };
+  return { key: `${role}_business_id`, label, fields: [`${role}_business_id`], render: value, sortValue: value };
+}
+
+/** "Source ID": the number a record has in the customer system it was imported from (complaint_identifier, …). */
+export function sourceIdColumn<T = any>(key: string, label = "Source ID"): Column<T> {
+  return {
+    key,
+    label,
+    render: (row) => hideUuid((row as unknown as Record<string, unknown>)?.[key]),
+  };
+}
+
+/**
+ * Sorting done by the server for a list it sends one page at a time (app/tableSort.tsx useServerSort): a heading
+ * click asks for that order across every page. Only the columns in `keys` can be sorted this way; their headings are
+ * plain text otherwise, so no heading pretends to sort what it cannot.
+ */
+export type ServerSort = { sort: SortState; onSort: (key: string) => void; keys: readonly string[] };
 
 type TableProps<T> = {
   rows: T[];
@@ -104,6 +188,12 @@ type TableProps<T> = {
   empty: { title: string; detail: string };
   rowKey: (row: T, index: number) => string;
   caption: string;
+  /** The server sorts and pages this list; the rows are one page, already in order. */
+  serverSort?: ServerSort;
+  /** All rows are here: the table sorts them all and then shows them this many at a time. */
+  pageSize?: number;
+  /** What one row is, for the page summary ("120 users"). */
+  pageNoun?: string;
 };
 
 /**
@@ -115,7 +205,15 @@ export function Table<T>(props: TableProps<T>) {
   return scope ? <ChoosableTable {...props} scope={scope} /> : <PlainTable {...props} />;
 }
 
-function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: TableProps<T> & { scope: string }) {
+function ChoosableTable<T>({
+  rows,
+  columns,
+  empty,
+  rowKey,
+  caption,
+  scope,
+  ...paging
+}: TableProps<T> & { scope: string }) {
   const id = `${scope}:${caption}`;
   // Columns without a heading (row actions such as Open or Change) always stay, at the end.
   const pinned = columns.filter((column) => !column.label.trim());
@@ -130,6 +228,8 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
     [rows, columns],
   );
   const [saved, setSaved] = useState<string[] | null>(() => loadSelection(id));
+  // Column widths set by dragging a heading's edge; "Reset to default" clears them with the field choice.
+  const { layout, commit } = useColumnLayout(id);
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
   const options = [
     ...named.map((column) => ({ key: column.key, label: column.label })),
@@ -150,6 +250,10 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
     };
   };
   const shown = [...selection.map((key) => named.find((column) => column.key === key) ?? extraColumn(key)), ...pinned];
+  const choose = (next: string[] | null) => {
+    setSaved(next);
+    saveSelection(id, next);
+  };
   return (
     <>
       <ColumnChooser
@@ -157,44 +261,163 @@ function ChoosableTable<T>({ rows, columns, empty, rowKey, caption, scope }: Tab
         options={options}
         selection={selection}
         defaults={defaults}
+        resized={Boolean(layout.widths && Object.keys(layout.widths).length)}
         onChange={(next) => {
-          setSaved(next);
-          saveSelection(id, next);
+          choose(next);
+          if (next === null) commit({});
         }}
       />
-      <PlainTable rows={rows} columns={shown} empty={empty} rowKey={rowKey} caption={caption} />
+      {/* Dragging a heading reorders the shown fields, the same order the chooser keeps. */}
+      <PlainTable
+        {...paging}
+        rows={rows}
+        columns={shown}
+        empty={empty}
+        rowKey={rowKey}
+        caption={caption}
+        layoutId={id}
+        onReorder={choose}
+      />
     </>
   );
 }
 
-function PlainTable<T>({ rows, columns, empty, rowKey, caption }: TableProps<T>) {
+function PlainTable<T>({
+  rows,
+  columns,
+  empty,
+  rowKey,
+  caption,
+  layoutId,
+  onReorder,
+  serverSort,
+  pageSize,
+  pageNoun = "row",
+}: TableProps<T> & { layoutId?: string; onReorder?: (keys: string[]) => void }) {
+  const named = columns.filter((column) => column.label.trim());
+  const pinned = columns.filter((column) => !column.label.trim());
+  const controls = useColumnControls({
+    id: layoutId ?? `list:${caption}`,
+    keys: named.map((column) => column.key),
+    pinned: pinned.map((column) => column.key),
+    onReorder,
+  });
+  // Sorted here (all the rows), or by the server (the rows are one page in its order).
+  const local = useSortedRows(serverSort ? [] : rows, (row, key) => {
+    const column = columns.find((item) => item.key === key);
+    return column ? columnSortValue(column, row) : undefined;
+  });
+  const sorted = serverSort ? rows : local.sorted;
+  const sort = serverSort ? serverSort.sort : local.sort;
+  const [page, setPage] = useState(1);
+  const toggle = (key: string) => {
+    setPage(1); // a new order starts from its first page
+    if (serverSort) serverSort.onSort(key);
+    else local.toggle(key);
+  };
   if (!rows.length) return <Empty title={empty.title} detail={empty.detail} />;
+  const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const current = Math.min(page, pages);
+  const visible = pageSize ? sorted.slice((current - 1) * pageSize, current * pageSize) : sorted;
+  const shown = [
+    ...controls.order
+      .map((key) => named.find((column) => column.key === key))
+      .filter((column): column is Column<T> => column !== undefined),
+    ...pinned,
+  ];
+  // Row keys keep the server's position, so a row keeps its identity (and focus) when the list is re-sorted.
+  const position = new Map(rows.map((row, index) => [row, index] as const));
   return (
-    <div className="ac-table-wrap">
-      <table className="ac-table">
-        <caption className="ca-sr-only">{caption}</caption>
-        <thead>
-          <tr>
-            {columns.map((column) => (
-              <th scope="col" key={column.key} className={column.numeric ? "num" : undefined}>
-                {column.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={rowKey(row, index)}>
-              {columns.map((column) => (
-                <td key={column.key} className={column.numeric ? "num" : undefined}>
-                  {column.render(row)}
-                </td>
-              ))}
+    <>
+      {!onReorder && controls.customized && (
+        <div className="tc-bar">
+          <button type="button" className="ac-link" onClick={controls.reset}>
+            Reset columns
+          </button>
+        </div>
+      )}
+      <div className="ac-table-wrap">
+        <table className={`ac-table ${controls.tableClassName}`.trim()} style={controls.tableStyle}>
+          <caption className="ca-sr-only">{caption}</caption>
+          {controls.colgroup}
+          <thead>
+            <tr ref={controls.headRowRef}>
+              {shown.map((column) => {
+                if (!column.label.trim())
+                  return (
+                    <th
+                      scope="col"
+                      key={column.key}
+                      className={column.numeric ? "num" : undefined}
+                      {...controls.pinnedProps(column.key)}
+                    >
+                      <span className="ca-sr-only">Actions</span>
+                    </th>
+                  );
+                const header = controls.header(column.key, column.label);
+                if (serverSort && !serverSort.keys.includes(column.key))
+                  return (
+                    <th
+                      scope="col"
+                      key={column.key}
+                      {...header.thProps}
+                      className={[column.numeric ? "num" : "", header.className].filter(Boolean).join(" ") || undefined}
+                    >
+                      <span className="table-sort-static" title="This column cannot be sorted across all pages">
+                        {column.label}
+                      </span>
+                      {header.grip}
+                    </th>
+                  );
+                return (
+                  <SortableHeader
+                    key={column.key}
+                    label={column.label}
+                    sortKey={column.key}
+                    sort={sort}
+                    onSort={toggle}
+                    className={[column.numeric ? "num" : "", header.className].filter(Boolean).join(" ")}
+                    thProps={header.thProps}
+                    onKeyDown={header.onKeyDown}
+                  >
+                    {header.grip}
+                  </SortableHeader>
+                );
+              })}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {visible.map((row, index) => (
+              <tr key={rowKey(row, position.get(row) ?? index)}>
+                {shown.map((column) => (
+                  <td key={column.key} className={column.numeric ? "num" : undefined}>
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {pageSize && pages > 1 && (
+        <nav className="tc-pager" aria-label={`${caption} pages`}>
+          <button type="button" className="ac-secondary" disabled={current <= 1} onClick={() => setPage(current - 1)}>
+            Previous
+          </button>
+          <span>
+            Page {current} of {pages} · {sorted.length} {sorted.length === 1 ? pageNoun : `${pageNoun}s`}
+          </span>
+          <button
+            type="button"
+            className="ac-secondary"
+            disabled={current >= pages}
+            onClick={() => setPage(current + 1)}
+          >
+            Next
+          </button>
+        </nav>
+      )}
+    </>
   );
 }
 
@@ -227,7 +450,9 @@ export type Confirmation = {
   reason?: { label: string; min: number };
   /** Ask the signed-in administrator to re-enter their password (the server verifies it). */
   password?: boolean;
-  run: (reason: string, password: string) => Promise<unknown>;
+  /** A statement the administrator must tick before the change is allowed (sent to the server as acknowledged). */
+  acknowledge?: string;
+  run: (reason: string, password: string, acknowledged: boolean) => Promise<unknown>;
   done: string;
 };
 
@@ -245,18 +470,20 @@ export function ConfirmDialog({
   const [error, setError] = useState("");
   const [reason, setReason] = useState("");
   const [password, setPassword] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
   useEffect(() => {
     setBusy(false);
     setError("");
     setReason("");
     setPassword("");
+    setAcknowledged(false);
   }, [request]);
   if (!request) return null;
   const confirm = async () => {
     setBusy(true);
     setError("");
     try {
-      await request.run(reason.trim(), password);
+      await request.run(reason.trim(), password, acknowledged);
       onDone(request.done);
     } catch (reason) {
       setError(errorText(reason, "The change was not applied."));
@@ -293,6 +520,12 @@ export function ConfirmDialog({
             />
           </label>
         )}
+        {request.acknowledge && (
+          <label className="ca-check ca-acknowledge">
+            <input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+            {request.acknowledge}
+          </label>
+        )}
         {error && (
           <p className="ca-inline-error" role="alert">
             <AlertTriangle size={15} aria-hidden="true" /> {error}
@@ -309,7 +542,8 @@ export function ConfirmDialog({
             disabled={
               busy ||
               (!!request.reason && reason.trim().length < request.reason.min) ||
-              (!!request.password && !password)
+              (!!request.password && !password) ||
+              (!!request.acknowledge && !acknowledged)
             }
           >
             {busy ? "Working…" : request.confirmLabel}
@@ -341,31 +575,73 @@ export function Drawer({ title, onClose, children }: { title: string; onClose: (
   );
 }
 
+const slug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+/**
+ * Tabs that follow the WAI-ARIA pattern: the arrow keys (and Home, End) move between tabs and open them, only the
+ * selected tab is in the Tab order, and the content below is the selected tab's labelled tabpanel.
+ */
 export function Tabs<T extends string>({
   tabs,
   active,
   onChange,
   label,
+  counts,
+  children,
 }: {
   tabs: readonly T[];
   active: T;
   onChange: (tab: T) => void;
   label: string;
+  /** A number to show on a tab (how many items it holds); tabs without one show none. */
+  counts?: Partial<Record<string, number | null>>;
+  /** The selected tab's content, rendered as its tabpanel. */
+  children?: ReactNode;
 }) {
+  const base = `tabs-${slug(label)}`;
+  const tabId = (tab: T) => `${base}-${slug(tab)}`;
+  const list = useRef<HTMLDivElement>(null);
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const next = nextTabIndex(event.key, Math.max(0, tabs.indexOf(active)), tabs.length);
+    if (next === null) return;
+    event.preventDefault();
+    onChange(tabs[next]);
+    list.current?.querySelector<HTMLButtonElement>(`#${CSS.escape(tabId(tabs[next]))}`)?.focus();
+  };
   return (
-    <div className="ac-tabs" role="tablist" aria-label={label}>
-      {tabs.map((tab) => (
-        <button
-          type="button"
-          role="tab"
-          key={tab}
-          aria-selected={active === tab}
-          className={active === tab ? "selected" : ""}
-          onClick={() => onChange(tab)}
-        >
-          {tab}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="ac-tabs" role="tablist" aria-label={label} ref={list} onKeyDown={onKeyDown}>
+        {tabs.map((tab) => (
+          <button
+            type="button"
+            role="tab"
+            key={tab}
+            id={tabId(tab)}
+            aria-selected={active === tab}
+            aria-controls={`${base}-panel`}
+            tabIndex={active === tab ? 0 : -1}
+            className={active === tab ? "selected" : ""}
+            onClick={() => onChange(tab)}
+          >
+            {tab}
+            {typeof counts?.[tab] === "number" && (
+              <>
+                {" "}
+                <span className="ac-tab-count">{counts[tab]}</span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      {children !== undefined && (
+        <div role="tabpanel" id={`${base}-panel`} aria-labelledby={tabId(active)} className="ac-tabpanel">
+          {children}
+        </div>
+      )}
+    </>
   );
 }

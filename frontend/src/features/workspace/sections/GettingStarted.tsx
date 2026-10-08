@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Bot,
   CheckCircle2,
@@ -11,11 +11,13 @@ import {
   Upload,
 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
-import { BarList, Empty, Panel, RingMeter, StatTile } from "../../admin/console/charts";
+import { BarList, Empty, Panel, RingMeter, StatTile, type PanelSource } from "../../admin/console/charts";
 import type { Slice } from "../../admin/console/dashboardModel";
 import { useResource } from "../../customer-admin/shared";
-import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
+import { countOf } from "./common";
 
 export type TrialStatus = {
   is_trial: boolean;
@@ -27,16 +29,7 @@ export type TrialStatus = {
   usage?: { users: number; rows: number };
   sample?: { products: number };
   own_data?: { products: number; lots: number; complaints: number };
-  templates?: { entity: string; title: string; required: string[]; optional: string[]; download: string }[];
-};
-type CheckReport = {
-  entity: string;
-  rows: number;
-  new_records: number;
-  error_count: number;
-  issues: { row: number | null; column: string | null; message: string }[];
-  ready: boolean;
-  preview: Record<string, string>[];
+  templates?: ImportTemplate[];
 };
 type Insights = {
   scope: string;
@@ -68,7 +61,7 @@ const slices = (items: { label: string; count: number }[]): Slice[] =>
   items.map((item) => ({ key: item.label, label: item.label, count: item.count, tone: "neutral" }));
 
 export function GettingStartedSection() {
-  const { open } = useWorkspace();
+  const { open, work } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
   const [visited, setVisited] = useState<string[]>(readVisited);
@@ -119,7 +112,9 @@ export function GettingStartedSection() {
     {
       id: "templates",
       title: "Download the CSV templates",
-      detail: "Products, lots and complaints: fill them from an export of your own system.",
+      detail: `${
+        trial?.templates?.length ? templateSummary(trial.templates) : "Products, lots, complaints and more"
+      }: fill them from an export of your own system.`.replace(/^./, (letter) => letter.toUpperCase()),
       icon: Download,
       done: visited.includes("templates"),
       action: () => {
@@ -160,10 +155,13 @@ export function GettingStartedSection() {
   return (
     <div className="ac-overview uw-trial">
       <Panel
-        title={trial?.days_left !== undefined ? `${trial.days_left} days left in your free trial` : "Your free trial"}
+        title={
+          trial?.days_left !== undefined
+            ? `${countOf(trial.days_left, "day")} left in your free trial`
+            : "Your free trial"
+        }
         eyebrow="Getting started"
-        state={status.state}
-        error={status.error}
+        source={status}
       >
         <div className="uw-trial-head">
           <RingMeter value={doneCount} total={steps.length} label="checklist done" />
@@ -219,14 +217,18 @@ export function GettingStartedSection() {
       </Panel>
 
       <ImportPanel
-        trial={trial}
+        id="trial-import"
+        templates={trial?.templates ?? []}
+        basePath="/api/v1/trial/imports"
+        fileLimitBytes={trial?.limits?.file_bytes}
         onImported={() => {
           status.reload();
           insights.reload();
+          work.refreshProducts();
         }}
       />
 
-      <InsightsPanel insights={insights.data} state={insights.state} error={insights.error} />
+      <InsightsPanel insights={insights.data} source={insights} />
 
       <TeamPanel onChanged={status.reload} />
     </div>
@@ -288,12 +290,7 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
   };
 
   return (
-    <Panel
-      title="Your team"
-      eyebrow={data ? `${data.seats_used} of ${data.limit} users` : "Team"}
-      state={team.state}
-      error={team.error}
-    >
+    <Panel title="Your team" eyebrow={data ? `${data.seats_used} of ${data.limit} users` : "Team"} source={team}>
       {data && (
         <>
           <ul className="uw-team">
@@ -374,208 +371,13 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
   );
 }
 
-function ImportPanel({ trial, onImported }: { trial: TrialStatus | null; onImported: () => void }) {
-  const templates = trial?.templates ?? [];
-  const [entity, setEntity] = useState("products");
-  const [file, setFile] = useState<File | null>(null);
-  const canImport = useCan("records.write");
-  const [report, setReport] = useState<CheckReport | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string } | null>(null);
-  const template = templates.find((item) => item.entity === entity);
-
-  useEffect(() => {
-    setFile(null);
-    setReport(null);
-    setMessage(null);
-  }, [entity]);
-
-  const send = async (path: string) => {
-    if (!file) return null;
-    const limit = trial?.limits?.file_bytes ?? 2 * 1024 * 1024;
-    if (file.size > limit) {
-      setMessage({ tone: "bad", text: "Files can be up to 2 MB during the free trial." });
-      return null;
-    }
-    return requestJson<any>(path, { method: "POST", body: await file.text(), headers: { "Content-Type": "text/csv" } });
-  };
-  const check = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      setReport(await send(`/api/v1/trial/imports/${entity}/check`));
-    } catch (error) {
-      setMessage({ tone: "bad", text: error instanceof Error ? error.message : "The file could not be checked." });
-    } finally {
-      setBusy(false);
-    }
-  };
-  const runImport = async () => {
-    setBusy(true);
-    try {
-      const result = await send(`/api/v1/trial/imports/${entity}`);
-      if (result) {
-        setMessage({
-          tone: "good",
-          text: `Imported ${template?.title.toLowerCase()}: ${result.created} new, ${result.updated} updated. Insights below are refreshed.`,
-        });
-        setReport(null);
-        setFile(null);
-        onImported();
-      }
-    } catch (error) {
-      setMessage({
-        tone: "bad",
-        text: error instanceof Error ? error.message : "The import failed; nothing was saved.",
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section id="trial-import" className="ac-panel uw-trial-import" aria-labelledby="trial-import-title">
-      <header className="ac-panel-head">
-        <div>
-          <p className="ac-eyebrow">Bring your own data</p>
-          <h2 id="trial-import-title">Upload a CSV file</h2>
-        </div>
-      </header>
-      <p className="uw-trial-note">
-        Load in this order: products, then lots, then complaints. Remove patient and personal details first. Only
-        template columns are accepted, and a file with any problem imports nothing.
-      </p>
-      <div className="ac-tabs" role="tablist" aria-label="Template">
-        {templates.map((item, index) => (
-          <button
-            key={item.entity}
-            type="button"
-            role="tab"
-            aria-selected={entity === item.entity}
-            className={entity === item.entity ? "selected" : ""}
-            disabled={busy}
-            onClick={() => setEntity(item.entity)}
-          >
-            {index + 1}. {item.title}
-          </button>
-        ))}
-      </div>
-      {template && (
-        <div className="uw-trial-template">
-          <div>
-            <strong>Required:</strong> {template.required.join(", ")}
-            <br />
-            <strong>Optional:</strong> {template.optional.join(", ")}
-          </div>
-          <a className="ac-secondary" href={template.download} download>
-            <Download size={15} aria-hidden="true" /> Download {template.entity}.csv
-          </a>
-        </div>
-      )}
-      <div className="uw-trial-upload">
-        <label className="ac-secondary">
-          <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a CSV file"}
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            aria-label={`Choose a ${entity} CSV file`}
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              setReport(null);
-              setMessage(null);
-            }}
-          />
-        </label>
-        {canImport ? (
-          <button type="button" className="ac-primary" disabled={!file || busy} onClick={check}>
-            {busy && !report ? "Checking…" : "Check file"}
-          </button>
-        ) : (
-          <p className="ac-muted" role="note">
-            View only: your role cannot import data.
-          </p>
-        )}
-      </div>
-      {message && (
-        <p className={`uw-trial-message is-${message.tone}`} role="status">
-          {message.text}
-        </p>
-      )}
-      {report && (
-        <div className="uw-trial-report" role="status">
-          {report.ready ? (
-            <p className="uw-trial-message is-good">
-              <CheckCircle2 size={16} aria-hidden="true" /> {report.rows} rows are ready to import ({report.new_records}{" "}
-              new records).
-            </p>
-          ) : (
-            <>
-              <p className="uw-trial-message is-bad">
-                {report.error_count} problem{report.error_count === 1 ? "" : "s"} found. Nothing has been saved. Fix the
-                file and check it again.
-              </p>
-              <ul className="uw-trial-issues">
-                {report.issues.map((issue, index) => (
-                  <li key={index}>
-                    {issue.row ? `Row ${issue.row}` : "File"}
-                    {issue.column ? ` · ${issue.column}` : ""}: {issue.message}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {report.preview.length > 0 && (
-            <div className="ac-table-wrap">
-              <table className="ac-table">
-                <caption className="ca-sr-only">First rows of the file</caption>
-                <thead>
-                  <tr>
-                    {Object.keys(report.preview[0]).map((column) => (
-                      <th key={column} scope="col">
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.preview.map((row, index) => (
-                    <tr key={index}>
-                      {Object.values(row).map((value, cell) => (
-                        <td key={cell}>{value || "—"}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {report.ready && canImport && (
-            <button type="button" className="ac-primary" disabled={busy} onClick={runImport}>
-              <Upload size={15} aria-hidden="true" /> {busy ? "Importing…" : `Import ${report.rows} rows`}
-            </button>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function InsightsPanel({
-  insights,
-  state,
-  error,
-}: {
-  insights: Insights | null;
-  state: "loading" | "ready" | "error" | "forbidden";
-  error?: string;
-}) {
+function InsightsPanel({ insights, source }: { insights: Insights | null; source: PanelSource }) {
   const { open, notify } = useWorkspace();
   return (
     <Panel
       title="Automatic insights"
-      eyebrow={insights ? `From ${insights.scope} · ${insights.total_complaints} complaints` : "Insights"}
-      state={state}
-      error={error}
+      eyebrow={insights ? `From ${insights.scope} · ${countOf(insights.total_complaints, "complaint")}` : "Insights"}
+      source={source}
     >
       {insights && insights.total_complaints === 0 ? (
         <Empty title="No complaints yet" detail="Upload complaints to see where they concentrate." />

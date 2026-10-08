@@ -1,4 +1,5 @@
 import { formatDateTime, formatDay } from "../../app/dates";
+import { isUuid } from "../../app/displayId";
 
 // Choosing which fields a list shows: the fields a list can offer, how a raw value is shown, and the saved choice.
 
@@ -7,33 +8,51 @@ const HIDDEN = /(password|secret|token|hash|credential_value|^can_|^is_last_|^lo
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 
 const isPlain = (value: unknown) => value === null || ["string", "number", "boolean"].includes(typeof value);
+// Technical keys: the record's own UUID and its references to other records. People see business_id instead.
+const KEY_FIELD = /^(id|.*_id|.*_ids)$/;
+const holdsUuid = (value: unknown) => isUuid(value) || (Array.isArray(value) && value.some(isUuid));
 
 /**
  * Field keys the rows carry that can be shown as a column: plain values or lists of plain values (never nested
- * objects, never anything that looks like a secret, never internal "_" keys). Looks at the first rows only.
+ * objects, never anything that looks like a secret, never internal "_" keys, never a UUID: `id` and `*_id` keys
+ * holding UUIDs, or any field whose values are UUIDs). `business_id` and `*_business_id` are offered. Looks at the
+ * first rows only.
  */
 export const availableFieldKeys = (rows: unknown[], exclude: Iterable<string> = [], sample = 25): string[] => {
   const skip = new Set(exclude);
   const order: string[] = [];
   const unusable = new Set<string>();
   const withValue = new Set<string>();
+  const uuidKeys = new Set<string>();
+  const textKeys = new Set<string>();
   for (const row of rows.slice(0, sample)) {
     if (!row || typeof row !== "object") continue;
     for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
       if (skip.has(key) || key.startsWith("_") || HIDDEN.test(key)) continue;
       if (!order.includes(key)) order.push(key);
       if (!(isPlain(value) || (Array.isArray(value) && value.every(isPlain)))) unusable.add(key);
-      else if (value !== null && value !== undefined && value !== "") withValue.add(key);
+      else if (value !== null && value !== undefined && value !== "") {
+        withValue.add(key);
+        if (holdsUuid(value)) uuidKeys.add(key);
+        else textKeys.add(key);
+      }
     }
   }
+  // A key field holding a UUID in any row is hidden; any other field is hidden when every value it has is a UUID.
+  const technical = (key: string) =>
+    !key.endsWith("business_id") && uuidKeys.has(key) && (KEY_FIELD.test(key) || !textKeys.has(key));
   // A field is offered when no row holds a nested record in it and at least one row has a value.
-  return order.filter((key) => !unusable.has(key) && withValue.has(key));
+  return order.filter((key) => !unusable.has(key) && withValue.has(key) && !technical(key));
 };
 
-/** "customer_identifier" -> "Customer identifier", "created_at" -> "Created", "tenant_id" -> "Tenant ID". */
+/**
+ * "customer_identifier" -> "Customer identifier", "created_at" -> "Created", "business_id" -> "ID",
+ * "tenant_business_id" -> "Tenant ID".
+ */
 export const fieldLabel = (key: string) => {
   const words = key
     .replace(/_at$/, "")
+    .replace(/(^|_)business_id$/, "$1id")
     .replace(/_/g, " ")
     .replace(/\bid\b/g, "ID")
     .replace(/\burl\b/g, "URL")
@@ -44,7 +63,7 @@ export const fieldLabel = (key: string) => {
 
 /** A raw value as a reader would want to see it. */
 export const formatFieldValue = (value: unknown): string => {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "" || isUuid(value)) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (Array.isArray(value)) return value.length ? value.map((item) => formatFieldValue(item)).join(", ") : "—";
   if (typeof value === "string" && ISO_DATE.test(value)) {

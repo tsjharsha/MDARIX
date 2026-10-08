@@ -335,7 +335,7 @@ def test_ai_execution_human_review_and_decision_are_distinct(conn):
     )
     decision = scalar(
         conn,
-        "INSERT INTO decisions (tenant_id, investigation_id, decision_identifier, decision_type, disposition, rationale, decision_timestamp, authorized_by_ref, created_at) VALUES (:t, :i, 'DEC-1', 'investigation_disposition', 'continue_investigation', 'Causality not established', :n, 'reviewer-1', :n) RETURNING id",
+        "INSERT INTO decisions (tenant_id, investigation_id, decision_identifier, decision_type, disposition, rationale, decision_timestamp, authorized_by_ref, created_at, updated_at) VALUES (:t, :i, 'DEC-1', 'investigation_disposition', 'continue_investigation', 'Causality not established', :n, 'reviewer-1', :n, :n) RETURNING id",
         t=ids["tenant"],
         i=ids["investigation"],
         n=NOW,

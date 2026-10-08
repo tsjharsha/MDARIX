@@ -145,7 +145,7 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
       "All traffic uses TLS, including the connection to the database.",
       "Authenticator secrets and connector credentials are encrypted before they are stored.",
       "Every uploaded file is scanned for malware before it is accepted, and files over the size limit are refused.",
-      "Encrypted backups are taken daily and copied off-site, and restoring them is tested.",
+      "The database runs on a managed service with encrypted, continuous backups that allow recovery to a point in time; restoring follows a written recovery procedure.",
     ],
   },
   {

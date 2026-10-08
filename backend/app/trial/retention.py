@@ -25,6 +25,27 @@ RETENTION_DAYS = 30
 
 # Records the trial created or uploaded. Identity, plan, subscription and audit tables are deliberately absent.
 TRIAL_DATA_TABLES = (
+    # Workflow tasks (md27) and their history: about cases, decisions, risks and supplier requests listed below.
+    "workflow_task_events",
+    "workflow_tasks",
+    # Signals (md28): their history, complaints and cases first, then the signals and the rule settings.
+    "signal_events",
+    "signal_complaints",
+    "investigation_signals",
+    "signals",
+    "signal_rules",
+    # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
+    "evidence_review_events",
+    "investigation_scope_versions",
+    # Reviews and Decision Brief versions (md32) with their quality-review actions: about the cases listed below.
+    "brief_review_actions",
+    "decision_brief_versions",
+    "case_reviews",
+    # The history of people's intelligence judgements (md30), about the cases listed below.
+    "intelligence_events",
+    # Decision follow-ups and late-evidence impact assessments (md33): about the decisions and cases listed below.
+    "decision_follow_ups",
+    "impact_assessments",
     "ai_interaction_feedback",
     "ai_interactions",
     "ai_interaction_sessions",
@@ -132,6 +153,7 @@ def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
             due.append(
                 {
                     "tenant_id": str(tenant.id),
+                    "tenant_business_id": tenant.business_id,
                     "tenant_key": tenant.tenant_key,
                     "name": tenant.name,
                     "trial_ended_at": ended.isoformat(),
@@ -197,7 +219,10 @@ def _note_legal_hold(db: Session, trial: dict, actor_ref: str, now: datetime) ->
             entity_type="Tenant",
             entity_id=tenant.id,
             reason=tenant.legal_hold_reason,
-            details={"delete_after": trial["delete_after"], "legal_hold_set_at": tenant.legal_hold_set_at.isoformat() if tenant.legal_hold_set_at else None},
+            details={
+                "delete_after": trial["delete_after"],
+                "legal_hold_set_at": tenant.legal_hold_set_at.isoformat() if tenant.legal_hold_set_at else None,
+            },
             created_at=now,
         )
     )

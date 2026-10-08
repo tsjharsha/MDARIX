@@ -33,7 +33,8 @@ def test_edit_assign_close_and_reopen():
     )
     assert edited.status_code == 200 and edited.json()["investigation_question"].startswith("Why do occlusion")
     assignees = lead.get("/api/v1/investigation-assignees").json()
-    assert assignees and all(set(person) == {"id", "display_name"} for person in assignees)  # names only
+    # Names and identifiers only, never contact details.
+    assert assignees and all(set(person) == {"id", "business_id", "display_name"} for person in assignees)
     colleague = assignees[0]
     assigned = lead.patch(path, json={"reason": REASON, "assignee_id": colleague["id"]})
     assert assigned.status_code == 200 and assigned.json()["owner_ref"]
@@ -95,4 +96,28 @@ def test_the_rules_around_managing_a_case():
         bind_system(db, "test cleanup")
         db.query(HumanReview).filter(HumanReview.decision_id == decision_id).delete(synchronize_session=False)
         db.query(Decision).filter(Decision.id == decision_id).delete(synchronize_session=False)
+        db.commit()
+
+
+def test_assigning_a_case_to_a_colleague_queues_one_email_with_ids_only():
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.notifications import INVESTIGATION_ASSIGNED
+
+    lead = _client_with_role("INVESTIGATOR")
+    case = _open_case(lead)
+    colleague = lead.get("/api/v1/investigation-assignees").json()[0]
+    assigned = lead.patch(f"/api/v1/investigations/{case}", json={"reason": REASON, "assignee_id": colleague["id"]})
+    assert assigned.status_code == 200, assigned.text
+    with SessionLocal() as db:
+        bind_system(db, "test: the assignment notification")
+        events = (
+            db.query(OutboxEvent)
+            .filter(OutboxEvent.event_name == INVESTIGATION_ASSIGNED, OutboxEvent.aggregate_id == uuid.UUID(case))
+            .all()
+        )
+        assert len(events) == 1
+        payload = events[0].payload
+        assert payload["assignee_user_id"] == colleague["id"] and "@" not in str(payload)
+        for event in events:
+            db.delete(event)
         db.commit()

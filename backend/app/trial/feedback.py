@@ -1,9 +1,11 @@
-"""Trial feedback: the questionnaire a free-trial user fills in, and what may be shown on the MDARIX website.
+"""Customer feedback: the questionnaire any signed-in user fills in, and what may be shown on the MDARIX website.
 
-A trial user answers questions about the product and their experience and chooses how their words may be used:
+Feedback is open to every organization, trial or paying (the tables and routes keep their original "trial" names).
+A user answers questions about the product and their experience and chooses how their words may be used:
 with their company's name (NAMED), without it (ANONYMOUS) or not at all (PRIVATE). The exact consent wording they saw
 is stored with the answer. Nothing is public until a Platform Administrator publishes it; an anonymous quote that
 names the company is refused, and the person can withdraw consent at any time, which unpublishes it at once.
+Each response is announced to the MDARIX team by email (``FEEDBACK_SUBMITTED``, backend/app/notifications.py).
 """
 
 from __future__ import annotations
@@ -22,8 +24,8 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant
 from backend.app.db.models.stage2 import TrialFeedback
 from backend.app.db.session import get_db
 from backend.app.db.tenant_scope import bind_system
+from backend.app.notifications import notify_feedback_submitted
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.trial.service import trial_subscription
 from backend.app.trial.team import trial_request
 
 router = APIRouter(prefix="/api/v1", tags=["Trial feedback"])
@@ -111,11 +113,6 @@ def _user(db: Session, ctx: AuthenticatedRequestContext) -> AuthUser:
     return user
 
 
-def _require_trial(db: Session, tenant_id: uuid.UUID) -> None:
-    if trial_subscription(db, tenant_id) is None:
-        raise _error(404, "NOT_A_TRIAL_WORKSPACE", "Feedback is collected during the free trial")
-
-
 def _organization(db: Session, tenant_id: uuid.UUID) -> str:
     request = trial_request(db, tenant_id)
     if request is not None and request.organization:
@@ -167,6 +164,7 @@ def attribution(row: TrialFeedback) -> str:
 def _mine(row: TrialFeedback) -> dict:
     return {
         "id": str(row.id),
+        "business_id": row.business_id,
         "created_at": row.created_at.isoformat(),
         "rating_overall": row.rating_overall,
         "publish_consent": row.publish_consent,
@@ -196,7 +194,6 @@ def _audit(db: Session, tenant_id, actor, action: str, row: TrialFeedback, detai
 @router.get("/trial/feedback")
 def my_feedback(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    _require_trial(db, tenant_id)
     user = _user(db, ctx)
     organization = _organization(db, tenant_id)
     rows = (
@@ -223,7 +220,6 @@ def submit_feedback(
     db: Session = Depends(get_db),
 ):
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    _require_trial(db, tenant_id)
     user = _user(db, ctx)
     now = datetime.now(timezone.utc)
     recent = (
@@ -281,6 +277,7 @@ def submit_feedback(
     db.add(row)
     db.flush()
     _audit(db, tenant_id, user.id, "TRIAL_FEEDBACK_SUBMITTED", row, {"consent": row.publish_consent}, now)
+    notify_feedback_submitted(db, tenant_id, feedback_id=row.id)
     db.commit()
     return _mine(row)
 
@@ -316,7 +313,21 @@ def withdraw_consent(
 # ------------------------------------------------------------------------------------------- Platform Admin
 
 
-def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
+def _tenant_references(db: Session, tenant_ids) -> dict:
+    """Tenant id -> (tenant key, tenant business id), read in one query."""
+    tenant_ids = set(tenant_ids)
+    if not tenant_ids:
+        return {}
+    return {
+        tenant_id: (tenant_key, business_id)
+        for tenant_id, tenant_key, business_id in db.query(Tenant.id, Tenant.tenant_key, Tenant.business_id).filter(
+            Tenant.id.in_(tenant_ids)
+        )
+    }
+
+
+def _admin_row(row: TrialFeedback, tenants: dict) -> dict:
+    tenant_key, tenant_business_id = tenants.get(row.tenant_id, (None, None))
     return {
         **{
             column: getattr(row, column)
@@ -344,7 +355,9 @@ def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
             )
         },
         "id": str(row.id),
-        "tenant_key": tenant_keys.get(row.tenant_id),
+        "business_id": row.business_id,
+        "tenant_key": tenant_key,
+        "tenant_business_id": tenant_business_id,
         "attribution": attribution(row) if row.publish_consent != "PRIVATE" else None,
         "consent_at": row.consent_at.isoformat(),
         "created_at": row.created_at.isoformat(),
@@ -356,7 +369,7 @@ def _admin_row(row: TrialFeedback, tenant_keys: dict) -> dict:
 def list_feedback(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
     rows = db.query(TrialFeedback).order_by(TrialFeedback.created_at.desc()).limit(500).all()
-    tenant_keys = dict(db.query(Tenant.id, Tenant.tenant_key).filter(Tenant.id.in_({row.tenant_id for row in rows})))
+    tenants = _tenant_references(db, (row.tenant_id for row in rows))
     scores = [row.recommend_score for row in rows if row.recommend_score is not None]
     promoters = sum(1 for score in scores if score >= 9)
     detractors = sum(1 for score in scores if score <= 6)
@@ -366,7 +379,7 @@ def list_feedback(request: Request, db: Session = Depends(get_db)):
         return round(sum(values) / len(values), 1) if values else None
 
     return {
-        "items": [_admin_row(row, tenant_keys) for row in rows],
+        "items": [_admin_row(row, tenants) for row in rows],
         "summary": {
             "responses": len(rows),
             "overall": average("rating_overall"),
@@ -412,8 +425,7 @@ def change_publication(
         now,
     )
     db.commit()
-    tenant_keys = dict(db.query(Tenant.id, Tenant.tenant_key).filter(Tenant.id == row.tenant_id))
-    return _admin_row(row, tenant_keys)
+    return _admin_row(row, _tenant_references(db, [row.tenant_id]))
 
 
 # ------------------------------------------------------------------------------------------- Website

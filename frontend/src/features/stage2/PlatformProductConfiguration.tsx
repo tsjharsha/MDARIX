@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { describeError, requestJson } from "../../app/apiClient";
+import { safeText } from "../../app/displayId";
 type Configuration = { tenant: any; products: any[]; versions: any[]; connectors: any[]; mapping_versions: any[] };
 export function PlatformProductConfiguration() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -6,24 +8,19 @@ export function PlatformProductConfiguration() {
   const [data, setData] = useState<Configuration | null>(null);
   const [error, setError] = useState("");
   const loadCustomers = async () => {
-    const r = await fetch("/api/v1/platform-admin/customers");
-    if (!r.ok) throw new Error("Customer directory unavailable");
-    const rows = await r.json();
+    const rows = await requestJson<any[]>("/api/v1/platform-admin/customers");
     setCustomers(rows);
     if (!tenantId && rows[0]) setTenantId(rows[0].id);
   };
   const load = async (id: string) => {
     if (!id) return;
-    const r = await fetch(`/api/v1/platform/product-configuration/${encodeURIComponent(id)}`);
-    const b = await r.json();
-    if (!r.ok) throw new Error(b.detail?.message ?? "Product configuration unavailable");
-    setData(b);
+    setData(await requestJson<Configuration>(`/api/v1/platform/product-configuration/${encodeURIComponent(id)}`));
   };
   useEffect(() => {
-    void loadCustomers().catch((e) => setError(e.message));
+    void loadCustomers().catch((e) => setError(describeError(e, "Customer directory unavailable")));
   }, []);
   useEffect(() => {
-    void load(tenantId).catch((e) => setError(e.message));
+    void load(tenantId).catch((e) => setError(describeError(e, "Product configuration unavailable")));
   }, [tenantId]);
   return (
     <div className="content governance-view admin-page">
@@ -83,9 +80,7 @@ export function PlatformProductConfiguration() {
               {data.products.map((p) => (
                 <article key={p.id}>
                   <strong>{p.name}</strong>
-                  <span>
-                    {p.identifier} · {p.status}
-                  </span>
+                  <span>{[safeText(p.business_id), safeText(p.identifier), p.status].filter(Boolean).join(" · ")}</span>
                   <small>
                     {data.versions
                       .filter((v) => v.product_id === p.id)
@@ -102,9 +97,7 @@ export function PlatformProductConfiguration() {
             <div className="evidence-list">
               {data.connectors.map((c) => (
                 <article key={c.id}>
-                  <strong>
-                    {c.code} · {c.status}
-                  </strong>
+                  <strong>{[safeText(c.business_id), c.code, c.status].filter(Boolean).join(" · ")}</strong>
                   <span>
                     {c.connector_type} · {c.version}
                   </span>
@@ -124,7 +117,11 @@ export function PlatformProductConfiguration() {
                   <strong>
                     {m.version} · {m.status}
                   </strong>
-                  <span>Master mapping {m.master_mapping_id}</span>
+                  <span>
+                    {safeText(m.master_mapping_id)
+                      ? `Master mapping ${m.master_mapping_id}`
+                      : "Master mapping baseline"}
+                  </span>
                   <small>{Object.keys(m.rules || {}).length} governed field rule(s)</small>
                 </article>
               ))}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, RefreshCw, Star } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import { Table } from "../customer-admin/shared";
+import { Table, idColumn } from "../customer-admin/shared";
 import { formatDay, formatDateTime } from "../../app/dates";
 
 type Feedback = {
@@ -122,11 +122,10 @@ export function TrialFeedbackWorkspace() {
   const rows = items.filter(matches);
   const open = items.find((item) => item.id === selected) ?? null;
   return (
-    <section className="platform-admin-card trial-queue" aria-labelledby="feedback-title">
+    // The page heading ("Trial feedback and website quotes") is the section's (CustomersAndTenants).
+    <section className="platform-admin-card trial-queue" aria-label="What trial users tell us">
       <div className="platform-admin-card-title">
         <div>
-          <span className="eyebrow">Trial feedback</span>
-          <h3 id="feedback-title">What trial users tell us</h3>
           <p>
             Answers to the questionnaire in the trial workspace. A quote can be published on the website only when the
             person agreed, and is credited exactly as they chose: with their company's name or anonymously.
@@ -199,6 +198,7 @@ export function TrialFeedbackWorkspace() {
           rowKey={(row) => row.id}
           empty={{ title: "Nothing here yet", detail: "Responses appear here as trial users send feedback." }}
           columns={[
+            idColumn("Feedback ID"),
             {
               key: "company",
               label: "Company",

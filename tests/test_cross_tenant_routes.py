@@ -33,6 +33,8 @@ SKIP = {
     "/api/v1/auth/session",
     "/api/v1/communication/resend/webhook",
     "/api/v1/stage3/resend/webhook",
+    # Starts a long real-pipeline evaluation; its tenant scoping is covered by tests/test_evaluation_router.py.
+    "/api/v1/evaluations/runs",
 }
 
 

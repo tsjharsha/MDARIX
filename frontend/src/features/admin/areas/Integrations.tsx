@@ -2,16 +2,19 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, CircleSlash, RefreshCcw } from "lucide-react";
 import { BarList, Panel, StatTile } from "../console/charts";
 import type { Slice, Tone } from "../console/dashboardModel";
-import { SearchBox, Table, formatDate, listOf, useResource } from "../../customer-admin/shared";
-import { titleCase } from "../customers/model";
+import { SearchBox, Table, formatDate, idColumn, listOf, useResource } from "../../customer-admin/shared";
+import { versionLabel } from "./dataModel";
+import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
+import { hideUuid, referenceId } from "../../../app/displayId";
+import { sortParams, useServerSort } from "../../../app/tableSort";
 
 export function Integrations({ section }: { section: string }) {
   if (section === "Runs & failures") return <Runs />;
   if (section === "Reconciliation") return <Reconciliation />;
   if (section === "Credentials") return <Credentials />;
-  if (section === "API & schemas") return <Schemas />;
+  if (section === "Source schemas") return <Schemas />;
   return <Catalog />;
 }
 
@@ -37,7 +40,7 @@ function Catalog() {
   const chosen = rows.find((row) => row.application_id === selected);
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Source systems" title="Connector catalog" state={applications.state} error={applications.error}>
+      <Panel eyebrow="Source systems" title="Connector catalog" source={applications}>
         <Intro>Systems a customer can connect (QMS, ERP, PLM and others). Choose one to see its connectors.</Intro>
         <Table
           caption="Source systems"
@@ -60,7 +63,11 @@ function Catalog() {
               ),
             },
             { key: "support", label: "Support", render: (row) => titleCase(row.integration_support_status ?? "—") },
-            { key: "type", label: "Connects by", render: (row) => row.default_connector_type ?? "—" },
+            {
+              key: "type",
+              label: "Connects by",
+              render: (row) => (row.default_connector_type ? displayCode(row.default_connector_type) : "—"),
+            },
             { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
           ]}
         />
@@ -80,12 +87,16 @@ function Catalog() {
               rowKey={(row) => `${row.connector_id}-${row.version}`}
               empty={{ title: "No connector yet", detail: "No connector version is published for this system." }}
               columns={[
-                { key: "connector", label: "Connector", render: (row) => <strong>{row.connector_id}</strong> },
-                { key: "type", label: "Type", render: (row) => row.connector_type },
-                { key: "version", label: "Version", render: (row) => row.version },
+                {
+                  key: "connector",
+                  label: "Connector",
+                  render: (row) => <strong>{hideUuid(row.connector_id)}</strong>,
+                },
+                { key: "type", label: "Type", render: (row) => displayCode(row.connector_type) },
+                { key: "version", label: "Version", render: (row) => versionLabel(row.version) },
                 {
                   key: "sync",
-                  label: "Incremental sync",
+                  label: "Only new changes",
                   render: (row) => (row.supports_incremental_sync ? "Yes" : "No"),
                 },
                 { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
@@ -126,12 +137,39 @@ type RunPage = {
   last_30_days: { by_status: Record<string, number>; by_reconciliation: Record<string, number> };
 };
 
+/** Columns the server can order every page of runs by (backend platform_console.py integration_runs). */
+const RUN_SORT_KEYS = [
+  "when",
+  "tenant",
+  "source",
+  "records",
+  "status",
+  "problem",
+  "reconciliation",
+  "started_at",
+  "completed_at",
+  "tenant_name",
+  "source_system",
+  "connection_id",
+  "run_type",
+  "records_received",
+  "records_accepted",
+  "records_rejected",
+  "records_quarantined",
+  "records_duplicate",
+  "retry_attempt",
+  "reconciliation_status",
+  "schema_drift_status",
+  "failure_category",
+] as const;
+
 function useRuns(filters: Record<string, string>) {
   const [page, setPage] = useState(1);
-  const params = new URLSearchParams({ page: String(page), page_size: "25" });
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const params = new URLSearchParams({ page: String(page), page_size: "25", ...sortParams(sort) });
   Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
   const runs = useResource<RunPage>(`/api/v1/platform-admin/console/integration-runs?${params}`);
-  return { runs, page, setPage };
+  return { runs, page, setPage, serverSort: { sort, onSort, keys: RUN_SORT_KEYS } };
 }
 
 const toneOf = (status: string): Tone => {
@@ -142,6 +180,17 @@ const toneOf = (status: string): Tone => {
   return "neutral";
 };
 
+/** Why a run failed, in words (the codes the connector sync and import record). */
+const FAILURE_LABELS: Record<string, string> = {
+  PROVIDER_READ_FAILED: "Could not read from the source system",
+  PROVIDER_RESPONSE_TOO_LARGE: "The source system sent too much at once",
+  PROVIDER_TOO_MANY_PAGES: "The source system sent too many pages",
+  PROVIDER_NEXT_LINK_REFUSED: "The source system pointed to another address",
+  MAPPING_NOT_USABLE: "The mapping cannot be used",
+  IMPORT_BLOCKED: "Import was blocked",
+};
+const failureLabel = (code: string) => FAILURE_LABELS[code.toUpperCase()] ?? displayCode(code);
+
 const slices = (counts: Record<string, number> = {}): Slice[] =>
   Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
@@ -151,7 +200,7 @@ const RUN_COLUMNS = [
   { key: "when", fields: ["started_at"], label: "Started", render: (row: Run) => formatDate(row.started_at) },
   {
     key: "tenant",
-    fields: ["tenant_name", "tenant_key", "customer_name", "tenant_id"],
+    fields: ["tenant_name", "tenant_key", "customer_name", "tenant_business_id", "tenant_id"],
     label: "Tenant",
     render: (row: Run) => <TenantCell row={row} />,
   },
@@ -161,8 +210,8 @@ const RUN_COLUMNS = [
     label: "Source",
     render: (row: Run) => (
       <span className="cc-stack">
-        <strong>{row.source_system}</strong>
-        <small>{row.connection_id}</small>
+        <strong>{displayCode(row.source_system)}</strong>
+        <small>{referenceId(row, "connection", row.connection_id)}</small>
       </span>
     ),
   },
@@ -181,7 +230,7 @@ function Runs() {
   const [status, setStatus] = useState("");
   const [tenantId, setTenantId] = useState("");
   const [query, setQuery] = useState("");
-  const { runs, page, setPage } = useRuns({ status, tenant_id: tenantId, q: query.trim() });
+  const { runs, page, setPage, serverSort } = useRuns({ status, tenant_id: tenantId, q: query.trim() });
   const counts = runs.data?.last_30_days.by_status ?? {};
   const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
   const failed = (counts.FAILED ?? 0) + (counts.ERROR ?? 0) + (counts.PARTIAL ?? 0);
@@ -201,9 +250,9 @@ function Runs() {
           onOpen={() => filter(() => setStatus(""))}
         />
         <StatTile
-          label="Failed"
+          label="Problems"
           value={runs.data ? failed : null}
-          detail={failed ? "Needs a look" : "None"}
+          detail={failed ? "Failed or partial runs: needs a look" : "No failed or partial runs"}
           icon={<AlertTriangle size={18} />}
           tone={failed ? "critical" : "good"}
           onOpen={() => filter(() => setStatus("problems"))}
@@ -225,12 +274,12 @@ function Runs() {
           onOpen={() => filter(() => setStatus("completed"))}
         />
       </section>
-      <Panel eyebrow="All tenants" title="Integration runs" state={runs.state} error={runs.error}>
+      <Panel eyebrow="All tenants" title="Integration runs" source={runs}>
         <div className="cc-toolbar">
           <SearchBox value={query} onChange={(value) => filter(() => setQuery(value))} label="Search source system" />
           <select aria-label="Result" value={status} onChange={(event) => filter(() => setStatus(event.target.value))}>
             <option value="">All results</option>
-            <option value="problems">Failed or rejected records</option>
+            <option value="problems">Problems: failed, partial or rejected records</option>
             <option value="completed_with_warnings">Completed with warnings</option>
             <option value="completed">Completed</option>
           </select>
@@ -245,6 +294,7 @@ function Runs() {
           caption="Integration runs"
           rows={runs.data?.items ?? []}
           rowKey={(row) => row.id}
+          serverSort={serverSort}
           empty={{ title: "No runs", detail: "No run matches these filters." }}
           columns={[
             ...RUN_COLUMNS,
@@ -253,9 +303,9 @@ function Runs() {
               label: "Problem",
               render: (row: Run) =>
                 row.failure_category
-                  ? titleCase(row.failure_category)
+                  ? failureLabel(row.failure_category)
                   : row.schema_drift_status && !/^(NONE|NO_DRIFT|OK|MATCH)$/i.test(row.schema_drift_status)
-                    ? `Schema: ${titleCase(row.schema_drift_status)}`
+                    ? `Source fields changed (${displayCode(row.schema_drift_status).toLowerCase()})`
                     : row.records_rejected
                       ? "Rejected records"
                       : "—",
@@ -270,10 +320,10 @@ function Runs() {
 
 /** Runs that were checked against their source, and whether the counts matched. */
 function Reconciliation() {
-  const { runs, page, setPage } = useRuns({ reconciled: "true" });
+  const { runs, page, setPage, serverSort } = useRuns({ reconciled: "true" });
   return (
     <div className="ac-grid two ar-wide-right">
-      <Panel eyebrow="Last 30 days" title="Reconciliation results" state={runs.state} error={runs.error}>
+      <Panel eyebrow="Last 30 days" title="Reconciliation results" source={runs}>
         <Intro>After a run, the records kept are checked against the source system. A mismatch needs a look.</Intro>
         {runs.data && Object.keys(runs.data.last_30_days.by_reconciliation).length ? (
           <BarList items={slices(runs.data.last_30_days.by_reconciliation)} />
@@ -281,11 +331,12 @@ function Reconciliation() {
           <p className="ac-muted">No run was reconciled in the last 30 days.</p>
         )}
       </Panel>
-      <Panel eyebrow="All tenants" title="Reconciled runs" state={runs.state} error={runs.error}>
+      <Panel eyebrow="All tenants" title="Reconciled runs" source={runs}>
         <Table
           caption="Reconciled runs"
           rows={runs.data?.items ?? []}
           rowKey={(row) => row.id}
+          serverSort={serverSort}
           empty={{ title: "No reconciled runs", detail: "Runs appear here once they are reconciled." }}
           columns={[
             ...RUN_COLUMNS.filter((column) => column.key !== "status"),
@@ -308,12 +359,7 @@ function Credentials() {
   const rows = listOf(credentials.data);
   const missing = rows.filter((row) => !row.credential_configured).length;
   return (
-    <Panel
-      eyebrow="MDARIX platform tenant"
-      title="Connection credentials"
-      state={credentials.state}
-      error={credentials.error}
-    >
+    <Panel eyebrow="MDARIX platform tenant" title="Connection credentials" source={credentials}>
       <Intro>
         Secrets live in the secret store; MDARIX keeps only a reference to them and never shows their value.{" "}
         {rows.length > 0 &&
@@ -324,16 +370,16 @@ function Credentials() {
         rows={rows}
         rowKey={(row) => row.id}
         empty={{ title: "No connections", detail: "Connections of the platform tenant appear here." }}
+        // The secret's reference in the store is not shown by default; it can be added from the field chooser.
         columns={[
+          idColumn("Connection ID", "code"),
           {
             key: "connection",
             label: "Connection",
             render: (row) => (
               <span className="cc-stack">
-                <strong>{row.code}</strong>
-                <small>
-                  {row.connector_type} · {row.version}
-                </small>
+                <strong>{displayCode(row.connector_type)}</strong>
+                <small>{versionLabel(row.version)}</small>
               </span>
             ),
           },
@@ -351,7 +397,6 @@ function Credentials() {
                 </span>
               ),
           },
-          { key: "reference", label: "Secret reference", render: (row) => row.credential_ref ?? "—" },
           { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
         ]}
       />
@@ -374,11 +419,8 @@ function Schemas() {
   const objectRows = listOf(objects.data);
   return (
     <div className="ac-grid">
-      <Panel eyebrow="Source schemas" title="Records and fields" state={applications.state} error={applications.error}>
-        <Intro>
-          Choose a source system to see the records it offers, then a record to see its fields. The platform API itself
-          is under Operations, Developer API.
-        </Intro>
+      <Panel eyebrow="Source schemas" title="Records and fields" source={applications}>
+        <Intro>Choose a source system to see the records it offers, then a record to see its fields.</Intro>
         <label className="ca-field ar-picker">
           Source system
           <select
@@ -399,7 +441,7 @@ function Schemas() {
       </Panel>
       {applicationId && (
         <div className="ac-grid two ar-wide-right">
-          <Panel eyebrow="Records" title="Source records" state={objects.state} error={objects.error}>
+          <Panel eyebrow="Records" title="Source records" source={objects}>
             <Table
               caption="Source records"
               rows={objectRows}
@@ -416,7 +458,7 @@ function Schemas() {
                       onClick={() => setObjectId(row.source_object_id)}
                     >
                       <strong>{row.object_name}</strong>
-                      <small>Key: {row.primary_key_field ?? "—"}</small>
+                      <small>Identified by: {row.primary_key_field ?? "—"}</small>
                     </button>
                   ),
                 },
@@ -435,10 +477,7 @@ function Schemas() {
                     key: "field",
                     label: "Field",
                     render: (row) => (
-                      <span className="cc-stack">
-                        <strong>{row.field_label ?? row.field_name}</strong>
-                        <small>{row.field_name}</small>
-                      </span>
+                      <strong title={`Technical name: ${row.field_name}`}>{row.field_label ?? row.field_name}</strong>
                     ),
                   },
                   { key: "type", label: "Type", render: (row) => titleCase(row.data_type) },

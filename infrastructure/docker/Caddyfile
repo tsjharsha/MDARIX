@@ -1,8 +1,8 @@
 # MDARIX front door (docker-compose.prod.yml). Caddy obtains and renews the TLS certificate for MDARIX_DOMAIN
 # automatically (Let's Encrypt), redirects HTTP to HTTPS, serves the built frontend and proxies the API.
+# (For MDARIX_DOMAIN=localhost, as in CI, Caddy issues the certificate from its own local CA instead.)
 {
 	email {$ACME_EMAIL}
-	# Uploads above this are refused here, before they reach the API (imports allow 10 MB, attachments 10 MB).
 	servers {
 		max_header_size 32KB
 	}
@@ -11,45 +11,59 @@
 {$MDARIX_DOMAIN} {
 	encode zstd gzip
 
+	# Uploads above this are refused here, before they reach the API (imports allow 10 MB, attachments 10 MB).
 	request_body {
 		max_size 25MB
 	}
 
 	header {
+		# HSTS preload: add "; preload" and submit the domain at hstspreload.org only once every subdomain of the
+		# registered domain serves HTTPS for good: removal from browsers' preload lists takes months.
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
 		-Server
 	}
 
-	# Readiness details are for the operator, not the internet.
+	# Readiness details (components, errors) are for the operator, not the internet: they are read on the VM
+	# (DEPLOYMENT.md). Uptime monitors and status pages use /health/status, which says only ok, degraded or down.
 	@internal_health path /health /health/ready
 	handle @internal_health {
 		respond 404
-	}
-
-	handle /api/* {
-		reverse_proxy api:8000 {
-			header_up X-Forwarded-Proto {scheme}
-		}
 	}
 
 	handle /health/live {
 		reverse_proxy api:8000
 	}
 
+	handle /health/status {
+		reverse_proxy api:8000
+	}
+
+	# API responses carry personal and customer data: never kept by a browser or an intermediate cache.
+	handle /api/* {
+		# ">" replaces whatever the API sent, once the response is written.
+		header >Cache-Control "no-store"
+		reverse_proxy api:8000 {
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
 	# Built assets carry a content hash in their names: cache them for a year. Pages are revalidated every time,
 	# so a deploy reaches everyone at once.
-	@assets path /assets/*
-	header @assets Cache-Control "public, max-age=31536000, immutable"
-	@pages not path /assets/*
-	header @pages Cache-Control "no-cache"
+	handle /assets/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		root * /srv
+		file_server
+	}
 
 	handle {
+		header Cache-Control "no-cache"
 		root * /srv
 		try_files {path} /index.html
 		file_server
@@ -57,6 +71,16 @@
 
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			# Activation, invitation and password-reset links carry a single-use token in the query string. It must
+			# not land in the access log, where anyone reading logs could use an unexpired link: the query parameter
+			# is removed, and so is the Referer header (the pages a link opens send it with the token).
+			# Caddy already redacts cookies and Authorization headers.
+			request>uri query {
+				delete token
+			}
+			request>headers>Referer delete
+		}
 	}
 }

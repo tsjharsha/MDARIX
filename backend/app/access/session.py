@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from access_control.personas import get_persona
 from access_control.policy import PermissionSet, Role, User, effective_permissions
+from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import (
     FeatureEntitlement,
     PermissionSetDefinition,
@@ -23,10 +24,36 @@ from backend.app.db.models.foundation import (
 from backend.app.db.session import get_db
 from backend.app.access.schemas import RoleSwitch
 from backend.app.access.authz import _authenticated_user, _is_customer_admin, _is_platform_admin
-from backend.app.access.permissions import permissions_for_role, role_of_user
+from backend.app.access.permissions import normalize_role, permissions_for_roles, role_of_user, roles_of_user
+from backend.app.role_codes import role_label
 from backend.app.runtime_env import environment
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
+
+
+def role_entries(db: Session, user) -> list[dict]:
+    """Every role the person holds, as the screens show them: the account role first, then additional roles."""
+    account = normalize_role(role_of_user(db, user))
+    return [
+        {
+            "code": normalize_role(role),
+            "label": role_label(role),
+            "source": "account" if normalize_role(role) == account else "additional",
+        }
+        for role in roles_of_user(db, user)
+    ]
+
+
+def organization_business_ids(db: Session, tenant_id) -> dict:
+    """The signed-in user's tenant and customer as the screens show them (TEN000001, CUST000001)."""
+    row = (
+        db.query(Tenant.business_id, Customer.business_id)
+        .outerjoin(Customer, Customer.id == Tenant.customer_id)
+        .filter(Tenant.id == tenant_id)
+        .first()
+    )
+    tenant_business_id, customer_business_id = row if row is not None else (None, None)
+    return {"tenant_business_id": tenant_business_id, "customer_business_id": customer_business_id}
 
 
 @router.get("/me/context")
@@ -125,11 +152,16 @@ def context(request: Request, db: Session = Depends(get_db)):
         personas = []
     return {
         "user_id": str(user.id),
+        "business_id": user.business_id,
         "display_name": user.display_name,
         "email": user.username,
         "tenant_id": str(user.tenant_id),
+        **organization_business_ids(db, user.tenant_id),
         "active_role": role.name,
         "role_version": role.version,
+        # All the roles the person holds (account role and additional workflow roles); active_role stays the
+        # account role so existing screens behave as before.
+        "roles": role_entries(db, user),
         "personas": personas,
         "permissions": permissions,
     }
@@ -163,6 +195,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
                 {
                     "membership_id": str(membership.id),
                     "tenant_id": str(tenant.id),
+                    "tenant_business_id": tenant.business_id,
                     "tenant_key": tenant.tenant_key,
                     "tenant_name": tenant.name,
                     "is_default": bool(membership.is_default),
@@ -184,7 +217,13 @@ def session_context(request: Request, db: Session = Depends(get_db)):
     if assignment is not None:
         plan_row = db.query(PlanDefinition).filter(PlanDefinition.id == assignment.plan_id).first()
         if plan_row is not None:
-            plan = {"id": str(plan_row.id), "code": plan_row.code, "name": plan_row.name, "version": plan_row.version}
+            plan = {
+                "id": str(plan_row.id),
+                "business_id": plan_row.business_id,
+                "code": plan_row.code,
+                "name": plan_row.name,
+                "version": plan_row.version,
+            }
             entitlements = [
                 {"feature_code": item.feature_code, "enabled": bool(item.enabled), "limits": item.limits or {}}
                 for item in db.query(FeatureEntitlement)
@@ -226,7 +265,7 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "memberships": memberships,
         "current_tenant": next(
             (item for item in memberships if item["tenant_id"] == str(user.tenant_id)),
-            {"tenant_id": str(user.tenant_id)},
+            {"tenant_id": str(user.tenant_id), "tenant_business_id": base["tenant_business_id"]},
         ),
         "plan": plan,
         "license": {"state": license_state, "effective": license_state == "ACTIVE"},
@@ -235,9 +274,10 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         "feature_toggles": {item["feature_code"]: item["enabled"] for item in entitlements},
         "allowed_menu": allowed_menu,
         "allowed_actions": base.get("permissions", {}),
-        # The business permissions the API enforces (records.write, ai.run, data.export, regulatory.approve), from
-        # the same rule as require_permission, so the interface can hide what the server would refuse.
-        "business_permissions": sorted(permissions_for_role(role_of_user(db, user))),
+        # The business permissions the API enforces (records.write, ai.run, data.export, regulatory.approve, and the
+        # workflow permissions), from the same rule as require_permission (the union over all the person's roles),
+        # so the interface can hide what the server would refuse.
+        "business_permissions": sorted(permissions_for_roles(roles_of_user(db, user))),
         "policy_version": base.get("role_version", "legacy"),
         "environment": environment(),
     }

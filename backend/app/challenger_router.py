@@ -10,6 +10,7 @@ from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from challenger.schemas import ChallengeRequest, ChallengeResponse
 from challenger.service import ChallengerError, ChallengerService
+from investigator.business_ids import with_evidence_business_ids
 from backend.app.access.permissions import AI_RUN, require_permission
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["AI Challenger"])
@@ -67,7 +68,6 @@ def create_challenges(
             )
         )
         db.commit()
-        return result
     except ChallengerError as e:
         raise err(e) from e
     except HTTPException:
@@ -96,6 +96,7 @@ def create_challenges(
                 "correlation_id": correlation,
             },
         ) from exc
+    return with_evidence_business_ids(db, result)
 
 
 @router.get("/{investigation_id}/challenges", response_model=ChallengeResponse)
@@ -110,4 +111,4 @@ def latest_challenges(
         raise HTTPException(
             status_code=404, detail={"code": "CHALLENGE_SET_NOT_FOUND", "message": "No challenge set exists"}
         )
-    return result
+    return with_evidence_business_ids(db, result)

@@ -2,6 +2,10 @@ import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileText, Info, Search } from "lucide-react";
 import { Inline, Markdown } from "../shared/Markdown";
 import { useCan } from "../workspace/workspaceContext";
+import { refusalOf, scopeLabel } from "./refusal";
+import { StatementKind } from "../shared/StatementKind";
+import { answerOriginText, hasStructuredContent, structuredOf } from "./structuredModel";
+import { StructuredAnswerView } from "./StructuredAnswer";
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -133,6 +137,12 @@ function AskAnswer({ result }: { result: any }) {
     ([, items]) => items.length > 0,
   );
   const notes = listOf(response.limitations).map(asText);
+  // Why no model answered (AI switched off, allowance used up, ...), with what the user can do about it.
+  const refusal = refusalOf(response);
+  // The structured answer (Phase 4), shown section by section when the service sends one; else the answer as before.
+  const structured = structuredOf(result);
+  const showStructured = hasStructuredContent(structured);
+  const madeBy = answerOriginText(structured);
   return (
     <section className="panel ask-answer" aria-labelledby="ask-answer-title">
       <header className="ask-answer-head">
@@ -152,11 +162,32 @@ function AskAnswer({ result }: { result: any }) {
             </span>
           )}
           <span className="ask-badge">Human review required</span>
+          {structured?.aiUsed === false ? (
+            <span className="ask-badge" data-ai-used="false">
+              <Info size={14} aria-hidden="true" /> {madeBy}
+            </span>
+          ) : structured?.aiUsed === true ? (
+            <StatementKind kind="AI_INTERPRETATION" origin="AI" />
+          ) : null}
         </div>
       </header>
 
-      {answer ? (
+      {showStructured ? (
+        <>
+          {structured.aiUsed === true && <p className="ask-note">{madeBy}.</p>}
+          {structured.aiUsed !== true && refusal && (
+            <p className="ask-note" role="note" data-refusal-code={refusal.code}>
+              <Info size={14} aria-hidden="true" /> {refusal.message}
+            </p>
+          )}
+          <StructuredAnswerView answer={structured} citations={citations} />
+        </>
+      ) : answer ? (
         <Markdown source={answer} citations={citations} />
+      ) : refusal ? (
+        <p className="ask-unavailable" role="status" data-refusal-code={refusal.code}>
+          <AlertTriangle size={16} aria-hidden="true" /> {refusal.message}
+        </p>
       ) : (
         <p className="ask-unavailable">
           <AlertTriangle size={16} aria-hidden="true" /> The AI answer is not available right now.{" "}
@@ -171,20 +202,21 @@ function AskAnswer({ result }: { result: any }) {
         </p>
       )}
 
-      {sections.map(([title, items]) => (
-        <div className="ask-section" key={title}>
-          <h4>{title}</h4>
-          <ul>
-            {items.map((item, index) => (
-              <li key={index}>
-                <Inline text={asText(item)} citations={citations} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
+      {!showStructured &&
+        sections.map(([title, items]) => (
+          <div className="ask-section" key={title}>
+            <h4>{title}</h4>
+            <ul>
+              {items.map((item, index) => (
+                <li key={index}>
+                  <Inline text={asText(item)} citations={citations} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
 
-      {sources.length > 0 && (
+      {!showStructured && sources.length > 0 && (
         <div className="ask-section">
           <h4>Sources used ({sources.length})</h4>
           <ul className="ask-sources">
@@ -219,7 +251,7 @@ function AskAnswer({ result }: { result: any }) {
         </div>
       )}
 
-      {answer && notes.length > 0 && (
+      {(answer || showStructured) && notes.length > 0 && (
         <p className="ask-note">
           <Info size={14} aria-hidden="true" /> {notes.join(" ")} AI suggestions are advisory; a person decides.
         </p>
@@ -232,8 +264,8 @@ function AskAnswer({ result }: { result: any }) {
           <dd>{result.interaction_id ?? "—"}</dd>
           <dt>Context policy</dt>
           <dd>{response.grounding?.policy_version ?? "—"}</dd>
-          <dt>Tenant scope enforced</dt>
-          <dd>{grounded ? "Yes" : "No"}</dd>
+          <dt>Scoped to investigation</dt>
+          <dd>{scopeLabel(grounded)}</dd>
           <dt>Field policy</dt>
           <dd>{response.grounding?.field_policy ?? "—"}</dd>
         </dl>

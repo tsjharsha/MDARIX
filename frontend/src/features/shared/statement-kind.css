@@ -1,0 +1,96 @@
+/* Statement kind badges (Phase 4). Each kind has its own border style and icon as well as colour, so the kind never
+   depends on colour alone. Only a fact is drawn with a solid border; AI interpretation is dashed violet and never
+   green, never a check mark, never a seal. */
+.sk-badge {
+  display: inline-flex;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid #8a97a3;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.sk-kind,
+.sk-origin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+}
+.sk-origin {
+  border-left: 1px solid currentColor;
+  background: #ffffff;
+  color: #4a5d6e;
+  font-weight: 500;
+}
+.sk-fact {
+  border-color: #1f6f43;
+}
+.sk-fact .sk-kind {
+  background: #e3f3ea;
+  color: #14502f;
+}
+.sk-source {
+  border-color: #2a5fa8;
+}
+.sk-source .sk-kind {
+  background: #e4eefb;
+  color: #1d4378;
+}
+.sk-derived {
+  border-color: #087b78;
+  border-style: double;
+  border-width: 3px;
+}
+.sk-derived .sk-kind {
+  background: #e3f2f1;
+  color: #065a58;
+}
+.sk-ai {
+  border-color: #6b3fb5;
+  border-style: dashed;
+}
+.sk-ai .sk-kind {
+  background: #f1eafb;
+  color: #4c2a86;
+  font-style: italic;
+}
+.sk-hypothesis {
+  border-color: #a46a00;
+  border-style: dotted;
+  border-width: 2px;
+}
+.sk-hypothesis .sk-kind {
+  background: #fdf4dc;
+  color: #6e4700;
+}
+.sk-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px dashed #6b3fb5;
+  border-radius: 8px;
+  background: #faf7fe;
+  color: #2d1e4a;
+  font-size: 13px;
+}
+.sk-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #087b78;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sk-link:focus-visible {
+  outline: 2px solid #087b78;
+  outline-offset: 2px;
+}

@@ -114,3 +114,29 @@ def test_only_platform_admins_list_and_update_demo_requests():
             {"id": item["id"]},
         ).scalar_one()
     assert audited == 1
+
+
+def test_the_visitor_gets_one_acknowledgement_and_a_mail_failure_never_shows(monkeypatch):
+    from auth import emailer
+
+    sent = []
+    monkeypatch.setattr(
+        emailer,
+        "send_demo_request_acknowledgement",
+        lambda recipient, **kw: sent.append((recipient, kw["display_name"])) or "SENT",
+    )
+    client = TestClient(app)
+    response, body = _submit(client)
+    assert response.status_code == 200
+    assert sent == [(body["email"], "Priya Sharma")]
+    _submit(client, email=body["email"])  # the same open request again: no second email
+    _submit(client, website="http://spam.example")  # automated: nothing stored, nothing sent
+    assert len(sent) == 1
+
+    def refuse(*_args, **_kwargs):
+        raise emailer.EmailDeliveryError("provider down")
+
+    monkeypatch.setattr(emailer, "send_demo_request_acknowledgement", refuse)
+    failed, failed_body = _submit(client)
+    assert failed.status_code == 200 and failed.json() == {"status": "DEMO_REQUEST_RECEIVED"}
+    assert len(_rows(failed_body["email"])) == 1

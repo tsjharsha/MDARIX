@@ -1,5 +1,6 @@
 // Pure aggregation for the user workspace overview. Every figure comes from tenant-scoped API responses.
 import { titleCase, type Slice, type Tone } from "../admin/console/dashboardModel";
+import { signalsTab } from "./signals";
 
 const code = (value: unknown) =>
   String(value ?? "")
@@ -9,9 +10,38 @@ const code = (value: unknown) =>
 
 const CLOSED = ["CLOSED", "RESOLVED", "COMPLETED", "CANCELLED", "ARCHIVED"];
 
+/** Today's calendar date where the person is (YYYY-MM-DD), not in UTC: late in the evening west of Greenwich, or
+ * early in the morning east of it, the UTC date is already another day. */
+export function localDay(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** The workspace opens on the current state of the records, with today's date ready for point-in-time views. */
 export function defaultTimeContext(today = new Date()): { asOf: string; mode: "current" } {
-  return { asOf: today.toISOString().slice(0, 10), mode: "current" };
+  return { asOf: localDay(today), mode: "current" };
+}
+
+export type DashboardStatus = "loading" | "error" | "empty" | "attention" | "clear";
+
+/**
+ * What the dashboard's headline may say. "Nothing needs your attention" is said only when the data was actually
+ * read and the organization has records; a failed source or an empty organization is said as such.
+ */
+export function dashboardStatus(input: {
+  states: Array<"loading" | "ready" | "error" | "forbidden">;
+  counts: Record<string, number | undefined> | null;
+  attention: number;
+}): DashboardStatus {
+  if (input.states.includes("loading")) return "loading";
+  if (input.states.includes("error")) return "error";
+  const counts = input.counts ?? {};
+  const records = ["products", "complaints", "investigations", "evidence"].reduce(
+    (total, key) => total + (Number(counts[key]) || 0),
+    0,
+  );
+  if (input.counts && records === 0) return "empty";
+  return input.attention ? "attention" : "clear";
 }
 
 /** Keep the current selection when it is still listed; otherwise the first open case, else the first case. */
@@ -73,9 +103,9 @@ export function workspaceAttention(input: {
       key: "signals",
       tone: "serious",
       title: `${input.highSeveritySignals} high-severity ${input.highSeveritySignals === 1 ? "signal" : "signals"}`,
-      detail: "Review recent complaints",
+      detail: "Triage high and critical signals",
       section: "Signals",
-      tab: "All signals",
+      tab: signalsTab({ filters: { priorities: ["HIGH", "CRITICAL"] } }),
     });
   if (input.openInvestigations)
     items.push({
