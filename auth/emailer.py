@@ -22,6 +22,10 @@ from email.utils import make_msgid, parseaddr
 
 from dotenv import load_dotenv
 
+# How long an invitation link works, as the emails say it (auth.durable.INVITATION_SECONDS; a test keeps the two
+# in step).
+INVITATION_VALID_FOR = "48 hours"
+
 load_dotenv()
 
 BRAND = "#087b78"
@@ -204,7 +208,7 @@ def _send_email(
 # ------------------------------------------------------------------------------------------- accounts
 
 
-def send_activation_email(recipient: str, token: str, organization: str, valid_for: str = "72 hours") -> str:
+def send_activation_email(recipient: str, token: str, organization: str, valid_for: str = INVITATION_VALID_FOR) -> str:
     url = f"{company().app_url}/activate-account?token={token}"
     return _send(
         recipient,
@@ -227,7 +231,14 @@ def send_activation_email(recipient: str, token: str, organization: str, valid_f
 
 
 def send_trial_invitation(
-    recipient: str, token: str, organization: str, *, ends_on: str, users: int, rows: int, valid_for: str = "72 hours"
+    recipient: str,
+    token: str,
+    organization: str,
+    *,
+    ends_on: str,
+    users: int,
+    rows: int,
+    valid_for: str = INVITATION_VALID_FOR,
 ) -> str:
     """The invitation to a free-trial workspace: what the trial includes and what happens when it ends."""
     url = f"{company().app_url}/activate-account?token={token}"

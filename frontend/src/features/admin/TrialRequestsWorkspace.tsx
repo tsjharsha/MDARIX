@@ -76,7 +76,7 @@ export function TrialRequestsWorkspace() {
             : link
               ? {
                   tone: "good",
-                  text: `${created}Email is not configured on this development server. Send ${row.email} this one-time activation link (valid 72 hours):`,
+                  text: `${created}Email is not configured on this development server. Send ${row.email} this one-time activation link (valid 48 hours):`,
                   link,
                 }
               : {
@@ -281,7 +281,7 @@ export function TrialRequestsWorkspace() {
               <li>a private trial workspace on the Free Trial plan (3 users, 5,000 uploaded rows)</li>
               <li>a 30-day trial that closes automatically</li>
               <li>the sample dataset</li>
-              <li>an account for {confirming.email} and a one-time invitation valid for 72 hours</li>
+              <li>an account for {confirming.email} and a one-time invitation valid for 48 hours</li>
             </ul>
             <div className="trial-queue-dialog-actions">
               <button className="platform-admin-secondary" onClick={() => setConfirming(null)}>

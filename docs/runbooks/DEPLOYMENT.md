@@ -124,7 +124,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production run --rm mi
 docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate python scripts/create_platform_admin.py colleague@yourcompany.com --name "Colleague Name"
 ```
 
-Each person receives an activation link (72 hours; printed instead when email is not working). They sign in, set up
+Each person receives an activation link (48 hours; printed instead when email is not working). They sign in, set up
 MFA (required for administrators), and create the first customer from Platform Admin > Customers & Tenants >
 Onboarding.
 

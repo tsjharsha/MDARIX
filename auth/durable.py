@@ -17,7 +17,9 @@ from backend.app.db.models.stage2 import (
 )
 
 SESSION_SECONDS = 3600
-INVITATION_SECONDS = 72 * 3600
+# An invitation or activation link works once and expires after 48 hours (a link sent on a Friday afternoon still
+# works on Sunday); a person whose link expired asks for a new one or uses "Forgot password?".
+INVITATION_SECONDS = 48 * 3600
 RESET_SECONDS = 3600
 
 

@@ -17,7 +17,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from auth.durable import issue_invitation
+from auth.durable import INVITATION_SECONDS, issue_invitation
 from auth.emailer import EmailDeliveryError, send_trial_invitation
 from auth.service import _hash
 from backend.app.customer_lifecycle import build_customer_tenant
@@ -41,7 +41,7 @@ TRIAL_DAYS = 30
 TRIAL_USER_LIMIT = 3
 TRIAL_ROW_LIMIT = 5000
 TRIAL_FILE_LIMIT_BYTES = 2 * 1024 * 1024
-TRIAL_INVITATION_TTL_SECONDS = 72 * 3600
+TRIAL_INVITATION_TTL_SECONDS = INVITATION_SECONDS
 # The requester works in the workspace (not the admin console), so they get a workspace role.
 TRIAL_USER_ROLE = "Leader"
 TRIAL_LIMITS = {

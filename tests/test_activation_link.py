@@ -85,7 +85,7 @@ def test_a_platform_administrator_gets_a_fresh_single_use_link(world):
     assert link.path == "/activate-account"
     token = parse_qs(link.query)["token"][0]
     expires_at = datetime.fromisoformat(body["expires_at"])
-    assert timedelta(hours=71) < expires_at - datetime.now(timezone.utc) <= timedelta(hours=72)
+    assert timedelta(hours=47) < expires_at - datetime.now(timezone.utc) <= timedelta(hours=48)
     with SessionLocal() as db:
         bind_system(db, "test: which links work")
         assert peek(db, token, "activation") == str(user_id)

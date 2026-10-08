@@ -41,7 +41,7 @@ def test_every_email_has_text_and_html_with_company_and_support(company, outbox)
     assert message["subject"] == "Activate your MDARIX account"
     for body in (message["text"], message["html"]):
         assert "https://app.example.com/activate-account?token=tok123" in body
-        assert "Example Labs Ltd" in body and "support@example.com" in body and "72 hours" in body
+        assert "Example Labs Ltd" in body and "support@example.com" in body and "48 hours" in body
 
 
 def test_values_from_people_are_escaped_in_html(company, outbox):
@@ -214,3 +214,11 @@ def test_trial_reminders_are_queued_once_per_stage():
     finally:
         db.rollback()
         db.close()
+
+
+def test_invitation_emails_state_the_real_link_lifetime():
+    """The emails say how long an invitation link works; that must be the lifetime the server gives the link."""
+    from auth.durable import INVITATION_SECONDS
+    from auth.emailer import INVITATION_VALID_FOR
+
+    assert INVITATION_VALID_FOR == f"{INVITATION_SECONDS // 3600} hours"
