@@ -21,7 +21,7 @@ SECURITY = {
     "X-Frame-Options": "DENY",
     "Cache-Control": "no-store",
 }
-COOKIE = "__Host-mdarix_session=abc; Path=/; Secure; HttpOnly; SameSite=Lax"
+COOKIE = "__Host-mdarix_session=abc; Path=/; Secure; HttpOnly; SameSite=Strict"
 
 
 def _headers(values: dict) -> Message:
