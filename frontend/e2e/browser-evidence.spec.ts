@@ -393,10 +393,17 @@ test.describe("MDARIX browser evidence", () => {
       async () => (await fetch("/api/v1/auth/signout", { method: "POST", credentials: "same-origin" })).status,
     );
     expect(signedOut).toBe(200);
-    const toggle = page.getByRole("button", { name: "Open navigation" });
-    if (await toggle.isVisible()) await toggle.click();
-    // Any API call now answers 401, and the app goes to sign-in with the reason and the page to return to.
-    await navigation.getByRole("button", { name: /^Investigations/ }).click();
+    // Any API call now answers 401, and the app goes to sign-in with the reason and the page to return to. A
+    // background check of the page may get there first; otherwise moving to another section makes the request (and
+    // the redirect may land while the click is under way).
+    if (!page.url().includes("/signin")) {
+      const toggle = page.getByRole("button", { name: "Open navigation" });
+      if (await toggle.isVisible().catch(() => false)) await toggle.click().catch(() => {});
+      await navigation
+        .getByRole("button", { name: /^Investigations/ })
+        .click({ timeout: 10_000 })
+        .catch(() => {});
+    }
     await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Fsignals/, { timeout: 20_000 });
     await expect(page.getByRole("status")).toContainText(/session has ended/i);
     await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
