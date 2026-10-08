@@ -44,6 +44,8 @@ artifacts/compliance/audit-archives/
 artifacts/audit-archives/
 artifacts/data-plane-backups/
 artifacts/automated-release-gate.md
+# Local demo recordings and their injected recorder helpers are generated evidence, not application source.
+artifacts/demo/
 
 # Keys, certificates, database dumps and encrypted backups never belong in the repository; the filled production
 # settings (.env.production, .env.migrate) are covered by .env.* above.
