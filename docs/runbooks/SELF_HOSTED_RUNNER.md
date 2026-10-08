@@ -27,7 +27,7 @@ the repository variables `CI_LINUX_RUNNER` and `CI_WINDOWS_RUNNER`, and falls ba
    Apply & restart. Check from Ubuntu: `wsl -d Ubuntu -u runner -- docker ps` lists the containers.
    (Docker Desktop's restart stops containers whose restart policy is `no`; start the development stack again
    afterwards with `docker compose up -d` if it is needed.)
-4. **Windows runner package:** download `actions-runner-win-x64-<version>.zip` from
+4. **Windows runner package (optional):** download `actions-runner-win-x64-<version>.zip` from
    https://github.com/actions/runner/releases, check its SHA-256 against the release notes, and unpack it into
    `C:\actions-runner`.
 5. **Register both runners.** A repository administrator gets a registration token (valid one hour, used once):
@@ -41,8 +41,13 @@ the repository variables `CI_LINUX_RUNNER` and `CI_WINDOWS_RUNNER`, and falls ba
    logon task shown in its header comment.
 7. **Point CI at them:**
    `gh variable set CI_LINUX_RUNNER --body mdarix-linux` and `gh variable set CI_WINDOWS_RUNNER --body mdarix-windows`.
-   From the next push every job runs on this PC. The CodeQL workflow stays on GitHub's runners (it is not a required
-   check and its bundle is large).
+   From the next push every job, including CodeQL, runs on this PC. CodeQL follows `CI_LINUX_RUNNER` and falls back
+   to GitHub's Ubuntu runner only when that variable is unset.
+
+   If Windows Application Control does not permit the Windows runner, use the Linux runner for the frontend job as
+   well: `gh variable set CI_WINDOWS_RUNNER --body mdarix-linux`. The frontend commands are deliberately
+   cross-platform, so this does not reduce the test coverage. CodeQL also honors `CI_LINUX_RUNNER`, avoiding a
+   GitHub-hosted billing dependency.
 
 ## Before each CI run
 

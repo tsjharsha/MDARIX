@@ -538,6 +538,10 @@ jobs:
   frontend:
     if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_WINDOWS_RUNNER || 'windows-latest' }}
+    defaults:
+      run:
+        # GitHub provides Bash on both Windows and Linux runners. Using one shell keeps the npm command portable.
+        shell: bash
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       # The same Node major version as the web image (Dockerfile.web).
@@ -546,15 +550,15 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm.cmd --prefix frontend ci
-      - run: npm.cmd --prefix frontend audit --audit-level=high
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend audit --audit-level=high
       - name: Dependencies shipped to browsers have no high or critical advisory
-        run: npm.cmd --prefix frontend audit --omit=dev --audit-level=high
-      - run: npm.cmd --prefix frontend run build
-      - run: npm.cmd --prefix frontend run lint
-      - run: npm.cmd --prefix frontend run format:check
+        run: npm --prefix frontend audit --omit=dev --audit-level=high
+      - run: npm --prefix frontend run build
+      - run: npm --prefix frontend run lint
+      - run: npm --prefix frontend run format:check
       - name: Run frontend tests
-        run: npm.cmd --prefix frontend test -- --run
+        run: npm --prefix frontend test -- --run
 
   browser:
     name: Browser and accessibility evidence

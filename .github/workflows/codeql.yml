@@ -13,7 +13,7 @@ permissions:
   actions: read
 jobs:
   analyze:
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-24.04' }}
     strategy:
       fail-fast: false
       matrix:
