@@ -218,15 +218,23 @@ def _record_mutation(request: Request, token: str, status_code: int) -> None:
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    """The headers Caddy adds in production (infrastructure/docker/Caddyfile), set by the API too, so a deployment
+    without that proxy, or a route it does not cover, is protected the same way."""
     response = await call_next(request)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
+    response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+    response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
     response.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+        "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
     )
+    if request.url.path.startswith("/api/"):
+        # API answers carry personal and customer data: never kept by a browser or a shared cache, unless a route
+        # chose its own caching (the public company details and legal texts).
+        response.headers.setdefault("Cache-Control", "no-store")
     forwarded_https = request.headers.get("x-forwarded-proto", "").lower() == "https"
     if is_production_like() or request.url.scheme == "https" or forwarded_https:
         # Browsers keep to HTTPS for this site for a year once they have seen it over HTTPS.
