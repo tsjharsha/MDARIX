@@ -488,7 +488,8 @@ jobs:
       - name: Start the stack (migrate, API, worker, scheduler, ClamAV, Caddy)
         run: |
           docker compose up --no-start
-          docker network connect --alias db mdarix_internal pg
+          internal_network=$(docker compose config --format json | python3 -c "import json,sys; print(json.load(sys.stdin)['networks']['internal']['name'])")
+          docker network connect --alias db "$internal_network" pg
           docker compose up -d --no-build --wait --wait-timeout 1200 api worker scheduler web
           docker compose ps -a
       - name: Production checks through Caddy
@@ -762,7 +763,11 @@ jobs:
       # MinIO is an optional local object-storage service. The hosted runner
       # does not require it for the contract/integration tests below, and the
       # upstream image is not reliably pullable from the runner registry.
-      - run: docker compose up -d postgres mailpit trackwise-simulator plm-simulator erp-simulator supplier-simulator veeva-qms-simulator teamcenter-simulator oracle-erp-simulator coupa-simulator
+      # The job-level PostgreSQL service above is the MDARIX control database.
+      # Compose starts only Mailpit and the simulator/provider databases here;
+      # asking it to start `postgres` would collide with that service on a
+      # persistent self-hosted Docker daemon.
+      - run: docker compose up -d mailpit trackwise-simulator plm-simulator erp-simulator supplier-simulator veeva-qms-simulator teamcenter-simulator oracle-erp-simulator coupa-simulator
       # The simulators and the mail catcher started above must answer, or the integration evidence is meaningless.
       - run: python scripts/validate_local_stack.py --require 8101,8102,8103,8104,8025
       - run: python -m pytest -q tests/test_persistent_source_simulator.py tests/test_api_connector_contract.py tests/test_connector_security.py
