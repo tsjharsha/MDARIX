@@ -60,6 +60,12 @@ def production(monkeypatch, tmp_path):
         "MDARIX_TRIAL_ALERT_EMAIL": "sales@mdarix-pilot.test",
         "MDARIX_TRUSTED_PROXY_HOPS": "1",
         "MDARIX_GENAI_PROVIDER": "controlled",
+        # Keep the configuration-gate unit tests hermetic. The real local-model
+        # checksum is validated separately in test_data_boundary_hardening.py
+        # and by the production-evidence CI job after it warms the pinned cache.
+        # Without this explicit test provider, these tests accidentally depend
+        # on whether a developer or runner already has .model-cache populated.
+        "MDARIX_EMBEDDING_PROVIDER": "deterministic",
         "MDARIX_BACKUP_AGE_RECIPIENT": "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p",
         "MDARIX_BACKUP_S3_URI": "s3://mdarix-pilot-backups/prod",
         "MDARIX_BACKUP_HEARTBEAT_URL": "https://hc.mdarix-pilot.test/backup",
