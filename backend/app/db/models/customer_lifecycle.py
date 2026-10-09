@@ -217,6 +217,11 @@ class Cell(Base):
     last_heartbeat_at = tz()
     health: Mapped[str | None] = mapped_column(String(30))
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PROVISIONING")
+    # md37 (the platform-cell link): the cell's credential (hashed), the licence the platform last issued it, and
+    # what its last heartbeat said (metadata only).
+    credential_hash: Mapped[str | None] = mapped_column(String(64))
+    licence_envelope: Mapped[dict | None] = mapped_column(JSONB)
+    last_heartbeat: Mapped[dict | None] = mapped_column(JSONB)
     created_at = tz(False)
     updated_at = tz(False)
     __table_args__ = (
@@ -227,6 +232,81 @@ class Cell(Base):
         ),
         CheckConstraint("status in ('PROVISIONING','ACTIVE','SUSPENDED','RETIRED')", name="cell_status_allowed"),
     )
+
+
+class CellHeartbeat(Base):
+    """One heartbeat a cell sent the platform (md37): versions, health, job outcomes and counts. Never record
+    content: the schema that accepts a heartbeat refuses free text (backend/app/cell_link_api.py)."""
+
+    __tablename__ = "cell_heartbeats"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    cell_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cells.id"), nullable=False)
+    received_at = tz(False)
+    software_version: Mapped[str | None] = mapped_column(String(80))
+    schema_version: Mapped[str | None] = mapped_column(String(80))
+    health: Mapped[str | None] = mapped_column(String(30))
+    metrics: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_cell_heartbeats_tenant_id"),)
+
+
+class Package(Base):
+    """A signed package the platform offers to cells (md37, ADR-014): reference data, mapping templates, policies.
+    Stored as the signed envelope it was uploaded as; the platform never re-signs. Global, like plan definitions."""
+
+    __tablename__ = "packages"
+    id = uuid_pk()
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    code: Mapped[str] = mapped_column(String(120), nullable=False)
+    version: Mapped[str] = mapped_column(String(40), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    key_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    envelope: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="RELEASED")
+    released_at = tz()
+    released_by: Mapped[str | None] = mapped_column(String(255))
+    created_at = tz(False)
+    updated_at = tz(False)
+    __table_args__ = (
+        UniqueConstraint("kind", "code", "version", name="uq_packages_kind_code_version"),
+        CheckConstraint("status in ('RELEASED','WITHDRAWN')", name="package_status_allowed"),
+    )
+
+
+class CellPackageState(Base):
+    """What a cell last reported about a package (md37): received, applied, failed or rejected."""
+
+    __tablename__ = "cell_package_states"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    package_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("packages.id"), nullable=False)
+    state: Mapped[str] = mapped_column(String(30), nullable=False)
+    reported_at = tz(False)
+    detail: Mapped[dict | None] = mapped_column(JSONB)
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "package_id", name="uq_cell_package_states_tenant_package"),
+        UniqueConstraint("tenant_id", "id", name="uq_cell_package_states_tenant_id"),
+    )
+
+
+class ReceivedPackage(Base):
+    """A package a cell fetched from the platform (md37), as received and verified against the pinned key: its
+    status says whether it was applied (licences, automatically), offered to the administrator, failed or rejected."""
+
+    __tablename__ = "received_packages"
+    id = uuid_pk()
+    tenant_id = tenant_fk()
+    kind: Mapped[str] = mapped_column(String(40), nullable=False)
+    code: Mapped[str] = mapped_column(String(120), nullable=False)
+    version: Mapped[str] = mapped_column(String(40), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    key_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    envelope: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), nullable=False)
+    received_at = tz(False)
+    applied_at = tz()
+    detail: Mapped[dict | None] = mapped_column(JSONB)
+    __table_args__ = (UniqueConstraint("tenant_id", "id", name="uq_received_packages_tenant_id"),)
 
 
 class CellLicence(Base):

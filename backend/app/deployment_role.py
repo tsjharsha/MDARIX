@@ -38,7 +38,8 @@ _SERVED = {
     PLATFORM: frozenset({OPS, SHARED, PLATFORM_ROUTES}),
     CELL: frozenset({OPS, SHARED, WORKSPACE}),
 }
-_PLATFORM_PREFIXES = ("/api/v1/platform-admin/", "/api/v1/platform/")
+# Platform administration by staff, and the link the cells call (backend/app/cell_link_api.py).
+_PLATFORM_PREFIXES = ("/api/v1/platform-admin/", "/api/v1/platform/", "/api/v1/cells/")
 _SHARED_PREFIXES = (
     "/api/v1/auth/",
     "/api/v1/session/",

@@ -84,7 +84,9 @@ from graph.schemas import GraphResponse, HealthResponse, RelationshipDetail
 from graph.service import GraphError, RealityGraphService
 from scenario_intelligence.router import router as scenario_router
 from backend.app.runtime_env import is_production_like
-from backend.app.deployment_role import serves_path
+from backend.app import cell_link
+from backend.app.cell_link_api import admin_router as cell_admin_router, router as cell_link_router
+from backend.app.deployment_role import is_cell, serves_path
 from backend.app.db.tenant_scope import bind_tenant, scoped_bind
 
 configure_logging()
@@ -273,6 +275,43 @@ async def deployment_role_gate(request: Request, call_next):
     return await call_next(request)
 
 
+_WRITABLE_WHEN_EXPIRED = (
+    "/api/v1/auth/",
+    "/api/v1/session",
+    "/api/v1/me",
+    "/api/v1/public/",
+    "/api/v1/client-errors",
+    "/health",
+)
+
+
+@app.middleware("http")
+async def licence_read_only_gate(request: Request, call_next):
+    """A CELL whose licence has passed its end date and its grace period (decision D6) keeps serving everything it
+    holds but refuses state changes, except signing in; nothing is deleted (backend/app/cell_link.py)."""
+    if (
+        request.method in {"GET", "HEAD", "OPTIONS"}
+        or not is_cell()
+        or request.url.path.startswith(_WRITABLE_WHEN_EXPIRED)
+    ):
+        return await call_next(request)
+    state = await run_in_threadpool(cell_link.read_only)
+    if state:
+        return JSONResponse(
+            status_code=423,
+            content={
+                "detail": {
+                    "code": "LICENCE_EXPIRED",
+                    "message": "This organization's licence has expired: records can be read but not changed until a "
+                    "new licence is applied",
+                    "valid_until": state.get("valid_until"),
+                    "grace_until": state.get("grace_until"),
+                }
+            },
+        )
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def request_id_and_log(request: Request, call_next):
     """Give every request an id (the caller's X-Request-ID when it is plain, else a new one), attach it to every
@@ -375,6 +414,8 @@ app.include_router(decision_brief_router)  # Decision Brief: versions, submissio
 app.include_router(decision_followups_router)  # After the decision: follow-ups, impact assessments, closure check
 app.include_router(human_decision_router)  # Human decision: queue, decision screen, signing, record
 app.include_router(case_audit_router)  # Trust & audit of a case: timeline, replay, AI runs, integrity, export
+app.include_router(cell_link_router)  # The link the tenant cells call: enrollment, heartbeat, packages
+app.include_router(cell_admin_router)  # Platform administration of packages and the fleet of cells
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

@@ -100,10 +100,14 @@ the platform the organization has moved, and later deleting the source copy, are
 3. Verify a signature in *Decisions*: the audit chain and the signatures moved verbatim.
 4. On the platform, mark the cell ACTIVE (Phase 4 automates this through enrollment).
 
-## Limits of this phase
+## 6. The link to the platform
+
+Once the cell runs, its `platform-sync` job enrolls with the one-time token the bundle carried, sends a heartbeat
+every 15 minutes and fetches the licence and packages the platform signed: docs/runbooks/CELL_LINK.md. A licence
+past its end date is honoured for 30 days, then the cell is read-only until a new one arrives (decision D6).
+
+## Limits
 
 - Only local object storage is moved by the tool; an S3 prefix is copied with the provider's tools and the cell's
   bucket configured in `cell.env`.
-- A licence's `valid_until` becomes the plan assignment's end; the grace period and read-only mode (decision D6)
-  come with the platform link in Phase 4.
 - The local development tenant databases built before migrations (`tenant-a..d`) cannot be cell targets.

@@ -18,6 +18,7 @@ jobs:
     permissions:
       contents: write   # the GitHub release
       packages: write   # the images
+      id-token: write   # keyless image signatures (Sigstore)
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: The tag matches VERSION
@@ -76,7 +77,55 @@ jobs:
             echo "See CHANGELOG.md for ${GITHUB_REF_NAME#v}."
           } >> release-notes.md
           cat release-notes.md >> "$GITHUB_STEP_SUMMARY"
+      # A cell operator verifies an image before upgrading (docs/runbooks/CELL_LINK.md): the signature names this
+      # workflow and this repository as the signer, through GitHub's OIDC identity; no key to lose or rotate.
+      - uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+      - name: Sign the images by digest
+        env:
+          REPOSITORY: ${{ steps.names.outputs.repository }}
+        run: |
+          for image in api web backup; do
+            digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$REPOSITORY/$image:$GITHUB_REF_NAME")
+            cosign sign --yes "$digest"
+          done
+          {
+            echo
+            echo "## Verify before you upgrade"
+            echo
+            echo '```'
+            echo "cosign verify --certificate-identity-regexp '^https://github.com/${GITHUB_REPOSITORY}/' \\"
+            echo "  --certificate-oidc-issuer https://token.actions.githubusercontent.com ${REPOSITORY}/api:${GITHUB_REF_NAME}"
+            echo '```'
+            echo
+            echo "The software bill of materials of each image (SPDX) is attached to this release."
+          } >> release-notes.md
+      - name: Software bill of materials for each image
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ steps.names.outputs.repository }}/api:${{ github.ref_name }}
+          format: spdx-json
+          output-file: sbom-api.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ steps.names.outputs.repository }}/web:${{ github.ref_name }}
+          format: spdx-json
+          output-file: sbom-web.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ steps.names.outputs.repository }}/backup:${{ github.ref_name }}
+          format: spdx-json
+          output-file: sbom-backup.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           body_path: release-notes.md
+          files: |
+            sbom-api.spdx.json
+            sbom-web.spdx.json
+            sbom-backup.spdx.json
           fail_on_unmatched_files: false

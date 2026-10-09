@@ -66,6 +66,7 @@ export function Operations({ section }: { section: string }) {
   if (section === "Queues & jobs") return <Queues />;
   if (section === "Email & notifications") return <Email />;
   if (section === "Developer API") return <DeveloperApi />;
+  if (section === "Tenant cells") return <Cells />;
   return <Health />;
 }
 
@@ -534,5 +535,145 @@ function DeveloperApi() {
         ]}
       />
     </Panel>
+  );
+}
+
+type CellRow = {
+  id: string;
+  tenant_name?: string | null;
+  tenant_key?: string | null;
+  tenant_business_id?: string | null;
+  hosting_mode: string;
+  status: string;
+  enrolled_at: string | null;
+  last_heartbeat_at: string | null;
+  seconds_since_heartbeat: number | null;
+  contact: "NEVER" | "CURRENT" | "LATE";
+  health: string | null;
+  software_version: string | null;
+  schema_version: string | null;
+  jobs_failed: number;
+  jobs_reported: number;
+  packages: Record<string, number>;
+  licence_status: string | null;
+  licence_valid_until: string | null;
+};
+
+const HOSTING: Record<string, string> = {
+  MDARIX_MANAGED: "Run by MDARIX",
+  CUSTOMER_CLOUD: "Customer's cloud",
+  CUSTOMER_ON_PREM: "Customer's own servers",
+};
+
+/** The cell's last contact, as a word with a tone. */
+export function cellContact(row: Pick<CellRow, "contact" | "seconds_since_heartbeat" | "status">): {
+  value: string;
+  tone: "good" | "warning" | "critical";
+} {
+  if (row.status === "PROVISIONING") return { value: "Not enrolled yet", tone: "warning" };
+  if (row.contact === "NEVER") return { value: "Never", tone: "critical" };
+  if (row.contact === "LATE") return { value: `Late (${sinceText(row.seconds_since_heartbeat)})`, tone: "critical" };
+  return { value: sinceText(row.seconds_since_heartbeat) || "Just now", tone: "good" };
+}
+
+/**
+ * Every customer's cell as its heartbeats describe it. A cell calls the platform every quarter hour with versions,
+ * health, job outcomes and counts; the platform never calls a cell and never sees its records.
+ */
+function Cells() {
+  const cells = useResource<{ items: CellRow[]; heartbeat_every_minutes: number }>(
+    "/api/v1/platform-admin/console/cells",
+  );
+  const rows = cells.data?.items ?? [];
+  const late = rows.filter((row) => row.status === "ACTIVE" && row.contact !== "CURRENT").length;
+  const failing = rows.filter((row) => row.jobs_failed > 0).length;
+  return (
+    <div className="ac-grid">
+      <Intro>
+        Each cell is one customer's own MDARIX, with its own database and keys. It reports here every{" "}
+        {cells.data?.heartbeat_every_minutes ?? 15} minutes: what it runs, whether it is healthy, which jobs failed and
+        which packages it holds. Nothing a customer records ever reaches this page.
+      </Intro>
+      <section className="ac-stats ar-stats-4" aria-label="Tenant cells">
+        <StatTile
+          label="Cells"
+          value={cells.data ? rows.length : null}
+          detail="Registered"
+          icon={<ServerCog size={18} />}
+        />
+        <StatTile
+          label="Reporting"
+          value={cells.data ? rows.filter((row) => row.contact === "CURRENT").length : null}
+          detail="Heard from within the last half hour"
+          icon={<Activity size={18} />}
+          tone={cells.data ? (late ? "warning" : "good") : undefined}
+        />
+        <StatTile
+          label="Late or silent"
+          value={cells.data ? late : null}
+          detail="Enrolled cells not heard from in time"
+          icon={<TriangleAlert size={18} />}
+          tone={cells.data ? (late ? "critical" : "good") : undefined}
+        />
+        <StatTile
+          label="With failing jobs"
+          value={cells.data ? failing : null}
+          detail="A scheduled job failed at the last report"
+          icon={<Database size={18} />}
+          tone={cells.data ? (failing ? "warning" : "good") : undefined}
+        />
+      </section>
+      <Panel eyebrow="Fleet" title="Tenant cells" state={cells.state} error={cells.error}>
+        <Table<CellRow>
+          caption="Tenant cells"
+          rows={rows}
+          rowKey={(row) => row.id}
+          pageSize={25}
+          pageNoun="cells"
+          empty={{
+            title: "No cells yet",
+            detail: "Issue a cell's documents with scripts/cell_platform.py to register one.",
+          }}
+          columns={[
+            { key: "tenant", label: "Organization", render: (row) => <TenantCell row={row} /> },
+            { key: "hosting_mode", label: "Hosting", render: (row) => HOSTING[row.hosting_mode] ?? row.hosting_mode },
+            { key: "status", label: "Status", render: (row) => <StatusBadge status={row.status} /> },
+            {
+              key: "contact",
+              label: "Last contact",
+              render: (row) => {
+                const contact = cellContact(row);
+                return <span className={`ac-tone-${contact.tone}`}>{contact.value}</span>;
+              },
+              sortValue: (row) => row.seconds_since_heartbeat ?? Number.MAX_SAFE_INTEGER,
+            },
+            { key: "health", label: "Health", render: (row) => (row.health ? row.health.toUpperCase() : "") },
+            { key: "software_version", label: "Version", render: (row) => row.software_version ?? "" },
+            {
+              key: "jobs",
+              label: "Jobs",
+              render: (row) => (row.jobs_reported ? `${row.jobs_failed} failed of ${row.jobs_reported}` : ""),
+              sortValue: (row) => row.jobs_failed,
+            },
+            {
+              key: "packages",
+              label: "Packages",
+              render: (row) =>
+                Object.entries(row.packages)
+                  .map(([state, count]) => `${count} ${state.toLowerCase()}`)
+                  .join(", "),
+            },
+            {
+              key: "licence",
+              label: "Licence",
+              render: (row) =>
+                row.licence_status
+                  ? `${row.licence_status}${row.licence_valid_until ? ` until ${formatDate(row.licence_valid_until)}` : ""}`
+                  : "",
+            },
+          ]}
+        />
+      </Panel>
+    </div>
   );
 }

@@ -14,9 +14,9 @@ import {
 } from "./sections";
 
 describe("platform administrator areas", () => {
-  it("keeps each area short: 32 sections instead of 80, a guided sequence only where setup is one", () => {
+  it("keeps each area short: 33 sections instead of 80, a guided sequence only where setup is one", () => {
     const counts = Object.entries(AREA_SECTIONS).map(([area, sections]) => [area, sections.length] as const);
-    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(32);
+    expect(counts.reduce((sum, [, count]) => sum + count, 0)).toBe(33);
     for (const [area, count] of counts) if (area !== DATA_AND_INTEGRATIONS) expect(count).toBeLessThanOrEqual(6);
   });
 
