@@ -31,7 +31,7 @@ jobs:
           output: codeql-results
       - name: Fail on high and critical findings
         run: |
-          python - <<'PY'
+          python3 - <<'PY'
           import glob, json, sys
           serious = []
           for path in glob.glob("codeql-results/*.sarif"):
