@@ -86,3 +86,15 @@ vulnerabilities:
       Perl Archive::Tar memory exhaustion from a crafted tar header. MDARIX runs no Perl and reads no tar files. Debian:
       fix deferred.
     expired_at: 2027-01-06
+  - id: CVE-2026-88647
+    statement: >-
+      GnuTLS hostname-verification information disclosure with no Debian-fixed version available. The MDARIX API does
+      not call GnuTLS: Python HTTPS uses OpenSSL and PostgreSQL connections use libpq/OpenSSL. Reassess when Debian
+      publishes a fixed libgnutls30 package.
+    expired_at: 2027-01-06
+  - id: CVE-2026-88648
+    statement: >-
+      GnuTLS cross-domain certificate-restriction bypass with no Debian-fixed version available. The MDARIX API does
+      not call GnuTLS: Python HTTPS uses OpenSSL and PostgreSQL connections use libpq/OpenSSL. Reassess when Debian
+      publishes a fixed libgnutls30 package.
+    expired_at: 2027-01-06

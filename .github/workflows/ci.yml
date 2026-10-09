@@ -262,6 +262,8 @@ jobs:
           python-version: '3.13'
       - run: python -m pip install --require-hashes -r requirements.txt
       - run: python -m pip install -r requirements-dev.txt
+      - name: Remove stale tenant data-plane volumes from an interrupted self-hosted run
+        run: docker compose down -v --remove-orphans 2>/dev/null || true
       - name: Start the four tenant databases
         run: docker compose up -d --wait tenant-a-data tenant-b-data tenant-c-data tenant-d-data
       - name: Control database, runtime role and the four fixture organizations
@@ -302,6 +304,9 @@ jobs:
           SQL
       - name: Data-plane routing tests
         run: python -m pytest -m dataplane -q tests/test_data_plane_routing.py
+      - name: Remove tenant data-plane containers and volumes
+        if: always()
+        run: docker compose down -v --remove-orphans 2>/dev/null || true
 
   production-mode:
     name: Production mode

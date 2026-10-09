@@ -210,8 +210,11 @@ services:
       test: ["CMD", "clamdcheck.sh"]
       interval: 60s
       timeout: 10s
-      retries: 5
-      start_period: 300s
+      # A fresh signature volume can take more than ten minutes on a constrained validation runner. During the start
+      # period Compose still checks readiness, but it does not fail the service while freshclam performs that initial
+      # download. Steady-state failures are still detected after startup.
+      retries: 10
+      start_period: 900s
     logging: *logging
 
   # Encrypted backups (host cron, docs/runbooks/BACKUP_AND_RESTORE.md):
