@@ -688,13 +688,49 @@ jobs:
           docker build -f infrastructure/docker/backup/Dockerfile -t mdarix/backup:ci .
       # Every high or critical finding fails the job, fixable or not, except the reviewed ones in .trivyignore.yaml
       # (each with its reason and an expiry date, after which it fails again until reviewed).
-      - name: Scan the images (high and critical findings fail the job unless reviewed in .trivyignore.yaml)
+      - name: Download the vulnerability database with bounded retries
+        shell: bash
         run: |
+          set -euo pipefail
+          cache_volume="mdarix-trivy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "TRIVY_CACHE_VOLUME=${cache_volume}" >> "$GITHUB_ENV"
+          docker volume create "$cache_volume" >/dev/null
+
+          for attempt in 1 2 3; do
+            if docker run --rm \
+              -v "${cache_volume}:/root/.cache/trivy" \
+              aquasec/trivy:0.57.0 image --download-db-only --no-progress; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Trivy vulnerability database download failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+
+            echo "Trivy database download attempt ${attempt} failed; replacing the cache and retrying." >&2
+            docker volume rm -f "$cache_volume" >/dev/null 2>&1 || true
+            docker volume create "$cache_volume" >/dev/null
+            sleep $((attempt * 5))
+          done
+      - name: Scan the images (high and critical findings fail the job unless reviewed in .trivyignore.yaml)
+        shell: bash
+        run: |
+          set -euo pipefail
           for image in mdarix/api:ci mdarix/web:ci mdarix/backup:ci; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "${TRIVY_CACHE_VOLUME}:/root/.cache/trivy" \
               -v "$PWD/.trivyignore.yaml:/review/.trivyignore.yaml:ro" aquasec/trivy:0.57.0 image \
-              --exit-code 1 --severity CRITICAL,HIGH --ignorefile /review/.trivyignore.yaml --no-progress "$image"
+              --skip-db-update --exit-code 1 --severity CRITICAL,HIGH \
+              --ignorefile /review/.trivyignore.yaml --no-progress "$image"
           done
+      - name: Remove the isolated Trivy database cache
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${TRIVY_CACHE_VOLUME:-}" ]; then
+            docker volume rm -f "$TRIVY_CACHE_VOLUME" >/dev/null 2>&1 || true
+          fi
 
   security:
     name: Security and static gates
