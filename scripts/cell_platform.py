@@ -17,8 +17,10 @@ Runs against the platform (MULTI or PLATFORM) database the environment points at
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import secrets
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -75,7 +77,15 @@ CUSTOMER_FIELDS = (
 
 
 def enrollment_content(
-    tenant: Tenant, customer: Customer, *, hosting_mode: str, admin_email: str, admin_name: str, now: datetime
+    tenant: Tenant,
+    customer: Customer,
+    *,
+    hosting_mode: str,
+    admin_email: str,
+    admin_name: str,
+    now: datetime,
+    platform_url: str = "",
+    enrollment_token: str = "",
 ) -> dict:
     if hosting_mode not in HOSTING_MODES:
         raise PackageError(f"hosting mode must be one of {', '.join(HOSTING_MODES)}")
@@ -85,6 +95,10 @@ def enrollment_content(
         "administrator": {"email": admin_email.strip().lower(), "display_name": admin_name.strip() or admin_email},
         "hosting_mode": hosting_mode,
         "issued_at": now.isoformat(),
+        # The platform-cell link (backend/app/cell_link.py): where the cell calls, and the one-time token its first
+        # call exchanges for a certificate and a credential. The bundle is handed over securely, like a password.
+        "platform_url": platform_url.rstrip("/"),
+        "enrollment_token": enrollment_token,
     }
 
 
@@ -121,8 +135,10 @@ def issue(
     private_key: str,
     valid_until: datetime | None = None,
     now: datetime | None = None,
+    platform_url: str = "",
 ) -> tuple[dict, dict]:
-    """The signed enrollment bundle and licence for ``tenant_key``; registers the cell. Commits."""
+    """The signed enrollment bundle and licence for ``tenant_key``; registers the cell with a fresh one-time
+    enrollment token and the licence it will fetch. Commits."""
     now = now or datetime.now(timezone.utc)
     bind_system(db, "cell platform: issue a cell's documents")
     tenant = db.query(Tenant).filter(Tenant.tenant_key == tenant_key).first()
@@ -130,10 +146,18 @@ def issue(
         raise PackageError(f"No organization has the key {tenant_key}")
     customer = db.get(Customer, tenant.customer_id)
     plan, entitlements, assignment = active_plan(db, tenant)
+    enrollment_token = secrets.token_urlsafe(32)
     enrollment = sign(
         "ENROLLMENT",
         enrollment_content(
-            tenant, customer, hosting_mode=hosting_mode, admin_email=admin_email, admin_name=admin_name, now=now
+            tenant,
+            customer,
+            hosting_mode=hosting_mode,
+            admin_email=admin_email,
+            admin_name=admin_name,
+            now=now,
+            platform_url=platform_url,
+            enrollment_token=enrollment_token,
         ),
         private_key,
     )
@@ -148,6 +172,10 @@ def issue(
         db.add(cell)
     cell.hosting_mode = hosting_mode
     cell.status = "PROVISIONING"
+    cell.enrollment_token_hash = hashlib.sha256(enrollment_token.encode("utf-8")).hexdigest()
+    cell.credential_hash = None
+    cell.client_certificate_fingerprint = None
+    cell.licence_envelope = licence
     cell.updated_at = now
     tenant.deployment_model = "CELL"
     tenant.updated_at = now
@@ -186,7 +214,44 @@ def main(argv: list[str] | None = None) -> int:
     issuing.add_argument("--private-key-file", required=True)
     issuing.add_argument("--valid-until", help="ISO-8601 time the licence expires (none: open-ended)")
     issuing.add_argument("--out", required=True, help="directory for enrollment.json and licence.json")
+    issuing.add_argument("--platform-url", default="", help="the https address the cell reports to")
+    ca = commands.add_parser("ca-init", help="create the platform's certificate authority for cell certificates")
+    ca.add_argument("--out", required=True, help="directory for platform-ca.key and platform-ca.crt")
+    signing = commands.add_parser("sign-package", help="sign a reference-data, mapping-template or policy package")
+    signing.add_argument("--kind", choices=("REFERENCE_DATA", "MAPPING_TEMPLATE", "POLICY"), required=True)
+    signing.add_argument("--code", required=True)
+    signing.add_argument("--version", required=True)
+    signing.add_argument("--content", required=True, help="JSON file with the package's content")
+    signing.add_argument("--private-key-file", required=True)
+    signing.add_argument("--out", required=True, help="file for the signed package")
     args = parser.parse_args(argv)
+
+    if args.command == "ca-init":
+        from backend.app.cell_pki import generate_ca
+
+        key_pem, cert_pem = generate_ca()
+        out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "platform-ca.key").write_text(key_pem, encoding="ascii")
+        try:
+            os.chmod(out / "platform-ca.key", 0o600)
+        except OSError:
+            pass
+        (out / "platform-ca.crt").write_text(cert_pem, encoding="ascii")
+        print(f"MDARIX_PLATFORM_CA_KEY_FILE={out / 'platform-ca.key'}")
+        print(f"MDARIX_PLATFORM_CA_CERT_FILE={out / 'platform-ca.crt'}")
+        return 0
+
+    if args.command == "sign-package":
+        content = json.loads(Path(args.content).read_text(encoding="utf-8"))
+        if not isinstance(content, dict):
+            print("REFUSED the content must be a JSON object", file=sys.stderr)
+            return 2
+        content = {**content, "code": args.code, "version": args.version}
+        envelope = sign(args.kind, content, Path(args.private_key_file).read_text(encoding="utf-8").strip())
+        Path(args.out).write_text(json.dumps(envelope, indent=2), encoding="utf-8")
+        print(json.dumps({"package": args.out, "content_sha256": envelope["content_sha256"]}, indent=2))
+        return 0
 
     if args.command == "keygen":
         private, public = generate_keypair()
@@ -219,6 +284,7 @@ def main(argv: list[str] | None = None) -> int:
             admin_name=args.admin_name,
             private_key=private_key,
             valid_until=valid_until,
+            platform_url=args.platform_url,
         )
     except PackageError as exc:
         print(f"REFUSED {exc}", file=sys.stderr)

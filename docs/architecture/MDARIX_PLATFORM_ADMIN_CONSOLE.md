@@ -26,7 +26,7 @@ Security and Operations. Customers & Tenants is described in
 | Integrations | Connector catalog · Runs & failures · Reconciliation · Credentials · API & schemas | `/admin/mapping/*`, `/platform-admin/console/integration-runs`, `/admin/integrations/credentials` |
 | AI Control Center | Overview · Evaluations · Executions · Agents & guardrails | `/platform-admin/ai/models`, `/platform-admin/console/ai-activity`, `/evaluations/golden/latest`, `/ai/agents/catalog` |
 | Security | Overview · Audit trail · Support access · Retention | `/platform-admin/console/security`, `/platform-admin/console/audit`, `/platform-admin/console/support-access` |
-| Operations | System health · Queues & jobs · Email & notifications · Developer API | `/platform-admin/console/operations`, `/health/ready`, `/platform-admin/api-contract` |
+| Operations | System health · Queues & jobs · Email & notifications · Tenant cells · Developer API | `/platform-admin/console/operations`, `/health/ready`, `/platform-admin/console/cells`, `/platform-admin/api-contract` |
 
 The code is in:
 - `frontend/src/features/admin/areas/`: one file per area.

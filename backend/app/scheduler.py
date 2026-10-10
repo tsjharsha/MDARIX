@@ -232,7 +232,22 @@ def late_evidence_sweep(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def platform_sync(db: Session, _state: dict) -> dict:
+    """A cell reports to the platform and fetches its licence and packages (backend/app/cell_link.py)."""
+    from backend.app import cell_link
+    from backend.app.deployment_role import cell_tenant_id, cell_tenant_key
+
+    return cell_link.sync(db, cell_tenant_id(), cell_tenant_key())
+
+
 JOBS: tuple[Job, ...] = (
+    Job(
+        "platform-sync",
+        timedelta(minutes=15),
+        platform_sync,
+        "Report to the platform and fetch its licence and packages",
+        frozenset({CELL}),
+    ),
     Job(
         "tenant-lifecycle",
         timedelta(minutes=15),

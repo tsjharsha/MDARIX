@@ -27,6 +27,10 @@ ADMIN_PREFIXES = (
 )
 # Business routes that change state but are governed another way. Every entry needs a reason.
 EXEMPT = {
+    ("POST", "/api/v1/cells/enroll"): "a tenant cell, not a person: the one-time enrollment token from its signed "
+    "bundle (backend/app/cell_link_api.py)",
+    ("POST", "/api/v1/cells/heartbeat"): "a tenant cell, not a person: its credential and, through the front door, "
+    "its client certificate (backend/app/cell_link_api.py)",
     ("POST", "/api/v1/communication/resend/webhook"): "provider webhook, verified by signature",
     ("POST", "/api/v1/stage3/resend/webhook"): "provider webhook, verified by signature",
     ("POST", "/api/v1/governance/decisions/{decision_id}/sign"): "approval authority + segregation of duties",

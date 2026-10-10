@@ -18,6 +18,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from dotenv import load_dotenv  # noqa: E402
+
+# The settings file first (MDARIX_ENV among them), before the configuration check decides what environment this is:
+# the API and the worker load it through the database module they import first; this script has no such import
+# before the check, and an unset MDARIX_ENV means production.
+load_dotenv()
+
 from backend.app.logging_setup import configure_logging  # noqa: E402
 
 

@@ -33,6 +33,8 @@ def _set_role(monkeypatch, role: str, tenant=None) -> None:
     else:
         monkeypatch.setenv("MDARIX_CELL_TENANT_ID", str(tenant.id))
         monkeypatch.setenv("MDARIX_CELL_TENANT_KEY", tenant.tenant_key)
+        # A cell reports to the platform (backend/app/cell_link.py).
+        monkeypatch.setenv("MDARIX_PLATFORM_URL", "https://platform.test")
         # A cell pins the platform's package-signing key (backend/app/cell_packages.py).
         from backend.app.cell_packages import generate_keypair
 
@@ -138,7 +140,8 @@ def test_a_cell_signs_in_only_its_own_organization_and_the_platform_only_platfor
 def test_the_scheduler_runs_only_the_jobs_its_role_owns(monkeypatch):
     names = {job.name for job in scheduler.JOBS}
     _set_role(monkeypatch, "MULTI")
-    assert {job.name for job in scheduler.active_jobs()} == names
+    # Everything but the cell's call home: a MULTI deployment is its own platform.
+    assert {job.name for job in scheduler.active_jobs()} == names - {"platform-sync"}
     _set_role(monkeypatch, "CELL")
     cell = {job.name for job in scheduler.active_jobs()}
     assert {"signal_detection", "connector-sync", "embedding-catch-up", "audit-chain-verification"} <= cell

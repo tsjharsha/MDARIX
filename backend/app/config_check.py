@@ -198,8 +198,20 @@ def _deployment_role_problems() -> list[str]:
         # A cell trusts only documents the platform signed (licences, packages): the public key is pinned here.
         if problem := public_key_problem(platform_public_key()):
             found.append(problem)
+        url = urlparse(_get("MDARIX_PLATFORM_URL"))
+        if url.scheme != "https" or not url.netloc:
+            found.append("MDARIX_PLATFORM_URL must be the https address of the MDARIX platform this cell reports to")
     elif _get("MDARIX_CELL_TENANT_ID") or _get("MDARIX_CELL_TENANT_KEY"):
         found.append(f"MDARIX_CELL_TENANT_ID and MDARIX_CELL_TENANT_KEY are for a CELL, not a {value} deployment")
+    if value == roles.PLATFORM:
+        from backend.app.cell_packages import platform_public_key, public_key_problem
+        from backend.app.cell_pki import platform_ca_problem
+
+        # The platform verifies uploaded packages with the key the cells pin, and signs cell certificates.
+        if problem := public_key_problem(platform_public_key()):
+            found.append(problem.replace("in a CELL", "on the PLATFORM"))
+        if problem := platform_ca_problem():
+            found.append(problem)
     return found
 
 

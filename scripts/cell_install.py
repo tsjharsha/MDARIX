@@ -336,6 +336,11 @@ def install(args) -> dict:
             "MDARIX_OBJECT_STORAGE_SIGNING_SECRET": secret_values["MDARIX_OBJECT_STORAGE_SIGNING_SECRET"],
             "MDARIX_DEMO_REQUEST_SALT": secret_values["MDARIX_DEMO_REQUEST_SALT"],
             "MDARIX_RATE_LIMIT_SALT": secret_values["MDARIX_RATE_LIMIT_SALT"],
+            # The platform-cell link (backend/app/cell_link.py): where to call, the one-time enrollment token, and
+            # where the cell keeps its certificate and credential once enrolled.
+            "MDARIX_PLATFORM_URL": str(enrollment.get("platform_url") or ""),
+            "MDARIX_CELL_ENROLLMENT_TOKEN": str(enrollment.get("enrollment_token") or ""),
+            "MDARIX_CELL_IDENTITY_DIR": args.identity_dir or "/var/lib/mdarix/cell",
         }
         if args.app_url:
             settings["MDARIX_APP_URL"] = args.app_url
@@ -356,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runtime-password", help="password for the runtime role (else generated)")
     parser.add_argument("--skip-runtime-role", action="store_true", help="the operator manages the runtime role")
     parser.add_argument("--no-admin-invitation", action="store_true", help="do not invite the first administrator")
+    parser.add_argument("--identity-dir", help="where the cell keeps its certificate and credential (settings file)")
     parser.add_argument("--apply", action="store_true", help="build the cell (without it: verify and report)")
     args = parser.parse_args(argv)
     try:

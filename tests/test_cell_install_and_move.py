@@ -109,6 +109,7 @@ def _install_args(database_url: str, bundle: str, licence: str | None, public_ke
         "runtime_password": runtime_password,
         "skip_runtime_role": runtime_password is None or len(runtime_password) < 24,
         "no_admin_invitation": False,
+        "identity_dir": None,
         "apply": True,
     }
     values.update(overrides)

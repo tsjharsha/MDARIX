@@ -51,6 +51,10 @@
 		header >Cache-Control "no-store"
 		reverse_proxy api:8000 {
 			header_up X-Forwarded-Proto {scheme}
+			# The platform's cells present a client certificate (docs/runbooks/CELL_LINK.md: the tls client_auth
+			# block of a PLATFORM deployment); its fingerprint reaches the API here and never from a client, since
+			# header_up replaces whatever a caller sent. Empty when no certificate was presented.
+			header_up X-Client-Certificate-Fingerprint {http.request.tls.client.fingerprint}
 		}
 	}
 
