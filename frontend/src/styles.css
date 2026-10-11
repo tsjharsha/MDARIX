@@ -10282,6 +10282,424 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-page .auth-card .auth-field small {
   font-weight: 400;
 }
+/* ---------------------------------------------------------------- Trial sign-up (features/auth/SignupForm.tsx) */
+.auth-page .auth-card .auth-field select,
+.auth-page .auth-card .auth-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--mdx-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--auth-ink);
+  font: inherit;
+  font-weight: 400;
+}
+.auth-page .auth-card .auth-field textarea {
+  resize: vertical;
+}
+.auth-page .auth-card .auth-field select:focus,
+.auth-page .auth-card .auth-field textarea:focus,
+.auth-page .auth-card .auth-check input:focus-visible {
+  outline: 3px solid #157b7533;
+  border-color: var(--mdx-teal);
+}
+.auth-page .auth-card .auth-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 14px;
+}
+.auth-page .auth-card .auth-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--auth-ink);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.auth-page .auth-card .auth-check input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--auth-teal);
+}
+.auth-page .auth-card .auth-check-required {
+  font-weight: 600;
+}
+
+/* The page: a dark story panel with the moving figure on the left, the request on the right. */
+.auth-page.is-signup .auth-page-body {
+  width: min(1240px, 100%);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 560px);
+  align-items: start;
+  gap: clamp(28px, 4vw, 56px);
+}
+.auth-page.is-signup .auth-aside {
+  position: sticky;
+  top: 24px;
+  padding: clamp(24px, 3vw, 40px);
+  border-radius: 20px;
+  background:
+    radial-gradient(120% 80% at 100% 0%, #0f6f6b55, transparent 60%),
+    linear-gradient(160deg, #10263b 0%, #0d3346 55%, #0b3f45 100%);
+  box-shadow: 0 30px 70px #0b1f3340;
+  color: #eaf3f3;
+}
+.auth-page.is-signup .auth-aside .auth-eyebrow {
+  color: #7fd4cb;
+}
+.auth-page.is-signup .auth-aside h2 {
+  color: #fff;
+}
+.auth-page.is-signup .auth-aside li > span {
+  background: #ffffff14;
+  color: #7fd4cb;
+}
+.auth-page.is-signup .auth-aside strong {
+  color: #fff;
+}
+.auth-page.is-signup .auth-aside p {
+  color: #b9cad6;
+}
+
+/* The one moving figure (features/auth/SignupMotion.tsx): a 9-second loop, still with reduced motion. */
+.su-motion {
+  margin: 20px 0 26px;
+  padding: 14px 14px 10px;
+  border: 1px solid #ffffff1f;
+  border-radius: 16px;
+  background: #0a1d2ecc;
+}
+.su-motion svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.su-title {
+  fill: #e8f1f6;
+  font-size: 13px;
+  font-weight: 700;
+}
+.su-note {
+  fill: #8fa6b5;
+  font-size: 11px;
+}
+.su-dot {
+  fill: #4b6478;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: su-dot-in 9s ease-out infinite both;
+}
+.su-dot-hit {
+  fill: #f2b04b;
+  animation:
+    su-dot-in 9s ease-out infinite both,
+    su-dot-hit 9s ease-in-out infinite both;
+}
+.su-box {
+  fill: none;
+  stroke: #f2b04b;
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: su-box-draw 9s ease-in-out infinite both;
+}
+.su-label {
+  animation: su-label-in 9s ease-out infinite both;
+}
+.su-label rect {
+  fill: #f2b04b;
+}
+.su-label text {
+  fill: #10202f;
+  font-size: 12px;
+  font-weight: 700;
+}
+.su-stage rect {
+  fill: #0f6f6b;
+  stroke: #3fb8ab;
+  stroke-width: 1.25;
+}
+.su-stage text {
+  fill: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.su-stage-1 rect {
+  animation: su-lit-1 9s ease-in-out infinite both;
+}
+.su-stage-2 rect {
+  animation: su-lit-2 9s ease-in-out infinite both;
+}
+.su-stage-3 rect {
+  animation: su-lit-3 9s ease-in-out infinite both;
+}
+.su-link {
+  stroke: #ffffff55;
+  stroke-width: 1.5;
+}
+@keyframes su-dot-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  5%,
+  86% {
+    opacity: 1;
+    transform: none;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes su-dot-hit {
+  0%,
+  30% {
+    fill: #4b6478;
+  }
+  36%,
+  100% {
+    fill: #f2b04b;
+  }
+}
+@keyframes su-box-draw {
+  0%,
+  40% {
+    stroke-dashoffset: 1;
+    opacity: 1;
+  }
+  50%,
+  86% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+  94%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+@keyframes su-label-in {
+  0%,
+  48% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  54%,
+  86% {
+    opacity: 1;
+    transform: none;
+  }
+  94%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes su-lit-1 {
+  0%,
+  4% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+  9%,
+  86% {
+    fill: #0f6f6b;
+    stroke: #3fb8ab;
+  }
+  94%,
+  100% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+}
+@keyframes su-lit-2 {
+  0%,
+  50% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+  55%,
+  86% {
+    fill: #0f6f6b;
+    stroke: #3fb8ab;
+  }
+  94%,
+  100% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+}
+@keyframes su-lit-3 {
+  0%,
+  63% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+  68%,
+  86% {
+    fill: #0f6f6b;
+    stroke: #3fb8ab;
+  }
+  94%,
+  100% {
+    fill: #ffffff10;
+    stroke: #ffffff30;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .su-motion * {
+    animation: none !important;
+  }
+}
+
+/* The request card: two steps, a two-column grid that becomes one column on a phone. */
+.auth-page .auth-card.su-card {
+  gap: 18px;
+}
+.su-steps {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.su-steps li {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1f5f8;
+  color: var(--auth-ink-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+.su-steps li span {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d9e3ea;
+  color: var(--auth-ink);
+  font-size: 12px;
+}
+.su-steps li.is-current {
+  background: #e6f4f3;
+  color: var(--auth-teal);
+}
+.su-steps li.is-current span,
+.su-steps li.is-done span {
+  background: var(--auth-teal);
+  color: #fff;
+}
+.su-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.su-legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.su-wide {
+  grid-column: 1 / -1;
+}
+.su-hint {
+  margin: 0;
+  color: var(--auth-ink-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-page .auth-card .su-confirm {
+  padding: 12px 14px;
+  border: 1px solid var(--auth-line);
+  border-radius: 10px;
+  background: #f7fafb;
+}
+.su-actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+}
+.su-secondary {
+  padding: 13px 20px;
+  border: 1px solid var(--auth-line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--auth-ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.su-secondary:hover {
+  border-color: var(--auth-teal);
+  color: var(--auth-teal);
+}
+.su-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fdecec;
+  color: #8a1c1c;
+  font-size: 14px;
+}
+.auth-page .auth-card.su-done {
+  justify-items: start;
+}
+.su-done > svg {
+  color: #0b8a5a;
+}
+.su-next {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--auth-ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+@media (max-width: 860px) {
+  .auth-page.is-signup .auth-page-body {
+    grid-template-columns: 1fr;
+  }
+  /* On a phone the story and its figure follow the form. */
+  .auth-page.is-signup .auth-aside {
+    position: static;
+    display: block;
+    order: 2;
+    width: 100%;
+    max-width: 460px;
+    box-sizing: border-box;
+  }
+  .auth-page.is-signup .auth-page-main {
+    width: 100%;
+    max-width: 460px;
+  }
+}
+@media (max-width: 520px) {
+  .su-fields {
+    grid-template-columns: 1fr;
+  }
+  .su-actions {
+    grid-template-columns: 1fr;
+  }
+}
 .auth-page .auth-card .auth-consent {
   margin: 0;
   color: var(--auth-ink-2);
@@ -10860,4 +11278,31 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+/* Platform Admin > trial requests: what the requester told MDARIX, folded until opened. */
+.trial-queue-answers summary {
+  cursor: pointer;
+  color: var(--mdx-teal);
+  font-weight: 600;
+}
+.trial-queue-answers dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  max-width: 360px;
+}
+.trial-queue-answers dl > div {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px;
+}
+.trial-queue-answers dt {
+  color: var(--mdx-muted);
+  font-size: 12px;
+}
+.trial-queue-answers dd {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }

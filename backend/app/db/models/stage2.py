@@ -194,6 +194,8 @@ class OnboardingRequest(Base):
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     organization: Mapped[str] = mapped_column(String(160), nullable=False)
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="PENDING_REVIEW")
+    # What the requester told MDARIX about their company and trial (md39, backend/app/trial/request_profile.py).
+    profile = mapped_column(JSONB, nullable=False, server_default="{}")
     created_at = _ts(False)
     updated_at = _ts(False)
     # Review outcome (md04): who decided, when, why, and the trial workspace an approval created.

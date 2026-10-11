@@ -1,5 +1,7 @@
 import React, { useState, type ReactNode } from "react";
 import { CalendarCheck, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+import { SignupForm } from "./SignupForm";
+import { SignupMotion } from "./SignupMotion";
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
   signin: {
@@ -17,11 +19,11 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
   },
   signup: {
     eyebrow: "Free 30-day trial",
-    title: "See MDARIX on a real investigation in minutes.",
+    title: "Watch MDARIX find the pattern in your complaints.",
     points: [
-      [ShieldCheck, "Your own private workspace", "Approved by our team and isolated from every other customer."],
-      [FileSearch, "Ready-made sample data", "Explore a full device investigation before sharing anything."],
-      [UserCheck, "Then try your own data", "Simple CSV templates, checked for personal data before import."],
+      [ShieldCheck, "Your own private workspace", "Approved by our team, isolated from every other customer."],
+      [FileSearch, "Sample data on day one", "Explore a full device investigation before sharing anything."],
+      [UserCheck, "Then your own exports", "CSV templates, checked for personal data before import."],
     ],
   },
   "request-demo": {
@@ -48,7 +50,7 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
 export function AuthFrame({ mode, children }: { mode: string; children: ReactNode }) {
   const aside = ASIDE[mode] ?? ASIDE.security;
   return (
-    <div className="auth-page">
+    <div className={mode === "signup" ? "auth-page is-signup" : "auth-page"}>
       <a className="app-skip" href="#auth-main">
         Skip to content
       </a>
@@ -67,6 +69,7 @@ export function AuthFrame({ mode, children }: { mode: string; children: ReactNod
         <section className="auth-aside" aria-label="About MDARIX">
           <span className="auth-eyebrow">{aside.eyebrow}</span>
           <h2>{aside.title}</h2>
+          {mode === "signup" && <SignupMotion />}
           <ul>
             {aside.points.map(([Icon, title, text]) => (
               <li key={title}>
@@ -298,6 +301,12 @@ export function AuthPage({ mode }: { mode: string }) {
     }
     afterSignin(data);
   };
+  if (mode === "signup")
+    return (
+      <AuthFrame mode="signup">
+        <SignupForm />
+      </AuthFrame>
+    );
   if (mode === "signin" && organizations.length)
     return (
       <AuthFrame mode="signin">

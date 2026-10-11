@@ -10,13 +10,14 @@ from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.main import app
+from tests.signup_profile import PROFILE
 from tests.test_auth_hardening import _user
 
 URL = "/api/v1/auth/signup"
 
 
 def _request(email):
-    return {"email": email, "display_name": "Dana Requester", "organization": "Acme Devices"}
+    return {"email": email, "display_name": "Dana Requester", "organization": "Acme Devices", **PROFILE}
 
 
 def _stored(email) -> int:

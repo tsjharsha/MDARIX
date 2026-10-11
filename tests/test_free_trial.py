@@ -17,6 +17,7 @@ from backend.app.main import app
 from backend.app.trial.service import trial_subscription
 from backend.app.db.session import engine
 from tests.conftest import authenticated_client
+from tests.signup_profile import PROFILE, PROFILE_LINES
 
 PASSWORD = "Trial password 2026!"
 
@@ -70,7 +71,7 @@ def _request_trial(organization="Trial Devices Inc") -> str:
     email = f"trial-{uuid.uuid4().hex[:10]}@example.invalid"
     response = TestClient(app).post(
         "/api/v1/auth/signup",
-        json={"email": email, "display_name": "Taylor Quality", "organization": organization},
+        json={"email": email, "display_name": "Taylor Quality", "organization": organization, **PROFILE},
     )
     assert response.status_code == 200, response.text
     assert response.json()["status"] == "ONBOARDING_REQUEST_ACCEPTED"
@@ -353,7 +354,10 @@ def test_closed_trial_data_is_deleted_after_30_days():
     assert user.get("/api/v1/trial/status").status_code == 401
     assert TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD}).status_code != 200
     queue = admin.get("/api/v1/platform-admin/trial-requests").json()["items"]
-    assert next(item for item in queue if item["tenant_id"] == approval["tenant_id"])["data_deleted"] is True
+    request = next(item for item in queue if item["tenant_id"] == approval["tenant_id"])
+    assert request["data_deleted"] is True
+    # The requester's job title goes with the rest of their personal data; the company facts stay.
+    assert "job_title" not in request["profile"] and request["profile"]["country"] == "United States"
 
 
 def test_new_trial_request_alerts_the_platform_admin(monkeypatch):
@@ -366,13 +370,18 @@ def test_new_trial_request_alerts_the_platform_admin(monkeypatch):
     assert sent == [
         (
             "admin-alerts@example.invalid",
-            {"organization": "Alerted Devices", "display_name": "Taylor Quality", "email": email},
+            {
+                "organization": "Alerted Devices",
+                "display_name": "Taylor Quality",
+                "email": email,
+                "profile_lines": PROFILE_LINES,
+            },
         )
     ]
     # Repeating the same request does not alert again.
     again = TestClient(app).post(
         "/api/v1/auth/signup",
-        json={"email": email, "display_name": "Taylor Quality", "organization": "Alerted Devices"},
+        json={"email": email, "display_name": "Taylor Quality", "organization": "Alerted Devices", **PROFILE},
     )
     assert again.status_code == 200 and len(sent) == 1
 
@@ -387,3 +396,49 @@ def test_a_failing_alert_never_breaks_sign_up(monkeypatch):
     monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "")
     monkeypatch.setattr("auth.emailer.send_trial_request_alert", lambda *a, **k: (_ for _ in ()).throw(AssertionError))
     _request_trial("Quiet Devices")  # no alert address configured: nothing is sent
+
+
+def test_a_trial_request_needs_the_required_answers_and_stores_nothing_without_them():
+    email = f"trial-{uuid.uuid4().hex[:10]}@example.invalid"
+    base = {"email": email, "display_name": "Taylor Quality", "organization": "Answer Devices"}
+    client = TestClient(app)
+    for missing, code in (
+        ({**PROFILE, "job_title": ""}, "JOB_TITLE_REQUIRED"),
+        ({**PROFILE, "country": " "}, "COUNTRY_REQUIRED"),
+        ({**PROFILE, "no_patient_data": False}, "NO_PATIENT_DATA_CONFIRMATION_REQUIRED"),
+        ({**PROFILE, "device_class": "CLASS_IV"}, "INVALID_DEVICE_CLASS"),
+    ):
+        refused = client.post("/api/v1/auth/signup", json={**base, **missing})
+        assert refused.status_code == 422 and refused.json()["detail"]["code"] == code
+    db = SessionLocal()
+    try:
+        assert db.query(OnboardingRequest).filter(OnboardingRequest.email == email).count() == 0
+    finally:
+        db.close()
+
+
+def test_the_review_queue_shows_what_the_requester_told_us():
+    email = f"trial-{uuid.uuid4().hex[:10]}@example.invalid"
+    answers = {
+        **PROFILE,
+        "company_size": "201-1000",
+        "device_types": "Infusion pumps",
+        "device_class": "CLASS_II",
+        "markets": ["US", "EU"],
+        "complaint_system": "TRACKWISE",
+        "complaint_volume": "50_500",
+        "trial_data": "ANONYMIZED_EXPORTS",
+        "evaluation_goal": "Complaint trending",
+    }
+    sent = TestClient(app).post(
+        "/api/v1/auth/signup",
+        json={"email": email, "display_name": "Taylor Quality", "organization": "Profile Devices", **answers},
+    )
+    assert sent.status_code == 200, sent.text
+    queue = authenticated_client().get("/api/v1/platform-admin/trial-requests").json()["items"]
+    item = next(row for row in queue if row["email"] == email)
+    assert item["profile"]["complaint_system"] == "TRACKWISE" and item["profile"]["markets"] == ["US", "EU"]
+    lines = {line["label"]: line["value"] for line in item["profile_lines"]}
+    assert lines["Highest device class"] == "Class II"
+    assert lines["Markets"] == "United States (FDA), European Union (MDR/IVDR)"
+    assert lines["Trial data"] == "Our anonymized exports"

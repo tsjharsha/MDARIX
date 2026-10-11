@@ -22,6 +22,7 @@ from backend.app.db.session import SessionLocal, runtime_engine, runtime_role_ac
 from backend.app.main import app
 from genai import policy
 from tests.conftest import authenticated_client
+from tests.signup_profile import PROFILE
 
 PASSWORD = "Hardening test password 2026"
 
@@ -108,7 +109,7 @@ def test_signup_answers_the_same_for_new_known_and_repeated_emails():
     client = TestClient(app)
     existing = _user()
     new_email = f"signup-{uuid.uuid4().hex[:10]}@example.invalid"
-    body = {"display_name": "Person", "organization": "Org"}
+    body = {"display_name": "Person", "organization": "Org", **PROFILE}
     first = client.post("/api/v1/auth/signup", json={**body, "email": new_email})
     again = client.post("/api/v1/auth/signup", json={**body, "email": new_email})
     known = client.post("/api/v1/auth/signup", json={**body, "email": existing.username})
@@ -129,12 +130,19 @@ def test_signup_is_rate_limited_per_address(limits_on, behind_proxy):
     for _ in range(5):
         email = f"limit-{uuid.uuid4().hex[:10]}@example.invalid"
         response = client.post(
-            "/api/v1/auth/signup", json={"email": email, "display_name": "P", "organization": "O"}, headers=headers
+            "/api/v1/auth/signup",
+            json={"email": email, "display_name": "P", "organization": "O", **PROFILE},
+            headers=headers,
         )
         assert response.status_code == 200
     refused = client.post(
         "/api/v1/auth/signup",
-        json={"email": f"limit-{uuid.uuid4().hex[:10]}@example.invalid", "display_name": "P", "organization": "O"},
+        json={
+            "email": f"limit-{uuid.uuid4().hex[:10]}@example.invalid",
+            "display_name": "P",
+            "organization": "O",
+            **PROFILE,
+        },
         headers=headers,
     )
     assert refused.status_code == 429
@@ -143,7 +151,12 @@ def test_signup_is_rate_limited_per_address(limits_on, behind_proxy):
     # Another address is not affected.
     other = client.post(
         "/api/v1/auth/signup",
-        json={"email": f"limit-{uuid.uuid4().hex[:10]}@example.invalid", "display_name": "P", "organization": "O"},
+        json={
+            "email": f"limit-{uuid.uuid4().hex[:10]}@example.invalid",
+            "display_name": "P",
+            "organization": "O",
+            **PROFILE,
+        },
         headers={"X-Forwarded-For": "198.51.100.20"},
     )
     assert other.status_code == 200

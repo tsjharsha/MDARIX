@@ -19,6 +19,9 @@ type TrialRequest = {
   data_delete_after: string | null;
   data_deleted: boolean;
   owner_status: string | null;
+  // What the requester told MDARIX about their company and trial, as readable lines (trial/request_profile.py).
+  profile?: { job_title?: string; country?: string; [key: string]: unknown };
+  profile_lines?: { label: string; value: string }[];
 };
 type DueTrial = { tenant_id: string; tenant_key: string; name: string; trial_ended_at: string; delete_after: string };
 type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
@@ -203,8 +206,31 @@ export function TrialRequestsWorkspace() {
                 <span className="cc-stack">
                   {row.display_name}
                   <small>{row.email}</small>
+                  {Boolean(row.profile?.job_title || row.profile?.country) && (
+                    <small>{[row.profile?.job_title, row.profile?.country].filter(Boolean).join(" · ")}</small>
+                  )}
                 </span>
               ),
+            },
+            {
+              key: "answers",
+              label: "About the request",
+              render: (row) =>
+                row.profile_lines?.length ? (
+                  <details className="trial-queue-answers">
+                    <summary>{row.profile_lines.length} answers</summary>
+                    <dl>
+                      {row.profile_lines.map((line) => (
+                        <div key={line.label}>
+                          <dt>{line.label}</dt>
+                          <dd>{line.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </details>
+                ) : (
+                  <small>Not given (requested before these questions)</small>
+                ),
             },
             { key: "requested", label: "Requested", render: (row) => formatDate(row.created_at) },
             {
