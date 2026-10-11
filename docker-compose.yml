@@ -58,6 +58,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
+      # The environment named in .env (development locally). The worker checks its configuration at start
+      # (backend/app/config_check.py): unset means production, which refuses to start without production settings.
+      MDARIX_ENV: ${MDARIX_ENV:-}
       MDARIX_OUTBOX_INTERVAL_SECONDS: ${MDARIX_OUTBOX_INTERVAL_SECONDS:-5}
       MDARIX_OUTBOX_BATCH_SIZE: ${MDARIX_OUTBOX_BATCH_SIZE:-50}
       MDARIX_OUTBOX_MAX_ATTEMPTS: ${MDARIX_OUTBOX_MAX_ATTEMPTS:-5}
