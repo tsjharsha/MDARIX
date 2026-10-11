@@ -15,11 +15,16 @@ RUN groupadd --system --gid 10001 mdarix \
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt
 RUN pip install --require-hashes -r /app/requirements.txt
+# Every project package the worker can import, lazy imports included: outbox failures are described with
+# genai (which uses retrieval); exports and report jobs store files with object_storage.
 COPY auth /app/auth
 COPY backend /app/backend
-COPY outbox /app/outbox
+COPY genai /app/genai
 COPY integration /app/integration
+COPY object_storage /app/object_storage
+COPY outbox /app/outbox
 COPY reports /app/reports
+COPY retrieval /app/retrieval
 COPY scripts /app/scripts
 
 USER mdarix
