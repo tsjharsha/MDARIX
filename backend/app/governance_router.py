@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from auth.service import _verify
 from backend.app.db.models.foundation import (
     ApprovalAuthority,
+    AuditEvent,
     AuthUser,
     Decision,
     FeatureEntitlement,
@@ -127,8 +128,36 @@ def approval_check(
         .filter_by(tenant_id=tenant_id, object_type="Decision", decision_type="INVESTIGATION_REVIEW", status="ACTIVE")
         .first()
     )
-    if sod and sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
-        return ("SOD_DENIED", "Approval by another authorized user is required"), None
+    if sod:
+        if sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
+            return ("SOD_DENIED", "Approval by another authorized user is required"), None
+
+        # Material edits are recorded in the immutable audit stream.  Using that stream here means the rule also
+        # covers legacy mutation routes that do not have a dedicated ``last_material_editor`` column on Decision.
+        # Creation and approval/signature events are excluded: they do not change the decision being reviewed.
+        if sod.last_material_editor_cannot_approve:
+            material_edit = (
+                db.query(AuditEvent)
+                .filter(
+                    AuditEvent.tenant_id == tenant_id,
+                    AuditEvent.entity_type == "Decision",
+                    AuditEvent.entity_id == decision.id,
+                    ~AuditEvent.action.in_(
+                        (
+                            "DECISION_CREATED",
+                            "DECISION_APPROVED",
+                            "DECISION_SIGNED",
+                            "DECISION_REVIEWED",
+                            "SIGNATURE_CREATED",
+                        )
+                    ),
+                    AuditEvent.actor_ref.isnot(None),
+                )
+                .order_by(AuditEvent.created_at.desc(), AuditEvent.chain_seq.desc())
+                .first()
+            )
+            if material_edit is not None and str(material_edit.actor_ref) == str(user_id):
+                return ("SOD_DENIED", "Approval by the last material editor is not permitted"), None
     return None, role_used
 
 
