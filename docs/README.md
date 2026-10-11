@@ -13,7 +13,7 @@ STATUS.md win.
 | [architecture/mapping/](architecture/mapping/) | Mapping Studio and canonical mapping designs | Current reference |
 | [architecture/future/](architecture/future/) | Target-state designs that are **not built** yet | Future |
 | [specs/](specs/) | Original R1 product/architecture specifications and per-capability contracts (Day 1 freeze onward) | Reference; some details superseded |
-| [adr/](adr/) | Architecture decision records: ADR-001…ADR-010 (still *Proposed*); ADR-011…ADR-016 (*Accepted* 2026-10-08: control plane and tenant cell, data placement, deployment roles, cell identity and packages, platform access, migrations) | Reference |
+| [adr/](adr/) | Architecture decision records: ADR-001…ADR-010 (still *Proposed*); ADR-011…ADR-016 (*Accepted* 2026-10-08: control plane and tenant cell, data placement, deployment roles, cell identity and packages, platform access, migrations); ADR-017 (*Accepted* 2026-10-11: staging on Oracle Cloud Always Free, pilots on Azure) | Reference |
 | [user-guide/](user-guide/) | Pilot guide pointer and the plain-language Quality Manager workflow walkthrough | Current |
 | [diagrams/](diagrams/) | Mermaid architecture diagrams | Reference |
 | [runbooks/](runbooks/) | Database hardening, production readiness gates, operations, developer tooling, simulator endpoints | Operational |

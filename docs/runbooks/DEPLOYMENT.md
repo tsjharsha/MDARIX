@@ -12,6 +12,9 @@ Everything is defined in `docker-compose.prod.yml`. Settings live in two files o
 The API, worker and scheduler refuse to start if an owner or backup password reaches their environment, so a
 compromised long-running service never holds credentials that bypass row-level security.
 
+Staging runs the same stack on a free Oracle Cloud ARM server, with Postgres on the server: see
+[STAGING_ORACLE.md](STAGING_ORACLE.md) (ADR-017).
+
 **Every compose command passes `--env-file .env.production`.** Compose fills the `${...}` values in
 `docker-compose.prod.yml` (image tags, domain, backup folder) only from that file, never from the services'
 `env_file`; without it a fresh VM stops with "required variable MDARIX_DOMAIN is missing". The commands below are
