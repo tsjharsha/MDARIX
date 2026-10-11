@@ -213,3 +213,22 @@ def test_people_of_an_organization_need_people_access_except_its_only_administra
     assert staff.post(f"/api/v1/platform-admin/users/{admin_id}/mfa-reset", json=reset).status_code == 200
     listing = staff.get("/api/v1/platform-admin/customer-users", params={"tenant_id": tenant}).json()
     assert listing["items"] == [] and listing["withheld"] >= 1
+
+
+def test_repeated_reads_of_the_same_page_count_once_and_every_change_counts():
+    """Paging through a list (or the audit trail itself) is one use; each change is recorded on its own."""
+    from backend.app.db.models.foundation import AuthUser
+    from tests.support_grants import grant_support_access, legacy_platform_admin_id
+
+    tenant = _organization()
+    staff_id = legacy_platform_admin_id()
+    grant_support_access(tenant, staff_id, areas=(access.CONFIGURATION,), write=True)
+    with SessionLocal() as db:
+        bind_system(db, "test: support access uses")
+        staff = db.get(AuthUser, staff_id)
+        for _ in range(3):
+            access.require_customer_approved_access(db, staff, uuid.UUID(tenant), access.CONFIGURATION)
+        for _ in range(2):
+            access.require_customer_approved_access(db, staff, uuid.UUID(tenant), access.CONFIGURATION, write=True)
+    used = _audit(tenant, access.ACCESS_USED)
+    assert [row.details["write"] for row in used] == [False, True, True]

@@ -25,9 +25,11 @@ Every grant is **read-only unless it asks for changes**, names one platform coll
 3. **The customer decides** (Customer Administration > Security > Support access): approve with a reason **and their
    authenticator code**, or deny. Platform administrators can never decide for a customer, even in an organization
    their account belongs to.
-4. **Use**: every request the colleague makes under the grant is written to the organization's own audit trail
-   (`SUPPORT_ACCESS_USED`, with the area, whether it changed something, and the address opened). The customer sees
-   each use under the request's *History*, and a count in the list.
+4. **Use**: the colleague's use of the grant is written to the organization's own audit trail
+   (`SUPPORT_ACCESS_USED`, with the area, whether it changed something, and the address opened). Every change is
+   written; repeated reads of the same address within 10 minutes are written once, so paging through a list (or the
+   audit trail itself) is one use. The customer sees each use under the request's *History*, and a count in the
+   list.
 5. **End**: either side revokes it at any moment; otherwise it expires on its own.
 
 Without a grant the platform answers `403 CUSTOMER_APPROVAL_REQUIRED` (naming the area needed) and writes the refusal

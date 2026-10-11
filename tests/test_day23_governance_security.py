@@ -326,6 +326,24 @@ def test_api_signing_security_matrix():
         assert stale_sign.status_code == 409
         db.expire_all()
         assert db.query(SignedApprovalRecord).filter_by(object_id=stale.id).count() == 0
+        # The approver made the material change, so the policy refuses their approval of the current version too.
+        current_version = db.get(Decision, stale.id).updated_at.isoformat()
+        editor_sign = approver_client.post(
+            f"/api/v1/governance/decisions/{stale.id}/sign",
+            json={
+                "decision": "APPROVE",
+                "remarks": "Own edit",
+                "password": "Correct current password 123",
+                "object_version": current_version,
+            },
+        )
+        assert editor_sign.status_code == 403
+        assert editor_sign.json()["detail"] == {
+            "code": "SOD_DENIED",
+            "message": "Approval by the last material editor is not permitted",
+        }
+        db.expire_all()
+        assert db.query(SignedApprovalRecord).filter_by(object_id=stale.id).count() == 0
         entitlement = db.query(FeatureEntitlement).filter_by(feature_code="DECISION_CENTER_SIGNATURES").first()
         entitlement.enabled = False
         db.commit()

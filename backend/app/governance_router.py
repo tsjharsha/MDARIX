@@ -91,6 +91,11 @@ def approval_denial(db, tenant_id, role_name: str | Sequence[str], decision, use
     return approval_check(db, tenant_id, role_name, decision, user_id)[0]
 
 
+# Audit actions that change a Decision's substance: the legacy material-change route (``/material-change``) and a
+# late-evidence impact assessment that puts a signed decision under reconsideration (decision_followups/impact.py).
+MATERIAL_EDIT_ACTIONS = ("RE_REVIEW_REQUIRED", "DECISION_UNDER_RECONSIDERATION")
+
+
 def approval_check(
     db, tenant_id, roles: str | Sequence[str] | None, decision, user_id: str
 ) -> tuple[tuple[str, str] | None, str | None]:
@@ -134,23 +139,19 @@ def approval_check(
 
         # Material edits are recorded in the immutable audit stream.  Using that stream here means the rule also
         # covers legacy mutation routes that do not have a dedicated ``last_material_editor`` column on Decision.
-        # Creation and approval/signature events are excluded: they do not change the decision being reviewed.
-        if sod.last_material_editor_cannot_approve:
+        # Only events that change the decision count (MATERIAL_EDIT_ACTIONS): the sign route itself writes
+        # APPROVAL_REQUESTED and refusal events for the signer, which must not make them its "last editor".
+        # Only a stored Decision has an audit stream to read. The Decision Brief signing path passes just the brief's
+        # author (human_decision/service.py approval_subject) and enforces its own author/contributor rule.
+        decision_id = getattr(decision, "id", None)
+        if sod.last_material_editor_cannot_approve and decision_id is not None:
             material_edit = (
                 db.query(AuditEvent)
                 .filter(
                     AuditEvent.tenant_id == tenant_id,
                     AuditEvent.entity_type == "Decision",
-                    AuditEvent.entity_id == decision.id,
-                    ~AuditEvent.action.in_(
-                        (
-                            "DECISION_CREATED",
-                            "DECISION_APPROVED",
-                            "DECISION_SIGNED",
-                            "DECISION_REVIEWED",
-                            "SIGNATURE_CREATED",
-                        )
-                    ),
+                    AuditEvent.entity_id == decision_id,
+                    AuditEvent.action.in_(MATERIAL_EDIT_ACTIONS),
                     AuditEvent.actor_ref.isnot(None),
                 )
                 .order_by(AuditEvent.created_at.desc(), AuditEvent.chain_seq.desc())

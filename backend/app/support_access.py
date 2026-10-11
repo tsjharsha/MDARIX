@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException, Request
 from sqlalchemy import String, cast, or_, select
@@ -61,6 +61,10 @@ OPEN = frozenset({PENDING, AWAITING_CUSTOMER, APPROVED})
 
 ACCESS_USED = "SUPPORT_ACCESS_USED"
 ACCESS_REFUSED = "SUPPORT_ACCESS_REFUSED"
+# Repeated reads of the same page under the same grant within this window are recorded once: paging through a list
+# (or the audit trail itself, where every recorded read would shift the pages being read) is one use, not ten.
+# Changes (write) are always recorded.
+READ_USE_WINDOW = timedelta(minutes=10)
 
 
 class ScopeInvalid(ValueError):
@@ -208,18 +212,12 @@ def open_tenants(
     now = datetime.now(timezone.utc)
     candidates = set(within) if within is not None else None
     grants = _grants_by_tenant(db, user, area, write=write, now=now, within=candidates)
-    method = request.method if request is not None else None
+    recorded = False
     for tenant_id, grant in grants.items():
-        _record(
-            db,
-            tenant_id=tenant_id,
-            user=user,
-            action=ACCESS_USED,
-            grant_id=grant.id,
-            details={"grant_id": str(grant.id), "area": area, "write": write, "method": method, "path": _path(request)},
-            request=request,
+        recorded |= _record_use(
+            db, tenant_id=tenant_id, user=user, grant=grant, area=area, write=write, request=request
         )
-    if grants:
+    if recorded:
         db.commit()
     own = platform_tenant_id(db)
     include_own = own is not None and (candidates is None or own in candidates)
@@ -228,6 +226,49 @@ def open_tenants(
 
 def _path(request: Request | None) -> str | None:
     return request.url.path if request is not None else None
+
+
+def _record_use(db: Session, *, tenant_id, user: AuthUser, grant, area: str, write: bool, request) -> bool:
+    """Record a use of ``grant`` in the organization's audit trail; False when it is a repeated read of the same page
+    within :data:`READ_USE_WINDOW` (already recorded). The caller commits."""
+    path = _path(request)
+    if not write:
+        since = datetime.now(timezone.utc) - READ_USE_WINDOW
+        same_path = (
+            AuditEvent.details["path"].astext.is_(None) if path is None else AuditEvent.details["path"].astext == path
+        )
+        repeated = (
+            db.query(AuditEvent.id)
+            .filter(
+                AuditEvent.tenant_id == tenant_id,
+                AuditEvent.action == ACCESS_USED,
+                AuditEvent.actor_ref == str(user.id),
+                AuditEvent.entity_id == grant.id,
+                AuditEvent.created_at >= since,
+                AuditEvent.details["area"].astext == area,
+                AuditEvent.details["write"].astext == "false",
+                same_path,
+            )
+            .first()
+        )
+        if repeated is not None:
+            return False
+    _record(
+        db,
+        tenant_id=tenant_id,
+        user=user,
+        action=ACCESS_USED,
+        grant_id=grant.id,
+        details={
+            "grant_id": str(grant.id),
+            "area": area,
+            "write": write,
+            "method": request.method if request is not None else None,
+            "path": path,
+        },
+        request=request,
+    )
+    return True
 
 
 def _record(db: Session, *, tenant_id, user: AuthUser, action: str, grant_id, details: dict, request) -> None:
@@ -289,16 +330,8 @@ def require_customer_approved_access(
                 "write": write,
             },
         )
-    _record(
-        db,
-        tenant_id=tenant_id,
-        user=user,
-        action=ACCESS_USED,
-        grant_id=grant.id,
-        details={"grant_id": str(grant.id), "area": area, "write": write, "method": method, "path": _path(request)},
-        request=request,
-    )
-    db.commit()
+    if _record_use(db, tenant_id=tenant_id, user=user, grant=grant, area=area, write=write, request=request):
+        db.commit()
     return grant
 
 
