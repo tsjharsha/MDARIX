@@ -17,6 +17,7 @@ from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.orm import Session
 
 from auth.emailer import smtp_configuration_status
+from backend.app import support_access
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.platform_subscriptions import DEFAULT_REMINDER_THRESHOLDS
 from backend.app.access.schemas import QueueItemsAction
@@ -438,11 +439,17 @@ def platform_audit(
     order: str = "",
     db: Session = Depends(get_db),
 ):
-    """The audit trail across every tenant, newest first: who did what, where and why (never old/new values).
-    ``sort``/``order`` order every page by a column instead (backend/app/sorting.py)."""
-    _require_platform_admin(request, db)
+    """The audit trail across organizations, newest first: who did what, where and why (never old/new values).
+    It shows the platform's own events, what MDARIX staff did anywhere, and the rest of an organization's trail only
+    where its administrators approved Audit access (backend/app/support_access.py); ``complete`` says whether a
+    filtered organization's trail is shown in full. ``sort``/``order`` order every page by a column instead
+    (backend/app/sorting.py)."""
+    admin = _require_platform_admin(request, db)
     page, page_size = _page(page, page_size)
-    query = db.query(AuditEvent)
+    opened = support_access.open_tenants(
+        db, admin, support_access.AUDIT, within={tenant_id} if tenant_id else None, request=request
+    )
+    query = db.query(AuditEvent).filter(support_access.visible_audit_clause(opened))
     if tenant_id:
         query = query.filter(AuditEvent.tenant_id == tenant_id)
     if attention:
@@ -513,7 +520,13 @@ def platform_audit(
                 row.tenant_id,
             )
         )
-    return {"items": items, "total": total, "page": page, "pages": max(1, (total + page_size - 1) // page_size)}
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "pages": max(1, (total + page_size - 1) // page_size),
+        "complete": bool(tenant_id) and tenant_id in opened,
+    }
 
 
 @router.get("/platform-admin/console/security")
@@ -585,18 +598,29 @@ def security_posture(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/platform-admin/console/support-access")
 def support_access_overview(request: Request, db: Session = Depends(get_db)):
-    """Support access grants with readable tenant and person names, newest first."""
+    """Support access grants with readable tenant and person names, newest first: where each stands (waiting for
+    MDARIX's approval, waiting for the customer, active, denied, revoked, expired), what it covers and who decided."""
     _require_platform_admin(request, db)
+    support_access.expire(db)
+    db.commit()
     rows = db.query(SupportAccessGrant).order_by(SupportAccessGrant.created_at.desc()).limit(200).all()
     names = _tenant_names(db, [row.tenant_id for row in rows])
-    people = _actor_names(db, [row.platform_user_id for row in rows] + [row.approved_by for row in rows])
+    people = _actor_names(
+        db,
+        [row.platform_user_id for row in rows]
+        + [row.requested_by for row in rows]
+        + [row.approved_by for row in rows]
+        + [row.customer_decided_by for row in rows],
+    )
     now = datetime.now(timezone.utc)
     items = []
     for row in rows:
         status = (row.status or "").upper()
-        expired = bool(row.expires_at and row.expires_at <= now)
+        scope = support_access.SupportScope.stored(row.scope)
+        open_ = status in support_access.OPEN and bool(row.expires_at and row.expires_at > now)
         person = people.get(str(row.platform_user_id), {})
         approver = people.get(str(row.approved_by), {}) if row.approved_by else {}
+        customer = people.get(str(row.customer_decided_by), {}) if row.customer_decided_by else {}
         items.append(
             _with_tenant(
                 {
@@ -604,21 +628,27 @@ def support_access_overview(request: Request, db: Session = Depends(get_db)):
                     "person": person.get("name"),
                     "platform_user_id": str(row.platform_user_id),
                     "platform_user_business_id": person.get("business_id"),
-                    "scope": row.scope or {},
+                    "requested_by": people.get(str(row.requested_by), {}).get("name") if row.requested_by else None,
+                    "scope": scope.as_dict(),
+                    "areas": scope.describe(),
+                    "write": scope.write,
                     "reason": row.reason,
-                    "status": "EXPIRED" if expired and status in {"PENDING", "ACTIVE", "APPROVED"} else status,
+                    "status": status if open_ or status not in support_access.OPEN else support_access.EXPIRED,
                     "starts_at": _iso(row.starts_at),
                     "expires_at": _iso(row.expires_at),
                     "approved_by": approver.get("name"),
                     "approved_by_business_id": approver.get("business_id"),
-                    "can_approve": status == "PENDING" and not expired,
-                    "can_revoke": status in {"PENDING", "ACTIVE", "APPROVED"} and not expired,
+                    "customer_decided_by": customer.get("name"),
+                    "customer_decided_at": _iso(row.customer_decided_at),
+                    "customer_decision_reason": row.customer_decision_reason,
+                    "can_approve": status == support_access.PENDING and open_,
+                    "can_revoke": open_,
                 },
                 names,
                 row.tenant_id,
             )
         )
-    return {"items": items}
+    return {"items": items, "areas": [{"code": code, "label": label} for code, label in support_access.AREAS.items()]}
 
 
 # Operations ----------------------------------------------------------------------------------------------------

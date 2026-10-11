@@ -298,8 +298,11 @@ def test_integration_runs_unknown_key_keeps_newest_first(platform, runs):
 
 
 @pytest.fixture(scope="module")
-def audit_events(tenants, prefix):
+def audit_events(platform, tenants, prefix):
     tenant = tenants[1]
+    from tests.support_grants import grant_for
+
+    grant_for(platform, tenant["id"], areas=("AUDIT",))  # the customer approved Audit access
     now = datetime.now(timezone.utc)
     _add(
         *[

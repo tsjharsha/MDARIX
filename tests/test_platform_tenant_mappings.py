@@ -22,6 +22,9 @@ def _acme() -> str:
 
 def test_staff_prepare_a_draft_the_customer_sees_and_releases():
     platform, tenant_id = authenticated_client(), _acme()
+    from tests.support_grants import grant_support_access
+
+    grant_support_access(tenant_id, areas=("CONFIGURATION",))  # the customer approved Configuration access
     code = f"PREP_{uuid.uuid4().hex[:8].upper()}"
     made = platform.post(
         f"/api/v1/platform-admin/tenants/{tenant_id}/mappings",

@@ -99,6 +99,15 @@ class LocalModelEmbeddingProvider:
                 try:
                     from fastembed import TextEmbedding
                 except ImportError as exc:  # pragma: no cover - dependency is in requirements.txt
+                    from backend.app.runtime_env import is_production_like
+
+                    if is_production_like():
+                        # Production-like images must carry both the runtime and the pinned model.  Do not
+                        # silently fall back to an install/download path when the optional runtime is absent.
+                        raise EmbeddingUnavailable(
+                            "The local embedding runtime is not installed; a staging or production server never "
+                            "downloads the model (the image carries it)"
+                        ) from exc
                     raise EmbeddingUnavailable("fastembed is not installed") from exc
                 cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
                 try:

@@ -694,6 +694,40 @@ def send_connector_sync_failed_notice(recipient: str, *, organization: str, conn
     )
 
 
+def send_support_access_request(
+    recipient: str,
+    *,
+    organization: str,
+    person: str,
+    areas: list[str],
+    write: bool,
+    expires: str,
+    reason: str,
+) -> str:
+    """MDARIX asks to see part of the organization's data: nothing opens until one of its administrators approves."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"MDARIX asks for support access to {organization}",
+            heading="MDARIX asks for your approval",
+            paragraphs=(
+                f"MDARIX support would like {person} to have temporary access to part of {organization}'s data. "
+                "Nothing is opened until one of your administrators approves it, and you can revoke it at any time.",
+                "Every use of the access is recorded in your audit trail.",
+            ),
+            details=(
+                ("Who", person),
+                ("Access", "Read and change" if write else "Read only"),
+                ("Until", expires),
+                ("Why", reason),
+            ),
+            items=tuple(areas),
+            button=("Review the request", f"{company().app_url}/app/customer-admin"),
+            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+        ),
+    )
+
+
 def send_ai_budget_notice(
     recipient: str, *, organization: str, percent: int, month: str, tokens_used: int | None, budget: int | None
 ) -> str:

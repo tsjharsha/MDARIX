@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from auth.service import _verify
 from backend.app.db.models.foundation import (
     ApprovalAuthority,
+    AuditEvent,
     AuthUser,
     Decision,
     FeatureEntitlement,
@@ -90,6 +91,11 @@ def approval_denial(db, tenant_id, role_name: str | Sequence[str], decision, use
     return approval_check(db, tenant_id, role_name, decision, user_id)[0]
 
 
+# Audit actions that change a Decision's substance: the legacy material-change route (``/material-change``) and a
+# late-evidence impact assessment that puts a signed decision under reconsideration (decision_followups/impact.py).
+MATERIAL_EDIT_ACTIONS = ("RE_REVIEW_REQUIRED", "DECISION_UNDER_RECONSIDERATION")
+
+
 def approval_check(
     db, tenant_id, roles: str | Sequence[str] | None, decision, user_id: str
 ) -> tuple[tuple[str, str] | None, str | None]:
@@ -127,8 +133,32 @@ def approval_check(
         .filter_by(tenant_id=tenant_id, object_type="Decision", decision_type="INVESTIGATION_REVIEW", status="ACTIVE")
         .first()
     )
-    if sod and sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
-        return ("SOD_DENIED", "Approval by another authorized user is required"), None
+    if sod:
+        if sod.creator_cannot_approve and str(decision.authorized_by_ref) == str(user_id):
+            return ("SOD_DENIED", "Approval by another authorized user is required"), None
+
+        # Material edits are recorded in the immutable audit stream.  Using that stream here means the rule also
+        # covers legacy mutation routes that do not have a dedicated ``last_material_editor`` column on Decision.
+        # Only events that change the decision count (MATERIAL_EDIT_ACTIONS): the sign route itself writes
+        # APPROVAL_REQUESTED and refusal events for the signer, which must not make them its "last editor".
+        # Only a stored Decision has an audit stream to read. The Decision Brief signing path passes just the brief's
+        # author (human_decision/service.py approval_subject) and enforces its own author/contributor rule.
+        decision_id = getattr(decision, "id", None)
+        if sod.last_material_editor_cannot_approve and decision_id is not None:
+            material_edit = (
+                db.query(AuditEvent)
+                .filter(
+                    AuditEvent.tenant_id == tenant_id,
+                    AuditEvent.entity_type == "Decision",
+                    AuditEvent.entity_id == decision_id,
+                    AuditEvent.action.in_(MATERIAL_EDIT_ACTIONS),
+                    AuditEvent.actor_ref.isnot(None),
+                )
+                .order_by(AuditEvent.created_at.desc(), AuditEvent.chain_seq.desc())
+                .first()
+            )
+            if material_edit is not None and str(material_edit.actor_ref) == str(user_id):
+                return ("SOD_DENIED", "Approval by the last material editor is not permitted"), None
     return None, role_used
 
 

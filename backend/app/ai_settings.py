@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app import support_access
 from backend.app.access.authz import _admin_tenant, _require_platform_admin
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import get_db
@@ -139,9 +140,12 @@ def update_customer_ai_settings(payload: CustomerAiSettings, request: Request, d
 
 @router.get("/platform-admin/tenants/{tenant_id}/ai-settings")
 def get_platform_ai_settings(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    _require_platform_admin(request, db)
+    platform_admin = _require_platform_admin(request, db)
     if db.get(Tenant, tenant_id) is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
+    support_access.require_customer_approved_access(
+        db, platform_admin, tenant_id, support_access.CONFIGURATION, request=request
+    )
     return _settings(db, tenant_id)
 
 
@@ -153,6 +157,11 @@ def update_platform_ai_settings(
     tenant = db.get(Tenant, tenant_id)
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
+    # Whether the organization's content may go to an AI model is the customer's decision.
+    support_access.require_customer_approved_access(
+        db, platform_admin, tenant_id, support_access.CONFIGURATION, write=True, request=request
+    )
+    tenant = db.get(Tenant, tenant_id)
     before = {
         "ai_processing_allowed": tenant.ai_processing_allowed,
         "ai_monthly_token_budget": tenant.ai_monthly_token_budget,

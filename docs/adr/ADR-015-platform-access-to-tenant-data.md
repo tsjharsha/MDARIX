@@ -10,5 +10,26 @@ Customer-approved, time-boxed, audited access is what enterprise customers and r
 Platform onboarding no longer configures a customer's products; the customer administrator does, or MDARIX staff through an approved grant. Problem reports from a cell carry a reference, page and error code; free text only with the user's consent.
 ## Alternatives Considered
 Platform-approved grants with separation of duties between platform administrators: rejected, because the customer is not in the loop.
+## Implementation (Phase 5, 2026-10-11)
+For every deployment role, not only cells, platform staff reach an organization's data only under a grant its
+Customer Administrator approved (`backend/app/support_access.py`, `backend/app/support_access_api.py`, runbook
+`docs/runbooks/SUPPORT_ACCESS.md`):
+- A grant names a colleague, an organization, **areas** (Configuration, Audit trail, People, Full export), read-only
+  or with changes, a reason and a window of at most 24 hours. A second platform administrator approves it for MDARIX
+  (requester and recipient excluded); then a Customer Administrator approves it **with their authenticator code**, or
+  denies it. Either side revokes it at any time. Migration md38 returned every grant approved by platform staff alone
+  to "waiting for the customer".
+- One gate guards each platform route that reaches an organization's data; a refusal (`403 CUSTOMER_APPROVAL_REQUIRED`)
+  and every use are written to the organization's own audit trail, and the customer sees every use of each grant.
+  Lists spanning organizations leave out what is not granted and say how much they left out.
+- Kept open without a grant: the platform's own organization and its records about an organization; what MDARIX staff
+  did inside an organization (staff accountability); legal hold and the final purge; problem reports a customer sent;
+  provisioning Customer Administrators; and continuity, where nobody inside could act (the only active Customer
+  Administrator's authenticator, the first one's activation).
+- Differs from the decision above in one respect: instead of a temporary account in the cell, the grant opens the
+  named areas to the colleague's own platform account, which keeps one identity per person and every use attributable.
+  In a CELL deployment platform routes are not served at all (ADR-013), so the grant model applies to MULTI and to the
+  platform's own records until cells host support access themselves (Phase 7).
+
 ## Status
-ACCEPTED (2026-10-08)
+ACCEPTED (2026-10-08); IMPLEMENTED (2026-10-11)

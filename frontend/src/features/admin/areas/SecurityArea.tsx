@@ -298,24 +298,46 @@ type Grant = {
   id: string;
   person?: string | null;
   platform_user_business_id?: string | null;
+  requested_by?: string | null;
   tenant_name?: string | null;
   tenant_key?: string | null;
   customer_name?: string | null;
   reason: string;
   status: string;
+  areas?: Array<{ code: string; label: string }>;
+  write?: boolean;
   starts_at?: string | null;
   expires_at?: string | null;
   approved_by?: string | null;
+  customer_decided_by?: string | null;
+  customer_decision_reason?: string | null;
   can_approve: boolean;
   can_revoke: boolean;
 };
 
+type Area = { code: string; label: string };
+
+/** Where a request stands: waiting for MDARIX, waiting for the customer, then the customer's decision. */
+const GRANT_STATUS: Record<string, string> = {
+  PENDING: "Waiting for MDARIX approval",
+  AWAITING_CUSTOMER: "Waiting for the customer",
+  APPROVED: "Active (customer approved)",
+  DENIED: "Denied by the customer",
+  REVOKED: "Revoked",
+  EXPIRED: "Ended",
+};
+
+const areaShortNames = (areas?: Area[]) => (areas ?? []).map((area) => area.label.split(":")[0].trim()).join(", ");
+
 const PLATFORM_ROLES = ["PLATFORM_ADMIN", "MDARIX_ADMINISTRATOR", "ADMINISTRATOR", "ADMIN"];
 const DECISION = { label: "Reason (kept in the audit trail)", min: 10 };
 
-/** Time-limited, read-only access to a customer tenant for support, approved by a second platform administrator. */
+/**
+ * Time-limited access to part of a customer's data, for one platform colleague. A second platform administrator
+ * approves it for MDARIX; then the customer's own administrators decide. Without their approval nothing opens.
+ */
 function SupportAccess({ onMessage }: { onMessage: Notify }) {
-  const grants = useResource<{ items: Grant[] }>("/api/v1/platform-admin/console/support-access");
+  const grants = useResource<{ items: Grant[]; areas: Area[] }>("/api/v1/platform-admin/console/support-access");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [requesting, setRequesting] = useState(false);
   const rows = grants.data?.items ?? [];
@@ -331,8 +353,9 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
       }
     >
       <Intro>
-        Support access is read-only, lasts at most 24 hours, and becomes active only when a different platform
-        administrator approves it.
+        A customer's data is theirs. Support access names the areas you need, is read-only unless changes are asked for,
+        lasts at most 24 hours, and opens only after a second platform administrator approves it for MDARIX and then one
+        of the customer's administrators approves it. Every use is recorded in the customer's audit trail.
       </Intro>
       <Table
         caption="Support access"
@@ -352,6 +375,17 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
             label: "For",
             render: (row) => <PersonCell name={row.person} businessId={row.platform_user_business_id} />,
           },
+          {
+            key: "access",
+            fields: ["areas", "write"],
+            label: "Access",
+            render: (row) => (
+              <span className="cc-stack">
+                <strong>{areaShortNames(row.areas) || "No area named"}</strong>
+                <small>{row.write ? "Read and change" : "Read only"}</small>
+              </span>
+            ),
+          },
           { key: "why", label: "Reason", render: (row) => row.reason },
           {
             key: "window",
@@ -370,7 +404,9 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
             render: (row) => (
               <span className="cc-stack">
                 <StatusBadge status={row.status} />
-                {row.approved_by && <small>Approved by {row.approved_by}</small>}
+                <small>{GRANT_STATUS[row.status] ?? row.status}</small>
+                {row.approved_by && <small>For MDARIX: {row.approved_by}</small>}
+                {row.customer_decided_by && <small>Customer: {row.customer_decided_by}</small>}
               </span>
             ),
           },
@@ -385,17 +421,17 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
                     className="ac-link"
                     onClick={() =>
                       setConfirm({
-                        title: `Approve support access to ${row.tenant_name ?? "this tenant"}?`,
-                        body: `${row.person ?? "The requester"} gets read-only access until ${formatDate(row.expires_at)}. You cannot approve your own request.`,
-                        confirmLabel: "Approve",
+                        title: `Approve for MDARIX: support access to ${row.tenant_name ?? "this tenant"}?`,
+                        body: `The request goes to the customer's administrators, who decide. Nothing opens before they approve. You cannot approve a request you made or one for yourself.`,
+                        confirmLabel: "Approve for MDARIX",
                         reason: DECISION,
                         run: (reason) =>
                           send(`/api/v1/platform-admin/support-access/${row.id}/approve`, "POST", { reason }),
-                        done: "Support access approved.",
+                        done: "Approved for MDARIX. The customer's administrators have been asked.",
                       })
                     }
                   >
-                    Approve
+                    Approve for MDARIX
                   </button>
                 )}
                 {row.can_revoke && (
@@ -434,10 +470,13 @@ function SupportAccess({ onMessage }: { onMessage: Notify }) {
       />
       {requesting && (
         <RequestAccess
+          areas={grants.data?.areas ?? []}
           onClose={() => setRequesting(false)}
           onRequested={() => {
             setRequesting(false);
-            onMessage("Support access requested. Another platform administrator must approve it.");
+            onMessage(
+              "Support access requested. A second platform administrator approves it for MDARIX, then the customer decides.",
+            );
             grants.reload();
           }}
         />
@@ -453,7 +492,15 @@ const DURATIONS = [
   [24, "24 hours"],
 ] as const;
 
-function RequestAccess({ onClose, onRequested }: { onClose: () => void; onRequested: () => void }) {
+function RequestAccess({
+  areas,
+  onClose,
+  onRequested,
+}: {
+  areas: Area[];
+  onClose: () => void;
+  onRequested: () => void;
+}) {
   const users = useResource<any[]>("/api/v1/admin/identity/users");
   const people = listOf(users.data).filter(
     (user) =>
@@ -463,12 +510,25 @@ function RequestAccess({ onClose, onRequested }: { onClose: () => void; onReques
           .replace(/ /g, "_"),
       ) && String(user.status ?? "").toUpperCase() === "ACTIVE",
   );
-  const [form, setForm] = useState({ tenant_id: "", platform_user_id: "", hours: 4, reason: "" });
+  const [form, setForm] = useState({
+    tenant_id: "",
+    platform_user_id: "",
+    hours: 4,
+    reason: "",
+    areas: [] as string[],
+    write: false,
+  });
+  const toggleArea = (code: string) =>
+    setForm((current) => ({
+      ...current,
+      areas: current.areas.includes(code) ? current.areas.filter((item) => item !== code) : [...current.areas, code],
+    }));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.tenant_id) return setError("Choose the tenant.");
+    if (!form.areas.length) return setError("Choose what you need to see: at least one area.");
     setBusy(true);
     setError("");
     const starts = new Date();
@@ -477,7 +537,7 @@ function RequestAccess({ onClose, onRequested }: { onClose: () => void; onReques
       await send("/api/v1/platform-admin/support-access", "POST", {
         tenant_id: form.tenant_id,
         platform_user_id: form.platform_user_id,
-        scope: { customer_360: true, read_only: true },
+        scope: { areas: form.areas, write: form.write },
         reason: form.reason.trim(),
         starts_at: starts.toISOString(),
         expires_at: expires.toISOString(),
@@ -494,7 +554,10 @@ function RequestAccess({ onClose, onRequested }: { onClose: () => void; onReques
       <form className="ac-modal" role="dialog" aria-modal="true" aria-labelledby="ar-request-access" onSubmit={submit}>
         <p className="ac-eyebrow">Support access</p>
         <h2 id="ar-request-access">Request access</h2>
-        <p>Read-only access to one tenant, starting now. A different platform administrator must approve it.</p>
+        <p>
+          Access to part of one customer's data, starting now. A second platform administrator approves it for MDARIX,
+          then the customer's administrators decide.
+        </p>
         <TenantPicker value={form.tenant_id} onChange={(tenant_id) => setForm({ ...form, tenant_id })} />
         <label className="ca-field">
           For
@@ -513,6 +576,23 @@ function RequestAccess({ onClose, onRequested }: { onClose: () => void; onReques
             ))}
           </select>
         </label>
+        <fieldset className="ca-field">
+          <legend>What you need (only these areas open)</legend>
+          {areas.map((area) => (
+            <label key={area.code} className="ca-check">
+              <input type="checkbox" checked={form.areas.includes(area.code)} onChange={() => toggleArea(area.code)} />
+              {area.label}
+            </label>
+          ))}
+          <label className="ca-check">
+            <input
+              type="checkbox"
+              checked={form.write}
+              onChange={(event) => setForm({ ...form, write: event.target.checked })}
+            />
+            Also allow changes (otherwise read-only)
+          </label>
+        </fieldset>
         <label className="ca-field">
           For how long
           <select value={form.hours} onChange={(event) => setForm({ ...form, hours: Number(event.target.value) })}>

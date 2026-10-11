@@ -5,8 +5,10 @@ import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { useConsole } from "../context";
 import { Table, Tabs, formatDate, listOf, send, useResource } from "../shared";
 import { plural, readable } from "../labels";
+import { awaitingCount, type SupportGrant } from "../supportAccessModel";
+import { SupportAccess } from "./SupportAccess";
 
-const TABS = ["Posture", "AI processing", "Single sign-on", "Security events"] as const;
+const TABS = ["Posture", "Support access", "AI processing", "Single sign-on", "Security events"] as const;
 type Tab = (typeof TABS)[number];
 
 // How a single sign-on setup reads while MDARIX checks it ("Pending verification" alone says nothing about who acts).
@@ -31,10 +33,19 @@ const SECURITY_ACTIONS = [
 
 export function SecuritySection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<Tab>((TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Posture");
+  // Requests from MDARIX support that wait for a decision show on the tab, wherever the administrator is.
+  const support = useResource<{ items: SupportGrant[] }>("/api/v1/admin/support-access");
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Security sections">
+      <Tabs
+        tabs={TABS}
+        active={active}
+        onChange={setActive}
+        label="Security sections"
+        counts={{ "Support access": awaitingCount(support.data?.items ?? []) }}
+      >
         {active === "Posture" && <Posture />}
+        {active === "Support access" && <SupportAccess />}
         {active === "AI processing" && <AiProcessing />}
         {active === "Single sign-on" && <SingleSignOn />}
         {active === "Security events" && <SecurityEvents />}

@@ -43,7 +43,10 @@ Audit trail.
 - **Reminder email templates:** the screen offers only the variables the server accepts: `customer_name`,
   `expiry_date`, `days_remaining` and `activation_link`. The previous screen sent other names, so every save
   failed.
-- **Support access:** Approve and Revoke work again. Each asks for a reason. The server refuses approval by the
+- **Support access** (docs/runbooks/SUPPORT_ACCESS.md): a request names the areas needed (Configuration, Audit
+  trail, People, Full export) and whether changes are allowed; *Approve for MDARIX* passes it to the customer, whose
+  administrators decide with their authenticator code. Nothing of an organization's own data opens before that.
+  Approve and Revoke each ask for a reason. The server refuses approval by the
   administrator who requested the access and by the one who would receive it (md35 records the requester), so a
   third platform administrator approves.
 

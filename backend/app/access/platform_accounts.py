@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from backend.app import support_access
 from backend.app.access.authz import _require_platform_admin
 from backend.app.db.models.customer_lifecycle import Customer
 from backend.app.db.models.foundation import AuthUser, Tenant
@@ -126,10 +127,15 @@ def list_customer_users(
     db: Session = Depends(get_db),
 ):
     """The people of customer organizations: every account that is neither a platform administrator nor a Customer
-    Administrator, across all customers, one page at a time. Read-only: each customer's administrators manage them.
-    ``sort``/``order`` order every page by a column (backend/app/sorting.py); by default by customer, tenant, name."""
-    _require_platform_admin(request, db)
+    Administrator, one page at a time. Read-only: each customer's administrators manage them. Only organizations
+    whose administrators approved People access are listed (backend/app/support_access.py); ``withheld`` counts the
+    organizations left out. ``sort``/``order`` order every page by a column (backend/app/sorting.py); by default by
+    customer, tenant, name."""
+    admin = _require_platform_admin(request, db)
+    opened = sorted(support_access.open_tenants(db, admin, support_access.PEOPLE, request=request), key=str)
     query = _base(db).filter(~_is_platform_role(), ~_is_customer_admin_role())
+    withheld = query.filter(AuthUser.tenant_id.not_in(opened)).with_entities(AuthUser.tenant_id).distinct().count()
+    query = query.filter(AuthUser.tenant_id.in_(opened))
     query = _status(_search(query, q), status)
     if role and role.strip():
         wanted = "_".join(role.strip().upper().replace("-", " ").split())
@@ -178,6 +184,7 @@ def list_customer_users(
         "page": current,
         "pages": pages,
         "page_size": size,
+        "withheld": withheld,
     }
 
 

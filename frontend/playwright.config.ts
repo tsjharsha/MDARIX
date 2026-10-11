@@ -27,7 +27,9 @@ export default defineConfig({
     channel: process.env.PLAYWRIGHT_CHANNEL || "chrome",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    // Browser evidence is captured as screenshots and axe reports. Keeping video disabled avoids requiring the
+    // optional ffmpeg download on local MVP validation machines.
+    video: "off",
   },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },

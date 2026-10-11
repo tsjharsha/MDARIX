@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app import support_access
 from backend.app.access.authz import _admin_tenant, _require_platform_admin, ensure_user_visible
 from backend.app.business_ids import business_id_of
 from backend.app.db.models.foundation import AuditEvent, AuthUser, PlanDefinition, Tenant, TenantMembership
@@ -324,6 +325,10 @@ def request_tenant_export(
 ):
     platform_admin = _require_platform_admin(request, db)
     tenant_id = _tenant(db, tenant_id)
+    # A copy of every record of the organization: only under the full-export access its administrators approved.
+    support_access.require_customer_approved_access(
+        db, platform_admin, tenant_id, support_access.DATA_EXPORT, request=request
+    )
     confirm_with_authenticator(
         db, platform_admin, payload.mfa_code, tenant_id=tenant_id, action="TENANT_EXPORT", request=request
     )
@@ -339,7 +344,12 @@ def list_tenant_exports(tenant_id: uuid.UUID, request: Request, db: Session = De
 @router.get("/platform-admin/tenants/{tenant_id}/exports/{export_id}/download")
 def download_tenant_export(tenant_id: uuid.UUID, export_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     platform_admin = _require_platform_admin(request, db)
-    return _download(db, _tenant(db, tenant_id), export_id, str(platform_admin.id))
+    tenant_id = _tenant(db, tenant_id)
+    # Checked again at download: the access may have been revoked or have expired since the export was made.
+    support_access.require_customer_approved_access(
+        db, platform_admin, tenant_id, support_access.DATA_EXPORT, request=request
+    )
+    return _download(db, tenant_id, export_id, str(platform_admin.id))
 
 
 class PurgeRequest(BaseModel):

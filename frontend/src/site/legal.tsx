@@ -48,6 +48,75 @@ export const LEGAL_PAGES = {
 } as const;
 export type LegalPath = keyof typeof LEGAL_PAGES;
 
+const LEGAL_SUMMARIES: Record<LegalPath, { intro: string; sections: { title: string; body: string }[] }> = {
+  "/privacy": {
+    intro:
+      "This page explains how MDARIX handles website, trial, account, security, and customer-submitted investigation data.",
+    sections: [
+      {
+        title: "What we collect",
+        body: "We collect information needed to respond to demo and trial requests, operate accounts, protect the service, maintain audit history, and provide customer-requested investigation workflows.",
+      },
+      {
+        title: "Customer content",
+        body: "Customer quality, complaint, product, supplier, and investigation content is processed to provide the service and remains subject to the customer agreement and configured access controls.",
+      },
+      {
+        title: "AI and human review",
+        body: "AI features are advisory. They may process authorized context when enabled, but AI output is not a verified fact, regulatory conclusion, or human decision.",
+      },
+      {
+        title: "Retention and rights",
+        body: "Retention, deletion, export, legal holds, and data requests follow the applicable customer agreement and approved retention schedule. Contact MDARIX for privacy questions.",
+      },
+    ],
+  },
+  "/terms": {
+    intro:
+      "These terms describe the permitted use of the MDARIX product-investigation platform by organizations and their authorized users.",
+    sections: [
+      {
+        title: "The service",
+        body: "MDARIX connects product, complaint, supplier, evidence, investigation, and human-review workflows. Availability and included capabilities depend on the applicable order or trial arrangement.",
+      },
+      {
+        title: "Your responsibilities",
+        body: "Customers control their users, permissions, connected systems, and submitted content. Users must not access another organization’s data, bypass security controls, or upload malicious content.",
+      },
+      {
+        title: "Human decisions",
+        body: "MDARIX and its AI features support investigation work. Authorized customer personnel remain responsible for quality, regulatory, safety, and product decisions.",
+      },
+      {
+        title: "Data and security",
+        body: "Customer content is used to provide and secure the service. Access is tenant-scoped, activity is audited, and production commitments are governed by the signed customer agreement.",
+      },
+    ],
+  },
+  "/trial-agreement": {
+    intro:
+      "The free trial lets an invited organization evaluate MDARIX with synthetic or non-sensitive data before deciding whether to proceed.",
+    sections: [
+      {
+        title: "Trial scope",
+        body: "A trial is limited by the invitation, plan, seat, and data allowances shown at activation. Features may be limited and the environment is intended for evaluation.",
+      },
+      {
+        title: "Use safe evaluation data",
+        body: "Use synthetic data or data that does not identify patients during a trial. Do not upload patient-identifiable or regulated production records unless a separate written arrangement permits it.",
+      },
+      {
+        title: "AI and decisions",
+        body: "AI output is advisory and requires human review. The trial does not replace a customer’s quality system, regulatory process, validation, or approval controls.",
+      },
+      {
+        title: "End of trial",
+        body: "Trial access ends on the date shown in the invitation or workspace. Trial data is handled according to the applicable retention notice and agreement; contact MDARIX before expiry if you need an export or extension.",
+      },
+    ],
+  },
+};
+
 function EmailLink({ address }: { address: string }) {
   return <a href={`mailto:${address}`}>{address}</a>;
 }
@@ -80,15 +149,28 @@ export function LegalDocumentPage({ path }: { path: LegalPath }) {
       <h1 id="legal-title">{title}</h1>
       {state.status === "LOADING" && <p className="ms-legal-note">Loading…</p>}
       {state.status === "PENDING" && (
-        <p className="ms-legal-note" role="status">
-          This document is being finalized and will be published here before any customer data is processed.
-          {contact ? (
-            <>
-              {" "}
-              Questions in the meantime: <EmailLink address={contact} />.
-            </>
-          ) : null}
-        </p>
+        <>
+          <div className="ms-legal-notice" role="status">
+            <strong>Information page — formal legal text pending approval</strong>
+            <span>
+              This summary is provided for product orientation only and is not a substitute for the approved agreement.
+            </span>
+          </div>
+          <p className="ms-legal-lead">{LEGAL_SUMMARIES[path].intro}</p>
+          <div className="ms-legal-body ms-legal-summary">
+            {LEGAL_SUMMARIES[path].sections.map((section) => (
+              <section key={section.title}>
+                <h2>{section.title}</h2>
+                <p>{section.body}</p>
+              </section>
+            ))}
+          </div>
+          {contact && (
+            <p className="ms-legal-note">
+              Questions about the formal document: <EmailLink address={contact} />.
+            </p>
+          )}
+        </>
       )}
       {state.status === "READY" && state.markdown && (
         <div className="ms-legal-body">
@@ -204,7 +286,10 @@ export function ContactPage() {
     <article className="ms-section ms-legal" aria-labelledby="contact-page-title">
       <span className="ms-eyebrow">Company</span>
       <h1 id="contact-page-title">Contact MDARIX</h1>
-      <p className="ms-legal-lead">Questions about a trial, becoming a design partner, your account or your data.</p>
+      <p className="ms-legal-lead">
+        Questions about a trial, becoming a design partner, your account, integrations, or your data? Choose the route
+        that best matches your request and our team will direct it to the right owner.
+      </p>
       <div className="ms-contact-grid">
         {info?.support_email && (
           <div className="ms-card">
@@ -227,6 +312,32 @@ export function ContactPage() {
             {info.company_address && <span>{info.company_address}</span>}
           </div>
         )}
+      </div>
+      {!info?.support_email && !info?.privacy_email && (
+        <div className="ms-legal-notice" role="status">
+          <strong>Contact details are being configured</strong>
+          <span>
+            The MDARIX operator will publish the approved support and privacy addresses before customer onboarding.
+          </span>
+        </div>
+      )}
+      <div className="ms-contact-topics">
+        <div>
+          <strong>Product and design partnerships</strong>
+          <span>Discuss post-market surveillance, investigation workflows, evidence review, or a controlled demo.</span>
+        </div>
+        <div>
+          <strong>Support and account help</strong>
+          <span>
+            Include your organization, workspace, and a short description of the issue. Do not include patient data.
+          </span>
+        </div>
+        <div>
+          <strong>Privacy and data requests</strong>
+          <span>
+            Use the privacy contact for access, correction, deletion, export, or other personal-data questions.
+          </span>
+        </div>
       </div>
       <div className="ms-cta-row">
         <a className="ms-btn ms-btn-primary" href="/request-demo">

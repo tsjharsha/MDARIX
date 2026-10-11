@@ -17,7 +17,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.customer_lifecycle import (
-    SupportAccessGrant,
     TenantEnvironment,
 )
 from backend.app.db.models.foundation import (
@@ -359,19 +358,10 @@ def _parse_support_time(value: str, field: str) -> datetime:
 
 
 def _expire_support_grants(db: Session, tenant_id: uuid.UUID | None = None) -> int:
-    now = datetime.now(timezone.utc)
-    query = db.query(SupportAccessGrant).filter(
-        SupportAccessGrant.status == "APPROVED", SupportAccessGrant.expires_at <= now
-    )
-    if tenant_id is not None:
-        query = query.filter(SupportAccessGrant.tenant_id == tenant_id)
-    rows = query.all()
-    for row in rows:
-        row.status = "EXPIRED"
-        row.updated_at = now
-    if rows:
-        db.flush()
-    return len(rows)
+    """Close every open support grant whose window has passed (backend/app/support_access.py)."""
+    from backend.app.support_access import expire
+
+    return expire(db, tenant_id)
 
 
 _PROVIDER_PATH_DEFAULTS = {"health_path": "health", "schema_path": "schema"}
