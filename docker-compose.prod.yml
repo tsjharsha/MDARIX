@@ -197,7 +197,8 @@ services:
       migrate: {condition: service_completed_successfully}
 
   # Virus scanning for every uploaded file (object_storage/service.py, clamd INSTREAM). Signatures refresh daily.
-  # Pinned by digest (the multi-platform index of clamav/clamav:1.4); Dependabot proposes updates.
+  # Pinned by digest (clamav/clamav:1.4, published for x86-64 only); Dependabot proposes updates. An ARM server uses
+  # clamav/clamav-debian instead (docker-compose.staging-oracle.yml).
   clamav:
     image: clamav/clamav:1.4@sha256:57deb108fc4c72778aa83eafbca7bb7153e28c3f57c005afd38d31f16da86f23
     restart: unless-stopped

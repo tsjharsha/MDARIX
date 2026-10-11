@@ -1,0 +1,84 @@
+# MDARIX staging on one Oracle Cloud "Always Free" ARM server (docs/runbooks/STAGING_ORACLE.md, ADR-017).
+#
+# A layer on the production file, which stays the one definition of the application services:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.staging-oracle.yml --env-file .env.production ...
+#
+# (or COMPOSE_FILE=docker-compose.prod.yml:docker-compose.staging-oracle.yml and COMPOSE_ENV_FILES=.env.production in
+# the deploy user's profile). Only what this server needs differently from production is here:
+#
+#   - Postgres runs on the server, because Oracle's free tier has no managed PostgreSQL. It is reachable on the
+#     private network only, over TLS only (its own certificate authority, made by infrastructure/staging/
+#     prepare-database.sh), so the application connects with POSTGRES_SSLMODE=verify-full exactly as in production.
+#     It has no point-in-time recovery: staging holds no customer data (ADR-017).
+#   - ClamAV comes from the Debian-based image, which is published for ARM; the Alpine-based image production uses
+#     is published for x86 only.
+#   - The images are built on the server (released images are x86): MDARIX_IMAGE_REPOSITORY=mdarix.
+
+services:
+  postgres:
+    # pgvector/pgvector:pg16, pinned by the digest of its multi-platform index (amd64 and arm64).
+    image: pgvector/pgvector:pg16@sha256:7b822b0aac60967beb1ea5e576b8602c94c300a157d187f385ae3e0da199b90a
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/mdarix-db/tls/server.crt
+      - -c
+      - ssl_key_file=/etc/mdarix-db/tls/server.key
+      - -c
+      - ssl_min_protocol_version=TLSv1.2
+      # Inside the container the postgres user signs in over the socket (peer); every network connection must use
+      # TLS and a password, and anything else is refused (infrastructure/staging/pg_hba.conf).
+      - -c
+      - hba_file=/etc/mdarix-db/pg_hba.conf
+      - -c
+      - password_encryption=scram-sha-256
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      # Read once, when the database cluster is first created. It never reaches the application containers.
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    secrets: [postgres_admin_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./staging-secrets/db-tls/server.crt:/etc/mdarix-db/tls/server.crt:ro
+      - ./staging-secrets/db-tls/server.key:/etc/mdarix-db/tls/server.key:ro
+      - ./infrastructure/staging/pg_hba.conf:/etc/mdarix-db/pg_hba.conf:ro
+    networks: [internal]
+    shm_size: 256m
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2g
+    cpus: 1.0
+    # A clean shutdown writes a checkpoint, so the next start does not replay the write-ahead log.
+    stop_grace_period: 60s
+    healthcheck:
+      # As the postgres user, so the socket's peer rule accepts it (as root, every check would log a failed login).
+      test: ["CMD", "gosu", "postgres", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "10"}
+
+  # The schema job waits for the database; the API, worker and scheduler already wait for the schema job.
+  migrate:
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  clamav:
+    # clamav/clamav-debian:1.4, pinned by the digest of its multi-platform index (amd64, arm64, ppc64le). Same
+    # clamd port (3310), signature folder (/var/lib/clamav) and health script (clamdcheck.sh) as clamav/clamav.
+    image: clamav/clamav-debian:1.4@sha256:6d0680780fd29855cb7018f68272cb520821f614259e2066f8ec669069ac91b3
+
+secrets:
+  postgres_admin_password:
+    file: ./staging-secrets/postgres-admin-password
+
+volumes:
+  postgres_data: {}

@@ -25,4 +25,5 @@ evaluation/scenarios/** text eol=lf
 *.sh text eol=lf
 Dockerfile* text eol=lf
 infrastructure/docker/** text eol=lf
+infrastructure/staging/** text eol=lf
 docker-compose*.yml text eol=lf

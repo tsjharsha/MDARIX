@@ -56,4 +56,6 @@ artifacts/demo/
 *.age
 .env.migrate
 /certs/
+# The staging database's administrator password and TLS key (infrastructure/staging/prepare-database.sh).
+/staging-secrets/
 .logs/

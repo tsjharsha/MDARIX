@@ -3,6 +3,13 @@
 Required checks fail fast: both instances healthy, durable session reuse and
 cross-instance revocation. Optional integrations are reported explicitly as
 PASS, NOT_CONFIGURED, or NOT_EXERCISED; they are never inferred from config.
+
+It runs with the settings of the environment it is started in, development or staging/production (on a server:
+inside the api container, docs/runbooks/STAGING_ORACLE.md). The session cookie is that environment's
+(auth/cookies.py: ``__Host-mdarix_session`` outside development) and is sent explicitly to each instance, because
+the instances listen on plain HTTP and an HTTP client would not send a ``Secure`` cookie back by itself. A state
+change carrying the cookie names the app's own origin (MDARIX_APP_URL), as a browser does, since production-like
+servers refuse it otherwise (backend/app/main.py, enforce_cookie_csrf).
 """
 
 from __future__ import annotations
@@ -13,6 +20,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import httpx
 
@@ -21,6 +29,12 @@ sys.path.insert(0, str(ROOT))
 PORTS = tuple(int(value) for value in os.getenv("MDARIX_MULTI_INSTANCE_PORTS", "8021,8022").split(","))
 EMAIL = os.getenv("MDARIX_TEST_EMAIL", "r1-user-01@synthetic.invalid")
 PASSWORD = os.environ["DAY35_FIXTURE_PASSWORD"]  # no default: fixture passwords come from the environment
+
+from auth.cookies import session_cookie_name  # noqa: E402 (needs ROOT on sys.path)
+
+COOKIE = session_cookie_name()
+_APP_URL = urlparse(os.getenv("MDARIX_APP_URL", "").strip())
+APP_ORIGIN = {"Origin": f"{_APP_URL.scheme}://{_APP_URL.netloc}"} if _APP_URL.scheme and _APP_URL.netloc else {}
 
 
 def get(client: httpx.Client, path: str):
@@ -55,10 +69,11 @@ def main() -> int:
 
             signed = clients[0].post("/api/v1/auth/signin", json={"email": EMAIL, "password": PASSWORD}, timeout=15)
             signed.raise_for_status()
-            cookie = signed.cookies.get("mdarix_session")
+            cookie = signed.cookies.get(COOKIE)
             if not cookie:
-                raise RuntimeError("signin did not return a durable session cookie")
-            shared = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}", cookies={"mdarix_session": cookie})
+                raise RuntimeError(f"signin did not return a durable session cookie ({COOKIE})")
+            first = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}", cookies={COOKIE: cookie})
+            shared = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}", cookies={COOKIE: cookie})
             try:
                 session = get(shared, "/api/v1/auth/session")
                 session.raise_for_status()
@@ -67,29 +82,32 @@ def main() -> int:
                     raise RuntimeError("session context is incomplete")
                 print(f"PASS | session reuse | user={context['user_id']} tenant={context['tenant_id']}")
 
-                revoked = shared.post("/api/v1/auth/signout", timeout=10)
+                # Instance 1 accepts the session before the revocation, so its refusal afterwards is the revocation.
+                before_revoke = get(first, "/api/v1/auth/session")
+                if before_revoke.status_code != 200:
+                    raise RuntimeError(f"instance 1 did not accept the session (HTTP {before_revoke.status_code})")
+                revoked = shared.post("/api/v1/auth/signout", headers=APP_ORIGIN, timeout=10)
                 revoked.raise_for_status()
-                after_revoke = get(clients[0], "/api/v1/auth/session")
+                after_revoke = get(first, "/api/v1/auth/session")
                 if after_revoke.status_code != 401:
                     raise RuntimeError("session remained valid after cross-instance revocation")
                 print("PASS | session revocation | instance 1 rejected session revoked by instance 2")
             finally:
                 shared.close()
+                first.close()
 
             signed_again = clients[0].post(
                 "/api/v1/auth/signin", json={"email": EMAIL, "password": PASSWORD}, timeout=15
             )
             signed_again.raise_for_status()
-            cookie_again = signed_again.cookies.get("mdarix_session")
-            expiring = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}", cookies={"mdarix_session": cookie_again})
+            cookie_again = signed_again.cookies.get(COOKIE)
+            expiring = httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}", cookies={COOKIE: cookie_again})
             try:
                 print("NOT_EXERCISED | session expiry | requires a controlled short-TTL deployment or DB fixture")
             finally:
                 expiring.close()
 
-            with httpx.Client(
-                base_url=f"http://127.0.0.1:{PORTS[0]}", cookies={"mdarix_session": cookie_again}
-            ) as authenticated:
+            with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}", cookies={COOKIE: cookie_again}) as authenticated:
                 for label, path in (
                     ("SMTP/provider", "/api/v1/communication/provider-health"),
                     ("GenAI/provider", "/api/v1/stage3/genai-health"),
