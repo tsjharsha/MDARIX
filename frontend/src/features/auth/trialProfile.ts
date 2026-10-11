@@ -4,6 +4,8 @@
  * invitation email after approval, and MDARIX staff never see it.
  */
 
+import { DIALING_CODES } from "./dialingCodes";
+
 export type Option = { value: string; label: string };
 
 export const COMPANY_SIZES: Option[] = [
@@ -110,4 +112,34 @@ export function signupBody(email: string, name: string, company: string, profile
     evaluation_goal: profile.evaluationGoal,
     no_patient_data: profile.noPatientData,
   };
+}
+
+export type Country = { code: string; name: string; dial: string; label: string };
+
+/**
+ * Every country and territory for the sign-up dropdown, sorted by name and shown as "+91 - India": the dialing code
+ * from libphonenumber's metadata (dialingCodes.ts), the name from the browser's standard English region names.
+ */
+export function countries(locale = "en"): Country[] {
+  const names =
+    typeof Intl !== "undefined" && "DisplayNames" in Intl ? new Intl.DisplayNames([locale], { type: "region" }) : null;
+  return DIALING_CODES.map(([code, dial]) => {
+    const name = names?.of(code) ?? code;
+    return { code, name, dial, label: `${dial} - ${name}` };
+  }).sort((a, b) => a.name.localeCompare(b.name, locale));
+}
+
+/** The same check the server makes (backend/app/trial/request_profile.py): +, the country code, then 8 to 15 digits in
+ * all; an empty phone is fine (it is optional). */
+export function isInternationalPhone(value: string): boolean {
+  const phone = value.trim();
+  if (!phone) return true;
+  const digits = phone.replace(/\D/g, "").length;
+  return /^\+[1-9][0-9 ().-]*$/.test(phone) && digits >= 8 && digits <= 15;
+}
+
+/** When a country is chosen and the phone is still empty (or only another country's code), start it with the code. */
+export function phoneWithDialCode(phone: string, dial: string): string {
+  const current = phone.trim();
+  return !current || /^\+\d{1,4}$/.test(current) ? `${dial} ` : phone;
 }

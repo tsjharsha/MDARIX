@@ -10659,6 +10659,31 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: #8a1c1c;
   font-size: 14px;
 }
+.su-message p {
+  margin: 0;
+  line-height: 1.5;
+}
+.su-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 8px !important;
+}
+.su-message-actions a {
+  color: #8a1c1c;
+  font-weight: 700;
+  text-decoration: underline;
+}
+.su-req {
+  margin-left: 2px;
+  color: #b42318;
+  font-weight: 700;
+}
+.su-required-note {
+  margin: -6px 0 0;
+  color: var(--auth-ink-2);
+  font-size: 13px;
+}
 .auth-page .auth-card.su-done {
   justify-items: start;
 }

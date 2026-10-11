@@ -383,7 +383,8 @@ def test_new_trial_request_alerts_the_platform_admin(monkeypatch):
         "/api/v1/auth/signup",
         json={"email": email, "display_name": "Taylor Quality", "organization": "Alerted Devices", **PROFILE},
     )
-    assert again.status_code == 200 and len(sent) == 1
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "TRIAL_ALREADY_REQUESTED"
+    assert len(sent) == 1
 
 
 def test_a_failing_alert_never_breaks_sign_up(monkeypatch):

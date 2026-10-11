@@ -105,7 +105,7 @@ def behind_proxy(monkeypatch):
 # ------------------------------------------------------------------------------------------- Sign-up
 
 
-def test_signup_answers_the_same_for_new_known_and_repeated_emails():
+def test_signup_tells_a_known_or_repeated_email_to_sign_in_or_wait():
     client = TestClient(app)
     existing = _user()
     new_email = f"signup-{uuid.uuid4().hex[:10]}@example.invalid"
@@ -113,9 +113,11 @@ def test_signup_answers_the_same_for_new_known_and_repeated_emails():
     first = client.post("/api/v1/auth/signup", json={**body, "email": new_email})
     again = client.post("/api/v1/auth/signup", json={**body, "email": new_email})
     known = client.post("/api/v1/auth/signup", json={**body, "email": existing.username})
-    assert first.status_code == again.status_code == known.status_code == 200
-    assert first.json() == again.json() == known.json()
-    assert "request_id" not in first.json()
+    assert first.status_code == 200 and "request_id" not in first.json()
+    # Product decision 2026-10-11: a known email is told so, to sign in or reset the password (rate limits apply).
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "TRIAL_ALREADY_REQUESTED"
+    assert known.status_code == 409 and known.json()["detail"]["code"] == "EMAIL_ALREADY_REGISTERED"
+    assert "reset your password" in known.json()["detail"]["message"]
     db = SessionLocal()
     try:
         assert db.query(OnboardingRequest).filter(OnboardingRequest.email == new_email).count() == 1

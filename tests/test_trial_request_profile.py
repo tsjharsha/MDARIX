@@ -78,6 +78,10 @@ def test_only_offered_choices_are_stored_and_empty_answers_are_left_out():
         ({"trial_data": "LIVE_PATIENT_DATA"}, "INVALID_TRIAL_DATA"),
         ({"phone": "call me maybe"}, "VALID_PHONE_REQUIRED"),
         ({"phone": "12345"}, "VALID_PHONE_REQUIRED"),
+        ({"phone": "98400 80008"}, "VALID_PHONE_REQUIRED"),  # international format only: + and the country code
+        ({"phone": "+0 123 456 789"}, "VALID_PHONE_REQUIRED"),
+        ({"phone": "+12345"}, "VALID_PHONE_REQUIRED"),
+        ({"phone": "+91 98400 80008 12345"}, "VALID_PHONE_REQUIRED"),  # more than 15 digits
     ):
         with pytest.raises(rp.ProfileError) as problem:
             rp.build_profile(_signup(**answers))

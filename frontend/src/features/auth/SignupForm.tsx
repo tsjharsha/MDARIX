@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import {
@@ -9,6 +9,9 @@ import {
   EMPTY_PROFILE,
   MARKETS,
   TRIAL_DATA,
+  countries,
+  isInternationalPhone,
+  phoneWithDialCode,
   signupBody,
   toggleMarket,
   type Option,
@@ -21,12 +24,25 @@ const STEP_ONE_CODES = new Set([
   "COUNTRY_REQUIRED",
   "VALID_EMAIL_REQUIRED",
   "VALID_PHONE_REQUIRED",
+  "EMAIL_ALREADY_REGISTERED",
+  "TRIAL_ALREADY_REQUESTED",
 ]);
 
 const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
 };
+
+const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
+
+/** The asterisk of a required field (the input itself carries `required`, which screen readers announce). */
+function Req() {
+  return (
+    <span className="su-req" aria-hidden="true">
+      *
+    </span>
+  );
+}
 
 function Choice({
   label,
@@ -55,9 +71,9 @@ function Choice({
 }
 
 /**
- * The free-trial request, in two short steps: who you are (required), then your trial (optional details and the
- * no-patient-data confirmation). No password is asked for: the requester sets it from the invitation email and MDARIX
- * staff never see it. POST /api/v1/auth/signup answers the same for new and known emails.
+ * The free-trial request, in two short steps: who you are, then your trial. Required fields carry an asterisk. No
+ * password is asked for: the requester sets it from the invitation email and MDARIX staff never see it. An email that
+ * already has an account is told so, with Sign in and Reset password at hand.
  */
 export function SignupForm() {
   const [step, setStep] = useState<1 | 2>(1);
@@ -68,17 +84,39 @@ export function SignupForm() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [message, setMessage] = useState("");
+  const [problem, setProblem] = useState("");
   const stepOne = useRef<HTMLFieldSetElement>(null);
+  const phoneInput = useRef<HTMLInputElement>(null);
+  const allCountries = useMemo(() => countries(), []);
   const answer =
     <K extends keyof TrialProfile>(key: K) =>
     (value: TrialProfile[K]) =>
       setProfile((current) => ({ ...current, [key]: value }));
 
+  const chooseCountry = (countryName: string) => {
+    const chosen = allCountries.find((country) => country.name === countryName);
+    setProfile((current) => ({
+      ...current,
+      country: countryName,
+      phone: chosen ? phoneWithDialCode(current.phone, chosen.dial) : current.phone,
+    }));
+  };
+
   const next = () => {
-    if (stepOne.current?.reportValidity()) {
-      setMessage("");
-      setStep(2);
+    phoneInput.current?.setCustomValidity(isInternationalPhone(profile.phone) ? "" : PHONE_HINT);
+    // A fieldset always reports itself valid (it is not a candidate for constraint validation): each field is checked,
+    // and the first one with a problem says so.
+    const fields = Array.from(
+      stepOne.current?.querySelectorAll<HTMLInputElement | HTMLSelectElement>("input, select") ?? [],
+    );
+    const invalid = fields.find((field) => !field.checkValidity());
+    if (invalid) {
+      invalid.reportValidity();
+      return;
     }
+    setMessage("");
+    setProblem("");
+    setStep(2);
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -87,13 +125,14 @@ export function SignupForm() {
     if (busy) return;
     setBusy(true);
     setMessage("");
+    setProblem("");
     try {
       let response: Response;
       try {
         response = await fetch("/api/v1/auth/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(signupBody(email, name, company, profile)),
+          body: JSON.stringify(signupBody(email, name, company, { ...profile, phone: profile.phone.trim() })),
         });
       } catch {
         setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
@@ -105,9 +144,10 @@ export function SignupForm() {
         return;
       }
       if (!response.ok) {
-        const code: string | undefined = data.detail?.code;
-        if (code && STEP_ONE_CODES.has(code)) setStep(1);
-        setMessage((code && MESSAGES[code]) || data.detail?.message || "The request could not be completed.");
+        const code: string = data.detail?.code ?? "";
+        if (STEP_ONE_CODES.has(code)) setStep(1);
+        setProblem(code);
+        setMessage(MESSAGES[code] || data.detail?.message || "The request could not be completed.");
         return;
       }
       setDone(true);
@@ -136,6 +176,18 @@ export function SignupForm() {
       </div>
     );
 
+  const alert = message && (
+    <div className="su-message" role="alert">
+      <p>{message}</p>
+      {problem === "EMAIL_ALREADY_REGISTERED" && (
+        <p className="su-message-actions">
+          <a href={`/signin?email=${encodeURIComponent(email)}`}>Sign in</a>
+          <a href="/forgot-password">Reset password</a>
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <form className="auth-card su-card" onSubmit={submit}>
       <span className="eyebrow">Request access</span>
@@ -152,12 +204,18 @@ export function SignupForm() {
           <span>2</span> Your trial
         </li>
       </ol>
+      <p className="su-required-note">
+        Fields marked <span className="su-req">*</span> are required.
+      </p>
 
       {step === 1 ? (
         <fieldset className="su-fields" ref={stepOne}>
           <legend className="su-legend">About you</legend>
+          {alert && <div className="su-wide">{alert}</div>}
           <label className="auth-field">
-            Full name
+            <span>
+              Full name <Req />
+            </span>
             <input
               required
               maxLength={120}
@@ -167,7 +225,9 @@ export function SignupForm() {
             />
           </label>
           <label className="auth-field">
-            Job title
+            <span>
+              Job title <Req />
+            </span>
             <input
               required
               maxLength={120}
@@ -177,7 +237,9 @@ export function SignupForm() {
             />
           </label>
           <label className="auth-field su-wide">
-            Work email
+            <span>
+              Work email <Req />
+            </span>
             <input
               required
               type="email"
@@ -188,7 +250,9 @@ export function SignupForm() {
             />
           </label>
           <label className="auth-field">
-            Company
+            <span>
+              Company <Req />
+            </span>
             <input
               required
               maxLength={160}
@@ -198,26 +262,35 @@ export function SignupForm() {
             />
           </label>
           <label className="auth-field">
-            Country
-            <input
-              required
-              maxLength={80}
-              autoComplete="country-name"
-              value={profile.country}
-              onChange={(e) => answer("country")(e.target.value)}
-            />
+            <span>
+              Country <Req />
+            </span>
+            <select required value={profile.country} onChange={(e) => chooseCountry(e.target.value)}>
+              <option value="">Choose your country…</option>
+              {allCountries.map((country) => (
+                <option key={country.code} value={country.name}>
+                  {country.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="auth-field su-wide">
-            <span>
-              Phone <small>(optional)</small>
-            </span>
+            Phone
             <input
+              ref={phoneInput}
               type="tel"
               maxLength={30}
               autoComplete="tel"
+              inputMode="tel"
+              placeholder="+91 98765 43210"
+              aria-describedby="su-phone-hint"
               value={profile.phone}
-              onChange={(e) => answer("phone")(e.target.value)}
+              onChange={(e) => {
+                e.target.setCustomValidity("");
+                answer("phone")(e.target.value);
+              }}
             />
+            <small id="su-phone-hint">{PHONE_HINT}</small>
           </label>
           <button className="primary-action su-wide" type="button" onClick={next}>
             Continue
@@ -227,7 +300,7 @@ export function SignupForm() {
         <fieldset className="su-fields">
           <legend className="su-legend">Your trial</legend>
           <p className="su-hint su-wide">
-            Optional: these answers help us prepare sample data and checks that match your devices.
+            These answers help us prepare sample data and checks that match your devices.
           </p>
           <Choice
             label="Company size"
@@ -302,7 +375,9 @@ export function SignupForm() {
               checked={profile.noPatientData}
               onChange={(e) => answer("noPatientData")(e.target.checked)}
             />
-            We will not upload patient-identifiable data during the trial.
+            <span>
+              We will not upload patient-identifiable data during the trial. <Req />
+            </span>
           </label>
           <p className="auth-consent su-wide">
             By requesting a trial you agree to the <a href="/terms">Terms of Service</a> and the{" "}
@@ -310,6 +385,7 @@ export function SignupForm() {
             <a href="/privacy">Privacy Policy</a>. Trial data is deleted 30 days after the trial ends unless you
             continue.
           </p>
+          {alert && <div className="su-wide">{alert}</div>}
           <div className="su-actions su-wide">
             <button className="su-secondary" type="button" onClick={() => setStep(1)} disabled={busy}>
               Back
@@ -321,11 +397,6 @@ export function SignupForm() {
         </fieldset>
       )}
 
-      {message && (
-        <p className="su-message" role="alert">
-          {message}
-        </p>
-      )}
       <p className="auth-links">
         Already have an account? <a href="/signin">Sign in</a>
       </p>

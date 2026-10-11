@@ -59,8 +59,10 @@ TRIAL_DATA = {
     "ANONYMIZED_EXPORTS": "Our anonymized exports",
 }
 
-# A phone number as people type it: an optional +, then digits with spaces, dashes, dots or brackets; 7 to 20 digits.
-_PHONE_CHARS = re.compile(r"^\+?[0-9 ().-]+$")
+# A phone number in international format: +, the country code and the number (E.164: at most 15 digits), with the
+# spaces, dashes, dots or brackets people type.
+_PHONE_CHARS = re.compile(r"^\+[1-9][0-9 ().-]*$")
+PHONE_FORMAT = "+ country code and number, for example +91 98765 43210"
 
 
 class ProfileError(ValueError):
@@ -99,8 +101,11 @@ def build_profile(data) -> dict:
             "Confirm that you will not upload patient-identifiable data during the trial",
         )
     phone = _text(data.phone)
-    if phone and (not _PHONE_CHARS.match(phone) or not 7 <= sum(ch.isdigit() for ch in phone) <= 20):
-        raise ProfileError("VALID_PHONE_REQUIRED", "Enter a valid phone number, or leave it empty")
+    if phone and (not _PHONE_CHARS.match(phone) or not 8 <= sum(ch.isdigit() for ch in phone) <= 15):
+        raise ProfileError(
+            "VALID_PHONE_REQUIRED",
+            f"Enter the phone number in international format ({PHONE_FORMAT}), or leave it empty",
+        )
     markets = []
     for market in data.markets or []:
         if market not in MARKETS:
