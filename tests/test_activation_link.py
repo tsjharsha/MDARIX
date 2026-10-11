@@ -53,6 +53,10 @@ def world():
         }
         db.commit()
         ids = {key: (user.id, user.tenant_id, user.username) for key, user in made.items()}
+    from tests.support_grants import grant_support_access
+
+    # MDARIX support issues links to the organization's people under the People access its administrators approved.
+    grant_support_access(ids["customer_admin"][1], ids["platform"][0])
     return ids
 
 

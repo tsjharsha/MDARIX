@@ -120,6 +120,9 @@ def tenant():
     saved = (row.ai_processing_allowed, row.ai_monthly_token_budget)
     db.close()
     _set(tenant_id, ai_processing_allowed=False)  # so the switch below is a real "on" that needs the acknowledgement
+    from tests.support_grants import grant_support_access
+
+    grant_support_access(tenant_id, areas=("CONFIGURATION",))  # the customer approved Configuration access
     switched = authenticated_client().put(
         f"/api/v1/platform-admin/tenants/{tenant_id}/ai-settings",
         json={
@@ -350,6 +353,9 @@ def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the
         json={"company_name": f"AI Default {code}", "tenant_code": code, "plan_code": "STARTER"},
     )
     assert created.status_code == 200, created.text
+    from tests.support_grants import grant_support_access
+
+    grant_support_access(created.json()["id"], areas=("CONFIGURATION",))
     url = f"/api/v1/platform-admin/tenants/{created.json()['id']}/ai-settings"
     assert platform.get(url).json()["ai_processing_allowed"] is False
     body = {"ai_processing_allowed": True, "reason": "Customer signed the AI addendum"}

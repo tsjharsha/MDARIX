@@ -26,6 +26,7 @@ from auth.durable import hash_token, issue_invitation, issue_reset, revoke_user_
 from auth.emailer import EmailDeliveryError, company, send_activation_email, send_password_reset_email
 from auth.service import _hash
 from backend.app.access.authz import _require_platform_admin
+from backend.app import support_access
 from backend.app.access.common import _development_token, _enforce_invite_limits, erasure_refused
 from backend.app.access.schemas import (
     CustomerAdminActionRequest,
@@ -407,6 +408,9 @@ def issue_activation_link(user_id: uuid.UUID, request: Request, response: Respon
     user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
+    # MDARIX activates a Customer Administrator only while the organization has no active one (continuity);
+    # anyone else of the organization only under the People access its administrators approved.
+    support_access.require_people_access(db, platform_admin, user, continuity=True, request=request)
     status = (user.status or "").upper()
     if status == "ACTIVE":
         raise HTTPException(
@@ -458,6 +462,8 @@ def erase_user_personal_data(
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
     if user_id == platform_admin.id:
         raise HTTPException(409, detail={"code": "SELF_CHANGE_NOT_ALLOWED", "message": "You cannot erase yourself"})
+    # Erasure is the organization's decision: its administrators do it, or approve People access for MDARIX.
+    support_access.require_people_access(db, platform_admin, user, continuity=False, request=request)
     try:
         result = erase_person(db, user, str(platform_admin.id), payload.reason.strip())
     except PurgeFailed as exc:
@@ -482,6 +488,9 @@ def reset_user_mfa(
     user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
+    # Colleagues on the platform team, and an organization's only active Customer Administrator, are MDARIX's to
+    # recover; anyone else, under the People access the organization's administrators approved.
+    support_access.require_people_access(db, platform_admin, user, continuity=True, request=request)
     now = datetime.now(timezone.utc)
     revoked = mfa.reset(db, user, now)
     _audit(

@@ -1,0 +1,318 @@
+"""The customer's side of support access (ADR-015, backend/app/support_access.py).
+
+A Customer Administrator sees every request MDARIX approved for their organization: who would get access, to what,
+whether changes are allowed, why and until when. They approve it (with their authenticator code: consent to data
+access is as strong as a signature), deny it, or revoke it at any time, and see every use made of it, as recorded in
+their own audit trail. Platform administrators cannot decide for a customer, even in an organization they belong to.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from backend.app import support_access as access
+from backend.app.access.authz import _authenticated_user
+from backend.app.db.models.customer_lifecycle import SupportAccessGrant
+from backend.app.db.models.foundation import AuditEvent, AuthUser
+from backend.app.db.session import get_db
+from backend.app.enterprise_audit import make_audit_event
+from backend.app.role_codes import is_customer_admin_role
+from backend.app.tenant_export_api import confirm_with_authenticator
+
+router = APIRouter(prefix="/api/v1", tags=["Support access"])
+
+DECISIONS = {
+    "SUPPORT_ACCESS_REQUESTED",
+    "SUPPORT_ACCESS_APPROVED",
+    "SUPPORT_ACCESS_CUSTOMER_APPROVED",
+    "SUPPORT_ACCESS_DENIED",
+    "SUPPORT_ACCESS_REVOKED",
+    access.ACCESS_USED,
+}
+
+
+class CustomerApproval(BaseModel):
+    reason: str = Field(min_length=10, max_length=1000)
+    # The approving administrator's current authenticator code (confirm_with_authenticator).
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
+
+
+class CustomerDecision(BaseModel):
+    reason: str = Field(min_length=10, max_length=1000)
+
+
+def _customer_admin(request: Request, db: Session) -> AuthUser:
+    user = _authenticated_user(request, db)
+    if not is_customer_admin_role(user.role):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "CUSTOMER_ADMIN_REQUIRED",
+                "message": "Only the organization's Customer Administrators decide on support access",
+            },
+        )
+    return user
+
+
+def _grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, *, lock: bool = True) -> SupportAccessGrant:
+    query = db.query(SupportAccessGrant).filter(
+        SupportAccessGrant.id == grant_id,
+        SupportAccessGrant.tenant_id == admin.tenant_id,
+        # Only what MDARIX approved reaches the customer; a request still inside MDARIX is not theirs to see.
+        SupportAccessGrant.approved_at.isnot(None),
+    )
+    row = (query.with_for_update() if lock else query).first()
+    if row is None:
+        raise HTTPException(
+            404, detail={"code": "SUPPORT_ACCESS_NOT_FOUND", "message": "Support access request is not available"}
+        )
+    return row
+
+
+def _people(db: Session, ids) -> dict[str, dict]:
+    wanted = [value for value in ids if value]
+    if not wanted:
+        return {}
+    rows = db.query(AuthUser).filter(AuthUser.id.in_(wanted)).all()
+    return {str(row.id): {"name": row.display_name or row.username, "email": row.username} for row in rows}
+
+
+def _uses(db: Session, tenant_id, grant_ids) -> dict[str, dict]:
+    if not grant_ids:
+        return {}
+    rows = (
+        db.query(AuditEvent.entity_id, func.count(AuditEvent.id), func.max(AuditEvent.created_at))
+        .filter(
+            AuditEvent.tenant_id == tenant_id,
+            AuditEvent.action == access.ACCESS_USED,
+            AuditEvent.entity_id.in_(grant_ids),
+        )
+        .group_by(AuditEvent.entity_id)
+        .all()
+    )
+    return {str(grant_id): {"count": count, "last": last} for grant_id, count, last in rows}
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value else None
+
+
+def describe(row: SupportAccessGrant, people: dict, uses: dict, now: datetime) -> dict:
+    """A grant as its organization's administrators read it."""
+    scope = access.SupportScope.stored(row.scope)
+    recipient = people.get(str(row.platform_user_id), {})
+    use = uses.get(str(row.id), {})
+    awaiting = row.status == access.AWAITING_CUSTOMER and access._aware(row.expires_at) > now
+    is_open = row.status in {access.AWAITING_CUSTOMER, access.APPROVED} and access._aware(row.expires_at) > now
+    return {
+        "id": str(row.id),
+        "status": row.status,
+        "person": recipient.get("name"),
+        "person_email": recipient.get("email"),
+        "requested_by": people.get(str(row.requested_by), {}).get("name"),
+        "approved_for_mdarix_by": people.get(str(row.approved_by), {}).get("name"),
+        "reason": row.reason,
+        "areas": scope.describe(),
+        "write": scope.write,
+        "starts_at": _iso(row.starts_at),
+        "expires_at": _iso(row.expires_at),
+        "decided_by": people.get(str(row.customer_decided_by), {}).get("name"),
+        "decided_at": _iso(row.customer_decided_at),
+        "decision_reason": row.customer_decision_reason,
+        "revoked_at": _iso(row.revoked_at),
+        "uses": use.get("count", 0),
+        "last_used_at": _iso(use.get("last")),
+        "can_approve": awaiting and bool(scope.areas),
+        "can_deny": awaiting,
+        "can_revoke": is_open,
+    }
+
+
+def _audit(db: Session, admin: AuthUser, row: SupportAccessGrant, action: str, reason: str, request, details=None):
+    db.add(
+        make_audit_event(
+            tenant_id=admin.tenant_id,
+            actor_ref=str(admin.id),
+            action=action,
+            entity_type="SupportAccessGrant",
+            entity_id=row.id,
+            details={"source": "CUSTOMER_ADMIN", **(details or {})},
+            reason=reason,
+            request=request,
+        )
+    )
+
+
+@router.get("/admin/support-access")
+def list_support_access(request: Request, db: Session = Depends(get_db)):
+    """Every request MDARIX approved for this organization, newest first, and how many waits for a decision."""
+    admin = _customer_admin(request, db)
+    access.expire(db, admin.tenant_id)
+    db.commit()
+    rows = (
+        db.query(SupportAccessGrant)
+        .filter(SupportAccessGrant.tenant_id == admin.tenant_id, SupportAccessGrant.approved_at.isnot(None))
+        .order_by(SupportAccessGrant.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    people = _people(
+        db,
+        {
+            value
+            for row in rows
+            for value in (row.platform_user_id, row.requested_by, row.approved_by, row.customer_decided_by)
+        },
+    )
+    uses = _uses(db, admin.tenant_id, [row.id for row in rows])
+    now = datetime.now(timezone.utc)
+    items = [describe(row, people, uses, now) for row in rows]
+    return {
+        "items": items,
+        "awaiting_decision": sum(1 for item in items if item["can_approve"] or item["can_deny"]),
+        "areas": [{"code": code, "label": label} for code, label in access.AREAS.items()],
+    }
+
+
+def _decided(db: Session, admin: AuthUser, row: SupportAccessGrant) -> dict:
+    people = _people(db, {row.platform_user_id, row.requested_by, row.approved_by, row.customer_decided_by})
+    return describe(row, people, _uses(db, admin.tenant_id, [row.id]), datetime.now(timezone.utc))
+
+
+def _awaiting(row: SupportAccessGrant, now: datetime) -> None:
+    if row.status != access.AWAITING_CUSTOMER or access._aware(row.expires_at) <= now:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "SUPPORT_ACCESS_NOT_AWAITING",
+                "message": "This request is no longer waiting for a decision (decided, revoked or expired)",
+            },
+        )
+
+
+@router.post("/admin/support-access/{grant_id}/approve")
+def approve_support_access(
+    grant_id: uuid.UUID, payload: CustomerApproval, request: Request, db: Session = Depends(get_db)
+):
+    admin = _customer_admin(request, db)
+    row = _grant(db, admin, grant_id)
+    now = datetime.now(timezone.utc)
+    _awaiting(row, now)
+    if not access.SupportScope.stored(row.scope).areas:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "SUPPORT_SCOPE_EMPTY",
+                "message": "This request names no area of your data: deny it, and MDARIX can ask again",
+            },
+        )
+    confirm_with_authenticator(
+        db, admin, payload.mfa_code, tenant_id=admin.tenant_id, action="SUPPORT_ACCESS_APPROVE", request=request
+    )
+    row.status = access.APPROVED
+    row.customer_decided_by = admin.id
+    row.customer_decided_at = now
+    row.customer_decision_reason = payload.reason.strip()
+    row.updated_at = now
+    _audit(
+        db,
+        admin,
+        row,
+        "SUPPORT_ACCESS_CUSTOMER_APPROVED",
+        row.customer_decision_reason,
+        request,
+        {**access.SupportScope.stored(row.scope).as_dict(), "expires_at": row.expires_at.isoformat()},
+    )
+    db.commit()
+    return _decided(db, admin, row)
+
+
+@router.post("/admin/support-access/{grant_id}/deny")
+def deny_support_access(
+    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
+):
+    admin = _customer_admin(request, db)
+    row = _grant(db, admin, grant_id)
+    now = datetime.now(timezone.utc)
+    _awaiting(row, now)
+    row.status = access.DENIED
+    row.customer_decided_by = admin.id
+    row.customer_decided_at = now
+    row.customer_decision_reason = payload.reason.strip()
+    row.updated_at = now
+    _audit(db, admin, row, "SUPPORT_ACCESS_DENIED", row.customer_decision_reason, request)
+    db.commit()
+    return _decided(db, admin, row)
+
+
+@router.post("/admin/support-access/{grant_id}/revoke")
+def revoke_support_access(
+    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
+):
+    """End a request or an approved access at once, whatever its window says."""
+    admin = _customer_admin(request, db)
+    row = _grant(db, admin, grant_id)
+    now = datetime.now(timezone.utc)
+    if row.status not in {access.AWAITING_CUSTOMER, access.APPROVED} or access._aware(row.expires_at) <= now:
+        raise HTTPException(
+            409,
+            detail={"code": "SUPPORT_ACCESS_NOT_OPEN", "message": "This access has already ended"},
+        )
+    row.status = access.REVOKED
+    row.revoked_at = now
+    row.revoked_by = admin.id
+    row.updated_at = now
+    _audit(db, admin, row, "SUPPORT_ACCESS_REVOKED", payload.reason.strip(), request)
+    db.commit()
+    return _decided(db, admin, row)
+
+
+@router.get("/admin/support-access/{grant_id}/activity")
+def support_access_activity(grant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
+    """The life of one grant, from the organization's own audit trail: the request, MDARIX's approval, the
+    customer's decision, and every use of the access (what was opened, when, by whom)."""
+    admin = _customer_admin(request, db)
+    row = _grant(db, admin, grant_id, lock=False)
+    events = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.tenant_id == admin.tenant_id,
+            AuditEvent.entity_type == "SupportAccessGrant",
+            AuditEvent.entity_id == row.id,
+            AuditEvent.action.in_(sorted(DECISIONS)),
+        )
+        .order_by(AuditEvent.chain_seq)
+        .limit(500)
+        .all()
+    )
+    people = _people(db, {uuid.UUID(event.actor_ref) for event in events if _is_uuid(event.actor_ref)})
+    return {
+        "grant_id": str(row.id),
+        "items": [
+            {
+                "at": _iso(event.created_at),
+                "action": event.action,
+                "who": people.get(str(event.actor_ref), {}).get("name") or event.actor_ref,
+                "area": (event.details or {}).get("area"),
+                "write": (event.details or {}).get("write"),
+                "method": (event.details or {}).get("method"),
+                "path": (event.details or {}).get("path"),
+                "reason": event.reason or (event.details or {}).get("reason"),
+            }
+            for event in events
+        ],
+    }
+
+
+def _is_uuid(value) -> bool:
+    try:
+        uuid.UUID(str(value))
+        return True
+    except ValueError:
+        return False

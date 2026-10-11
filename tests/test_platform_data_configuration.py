@@ -48,6 +48,9 @@ def test_a_platform_administrator_edits_a_tenant_product(platform):
         "/api/v1/platform-admin/customers",
         json={"company_name": f"Product Test {code}", "tenant_code": code, "plan_code": "STARTER"},
     ).json()
+    from tests.support_grants import grant_for
+
+    grant_for(platform, tenant["id"], areas=("CONFIGURATION",))  # Configuration, with changes, approved
     created = platform.post(
         "/api/v1/platform/product-configuration/products",
         json={"tenant_id": tenant["id"], "product_identifier": f"P-{code}", "name": "Infusion Pump"},

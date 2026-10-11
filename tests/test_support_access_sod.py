@@ -85,7 +85,7 @@ def test_a_third_administrator_approves_support_access():
         json={
             "tenant_id": tenant,
             "platform_user_id": str(recipient_id),
-            "scope": {"read": ["integration-runs"]},
+            "scope": {"areas": ["CONFIGURATION"]},
             "reason": "Investigate the customer's failed synchronization",
             "starts_at": starts_at.isoformat(),
             "expires_at": (starts_at + timedelta(hours=2)).isoformat(),
@@ -102,9 +102,12 @@ def test_a_third_administrator_approves_support_access():
     approved = third.post(f"{SUPPORT_ACCESS}/{grant}/approve", json=decision)
     assert approved.status_code == 200, approved.text
     assert approved.json()["approved_by"] == str(third_id)
+    # MDARIX's approval passes it to the customer, whose administrators decide (tests/
+    # test_support_access_customer_approval.py).
+    assert approved.json()["status"] == "AWAITING_CUSTOMER" and approved.json()["customer_approval_required"]
 
     listed = next(item for item in third.get(SUPPORT_ACCESS).json()["items"] if item["id"] == grant)
     assert listed["requested_by"] == str(requester_id)
     assert listed["platform_user_id"] == str(recipient_id)
     assert listed["approved_by"] == str(third_id)
-    assert listed["status"] == "APPROVED"
+    assert listed["status"] == "AWAITING_CUSTOMER" and listed["customer_decided_by"] is None

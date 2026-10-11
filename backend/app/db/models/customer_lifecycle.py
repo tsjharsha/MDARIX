@@ -188,7 +188,14 @@ class SupportAccessGrant(Base):
     status: Mapped[str] = mapped_column(String(30), nullable=False, server_default="PENDING")
     # Who asked (md35): approval refuses the requester as well as the person who would receive the access.
     requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # MDARIX's approval (a third platform administrator); then the customer's decision (md38, backend/app/
+    # support_access.py). Only a grant the customer approved opens anything.
     approved_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    approved_at = tz()
+    customer_decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    customer_decided_at = tz()
+    customer_decision_reason: Mapped[str | None] = mapped_column(Text)
+    revoked_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     starts_at = tz(False)
     expires_at = tz(False)
     revoked_at = tz()

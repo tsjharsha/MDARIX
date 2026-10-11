@@ -41,6 +41,7 @@ from backend.app.access.authz import (
     _require_platform_admin,
     is_hidden_from,
 )
+from backend.app import support_access
 from backend.app.access.common import _audit_configuration, _provider_get
 from backend.app.access.connector_mapping import (
     IMPORTABLE_TARGETS,
@@ -298,9 +299,11 @@ def _customer_tenant(db: Session, tenant_id: uuid.UUID) -> Tenant:
 
 @router.get("/platform-admin/tenants/{tenant_id}/mappings")
 def platform_list_tenant_mappings(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    """A customer tenant's mapping sheets, for the MDARIX team that helps set them up."""
-    _require_platform_admin(request, db)
+    """A customer tenant's mapping sheets, for the MDARIX team that helps set them up, under the Configuration
+    access the customer approved (backend/app/support_access.py)."""
+    admin = _require_platform_admin(request, db)
     _customer_tenant(db, tenant_id)
+    support_access.require_customer_approved_access(db, admin, tenant_id, support_access.CONFIGURATION, request=request)
     rows = (
         db.query(MappingConfiguration)
         .filter(MappingConfiguration.tenant_id == tenant_id)
@@ -315,9 +318,13 @@ def platform_create_tenant_mapping(
     tenant_id: uuid.UUID, payload: MappingRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Prepare a draft mapping sheet for a customer tenant. Releasing it stays with the customer's own
-    administrators (request, approve by a second administrator, release), so the customer decides what imports."""
+    administrators (request, approve by a second administrator, release), so the customer decides what imports.
+    Needs the Configuration access, with changes, the customer approved."""
     admin = _require_platform_admin(request, db)
     tenant = _customer_tenant(db, tenant_id)
+    support_access.require_customer_approved_access(
+        db, admin, tenant.id, support_access.CONFIGURATION, write=True, request=request
+    )
     now = datetime.now(timezone.utc)
     row = _new_mapping(db, tenant.id, payload, now)
     from backend.app.enterprise_audit import make_audit_event

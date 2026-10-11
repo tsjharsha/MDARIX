@@ -15,7 +15,7 @@ from backend.app.customer_lifecycle import (
     is_operator_customer,
     shared_data_plane,
 )
-from backend.app import csv_safe
+from backend.app import csv_safe, support_access
 from backend.app.db.models.customer_lifecycle import (
     Customer,
     IdentityProviderConfiguration,
@@ -862,8 +862,10 @@ def transition_platform_customer(
 
 @router.get("/platform-admin/customer-records/{customer_id}/tabs/{tab}")
 def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request, db: Session = Depends(get_db)):
-    """Return structured, server-authorized Customer 360 tab data."""
-    _require_platform_admin(request, db)
+    """Return structured, server-authorized Customer 360 tab data. The customer's own data (its integrations, its
+    organizations' audit trail) shows only for organizations whose administrators approved support access; the rest
+    are counted in ``withheld`` (backend/app/support_access.py)."""
+    admin = _require_platform_admin(request, db)
     customer = db.query(Customer).filter(Customer.id == customer_id).first()
     if customer is None:
         raise HTTPException(404, detail={"code": "CUSTOMER_NOT_FOUND", "message": "Customer is not available"})
@@ -872,6 +874,7 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
     # Rows name their tenant; the screen shows the tenant's business identifier, not its UUID.
     tenant_business_ids = {tenant.id: tenant.business_id for tenant in tenants}
     key = tab.strip().lower().replace(" ", "_")
+    withheld = 0
     if key in {"administrators", "users"}:
         rows = (
             db.query(AuthUser)
@@ -967,7 +970,13 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             for row in rows
         ]
     elif key == "integrations":
-        rows = db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id.in_(tenant_ids)).all()
+        opened = support_access.open_tenants(
+            db, admin, support_access.CONFIGURATION, within=set(tenant_ids), request=request
+        )
+        withheld = len(set(tenant_ids) - opened)
+        rows = (
+            db.query(ConnectorConfiguration).filter(ConnectorConfiguration.tenant_id.in_(sorted(opened, key=str))).all()
+        )
         items = [
             {
                 "id": str(row.id),
@@ -1015,12 +1024,20 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
             for row in rows
         ]
     elif key in {"security", "audit", "activity"}:
-        # The customer's tenants' events, and the events about the customer itself (edits, status changes).
+        # The customer's tenants' events, and the events about the customer itself (edits, status changes); of
+        # those, an organization's own events only where its administrators approved Audit access, and what MDARIX
+        # staff did anywhere.
+        opened = support_access.open_tenants(db, admin, support_access.AUDIT, within=set(tenant_ids), request=request)
+        withheld = len(set(tenant_ids) - opened)
         query = db.query(AuditEvent).filter(
             or_(
                 AuditEvent.tenant_id.in_(tenant_ids),
                 and_(AuditEvent.entity_type == "Customer", AuditEvent.entity_id == customer.id),
-            )
+            ),
+            or_(
+                support_access.visible_audit_clause(opened),
+                and_(AuditEvent.entity_type == "Customer", AuditEvent.entity_id == customer.id),
+            ),
         )
         if key == "activity":
             # What people changed, without the automatic per-request log entries (still in the full audit log).
@@ -1050,6 +1067,8 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
         "items": items,
         "count": len(items),
         "scope": "platform-authorized",
+        # Organizations of this customer whose data this tab leaves out until their administrators approve access.
+        "withheld": withheld,
     }
 
 
@@ -1057,7 +1076,8 @@ def get_platform_customer_tab(customer_id: uuid.UUID, tab: str, request: Request
 def get_platform_connector_detail(
     tenant_id: uuid.UUID, connector_id: uuid.UUID, request: Request, db: Session = Depends(get_db)
 ):
-    _require_platform_admin(request, db)
+    admin = _require_platform_admin(request, db)
+    support_access.require_customer_approved_access(db, admin, tenant_id, support_access.CONFIGURATION, request=request)
     row = (
         db.query(ConnectorConfiguration)
         .filter(ConnectorConfiguration.id == connector_id, ConnectorConfiguration.tenant_id == tenant_id)

@@ -95,6 +95,9 @@ def customer(platform):
         json={"company_name": f"Business Id Test {code}", "tenant_code": code, "plan_code": "STARTER"},
     )
     assert created.status_code == 200, created.text
+    from tests.support_grants import grant_for
+
+    grant_for(platform, created.json()["id"])  # what staff see of it, under the access the customer approved
     return created.json()
 
 

@@ -21,6 +21,7 @@ from backend.app.access.schemas import (
     PlatformProductUpdateRequest,
     PlatformProductVersionRequest,
 )
+from backend.app import support_access
 from backend.app.access.authz import _require_platform_admin
 from backend.app.access.common import _audit_configuration, _safe_connector_summary
 
@@ -144,12 +145,14 @@ def get_mapping_impact(request: Request, db: Session = Depends(get_db)):
 def platform_product_configuration(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     """Platform-only product, version, connector and mapping configuration view.
 
-    Secrets are never returned; tenant_id is selected only after platform authorization.
+    Secrets are never returned; tenant_id is selected only after platform authorization, and the organization's
+    products, connectors and mappings need the Configuration access its administrators approved.
     """
-    _require_platform_admin(request, db)
+    admin = _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
+    support_access.require_customer_approved_access(db, admin, tenant_id, support_access.CONFIGURATION, request=request)
     # Products and versions are business records: read them from the tenant's own data plane.
     with tenant_data_session(tenant_id) as data:
         products = data.query(Product).filter(Product.tenant_id == tenant_id).order_by(Product.name).all()
@@ -226,6 +229,9 @@ def platform_create_product(payload: PlatformProductRequest, request: Request, d
     tenant = db.query(Tenant).filter(Tenant.id == payload.tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Customer is not available"})
+    support_access.require_customer_approved_access(
+        db, admin, payload.tenant_id, support_access.CONFIGURATION, write=True, request=request
+    )
     now = datetime.now(timezone.utc)
     with tenant_data_session(payload.tenant_id) as data:
         if (
@@ -273,6 +279,9 @@ def platform_update_product(
 ):
     """Edit a tenant's product: name, description, family, manufacturer or lifecycle (identifier is fixed)."""
     admin = _require_platform_admin(request, db)
+    support_access.require_customer_approved_access(
+        db, admin, tenant_id, support_access.CONFIGURATION, write=True, request=request
+    )
     changes = payload.model_dump(exclude_unset=True)
     with tenant_data_session(tenant_id) as data:
         row = data.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
@@ -315,6 +324,9 @@ def platform_create_product_version(
     payload: PlatformProductVersionRequest, request: Request, db: Session = Depends(get_db)
 ):
     admin = _require_platform_admin(request, db)
+    support_access.require_customer_approved_access(
+        db, admin, payload.tenant_id, support_access.CONFIGURATION, write=True, request=request
+    )
     now = datetime.now(timezone.utc)
     release = (
         datetime.fromisoformat(payload.release_timestamp.replace("Z", "+00:00")) if payload.release_timestamp else None

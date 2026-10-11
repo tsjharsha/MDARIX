@@ -41,6 +41,12 @@ def test_an_erasure_under_a_legal_hold_is_refused_as_such(held, who):
     if who == "customer_admin":
         response = client.post(f"/api/v1/admin/identity/users/{person_id}/erase", json=REASON)
     else:
+        from tests.support_grants import grant_support_access
+
+        with SessionLocal() as db:
+            bind_system(db, "test: the person's organization")
+            tenant_id = db.get(AuthUser, person_id).tenant_id
+        grant_support_access(tenant_id, areas=("PEOPLE",))
         response = authenticated_client().post(f"/api/v1/platform-admin/users/{person_id}/erase", json=REASON)
     assert response.status_code == 409, response.text
     detail = response.json()["detail"]

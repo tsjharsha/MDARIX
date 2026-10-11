@@ -26,7 +26,7 @@ from backend.app.customer_lifecycle import (
     effective_access,
     is_operator_customer,
 )
-from backend.app import csv_safe
+from backend.app import csv_safe, support_access
 from backend.app.db.models.customer_lifecycle import (
     Customer,
     IdentityProviderConfiguration,
@@ -65,7 +65,6 @@ from backend.app.access.authz import _is_platform_admin, _require_platform_admin
 from backend.app.access.common import (
     _enforce_invite_limits,
     _ensure_email_not_used_elsewhere,
-    _expire_support_grants,
     _parse_support_time,
 )
 
@@ -388,7 +387,7 @@ def run_scheduled_lifecycle(request: Request, db: Session = Depends(get_db)):
 @router.get("/platform-admin/support-access")
 def list_support_access(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
-    _expire_support_grants(db)
+    support_access.expire(db)
     rows = db.query(SupportAccessGrant).order_by(SupportAccessGrant.created_at.desc()).all()
     db.commit()
     return {
@@ -404,14 +403,20 @@ def list_support_access(request: Request, db: Session = Depends(get_db)):
                 "expires_at": row.expires_at,
                 "requested_by": str(row.requested_by) if row.requested_by else None,
                 "approved_by": str(row.approved_by) if row.approved_by else None,
+                "approved_at": row.approved_at,
+                "customer_decided_by": str(row.customer_decided_by) if row.customer_decided_by else None,
+                "customer_decided_at": row.customer_decided_at,
             }
             for row in rows
-        ]
+        ],
+        "areas": [{"code": code, "label": label} for code, label in support_access.AREAS.items()],
     }
 
 
 @router.post("/platform-admin/support-access")
 def create_support_access(payload: SupportAccessRequest, request: Request, db: Session = Depends(get_db)):
+    """Ask for access to part of an organization's data, for a named colleague, for at most 24 hours. A second
+    platform administrator approves it for MDARIX; then the organization's own administrators decide."""
     admin = _require_platform_admin(request, db)
     starts_at = _parse_support_time(payload.starts_at, "starts_at")
     expires_at = _parse_support_time(payload.expires_at, "expires_at")
@@ -420,8 +425,17 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
     if window_error:
         code = "SUPPORT_ACCESS_TOO_LONG" if "24 hours" in window_error else "INVALID_SUPPORT_EXPIRY"
         raise HTTPException(422, detail={"code": code, "message": window_error})
+    try:
+        scope = support_access.SupportScope.parse(payload.scope)
+    except support_access.ScopeInvalid as exc:
+        raise HTTPException(422, detail={"code": "SUPPORT_SCOPE_INVALID", "message": str(exc)}) from exc
     if db.query(Tenant).filter(Tenant.id == payload.tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    if str(payload.tenant_id) == str(support_access.platform_tenant_id(db)):
+        raise HTTPException(
+            422,
+            detail={"code": "PLATFORM_TENANT", "message": "The platform's own organization needs no support access"},
+        )
     target = db.query(AuthUser).filter(AuthUser.id == payload.platform_user_id).first()
     if target is None or not _is_platform_admin(target):
         raise HTTPException(
@@ -431,9 +445,9 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
         id=uuid.uuid4(),
         tenant_id=payload.tenant_id,
         platform_user_id=payload.platform_user_id,
-        scope=payload.scope,
+        scope=scope.as_dict(),
         reason=payload.reason.strip(),
-        status="PENDING",
+        status=support_access.PENDING,
         requested_by=admin.id,
         starts_at=starts_at,
         expires_at=expires_at,
@@ -449,7 +463,7 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
             action="SUPPORT_ACCESS_REQUESTED",
             entity_type="SupportAccessGrant",
             entity_id=row.id,
-            details={"scope": payload.scope, "expires_at": expires_at.isoformat(), "reason": payload.reason},
+            details={"scope": scope.as_dict(), "expires_at": expires_at.isoformat(), "reason": payload.reason},
             created_at=now,
         )
     )
@@ -458,8 +472,10 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
         "id": str(row.id),
         "status": row.status,
         "tenant_id": str(row.tenant_id),
+        "scope": scope.as_dict(),
         "expires_at": row.expires_at,
         "approval_required": True,
+        "customer_approval_required": True,
     }
 
 
@@ -474,8 +490,8 @@ def approve_support_access(
             404, detail={"code": "SUPPORT_ACCESS_NOT_FOUND", "message": "Support access grant is not available"}
         )
     now = datetime.now(timezone.utc)
-    if row.status != "PENDING" or row.expires_at <= now:
-        row.status = "EXPIRED" if row.expires_at <= now else row.status
+    if row.status != support_access.PENDING or row.expires_at <= now:
+        row.status = support_access.EXPIRED if row.expires_at <= now else row.status
         db.commit()
         raise HTTPException(
             409, detail={"code": "SUPPORT_ACCESS_NOT_APPROVABLE", "message": "Grant is expired or no longer pending"}
@@ -490,8 +506,11 @@ def approve_support_access(
                 "message": "The administrator who requested support access, or who would receive it, cannot approve it",
             },
         )
-    row.status = "APPROVED"
+    # MDARIX's approval only passes the request to the customer: nothing opens until one of the organization's
+    # Customer Administrators approves it (backend/app/support_access_api.py).
+    row.status = support_access.AWAITING_CUSTOMER
     row.approved_by = admin.id
+    row.approved_at = now
     row.updated_at = now
     db.add(
         AuditEvent(
@@ -501,12 +520,21 @@ def approve_support_access(
             action="SUPPORT_ACCESS_APPROVED",
             entity_type="SupportAccessGrant",
             entity_id=row.id,
-            details={"reason": payload.reason, "expires_at": row.expires_at.isoformat()},
+            details={"reason": payload.reason, "expires_at": row.expires_at.isoformat(), "next": "CUSTOMER_DECISION"},
             created_at=now,
         )
     )
+    from backend.app.notifications import notify_support_access_awaiting_customer
+
+    notify_support_access_awaiting_customer(db, row.tenant_id, grant_id=row.id)
     db.commit()
-    return {"id": str(row.id), "status": row.status, "expires_at": row.expires_at, "approved_by": str(admin.id)}
+    return {
+        "id": str(row.id),
+        "status": row.status,
+        "expires_at": row.expires_at,
+        "approved_by": str(admin.id),
+        "customer_approval_required": True,
+    }
 
 
 @router.post("/platform-admin/support-access/{grant_id}/revoke")
@@ -520,8 +548,13 @@ def revoke_support_access(
             404, detail={"code": "SUPPORT_ACCESS_NOT_FOUND", "message": "Support access grant is not available"}
         )
     now = datetime.now(timezone.utc)
-    row.status = "REVOKED"
+    if row.status not in support_access.OPEN:
+        raise HTTPException(
+            409, detail={"code": "SUPPORT_ACCESS_NOT_OPEN", "message": "This support access has already ended"}
+        )
+    row.status = support_access.REVOKED
     row.revoked_at = now
+    row.revoked_by = admin.id
     row.updated_at = now
     db.add(
         AuditEvent(
@@ -1289,18 +1322,26 @@ def get_platform_tenant_security(tenant_id: uuid.UUID, request: Request, db: Ses
 
 @router.get("/platform-admin/tenants/{tenant_id}/audit")
 def get_platform_tenant_audit(tenant_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    _require_platform_admin(request, db)
+    """The organization's audit trail: all of it under the customer's Audit grant; without one, what MDARIX staff
+    did in it (``complete`` says which)."""
+    admin = _require_platform_admin(request, db)
     if db.query(Tenant).filter(Tenant.id == tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    return _tenant_audit(db, admin, tenant_id, request)
+
+
+def _tenant_audit(db: Session, admin: AuthUser, tenant_id: uuid.UUID, request: Request) -> dict:
+    opened = support_access.open_tenants(db, admin, support_access.AUDIT, within={tenant_id}, request=request)
     rows = (
         db.query(AuditEvent)
-        .filter(AuditEvent.tenant_id == tenant_id)
+        .filter(AuditEvent.tenant_id == tenant_id, support_access.visible_audit_clause(opened))
         .order_by(AuditEvent.created_at.desc())
         .limit(100)
         .all()
     )
     return {
         "tenant_id": str(tenant_id),
+        "complete": tenant_id in opened,
         "items": [
             {
                 "id": str(row.id),
@@ -1319,8 +1360,10 @@ def get_platform_tenant_audit(tenant_id: uuid.UUID, request: Request, db: Sessio
 
 @router.get("/platform-admin/tenants/{tenant_id}/tabs/{tab}")
 def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db: Session = Depends(get_db)):
-    """Return structured, server-authorized Tenant 360 tab data."""
-    _require_platform_admin(request, db)
+    """Return structured, server-authorized Tenant 360 tab data. The organization's own data (its integrations,
+    configuration and audit trail) needs the support access its administrators approved
+    (backend/app/support_access.py); the platform's records about it do not."""
+    admin = _require_platform_admin(request, db)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
@@ -1400,6 +1443,9 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
                     for feature in features
                 )
     elif key in {"integrations", "integration"}:
+        support_access.require_customer_approved_access(
+            db, admin, tenant_id, support_access.CONFIGURATION, request=request
+        )
         rows = (
             db.query(ConnectorConfiguration)
             .filter(ConnectorConfiguration.tenant_id == tenant_id)
@@ -1420,6 +1466,9 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
             for row in rows
         ]
     elif key in {"configuration", "config"}:
+        support_access.require_customer_approved_access(
+            db, admin, tenant_id, support_access.CONFIGURATION, request=request
+        )
         rows = db.query(MappingConfiguration).filter(MappingConfiguration.tenant_id == tenant_id).all()
         items = [
             {
@@ -1454,12 +1503,12 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
             else []
         )
     elif key == "audit":
-        items = get_platform_tenant_audit(tenant_id, request, db)["items"]
+        items = _tenant_audit(db, admin, tenant_id, request)["items"]
     elif key == "activity":
         # What people changed, without the automatic per-request log entries (still in the full audit log).
         items = [
             item
-            for item in get_platform_tenant_audit(tenant_id, request, db)["items"]
+            for item in _tenant_audit(db, admin, tenant_id, request)["items"]
             if not str(item.get("action", "")).startswith("REQUEST_")
         ]
     else:
@@ -1475,10 +1524,11 @@ def get_platform_tenant_tab(tenant_id: uuid.UUID, tab: str, request: Request, db
 
 @router.get("/platform-admin/audit-events/{event_id}")
 def get_platform_audit_event_detail(event_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
-    _require_platform_admin(request, db)
+    admin = _require_platform_admin(request, db)
     row = db.query(AuditEvent).filter(AuditEvent.id == event_id).first()
     if row is None:
         raise HTTPException(404, detail={"code": "AUDIT_EVENT_NOT_FOUND", "message": "Audit event is not available"})
+    support_access.require_audit_event_access(db, admin, row, request)
     return {
         "id": str(row.id),
         "tenant_id": str(row.tenant_id),

@@ -342,6 +342,9 @@ def test_only_platform_admins_reset_mfa_across_organizations():
         ).status_code
         == 403
     )
+    from tests.support_grants import grant_support_access
+
+    grant_support_access(member.tenant_id, areas=("PEOPLE",))  # the organization approved People access
     response = authenticated_client().post(
         f"/api/v1/platform-admin/users/{member.id}/mfa-reset", json={"reason": "Lost phone"}
     )

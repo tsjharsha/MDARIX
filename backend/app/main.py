@@ -86,6 +86,7 @@ from scenario_intelligence.router import router as scenario_router
 from backend.app.runtime_env import is_production_like
 from backend.app import cell_link
 from backend.app.cell_link_api import admin_router as cell_admin_router, router as cell_link_router
+from backend.app.support_access_api import router as support_access_router
 from backend.app.deployment_role import is_cell, serves_path
 from backend.app.db.tenant_scope import bind_tenant, scoped_bind
 
@@ -416,6 +417,7 @@ app.include_router(human_decision_router)  # Human decision: queue, decision scr
 app.include_router(case_audit_router)  # Trust & audit of a case: timeline, replay, AI runs, integrity, export
 app.include_router(cell_link_router)  # The link the tenant cells call: enrollment, heartbeat, packages
 app.include_router(cell_admin_router)  # Platform administration of packages and the fleet of cells
+app.include_router(support_access_router)  # The customer approves, denies and revokes support access
 graph_service = RealityGraphService()
 product360_service = Product360Service()
 

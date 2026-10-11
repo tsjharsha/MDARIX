@@ -45,8 +45,12 @@ def organization(platform):
     return make_organization(platform)
 
 
-def make_organization(platform) -> dict:
-    """A fresh customer organization with a product, a user, a session, an audit event and a stored file."""
+def make_organization(platform, *, support_access: bool = True) -> dict:
+    """A fresh customer organization with a product, a user, a session, an audit event and a stored file.
+
+    The creating platform administrator holds support access the customer approved (every area, with changes),
+    since the tests using it are about what staff do with the data; ``support_access=False`` leaves it out
+    (the approval itself: tests/test_support_access_customer_approval.py)."""
     code = f"PRG{uuid.uuid4().hex[:6].upper()}"
     created = platform.post(
         "/api/v1/platform-admin/customers",
@@ -108,6 +112,10 @@ def make_organization(platform) -> dict:
     db.commit()
     db.close()
     ObjectStorageService().put(str(tenant_id), "evidence/report.txt", b"stored evidence", internal=True)
+    if support_access:
+        from tests.support_grants import grant_for
+
+        grant_for(platform, tenant_id)
     return {"tenant_id": tenant_id, "user_id": user_id, "tenant_key": created.json()["tenant_key"]}
 
 

@@ -414,6 +414,42 @@ def notify_trial_request_declined(db: Session, tenant_id, *, request_id, **_refs
     )
 
 
+SUPPORT_ACCESS_AWAITING_CUSTOMER = "SUPPORT_ACCESS_AWAITING_CUSTOMER"
+
+
+def notify_support_access_awaiting_customer(db: Session, tenant_id, *, grant_id, **_refs) -> OutboxEvent:
+    """Tell the organization's administrators that MDARIX asks for support access (backend/app/support_access.py)."""
+    return _queue(
+        db, tenant_id, SUPPORT_ACCESS_AWAITING_CUSTOMER, "SupportAccessGrant", grant_id, {"grant_id": _id(grant_id)}
+    )
+
+
+def _support_access_request(db: Session, payload: dict, emailer) -> None:
+    from backend.app.db.models.customer_lifecycle import SupportAccessGrant
+    from backend.app.support_access import AWAITING_CUSTOMER, SupportScope
+
+    tenant_id = _uuid(payload.get("tenant_id"))
+    grant = (
+        db.query(SupportAccessGrant)
+        .filter(SupportAccessGrant.id == _uuid(payload.get("grant_id")), SupportAccessGrant.tenant_id == tenant_id)
+        .first()
+    )
+    if grant is None or grant.status != AWAITING_CUSTOMER:
+        return  # decided, revoked or expired before the email went out: nothing to ask any more
+    person = db.query(AuthUser).filter(AuthUser.id == grant.platform_user_id).first()
+    scope = SupportScope.stored(grant.scope)
+    _deliver(
+        emailer.send_support_access_request,
+        customer_admin_emails(db, tenant_id),
+        organization=_organization(db, tenant_id),
+        person=(person.display_name or person.username) if person else "An MDARIX support colleague",
+        areas=[item["label"] for item in scope.describe()],
+        write=scope.write,
+        expires=f"{_long_date(grant.expires_at)}, {grant.expires_at:%H:%M} UTC",
+        reason=grant.reason,
+    )
+
+
 def notify_security_notice(db: Session, tenant_id, *, user_id, kind: str, **_refs) -> OutboxEvent | None:
     """Tell a person the way they sign in changed (auth/security_notices.py: kinds, wording, delivery)."""
     from auth.security_notices import queue_security_notice
@@ -697,6 +733,9 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name == FEEDBACK_SUBMITTED:
         _feedback(db, payload, emailer)
+        return True
+    if event_name == SUPPORT_ACCESS_AWAITING_CUSTOMER:
+        _support_access_request(db, payload, emailer)
         return True
     from auth.security_notices import handle_security_notice
 
