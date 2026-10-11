@@ -164,7 +164,7 @@ class _GovernanceDB:
         if model is ApprovalAuthority:
             return _Rows(self.authorities)
         if model is SegregationOfDutiesPolicy:
-            return _Rows([SimpleNamespace(creator_cannot_approve=True)])
+            return _Rows([SimpleNamespace(creator_cannot_approve=True, last_material_editor_cannot_approve=False)])
         raise AssertionError(model)
 
 
