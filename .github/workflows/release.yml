@@ -14,7 +14,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    runs-on: ubuntu-24.04
+    # The self-hosted Linux runner when the repository variable CI_LINUX_RUNNER names it (as in ci.yml), else a
+    # GitHub-hosted one. The images are built for x86 (linux/amd64), which the self-hosted WSL runner also is.
+    runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-24.04' }}
     permissions:
       contents: write   # the GitHub release
       packages: write   # the images

@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-from backend.app.runtime_env import PRODUCTION, environment, is_production_like
+from backend.app.runtime_env import PRODUCTION, STAGING, environment, is_production_like
 
 # Values that only ever appear in templates and examples; a server that still shows one was never configured.
 PLACEHOLDER_MARKERS = ("example.com", "example.test", "changeme", "change-me", "change_me")
@@ -29,6 +29,14 @@ CONNECTOR_HOSTS_ACKNOWLEDGEMENT = "MDARIX_CONNECTOR_ALLOWED_HOSTS_ACKNOWLEDGED"
 # Production keeps an off-site backup copy in a bucket, unless an operator states that copies leave the server another
 # way (for example the managed database's own backups and point-in-time recovery).
 BACKUP_OFFSITE_ACKNOWLEDGEMENT = "MDARIX_BACKUP_OFFSITE_ACKNOWLEDGED"
+# A private staging server (ADR-017) may run before the lawyer-approved legal texts and the company details exist: the
+# whole site sits behind a login at Caddy (MDARIX_SITE_ACCESS=private), so nothing reaches the public, and an operator
+# states it with this acknowledgement. Production never gets the exemption.
+PRIVATE_STAGING_ACKNOWLEDGEMENT = "MDARIX_PRIVATE_STAGING_ACKNOWLEDGED"
+SITE_ACCESS_VALUES = ("public", "private")
+# What "caddy hash-password" prints. A hash cut short (a "$" in .env.production read as a variable when the value is not
+# in single quotes) would lock everyone out, so it is checked here, where the problem is named.
+BCRYPT_HASH = re.compile(r"\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}")
 
 
 def _get(name: str) -> str:
@@ -138,12 +146,14 @@ def problems(*, offline: bool = False) -> list[str]:
     add(_email_problem("MDARIX_SMTP_FROM"))
     add(_email_problem("MDARIX_SUPPORT_EMAIL"))
     add(_email_problem("MDARIX_PRIVACY_EMAIL"))
-    for name in ("MDARIX_COMPANY_LEGAL_NAME", "MDARIX_COMPANY_ADDRESS"):
-        if not _get(name):
-            add(f"{name} must be set: it appears in the legal pages, the footer and every email")
-    if _get("MDARIX_LEGAL_TEXT_APPROVED").lower() != "true":
-        add("MDARIX_LEGAL_TEXT_APPROVED must be true once a lawyer has approved the privacy policy and terms")
-    add(_legal_documents_problem())
+    found.extend(_site_access_problems())
+    if not private_staging():
+        for name in ("MDARIX_COMPANY_LEGAL_NAME", "MDARIX_COMPANY_ADDRESS"):
+            if not _get(name):
+                add(f"{name} must be set: it appears in the legal pages, the footer and every email")
+        if _get("MDARIX_LEGAL_TEXT_APPROVED").lower() != "true":
+            add("MDARIX_LEGAL_TEXT_APPROVED must be true once a lawyer has approved the privacy policy and terms")
+        add(_legal_documents_problem())
     found.extend(_alerting_problems())
     found.extend(_backup_and_monitoring_problems())
 
@@ -393,6 +403,45 @@ def _embedding_model_problem() -> str | None:
     from retrieval.embedding_provider import local_model_problem
 
     return local_model_problem()
+
+
+def _site_login_set() -> bool:
+    return bool(_get("MDARIX_SITE_LOGIN_USER")) and bool(BCRYPT_HASH.fullmatch(_get("MDARIX_SITE_LOGIN_HASH")))
+
+
+def private_staging() -> bool:
+    """A staging server whose whole site is behind Caddy's login, acknowledged by an operator: it may run with draft
+    legal texts and without the company details (ADR-017)."""
+    return (
+        environment() == STAGING
+        and (_get("MDARIX_SITE_ACCESS") or "public").lower() == "private"
+        and _site_login_set()
+        and _get(PRIVATE_STAGING_ACKNOWLEDGEMENT).lower() == "true"
+    )
+
+
+def _site_access_problems() -> list[str]:
+    """MDARIX_SITE_ACCESS, read by Caddy too (infrastructure/docker/Caddyfile): public, or private behind a login."""
+    found = []
+    access = (_get("MDARIX_SITE_ACCESS") or "public").lower()
+    if access not in SITE_ACCESS_VALUES:
+        found.append(f"MDARIX_SITE_ACCESS must be public or private (got {_get('MDARIX_SITE_ACCESS')!r})")
+    if access == "private":
+        if not _get("MDARIX_SITE_LOGIN_USER"):
+            found.append("MDARIX_SITE_LOGIN_USER must be set when MDARIX_SITE_ACCESS is private")
+        if not BCRYPT_HASH.fullmatch(_get("MDARIX_SITE_LOGIN_HASH")):
+            found.append(
+                "MDARIX_SITE_LOGIN_HASH must be the whole bcrypt hash from 'caddy hash-password', in single quotes in "
+                ".env.production (a $ outside quotes is read as a variable and cuts the hash short)"
+            )
+    if _get(PRIVATE_STAGING_ACKNOWLEDGEMENT).lower() == "true":
+        if environment() != STAGING:
+            found.append(f"{PRIVATE_STAGING_ACKNOWLEDGEMENT} applies to a staging server only: remove it in production")
+        elif access != "private":
+            found.append(
+                f"{PRIVATE_STAGING_ACKNOWLEDGEMENT} needs MDARIX_SITE_ACCESS=private (the site behind a login)"
+            )
+    return found
 
 
 def _legal_documents_problem() -> str | None:

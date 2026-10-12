@@ -28,8 +28,32 @@ start until `MDARIX_LEGAL_TEXT_APPROVED=true`, `MDARIX_COMPANY_LEGAL_NAME` and `
 `legal/privacy.md`, `terms.md` and `trial-agreement.md` read as final (no DRAFT banner, no `[PLACEHOLDER]`). Staging is
 on the public internet, so it would publish those pages.
 
-Until the lawyer-approved texts exist, staging cannot start. How to proceed in the meantime is an open decision
-(ADR-017, "Open decision"). Sections 1 to 6 do not depend on it.
+Until the lawyer-approved texts exist, staging runs as a **private staging server** (ADR-017, decided 2026-10-12):
+Caddy asks for a login before every page and API call, so the draft legal pages and the empty company details reach
+only the people given that login. Only `/health/live` and `/health/status` stay open, for the uptime monitors. The
+configuration check then skips the legal checks, and only when all of these hold:
+
+| Setting | Value |
+|---|---|
+| `MDARIX_ENV` | `staging` (production never gets the exemption) |
+| `MDARIX_SITE_ACCESS` | `private` |
+| `MDARIX_SITE_LOGIN_USER` | a user name for the testers, e.g. `staging` |
+| `MDARIX_SITE_LOGIN_HASH` | the bcrypt hash of a long random password, **in single quotes** (it contains `$`) |
+| `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED` | `true` |
+
+Make the hash on any machine with Docker, and keep the password in your password manager:
+
+```bash
+docker run --rm caddy:2.11-alpine caddy hash-password      # type the password twice; prints $2a$14$...
+```
+
+```ini
+MDARIX_SITE_LOGIN_HASH='$2a$14$...the whole line it printed...'
+```
+
+The browser asks for this login once per session, before the MDARIX sign-in page. Invitation and password-reset links
+sent from staging open behind the same login, so give it to every tester. Once the lawyer-approved texts and the
+company details are in place, set `MDARIX_SITE_ACCESS=public` and remove the acknowledgement.
 
 ## 1. What you need
 
@@ -160,6 +184,8 @@ values differ from production:
 | `MDARIX_DB_OWNER_USER` | `mdarix_owner` (its password, `MDARIX_DB_OWNER_PASSWORD`, goes in `.env.migrate`) |
 | `MDARIX_OBJECT_STORAGE_PROVIDER` | `local`, with `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY` set; leave the bucket settings empty |
 | `MDARIX_SCHEDULER_HEARTBEAT_URL` | the heartbeat monitor's ping address (section 8.3) |
+| `MDARIX_WWW_REDIRECT` | `off` (the staging host name has no www record) |
+| `MDARIX_SITE_ACCESS` and the login settings | as in section 0 |
 
 The runtime role (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `MDARIX_DB_RUNTIME_USER`, `MDARIX_DB_RUNTIME_PASSWORD`) is set
 as in production: the `migrate` job creates it.
@@ -205,14 +231,16 @@ the embedding model, and takes a while on two cores.
 
 ## 7. Check the settings, start, and create the administrators
 
-Once section 0 is settled:
+With the private-site settings of section 0 in `.env.production`:
 
 ```bash
 docker compose run --rm --no-deps api python -m backend.app.config_check --offline   # prints nothing when ready
 docker compose up -d --no-build --wait                # ClamAV's first signature download can take up to 15 minutes
 docker compose ps -a                                  # all healthy; migrate "Exited (0)"
 docker compose exec api python -m backend.app.config_check                           # the online checks too
-curl -fsS https://<staging host>/health/status        # {"status":"ok"}
+curl -fsS https://<staging host>/health/status        # {"status":"ok"}: open, for the monitors
+curl -s -o /dev/null -w '%{http_code}
+' https://<staging host>/   # 401: the site asks for the login
 ```
 
 Then invite two Platform Administrators (DEPLOYMENT.md section 2.5), with `docker compose run --rm migrate python

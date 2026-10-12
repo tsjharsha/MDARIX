@@ -391,6 +391,81 @@ def test_the_draft_legal_documents_in_the_repository_are_refused(production):
         assert f"{name} (the DRAFT banner and" in problems
 
 
+# ------------------------------------------------------------------ private staging (ADR-017)
+
+# "caddy hash-password" output for a throwaway test password.
+BCRYPT = "$2a$14$T2K1p8dlCjsXSQmMSsUtHO8ZF6iDppTB6EFbgBd.IeF0yw/oaOc5m"
+
+
+@pytest.fixture
+def private_staging(production):
+    """A staging server behind Caddy's login, with the repository's draft legal texts and no company details."""
+    from pathlib import Path
+
+    production.setenv("MDARIX_ENV", "staging")
+    for name in ("MDARIX_BACKUP_AGE_RECIPIENT", "MDARIX_BACKUP_HEARTBEAT_URL", "MDARIX_SCHEDULER_HEARTBEAT_URL"):
+        production.delenv(name)
+    production.delenv("MDARIX_BACKUP_S3_URI")
+    production.setenv("MDARIX_LEGAL_DIR", str(Path(__file__).resolve().parents[1] / "legal"))
+    production.setenv("MDARIX_LEGAL_TEXT_APPROVED", "false")
+    production.delenv("MDARIX_COMPANY_LEGAL_NAME")
+    production.delenv("MDARIX_COMPANY_ADDRESS")
+    production.setenv("MDARIX_SITE_ACCESS", "private")
+    production.setenv("MDARIX_SITE_LOGIN_USER", "staging")
+    production.setenv("MDARIX_SITE_LOGIN_HASH", BCRYPT)
+    production.setenv("MDARIX_PRIVATE_STAGING_ACKNOWLEDGED", "true")
+    return production
+
+
+def test_a_private_staging_server_runs_before_the_legal_texts_are_approved(private_staging):
+    assert config_check.private_staging()
+    assert config_check.problems(offline=True) == []
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("MDARIX_ENV", "production"),  # never in production
+        ("MDARIX_SITE_ACCESS", "public"),  # the site must be behind the login
+        ("MDARIX_SITE_LOGIN_USER", ""),
+        ("MDARIX_SITE_LOGIN_HASH", "$2a$14"),  # cut short: "$..." read as a variable outside single quotes
+        ("MDARIX_PRIVATE_STAGING_ACKNOWLEDGED", "false"),
+    ],
+)
+def test_without_every_condition_the_legal_checks_apply_again(private_staging, name, value):
+    private_staging.setenv(name, value)
+    assert not config_check.private_staging()
+    problems = found()
+    assert "MDARIX_LEGAL_TEXT_APPROVED must be true" in problems
+    assert "MDARIX_COMPANY_LEGAL_NAME must be set" in problems
+    assert "privacy.md (the DRAFT banner and" in problems
+
+
+def test_a_private_site_needs_its_login_and_the_acknowledgement_its_place(private_staging):
+    private_staging.setenv("MDARIX_SITE_LOGIN_HASH", "$2a$14")
+    assert "MDARIX_SITE_LOGIN_HASH must be the whole bcrypt hash" in found()
+    private_staging.setenv("MDARIX_SITE_LOGIN_HASH", BCRYPT)
+    private_staging.delenv("MDARIX_SITE_LOGIN_USER")
+    assert "MDARIX_SITE_LOGIN_USER must be set when MDARIX_SITE_ACCESS is private" in found()
+    private_staging.setenv("MDARIX_SITE_LOGIN_USER", "staging")
+    private_staging.setenv("MDARIX_SITE_ACCESS", "hidden")
+    assert "MDARIX_SITE_ACCESS must be public or private" in found()
+    private_staging.setenv("MDARIX_SITE_ACCESS", "public")
+    assert "MDARIX_PRIVATE_STAGING_ACKNOWLEDGED needs MDARIX_SITE_ACCESS=private" in found()
+    private_staging.setenv("MDARIX_SITE_ACCESS", "private")
+    private_staging.setenv("MDARIX_ENV", "production")
+    assert "MDARIX_PRIVATE_STAGING_ACKNOWLEDGED applies to a staging server only" in found()
+
+
+def test_production_behind_a_login_still_needs_the_approved_legal_texts(production):
+    production.setenv("MDARIX_SITE_ACCESS", "private")
+    production.setenv("MDARIX_SITE_LOGIN_USER", "preview")
+    production.setenv("MDARIX_SITE_LOGIN_HASH", BCRYPT)
+    assert config_check.problems(offline=True) == []  # a login is allowed, the approved texts are still checked
+    production.setenv("MDARIX_LEGAL_TEXT_APPROVED", "false")
+    assert "MDARIX_LEGAL_TEXT_APPROVED must be true" in found()
+
+
 # ------------------------------------------------------------------ AI cost
 
 

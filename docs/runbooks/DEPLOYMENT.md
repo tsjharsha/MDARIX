@@ -31,7 +31,7 @@ export COMPOSE_FILE=docker-compose.prod.yml COMPOSE_ENV_FILES=.env.production   
 | VM | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 80 GB disk. The compose limits add up to about 7 GB (ClamAV 2 GB, API 2 GB, worker 1.5 GB, scheduler 1 GB, backup 1 GB, Caddy 256 MB). |
 | Database | Managed PostgreSQL 16 with the `pgvector` and `pgcrypto` extensions, point-in-time recovery on (7+ days), automated daily snapshots, TLS required (AWS RDS, Azure Database for PostgreSQL Flexible Server, Google Cloud SQL). **Direct connection only, no transaction-mode pooler** (PgBouncer in transaction mode, RDS Proxy pinning aside): the scheduler holds session-level advisory locks, which a transaction pooler would hand to other clients. |
 | Files | An S3 bucket in the same region (versioning on, private, SSE), `MDARIX_OBJECT_STORAGE_PROVIDER=s3`. The provider keeps uploaded files durable on its own; see BACKUP_AND_RESTORE.md for the file RPO. |
-| DNS | An A record (and AAAA if IPv6) for the app domain pointing at the VM |
+| DNS | An A record (and AAAA if IPv6) for the app domain pointing at the VM. With `MDARIX_WWW_REDIRECT=on`, also `www` (CNAME to the domain): Caddy obtains its certificate too and redirects it to the domain. At Cloudflare, leave both records "DNS only" so Caddy's certificates reach browsers |
 | Email | An SMTP account on your own domain with SPF, DKIM and DMARC set up (Amazon SES, Postmark, SendGrid, Microsoft 365) |
 | Firewall | Inbound 80 and 443 from anywhere, 22 from your office/VPN only. Database reachable from the VM only. |
 | Backups | A second bucket (another account or region) with versioning and object lock, and an `age` key pair whose private key is kept offline (BACKUP_AND_RESTORE.md) |

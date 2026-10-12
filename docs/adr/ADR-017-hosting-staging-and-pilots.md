@@ -52,7 +52,14 @@ server being reclaimed when idle.
     S3-compatible bucket elsewhere for the off-site copies.
   - **Server size**: the B1MS database (1 vCore, 2 GB) suits a first pilot only; growth is paid.
 
-## Open decision
+## Decision on the legal pages (2026-10-12): private staging
+
+Option 1 below was chosen. `MDARIX_SITE_ACCESS=private` puts the whole site behind a login at Caddy (only
+`/health/live` and `/health/status` stay open for the monitors), and `backend/app/config_check.py` skips the
+legal checks only on a staging server with that login set and `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED=true`.
+Production is unchanged: it always needs the lawyer-approved texts and the company details.
+
+## The options that were considered
 Staging runs every production check, including the legal pages. It refuses to start until the texts are
 lawyer-approved and final and the company name and address are set. Staging is public, so it would publish them.
 The options:
@@ -70,4 +77,4 @@ The options:
 - Azure for both: the free server is too small for the application, so staging would not be free.
 
 ## Status
-ACCEPTED (2026-10-11). The open decision above is pending.
+ACCEPTED (2026-10-11). Private staging chosen (2026-10-12).
