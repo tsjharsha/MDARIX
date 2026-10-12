@@ -10,7 +10,9 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
-The design-partner pilot readiness work, to be released as 0.9.0.
+## [0.9.0] - 2026-10-12
+
+The design-partner pilot readiness release.
 
 ### Added
 
