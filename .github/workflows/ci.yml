@@ -765,6 +765,9 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Findings fail the job and are printed in its log; the SARIF artifact would need artifact storage, and a
+          # full quota must not fail the gate when no secret was found.
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
 
   integration:
     name: Simulator and integration gates
