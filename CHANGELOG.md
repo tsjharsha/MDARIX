@@ -40,6 +40,32 @@ The design-partner pilot readiness work, to be released as 0.9.0.
 - Pilot readiness features: legal hold, client error and support problem reports, erasure log, seven-year audit
   retention by default, tamper-evident audit-chain verification, tenant exports, risk register and traceability,
   report content (migrations md23 to md25).
+- Investigation workflow, phases 0 to 7: workflow roles, tasks and saved case context; signals, triage and detection;
+  case scope and evidence review; intelligence judgements and structured Ask; risk and regulatory reviews with a
+  controlled Decision Brief; the signed human decision, follow-ups, late evidence and closure; trust and audit of a
+  case (migrations md26 to md33, human-readable business IDs in md26).
+- Customer and organization lifecycle for Platform Administrators, platform accounts, redesigned dashboards for the
+  platform, customer and workspace consoles, and shared tables with movable, resizable columns and server-side
+  sorting.
+- Imports keep the rows that pass, with a rejects file, and mask personal data instead of refusing the file.
+- Deployment roles MULTI, PLATFORM and CELL from one codebase (ADR-013); tenant cells built from signed documents and
+  licensed; the platform-cell link with enrollment, heartbeats, signed packages and licence grace (migrations md36,
+  md37).
+- Customer-approved support access: platform staff read an organization's data only after its administrator
+  approves, for a limited time, and every use is audited (migrations md35, md38).
+- A richer free-trial request: job title, country, phone in international format, company size, devices, markets,
+  complaint system and volume, trial data and goal, and the confirmation that no patient data will be uploaded. Shown
+  to the reviewers; the personal answers are erased with the organization (migration md39).
+- A redesigned two-step sign-up page. An email that already has an account is told so, with Sign in and Reset password
+  links; a repeated trial request is told it is still under review.
+- Staging on an Oracle Cloud Always Free ARM server (`docker-compose.staging-oracle.yml`, ADR-017), private behind a
+  login until the lawyer-approved legal texts exist (`MDARIX_SITE_ACCESS=private`,
+  `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED`).
+- Optional `www.` redirect at Caddy (`MDARIX_WWW_REDIRECT=on`).
+- Self-hosted GitHub Actions runners (`infrastructure/ci/self-hosted/`), chosen through the repository variables
+  `CI_LINUX_RUNNER` and `CI_WINDOWS_RUNNER`; releases use the same runner.
+- Draft privacy policy, terms of service and free trial agreement for the lawyer (`legal/`); runbooks for key and
+  secret rotation.
 
 ### Changed
 
@@ -52,6 +78,13 @@ The design-partner pilot readiness work, to be released as 0.9.0.
   (migration md24).
 - The embedding model in the API image is pinned to one revision.
 - GitHub Actions are pinned to commit SHAs; CI uses Node 22, as the web image does.
+- Sign-up answers 409 for an email that already has an account (`EMAIL_ALREADY_REGISTERED`) or an earlier trial
+  request (`TRIAL_ALREADY_REQUESTED`), instead of the same answer for every email. Rate limits still apply.
+- The configuration check refuses draft legal documents (a DRAFT banner or a `[PLACEHOLDER]`) and, in production,
+  requires encrypted off-site backups and outside monitors.
+- Separation of duties: the last person to make a material edit to a decision cannot approve it.
+- Large screens split into smaller files (case intelligence views, demo golden path); the older embedded platform
+  administration screen is removed.
 
 ### Security
 
@@ -60,3 +93,8 @@ The design-partner pilot readiness work, to be released as 0.9.0.
 - Caddy no longer logs single-use tokens from links, marks API responses `no-store`, and sends
   `Cross-Origin-Resource-Policy: same-origin`.
 - The web container runs read-only without Linux capabilities other than binding ports 80 and 443.
+- Row-level security for organizations and customers, with every writer scoped (migration md34).
+- Session cookie `SameSite=Strict`; invitation and activation links expire after 48 hours (was 72); a full export and a
+  purge also need a current authenticator code; the API sets the same browser protections as Caddy.
+- Image scans fail on every high or critical finding except the reviewed ones in `.trivyignore.yaml`.
+- Caddy is built with `golang.org/x/net` v0.60.0 (CVE-2026-78669; Caddy v2.11.7 pins v0.59.0).
