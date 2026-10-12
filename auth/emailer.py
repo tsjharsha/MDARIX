@@ -422,14 +422,17 @@ def send_supplier_evidence_request(
 # ------------------------------------------------------------------------------------------- the MDARIX team
 
 
-def send_trial_request_alert(recipient: str, *, organization: str, display_name: str, email: str) -> str:
-    """Tell the Platform Admin that a free-trial request is waiting for review."""
+def send_trial_request_alert(
+    recipient: str, *, organization: str, display_name: str, email: str, profile_lines: tuple = ()
+) -> str:
+    """Tell the Platform Admin that a free-trial request is waiting for review. ``profile_lines`` = what the requester
+    said about their company and trial, as (label, words) pairs (backend/app/trial/request_profile.py describe)."""
     return _send(
         recipient,
         Message(
             subject=f"New MDARIX free trial request: {organization}",
             heading="A free trial request is waiting for review",
-            details=(("Company", organization), ("Name", display_name), ("Email", email)),
+            details=(("Company", organization), ("Name", display_name), ("Email", email), *profile_lines),
             button=("Review in Platform Admin", f"{company().app_url}/app/admin"),
             closing=("Platform Admin > Customers & Tenants > Onboarding.",),
             reason="You are receiving this email because you are on the MDARIX trial review rota.",

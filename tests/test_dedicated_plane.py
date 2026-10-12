@@ -52,6 +52,10 @@ def dedicated(tmp_path_factory):
     )
     assert created.status_code == 200, created.text
     tenant_id = uuid.UUID(created.json()["id"])
+    from tests.support_grants import grant_for
+
+    # The tests act on this customer's data as MDARIX staff: under support access the customer approved (ADR-015).
+    grant_for(platform, tenant_id)
     db = SessionLocal()
     bind_system(db, "test")
     plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()

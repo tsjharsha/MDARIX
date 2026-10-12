@@ -10,13 +10,14 @@ from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from backend.app.main import app
+from tests.signup_profile import PROFILE
 from tests.test_auth_hardening import _user
 
 URL = "/api/v1/auth/signup"
 
 
 def _request(email):
-    return {"email": email, "display_name": "Dana Requester", "organization": "Acme Devices"}
+    return {"email": email, "display_name": "Dana Requester", "organization": "Acme Devices", **PROFILE}
 
 
 def _stored(email) -> int:
@@ -25,7 +26,7 @@ def _stored(email) -> int:
         return db.query(OnboardingRequest).filter(OnboardingRequest.email == email).count()
 
 
-def test_a_new_request_is_acknowledged_once_and_a_repeat_or_known_email_is_not(monkeypatch):
+def test_a_new_request_is_acknowledged_once_and_a_repeat_or_known_email_is_refused(monkeypatch):
     sent = []
     monkeypatch.setattr(
         emailer, "send_trial_request_acknowledgement", lambda recipient, **kwargs: sent.append((recipient, kwargs))
@@ -35,8 +36,9 @@ def test_a_new_request_is_acknowledged_once_and_a_repeat_or_known_email_is_not(m
     first = client.post(URL, json=_request(email))
     again = client.post(URL, json=_request(email))
     known = client.post(URL, json=_request(_user().username))
-    assert first.status_code == again.status_code == known.status_code == 200
-    assert first.json() == again.json() == known.json()
+    assert first.status_code == 200
+    assert again.status_code == 409 and again.json()["detail"]["code"] == "TRIAL_ALREADY_REQUESTED"
+    assert known.status_code == 409 and known.json()["detail"]["code"] == "EMAIL_ALREADY_REGISTERED"
     assert sent == [(email, {"display_name": "Dana Requester", "organization": "Acme Devices"})]
 
 

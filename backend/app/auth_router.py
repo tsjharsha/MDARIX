@@ -83,6 +83,19 @@ class Signup(BaseModel):
     password: str | None = Field(default=None, max_length=128)
     display_name: str = Field(min_length=1, max_length=120)
     organization: str = Field(min_length=1, max_length=160)
+    # The requester's profile (backend/app/trial/request_profile.py checks the choices and the required answers).
+    job_title: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, max_length=80)
+    phone: str | None = Field(default=None, max_length=30)
+    company_size: str | None = Field(default=None, max_length=20)
+    device_types: str | None = Field(default=None, max_length=200)
+    device_class: str | None = Field(default=None, max_length=20)
+    markets: list[str] = Field(default_factory=list, max_length=6)
+    complaint_system: str | None = Field(default=None, max_length=30)
+    complaint_volume: str | None = Field(default=None, max_length=20)
+    trial_data: str | None = Field(default=None, max_length=30)
+    evaluation_goal: str | None = Field(default=None, max_length=1000)
+    no_patient_data: bool = False
 
 
 class Signin(BaseModel):
@@ -440,17 +453,48 @@ def mfa_challenge(request: Request, db: Session = Depends(get_db)):
 # ------------------------------------------------------------------------------------------- sign-up
 
 
-def _alert_trial_request(organization: str, display_name: str, email: str) -> None:
+def _alert_trial_request(organization: str, display_name: str, email: str, profile: dict | None = None) -> None:
     """Email the Platform Admin about a new trial request. Runs after the response; failures are only logged."""
     recipient = os.getenv("MDARIX_TRIAL_ALERT_EMAIL", "").strip()
     if not recipient:
         return
     from auth.emailer import send_trial_request_alert
+    from backend.app.trial.request_profile import describe
 
     try:
-        send_trial_request_alert(recipient, organization=organization, display_name=display_name, email=email)
+        send_trial_request_alert(
+            recipient,
+            organization=organization,
+            display_name=display_name,
+            email=email,
+            profile_lines=tuple(describe(profile)),
+        )
     except Exception as exc:  # the request is already saved; an alert failure must never surface to the visitor
         logger.warning("Trial request alert failed: %s", type(exc).__name__)
+
+
+EMAIL_ALREADY_REGISTERED = {
+    "code": "EMAIL_ALREADY_REGISTERED",
+    "message": (
+        "This email already has an MDARIX account. Sign in with it, reset your password if you have forgotten it, "
+        "or request the trial with a different work email."
+    ),
+}
+
+
+def _trial_already_requested(status: str | None) -> dict:
+    """The answer for an email that already asked for a trial, by what became of that request."""
+    if status == "DECLINED":
+        message = (
+            "A trial request from this email was already reviewed. Contact MDARIX to discuss it, or request the "
+            "trial with a different work email."
+        )
+    else:
+        message = (
+            "A trial request from this email is already waiting for review. We email you once it is reviewed, "
+            "usually within one business day."
+        )
+    return {"code": "TRIAL_ALREADY_REQUESTED", "message": message}
 
 
 SIGNUP_ACCEPTED = {
@@ -462,21 +506,29 @@ SIGNUP_ACCEPTED = {
 
 @router.post("/signup")
 def signup(data: Signup, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
-    """Record a free-trial request. The answer is the same whether or not the email already has an account or a
-    pending request, so this endpoint cannot be used to find out who uses MDARIX."""
+    """Record a free-trial request.
+
+    An email that already has an account, or already has a trial request, is told so (409) so the person can sign in,
+    reset their password or use another email. That says which emails MDARIX knows, a product decision of
+    2026-10-11; the per-address and per-email rate limits above bound how fast anyone can ask."""
     email = data.email.strip().lower()
     enforce("signup:ip", client_ip(request))
     enforce("signup:email", email)
     if "@" not in email or email.startswith("@") or email.endswith("@") or " " in email:
         raise HTTPException(422, detail={"code": "VALID_EMAIL_REQUIRED", "message": "Enter a valid work email"})
+    from backend.app.trial.request_profile import ProfileError, build_profile
+
+    bind_system(db, "trial sign-up: is this email already known")
+    if db.query(AuthUser.id).filter(AuthUser.username == email).first() is not None:
+        raise HTTPException(409, detail=EMAIL_ALREADY_REGISTERED)
+    earlier = db.query(OnboardingRequest.status).filter(OnboardingRequest.email == email).first()
+    if earlier is not None:
+        raise HTTPException(409, detail=_trial_already_requested(earlier.status))
     try:
-        bind_system(db, "trial sign-up: is this email already known")
-        known = (
-            db.query(AuthUser.id).filter(AuthUser.username == email).first() is not None
-            or db.query(OnboardingRequest.id).filter(OnboardingRequest.email == email).first() is not None
-        )
-        if known:
-            return dict(SIGNUP_ACCEPTED)
+        profile = build_profile(data)
+    except ProfileError as problem:
+        raise HTTPException(422, detail={"code": problem.code, "message": problem.message}) from None
+    try:
         now = datetime.now(timezone.utc)
         row = OnboardingRequest(
             id=uuid.uuid4(),
@@ -484,14 +536,14 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
             display_name=" ".join(data.display_name.split()),
             organization=" ".join(data.organization.split()),
             status="PENDING_REVIEW",
+            profile=profile,
             created_at=now,
             updated_at=now,
         )
         db.add(row)
         db.commit()
-        background.add_task(_alert_trial_request, row.organization, row.display_name, email)
-        # Only a newly stored request is acknowledged (a known email returned above, with the same answer), and
-        # after the response, so neither the body nor its timing reveals which emails MDARIX already knows.
+        background.add_task(_alert_trial_request, row.organization, row.display_name, email, profile)
+        # Only a newly stored request is acknowledged (a known email was refused above), after the response.
         from backend.app.trial.service import acknowledge_trial_request
 
         background.add_task(acknowledge_trial_request, row.organization, row.display_name, email)

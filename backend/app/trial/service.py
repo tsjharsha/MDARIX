@@ -33,6 +33,7 @@ from backend.app.db.models.foundation import (
     TenantPlanAssignment,
 )
 from backend.app.db.models.stage2 import OnboardingRequest, SubscriptionLifecycle
+from backend.app.trial.request_profile import describe as describe_profile
 from backend.app.trial.sample_data import seed_sample_workspace
 from backend.app.runtime_env import is_development
 
@@ -167,6 +168,9 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
         "display_name": row.display_name,
         "organization": row.organization,
         "status": row.status,
+        # What the requester told MDARIX (the codes, and the same as readable lines for the review screen).
+        "profile": dict(row.profile or {}),
+        "profile_lines": [{"label": label, "value": words} for label, words in describe_profile(row.profile)],
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
         "decision_reason": row.decision_reason,

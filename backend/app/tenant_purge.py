@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
 from backend.app.db.models.pilot_support import ErasureLog
 from backend.app.db.models.stage2 import OnboardingRequest
+from backend.app.trial.request_profile import erase_personal
 
 logger = logging.getLogger("mdarix.tenant_purge")
 
@@ -262,6 +263,8 @@ def _pseudonymize_people(db: Session, tenant_id, now: datetime) -> int:
     for request in db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).all():
         request.email = f"removed-{request.id.hex[:16]}{REMOVED_DOMAIN}"
         request.display_name = "Removed"
+        # The person's job title, phone and free-text goal go too; the company facts stay for the record.
+        request.profile = erase_personal(request.profile)
         request.updated_at = now
     return len(users)
 
