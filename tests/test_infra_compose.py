@@ -131,6 +131,27 @@ def test_caddy_keeps_readiness_internal_and_publishes_the_status():
     assert "request>headers>Referer delete" in CADDYFILE
 
 
+def test_caddy_is_public_without_www_unless_told_otherwise():
+    environment = SERVICES["web"]["environment"]
+    # ":-" also replaces an empty value, which Caddy would read as a snippet name that does not exist.
+    assert environment["MDARIX_SITE_ACCESS"] == "${MDARIX_SITE_ACCESS:-public}"
+    assert environment["MDARIX_WWW_REDIRECT"] == "${MDARIX_WWW_REDIRECT:-off}"
+    assert "import site_access_{$MDARIX_SITE_ACCESS:public}" in CADDYFILE
+    assert "import www_redirect_{$MDARIX_WWW_REDIRECT:off}" in CADDYFILE
+    assert re.search(r"\(site_access_public\) \{\s*\}", CADDYFILE)
+    assert re.search(r"\(www_redirect_off\) \{\s*\}", CADDYFILE)
+
+
+def test_a_private_site_asks_for_the_login_everywhere_but_the_monitors():
+    private = re.search(r"\(site_access_private\) \{(.*?)\n\}", CADDYFILE, re.S).group(1)
+    assert "@needs_login not path /health/live /health/status" in private
+    assert "basic_auth @needs_login {" in private
+    assert "{$MDARIX_SITE_LOGIN_USER} {$MDARIX_SITE_LOGIN_HASH}" in private
+    redirect = re.search(r"\(www_redirect_on\) \{(.*?)\n\}", CADDYFILE, re.S).group(1)
+    assert "www.{$MDARIX_DOMAIN} {" in redirect
+    assert "redir https://{$MDARIX_DOMAIN}{uri} permanent" in redirect
+
+
 def test_every_action_in_the_workflows_is_pinned_to_a_commit():
     for workflow in ("ci.yml", "codeql.yml", "release.yml"):
         text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")

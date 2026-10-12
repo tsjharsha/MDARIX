@@ -22,6 +22,9 @@ not list.
 | `MDARIX_APP_URL` | yes | The https address people use (`https://app.example.com`). Links in emails and the trusted browser origin. |
 | `MDARIX_ALLOWED_ORIGINS` | no | Extra trusted browser origins, comma-separated. |
 | `MDARIX_DOMAIN`, `ACME_EMAIL` | yes (compose) | Caddy's domain and Let's Encrypt account email. |
+| `MDARIX_WWW_REDIRECT` | no (compose) | `on`: Caddy also answers `www.<MDARIX_DOMAIN>` (its own certificate, so the www DNS record must exist) and redirects it to `MDARIX_DOMAIN`. Default `off`, the right value for a staging host name. |
+| `MDARIX_SITE_ACCESS` | no | `public` (default) or `private`: Caddy asks for a login before every page and API call, except `/health/live` and `/health/status` for the uptime monitors. Read by Caddy and by the configuration check. Not for a PLATFORM front door, whose cells authenticate with their own `Authorization` header. |
+| `MDARIX_SITE_LOGIN_USER`, `MDARIX_SITE_LOGIN_HASH` | when private | The login of a private site. The hash is the bcrypt output of `caddy hash-password`, in single quotes in `.env.production` (it contains `$`). Caddy refuses everyone while either is missing; the configuration check names the problem. |
 | `MDARIX_RELEASE` | yes (compose) | The release tag the server runs (e.g. `v0.9.0`): the image tag in docker-compose.prod.yml; also reported with client errors. |
 | `MDARIX_IMAGE_REPOSITORY` | yes (compose) | Where the release images are pulled from, e.g. `ghcr.io/stelikicherla-stack/mdarix-r1` (images `api`, `web`, `backup` under it); `mdarix` when building on the server. |
 | `MDARIX_TRUSTED_PROXY_HOPS` | yes behind Caddy | Number of proxies in front of the API (1 with Caddy); the client address is read from X-Forwarded-For accordingly. |
@@ -100,6 +103,7 @@ not list.
 | `MDARIX_COMPANY_LEGAL_NAME`, `MDARIX_COMPANY_ADDRESS` | yes | Shown on the legal pages, in the footer and in emails. |
 | `MDARIX_SUPPORT_EMAIL`, `MDARIX_PRIVACY_EMAIL` | yes | Contact addresses shown to customers. |
 | `MDARIX_LEGAL_TEXT_APPROVED` | yes | `true` once a lawyer approved the privacy policy, terms and trial agreement. |
+| `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED` | staging only | `true` on a private staging server (`MDARIX_ENV=staging`, `MDARIX_SITE_ACCESS=private` with its login): the legal texts may still be drafts and the company details empty, because only people given the login see the site (ADR-017). Refused in production, and ignored unless every condition holds. |
 | `MDARIX_LEGAL_DIR` | yes | Folder holding the approved `privacy.md`, `terms.md` and `trial-agreement.md` shown on the website (set by `docker-compose.prod.yml` to the mounted `./legal` folder; see `legal/README.md`). |
 | `MDARIX_OPERATOR_COUNTRY`, `MDARIX_OPERATOR_REGION` | no | Country and region of the MDARIX operator organization (create_platform_admin.py). |
 

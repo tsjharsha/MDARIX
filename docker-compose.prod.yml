@@ -54,10 +54,16 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
-    # Caddy needs no application settings, so it does not get .env.production: only its domain and ACME email.
+    # Caddy needs no application settings, so it does not get .env.production: only its domain and ACME email, who may
+    # open the site (public, or private behind a login on a private staging server) and the optional www redirect
+    # (infrastructure/docker/Caddyfile).
     environment:
       MDARIX_DOMAIN: ${MDARIX_DOMAIN:?set MDARIX_DOMAIN in .env.production and pass --env-file .env.production}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.production and pass --env-file .env.production}
+      MDARIX_SITE_ACCESS: ${MDARIX_SITE_ACCESS:-public}
+      MDARIX_SITE_LOGIN_USER: ${MDARIX_SITE_LOGIN_USER:-}
+      MDARIX_SITE_LOGIN_HASH: ${MDARIX_SITE_LOGIN_HASH:-}
+      MDARIX_WWW_REDIRECT: ${MDARIX_WWW_REDIRECT:-off}
     read_only: true
     # Certificates and Caddy's state live on the two volumes; nothing else is written.
     tmpfs:

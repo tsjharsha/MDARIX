@@ -8,7 +8,36 @@
 	}
 }
 
+# Who may open the site: MDARIX_SITE_ACCESS is "public" (production) or "private" (a private staging server: every page
+# and API call asks for the login MDARIX_SITE_LOGIN_USER / MDARIX_SITE_LOGIN_HASH, a bcrypt hash made with
+# "caddy hash-password"). Only the liveness and status endpoints stay open, for the uptime monitors. Any other value
+# names no snippet, and Caddy refuses to start; so does "private" without a user and hash.
+(site_access_public) {
+}
+
+(site_access_private) {
+	@needs_login not path /health/live /health/status
+	basic_auth @needs_login {
+		{$MDARIX_SITE_LOGIN_USER} {$MDARIX_SITE_LOGIN_HASH}
+	}
+}
+
+# MDARIX_WWW_REDIRECT=on also answers www.<domain> and sends it to <domain> (its own certificate, so the www DNS record
+# must exist). Off by default: a staging host name has no www record, and asking for its certificate would only fail.
+(www_redirect_off) {
+}
+
+(www_redirect_on) {
+	www.{$MDARIX_DOMAIN} {
+		redir https://{$MDARIX_DOMAIN}{uri} permanent
+	}
+}
+
+import www_redirect_{$MDARIX_WWW_REDIRECT:off}
+
 {$MDARIX_DOMAIN} {
+	import site_access_{$MDARIX_SITE_ACCESS:public}
+
 	encode zstd gzip
 
 	# Uploads above this are refused here, before they reach the API (imports allow 10 MB, attachments 10 MB).
