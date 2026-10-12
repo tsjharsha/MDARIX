@@ -11,8 +11,18 @@ RUN npm run build
 # Rebuild the pinned Caddy release with a patched Go toolchain. The upstream Caddy image can lag a Go security
 # release even when the Caddy application itself is current; compiling the same release here prevents the runtime
 # image from retaining a fixable standard-library vulnerability. Go's module checksum database verifies downloads.
+# Caddy's own main package (cmd/caddy/main.go) is built as a module of its own, so a dependency with a security fix can
+# be raised above the version the Caddy release pins: golang.org/x/net v0.60.0 (CVE-2026-78669; v2.11.7 pins v0.59.0).
+# Drop the raise once a Caddy release requires the fixed version itself. The last line prints what was built.
 FROM golang:1.26.9-alpine@sha256:cdfd4fe2da6b225d8b40c6b7a105736e548e83ff56d5d8f9394446eeb5eb84e0 AS caddy-build
-RUN GOMAXPROCS=2 CGO_ENABLED=0 go install -p=2 github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7
+WORKDIR /src/caddy
+RUN printf '%s\n' 'package main' '' 'import (' '	caddycmd "github.com/caddyserver/caddy/v2/cmd"' \
+        '	_ "github.com/caddyserver/caddy/v2/modules/standard"' ')' '' 'func main() { caddycmd.Main() }' > main.go \
+    && go mod init mdarix.local/caddy \
+    && go get github.com/caddyserver/caddy/v2@v2.11.7 golang.org/x/net@v0.60.0 \
+    && go mod tidy \
+    && GOMAXPROCS=2 CGO_ENABLED=0 go build -p=2 -trimpath -o /go/bin/caddy . \
+    && go version -m /go/bin/caddy | grep -E 'caddyserver/caddy/v2[[:space:]]|golang.org/x/net[[:space:]]'
 
 FROM caddy:2.11-alpine@sha256:881bbc60f9986d5ab8e7cfd6cf7e4ef3c9c0439fef2429d035d065577882f028
 # The pinned base keeps Caddy fixed; its OS packages take Alpine's security fixes at build time (CI scans the result).
