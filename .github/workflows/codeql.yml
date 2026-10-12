@@ -54,7 +54,10 @@ jobs:
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        # A report for people to read, never input to another job: a full artifact quota must not fail the gate.
+        continue-on-error: true
         with:
+          retention-days: 7
           name: codeql-${{ matrix.language }}
           path: codeql-results
           if-no-files-found: warn
