@@ -59,9 +59,12 @@ export function routeFor(
   tab: string | undefined,
   featureSet: FeatureSet,
 ): { section: string; tab: string | undefined } {
+  if (featureSet !== "mvp") return { section, tab };
   const caseEvidence = !tab || tab === "Case evidence" || tab.startsWith("Case evidence?");
-  if (featureSet === "mvp" && section === "Evidence" && caseEvidence)
-    return { section: "Investigations", tab: "Evidence" };
+  if (section === "Evidence" && caseEvidence) return { section: "Investigations", tab: "Evidence" };
+  // The legacy Decision center is parked: links to it (a case link, a task) open the case's own decision.
+  if (section === "Decisions" && tab && (tab === "Decision center" || tab.startsWith("Decision center?")))
+    return { section: "Investigations", tab: "Decision" };
   return { section, tab };
 }
 

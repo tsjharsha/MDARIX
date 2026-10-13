@@ -58,6 +58,12 @@ import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
 import { featureSetOf, routeFor } from "../../app/featureSet";
+import {
+  addressFor,
+  isWorkspaceHistoryState,
+  locationFromAddress,
+  type WorkspaceHistoryState,
+} from "./workspaceAddress";
 
 /**
  * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
@@ -184,11 +190,22 @@ export function UserWorkspace({
   // A link to a signal (/app/signals?signal=SIG000023) opens that signal in Signals (the case link wins over it).
   const [signalLink] = useState(() => (caseLink ? null : signalFromSearch(window.location.search)));
   const work = useWorkContext(caseLink);
-  // Under the MVP feature set a case's evidence is a step of the case page (app/featureSet.ts routeFor).
+  // Under the MVP feature set a case's evidence is a step of the case page (app/featureSet.ts routeFor), and every
+  // screen has its own address (workspaceAddress.ts).
   const featureSet = featureSetOf(session?.feature_set);
+  // The screen the address names (?section=, ?step=, ?tab=), under the MVP feature set only.
+  const [addressed] = useState(() =>
+    featureSet === "mvp"
+      ? locationFromAddress(window.location.pathname, window.location.search, VIEW_TO_SECTION, WORKSPACE_SECTIONS)
+      : null,
+  );
   const [start] = useState(() => {
     const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
-    const [section, tab] = caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
+    const [section, tab] = addressed
+      ? [addressed.section, addressed.tab]
+      : caseLink
+        ? caseLinkStart(initialView, base)
+        : signalLinkStart(initialView, base, signalLink);
     const routed = routeFor(section, tab, featureSet);
     return [routed.section as WorkspaceSection, routed.tab] as const;
   });
@@ -197,6 +214,8 @@ export function UserWorkspace({
     tab: start[1],
     key: 0,
   });
+  // The step the case page shows (it reports each change), for its address.
+  const [step, setStep] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
@@ -227,6 +246,7 @@ export function UserWorkspace({
         tab: routed.tab,
         key: current.key + 1,
       }));
+      setStep(undefined);
       setMenuOpen(false);
       setMessage(null);
       window.scrollTo({ top: 0 });
@@ -234,14 +254,18 @@ export function UserWorkspace({
     [setLocation, featureSet],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+  const reportStep = useCallback((tab: string) => setStep(tab), []);
 
   // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
   // that could not be opened is said so.
   const caseLinkState = work.caseLink?.state;
   useEffect(() => {
     if (!caseLink || !caseLinkState || caseLinkState === "resolving") return;
-    const { pathname, search, hash } = window.location;
-    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    // Under the MVP feature set the address keeps naming the case (workspaceAddress.ts), so it stays.
+    if (featureSet !== "mvp") {
+      const { pathname, search, hash } = window.location;
+      window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    }
     if (caseLinkState === "not-found")
       notify(`${caseLink} was not found in your organization, or your role cannot open it.`, "critical");
     else if (caseLinkState === "failed")
@@ -258,9 +282,57 @@ export function UserWorkspace({
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {
-    if (trial?.is_trial && (initialView ?? "home") === "home")
+    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed)
       setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));
   }, [trial?.is_trial]);
+
+  // Under the MVP feature set the address follows the screen: the section, and on the case page the case and its step
+  // (workspaceAddress.ts). Each move is a new history entry, so Back returns to the previous screen; the first
+  // address, and one restored by Back or Forward, replace the current entry instead.
+  const selectedCase = work.investigations.find((item) => String(item.id) === work.investigationId);
+  const caseRef = selectedCase ? (selectedCase.business_id ?? selectedCase.investigation_identifier ?? null) : null;
+  const addressSynced = useRef(false);
+  const restoring = useRef(false);
+  const caseResolving = work.caseLink?.state === "resolving";
+  useEffect(() => {
+    if (featureSet !== "mvp" || caseResolving) return;
+    const onCasePage = location.section === "Investigations";
+    const tab = onCasePage ? (step ?? location.tab) : location.tab;
+    const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
+    const { pathname, search, hash } = window.location;
+    if (next !== `${pathname}${search}`) {
+      const state: WorkspaceHistoryState = {
+        mdarixWorkspace: true,
+        section: location.section,
+        tab,
+        caseId: work.investigationId || null,
+        productId: work.productId || null,
+      };
+      if (addressSynced.current && !restoring.current) window.history.pushState(state, "", `${next}${hash}`);
+      else window.history.replaceState(state, "", `${next}${hash}`);
+    }
+    addressSynced.current = true;
+    restoring.current = false;
+  }, [featureSet, caseResolving, location.key, location.section, location.tab, step, caseRef]);
+
+  // Back and Forward restore the screen and its case from what the history entry kept.
+  const workRef = useRef(work);
+  workRef.current = work;
+  useEffect(() => {
+    if (featureSet !== "mvp") return;
+    const onPopState = (event: PopStateEvent) => {
+      if (!isWorkspaceHistoryState(event.state)) return;
+      const state = event.state;
+      restoring.current = true;
+      setLocation((current) => ({ section: state.section, tab: state.tab, key: current.key + 1 }));
+      setStep(state.tab);
+      const current = workRef.current;
+      if (state.caseId && state.caseId !== current.investigationId)
+        current.setInvestigationId(state.caseId, state.productId ?? undefined);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [featureSet]);
 
   // A section the server's menu does not grant is never rendered, even from an old link.
   useEffect(() => {
@@ -268,7 +340,7 @@ export function UserWorkspace({
   }, [visibleSections, location.section]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
-  const api: WorkspaceApi = { session, work, open, notify };
+  const api: WorkspaceApi = { session, work, open, notify, reportStep };
   const { section, tab } = location;
 
   return (

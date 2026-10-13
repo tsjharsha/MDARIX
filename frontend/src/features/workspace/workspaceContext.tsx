@@ -117,6 +117,8 @@ export type WorkspaceApi = {
   work: WorkContext;
   open: (section: WorkspaceSection, tab?: string) => void;
   notify: (text: string, tone?: "good" | "critical") => void;
+  /** The case page reports the step it shows, for the screen's address (workspaceAddress.ts). */
+  reportStep?: (tab: string) => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);

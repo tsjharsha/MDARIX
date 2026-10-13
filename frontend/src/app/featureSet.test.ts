@@ -72,6 +72,13 @@ describe("feature set", () => {
     expect(routeFor("Signals", "Signal inbox", "mvp")).toEqual({ section: "Signals", tab: "Signal inbox" });
   });
 
+  it("sends links to the parked Decision center to the case's own decision under mvp only", () => {
+    expect(routeFor("Decisions", "Decision center", "mvp")).toEqual({ section: "Investigations", tab: "Decision" });
+    expect(routeFor("Decisions", "Approvals", "mvp")).toEqual({ section: "Decisions", tab: "Approvals" });
+    expect(routeFor("Decisions", "Decision?case=c1", "mvp")).toEqual({ section: "Decisions", tab: "Decision?case=c1" });
+    expect(routeFor("Decisions", "Decision center", "full")).toEqual({ section: "Decisions", tab: "Decision center" });
+  });
+
   it("opens Trust & Audit on the audit trail when AI assurance is parked", () => {
     expect(initialTrustTab(null, false)).toBe("AI assurance");
     expect(initialTrustTab(null, false, "Audit trail")).toBe("Audit trail");

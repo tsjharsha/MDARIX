@@ -82,7 +82,7 @@ const CASE_PAGE_TABS = [
 type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
-  const { work, open } = useWorkspace();
+  const { work, open, reportStep } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).
   const featureSet = useFeatureSet();
@@ -116,6 +116,10 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
     setActive("All investigations");
     setStarting(true);
   }, [pending]);
+  // The step shown is part of the screen's address (workspaceAddress.ts).
+  useEffect(() => {
+    reportStep?.(active);
+  }, [active]);
   const [managing, setManaging] = useState<any | null>(null);
   const all = useResource<any>("/api/v1/analytics/investigations");
   const selected = work.investigations.find((item) => String(item.id) === work.investigationId);
