@@ -125,7 +125,7 @@ export const SAMPLE_MADE: readonly string[] = [
   "Built from the pain points above: each part re-creates a finding quality teams and inspectors keep meeting, so what MDARIX shows on the sample is what it looks for in your own records.",
   "Dated from the day your trial started, so reporting clocks, trends and due dates are live.",
   'Easy to tell apart: product, lot, complaint, investigation, CAPA and risk identifiers start with SAMPLE-, and product, supplier, evidence, CAPA and risk names end in "(Sample)".',
-  "In your organization's workspace only. It does not count toward your upload limit, and it is deleted with the trial's data.",
+  "In your organization's workspace only. It does not count toward your upload limit; once your own data is in you can remove it (the trial owner, under About the sample data), and it is deleted with the trial's data in any case.",
 ];
 
 /** The sample's size as short facts ("3 devices"), leaving out what the status did not count. */

@@ -193,11 +193,20 @@ def last_activity(db: Session, tenant_id: uuid.UUID) -> datetime | None:
         return None
 
 
-def progress(db: Session, tenant_id: uuid.UUID) -> dict:
-    """The chapters the organization acted in, for the Platform Admin overview."""
+REMEMBERED = "tried_before_sample_removed"
+
+
+def remembered(profile: dict | None) -> tuple:
+    """The chapters tried before the organization removed the sample data (kept in its trial request's profile)."""
+    return tuple((profile or {}).get(REMEMBERED) or ())
+
+
+def progress(db: Session, tenant_id: uuid.UUID, tried_before: tuple = ()) -> dict:
+    """The chapters the organization acted in, for the Platform Admin overview; ``tried_before``: chapters tried before
+    the sample data was removed (backend/app/trial/sample_removal.py), still counted."""
     counts = acted_counts(db, tenant_id)
-    acted = [code for code in CODES if counts.get(code)]
-    nxt = next((code for code in CODES if not counts.get(code)), None)
+    acted = [code for code in CODES if counts.get(code) or code in tried_before]
+    nxt = next((code for code in CODES if code not in acted), None)
     moment = last_activity(db, tenant_id)
     return {
         "acted": acted,
@@ -295,7 +304,12 @@ def _sample_case(db: Session, tenant_id: uuid.UUID) -> dict | None:
 
 
 def story(
-    db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready: bool = False, cited: tuple = ()
+    db: Session,
+    tenant_id: uuid.UUID,
+    today: date | None = None,
+    ai_ready: bool = False,
+    cited: tuple = (),
+    tried_before: tuple = (),
 ) -> dict:
     """Every chapter with its finding from the organization's records and whether it acted on it. ``ai_ready``: AI
     answers for this organization now (backend/app/ai_settings.py ai_ready); without it the investigation chapter
@@ -357,7 +371,7 @@ def story(
                 "pain": pain,
                 "opens": opens,
                 "finding": finding,
-                "acted": {"done": bool(counts.get(code)), "count": counts.get(code, 0)},
+                "acted": {"done": bool(counts.get(code)) or code in tried_before, "count": counts.get(code, 0)},
                 # The case these chapters are about (the guided investigation), so its button opens that case.
                 "case": sample_case if code in CASE_CHAPTERS else None,
                 "cited": code in cited,
@@ -428,7 +442,7 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
         request = trial_request(db, tenant.id)
         with Session(bind=db.get_bind(), autoflush=False) as session:
             bind_tenant(session, tenant.id)
-            reached = progress(session, tenant.id)
+            reached = progress(session, tenant.id, remembered(request.profile if request else None))
             rows_uploaded = imports.uploaded_rows(session, tenant.id)
         ended = subscription.expires_at <= now
         seconds_left = (subscription.expires_at - now).total_seconds()

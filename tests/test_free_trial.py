@@ -264,6 +264,66 @@ def test_what_the_organization_was_cited_for_leads_the_story():
     assert item["owner"]["email"] == email
 
 
+def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progress():
+    """Removing the sample deletes its records and the work done on them, keeps the organization's own uploads, and
+    keeps the chapters already tried; the preview says all of it first."""
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    export = (
+        "Complaint Number,Product Code,Product Name,Complaint Description,Lot #,Status\n"
+        "OWN-0001,OWN-PUMP,Own Pump,Display flickers at start-up,OWN-LOT-1,Open\n"
+    )
+    assert user.post("/api/v1/trial/imports/complaints", content=export).status_code == 200
+    flagged = {
+        item["complaint_identifier"]: item for item in user.get("/api/v1/complaints/second-look").json()["items"]
+    }
+    decided = user.post(
+        f"/api/v1/complaints/{flagged['SAMPLE-RV-01']['id']}/second-look",
+        json={"decision": "CONFIRMED", "reason": "Meets our complaint definition: harm reported"},
+    )
+    assert decided.status_code == 200, decided.text
+
+    preview = user.get("/api/v1/trial/sample-data/removal").json()
+    assert preview["is_owner"] and preview["has_sample"]
+    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 37
+    assert preview["work_on_sample"] >= 2 and preview["own_records_affected"] == 0
+    assert user.post("/api/v1/trial/sample-data/removal", json={}).status_code == 422
+    removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
+    assert removed.status_code == 200, removed.text
+    # The chapter tried on the sample, and the one the upload itself counts as tried.
+    assert removed.json()["chapters_kept"] == ["HIDDEN_COMPLAINTS", "YOUR_DATA"]
+
+    db = SessionLocal()
+    try:
+        assert (
+            db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == "MDARIX_SAMPLE").count()
+            == 0
+        )
+        assert (
+            db.query(Complaint)
+            .filter(Complaint.tenant_id == tenant_id, Complaint.source_system == "MDARIX_SAMPLE")
+            .count()
+            == 0
+        )
+        assert db.query(DecisionBriefVersion).filter(DecisionBriefVersion.tenant_id == tenant_id).count() == 0
+        own = (
+            db.query(Complaint)
+            .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == "OWN-0001")
+            .one()
+        )
+        assert own.status == "open"
+    finally:
+        db.close()
+    story = user.get("/api/v1/trial/story").json()
+    chapters = {chapter["code"]: chapter for chapter in story["chapters"]}
+    assert chapters["HIDDEN_COMPLAINTS"]["acted"]["done"] is True and chapters["DECIDE_AND_SIGN"]["case"] is None
+    assert user.get("/api/v1/trial/status").json()["sample"]["products"] == 0
+    assert user.get("/api/v1/trial/sample-data/removal").json()["has_sample"] is False
+    assert user.get("/api/v1/readiness").status_code == 200
+
+
 def test_a_request_cannot_be_approved_twice_or_after_decline():
     admin = authenticated_client()
     email = _request_trial()

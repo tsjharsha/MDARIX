@@ -310,8 +310,81 @@ def trial_story_chapters(
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     request = team.trial_request(db, tenant_id)
-    cited = citations.chapters_for((request.profile or {}).get("citations") if request else ())
-    return story.story(data, tenant_id, ai_ready=ai_ready(db, tenant_id), cited=tuple(cited))
+    profile = request.profile if request else None
+    cited = citations.chapters_for((profile or {}).get("citations"))
+    return story.story(
+        data, tenant_id, ai_ready=ai_ready(db, tenant_id), cited=tuple(cited), tried_before=story.remembered(profile)
+    )
+
+
+class SampleRemoval(BaseModel):
+    confirm: bool = False
+
+
+@router.get("/trial/sample-data/removal")
+def sample_removal_preview(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """What removing the sample data would delete (backend/app/trial/sample_removal.py), and whether the viewer may
+    do it (the person who started the trial)."""
+    from backend.app.trial import sample_removal
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {
+        **sample_removal.preview(data, tenant_id),
+        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+    }
+
+
+@router.post("/trial/sample-data/removal")
+def remove_sample_data(
+    payload: SampleRemoval,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Remove the sample data and everything done with it; the organization's own data stays and the chapters
+    already tried stay counted. The trial owner only, after confirming; audited as TRIAL_SAMPLE_REMOVED."""
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import sample_removal, story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    if not team.is_trial_owner(db, tenant_id, user):
+        raise HTTPException(
+            403, detail={"code": "TRIAL_OWNER_ONLY", "message": "Only the person who started the trial can remove it"}
+        )
+    if not payload.confirm:
+        raise HTTPException(422, detail={"code": "CONFIRMATION_REQUIRED", "message": "Confirm the removal first"})
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        raise HTTPException(404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"})
+    before = story.progress(data, tenant_id, story.remembered(request.profile))
+    try:
+        result = sample_removal.remove(data, tenant_id, before["acted"])
+    except RuntimeError as exc:
+        raise HTTPException(
+            409, detail={"code": "SAMPLE_REMOVAL_INCOMPLETE", "message": "The sample data could not be removed; nothing was changed"}
+        ) from exc
+    data.commit()
+    request.profile = {**(request.profile or {}), story.REMEMBERED: before["acted"]}
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(user.id),
+            action="TRIAL_SAMPLE_REMOVED",
+            entity_type="Tenant",
+            entity_id=tenant_id,
+            details={"deleted": result["deleted"], "chapters_kept": before["acted"]},
+            correlation_id=ctx.correlation_id,
+        )
+    )
+    db.commit()
+    return {"status": "SAMPLE_REMOVED", "deleted": result["deleted"], "chapters_kept": before["acted"]}
 
 
 class TrialFocus(BaseModel):
@@ -446,7 +519,8 @@ def book_trial_demo(
         )
     titles = {code: title for code, title, *_ in story.CHAPTERS}
     focus = [titles[code] for code in dict.fromkeys(payload.focus) if code in titles]
-    reached = story.progress(data, tenant_id)
+    request_row = team.trial_request(db, tenant_id)
+    reached = story.progress(data, tenant_id, story.remembered(request_row.profile if request_row else None))
     tenant = db.get(Tenant, tenant_id)
     organization = (tenant.name if tenant else None) or user.company or "Trial organization"
     seconds_left = (subscription.expires_at - now).total_seconds()
