@@ -11365,3 +11365,19 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-password-toggle:focus-visible {
   outline: 3px solid #157b7533;
 }
+
+/* The authenticator setup's QR code (features/auth/AuthPage.tsx, app/QrCodeSvg.tsx). */
+.mfa-setup .qr-code {
+  display: block;
+  width: 184px;
+  max-width: 100%;
+  height: auto;
+  margin: 4px auto 10px;
+  border: 1px solid #dbe4eb;
+  border-radius: 10px;
+}
+.mfa-key-label {
+  margin: 4px 0 2px;
+  color: #5b6b7b;
+  font-size: 13px;
+}
