@@ -144,9 +144,9 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
   Records: {
     icon: BadgeCheck,
-    description: "CAPA effectiveness checks",
+    description: "CAPA checks, risk file input",
     guide:
-      "What you hand an inspector or a management review: every CAPA's effectiveness check, planned with criteria and a date, reminded before the day, and signed with its result and the evidence seen.",
+      "What you hand an inspector or a management review: every CAPA's effectiveness check, planned with criteria and a date, reminded before the day, and signed with its result and the evidence seen; and whether each product's post-market data reached its risk file.",
     context: false,
   },
   Intelligence: {

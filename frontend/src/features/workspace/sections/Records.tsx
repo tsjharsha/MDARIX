@@ -45,6 +45,7 @@ import {
 } from "../effectiveness";
 import { StatusBadge } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
+import { RiskFileInput } from "./RiskFile";
 
 /**
  * Records: what goes to an inspector or a management review. Effectiveness checks: every CAPA's check, planned with
@@ -56,6 +57,7 @@ export function RecordsSection({ tab }: { tab?: string }) {
   return (
     <Tabs tabs={RECORDS_TABS} active={active} onChange={setActive} label="Record sections">
       {active === "Effectiveness checks" && <EffectivenessBoard initialCapa={target.capa} />}
+      {active === "Risk file input" && <RiskFileInput />}
     </Tabs>
   );
 }

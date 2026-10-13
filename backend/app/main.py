@@ -67,6 +67,7 @@ from backend.app.reportability.router import router as reportability_router
 from backend.app.capa_effectiveness.router import router as capa_effectiveness_router
 from backend.app.case_ai.router import router as case_ai_router
 from backend.app.readiness_home.router import router as readiness_router
+from backend.app.post_market.router import router as post_market_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
 from backend.app.risk_router import router as risk_router
@@ -429,6 +430,7 @@ app.include_router(reportability_router)  # Reportability watch and reporting wi
 app.include_router(capa_effectiveness_router)  # CAPA effectiveness checks (md41)
 app.include_router(case_ai_router)  # The case AI run in one pass (md42)
 app.include_router(readiness_router)  # Readiness: the inspector's checks and the management review summary
+app.include_router(post_market_router)  # Post-market data and the risk file, per product
 app.include_router(client_errors_router)
 app.include_router(support_router)
 app.include_router(risk_router)  # Risk & Traceability

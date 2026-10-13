@@ -151,6 +151,8 @@ DB_MODULES = {
     "test_signals_ai_api",
     # Lightweight MVP phase 5: readiness checks and the management review summary.
     "test_readiness_api",
+    # Post-market data and the risk file, per product.
+    "test_risk_file_api",
     # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
     "test_case_workflow",
     # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.

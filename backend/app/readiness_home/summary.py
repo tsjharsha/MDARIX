@@ -152,6 +152,27 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
             CapaEffectivenessCheck.signed_at < end,
         )
     )
+    from backend.app.post_market import risk_file as risk_file_board
+
+    risk_board = risk_file_board.board(
+        db, tenant_id, period_days=max(period_days, risk_file_board.PERIOD_MIN), today=today
+    )
+    risk_file = {
+        "summary": risk_board["summary"],
+        "products": [
+            {
+                "name": item["product"]["name"],
+                "label": item["label"],
+                "complaints": item["post_market"]["complaints"],
+                "harm": item["post_market"]["harm"],
+                "risk_reviews": item["risk_file"]["risk_reviews"],
+                "risks_assessed": item["risk_file"]["risks_assessed"],
+                "risks": item["risk_file"]["risks"],
+                "reassessments_open": item["risk_file"]["reassessments_open"],
+            }
+            for item in risk_board["items"][:TOP_GROUPS]
+        ],
+    }
     checks = service.readiness(db, tenant_id, today=today)
     capa_check = next((item for item in checks["checks"] if item["code"] == "CAPA_EFFECTIVENESS"), {})
     capa = {
@@ -170,6 +191,7 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         },
         "reporting": reporting,
         "trends": trends,
+        "risk_file": risk_file,
         "capa": capa,
         "limitations": [
             "Counts are of the records imported into MDARIX for the period; check them against the source systems.",
@@ -250,8 +272,24 @@ def lines(data: dict) -> list[tuple[str, str]]:
     else:
         body("Trend check: no product version above its own history.")
 
+    risk = data["risk_file"]
+    heading("5. Post-market data and the risk file (ISO 14971:2019 clause 10)")
+    counts = risk["summary"]
+    body(
+        f"{_n(counts['products'], 'product')}: {counts['not_reviewed']} with post-market data not reviewed against the "
+        f"risk file, {counts['reassessment_overdue']} with risk reassessments overdue, {counts['reassessment_open']} "
+        f"open, {counts['no_risk_register']} with no risks in MDARIX, {counts['reviewed']} reviewed."
+    )
+    for product in risk["products"]:
+        body(
+            f"- {product['name']}: {product['label'].lower()}; {_n(product['complaints'], 'complaint')} "
+            f"({product['harm']} with harm), {_n(product['risk_reviews'], 'risk review')}, "
+            f"{product['risks_assessed']} of {_n(product['risks'], 'risk')} assessed, "
+            f"{product['reassessments_open']} reassessments open."
+        )
+
     capa = data["capa"]
-    heading("5. Corrective and preventive action (management review inputs, clause 5.6.2)")
+    heading("6. Corrective and preventive action (management review inputs, clause 5.6.2)")
     body(
         f"{_n(capa['opened'], 'CAPA')} opened in the period; effectiveness checks signed: {capa['checks_signed_effective']} "
         f"effective, {capa['checks_signed_not_effective']} not effective."
@@ -259,7 +297,7 @@ def lines(data: dict) -> list[tuple[str, str]]:
     if capa["now"]:
         body(f"Today: {capa['now']}.")
 
-    heading("6. Limitations")
+    heading("7. Limitations")
     for item in data["limitations"]:
         muted(f"- {item}")
     return out

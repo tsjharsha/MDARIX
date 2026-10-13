@@ -52,6 +52,9 @@ WHY = {
     "CAPA_EFFECTIVENESS": "CAPA is among the observations FDA cites most often, and closing a CAPA without verifying "
     "that it worked is a recurring finding.",
     "TRIAGE_OVERDUE": "Signals left waiting are trends nobody has looked at.",
+    "RISK_FILE_INPUT": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as "
+    "input to risk management a significant deficiency (the first QMSR warning letter cited it); ISO 14971:2019 "
+    "clause 10 asks for post-production information to reach risk management.",
 }
 
 
@@ -287,12 +290,43 @@ def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
+def risk_file_input(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    """Products whose post-market data has not reached the risk file, or whose risk reassessments are still open."""
+    from backend.app.post_market import risk_file
+
+    found = risk_file.board(db, tenant_id, today=today)
+    summary = found["summary"]
+    urgent = summary["not_reviewed"] + summary["reassessment_overdue"]
+    pending = summary["reassessment_open"] + summary["no_risk_register"]
+    flagged = [
+        item
+        for item in found["items"]
+        if item["state"] in (risk_file.NOT_REVIEWED, risk_file.OVERDUE, risk_file.OPEN, risk_file.NO_REGISTER)
+    ]
+    return _check(
+        "RISK_FILE_INPUT",
+        "Post-market data not in the risk file",
+        len(flagged),
+        CRITICAL if urgent else ATTENTION if pending else CLEAR,
+        f"{_n(summary['not_reviewed'], 'product')} with harm, malfunctions or rising trends and no risk review in the "
+        f"last year; {summary['reassessment_overdue']} with risk reassessments overdue, "
+        f"{summary['reassessment_open']} open; {summary['no_risk_register']} with no risks in MDARIX",
+        {"section": "Records", "tab": "Risk file input"},
+        [
+            {"id": item["product"]["id"], "ref": item["product"]["business_id"], "label": item["product"]["name"]}
+            for item in flagged
+        ],
+        {"products": summary["products"]},
+    )
+
+
 HOME = ("COMPLAINTS_TO_RECHECK", "COMPLAINTS_PAST_TARGET", "REPORTING_CLOCKS", "TRENDS_WITHOUT_ACTION")
 CHECKS = (
     complaints_to_recheck,
     complaints_past_target,
     reporting_clocks,
     trends_without_action,
+    risk_file_input,
     harm_closed_without_case,
     capa_effectiveness,
     triage_overdue,

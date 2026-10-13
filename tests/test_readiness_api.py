@@ -239,7 +239,10 @@ def test_every_check_reads_the_records_behind_it(org, seeded):
     assert all(check["why"] for check in body["checks"])
     # A number never contradicts its state: zero is clear (or not set up), never a finding.
     assert all(check["value"] or check["state"] in ("CLEAR", "NOT_SET") for check in body["checks"])
-    assert body["summary"]["checks"] == 7 and body["summary"]["critical"] == 5
+    # Harm complaints of a product with no risk review: post-market data not in the risk file.
+    risk = checks["RISK_FILE_INPUT"]
+    assert (risk["value"], risk["state"]) == (1, "CRITICAL") and risk["items"][0]["id"] == seeded["product"]
+    assert body["summary"]["checks"] == 8 and body["summary"]["critical"] == 6
 
 
 def test_a_capa_on_the_decided_case_clears_the_trend_check(org, seeded):

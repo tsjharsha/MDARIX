@@ -4,7 +4,7 @@
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
 
-export const RECORDS_TABS = ["Effectiveness checks"] as const;
+export const RECORDS_TABS = ["Effectiveness checks", "Risk file input"] as const;
 export type RecordsTab = (typeof RECORDS_TABS)[number];
 
 export const EFFECTIVENESS_LIMITS = {
