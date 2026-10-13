@@ -17,6 +17,7 @@ import {
   type Option,
   type TrialProfile,
 } from "./trialProfile";
+import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 
 /** Answers whose problems are fixed on the first step: a refusal for one of them takes the person back there. */
 const STEP_ONE_CODES = new Set([
@@ -170,6 +171,9 @@ export function SignupForm() {
           <li>You set your own password from the invitation email. MDARIX never sees it.</li>
           <li>You sign in, explore the sample investigation, then upload your own exports.</li>
         </ol>
+        <a className="primary-action" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
+          Read the free trial user guide
+        </a>
         <a className="su-secondary" href="/">
           Back to website
         </a>

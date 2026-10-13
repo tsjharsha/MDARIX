@@ -185,6 +185,14 @@ operator knows a release migrates the database.
   button beside "Request a demo".
 - Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
   time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- The free trial user guide at `/help/trial-guide`: seven steps from requesting the trial to the one-to-one demo
+  (request, activate and sign in, invite two colleagues, the sample data story, your own data, feedback, the demo),
+  each with what to do, what you will see and an illustrated, animated picture of the screen (still under reduced
+  motion and in print). It opens without signing in, saves as a PDF (`docs/user-guide/MDARIX_Free_Trial_User_Guide.pdf`
+  is that PDF), and is linked from the sign-up confirmation, the trial's Help menu and Getting started.
+- Getting started shows the trial journey: the guide's seven steps, each ticked from the trial's own records (two
+  colleagues invited, three chapters tried, own data uploaded, feedback sent, demo requested), with a button for the
+  next step. The decide-and-sign chapter's button says "Open the case decision".
 - Getting started explains the sample data: what it holds (counted live), the pain point each part re-creates (hidden
   complaints, running reporting clocks, harm closed without an investigation, a trend after a supplier change, an
   investigation with its evidence, CAPAs without proof they worked, post-market data missing from the risk file), the

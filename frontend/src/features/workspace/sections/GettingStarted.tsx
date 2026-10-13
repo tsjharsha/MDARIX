@@ -18,7 +18,9 @@ import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData"
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
-import { BookDemo } from "./BookDemo";
+import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
+import { TrialJourney } from "./TrialJourney";
+import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel, scrollToSampleData } from "./SampleData";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
@@ -59,7 +61,8 @@ type Insights = {
 const slices = (items: { label: string; count: number }[]): Slice[] =>
   items.map((item) => ({ key: item.label, label: item.label, count: item.count, tone: "neutral" }));
 
-const scrollToImport = () => document.getElementById("trial-import")?.scrollIntoView({ behavior: "smooth" });
+const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+const scrollToImport = () => scrollTo("trial-import");
 
 /**
  * Getting started: the free trial as a story. The quality loop MDARIX closes, chapter by chapter, each with what the
@@ -87,6 +90,26 @@ export function GettingStartedSection() {
   const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
   const talk = () => window.open("/contact", "_blank", "noopener");
   const hasSample = (trial?.sample?.products ?? 0) > 0;
+  // The trial journey (the free trial user guide's seven steps), ticked from the trial's own records.
+  const feedback = useResource<{ submissions?: unknown[] }>("/api/v1/trial/feedback");
+  const demo = useResource<{ request: TrialDemoRequest | null }>(DEMO_REQUEST_PATH);
+  const own = trial?.own_data;
+  const journey = journeyProgress({
+    users: trial?.usage?.users,
+    userLimit: trial?.limits?.users,
+    chaptersTried: story.data?.acted,
+    ownComplaints: own?.complaints,
+    ownRecords: own ? own.products + own.lots : 0,
+    feedbackSent: (feedback.data?.submissions?.length ?? 0) > 0,
+    demoRequested: !!demo.data?.request,
+  });
+  const goJourney = (key: JourneyKey) => {
+    if (key === "team") return scrollTo("trial-team");
+    if (key === "sample") return scrollTo("trial-story");
+    if (key === "own-data") return scrollToImport();
+    if (key === "feedback") return open("Share feedback");
+    if (key === "demo") return scrollTo("trial-demo");
+  };
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
@@ -111,13 +134,15 @@ export function GettingStartedSection() {
             {CHAPTER_ACTION[next.code] ?? "Open"} <ChevronRight size={15} aria-hidden="true" />
           </button>
         )}
-        <BookDemo chapters={chapters} />
+        <BookDemo chapters={chapters} onBooked={demo.reload} />
         {hasSample && (
           <button type="button" className="ac-secondary" onClick={scrollToSampleData}>
             <FlaskConical size={15} aria-hidden="true" /> About the sample data
           </button>
         )}
       </QualityLoop>
+
+      <TrialJourney steps={journey} source={story} onGo={goJourney} />
 
       <Panel
         title={
@@ -159,6 +184,7 @@ export function GettingStartedSection() {
         </div>
       </Panel>
 
+      <div id="trial-story" className="uw-anchor" />
       <Panel title="Your story, chapter by chapter" eyebrow={`${acted} of ${total} tried`} source={story}>
         <p className="uw-trial-lede">
           Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records first and on your
@@ -188,7 +214,7 @@ export function GettingStartedSection() {
             />
           ))}
         </ol>
-        <div className="uw-story-partner">
+        <div id="trial-demo" className="uw-story-partner uw-anchor">
           <div>
             <strong>See it on your own records, one to one</strong>
             <p>
@@ -197,7 +223,7 @@ export function GettingStartedSection() {
             </p>
           </div>
           <div className="uw-story-partner-actions">
-            <BookDemo chapters={chapters} variant="primary" />
+            <BookDemo chapters={chapters} variant="primary" onBooked={demo.reload} />
             <button type="button" className="ac-link" onClick={talk}>
               <MessageSquare size={15} aria-hidden="true" /> Other questions
             </button>
@@ -230,7 +256,9 @@ export function GettingStartedSection() {
 
       <InsightsPanel insights={insights.data} source={insights} />
 
-      <TeamPanel onChanged={status.reload} />
+      <div id="trial-team" className="uw-anchor">
+        <TeamPanel onChanged={status.reload} />
+      </div>
     </div>
   );
 }

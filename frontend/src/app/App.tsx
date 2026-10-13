@@ -29,6 +29,8 @@ import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministr
 import { AuthPage } from "../features/auth/AuthPage";
 import { RequestDemoPage } from "../features/auth/RequestDemoPage";
 import { PilotGuidePage } from "../features/help/PilotGuidePage";
+import { TrialGuidePage } from "../features/help/TrialGuidePage";
+import { TRIAL_GUIDE_PATH } from "../features/help/trialGuide";
 
 export function App() {
   const publicPath = window.location.pathname;
@@ -36,6 +38,7 @@ export function App() {
     return <AuthPage mode={publicPath.slice(1)} />;
   if (publicPath === "/request-demo") return <RequestDemoPage />;
   if (publicPath === "/help/pilot-guide") return <PilotGuidePage />;
+  if (publicPath === TRIAL_GUIDE_PATH) return <TrialGuidePage />;
   // The signed-in application lives under /app and /platform-admin (router.ts). Match whole path segments, so a
   // website page such as /platform is never mistaken for /platform-admin.
   if (["/app", "/platform-admin"].some((root) => publicPath === root || publicPath.startsWith(`${root}/`)))

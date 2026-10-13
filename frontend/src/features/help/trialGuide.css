@@ -1,0 +1,515 @@
+/* The free trial user guide (TrialGuidePage.tsx). The base help page layout is in styles.css (.help-page). */
+.tg-page main {
+  padding-bottom: 64px;
+}
+.tg-page main:focus {
+  outline: none;
+}
+.tg-top-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.tg-print {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #0d9488;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f766e;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tg-print:hover {
+  background: #f0fdfa;
+}
+
+/* The hero: the journey on navy. */
+.tg-hero {
+  padding: 40px clamp(16px, 5vw, 64px) 32px;
+  background:
+    radial-gradient(circle at 85% 10%, rgb(13 148 136 / 35%), transparent 45%),
+    linear-gradient(160deg, #0b2540 0%, #0f3555 100%);
+  color: #ffffff;
+  text-align: center;
+}
+.tg-eyebrow {
+  color: #5eead4;
+}
+.tg-hero h1 {
+  margin: 8px auto 12px;
+  max-width: 820px;
+  font-size: clamp(28px, 4.4vw, 44px);
+  line-height: 1.15;
+}
+.tg-lede {
+  max-width: 760px;
+  margin: 0 auto;
+  color: #cbd5e1;
+  font-size: clamp(15px, 1.6vw, 17px);
+  line-height: 1.6;
+}
+.tg-journey {
+  display: block;
+  width: min(1040px, 100%);
+  height: auto;
+  margin: 18px auto 6px;
+}
+.tg-journey-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: tg-draw-line 2.6s ease-out 0.2s forwards;
+}
+.tg-facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tg-facts li {
+  display: grid;
+  min-width: 150px;
+  padding: 10px 16px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 6%);
+}
+.tg-facts strong {
+  font-size: 20px;
+}
+.tg-facts span {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+/* Contents. */
+.tg-contents {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 24px 16px 0;
+}
+.tg-contents ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tg-contents a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid #dbe4ec;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #183249;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.tg-contents a:hover {
+  border-color: #0d9488;
+}
+.tg-contents a span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #0d9488;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+/* Steps: the picture beside its text, alternating sides. */
+.tg-steps {
+  display: grid;
+  gap: 28px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 28px 16px 0;
+}
+.tg-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(18px, 3vw, 40px);
+  padding: clamp(16px, 2.4vw, 28px);
+  border: 1px solid #dbe4ec;
+  border-radius: 18px;
+  background: #ffffff;
+  scroll-margin-top: 16px;
+}
+.tg-step:nth-child(even) .tg-step-picture {
+  order: 2;
+}
+.tg-scene {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 12px 24px rgb(15 23 42 / 12%));
+}
+.tg-step-number {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tg-step-number span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.tg-step h2 {
+  margin: 6px 0 6px;
+  font-size: clamp(21px, 2.4vw, 26px);
+}
+.tg-why {
+  margin: 0 0 12px;
+  color: #475569;
+}
+.tg-actions {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  counter-reset: tg-action;
+}
+.tg-actions li {
+  position: relative;
+  margin: 8px 0;
+  padding-left: 34px;
+  counter-increment: tg-action;
+}
+.tg-actions li::before {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ccfbf1;
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 800;
+  content: counter(tg-action);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.tg-result,
+.tg-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tg-result {
+  background: #f0fdfa;
+  color: #134e4a;
+}
+.tg-result svg {
+  flex: none;
+  margin-top: 2px;
+  color: #0d9488;
+}
+.tg-tip {
+  background: #fffbeb;
+  color: #713f12;
+}
+.tg-tip svg {
+  flex: none;
+  margin-top: 2px;
+  color: #d97706;
+}
+.tg-after {
+  width: min(1120px, 100%);
+  margin: 28px auto 0;
+  padding: 0 16px;
+}
+.tg-after h2 {
+  margin-bottom: 8px;
+}
+.tg-after ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+.tg-after li {
+  margin: 6px 0;
+}
+.tg-small {
+  color: #64748b;
+  font-size: 13px;
+}
+
+/* The pictures' motion: a pointer moves to the highlighted control, which pulses; parts appear in turn. */
+.tg-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tg-ring 1.8s ease-out infinite;
+}
+.tg-pointer {
+  animation: tg-point 3.6s ease-in-out infinite;
+}
+.tg-pop {
+  opacity: 0;
+  animation: tg-pop 0.6s ease-out forwards;
+  animation-delay: var(--d, 0s);
+}
+.tg-draw {
+  stroke-dasharray: 60;
+  stroke-dashoffset: 60;
+  animation: tg-draw 0.8s ease-out 0.6s forwards;
+}
+.tg-draw.tg-late {
+  animation-delay: 1.4s;
+}
+.tg-grow {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: tg-grow 1.4s ease-out 1.2s both;
+}
+.tg-timer {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tg-timer 6s linear infinite;
+}
+.tg-loop {
+  stroke-dashoffset: 603;
+  animation: tg-loop 2.4s ease-out 0.3s forwards;
+}
+.tg-blink {
+  animation: tg-blink 1.6s ease-in-out infinite;
+}
+.tg-star {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tg-star 0.5s ease-out both;
+  animation-delay: var(--d, 0s);
+}
+.tg-fly {
+  animation: tg-fly 3.6s ease-in-out infinite;
+}
+.tg-pick {
+  animation: tg-blink 2s ease-in-out infinite;
+}
+@keyframes tg-ring {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
+}
+@keyframes tg-point {
+  0% {
+    transform: translate(calc(var(--tx) + 150px), calc(var(--ty) + 70px));
+  }
+  55%,
+  100% {
+    transform: translate(var(--tx), var(--ty));
+  }
+  62% {
+    transform: translate(var(--tx), var(--ty)) scale(0.85);
+  }
+}
+@keyframes tg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes tg-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tg-draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes tg-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes tg-timer {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 88;
+  }
+}
+@keyframes tg-loop {
+  to {
+    stroke-dashoffset: 402;
+  }
+}
+@keyframes tg-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes tg-star {
+  from {
+    transform: scale(0.2);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes tg-fly {
+  0% {
+    transform: translate(0, 0);
+    opacity: 1;
+  }
+  45% {
+    transform: translate(-60px, 20px);
+    opacity: 1;
+  }
+  70%,
+  100% {
+    transform: translate(-60px, 20px);
+    opacity: 0.25;
+  }
+}
+
+@media (max-width: 860px) {
+  .tg-step {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tg-step:nth-child(even) .tg-step-picture {
+    order: 0;
+  }
+}
+
+/* Still pictures, complete, for people who prefer less motion and on paper. */
+@media (prefers-reduced-motion: reduce) {
+  .tg-ring,
+  .tg-blink,
+  .tg-pick,
+  .tg-timer,
+  .tg-fly {
+    animation: none;
+  }
+  .tg-pop,
+  .tg-star,
+  .tg-grow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .tg-pointer {
+    animation: none;
+    transform: translate(var(--tx), var(--ty));
+  }
+  .tg-draw,
+  .tg-journey-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .tg-loop {
+    animation: none;
+    stroke-dashoffset: 402;
+  }
+}
+@media print {
+  .help-page-top,
+  .app-skip,
+  .tg-contents {
+    display: none;
+  }
+  :root:has(.tg-page),
+  .help-page.tg-page {
+    min-height: 0;
+    background: #ffffff;
+  }
+  .tg-page main {
+    padding-bottom: 0;
+  }
+  .tg-hero {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .tg-step,
+  .tg-after {
+    break-inside: avoid;
+  }
+  .tg-step {
+    border-color: #cbd5e1;
+  }
+  .tg-ring,
+  .tg-blink,
+  .tg-pick,
+  .tg-timer,
+  .tg-fly {
+    animation: none;
+  }
+  .tg-pop,
+  .tg-star,
+  .tg-grow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .tg-pointer {
+    animation: none;
+    transform: translate(var(--tx), var(--ty));
+  }
+  .tg-draw,
+  .tg-journey-line {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .tg-loop {
+    animation: none;
+    stroke-dashoffset: 402;
+  }
+  .tg-scene {
+    filter: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

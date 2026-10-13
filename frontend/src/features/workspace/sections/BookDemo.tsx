@@ -32,9 +32,12 @@ export function demoRequestText(request: TrialDemoRequest | null | undefined): s
 export function BookDemo({
   chapters,
   variant = "secondary",
+  onBooked,
 }: {
   chapters: readonly StoryChapter[];
   variant?: "primary" | "secondary";
+  /** Told when a request was sent, so other views of it (the trial journey) read it again. */
+  onBooked?: () => void;
 }) {
   const state = useResource<{ request: TrialDemoRequest | null }>(DEMO_REQUEST_PATH);
   const [open, setOpen] = useState(false);
@@ -52,7 +55,16 @@ export function BookDemo({
         {pending ? <CheckCircle2 size={15} aria-hidden="true" /> : <CalendarCheck size={15} aria-hidden="true" />}{" "}
         {pending ? "Demo requested" : "Book a one-to-one demo"}
       </button>
-      {open && <DemoForm chapters={chapters} onClose={() => setOpen(false)} onBooked={() => state.reload()} />}
+      {open && (
+        <DemoForm
+          chapters={chapters}
+          onClose={() => setOpen(false)}
+          onBooked={() => {
+            state.reload();
+            onBooked?.();
+          }}
+        />
+      )}
     </>
   );
 }

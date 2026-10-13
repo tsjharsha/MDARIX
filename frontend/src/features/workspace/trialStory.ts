@@ -45,7 +45,7 @@ export const CHAPTER_ACTION: Record<string, string> = {
   REPORTING_CLOCKS: "Check reporting clocks",
   TRENDS_TO_CASES: "Open the signal inbox",
   INVESTIGATE_WITH_AI: "Open the guided investigation",
-  DECIDE_AND_SIGN: "Open decisions",
+  DECIDE_AND_SIGN: "Open the case decision",
   CAPA_EFFECTIVE: "Check CAPA effectiveness",
   RISK_FILE: "Open risk file input",
   SHOW_THE_INSPECTOR: "Open Readiness",

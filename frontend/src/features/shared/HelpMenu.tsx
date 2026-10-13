@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { BookOpen, Bug, CircleHelp, LifeBuoy, NotebookText, ShieldCheck } from "lucide-react";
 import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
+import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 
 /**
  * Help in every signed-in screen: getting started (during a trial), the pilot guide, the support address, a
@@ -52,6 +53,13 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
               >
                 <BookOpen size={15} aria-hidden="true" /> Getting started and import templates
               </button>
+            </li>
+          )}
+          {onGettingStarted && (
+            <li>
+              <a href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
+                <NotebookText size={15} aria-hidden="true" /> Free trial user guide
+              </a>
             </li>
           )}
           <li>
