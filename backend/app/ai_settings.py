@@ -241,10 +241,11 @@ def ai_status_for(state: dict | None, models: list[dict]) -> dict:
         limit = int(state.get("monthly_token_budget") or 0)
         used = int(state.get("tokens_used") or 0)
         budget = {"used": used, "limit": limit, "remaining": max(0, limit - used)}
-    if not enabled:
-        reason = "AI_DISABLED"
-    elif not available:
+    # No AI service on this server is the first reason: switching the organization on would change nothing.
+    if not available:
         reason = "PROVIDER_UNAVAILABLE"
+    elif not enabled:
+        reason = "AI_DISABLED"
     elif budget is not None and budget["remaining"] <= 0:
         reason = "BUDGET_EXHAUSTED"
     else:
@@ -257,6 +258,15 @@ def ai_status_for(state: dict | None, models: list[dict]) -> dict:
         "message": AI_STATUS_MESSAGES[reason],
         "manual_paths": dict(MANUAL_PATHS),
     }
+
+
+def ai_ready(db: Session, tenant_id) -> bool:
+    """Whether AI really answers for this organization now: a provider is configured and allowed here, the
+    organization switched AI on, and its allowance is not used up."""
+    try:
+        return ai_status_for(governance.usage(db, tenant_id), _models_in_use())["reason_code"] is None
+    except Exception:
+        return False
 
 
 @router.get("/ai/status")

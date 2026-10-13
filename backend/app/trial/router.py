@@ -304,10 +304,12 @@ def trial_story_chapters(
     data: Session = Depends(get_data_plane_db),
 ):
     """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it."""
+    from backend.app.ai_settings import ai_ready
     from backend.app.trial import story
 
     _require_trial(db, ctx)
-    return story.story(data, uuid.UUID(str(ctx.tenant_id)))
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return story.story(data, tenant_id, ai_ready=ai_ready(db, tenant_id))
 
 
 class TrialDemoRequest(BaseModel):

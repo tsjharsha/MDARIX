@@ -122,6 +122,26 @@ def _count(db: Session, query) -> int:
         return 0
 
 
+# Where AI does not answer for the organization yet (no AI service here, or switched off), the investigation chapter
+# says what the case page does without it, so the trial never promises AI it does not get.
+WITHOUT_AI = {
+    "INVESTIGATE_WITH_AI": (
+        "Investigate with evidence you can trace",
+        "The case page brings the complaints, lots, changes and evidence together; ask MDARIX a question and the answer "
+        "cites the records it comes from; the investigator weighs each explanation. AI assistance joins when it is "
+        "switched on for your organization.",
+        "Small teams with large backlogs; conclusions that cannot show their sources are not trusted.",
+    )
+}
+
+
+def chapter_text(code: str, title: str, promise: str, pain: str, ai_ready: bool) -> tuple[str, str, str]:
+    """A chapter's title, promise and pain, as this organization gets it (with or without AI)."""
+    if not ai_ready and code in WITHOUT_AI:
+        return WITHOUT_AI[code]
+    return title, promise, pain
+
+
 def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
     """How often the organization acted in each chapter (records it created in MDARIX), sample data excluded."""
     from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
@@ -141,7 +161,9 @@ def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
         "HIDDEN_COMPLAINTS": count(ComplaintSecondLook),
         "REPORTING_CLOCKS": count(ComplaintReportability),
         "TRENDS_TO_CASES": count(InvestigationSignal),
-        "INVESTIGATE_WITH_AI": count(CaseAiRun) + count(AIInteraction),
+        # A question asked of MDARIX, or an analysis a person started (the case page's automatic first run does not
+        # count: opening a page is not investigating).
+        "INVESTIGATE_WITH_AI": count(CaseAiRun, CaseAiRun.trigger == "MANUAL") + count(AIInteraction),
         "DECIDE_AND_SIGN": count(Decision, Decision.decision_kind == "BRIEF"),
         "CAPA_EFFECTIVE": count(CapaEffectivenessCheck),
         "RISK_FILE": count(CaseReview, CaseReview.review_type == "RISK", CaseReview.status == "COMPLETED"),
@@ -249,8 +271,10 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}{'' if count == 1 else 's'}"
 
 
-def story(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> dict:
-    """Every chapter with its finding from the organization's records and whether it acted on it."""
+def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready: bool = False) -> dict:
+    """Every chapter with its finding from the organization's records and whether it acted on it. ``ai_ready``: AI
+    answers for this organization now (backend/app/ai_settings.py ai_ready); without it the investigation chapter
+    says what the case page does by itself."""
     from backend.app.readiness_home.service import readiness
 
     today = today or datetime.now(timezone.utc).date()
@@ -275,6 +299,7 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> dict:
     }
     chapters = []
     for number, (code, title, promise, pain, opens, check_code) in enumerate(CHAPTERS, 1):
+        title, promise, pain = chapter_text(code, title, promise, pain, ai_ready)
         check = checks.get(check_code) if check_code else None
         if code == "TRENDS_TO_CASES":
             finding = _trends_finding(db, tenant_id, checks.get("TRENDS_WITHOUT_ACTION"))
@@ -324,6 +349,9 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> dict:
 def trial_overview(db: Session, now: datetime | None = None) -> dict:
     """Every Free Trial organization still holding data: its dates, usage, story progress and feedback. ``db`` is the
     control database (the trials' shared data plane); each trial's records are read in a session bound to it."""
+    from backend.app.ai_settings import _models_in_use
+
+    ai_on_server = bool(_models_in_use())
     from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.models.foundation import AuthUser, PlanDefinition, Tenant
@@ -402,8 +430,10 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
             "demo_requested": sum(1 for item in items if item["demo_request"]),
             "chapters": {code: sum(1 for item in active if code in item["story"]["acted"]) for code in CODES},
         },
+        # With no AI service on this server, the investigation chapter carries its without-AI title here too.
         "chapters": [
-            {"code": code, "number": number, "title": title} for number, (code, title, *_) in enumerate(CHAPTERS, 1)
+            {"code": code, "number": number, "title": chapter_text(code, title, promise, pain, ai_on_server)[0]}
+            for number, (code, title, promise, pain, *_) in enumerate(CHAPTERS, 1)
         ],
         "engaged_chapters": ENGAGED_CHAPTERS,
         "items": items,

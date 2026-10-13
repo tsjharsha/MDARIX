@@ -82,7 +82,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     actions: [
       "Read About the sample data in Getting started: seven points, each with what is in the sample, why it matters and a button to the screen that shows it.",
       "Follow Your story, chapter by chapter. The quality loop at the top always names the next chapter; its button opens the right screen.",
-      "A chapter counts as tried when you act in it: confirm or dismiss a record in the second look, record a reporting decision, open a case from a signal, run the case AI or ask MDARIX a question, sign a decision, plan an effectiveness check, complete a risk review.",
+      "A chapter counts as tried when you act in it: confirm or dismiss a record in the second look, record a reporting decision, open a case from a signal, ask MDARIX a question about the case, sign a decision, plan an effectiveness check, complete a risk review.",
       "Finish in Readiness: choose Download PDF for the readiness summary, or Inspection pack (ZIP) for the summary with every record behind each check, the files you would hand an inspector.",
     ],
     result:

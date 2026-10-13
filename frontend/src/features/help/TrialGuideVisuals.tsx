@@ -344,7 +344,7 @@ function TeamScene() {
 
 function SampleScene() {
   const stations = [C.green, C.green, C.green, C.amber, C.red, C.red, C.amber, C.red];
-  const chapters = ["Hidden complaints", "Reporting clocks", "Trend to case", "Investigate with AI", "Decide and sign"];
+  const chapters = ["Hidden complaints", "Reporting clocks", "Trend to case", "Investigate a case", "Decide and sign"];
   return (
     <Frame address="mdarix.com/app · Getting started" label="The quality loop on the sample data, chapter by chapter">
       <rect x="1" y="35" width="300" height="294" fill={C.navy} />

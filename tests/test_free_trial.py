@@ -59,6 +59,32 @@ _TRIAL_BUSINESS_TABLES = (
 
 
 def _purge_trial_business_data():
+    # Everything a trial's records led to (a case analysis writes hypotheses, AI runs and their checks, ...): the
+    # purge's own table list, for every trial workspace at once, retried while foreign keys hold rows back; then the
+    # tables above, as before.
+    from sqlalchemy.exc import DBAPIError
+    from sqlalchemy.orm import Session as _Session
+
+    from backend.app.trial.retention import _existing_tables
+
+    trials = "tenant_id IN (SELECT id FROM tenants WHERE tenant_key LIKE :pattern)"
+    with _Session(engine) as db:
+        remaining = _existing_tables(db)
+        for _ in range(len(remaining)):
+            progress = False
+            for table in list(remaining):
+                savepoint = db.begin_nested()
+                try:
+                    db.execute(text(f"DELETE FROM {table} WHERE {trials}"), {"pattern": "TRIAL\\_%"})
+                    savepoint.commit()
+                except DBAPIError:
+                    savepoint.rollback()
+                    continue
+                remaining.remove(table)
+                progress = True
+            if not remaining or not progress:
+                break
+        db.commit()
     with engine.begin() as connection:
         for table in _TRIAL_BUSINESS_TABLES:
             connection.execute(
@@ -503,6 +529,9 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     chapters = {chapter["code"]: chapter for chapter in body["chapters"]}
     assert chapters["HIDDEN_COMPLAINTS"]["finding"]["value"] >= 5
     assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
+    # Trials start without AI: the chapter promises what the case page does without it.
+    assert chapters["INVESTIGATE_WITH_AI"]["title"] == "Investigate with evidence you can trace"
+    assert "AI assistance joins when it is switched on" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])
 
@@ -528,6 +557,34 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     summary = overview.json()["summary"]
     assert summary["active"] >= 1 and summary["acted"] >= 1 and summary["chapters"]["HIDDEN_COMPLAINTS"] >= 1
     assert [chapter["code"] for chapter in overview.json()["chapters"]][0] == "HIDDEN_COMPLAINTS"
+
+
+def test_opening_a_case_is_not_investigating_but_starting_its_analysis_is():
+    """The case page's automatic first analysis does not tick the investigation chapter; one a person starts does."""
+    from backend.app.db.models.foundation import Investigation
+
+    user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        case = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .one()
+        )
+        case_id = case.id
+    finally:
+        db.close()
+
+    def investigated() -> bool:
+        chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
+        return chapters["INVESTIGATE_WITH_AI"]["acted"]["done"]
+
+    assert user.post(f"/api/v1/investigations/{case_id}/ai-run", json={"trigger": "AUTO"}).status_code in (200, 202)
+    assert investigated() is False
+    started = user.post(f"/api/v1/investigations/{case_id}/ai-run", json={"trigger": "MANUAL"})
+    assert started.status_code in (200, 202), started.text
+    assert investigated() is True
 
 
 def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():

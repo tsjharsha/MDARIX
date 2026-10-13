@@ -31,7 +31,7 @@ export const CHAPTER_SHORT: Record<string, string> = {
   HIDDEN_COMPLAINTS: "Hidden complaints",
   REPORTING_CLOCKS: "Reporting clocks",
   TRENDS_TO_CASES: "Trend to case",
-  INVESTIGATE_WITH_AI: "AI investigation",
+  INVESTIGATE_WITH_AI: "Investigation",
   DECIDE_AND_SIGN: "Signed decision",
   CAPA_EFFECTIVE: "CAPA proven",
   RISK_FILE: "Risk file",
