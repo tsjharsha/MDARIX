@@ -53,6 +53,10 @@ EXEMPT = {
     ("POST", "/api/v1/public/demo-requests"): "public website form; stores contact details only, rate limited",
     ("POST", "/api/v1/trial/feedback"): "the trial user's own feedback; trial workspaces only, checked in the route",
     ("POST", "/api/v1/trial/feedback/{feedback_id}/withdraw-consent"): "the user's own feedback only",
+    (
+        "POST",
+        "/api/v1/trial/demo-request",
+    ): "the trial user's own demo request; trial workspaces only, checked in the route",
     ("POST", "/api/v1/client-errors"): "public by design: the browser's error boundary reports from the sign-in page "
     "and after a session ended; stores no business data, body capped, rate limited per address",
     (

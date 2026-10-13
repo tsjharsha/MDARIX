@@ -23,6 +23,32 @@ import {
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
 import { CustomerVoices, LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
+import { QualityLoop } from "../features/workspace/sections/QualityLoop";
+import { LOOP_ORDER, type LoopStation } from "../features/workspace/qualityLoop";
+
+// The quality loop on the home page: illustrative, synthetic values (said on the picture), in the order a complaint
+// travels; the product draws the same loop from each organization's own records (Readiness).
+const ILLUSTRATIVE_LOOP: Record<string, { value: number; tone: LoopStation["tone"]; state: string }> = {
+  COMPLAINTS_TO_RECHECK: { value: 5, tone: "critical", state: "Critical" },
+  COMPLAINTS_PAST_TARGET: { value: 0, tone: "good", state: "Clear" },
+  REPORTING_CLOCKS: { value: 2, tone: "warning", state: "Needs attention" },
+  HARM_CLOSED_WITHOUT_CASE: { value: 1, tone: "critical", state: "Critical" },
+  TRIAGE_OVERDUE: { value: 0, tone: "good", state: "Clear" },
+  TRENDS_WITHOUT_ACTION: { value: 1, tone: "warning", state: "Needs attention" },
+  CAPA_EFFECTIVENESS: { value: 1, tone: "critical", state: "Critical" },
+  RISK_FILE_INPUT: { value: 3, tone: "critical", state: "Critical" },
+};
+
+export const SITE_LOOP: LoopStation[] = LOOP_ORDER.map((step, index) => ({
+  key: step.code,
+  number: index + 1,
+  label: step.label,
+  caption: step.caption,
+  value: ILLUSTRATIVE_LOOP[step.code].value,
+  tone: ILLUSTRATIVE_LOOP[step.code].tone,
+  stateLabel: ILLUSTRATIVE_LOOP[step.code].state,
+  done: ILLUSTRATIVE_LOOP[step.code].tone === "good",
+}));
 
 export const SITE_PAGES = [
   "/",
@@ -191,8 +217,11 @@ export function HomePage() {
             <h1>{home.title}</h1>
             <p>{home.copy}</p>
             <div className="ms-cta-row">
-              <a className="ms-btn ms-btn-light" href="/request-demo">
-                Request a demo <ArrowRight size={16} aria-hidden="true" />
+              <a className="ms-btn ms-btn-light" href="/signup">
+                Start free trial <ArrowRight size={16} aria-hidden="true" />
+              </a>
+              <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
+                Request a demo
               </a>
               <a className="ms-btn ms-btn-ghost-light" href="/platform">
                 Explore the platform
@@ -212,6 +241,30 @@ export function HomePage() {
           </div>
           <InvestigationAnimation />
         </div>
+      </section>
+
+      <section className="ms-section ms-loop" id="quality-loop">
+        <SectionHead
+          eyebrow="Inspection readiness"
+          title="See your quality loop the way an inspector will."
+          copy="From the complaint that comes in to the risk file it must reach: eight checks drawn from 2026 FDA warning letters, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
+        />
+        <Reveal>
+          <QualityLoop
+            stations={SITE_LOOP}
+            eyebrow="Illustrative · synthetic data"
+            title="2 of 8 inspection checks clear"
+            detail="Hidden complaints, a harm complaint closed without an investigation, a CAPA closed without an effectiveness check, and post-market data that never reached the risk file: what an inspector would find first. Your free trial starts with sample data that tells this story, then reads your own export."
+            doneLabel="clear"
+          >
+            <a className="ms-btn ms-btn-light" href="/signup">
+              Start free trial <ArrowRight size={16} aria-hidden="true" />
+            </a>
+            <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
+              Book a one-to-one demo
+            </a>
+          </QualityLoop>
+        </Reveal>
       </section>
 
       <section className="ms-section ms-question">

@@ -195,11 +195,29 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "capa": capa,
         "limitations": [
             "Counts are of the records imported into MDARIX for the period; check them against the source systems.",
-            "The trend check compares each product version with its own history; numbers of devices in use are not "
-            "known to MDARIX.",
+            _trend_basis_limitation(board.get("basis") or {}),
             "Reporting windows are the organization's own; MDARIX keeps the clock and decides nothing.",
         ],
     }
+
+
+def _trend_basis_limitation(basis: dict) -> str:
+    """What the trend check counted by: units in the field where lots have quantities, else calendar days."""
+    units, time = int(basis.get("units") or 0), int(basis.get("time") or 0)
+    base = (
+        "The trend check compares each product version with its own history, or a new version with the one it replaced"
+    )
+    if units and not time:
+        return f"{base}, per unit in the field (lot quantities)."
+    if units:
+        return (
+            f"{base}: {units} group(s) per unit in the field (lot quantities), {time} per calendar day where lots have "
+            "no quantity, so a growing installed base can raise their rate by itself."
+        )
+    return (
+        f"{base}, per calendar day: lot quantities are not recorded, so a growing installed base can raise a rate by "
+        "itself. Add quantities to the lot import to count per unit in the field."
+    )
 
 
 def lines(data: dict) -> list[tuple[str, str]]:

@@ -27,6 +27,8 @@ export type TrialItem = {
     last_activity: string | null;
   };
   feedback: { responses: number; overall: number | null; recommend: number | null } | null;
+  // The trial's latest one-to-one demo request (booked from Getting started), or null.
+  demo_request?: { status: string; created_at: string | null; business_id: string | null } | null;
 };
 
 export type TrialOverview = {
@@ -38,6 +40,7 @@ export type TrialOverview = {
     engaged: number;
     own_data: number;
     feedback: number;
+    demo_requested?: number;
     chapters: Record<string, number>;
   };
   chapters: { code: string; number: number; title: string }[];

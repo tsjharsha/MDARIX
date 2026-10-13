@@ -5,6 +5,7 @@ import uuid
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -222,10 +223,19 @@ class DemoRequest(Base):
     handled_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     handled_at = _ts()
     note: Mapped[str | None] = mapped_column(Text)
+    # md44: a request made inside a free trial (source TRIAL) names the trial organization (not ``tenant_id``: this is
+    # MDARIX's sales record, not the organization's business data), the times that suit and the trial's progress.
+    source: Mapped[str] = mapped_column(String(20), nullable=False, server_default="WEBSITE")
+    trial_tenant_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    organization: Mapped[str | None] = mapped_column(String(160))
+    preferred_time: Mapped[str | None] = mapped_column(String(200))
+    context: Mapped[dict | None] = mapped_column(JSONB)
     __table_args__ = (
         Index("ix_demo_requests_created", "created_at"),
         Index("ix_demo_requests_email", "email"),
         Index("ix_demo_requests_source", "source_hash", "created_at"),
+        Index("ix_demo_requests_trial_tenant", "trial_tenant_id", "created_at"),
+        CheckConstraint("source IN ('WEBSITE', 'TRIAL')", name="ck_demo_requests_source_known"),
     )
 
 

@@ -9,6 +9,7 @@ import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData"
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
+import { BookDemo } from "./BookDemo";
 import {
   CHAPTER_ACTION,
   TRIAL_STORY_PATH,
@@ -97,9 +98,7 @@ export function GettingStartedSection() {
             {CHAPTER_ACTION[next.code] ?? "Open"} <ChevronRight size={15} aria-hidden="true" />
           </button>
         )}
-        <button type="button" className="ac-secondary" onClick={talk}>
-          <MessageSquare size={15} aria-hidden="true" /> Talk to us
-        </button>
+        <BookDemo chapters={chapters} />
       </QualityLoop>
 
       <Panel
@@ -161,12 +160,18 @@ export function GettingStartedSection() {
         </ol>
         <div className="uw-story-partner">
           <div>
-            <strong>Ready to run it on your live systems?</strong>
-            <p>Live connections to your QMS, PLM and ERP, onboarding support, and a design-partner price.</p>
+            <strong>See it on your own records, one to one</strong>
+            <p>
+              The MDARIX team walks through what your trial found and how a pilot on your live QMS, PLM and ERP data
+              would run, with onboarding support and a design-partner price.
+            </p>
           </div>
-          <button type="button" className="ac-secondary" onClick={talk}>
-            <MessageSquare size={15} aria-hidden="true" /> Talk to us about becoming a design partner
-          </button>
+          <div className="uw-story-partner-actions">
+            <BookDemo chapters={chapters} variant="primary" />
+            <button type="button" className="ac-link" onClick={talk}>
+              <MessageSquare size={15} aria-hidden="true" /> Other questions
+            </button>
+          </div>
         </div>
       </Panel>
 

@@ -20,6 +20,8 @@ export type ImportTemplate = {
   title: string;
   required: string[];
   optional: string[];
+  /** What the columns that change MDARIX's findings are for (lot quantity, awareness date, harm flags, ...). */
+  help?: Record<string, string>;
   download: string;
 };
 type CheckReport = {
@@ -227,6 +229,7 @@ export function ImportPanel({
           </a>
         </div>
       )}
+      {template && <ColumnGuide template={template} />}
       <div className="uw-trial-upload">
         <label className="ca-field uw-import-dates">
           Dates in the file
@@ -422,6 +425,41 @@ function FilePreviewTable({ rows }: { rows: Record<string, string>[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * What the template's key columns are for, beside the template. For lots, a callout first: a quantity on every lot
+ * turns the trend check from per calendar day into per unit in the field (exported for its test).
+ */
+export function ColumnGuide({ template }: { template: ImportTemplate }) {
+  const entries = Object.entries(template.help ?? {});
+  if (!entries.length) return null;
+  const perUnit = template.entity === "lots" && Boolean(template.help?.quantity);
+  return (
+    <div className="uw-import-guide">
+      {perUnit && (
+        <p className="uw-import-callout" role="note">
+          <strong>Per-unit trends from day one:</strong> add <code>quantity</code> (devices released) and{" "}
+          <code>manufacture_date</code> to every lot. The trend check then counts complaints per unit in the field, so a
+          version shipped in growing numbers is not mistaken for a rising trend. Lots already loaded can be updated by
+          uploading them again with the quantity.
+        </p>
+      )}
+      <details open={perUnit}>
+        <summary>What the key columns do</summary>
+        <dl>
+          {entries.map(([column, text]) => (
+            <div key={column}>
+              <dt>
+                <code>{column}</code>
+              </dt>
+              <dd>{text}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
     </div>
   );
 }

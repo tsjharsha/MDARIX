@@ -2,6 +2,7 @@ import { useId, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { AnimatedNumber } from "../../admin/console/motion";
 import { LOOP_SECONDS, loopDone, stationPoint, weakestLink, type LoopStation } from "../qualityLoop";
+import "./qualityLoop.css";
 
 const SIZE = 320;
 const CENTER = SIZE / 2;

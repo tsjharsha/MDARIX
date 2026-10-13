@@ -587,3 +587,183 @@ def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minut
         assert lot.quantity == 1250
     finally:
         db.close()
+
+
+def test_the_inspection_pack_holds_every_record_behind_every_check():
+    import hashlib
+    import io
+    import json
+    import zipfile
+
+    user, approval, _email = _approved_trial_client()
+    response = user.get("/api/v1/readiness/inspection-pack.zip", params={"period_days": 365})
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert "mdarix-inspection-pack-" in response.headers["content-disposition"]
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    names = archive.namelist()
+    assert names[:3] == ["00-README.txt", "01-readiness-summary.pdf", "02-inspection-checks.csv"]
+    assert names[-1] == "manifest.json" and len(names) == 12
+    manifest = json.loads(archive.read("manifest.json"))
+    assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 8
+    for entry in manifest["files"]:
+        assert hashlib.sha256(archive.read(entry["name"])).hexdigest() == entry["sha256"], entry["name"]
+    assert archive.read("01-readiness-summary.pdf").startswith(b"%PDF")
+
+    def rows(name):
+        text = archive.read(name).decode("utf-8-sig")
+        return text.splitlines()
+
+    hidden = rows("03-hidden-complaints.csv")
+    assert hidden[0].startswith("Complaint,Source ID,Product")
+    assert any("SAMPLE-RV-01" in line and "Cancelled or rejected" in line for line in hidden)
+    assert any("SAMPLE-RV-09" in line for line in rows("06-harm-closed-without-investigation.csv"))
+    assert len(rows("10-risk-file-input.csv")) == 4  # the header and the three sample products
+    assert any("SAMPLE-CAPA-01" in line for line in rows("09-capas-without-verified-effect.csv"))
+    checks = rows("02-inspection-checks.csv")
+    assert len(checks) == 9 and any("03-hidden-complaints.csv" in line for line in checks)
+    readme = archive.read("00-README.txt").decode("utf-8")
+    assert "SHA-256" in readme and "verify against the source records" in readme
+
+    # The export is audited, and handing the inspector a pack is chapter 8 of the trial's story.
+    chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
+    assert chapters["SHOW_THE_INSPECTOR"]["acted"]["done"] is True
+    assert user.get("/api/v1/readiness/inspection-pack.zip", params={"period_days": 10}).status_code == 422
+
+
+def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkeypatch):
+    from backend.app import notifications
+    from backend.app.db.data_plane import open_tenant_data_session
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.readiness_home import digest
+
+    user, approval, email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    monday = datetime(2026, 10, 19, 8, 0, tzinfo=timezone.utc)
+    db = SessionLocal()
+    try:
+        bind_system(db, "test: weekly readiness email")
+        with open_tenant_data_session(tenant_id) as data:
+            assert digest.queue_for_tenant(db, data, tenant_id, monday) is True
+            db.commit()
+            assert digest.queue_for_tenant(db, data, tenant_id, monday) is False  # once a week
+        event = (
+            db.query(OutboxEvent)
+            .filter(OutboxEvent.tenant_id == tenant_id, OutboxEvent.event_name == digest.EVENT)
+            .one()
+        )
+        payload = event.payload
+        assert payload["week"] == "2026-W43" and "@" not in str(payload)  # no address in the queue
+        content = payload["content"]
+        assert content["first"] is True and content["total"] == 8 and content["weakest"]["state"] == "CRITICAL"
+
+        sent = []
+        from auth import emailer
+
+        monkeypatch.setattr(
+            emailer, "send_readiness_digest", lambda recipient, **details: sent.append((recipient, details)) or "SENT"
+        )
+        assert notifications.handle_event(db, digest.EVENT, payload) is True
+        assert [recipient for recipient, _ in sent] == [email]  # the trial's Leader
+        assert sent[0][1]["week"] == "2026-W43" and sent[0][1]["content"]["total"] == 8
+
+        # The next week says what changed (compared with this week's snapshot).
+        with open_tenant_data_session(tenant_id) as data:
+            assert digest.queue_for_tenant(db, data, tenant_id, datetime(2026, 10, 26, 8, 0, tzinfo=timezone.utc))
+            db.commit()
+        later = (
+            db.query(OutboxEvent)
+            .filter(
+                OutboxEvent.tenant_id == tenant_id,
+                OutboxEvent.event_name == digest.EVENT,
+                OutboxEvent.payload["week"].as_string() == "2026-W44",
+            )
+            .one()
+        )
+        assert later.payload["content"]["first"] is False
+
+        # A quality lead may switch it off for themselves; then nobody of this trial gets it.
+        shown = user.get("/api/v1/me/email-preferences").json()
+        assert shown == {
+            "weekly_readiness": True,
+            "weekly_readiness_eligible": True,
+            "weekly_readiness_about": shown["weekly_readiness_about"],
+        }
+        assert (
+            user.put("/api/v1/me/email-preferences", json={"weekly_readiness": False}).json()["weekly_readiness"]
+            is False
+        )
+        db.expire_all()
+        assert digest.recipients(db, tenant_id) == []
+        assert user.put("/api/v1/me/email-preferences", json={"weekly_readiness": True}).status_code == 200
+        db.expire_all()
+        assert digest.recipients(db, tenant_id) == [email]
+    finally:
+        db.query(OutboxEvent).filter(OutboxEvent.tenant_id == tenant_id, OutboxEvent.event_name == digest.EVENT).delete(
+            synchronize_session=False
+        )
+        db.commit()
+        db.close()
+
+
+def test_a_trial_books_a_one_to_one_demo_and_mdarix_sees_its_progress(monkeypatch):
+    from auth import emailer
+    from backend.app.db.models.stage2 import DemoRequest
+
+    alerts = []
+    monkeypatch.setenv("MDARIX_DEMO_ALERT_EMAIL", "sales@mdarix.invalid")
+    monkeypatch.setattr(
+        emailer,
+        "send_trial_demo_request_alert",
+        lambda recipient, **details: alerts.append((recipient, details)) or "SENT",
+    )
+    user, approval, email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        assert user.get("/api/v1/trial/demo-request").json() == {"request": None}
+        refused = user.post("/api/v1/trial/demo-request", json={"phone": "abc"})
+        assert refused.status_code == 422 and refused.json()["detail"]["field"] == "phone"
+        booked = user.post(
+            "/api/v1/trial/demo-request",
+            json={
+                "preferred_time": "Tuesday or Wednesday afternoon (IST)",
+                "phone": "+91 98450 12345",
+                "focus": ["HIDDEN_COMPLAINTS", "RISK_FILE", "NOT_A_CHAPTER"],
+                "note": "We have a notified body audit in March.",
+            },
+        )
+        assert booked.status_code == 200, booked.text
+        assert booked.json()["status"] == "DEMO_REQUESTED"
+        assert booked.json()["request"]["preferred_time"] == "Tuesday or Wednesday afternoon (IST)"
+        again = user.post("/api/v1/trial/demo-request", json={})
+        assert again.json()["status"] == "ALREADY_REQUESTED"
+        assert again.json()["request"]["id"] == booked.json()["request"]["id"]
+        assert user.get("/api/v1/trial/demo-request").json()["request"]["status"] == "NEW"
+
+        # The MDARIX team is told, with the organization and how far the trial got.
+        assert [recipient for recipient, _ in alerts] == ["sales@mdarix.invalid"]
+        details = alerts[0][1]
+        assert details["email"] == email and details["organization"] == "Trial Devices Inc"
+        assert details["focus"] == (
+            "Recover complaints hidden as cancellations or inquiries",
+            "Feed post-market data into the risk file",
+        )
+        assert details["progress"].startswith("0 of 9 story chapters tried, 30 days left")
+
+        admin = authenticated_client()
+        listed = admin.get("/api/v1/platform-admin/demo-requests").json()["items"]
+        item = next(entry for entry in listed if entry["id"] == booked.json()["request"]["id"])
+        assert item["source"] == "TRIAL" and item["organization"] == "Trial Devices Inc"
+        assert item["trial_tenant_id"] == str(tenant_id) and item["context"]["chapters_total"] == 9
+        assert item["note"] == "We have a notified body audit in March."
+        trials = admin.get("/api/v1/platform-admin/trials").json()
+        mine = next(entry for entry in trials["items"] if entry["tenant_id"] == str(tenant_id))
+        assert mine["demo_request"]["status"] == "NEW" and trials["summary"]["demo_requested"] >= 1
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(DemoRequest).filter(DemoRequest.trial_tenant_id == tenant_id).delete(synchronize_session=False)
+            db.commit()
+        finally:
+            db.close()

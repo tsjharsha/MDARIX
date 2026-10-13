@@ -770,6 +770,8 @@ class AuthUser(Base):
     mfa_pending_secret_encrypted: Mapped[str | None] = mapped_column(Text)
     mfa_last_step: Mapped[int | None] = mapped_column(BigInteger)
     mfa_recovery_hashes: Mapped[list | None] = mapped_column(JSONB)
+    # md44: the person's email choices; {"weekly_readiness": false} stops the weekly readiness email.
+    email_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)

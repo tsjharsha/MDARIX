@@ -163,9 +163,9 @@ def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
-def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
-    """Decided signals whose cases have neither a CAPA nor a completed risk review, and significant trend check
-    results with no open signal."""
+def trends_without_action_rows(db: Session, tenant_id: uuid.UUID, today: date) -> tuple[list, list]:
+    """(decided signals whose cases have neither a CAPA nor a completed risk review, significant trend check groups
+    with no open signal): every one, for the check and the inspection pack."""
     from backend.app.signals.insight import trend_board
 
     has_capa = exists().where(
@@ -190,6 +190,13 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
     )
     board = trend_board(db, tenant_id, grouping="problem", today=today)
     rising = [item for item in board["items"] if item["result"] == "SIGNIFICANT" and not item["open_signals"]]
+    return decided, rising
+
+
+def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    """Decided signals whose cases have neither a CAPA nor a completed risk review, and significant trend check
+    results with no open signal."""
+    decided, rising = trends_without_action_rows(db, tenant_id, today)
     value = len(decided) + len(rising)
     items = [{"id": str(row.id), "ref": row.business_id, "label": row.title} for row in decided] + [
         {"id": item["key"], "ref": None, "label": item["name"]} for item in rising
@@ -210,7 +217,9 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
 # ------------------------------------------------------------------------------------------------- further checks
 
 
-def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+def harm_closed_rows(db: Session, tenant_id: uuid.UUID, today: date) -> list:
+    """Complaints of the last LOOKBACK_DAYS reporting a death or serious injury, closed, in no case and not dismissed
+    on the second look: every one, for the check and the inspection pack."""
     since = _midnight(today - timedelta(days=LOOKBACK_DAYS))
     received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
     in_case = exists().where(
@@ -234,7 +243,11 @@ def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> 
         .order_by(received.desc())
         .all()
     )
-    closed = [row for row in rows if review_rules.is_closed(row.status)]
+    return [row for row in rows if review_rules.is_closed(row.status)]
+
+
+def harm_closed_without_case(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    closed = harm_closed_rows(db, tenant_id, today)
     return _check(
         "HARM_CLOSED_WITHOUT_CASE",
         "Harm complaints closed without an investigation",
@@ -271,14 +284,19 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
-def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+def triage_overdue_rows(db: Session, tenant_id: uuid.UUID) -> list:
+    """Signals new or in triage past their due date: every one, for the check and the inspection pack."""
     now = datetime.now(timezone.utc)
-    rows = (
-        db.query(Signal.id, Signal.business_id, Signal.title)
+    return (
+        db.query(Signal.id, Signal.business_id, Signal.title, Signal.status, Signal.due_at)
         .filter(Signal.tenant_id == tenant_id, Signal.status.in_(AWAITING_TRIAGE), Signal.due_at < now)
         .order_by(Signal.due_at)
         .all()
     )
+
+
+def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    rows = triage_overdue_rows(db, tenant_id)
     return _check(
         "TRIAGE_OVERDUE",
         "Signals waiting past their triage date",

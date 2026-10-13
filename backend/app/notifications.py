@@ -21,6 +21,8 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
   ``MDARIX_SUPPORT_EMAIL``).
 * ``SECURITY_NOTICE`` (``notify_security_notice``): the account's owner (auth/security_notices.py builds it).
 * ``SUPPORT_PROBLEM_REPORTED`` (backend/app/support_api.py): the support team.
+* ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
+  Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
 """
 
 from __future__ import annotations
@@ -736,6 +738,11 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name == SUPPORT_ACCESS_AWAITING_CUSTOMER:
         _support_access_request(db, payload, emailer)
+        return True
+    if event_name == "READINESS_DIGEST":
+        from backend.app.readiness_home.digest import deliver
+
+        deliver(db, payload)
         return True
     from auth.security_notices import handle_security_notice
 

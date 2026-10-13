@@ -55,6 +55,7 @@ def import_templates(ctx: AuthenticatedRequestContext = Depends(get_request_cont
                 "title": spec["title"],
                 "required": spec["required"],
                 "optional": spec["optional"],
+                "help": imports.column_help(entity),
                 "download": f"/api/v1/data/import/templates/{entity}.csv",
             }
             for entity, spec in imports.TEMPLATES.items()

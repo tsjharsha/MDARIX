@@ -3,6 +3,8 @@
 - ``GET /api/v1/readiness``: every check (the four home numbers first), open to every signed-in member.
 - ``GET /api/v1/readiness/summary``: the summary's data for a period (30 to 1095 days; 365 by default).
 - ``GET /api/v1/readiness/summary.pdf``: the same as a PDF for management review (data.export), audited.
+- ``GET /api/v1/readiness/inspection-pack.zip``: the inspection pack (pack.py): the PDF, every check and every record
+  behind it as CSV, and a manifest of SHA-256 fingerprints (data.export), audited.
 """
 
 from __future__ import annotations
@@ -86,5 +88,48 @@ def readiness_summary_pdf(
     return Response(
         content,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
+    )
+
+
+@router.get("/inspection-pack.zip", dependencies=[Depends(require_permission(DATA_EXPORT))])
+def readiness_inspection_pack(
+    period_days: int = Query(summary.PERIOD_DEFAULT, ge=summary.PERIOD_MIN, le=summary.PERIOD_MAX),
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The inspection pack (pack.py): the summary PDF, every check and every record behind it as CSV, and a manifest
+    of SHA-256 fingerprints, in one ZIP (data.export), audited."""
+    from backend.app.readiness_home import pack
+
+    tenant_id = _tenant(ctx)
+    now = datetime.now(timezone.utc)
+    content, manifest = pack.build_pack(
+        db, tenant_id, organization=_organization(control_db, tenant_id), period_days=period_days, now=now
+    )
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=ctx.user_id,
+            action="READINESS_INSPECTION_PACK_EXPORTED",
+            entity_type="Tenant",
+            entity_id=tenant_id,
+            correlation_id=ctx.correlation_id,
+            details={
+                "period": manifest["period"],
+                "bytes": len(content),
+                "files": len(manifest["files"]),
+                "unreadable": manifest["unreadable"],
+                "format": "ZIP",
+            },
+            created_at=now,
+        )
+    )
+    db.commit()
+    filename = f"mdarix-inspection-pack-{manifest['period']['to']}.zip"
+    return Response(
+        content,
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"},
     )

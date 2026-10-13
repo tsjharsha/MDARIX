@@ -12,7 +12,39 @@ type DemoRequest = {
   created_at: string | null;
   handled_at: string | null;
   note: string | null;
+  // md44: a request booked from inside a free trial names the organization, the times that suit and its progress.
+  source?: "WEBSITE" | "TRIAL" | string;
+  organization?: string | null;
+  preferred_time?: string | null;
+  context?: {
+    chapters_tried?: number;
+    chapters_total?: number;
+    days_left?: number;
+    own_data?: boolean;
+    focus?: string[];
+  } | null;
 };
+
+/** Where a request came from, in one line: the website, or a trial with its organization. */
+export const demoSourceText = (row: Pick<DemoRequest, "source" | "organization">) =>
+  row.source === "TRIAL" ? `Free trial${row.organization ? `: ${row.organization}` : ""}` : "Website";
+
+/** A trial request's context in short lines: when suits, how far the trial got, what to focus on, the note. */
+export function demoContextLines(row: Pick<DemoRequest, "source" | "preferred_time" | "context" | "note">): string[] {
+  if (row.source !== "TRIAL") return row.note ? [row.note] : [];
+  const lines: string[] = [];
+  if (row.preferred_time) lines.push(`Suits: ${row.preferred_time}`);
+  const context = row.context ?? {};
+  if (context.chapters_total)
+    lines.push(
+      `${context.chapters_tried ?? 0} of ${context.chapters_total} story chapters tried` +
+        (context.days_left !== undefined ? `, ${context.days_left} days left` : "") +
+        (context.own_data ? ", own data uploaded" : ""),
+    );
+  if (context.focus?.length) lines.push(`Focus: ${context.focus.join("; ")}`);
+  if (row.note) lines.push(`Note: ${row.note}`);
+  return lines;
+}
 
 const FILTERS: [string, string][] = [
   ["NEW", "New"],
@@ -31,7 +63,8 @@ const formatDate = (value: string | null) =>
       })
     : "—";
 
-// Demo requests from the website: name, work email and phone. Staff contact the requester and record the outcome.
+// Demo requests from the website (name, work email, phone) and from inside free trials (the organization, the times
+// that suit and how far into the story the trial went). Staff contact the requester and record the outcome.
 export function DemoRequestsWorkspace() {
   const [items, setItems] = useState<DemoRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -124,13 +157,25 @@ export function DemoRequestsWorkspace() {
             idColumn("Request ID"),
             { key: "name", label: "Name", render: (row) => <strong>{row.name}</strong> },
             {
+              key: "source",
+              label: "From",
+              render: (row) => (
+                <span className="cc-stack">
+                  <span>{demoSourceText(row)}</span>
+                  {demoContextLines(row).map((line) => (
+                    <small key={line}>{line}</small>
+                  ))}
+                </span>
+              ),
+            },
+            {
               key: "contact",
               label: "Contact",
               render: (row) => (
                 <span className="cc-stack">
                   <a href={`mailto:${row.email}`}>{row.email}</a>
                   <small>
-                    <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`}>{row.phone}</a>
+                    {row.phone ? <a href={`tel:${row.phone.replace(/[^\d+]/g, "")}`}>{row.phone}</a> : "No phone given"}
                   </small>
                 </span>
               ),

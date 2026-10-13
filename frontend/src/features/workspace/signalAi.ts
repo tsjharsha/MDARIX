@@ -74,6 +74,18 @@ export const TREND_RESULT: Record<TrendResult, { label: string; tone: Tone }> = 
   SHORT_HISTORY: { label: "History too short", tone: "neutral" },
 };
 
+/** When some groups are counted per calendar day (their lots have no quantity), the sentence that says so and how to
+ * count per unit in the field instead; null when every group is counted per unit or nothing was counted. */
+export function perUnitHint(board: Pick<TrendBoard, "basis"> | null | undefined): string | null {
+  const time = board?.basis?.time ?? 0;
+  const units = board?.basis?.units ?? 0;
+  if (!time) return null;
+  const counted = units
+    ? `${time} of ${time + units} groups are counted per calendar day`
+    : `Every group is counted per calendar day`;
+  return `${counted} because their lots have no quantity, so a version shipped in growing numbers can look like a rising trend. Add each lot's quantity and manufacture date in the lot import to count per unit in the field.`;
+}
+
 /** What a group was compared with: its own history, or the version it replaced (a version too young for its own). */
 export function trendBaselineText(item: Pick<TrendItem, "baseline" | "baseline_name" | "history" | "history_days">) {
   if (item.baseline === "PREVIOUS_VERSION")

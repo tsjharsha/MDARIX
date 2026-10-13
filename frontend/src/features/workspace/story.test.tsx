@@ -290,3 +290,86 @@ describe("the trend check per unit and against the previous version", () => {
     expect(trendResultLabel({ result: "STEADY" })).toBe("In line with history");
   });
 });
+
+describe("the guide to per-unit trends", () => {
+  it("says when groups are counted per calendar day and how to count per unit", async () => {
+    const { perUnitHint } = await import("./signalAi");
+    expect(perUnitHint({ basis: { units: 3, time: 0 } })).toBeNull();
+    expect(perUnitHint(null)).toBeNull();
+    expect(perUnitHint({ basis: { units: 2, time: 3 } })).toMatch(/^3 of 5 groups are counted per calendar day/);
+    expect(perUnitHint({ basis: { units: 0, time: 4 } })).toMatch(/^Every group is counted per calendar day/);
+    expect(perUnitHint({ basis: { units: 0, time: 4 } })).toContain("Add each lot's quantity and manufacture date");
+  });
+
+  it("explains the key columns beside the template, with a per-unit callout for lots", async () => {
+    const { ColumnGuide } = await import("./sections/ImportData");
+    const lots = {
+      entity: "lots",
+      title: "Lots and batches",
+      required: ["lot_id", "product_id", "version"],
+      optional: ["manufacture_date", "site_id", "quantity"],
+      help: { quantity: "How many devices the lot released.", manufacture_date: "The day the lot was released." },
+      download: "/api/v1/data/import/templates/lots.csv",
+    };
+    const markup = renderToStaticMarkup(<ColumnGuide template={lots} />);
+    expect(markup).toContain("Per-unit trends from day one:");
+    expect(markup).toContain("How many devices the lot released.");
+    expect(markup).toContain("<details open");
+    const complaints = { ...lots, entity: "complaints", help: { awareness_date: "Reporting clocks start here." } };
+    const plain = renderToStaticMarkup(<ColumnGuide template={complaints} />);
+    expect(plain).not.toContain("Per-unit trends");
+    expect(plain).toContain("Reporting clocks start here.");
+    expect(renderToStaticMarkup(<ColumnGuide template={{ ...lots, help: undefined }} />)).toBe("");
+  });
+});
+
+describe("booking a one-to-one demo from the trial", () => {
+  it("offers the demo, and says when it was asked for", async () => {
+    const { BookDemo, demoRequestText } = await import("./sections/BookDemo");
+    expect(renderToStaticMarkup(<BookDemo chapters={[]} />)).toContain("Book a one-to-one demo");
+    expect(demoRequestText(null)).toBeNull();
+    expect(
+      demoRequestText({
+        id: "d1",
+        business_id: "DEMO000001",
+        status: "NEW",
+        created_at: "2026-10-13T10:00:00+00:00",
+        preferred_time: null,
+      }),
+    ).toMatch(/^You asked for a one-to-one demo on .+\. The MDARIX team will contact you to agree a time\.$/);
+    expect(
+      demoRequestText({ id: "d1", business_id: null, status: "CLOSED", created_at: null, preferred_time: null }),
+    ).toBeNull();
+  });
+
+  it("shows MDARIX staff where a request came from and how far the trial got", async () => {
+    const { demoContextLines, demoSourceText } = await import("../admin/DemoRequestsWorkspace");
+    expect(demoSourceText({ source: "WEBSITE" })).toBe("Website");
+    expect(demoSourceText({ source: "TRIAL", organization: "Acme Devices" })).toBe("Free trial: Acme Devices");
+    expect(
+      demoContextLines({
+        source: "TRIAL",
+        preferred_time: "Tuesday afternoon, IST",
+        note: "Audit in March.",
+        context: {
+          chapters_tried: 3,
+          chapters_total: 9,
+          days_left: 12,
+          own_data: true,
+          focus: ["Feed post-market data into the risk file"],
+        },
+      }),
+    ).toEqual([
+      "Suits: Tuesday afternoon, IST",
+      "3 of 9 story chapters tried, 12 days left, own data uploaded",
+      "Focus: Feed post-market data into the risk file",
+      "Note: Audit in March.",
+    ]);
+    expect(demoContextLines({ source: "WEBSITE", note: null, preferred_time: null, context: null })).toEqual([]);
+  });
+
+  it("lets a person switch the weekly readiness email off for themselves", async () => {
+    const { EmailChoices } = await import("./sections/Account");
+    expect(renderToStaticMarkup(<EmailChoices />)).toContain("Weekly readiness email");
+  });
+});

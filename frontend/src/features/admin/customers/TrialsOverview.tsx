@@ -1,4 +1,4 @@
-import { CalendarClock, MessageSquare, Rocket, Sparkles, Upload, Users } from "lucide-react";
+import { CalendarCheck, CalendarClock, MessageSquare, Rocket, Sparkles, Upload, Users } from "lucide-react";
 import { BarList, Panel, StatTile, ToneBadge } from "../console/charts";
 import { Table, formatDate, useResource } from "../../customer-admin/shared";
 import {
@@ -61,6 +61,13 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
           value={summary ? summary.own_data : null}
           detail="The strongest sign of intent"
           icon={<Upload size={18} />}
+        />
+        <StatTile
+          label="Booked a demo"
+          value={summary ? (summary.demo_requested ?? 0) : null}
+          detail="From Getting started; contact them under Onboarding"
+          tone={summary?.demo_requested ? "good" : undefined}
+          icon={<CalendarCheck size={18} />}
         />
         <StatTile
           label="Gave feedback"
@@ -196,6 +203,14 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
               key: "last_activity",
               label: "Last activity",
               render: (row) => (row.story.last_activity ? formatDate(row.story.last_activity) : "None yet"),
+            },
+            {
+              key: "demo",
+              label: "Demo",
+              render: (row) =>
+                row.demo_request
+                  ? `${row.demo_request.status === "NEW" ? "Requested" : row.demo_request.status === "CONTACTED" ? "Contacted" : "Closed"} ${formatDate(row.demo_request.created_at)}`
+                  : "Not yet",
             },
             {
               key: "feedback",

@@ -163,12 +163,36 @@ operator knows a release migrates the database.
   `scripts/golden_review_pack.py` writes the reviewer's pack for the golden dataset sign-off: each of the 15
   scenarios with its evidence, expected findings, forbidden conclusions and adversarial check, then the sign-off
   statement and command.
+- Readiness › Inspection pack (ZIP): the readiness summary PDF, the eight checks as a table, one CSV per check with
+  every record behind it (with the source system's identifier), a README and a manifest with each file's SHA-256, for
+  the day an inspector arrives (`GET /api/v1/readiness/inspection-pack.zip`, data export permission, audited as
+  `READINESS_INSPECTION_PACK_EXPORTED`). A list that cannot be read is named in the pack instead of failing it. The
+  trial story's "Show the inspector" chapter counts the pack as well as the PDF.
+- The weekly readiness email: on Monday from 06:00 UTC each organization's quality leads (Leader and Reviewer) get
+  their quality loop (the eight checks in story order), what changed since last week and the weakest link, with a
+  link to Readiness. The scheduler job `readiness-digest` (every 6 hours) queues it once per organization and ISO
+  week through the outbox, which holds no email addresses. My Account › Profile lets each person switch it off
+  (`GET/PUT /api/v1/me/email-preferences`, audited as `EMAIL_PREFERENCES_CHANGED`).
+- Per-unit trends from day one: Import data explains the key columns of each template, and the lots template says
+  what `quantity` does; Trend check, when it counts by calendar days, says so and opens Import data. Guide:
+  `docs/user-guide/PER_UNIT_TRENDS.md`.
+- Free trials book a one-to-one demo from Getting started: times that suit, an optional phone number, the chapters to
+  focus on and a note (`GET/POST /api/v1/trial/demo-request`, one open request per trial, audited as
+  `TRIAL_DEMO_REQUESTED`). The MDARIX team sees it in Platform Admin › Onboarding, marked as from a trial with the
+  organization and how far into the story it went, and by email (`MDARIX_DEMO_ALERT_EMAIL`, else
+  `MDARIX_TRIAL_ALERT_EMAIL`). Platform Admin › Trials counts the trials that booked a demo and shows each one's.
+- Website home: the quality loop, drawn with illustrative synthetic values and labelled so, and a "Start free trial"
+  button beside "Request a demo".
+- Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
+  time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
 
 ### Fixed
 
 - The AI release gate's first bar ("a contracted AI provider with zero data retention") is read from the contract
   settings themselves (`MDARIX_GENAI_CONTRACTED_PROVIDERS` and the provider's ZDR setting). Outside production the
   provider policy allows any provider, so a free development provider showed the bar as met.
+- The readiness summary PDF no longer says the numbers of devices in use are unknown when lot quantities are
+  imported; it says how the trends were counted (per unit in the field, by calendar days, or both).
 
 ### Changed
 

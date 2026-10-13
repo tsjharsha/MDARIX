@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Activity, AlertTriangle, Plus, TrendingUp } from "lucide-react";
 import { Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Table, errorText, send, useResource } from "../../customer-admin/shared";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
 import {
   TREND_GROUPS,
   canRaiseFromTrend,
@@ -13,6 +13,7 @@ import {
   trendPath,
   trendResultOf,
   type TrendBoard,
+  perUnitHint,
   trendBaselineText,
   trendBasisText,
   trendResultLabel,
@@ -27,7 +28,7 @@ import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
  * signal by itself; a triage lead raises one from a notable group in one click.
  */
 export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string) => void }) {
-  const { notify } = useWorkspace();
+  const { notify, open, session } = useWorkspace();
   const canTriage = useCan("signal.triage");
   const [group, setGroup] = useState<TrendGroup>("version");
   const [product, setProduct] = useState("");
@@ -62,7 +63,18 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
         eyebrow="Trend check · last 30 days against each version's own history"
         title={headline.title}
         detail={headline.detail}
-      />
+      >
+        {perUnitHint(board.data) && (
+          <div className="uw-trend-hint" role="note">
+            <p>{perUnitHint(board.data)}</p>
+            {sectionAllowed("Import data", session?.allowed_menu, session?.business_permissions) && (
+              <button type="button" className="ac-secondary" onClick={() => open("Import data")}>
+                Add lot quantities
+              </button>
+            )}
+          </div>
+        )}
+      </Hero>
       <div className="uw-cr-stats">
         <StatTile
           label="Significant rise"

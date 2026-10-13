@@ -32,6 +32,9 @@ export const SUMMARY_PERIODS = [
 
 export const summaryPdfPath = (days: number) => `/api/v1/readiness/summary.pdf?period_days=${days}`;
 
+/** The inspection pack: the summary PDF, every check and every record behind it as CSV, and SHA-256 fingerprints. */
+export const inspectionPackPath = (days: number) => `/api/v1/readiness/inspection-pack.zip?period_days=${days}`;
+
 export const CHECK_STATE: Record<CheckState, { label: string; tone: Tone }> = {
   CLEAR: { label: "Clear", tone: "good" },
   ATTENTION: { label: "Needs attention", tone: "warning" },

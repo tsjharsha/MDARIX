@@ -145,7 +145,10 @@ def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
         "DECIDE_AND_SIGN": count(Decision, Decision.decision_kind == "BRIEF"),
         "CAPA_EFFECTIVE": count(CapaEffectivenessCheck),
         "RISK_FILE": count(CaseReview, CaseReview.review_type == "RISK", CaseReview.status == "COMPLETED"),
-        "SHOW_THE_INSPECTOR": count(AuditEvent, AuditEvent.action == "READINESS_SUMMARY_EXPORTED"),
+        "SHOW_THE_INSPECTOR": count(
+            AuditEvent,
+            AuditEvent.action.in_(("READINESS_SUMMARY_EXPORTED", "READINESS_INSPECTION_PACK_EXPORTED")),
+        ),
         "YOUR_DATA": count(Complaint, Complaint.source_system == UPLOAD_SOURCE),
     }
 
@@ -345,6 +348,7 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
         .all()
     )
     feedback = _feedback_by_tenant(db, [tenant.id for _, tenant in rows])
+    demos = _demos_by_tenant(db, [tenant.id for _, tenant in rows])
     items = []
     for subscription, tenant in rows:
         users = (
@@ -382,6 +386,7 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
                 "rows": {"used": int(rows_uploaded or 0), "limit": TRIAL_ROW_LIMIT},
                 "story": reached,
                 "feedback": feedback.get(tenant.id),
+                "demo_request": demos.get(tenant.id),
             }
         )
     active = [item for item in items if item["state"] != "ENDED"]
@@ -394,6 +399,7 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
             "engaged": sum(1 for item in active if item["story"]["acted_count"] >= ENGAGED_CHAPTERS),
             "own_data": sum(1 for item in active if item["story"]["counts"].get("YOUR_DATA")),
             "feedback": sum(1 for item in items if item["feedback"]),
+            "demo_requested": sum(1 for item in items if item["demo_request"]),
             "chapters": {code: sum(1 for item in active if code in item["story"]["acted"]) for code in CODES},
         },
         "chapters": [
@@ -402,6 +408,29 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
         "engaged_chapters": ENGAGED_CHAPTERS,
         "items": items,
     }
+
+
+def _demos_by_tenant(db: Session, tenant_ids: list) -> dict:
+    """``{tenant id: {status, created_at, business_id}}``: each trial's latest one-to-one demo request."""
+    from backend.app.db.models.stage2 import DemoRequest
+
+    if not tenant_ids:
+        return {}
+    found: dict = {}
+    for row in (
+        db.query(DemoRequest.trial_tenant_id, DemoRequest.status, DemoRequest.created_at, DemoRequest.business_id)
+        .filter(DemoRequest.trial_tenant_id.in_(tenant_ids), DemoRequest.source == "TRIAL")
+        .order_by(DemoRequest.created_at.desc())
+    ):
+        found.setdefault(
+            row.trial_tenant_id,
+            {
+                "status": row.status,
+                "created_at": row.created_at.isoformat() if row.created_at else None,
+                "business_id": row.business_id,
+            },
+        )
+    return found
 
 
 def _feedback_by_tenant(db: Session, tenant_ids: list) -> dict:

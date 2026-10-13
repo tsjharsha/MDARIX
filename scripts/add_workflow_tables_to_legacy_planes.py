@@ -1,5 +1,5 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run) and md43 (units per lot).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot) and md44 (email preferences, trial demo requests).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -140,6 +140,17 @@ STEPS = (
         done_sql=(
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'lot_batches' AND column_name = 'quantity')"
+        ),
+    ),
+    Step(
+        "md44",
+        "md44_digest_and_demo_requests.py",
+        "add_digest_and_demo_columns",
+        (),
+        ("auth_users", "demo_requests"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'demo_requests' AND column_name = 'trial_tenant_id')"
         ),
     ),
 )

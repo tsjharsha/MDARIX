@@ -241,6 +241,14 @@ def reporting_reminders(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def readiness_digest(db: Session, _state: dict) -> dict:
+    """The weekly readiness email for every active organization: queued once per ISO week, from Monday 06:00 UTC
+    (backend/app/readiness_home/digest.py); the outbox worker sends it to the quality leads."""
+    from backend.app.readiness_home.digest import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 def platform_sync(db: Session, _state: dict) -> dict:
     """A cell reports to the platform and fetches its licence and packages (backend/app/cell_link.py)."""
     from backend.app import cell_link
@@ -325,6 +333,13 @@ JOBS: tuple[Job, ...] = (
         timedelta(hours=6),
         reporting_reminders,
         "Remind reviewers of reporting clocks and CAPA effectiveness checks that are due",
+        CELL_JOBS,
+    ),
+    Job(
+        "readiness-digest",
+        timedelta(hours=6),
+        readiness_digest,
+        "Email each organization's quality leads their quality loop once a week",
         CELL_JOBS,
     ),
     Job(

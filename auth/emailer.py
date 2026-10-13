@@ -455,6 +455,42 @@ def send_demo_request_alert(recipient: str, *, display_name: str, email: str, ph
     )
 
 
+def send_trial_demo_request_alert(
+    recipient: str,
+    *,
+    display_name: str,
+    email: str,
+    organization: str,
+    phone: str = "",
+    preferred_time: str = "",
+    progress: str = "",
+    focus: tuple[str, ...] = (),
+    note: str = "",
+) -> str:
+    """Tell the MDARIX team that someone in a free trial booked a one-to-one demo, with how far the trial got."""
+    details = [("Name", display_name), ("Email", email), ("Organization", organization)]
+    if phone:
+        details.append(("Phone", phone))
+    if preferred_time:
+        details.append(("Times that suit", preferred_time))
+    if progress:
+        details.append(("Trial progress", progress))
+    if focus:
+        details.append(("Focus", "; ".join(focus)))
+    return _send(
+        recipient,
+        Message(
+            subject=f"Trial demo request: {organization} ({display_name})",
+            heading="Someone in a free trial booked a one-to-one demo. Please contact them.",
+            details=tuple(details),
+            paragraphs=(f"Their note: {note}",) if note else (),
+            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
+            closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
+            reason="You are receiving this email because you handle MDARIX demo requests.",
+        ),
+    )
+
+
 def send_operations_alert(recipient: str, subject: str, body: str) -> str:
     """An operational alert for the team running MDARIX (backend/app/alerts.py)."""
     return _send(
@@ -727,6 +763,65 @@ def send_support_access_request(
             items=tuple(areas),
             button=("Review the request", f"{company().app_url}/app/customer-admin"),
             reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+        ),
+    )
+
+
+_DIGEST_STATES = {"CLEAR": "Clear", "ATTENTION": "Needs attention", "CRITICAL": "Critical", "NOT_SET": "Not set up"}
+
+
+def send_readiness_digest(recipient: str, *, organization: str, week: str, content: dict) -> str:
+    """The weekly readiness email (backend/app/readiness_home/digest.py): the loop, what changed, the weakest link."""
+    clear, total = int(content.get("clear") or 0), int(content.get("total") or 0)
+    stations = [item for item in content.get("stations") or [] if isinstance(item, dict)]
+    weakest = content.get("weakest") if isinstance(content.get("weakest"), dict) else None
+    changed = [str(line) for line in content.get("changes") or []]
+
+    def number(value) -> str:
+        return "unknown" if value is None else str(value)
+
+    paragraphs = [
+        f"{clear} of {total} inspection checks are clear in {organization} this week."
+        + (
+            " This is your first weekly readiness email: next week it will also say what changed."
+            if content.get("first")
+            else ""
+        )
+    ]
+    if weakest:
+        state = _DIGEST_STATES.get(weakest.get("state"), weakest.get("state") or "")
+        line = f"Weakest link: {weakest.get('label')}, {state.lower()} ({number(weakest.get('value'))})."
+        if weakest.get("detail"):
+            line += f" {weakest['detail']}."
+        paragraphs.append(line)
+        if weakest.get("why"):
+            paragraphs.append(f"Why it matters: {weakest['why']}")
+    else:
+        paragraphs.append("Every station of the loop is clear. Keep it that way: the checks run every day.")
+    if not content.get("first"):
+        paragraphs.append("What changed since last week:" if changed else "Nothing changed since last week.")
+    return _send(
+        recipient,
+        Message(
+            subject=f"Your quality loop this week: {clear} of {total} inspection checks clear ({week})",
+            heading=f"Your quality loop this week, {organization}",
+            paragraphs=tuple(paragraphs),
+            items=tuple(changed),
+            details=tuple(
+                (
+                    str(station.get("label")),
+                    f"{number(station.get('value'))} · {_DIGEST_STATES.get(station.get('state'), station.get('state') or '')}",
+                )
+                for station in stations
+            ),
+            button=("Open Readiness", f"{company().app_url}/app/readiness"),
+            closing=(
+                "On Readiness, the inspection pack (ZIP) holds the summary PDF and every record behind these checks.",
+            ),
+            reason=(
+                f"You receive this weekly summary because you lead quality for {organization} in MDARIX. To stop it, "
+                "switch off the weekly readiness email under My Account."
+            ),
         ),
     )
 

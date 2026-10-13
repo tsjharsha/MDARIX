@@ -154,6 +154,7 @@ def trial_status(
                 "title": spec["title"],
                 "required": spec["required"],
                 "optional": spec["optional"],
+                "help": imports.column_help(entity),
                 "download": f"/api/v1/trial/templates/{entity}.csv",
             }
             for entity, spec in imports.TEMPLATES.items()
@@ -290,6 +291,157 @@ def trial_story_chapters(
 
     _require_trial(db, ctx)
     return story.story(data, uuid.UUID(str(ctx.tenant_id)))
+
+
+class TrialDemoRequest(BaseModel):
+    """A one-to-one demo booked from inside the trial: when suits, what to focus on, anything else."""
+
+    preferred_time: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=30)
+    focus: list[str] = Field(default_factory=list, max_length=9)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+DEMO_REPEAT_DAYS = 14
+
+
+def _demo_view(row) -> dict | None:
+    if row is None:
+        return None
+    return {
+        "id": str(row.id),
+        "business_id": row.business_id,
+        "status": row.status,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "preferred_time": row.preferred_time,
+    }
+
+
+def _latest_trial_demo(db: Session, tenant_id: uuid.UUID):
+    from backend.app.db.models.stage2 import DemoRequest
+
+    return (
+        db.query(DemoRequest)
+        .filter(DemoRequest.trial_tenant_id == tenant_id, DemoRequest.source == "TRIAL")
+        .order_by(DemoRequest.created_at.desc())
+        .first()
+    )
+
+
+@router.get("/trial/demo-request")
+def trial_demo_request_status(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    """The trial's latest one-to-one demo request, or null."""
+    _require_trial(db, ctx)
+    return {"request": _demo_view(_latest_trial_demo(db, uuid.UUID(str(ctx.tenant_id))))}
+
+
+@router.post("/trial/demo-request")
+def book_trial_demo(
+    payload: TrialDemoRequest,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Book a one-to-one demo from inside the trial. The MDARIX team gets it in Platform Admin (Onboarding, marked as
+    from a trial, with the organization and how far into the story it went) and by email. One open request per trial
+    at a time: asking again within 14 days while it is open returns that request."""
+    import os
+    import re
+
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.models.stage2 import DemoRequest
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import story
+
+    subscription = _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    now = datetime.now(timezone.utc)
+    latest = _latest_trial_demo(db, tenant_id)
+    if latest is not None and latest.status == "NEW" and latest.created_at >= now - timedelta(days=DEMO_REPEAT_DAYS):
+        return {"status": "ALREADY_REQUESTED", "request": _demo_view(latest)}
+    phone = " ".join((payload.phone or "").split())
+    if phone and (not re.fullmatch(r"\+?[0-9 ()\-.]{7,30}", phone) or len(re.sub(r"\D", "", phone)) < 7):
+        raise HTTPException(
+            422, detail={"code": "DEMO_REQUEST_INVALID", "field": "phone", "message": "Enter a valid phone number"}
+        )
+    titles = {code: title for code, title, *_ in story.CHAPTERS}
+    focus = [titles[code] for code in dict.fromkeys(payload.focus) if code in titles]
+    reached = story.progress(data, tenant_id)
+    tenant = db.get(Tenant, tenant_id)
+    organization = (tenant.name if tenant else None) or user.company or "Trial organization"
+    seconds_left = (subscription.expires_at - now).total_seconds()
+    context = {
+        "chapters_tried": reached["acted_count"],
+        "chapters_total": reached["total"],
+        "acted": reached["acted"],
+        "own_data": bool(reached["counts"].get("YOUR_DATA")),
+        "days_left": max(0, int(-(-seconds_left // 86400))),
+        "focus": focus,
+    }
+    row = DemoRequest(
+        id=uuid.uuid4(),
+        display_name=(user.display_name or user.username)[:120],
+        email=user.username,
+        phone=phone,
+        status="NEW",
+        source="TRIAL",
+        trial_tenant_id=tenant_id,
+        organization=organization[:160],
+        preferred_time=" ".join((payload.preferred_time or "").split())[:200] or None,
+        note=" ".join((payload.note or "").split())[:1000] or None,
+        context=context,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(user.id),
+            action="TRIAL_DEMO_REQUESTED",
+            entity_type="DemoRequest",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            details={"chapters_tried": reached["acted_count"], "focus": focus},
+            created_at=now,
+        )
+    )
+    db.commit()
+    db.refresh(row)
+    recipient = (os.getenv("MDARIX_DEMO_ALERT_EMAIL") or os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
+    if recipient:
+        background.add_task(
+            _alert_trial_demo,
+            recipient,
+            {
+                "display_name": row.display_name,
+                "email": row.email,
+                "organization": organization,
+                "phone": phone,
+                "preferred_time": row.preferred_time or "",
+                "progress": f"{reached['acted_count']} of {reached['total']} story chapters tried, "
+                f"{context['days_left']} days left" + (", own data uploaded" if context["own_data"] else ""),
+                "focus": tuple(focus),
+                "note": row.note or "",
+            },
+        )
+    return {"status": "DEMO_REQUESTED", "request": _demo_view(row)}
+
+
+def _alert_trial_demo(recipient: str, details: dict) -> None:
+    """Email the MDARIX team after the response; a failure is only logged (the request is saved)."""
+    import logging
+
+    from auth.emailer import send_trial_demo_request_alert
+
+    try:
+        send_trial_demo_request_alert(recipient, **details)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial demo request alert failed: %s", type(exc).__name__)
 
 
 @router.get("/platform-admin/trials")

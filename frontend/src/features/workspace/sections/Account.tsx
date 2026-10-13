@@ -16,7 +16,12 @@ export function AccountSection({ tab }: { tab?: string }) {
   return (
     <>
       <Tabs tabs={TABS} active={active} onChange={setActive} label="Account sections">
-        {active === "Profile" && <Profile />}
+        {active === "Profile" && (
+          <>
+            <Profile />
+            <EmailChoices />
+          </>
+        )}
         {active === "Security" && <Security />}
         {active === "Access" && <Access />}
       </Tabs>
@@ -56,6 +61,57 @@ function Profile() {
       <p className="ac-muted">
         Your name, email and role are managed by your organization's administrator. Ask them if anything is wrong.
       </p>
+    </Panel>
+  );
+}
+
+type EmailPreferences = {
+  weekly_readiness: boolean;
+  weekly_readiness_eligible: boolean;
+  weekly_readiness_about: string;
+};
+
+/** The weekly readiness email, on or off for oneself (GET/PUT /api/v1/me/email-preferences). Exported for its test. */
+export function EmailChoices() {
+  const preferences = useResource<EmailPreferences>("/api/v1/me/email-preferences");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const data = preferences.data;
+  const change = async (on: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/me/email-preferences", "PUT", { weekly_readiness: on });
+      preferences.reload();
+    } catch (failure) {
+      setError(errorText(failure, "Your email choice was not saved."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Panel eyebrow="Email" title="Weekly readiness email" source={preferences}>
+      {data && (
+        <>
+          <p>{data.weekly_readiness_about}</p>
+          {data.weekly_readiness_eligible && (
+            <label className="ca-check">
+              <input
+                type="checkbox"
+                checked={data.weekly_readiness}
+                disabled={busy}
+                onChange={(event) => void change(event.target.checked)}
+              />{" "}
+              Send me the weekly readiness email
+            </label>
+          )}
+          {error && (
+            <p className="uw-flag-critical" role="alert">
+              {error}
+            </p>
+          )}
+        </>
+      )}
     </Panel>
   );
 }

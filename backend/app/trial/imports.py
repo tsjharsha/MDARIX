@@ -60,6 +60,41 @@ TRIAL_POLICY = ImportPolicy(
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
 COMPLAINT_STATUSES = {"open", "closed", "under investigation"}
 
+# What a column is for, in plain words, for the columns whose meaning changes what MDARIX finds (shown beside each
+# template in the import panel; templates_for() keeps only the template's own columns).
+COLUMN_HELP: dict[str, dict[str, str]] = {
+    "products": {
+        "version_release_date": "The day the version was released (YYYY-MM-DD). A version younger than 90 days is "
+        "compared with the version it replaced, from this day.",
+    },
+    "lots": {
+        "version": "The product version the lot builds. Its complaints are counted against this version's lots.",
+        "manufacture_date": "The day the lot was released to the field (YYYY-MM-DD). Its units count from this day.",
+        "quantity": "How many devices the lot released, a whole number (1,250 is fine). With a quantity on every lot "
+        "of a version, the trend check counts complaints per unit in the field instead of per calendar day, so a "
+        "version shipped in growing numbers is not mistaken for a rising trend.",
+    },
+    "complaints": {
+        "awareness_date": "When your organization first learned of the event (YYYY-MM-DD): reporting clocks start "
+        "here.",
+        "country": "Where the event happened: decides which market's reporting window applies.",
+        "death": "Y or N. A death reported starts the reporting clocks.",
+        "serious_injury": "Y or N. A serious injury reported starts the reporting clocks.",
+        "malfunction": "Y or N. A malfunction starts the reporting clocks of markets that report malfunctions.",
+        "status": "Cancelled records and inquiries stay visible: the second look checks them for complaint signs.",
+        "problem_code": "Your problem code. Signals group by product version and problem code.",
+    },
+}
+
+
+def column_help(entity: str) -> dict[str, str]:
+    """The help for the entity's own columns, in template order."""
+    spec = TEMPLATES.get(entity) or {}
+    columns = [*spec.get("required", []), *spec.get("optional", [])]
+    known = COLUMN_HELP.get(entity, {})
+    return {column: known[column] for column in columns if column in known}
+
+
 TEMPLATES: dict[str, dict] = {
     "products": {
         "title": "Products and versions",

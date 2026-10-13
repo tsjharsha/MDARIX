@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { AlarmClock, ChevronRight, Download, Hourglass, ScanSearch, ShieldCheck, TrendingUp } from "lucide-react";
+import {
+  AlarmClock,
+  Archive,
+  ChevronRight,
+  Download,
+  Hourglass,
+  ScanSearch,
+  ShieldCheck,
+  TrendingUp,
+} from "lucide-react";
 import { Panel, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { useResource } from "../../customer-admin/shared";
 import { describeError } from "../../../app/apiClient";
@@ -8,6 +17,7 @@ import { useCan, useWorkspace, type WorkspaceSection } from "../workspaceContext
 import {
   READINESS_PATH,
   SUMMARY_PERIODS,
+  inspectionPackPath,
   checkStateOf,
   checkValue,
   itemsText,
@@ -129,21 +139,31 @@ export function CheckRow({ check, onOpen }: { check: ReadinessCheck; onOpen: () 
 function SummaryDownload() {
   const canExport = useCan("data.export");
   const [days, setDays] = useState<number>(365);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"pdf" | "pack" | null>(null);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   if (!canExport) return null;
-  const download = async () => {
-    setBusy(true);
+  const download = async (kind: "pdf" | "pack") => {
+    setBusy(kind);
     setError("");
     setDone("");
     try {
-      const name = await downloadFile(summaryPdfPath(days), { fallbackName: "mdarix-readiness-summary.pdf" });
+      const name =
+        kind === "pdf"
+          ? await downloadFile(summaryPdfPath(days), { fallbackName: "mdarix-readiness-summary.pdf" })
+          : await downloadFile(inspectionPackPath(days), { fallbackName: "mdarix-inspection-pack.zip" });
       setDone(`Downloaded ${name}.`);
     } catch (failure) {
-      setError(describeError(failure, "The readiness summary could not be downloaded."));
+      setError(
+        describeError(
+          failure,
+          kind === "pdf"
+            ? "The readiness summary could not be downloaded."
+            : "The inspection pack could not be downloaded.",
+        ),
+      );
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
   return (
@@ -158,8 +178,17 @@ function SummaryDownload() {
           ))}
         </select>
       </label>
-      <button type="button" className="ac-primary" disabled={busy} onClick={() => void download()}>
-        <Download size={15} aria-hidden="true" /> {busy ? "Preparing…" : "Download PDF"}
+      <button type="button" className="ac-primary" disabled={busy !== null} onClick={() => void download("pdf")}>
+        <Download size={15} aria-hidden="true" /> {busy === "pdf" ? "Preparing…" : "Download PDF"}
+      </button>
+      <button
+        type="button"
+        className="ac-secondary"
+        disabled={busy !== null}
+        onClick={() => void download("pack")}
+        title="The summary PDF, every check and every record behind it as CSV, with SHA-256 fingerprints"
+      >
+        <Archive size={15} aria-hidden="true" /> {busy === "pack" ? "Preparing…" : "Inspection pack (ZIP)"}
       </button>
       {done && <small className="ac-muted">{done}</small>}
       <InlineError text={error} />
