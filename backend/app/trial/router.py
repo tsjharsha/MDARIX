@@ -362,13 +362,19 @@ def remove_sample_data(
         raise HTTPException(422, detail={"code": "CONFIRMATION_REQUIRED", "message": "Confirm the removal first"})
     request = team.trial_request(db, tenant_id)
     if request is None:
-        raise HTTPException(404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"})
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
     before = story.progress(data, tenant_id, story.remembered(request.profile))
     try:
         result = sample_removal.remove(data, tenant_id, before["acted"])
     except RuntimeError as exc:
         raise HTTPException(
-            409, detail={"code": "SAMPLE_REMOVAL_INCOMPLETE", "message": "The sample data could not be removed; nothing was changed"}
+            409,
+            detail={
+                "code": "SAMPLE_REMOVAL_INCOMPLETE",
+                "message": "The sample data could not be removed; nothing was changed",
+            },
         ) from exc
     data.commit()
     request.profile = {**(request.profile or {}), story.REMEMBERED: before["acted"]}

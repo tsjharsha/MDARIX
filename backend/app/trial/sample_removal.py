@@ -123,11 +123,14 @@ def plan(db: Session, tenant_id: uuid.UUID) -> dict:
             parents = doomed.get(parent)
             if not parents or "id" not in columns[child]:
                 continue
-            found = _ids(
-                db,
-                f"SELECT id FROM {child} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
-                {"tenant": tenant_id, "ids": list(parents)},
-            ) - doomed[child]
+            found = (
+                _ids(
+                    db,
+                    f"SELECT id FROM {child} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
+                    {"tenant": tenant_id, "ids": list(parents)},
+                )
+                - doomed[child]
+            )
             if found:
                 doomed[child] |= found
                 changed = True
@@ -135,11 +138,14 @@ def plan(db: Session, tenant_id: uuid.UUID) -> dict:
         for table, column in generic:
             if not every or "id" not in columns[table]:
                 continue
-            found = _ids(
-                db,
-                f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
-                {"tenant": tenant_id, "ids": list(every)},
-            ) - doomed[table]
+            found = (
+                _ids(
+                    db,
+                    f"SELECT id FROM {table} WHERE tenant_id = :tenant AND {column} = ANY(:ids)",
+                    {"tenant": tenant_id, "ids": list(every)},
+                )
+                - doomed[table]
+            )
             if found:
                 doomed[table] |= found
                 changed = True

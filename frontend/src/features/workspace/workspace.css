@@ -2898,3 +2898,41 @@ div.uw-task-count:hover {
   font-weight: 700;
   vertical-align: 2px;
 }
+
+/* Removing the sample data (sections/RemoveSample.tsx). */
+.uw-remove-sample {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Sentence starters under a reason field (sections/Starters.tsx). */
+.uw-starters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+  font-size: 13px;
+}
+.uw-starters > span {
+  color: var(--ac-muted);
+}
+.uw-starter {
+  padding: 4px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-starter:hover,
+.uw-starter:focus-visible {
+  border-color: var(--ac-teal);
+  background: var(--ac-teal-wash);
+}

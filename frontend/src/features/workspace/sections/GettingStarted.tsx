@@ -13,6 +13,7 @@ import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
+import { RemoveSamplePanel } from "./RemoveSample";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel } from "./SampleData";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
@@ -67,7 +68,7 @@ export type TrialTab = (typeof TRIAL_TABS)[number];
  * is the progress MDARIX sees (/api/v1/trial/story).
  */
 export function GettingStartedSection() {
-  const { open, work, session } = useWorkspace();
+  const { open, work, session, notify } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
   const story = useResource<TrialStory>(TRIAL_STORY_PATH);
@@ -202,6 +203,14 @@ export function GettingStartedSection() {
         <Tabs tabs={tabs} active={tabs.includes(tab) ? tab : tabs[0]} onChange={setTab} label="Your trial">
           {tab === "Your data" && (
             <>
+              {hasSample && (own?.complaints ?? 0) > 0 && trial?.is_owner && (
+                <p className="uw-cited-line">
+                  Your own data is in. Remove the sample so every screen shows only your records.{" "}
+                  <button type="button" className="ac-link" onClick={() => setTab("About the sample data")}>
+                    Remove the sample data
+                  </button>
+                </p>
+              )}
               <ImportPanel
                 id="trial-import"
                 complaintsAlone
@@ -225,6 +234,18 @@ export function GettingStartedSection() {
               allowed={allowed}
               onOpen={(opens) => {
                 if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+              }}
+            />
+          )}
+          {tab === "About the sample data" && hasSample && (
+            <RemoveSamplePanel
+              onRemoved={(text) => {
+                notify(text);
+                setTab("Your data");
+                status.reload();
+                story.reload();
+                insights.reload();
+                work.refreshProducts();
               }}
             />
           )}

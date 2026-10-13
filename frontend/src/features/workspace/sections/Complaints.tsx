@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -22,6 +22,8 @@ import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { ReportingWindows } from "./ReportingWindows";
+import { Starters } from "./Starters";
+import { SECOND_LOOK_STARTERS, STARTER_MIN_EXTRA, starterProblem } from "../starters";
 import {
   BACKLOG_SHOWS,
   COMPLAINTS_TABS,
@@ -425,7 +427,10 @@ function DecisionDrawer({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const text = decisionText(decision)!;
-  const problem = decisionProblem(reason);
+  // A starter begins the sentence; the person finishes it in their own words (workspace/starters.ts).
+  const starters = SECOND_LOOK_STARTERS[decision];
+  const problem = decisionProblem(reason) ?? starterProblem(reason, starters);
+  const field = useRef<HTMLTextAreaElement>(null);
   const name = recordId(item);
   const revising = !!item.decision;
   const request = investigationRequestFor(item);
@@ -507,6 +512,7 @@ function DecisionDrawer({
         <label className="ca-field">
           Reason
           <textarea
+            ref={field}
             required
             rows={4}
             maxLength={REVIEW_LIMITS.reasonMax}
@@ -519,7 +525,21 @@ function DecisionDrawer({
             onChange={(event) => setReason(event.target.value)}
           />
         </label>
-        {reason && problem && <p className="uw-hint">{problem}</p>}
+        <Starters
+          starters={starters}
+          onPick={(starter) => {
+            setReason(starter);
+            window.setTimeout(() => field.current?.focus(), 0);
+          }}
+        />
+        {reason ? (
+          problem && <p className="uw-hint">{problem}</p>
+        ) : (
+          <p className="ac-muted">
+            In your own words, at least {Math.max(REVIEW_LIMITS.reasonMin, STARTER_MIN_EXTRA)} characters: what in this
+            record shows it.
+          </p>
+        )}
         {error && (
           <p className="ca-inline-error" role="alert">
             <AlertTriangle size={15} aria-hidden="true" /> {error}

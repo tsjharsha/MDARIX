@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   AlarmClock,
   CheckCircle2,
@@ -35,6 +35,8 @@ import {
 } from "../reportability";
 import { StatusBadge, countOf } from "./common";
 import { ChipFilter, Hero, InlineError, Pager, ProductFilter } from "./boardParts";
+import { Starters } from "./Starters";
+import { REPORTABILITY_STARTERS, starterProblem } from "../starters";
 
 /** Whether the signed-in role may record a reportability decision (the server's rule). */
 function useCanDecide() {
@@ -310,7 +312,10 @@ function DecisionDrawer({ item, onClose, onDecided }: { item: WatchItem; onClose
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const name = recordId(item);
-  const problem = decisionProblem(form, todayIso(), item.aware_date);
+  // A starter begins the rationale; the person finishes it in their own words (workspace/starters.ts).
+  const starters = form.decision ? REPORTABILITY_STARTERS[form.decision] : [];
+  const problem = decisionProblem(form, todayIso(), item.aware_date) ?? starterProblem(form.rationale, starters);
+  const field = useRef<HTMLTextAreaElement>(null);
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (problem || busy) return;
@@ -391,6 +396,7 @@ function DecisionDrawer({ item, onClose, onDecided }: { item: WatchItem; onClose
         <label className="ca-field">
           Rationale
           <textarea
+            ref={field}
             rows={4}
             maxLength={REPORT_LIMITS.reasonMax}
             value={form.rationale}
@@ -402,6 +408,16 @@ function DecisionDrawer({ item, onClose, onDecided }: { item: WatchItem; onClose
             onChange={(event) => setForm({ ...form, rationale: event.target.value })}
           />
         </label>
+        <Starters
+          starters={starters}
+          onPick={(starter) => {
+            setForm({ ...form, rationale: starter });
+            window.setTimeout(() => field.current?.focus(), 0);
+          }}
+        />
+        {form.decision && !form.rationale && (
+          <p className="ac-muted">In your own words: why this event is, or is not, reportable.</p>
+        )}
         {form.decision && form.rationale && problem && <p className="uw-hint">{problem}</p>}
         <InlineError text={error} />
         <p className="ac-muted">

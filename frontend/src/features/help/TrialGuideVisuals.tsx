@@ -424,14 +424,14 @@ function OwnDataScene() {
   return (
     <Frame
       address="mdarix.com/app · Import data"
-      label="Upload your own data: six data types in order, check the file, then import"
+      label="Upload your own data: your quality system's export as it comes, checked, then imported"
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
       <text x="44" y="78" fontSize="9" fontWeight="700" fill={C.teal} letterSpacing="1">
         BRING YOUR OWN DATA
       </text>
       <text x="44" y="98" fontSize="15" fontWeight="800" fill={C.ink}>
-        Upload a CSV file
+        Upload your export
       </text>
       {types.map((type, index) => {
         const x = 44 + (index % 3) * 122;
@@ -464,7 +464,7 @@ function OwnDataScene() {
         <rect x="430" y="110" width="58" height="72" rx="6" fill={C.surface} stroke={C.teal} strokeWidth="2" />
         <path d="M472 110 v16 h16" fill="none" stroke={C.teal} strokeWidth="2" />
         <text x="459" y="160" fontSize="12" fontWeight="800" textAnchor="middle" fill={C.teal}>
-          CSV
+          XLSX
         </text>
       </g>
       <rect x="44" y="188" width="358" height="1" fill={C.line} />

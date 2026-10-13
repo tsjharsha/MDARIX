@@ -185,6 +185,31 @@ operator knows a release migrates the database.
   button beside "Request a demo".
 - Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
   time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Free trials, after a founder's review of the whole journey:
+  - Upload a quality system's export as it comes: headers are matched by the names QMS exports use (Complaint Number,
+    Product Code, Lot #...), columns the template does not know are left out and never stored, Excel workbooks
+    (.xlsx) are read, Windows and UTF-16 text is read exactly, and the quality system's own complaint status is kept
+    (so the second look works on the customer's own data). In a trial a complaints export alone is enough: the
+    products, versions and lots it names are added.
+  - The sample case's Decision Brief arrives written and submitted by a sample author (an account nobody signs in
+    with): one trial user reviews it and signs; whoever writes a brief still never reviews or signs it.
+  - Authenticator setup shows a QR code (a dependency-free encoder); activating an account goes straight on to sign-in
+    and authenticator setup.
+  - A company email's trial is approved at once (`MDARIX_TRIAL_AUTO_APPROVE`, `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX`);
+    free mail, a second request from the same company and anything over the day's cap wait for review.
+  - Getting started in three parts: the loop with one next step, the journey and a compact chapter list (details on
+    request), and tabs for data, team, the sample explained and the trial's dates. A "chapter done, next" banner
+    follows the trial user anywhere; a one-click rating after three chapters.
+  - "What were you cited for?": the warning letter, form 483 and notified body themes, each tied to the chapter that
+    answers it; those chapters are marked and come first, and Platform Admin > Trials shows them.
+  - The trial owner can remove the sample data once their own is in: the sample and the work done on it go (found by
+    the database's own links), their own data, reporting windows and the chapters already tried stay; a preview says
+    all of it first.
+  - Reasons on the second look and the reportability watch offer sentence starters to finish in one's own words; a
+    starter alone is never accepted.
+  - AI honesty: while AI does not answer for the organization, the investigation chapter reads "Investigate with
+    evidence you can trace" and counts only a person's own action, and the AI status says "no AI service here" before
+    "switched off".
 - Ending a free trial early: the person who started the trial asks from Getting started (End my trial early), with an
   optional reason and whether to delete the data (ticked by default), and may withdraw the request while it waits.
   Platform Admin (Customers & Tenants > Trials) approves, which ends the trial at once and, when chosen, purges its
@@ -212,6 +237,8 @@ operator knows a release migrates the database.
 
 ### Fixed
 
+- Platform Admin > Trials named the sample author as a trial's owner when the sample decision is staged; it names
+  the trial's own first person.
 - A purge now also deletes the demo requests a free trial booked (they name the person who asked), and the trial
   reminders skip an organization whose data has been deleted.
 - The AI release gate's first bar ("a contracted AI provider with zero data retention") is read from the contract

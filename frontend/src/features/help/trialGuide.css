@@ -478,7 +478,27 @@
     break-inside: avoid;
   }
   .tg-step {
+    gap: 12px;
+    padding: 14px 18px;
     border-color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .tg-step-picture {
+    width: 78%;
+    margin: 0 auto;
+  }
+  .tg-step h2 {
+    font-size: 20px;
+  }
+  .tg-actions li {
+    margin: 4px 0;
+  }
+  .tg-result,
+  .tg-tip {
+    margin-top: 6px;
+    padding: 7px 10px;
+    font-size: 12.5px;
   }
   .tg-ring,
   .tg-blink,
