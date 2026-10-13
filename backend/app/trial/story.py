@@ -65,10 +65,11 @@ CHAPTERS = (
     (
         "DECIDE_AND_SIGN",
         "Decide, sign and open the CAPA",
-        "The Decision Brief writes itself from the case; a different person reviews it, the approver signs with "
-        "password and authenticator code, and the CAPA opens from the signed decision.",
+        "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
+        "it, then sign the decision with your password and authenticator code; the CAPA opens from the signed "
+        "decision. The person who writes a brief never reviews or signs it, on every case.",
         "Trends that never become a CAPA are cited in most device warning letters.",
-        {"section": "Decisions", "tab": None},
+        {"section": "Investigations", "tab": "Decision Brief"},
         None,
     ),
     (
@@ -271,6 +272,27 @@ def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}{'' if count == 1 else 's'}"
 
 
+CASE_CHAPTERS = ("INVESTIGATE_WITH_AI", "DECIDE_AND_SIGN")
+
+
+def _sample_case(db: Session, tenant_id: uuid.UUID) -> dict | None:
+    """The guided investigation (SAMPLE-INV-001) while it is open: its id and product, else None."""
+    from backend.app.db.models.foundation import Investigation
+
+    try:
+        case = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .first()
+        )
+    except Exception:
+        db.rollback()
+        return None
+    if case is None or str(case.status or "").lower() in ("closed", "cancelled"):
+        return None
+    return {"id": str(case.id), "product_id": str(case.product_id) if case.product_id else None}
+
+
 def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready: bool = False) -> dict:
     """Every chapter with its finding from the organization's records and whether it acted on it. ``ai_ready``: AI
     answers for this organization now (backend/app/ai_settings.py ai_ready); without it the investigation chapter
@@ -297,6 +319,7 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready
             else "Sample data only so far",
         ),
     }
+    sample_case = _sample_case(db, tenant_id)
     chapters = []
     for number, (code, title, promise, pain, opens, check_code) in enumerate(CHAPTERS, 1):
         title, promise, pain = chapter_text(code, title, promise, pain, ai_ready)
@@ -331,6 +354,8 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready
                 "opens": opens,
                 "finding": finding,
                 "acted": {"done": bool(counts.get(code)), "count": counts.get(code, 0)},
+                # The case these chapters are about (the guided investigation), so its button opens that case.
+                "case": sample_case if code in CASE_CHAPTERS else None,
             }
         )
     acted = sum(1 for chapter in chapters if chapter["acted"]["done"])

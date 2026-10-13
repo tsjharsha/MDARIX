@@ -80,9 +80,13 @@ export function GettingStartedSection() {
   const allowed = (section: string) =>
     section === "Getting started" ||
     sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
-  const go = (chapter: Pick<StoryChapter, "code" | "opens">) => {
+  const go = (chapter: Pick<StoryChapter, "code" | "opens"> & Partial<Pick<StoryChapter, "case">>) => {
     if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return scrollToImport();
-    if (allowed(chapter.opens.section)) open(chapter.opens.section as WorkspaceSection, chapter.opens.tab ?? undefined);
+    if (!allowed(chapter.opens.section)) return;
+    // A chapter about the guided investigation opens that case, whatever the context bar holds.
+    const known = chapter.case ?? chapters.find((item) => item.code === chapter.code)?.case;
+    if (known) work.setInvestigationId(known.id, known.product_id);
+    open(chapter.opens.section as WorkspaceSection, chapter.opens.tab ?? undefined);
   };
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;

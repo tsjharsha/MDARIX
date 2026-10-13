@@ -196,7 +196,7 @@ export function CaseDecisionPanel({
         <Panel eyebrow="Signing" title="Sign the decision">
           <p className="ac-muted" role="note">
             {safeText(actions.reason) ??
-              "Only an authorized decision maker who did not prepare or review this brief can sign. Administrators never sign."}
+              "Only an authorized decision maker who did not write or submit this brief can sign. Administrators never sign."}
           </p>
         </Panel>
       )}

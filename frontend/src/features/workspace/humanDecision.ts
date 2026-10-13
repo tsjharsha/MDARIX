@@ -881,8 +881,8 @@ const CHECK_LABELS: Record<string, string> = {
   SNAPSHOT_HASH: "The evidence snapshot is intact",
   EVIDENCE_SNAPSHOT: "The evidence snapshot is intact",
   SIGNER_AUTHORITY: "The signer held approval authority when signing",
-  SEGREGATION_OF_DUTIES: "The signer did not prepare or review the brief",
-  SIGNER_NOT_AUTHOR: "The signer did not prepare or review the brief",
+  SEGREGATION_OF_DUTIES: "The signer did not write or submit the brief",
+  SIGNER_NOT_AUTHOR: "The signer did not write or submit the brief",
 };
 
 export type VerificationCheck = { key: string; label: string; ok: boolean; detail: string | null };

@@ -14,6 +14,8 @@ export type StoryChapter = {
   opens: { section: string; tab?: string | null };
   finding: { value: number | null; text: string | null; state: string };
   acted: { done: boolean; count: number };
+  /** The case the chapter is about (the guided investigation), opened with it; null when there is none. */
+  case?: { id: string; product_id: string | null } | null;
 };
 
 export type TrialStory = {
@@ -45,7 +47,7 @@ export const CHAPTER_ACTION: Record<string, string> = {
   REPORTING_CLOCKS: "Check reporting clocks",
   TRENDS_TO_CASES: "Open the signal inbox",
   INVESTIGATE_WITH_AI: "Open the guided investigation",
-  DECIDE_AND_SIGN: "Open the case decision",
+  DECIDE_AND_SIGN: "Review and sign the sample decision",
   CAPA_EFFECTIVE: "Check CAPA effectiveness",
   RISK_FILE: "Open risk file input",
   SHOW_THE_INSPECTOR: "Open Readiness",

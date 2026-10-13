@@ -86,6 +86,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     inSample: [
       "SAMPLE-INV-001: why did pressure alarms rise after Rev B?",
       "Evidence: the supplier change, the incoming inspection results for lots 003 and 004, and the complaint trend.",
+      "Its Decision Brief, written by a sample author, is waiting for your quality review and your signature.",
     ],
     requirement: "The cause is found before action is taken, and every conclusion traces back to its evidence.",
     reference: "ISO 13485 clauses 8.2.2 and 8.5.2",

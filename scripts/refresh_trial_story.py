@@ -8,8 +8,9 @@ sample products, complaints and the guided investigation, but not the hidden com
 register and sample reporting windows that Complaints, Records and Readiness show, nor the units per sample lot the
 trend check counts by (md43), and its signals wait for the scheduler. This adds exactly those sample records (marked
 MDARIX_SAMPLE) and quantities, once, to every trial that still holds its sample data, then runs signal detection; a
-trial's own records and its own reporting windows are never changed. Each trial is committed on its own, with an
-audit event.
+trial's own records and its own reporting windows are never changed. The guided investigation also gets its
+sample Decision Brief, written by the sample author and waiting for quality review (backend/app/trial/sample_decision.py),
+unless the case already has a brief. Each trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -65,6 +66,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
         seed_lot_quantities,
         seed_story_examples,
     )
+    from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -83,19 +85,23 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 )
                 .count()
             )
-            if not story_missing and not lots_missing:
+            decision_missing = not has_sample_decision(session, tenant_id)
+            if not story_missing and not lots_missing and not decision_missing:
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
             if not apply:
                 wanted = [
                     *(["the story"] if story_missing else []),
                     *([f"quantities for {lots_missing} sample lots"] if lots_missing else []),
+                    *(["the sample decision brief"] if decision_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
             now = datetime.now(timezone.utc)
             added = seed_story_examples(session, tenant_id, now) if story_missing else {"created": False}
             added["lot_quantities"] = seed_lot_quantities(session, tenant_id)
+            if decision_missing:
+                added["decision"] = stage_sample_decision(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

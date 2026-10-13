@@ -533,6 +533,10 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert chapters["INVESTIGATE_WITH_AI"]["title"] == "Investigate with evidence you can trace"
     assert "AI assistance joins when it is switched on" in chapters["INVESTIGATE_WITH_AI"]["promise"]
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
+    # The decision chapter opens the guided investigation's waiting brief.
+    assert chapters["DECIDE_AND_SIGN"]["opens"] == {"section": "Investigations", "tab": "Decision Brief"}
+    assert chapters["DECIDE_AND_SIGN"]["case"]["id"] and chapters["INVESTIGATE_WITH_AI"]["case"]
+    assert chapters["HIDDEN_COMPLAINTS"]["case"] is None
     assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])
 
     # A person decides one hidden complaint: the first chapter is acted on.
@@ -585,6 +589,52 @@ def test_opening_a_case_is_not_investigating_but_starting_its_analysis_is():
     started = user.post(f"/api/v1/investigations/{case_id}/ai-run", json={"trigger": "MANUAL"})
     assert started.status_code in (200, 202), started.text
     assert investigated() is True
+
+
+def test_one_trial_user_reviews_the_sample_brief_and_may_sign_its_decision():
+    """The guided investigation arrives with its brief written and submitted by the sample author (who cannot sign
+    in and holds no seat); the trial user alone reviews it, accepts it for decision and may sign, while the author
+    could not: segregation of duties holds."""
+    from backend.app.db.models.foundation import Investigation
+    from backend.app.db.models.reviews import DecisionBriefVersion
+    from backend.app.trial.sample_decision import SAMPLE_AUTHOR_NAME, stage_sample_decision
+
+    user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        case = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .one()
+        )
+        case_id = case.id
+        brief = db.query(DecisionBriefVersion).filter(DecisionBriefVersion.investigation_id == case_id).one()
+        author = db.get(AuthUser, uuid.UUID(brief.submitted_by))
+        assert brief.status == "READY_FOR_REVIEW" and brief.created_by == brief.submitted_by
+        assert author.display_name == SAMPLE_AUTHOR_NAME and author.status == "DISABLED"
+        # Staged once: approving again or refreshing leaves it.
+        assert stage_sample_decision(db, tenant_id)["created"] is False
+    finally:
+        db.close()
+    status = user.get("/api/v1/trial/status").json()
+    assert status["usage"]["users"] == 1
+    assert [member["display_name"] for member in user.get("/api/v1/trial/team").json()["members"]] != []
+    assert all(
+        member["display_name"] != SAMPLE_AUTHOR_NAME for member in user.get("/api/v1/trial/team").json()["members"]
+    )
+
+    base = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
+    started = user.post(f"{base}/start-review", json={})
+    assert started.status_code == 200, started.text
+    accepted = user.post(
+        f"{base}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence and scope hold."}
+    )
+    assert accepted.status_code == 200, accepted.text
+    screen = user.get(f"/api/v1/investigations/{case_id}/decision")
+    assert screen.status_code == 200, screen.text
+    actions = screen.json()["actions"]
+    assert actions["can_sign"] is True, actions
 
 
 def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():

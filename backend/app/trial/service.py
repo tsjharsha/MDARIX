@@ -288,6 +288,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         sample["story"] = seed_story_examples(db, tenant.id, now)
         # Units per sample lot (md43), so the trend check counts per device in the field.
         sample["lot_quantities"] = seed_lot_quantities(db, tenant.id)
+        # The guided investigation arrives with its Decision Brief written by a sample author and submitted for quality
+        # review, so one trial user can review it and sign the decision (backend/app/trial/sample_decision.py).
+        from backend.app.trial.sample_decision import stage_sample_decision
+
+        sample["decision"] = stage_sample_decision(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,
