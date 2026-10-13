@@ -1,5 +1,6 @@
 export type AppView =
   | "home"
+  | "readiness"
   | "my-work"
   | "products"
   | "complaints"
@@ -60,6 +61,7 @@ export type AppView =
 
 export const APP_ROUTES: Record<AppView, string> = {
   home: "/app",
+  readiness: "/app/readiness",
   "my-work": "/app/my-work",
   products: "/app/products",
   complaints: "/app/complaints",

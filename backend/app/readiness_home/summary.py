@@ -1,0 +1,279 @@
+"""The readiness summary for management review, as data and as a PDF.
+
+Organized by the management review inputs of ISO 13485:2016 clause 5.6.2 that MDARIX holds records for (feedback and
+complaint handling, reporting to regulatory authorities, corrective and preventive action), with the trend check and
+today's readiness checks; under the QMSR, FDA can now read management review records. Counts come from the
+organization's records as imported into MDARIX for the period chosen; nothing here is a conclusion or advice.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections import Counter
+from datetime import date, datetime, timedelta, timezone
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from backend.app.complaint_review import rules as review_rules
+from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
+from backend.app.db.models.complaint_review import ComplaintSecondLook
+from backend.app.db.models.foundation import Capa, Complaint, Product, ProductVersion
+from backend.app.db.models.reportability import ComplaintReportability
+from backend.app.db.models.signals import Signal
+from backend.app.readiness_home import service
+from backend.app.reportability import rules as report_rules
+
+PERIOD_DEFAULT, PERIOD_MIN, PERIOD_MAX = 365, 30, 1095
+TOP_GROUPS = 15
+WATERMARK = "MANAGEMENT REVIEW INPUT - VERIFY AGAINST SOURCE RECORDS"
+STATE_WORDS = {
+    service.CLEAR: "clear",
+    service.ATTENTION: "needs attention",
+    service.CRITICAL: "critical",
+    service.NOT_SET: "not set up",
+}
+
+
+def _midnight(day: date) -> datetime:
+    return datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+
+
+def _day(value) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        moment = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return moment.astimezone(timezone.utc).date()
+    return value
+
+
+def _n(count: int, noun: str, plural: str | None = None) -> str:
+    """ "1 CAPA", "3 CAPAs"."""
+    return f"{count} {noun if count == 1 else (plural or noun + 's')}"
+
+
+def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAULT, today: date | None = None) -> dict:
+    """Everything the summary shows, for ``period_days`` up to ``today`` (included)."""
+    today = today or service.today_utc()
+    start = today - timedelta(days=period_days - 1)
+    begin, end = _midnight(start), _midnight(today + timedelta(days=1))
+    received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
+
+    rows = (
+        db.query(
+            Complaint.status,
+            Complaint.death,
+            Complaint.serious_injury,
+            Complaint.malfunction,
+            Product.name,
+            ProductVersion.version_identifier,
+        )
+        .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
+        .outerjoin(
+            ProductVersion,
+            (ProductVersion.tenant_id == Complaint.tenant_id) & (ProductVersion.id == Complaint.product_version_id),
+        )
+        .filter(Complaint.tenant_id == tenant_id, received >= begin, received < end)
+        .all()
+    )
+    groups = Counter(
+        f"{name or 'No product'} {version or '(version not recorded)'}" for _, _, _, _, name, version in rows
+    )
+    complaints = {
+        "received": len(rows),
+        "closed": sum(1 for row in rows if review_rules.is_closed(row.status)),
+        "death": sum(1 for row in rows if row.death),
+        "serious_injury": sum(1 for row in rows if row.serious_injury),
+        "malfunction": sum(1 for row in rows if row.malfunction),
+        "by_product_version": [{"group": name, "complaints": count} for name, count in groups.most_common(TOP_GROUPS)],
+        "more_groups": max(0, len(groups) - TOP_GROUPS),
+    }
+    second_look = Counter(
+        decision
+        for (decision,) in db.query(ComplaintSecondLook.decision).filter(
+            ComplaintSecondLook.tenant_id == tenant_id,
+            ComplaintSecondLook.decided_at >= begin,
+            ComplaintSecondLook.decided_at < end,
+        )
+    )
+    decisions = (
+        db.query(ComplaintReportability)
+        .filter(
+            ComplaintReportability.tenant_id == tenant_id,
+            ComplaintReportability.decided_at >= begin,
+            ComplaintReportability.decided_at < end,
+        )
+        .all()
+    )
+    timeliness = [
+        report_rules.on_time(
+            row.reported_on if row.decision == report_rules.REPORTED else _day(row.decided_at), row.due_on
+        )
+        for row in decisions
+    ]
+    from backend.app.reportability.service import settings_of
+
+    reporting = {
+        "decisions": len(decisions),
+        "reported": sum(1 for row in decisions if row.decision == report_rules.REPORTED),
+        "not_reportable": sum(1 for row in decisions if row.decision == report_rules.NOT_REPORTABLE),
+        "inside_window": sum(1 for value in timeliness if value is True),
+        "after_window": sum(1 for value in timeliness if value is False),
+        "windows": [window["name"] for window in settings_of(db, tenant_id)["windows"]],
+    }
+    signals = Counter(
+        status
+        for (status,) in db.query(Signal.status).filter(
+            Signal.tenant_id == tenant_id, Signal.created_at >= begin, Signal.created_at < end
+        )
+    )
+    from backend.app.signals.insight import trend_board
+
+    board = trend_board(db, tenant_id, grouping="problem", today=today)
+    trends = {
+        "signals_raised": sum(signals.values()),
+        "signals_by_status": dict(sorted(signals.items())),
+        "rising": [item["sentence"] for item in board["items"] if item["result"] in ("SIGNIFICANT", "ELEVATED")][
+            :TOP_GROUPS
+        ],
+    }
+    capas_opened = int(
+        db.query(func.count(Capa.id))
+        .filter(Capa.tenant_id == tenant_id, Capa.opened_at >= begin, Capa.opened_at < end)
+        .scalar()
+        or 0
+    )
+    signed = Counter(
+        status
+        for (status,) in db.query(CapaEffectivenessCheck.status).filter(
+            CapaEffectivenessCheck.tenant_id == tenant_id,
+            CapaEffectivenessCheck.signed_at >= begin,
+            CapaEffectivenessCheck.signed_at < end,
+        )
+    )
+    checks = service.readiness(db, tenant_id, today=today)
+    capa_check = next((item for item in checks["checks"] if item["code"] == "CAPA_EFFECTIVENESS"), {})
+    capa = {
+        "opened": capas_opened,
+        "checks_signed_effective": signed.get("EFFECTIVE", 0),
+        "checks_signed_not_effective": signed.get("NOT_EFFECTIVE", 0),
+        "now": capa_check.get("detail"),
+    }
+    return {
+        "period": {"from": start.isoformat(), "to": today.isoformat(), "days": period_days},
+        "readiness": checks,
+        "complaints": complaints,
+        "second_look": {
+            "confirmed": second_look.get("CONFIRMED", 0),
+            "dismissed": second_look.get("DISMISSED", 0),
+        },
+        "reporting": reporting,
+        "trends": trends,
+        "capa": capa,
+        "limitations": [
+            "Counts are of the records imported into MDARIX for the period; check them against the source systems.",
+            "The trend check compares each product version with its own history; numbers of devices in use are not "
+            "known to MDARIX.",
+            "Reporting windows are the organization's own; MDARIX keeps the clock and decides nothing.",
+        ],
+    }
+
+
+def lines(data: dict) -> list[tuple[str, str]]:
+    """The summary as the PDF's lines: (text, style) with style heading, body or muted."""
+    out: list[tuple[str, str]] = []
+
+    def heading(text: str) -> None:
+        if out:
+            out.append(("", "body"))
+        out.append((text, "heading"))
+
+    def body(text: str) -> None:
+        out.append((text, "body"))
+
+    def muted(text: str) -> None:
+        out.append((text, "muted"))
+
+    period = data["period"]
+    readiness = data["readiness"]
+    heading("1. Readiness today")
+    summary = readiness["summary"]
+    body(
+        f"{summary['clear']} of {summary['checks']} checks clear; {summary['critical']} critical, "
+        f"{summary['attention']} needing attention, {summary['not_set']} not set up."
+    )
+    for check in readiness["checks"]:
+        value = "-" if check["value"] is None else check["value"]
+        body(f"- {check['title']}: {value} ({STATE_WORDS.get(check['state'], check['state'])}). {check['detail']}")
+        muted(f"    Why: {check['why']}")
+
+    complaints = data["complaints"]
+    heading("2. Feedback and complaint handling (management review inputs, ISO 13485:2016 clause 5.6.2)")
+    body(
+        f"{_n(complaints['received'], 'complaint')} received from {period['from']} to {period['to']}; "
+        f"{complaints['closed']} closed. {complaints['death']} report a death, {complaints['serious_injury']} a "
+        f"serious injury, {complaints['malfunction']} a malfunction."
+    )
+    body("By product version:")
+    for group in complaints["by_product_version"]:
+        body(f"- {group['group']}: {group['complaints']}")
+    if complaints["more_groups"]:
+        muted(f"  and {complaints['more_groups']} more product versions")
+    second = data["second_look"]
+    body(
+        f"Second look: {second['confirmed']} records confirmed as complaints and {second['dismissed']} dismissed in the "
+        "period."
+    )
+
+    reporting = data["reporting"]
+    heading("3. Reporting to regulatory authorities (management review input, clause 5.6.2)")
+    body(
+        f"{_n(reporting['decisions'], 'reportability decision')} in the period: {reporting['reported']} reported, "
+        f"{reporting['not_reportable']} not reportable; {reporting['inside_window']} inside the window, "
+        f"{reporting['after_window']} after it."
+    )
+    body(
+        "Reporting windows: " + ("; ".join(reporting["windows"]) if reporting["windows"] else "none entered yet") + "."
+    )
+
+    trends = data["trends"]
+    heading("4. Trends (inputs to risk management and CAPA)")
+    statuses = ", ".join(
+        f"{status.replace('_', ' ').lower()} {count}" for status, count in trends["signals_by_status"].items()
+    )
+    body(f"{_n(trends['signals_raised'], 'signal')} raised in the period" + (f" ({statuses})." if statuses else "."))
+    if trends["rising"]:
+        body("Trend check, groups above their own history:")
+        for sentence in trends["rising"]:
+            body(f"- {sentence}")
+    else:
+        body("Trend check: no product version above its own history.")
+
+    capa = data["capa"]
+    heading("5. Corrective and preventive action (management review inputs, clause 5.6.2)")
+    body(
+        f"{_n(capa['opened'], 'CAPA')} opened in the period; effectiveness checks signed: {capa['checks_signed_effective']} "
+        f"effective, {capa['checks_signed_not_effective']} not effective."
+    )
+    if capa["now"]:
+        body(f"Today: {capa['now']}.")
+
+    heading("6. Limitations")
+    for item in data["limitations"]:
+        muted(f"- {item}")
+    return out
+
+
+def render_pdf(data: dict, organization: str, generated_at: str) -> bytes:
+    from reports import pdf
+
+    period = data["period"]
+    header = [
+        f"Organization: {organization}",
+        f"Period: {period['from']} to {period['to']} ({period['days']} days)",
+        f"Generated: {generated_at}",
+        "For management review: counts from your records; a person reviews and decides.",
+    ]
+    footer = f"{organization} - readiness summary - generated {generated_at}"
+    return pdf.render("MDARIX readiness summary", header, lines(data), watermark=WATERMARK, footer=footer)

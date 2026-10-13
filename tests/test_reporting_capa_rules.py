@@ -188,3 +188,20 @@ def test_suggested_criteria_and_what_is_signed():
     meaning = capa.signature_meaning("CAPA000012", 2, capa.NOT_EFFECTIVE)
     assert meaning.startswith("I have reviewed effectiveness check 2 of CAPA000012") and "not effective" in meaning
     assert all(len(code) <= 12 for code in capa.SIGNATURE_CODES.values())
+
+
+def test_uk_and_canadian_templates_follow_their_regulations():
+    by_name = {window["name"]: rules.clean_window(window) for window in rules.TEMPLATES}
+    gb_serious = by_name["MHRA (Great Britain): serious incident (15 days)"]
+    gb_death = by_name["MHRA (Great Britain): death (10 days)"]
+    ca_death = by_name["Health Canada: death or serious deterioration (10 days)"]
+    ca_recur = by_name["Health Canada: could cause death or serious deterioration if it recurred (30 days)"]
+    assert (gb_serious["days"], gb_death["days"], ca_death["days"], ca_recur["days"]) == (15, 10, 10, 30)
+    assert all(window["day_basis"] == rules.CALENDAR for window in by_name.values())
+    aware, today = date(2026, 10, 1), date(2026, 10, 3)
+    windows = list(by_name.values())
+    uk_death = rules.clocks(_record(country="United Kingdom", death=True), windows, aware, today)
+    assert [clock.name for clock in uk_death] == [gb_death["name"], gb_serious["name"]]
+    canada = rules.clocks(_record(country="Canada", malfunction=True), windows, aware, today)
+    assert [clock.name for clock in canada] == [ca_recur["name"]] and canada[0].due == date(2026, 10, 31)
+    assert rules.windows_problem(windows) is None

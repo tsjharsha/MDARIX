@@ -68,6 +68,19 @@ operator knows a release migrates the database.
   maker to confirm.
 - A case's regulatory review shows each complaint's reporting clock against the organization's windows (and any
   decision recorded), with a link to the reportability watch.
+- Readiness (the home of the lightweight MVP): what an FDA investigator or a notified-body auditor would find today,
+  read from the organization's records (rules only): the four numbers (complaints to recheck, complaints past target,
+  reporting clocks, trends without CAPA or risk review) and further checks drawn from 2025-2026 findings (harm
+  complaints closed without an investigation, CAPAs without a verified effect, signals past their triage date); each
+  says why it matters and opens the records behind it (`GET /api/v1/readiness`). Under the `mvp` feature set it
+  replaces the Dashboard as home.
+- The readiness summary for management review as a PDF (`GET /api/v1/readiness/summary.pdf`, data.export, audited),
+  for 90 days to 3 years: readiness checks, complaint handling by product version, second-look outcomes,
+  reportability decisions and their timeliness, signals and trend check results, CAPAs and effectiveness checks,
+  organized by the management review inputs of ISO 13485:2016 clause 5.6.2.
+- Reporting window templates for Great Britain (MHRA: 15 days for a serious incident, 10 for a death; Medical Devices
+  Regulations 2002 as amended, regulation 44ZH) and Canada (Health Canada: 10 days for a death or serious
+  deterioration, 30 days for an incident that could cause one if it recurred; SOR/98-282 section 60).
 - Migration `md42` adds `case_ai_runs` (dedicated legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py
 --apply`).
 

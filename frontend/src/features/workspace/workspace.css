@@ -2180,3 +2180,98 @@ div.uw-task-count:hover {
     animation: none;
   }
 }
+
+/* Readiness (sections/Readiness.tsx): the four home numbers as large tiles, each opening the records behind it, and
+   the further inspection checks. The tone is repeated by a text label on every tile. */
+.uw-rd-home {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.uw-rd-tile {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--ac-line);
+  border-top: 5px solid var(--ac-neutral);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+.uw-rd-tile:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgb(16 32 47 / 10%);
+}
+.uw-rd-tile:disabled {
+  cursor: default;
+}
+.uw-rd-tile.tone-good {
+  border-top-color: var(--ac-good);
+}
+.uw-rd-tile.tone-warning {
+  border-top-color: var(--ac-warning);
+}
+.uw-rd-tile.tone-serious {
+  border-top-color: var(--ac-serious);
+}
+.uw-rd-tile.tone-critical {
+  border-top-color: var(--ac-critical);
+}
+.uw-rd-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
+.uw-rd-value {
+  font-size: 36px;
+  line-height: 1;
+  color: var(--ac-navy);
+}
+.uw-rd-detail {
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}
+.uw-rd-refs {
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-rd-why {
+  color: var(--ac-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.uw-rd-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ac-teal);
+  font-weight: 600;
+}
+.uw-rd-checks {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rd-download {
+  align-items: end;
+}
+@media (max-width: 1080px) {
+  .uw-rd-home {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .uw-rd-home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

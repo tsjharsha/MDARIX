@@ -8,6 +8,7 @@ import type { WorkspaceSection } from "./workspaceContext";
  * named by ?section=.
  */
 const SECTION_VIEW: Readonly<Record<string, AppView>> = {
+  Readiness: "readiness",
   Dashboard: "home",
   "My Work": "my-work",
   Products: "products",

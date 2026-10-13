@@ -19,6 +19,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  ShieldAlert,
   Upload,
   UserRound,
   X,
@@ -42,6 +43,7 @@ import {
 import { useWorkContext } from "./useWorkContext";
 import { ContextBar } from "./ContextBar";
 import { DashboardSection } from "./sections/Dashboard";
+import { ReadinessSection } from "./sections/Readiness";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { MyWorkSection } from "./sections/MyWork";
 import { ProductsSection } from "./sections/Products";
@@ -61,7 +63,7 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
-import { featureSetOf, routeFor } from "../../app/featureSet";
+import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
 import {
   addressFor,
   isWorkspaceHistoryState,
@@ -78,6 +80,13 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     icon: Rocket,
     description: "Your free trial, step by step",
     guide: "Set up your trial one step at a time: add your data, invite your team and try a first investigation.",
+    context: false,
+  },
+  Readiness: {
+    icon: ShieldAlert,
+    description: "What an inspector would find",
+    guide:
+      "What an FDA investigator or a notified-body auditor would find in your complaints, reports, trends and CAPAs today, read from your own records. Every number opens the records behind it.",
     context: false,
   },
   Dashboard: {
@@ -177,6 +186,7 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
 export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   home: ["Dashboard"],
+  readiness: ["Readiness"],
   "my-work": ["My Work"],
   products: ["Products"],
   complaints: ["Complaints"],
@@ -254,9 +264,10 @@ export function UserWorkspace({
       WORKSPACE_SECTIONS.filter(
         (section) =>
           (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
+          !(featureSet === "mvp" && PARKED_SECTIONS.includes(section)) &&
           sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
       ),
-    [session?.allowed_menu, session?.business_permissions, trial?.is_trial],
+    [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet],
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
@@ -481,6 +492,7 @@ export function UserWorkspace({
               <SectionErrorBoundary name={section} resetKey={location.key}>
                 <div className="ca-section">
                   {section === "Getting started" && <GettingStartedSection />}
+                  {section === "Readiness" && <ReadinessSection />}
                   {section === "Dashboard" && <DashboardSection />}
                   {section === "My Work" && <MyWorkSection tab={tab} />}
                   {section === "Products" && <ProductsSection tab={tab} />}

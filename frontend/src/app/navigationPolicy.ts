@@ -56,6 +56,7 @@ export const PLATFORM_ADMIN_VIEWS: readonly AppView[] = [
 /** The investigation workspace an Investigator works in (UserWorkspace and the screens it opens). */
 export const WORKSPACE_VIEWS: readonly AppView[] = [
   "home",
+  "readiness",
   "my-work",
   "products",
   "complaints",

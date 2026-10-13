@@ -5,6 +5,8 @@ import { featureSetOf, type FeatureSet } from "../../app/featureSet";
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
   "Getting started",
+  // What an inspector would find today (the home of the lightweight MVP).
+  "Readiness",
   "Dashboard",
   "My Work",
   "Products",
@@ -32,6 +34,7 @@ export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 /** Server menu keys (session context `allowed_menu`) that grant each section. My Account is always available. */
 export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Getting started": ["home"],
+  Readiness: ["home"],
   Dashboard: ["home"],
   "My Work": ["home", "investigations"],
   Products: ["products"],

@@ -125,7 +125,12 @@ _EU = [
     "NO",
 ]
 
-# Starting points to check against the organization's procedure; never applied until a person saves them.
+_GB = ["United Kingdom", "UK", "GB", "Great Britain", "England", "Scotland", "Wales"]
+_CA = ["Canada", "CA", "CAN"]
+
+# Starting points to check against the organization's procedure; never applied until a person saves them. Sources:
+# 21 CFR 803.50 and 803.53 (FDA); EU MDR Article 87; GB Medical Devices Regulations 2002 as amended, regulation 44ZH
+# (from 16 June 2025); Canada Medical Devices Regulations SOR/98-282 section 60 (calendar days).
 TEMPLATES = (
     {
         "name": "FDA MDR: death, serious injury or malfunction (30 calendar days)",
@@ -152,6 +157,40 @@ TEMPLATES = (
         "days": 10,
         "day_basis": CALENDAR,
         "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+    },
+    {
+        "name": "MHRA (Great Britain): serious incident (15 days)",
+        "markets": _GB,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 15,
+        "day_basis": CALENDAR,
+        "note": "A serious public health threat is 2 days, and a malfunction can be a serious incident; your reviewer "
+        "applies both. Northern Ireland follows the EU MDR but reports to the MHRA.",
+    },
+    {
+        "name": "MHRA (Great Britain): death (10 days)",
+        "markets": _GB,
+        "triggers": [DEATH],
+        "days": 10,
+        "day_basis": CALENDAR,
+        "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+    },
+    {
+        "name": "Health Canada: death or serious deterioration (10 days)",
+        "markets": _CA,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 10,
+        "day_basis": CALENDAR,
+        "note": "For an incident in Canada; a foreign incident is reported as soon as possible after the decision.",
+    },
+    {
+        "name": "Health Canada: could cause death or serious deterioration if it recurred (30 days)",
+        "markets": _CA,
+        "triggers": [MALFUNCTION],
+        "days": 30,
+        "day_basis": CALENDAR,
+        "note": "Whether a recurrence could cause death or serious deterioration rests on a judgment; your reviewer "
+        "applies it.",
     },
 )
 

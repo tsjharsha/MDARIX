@@ -26,6 +26,9 @@ export const PARKED_VIEWS: readonly AppView[] = [
   "platform-licenses",
 ];
 
+/** Workspace sections the MVP parks: Readiness is its home instead of the Dashboard. */
+export const PARKED_SECTIONS: readonly string[] = ["Dashboard"];
+
 /** Tabs the MVP parks, by workspace section. */
 export const PARKED_TABS: Readonly<Record<string, readonly string[]>> = {
   Investigations: ["Story"],
@@ -60,6 +63,8 @@ export function routeFor(
   featureSet: FeatureSet,
 ): { section: string; tab: string | undefined } {
   if (featureSet !== "mvp") return { section, tab };
+  // Readiness is the MVP's home: links to the Dashboard open it.
+  if (section === "Dashboard") return { section: "Readiness", tab: undefined };
   const caseEvidence = !tab || tab === "Case evidence" || tab.startsWith("Case evidence?");
   if (section === "Evidence" && caseEvidence) return { section: "Investigations", tab: "Evidence" };
   // The legacy Decision center is parked: links to it (a case link, a task) open the case's own decision.
