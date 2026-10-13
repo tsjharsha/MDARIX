@@ -167,6 +167,17 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert insights["scope"] == "sample data" and insights["findings"]
 
 
+def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatch):
+    """A free trial always gets the MVP interface, even where the deployment runs the full product, and Getting
+    started counts the sample records it explains; any other organization keeps the deployment's setting."""
+    monkeypatch.delenv("MDARIX_FEATURE_SET", raising=False)
+    user, _approval, _email = _approved_trial_client()
+    assert user.get("/api/v1/session/context").json()["feature_set"] == "mvp"
+    sample = user.get("/api/v1/trial/status").json()["sample"]
+    assert sample == {"products": 3, "lots": 15, "complaints": 37, "investigations": 1, "capas": 2, "risks": 3}
+    assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
+
+
 def test_a_request_cannot_be_approved_twice_or_after_decline():
     admin = authenticated_client()
     email = _request_trial()

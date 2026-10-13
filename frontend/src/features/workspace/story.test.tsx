@@ -372,4 +372,41 @@ describe("booking a one-to-one demo from the trial", () => {
     const { EmailChoices } = await import("./sections/Account");
     expect(renderToStaticMarkup(<EmailChoices />)).toContain("Weekly readiness email");
   });
+
+  it("explains the sample data: its size, the pain each part re-creates, the requirement and where to see it", async () => {
+    const { SampleDataPanel } = await import("./sections/SampleData");
+    const { SAMPLE_PAINS, sampleFacts } = await import("./sampleStory");
+    const counts = { products: 3, lots: 15, complaints: 37, investigations: 1, capas: 2, risks: 3 };
+    expect(sampleFacts(counts)).toEqual([
+      "3 devices",
+      "15 lots",
+      "37 complaints",
+      "1 investigation",
+      "2 CAPAs",
+      "3 risks",
+    ]);
+    expect(sampleFacts({ products: 3, capas: 0 })).toEqual(["3 devices"]);
+    expect(sampleFacts(null)).toEqual([]);
+    // Every pain opens a screen the MVP keeps, and names its requirement.
+    const kept = ["Readiness", "Complaints", "Signals", "Investigations", "Records"];
+    for (const pain of SAMPLE_PAINS) {
+      expect(kept).toContain(pain.opens.section);
+      expect(pain.requirement.length).toBeGreaterThan(20);
+    }
+    const html = renderToStaticMarkup(
+      <SampleDataPanel counts={counts} allowed={(section) => section !== "Records"} onOpen={() => undefined} />,
+    );
+    expect(html).toContain("What your sample data is, and why it looks like this");
+    expect(html).toContain("37 complaints");
+    for (const pain of SAMPLE_PAINS) expect(html).toContain(pain.title);
+    expect(html).toContain("ISO 13485 clause 8.2.2");
+    expect(html).toContain("How the sample data was made");
+    expect(html).toContain("No real company, device, patient or person");
+    // A screen the role does not hold is not offered.
+    expect(html).toContain('title="Your role does not include this screen"');
+    // A workspace without the sample shows nothing.
+    expect(
+      renderToStaticMarkup(<SampleDataPanel counts={{ products: 0 }} allowed={() => true} onOpen={() => undefined} />),
+    ).toBe("");
+  });
 });

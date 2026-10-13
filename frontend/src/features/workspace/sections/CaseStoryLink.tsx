@@ -3,10 +3,12 @@ import { History } from "lucide-react";
 import { safeText } from "../../../app/displayId";
 import { WorkspaceContext, sectionAllowed } from "../workspaceContext";
 import { trustTab } from "../caseAudit";
+import { featureSetOf } from "../../../app/featureSet";
 
 /**
  * "See the full case story in Trust & Audit": opens the case's timeline. Shown only inside the workspace and when the
- * person's menu has Trust & Audit; a case the context bar lists becomes the working case as well.
+ * person's menu has Trust & Audit; a case the context bar lists becomes the working case as well. Under the MVP feature
+ * set the timeline is in Records › Audit trail (app/featureSet.ts routeFor), and the link says so.
  */
 export function CaseStoryLink({
   investigationId,
@@ -29,7 +31,8 @@ export function CaseStoryLink({
   };
   return (
     <button type="button" className={className} onClick={go}>
-      <History size={15} aria-hidden="true" /> See the full case story in Trust &amp; Audit
+      <History size={15} aria-hidden="true" /> See the full case story in{" "}
+      {featureSetOf(session?.feature_set) === "mvp" ? "Records" : "Trust & Audit"}
     </button>
   );
 }

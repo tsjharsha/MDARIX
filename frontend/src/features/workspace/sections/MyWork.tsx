@@ -21,7 +21,10 @@ import { displayId, safeText } from "../../../app/displayId";
 import { useServerSort } from "../../../app/tableSort";
 import { WORKFLOW_ROLE_CODES, roleLabel } from "../../../app/roles";
 import { conversationSummary } from "../../ask/structuredModel";
-import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
+import { sectionAllowed, useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { MY_WORK_APPROVALS_TAB } from "../../../app/featureSet";
+import type { QueueRow } from "../humanDecision";
+import { ApprovalsPanel } from "./DecisionApprovals";
 import {
   REASON_MAX,
   TASK_ACTIONS,
@@ -88,21 +91,43 @@ const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
   created: { title: "No tasks created", detail: "Tasks you created appear here." },
 };
 
+type MyWorkView = MyWorkTab | typeof MY_WORK_APPROVALS_TAB;
+
 export function MyWorkSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<MyWorkTab>(() => initialMyWorkTab(tab));
+  const { work, open, notify } = useWorkspace();
+  // Under the MVP feature set the Decisions section is parked: the decisions awaiting a signature are listed here, for
+  // people who may sign, and each opens on its case's Decision step (app/featureSet.ts).
+  const canSign = useCan("decision.sign");
+  const approvals = useFeatureSet() === "mvp" && canSign;
+  const [active, setActive] = useState<MyWorkView>(() =>
+    approvals && (tab ?? "").split("?")[0] === MY_WORK_APPROVALS_TAB ? MY_WORK_APPROVALS_TAB : initialMyWorkTab(tab),
+  );
   // A task or link may name an evidence request to open ("Evidence requests?request=…", see taskDestination).
   const [request] = useState(() => {
     const target = parseRequestTab(tab);
     return target.tab === "Evidence requests" ? target.request : null;
   });
   const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
-  const tabs = myWorkTabs(summary.data, active);
+  const taskTabs = myWorkTabs(summary.data, active);
+  const tabs: MyWorkView[] = approvals ? [taskTabs[0], MY_WORK_APPROVALS_TAB, ...taskTabs.slice(1)] : taskTabs;
   const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
   const view = taskViewForTab(active);
+  const openApproval = (row: QueueRow) => {
+    if (!row.investigationId) return;
+    if (row.productId) work.setInvestigationId(row.investigationId, row.productId);
+    else if (work.investigations.some((item) => String(item.id) === row.investigationId))
+      work.setInvestigationId(row.investigationId);
+    else {
+      notify(`Choose ${row.caseId} in the context bar above, then open its Decision step.`, "critical");
+      return;
+    }
+    open("Investigations", "Decision");
+  };
   return (
     <>
       <Tabs tabs={tabs} active={active} onChange={setActive} label="My work sections" counts={counts}>
         {view && <TaskInbox key={view} view={view} summary={summary} />}
+        {active === MY_WORK_APPROVALS_TAB && <ApprovalsPanel onOpen={openApproval} />}
         {active === "Evidence requests" && (
           <>
             <EvidenceRequestsPanel investigationId={null} initialRequest={request} />

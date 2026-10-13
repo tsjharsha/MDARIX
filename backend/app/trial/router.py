@@ -22,7 +22,16 @@ from sqlalchemy.orm import Session
 from backend.app.access.authz import _require_platform_admin
 from backend.app.db.data_plane import get_data_plane_db, open_tenant_data_session
 from retrieval.record_evidence import embed_tenant_evidence
-from backend.app.db.models.foundation import AuditEvent, AuthUser, Complaint, LotBatch, Product
+from backend.app.db.models.foundation import (
+    AuditEvent,
+    AuthUser,
+    Capa,
+    Complaint,
+    Investigation,
+    LotBatch,
+    Product,
+    Risk,
+)
 from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -142,7 +151,15 @@ def trial_status(
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": imports.uploaded_rows(data, tenant_id)},
-        "sample": {"products": _count(data, Product, tenant_id, SAMPLE_SOURCE)},
+        # The sample dataset's records (Getting started explains what each part is for).
+        "sample": {
+            "products": _count(data, Product, tenant_id, SAMPLE_SOURCE),
+            "lots": _count(data, LotBatch, tenant_id, SAMPLE_SOURCE),
+            "complaints": _count(data, Complaint, tenant_id, SAMPLE_SOURCE),
+            "investigations": _count(data, Investigation, tenant_id, SAMPLE_SOURCE),
+            "capas": _count(data, Capa, tenant_id, SAMPLE_SOURCE),
+            "risks": _count(data, Risk, tenant_id, SAMPLE_SOURCE),
+        },
         "own_data": {
             "products": _count(data, Product, tenant_id, imports.UPLOAD_SOURCE),
             "lots": _count(data, LotBatch, tenant_id, imports.UPLOAD_SOURCE),

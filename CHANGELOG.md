@@ -185,6 +185,11 @@ operator knows a release migrates the database.
   button beside "Request a demo".
 - Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
   time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Getting started explains the sample data: what it holds (counted live), the pain point each part re-creates (hidden
+  complaints, running reporting clocks, harm closed without an investigation, a trend after a supplier change, an
+  investigation with its evidence, CAPAs without proof they worked, post-market data missing from the risk file), the
+  requirement behind each (ISO 13485, 21 CFR 803, EU MDR, ISO 14971) with a button to the screen that shows it, and how
+  the sample was made. The trial status counts the sample's lots, complaints, investigations, CAPAs and risks.
 
 ### Fixed
 
@@ -196,6 +201,16 @@ operator knows a release migrates the database.
 
 ### Changed
 
+- The MVP is five screens. Under `MDARIX_FEATURE_SET=mvp`, and always in a free trial, the workspace menu is Readiness,
+  Complaints, Signals, Investigations (the one case page), Records, My Work, Import data and My Account. Dashboard,
+  Products, Evidence, Decisions, Intelligence and Trust & Audit are parked, and every link into them opens the screen
+  that now holds the work: a case's evidence, Ask MDARIX, reviews and decision are steps of the case page; approvals
+  are a My Work tab for people who may sign; the audit trail (with each case's timeline, replay, AI runs and
+  integrity), reports and signature verification are Records tabs, each shown only to roles whose menu held the
+  section. Customer administration parks Integrations and Data Mapping (no simulated source-system connection is
+  shown) and the dashboard's connection and sync tiles. Platform administration parks Data & Integrations, Renewals,
+  Reminders (a link opens Subscriptions), Tenant cells and Developer API. Under `full` nothing changes; the parked code
+  and routes stay. `.env.production.example` now sets `mvp` for pilots.
 - Getting started tells the trial as a story. The quality loop names the next chapter, and each chapter shows its
   live finding, why it matters and where to try it. Progress comes from the server (what the organization did), not
   from the browser. The import, insights and team panels are unchanged.

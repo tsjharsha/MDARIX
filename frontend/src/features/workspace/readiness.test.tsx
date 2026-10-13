@@ -98,7 +98,8 @@ describe("Readiness in the workspace", () => {
   it("is the MVP's home; the full product keeps the dashboard", () => {
     expect(routeFor("Dashboard", undefined, "mvp")).toEqual({ section: "Readiness", tab: undefined });
     expect(routeFor("Dashboard", undefined, "full")).toEqual({ section: "Dashboard", tab: undefined });
-    expect(PARKED_SECTIONS).toEqual(["Dashboard"]);
+    expect(PARKED_SECTIONS).toContain("Dashboard");
+    expect(PARKED_SECTIONS).not.toContain("Readiness");
   });
 
   it("has its own address and menu entry", () => {

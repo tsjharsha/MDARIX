@@ -8,6 +8,9 @@
   interface (the session context names the feature set) and their API routes answer 404 here, before any handler
   runs. Parked code is kept, with its tests, and comes back by setting ``full``.
 
+A free trial always gets the MVP interface (``for_tenant``), whatever the deployment's setting: a trial shows the five
+screens the MVP is built around, not every screen as built. Its API routes follow the deployment's setting.
+
 A route is parked only when no screen the MVP keeps calls it. The failure-chain route, for example, stays served:
 the investigation panel's "unknowns and chain" step still calls it. The value is read from the environment on every
 call, so a process never caches a wrong answer and tests can set it.
@@ -55,6 +58,17 @@ def feature_set() -> str:
 
 def is_mvp() -> bool:
     return feature_set() == MVP
+
+
+def for_tenant(db, tenant_id) -> str:
+    """The feature set a tenant's interface shows: ``mvp`` where the deployment runs it, and for a tenant on the Free
+    Trial plan; otherwise the deployment's setting."""
+    configured = feature_set()
+    if configured == MVP or tenant_id is None:
+        return configured
+    from backend.app.trial.service import trial_subscription
+
+    return MVP if trial_subscription(db, tenant_id) is not None else configured
 
 
 def serves_path(path: str) -> bool:

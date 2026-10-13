@@ -37,6 +37,8 @@ export type TenantContext = {
   plan?: { business_id?: string | null; code?: string; name?: string; version?: string } | null;
   license?: { state?: string; effective?: boolean };
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
+  /** full or mvp (backend/app/feature_set.py): under mvp the connections and mapping sections are parked. */
+  feature_set?: string;
 };
 
 export type ConsoleApi = {

@@ -463,7 +463,7 @@ function NoCase({ detail }: { detail: string }) {
 
 /**
  * The case's record on the one case page: the signed, complete record to download (PDF for people, CSV and JSON for
- * systems) and its timeline in Trust & Audit.
+ * systems) and its timeline (Records › Audit trail under the MVP feature set, else Trust & Audit).
  */
 function CaseRecord({
   investigationId,

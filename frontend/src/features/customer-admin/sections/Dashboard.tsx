@@ -15,6 +15,7 @@ import { customerAttention, roleMix, seatUsage, userStatusSlices, type TenantUse
 import { licensedSeatLimit, useConsole } from "../context";
 import { listOf, useResource } from "../shared";
 import { formatDateTime } from "../../../app/dates";
+import { PARKED_CUSTOMER_ADMIN_SECTIONS, featureSetOf } from "../../../app/featureSet";
 import { safeText } from "../../../app/displayId";
 
 const SEAT_STATUSES = ["ACTIVE", "INVITED", "PENDING_VERIFICATION"];
@@ -34,6 +35,9 @@ const sum = (values: number[]) => values.reduce((total, value) => total + value,
 /** The organization at a glance: people, sign-ins, integrations, AI and audit activity, and what needs action. */
 export function Dashboard() {
   const { context, open } = useConsole();
+  // Under the MVP feature set connections and sync runs are parked (app/featureSet.ts): nothing here looks like a live
+  // source-system integration, and data comes in through Import data.
+  const mvp = featureSetOf(context?.feature_set) === "mvp";
   const dashboard = useResource<any>("/api/v1/admin/tenant-dashboard");
   const users = useResource<TenantUser[]>("/api/v1/admin/identity/users");
   const [range, setRange] = useState<Range>(30);
@@ -79,14 +83,14 @@ export function Dashboard() {
       attention: customerAttention({
         alerts: dashboard.data?.health?.alerts ?? [],
         users: people,
-        failedRuns: runFailed,
+        failedRuns: mvp ? 0 : runFailed,
         seats,
         daysToExpiry: null,
-      }),
+      }).filter((item) => !mvp || !PARKED_CUSTOMER_ADMIN_SECTIONS.includes(item.section)),
       statuses: userStatusSlices(people),
       roles: roleMix(people),
     };
-  }, [users.data, trends.data, dashboard.data, context]);
+  }, [users.data, trends.data, dashboard.data, context, mvp]);
 
   const loading = [dashboard, users].some((resource) => resource.state === "loading");
   const tone: Tone = loading ? "neutral" : worstTone(model.attention.map((item) => item.tone));
@@ -165,7 +169,7 @@ export function Dashboard() {
       activity: busyness(rates.events, busiest),
       onOpen: () => open("Audit"),
     },
-  ];
+  ].filter((item) => !mvp || (item.key !== "connections" && item.key !== "runs"));
 
   return (
     <div className="ac-overview ac-dashboard">
@@ -254,23 +258,27 @@ export function Dashboard() {
           icon={<UserPlus size={18} />}
           onOpen={() => open("Users")}
         />
-        <KpiTile
-          label="Connections"
-          value={connectors.state === "ready" ? connectorList.length : null}
-          detail={`${activeConnectors} active`}
-          icon={<Plug size={18} />}
-          onOpen={() => open("Integrations")}
-        />
-        <KpiTile
-          label="Sync runs"
-          value={trendsReady ? model.runTotal : null}
-          detail={`${model.runFailed} failed · last ${days} days`}
-          tone={trendsReady && model.runTotal ? (model.runFailed ? "critical" : "good") : undefined}
-          icon={<Activity size={18} />}
-          series={model.runs.map((point) => point.primary)}
-          seriesLabel={`Sync runs per day, last ${days} days`}
-          onOpen={() => open("Integrations", "Sync activity")}
-        />
+        {!mvp && (
+          <>
+            <KpiTile
+              label="Connections"
+              value={connectors.state === "ready" ? connectorList.length : null}
+              detail={`${activeConnectors} active`}
+              icon={<Plug size={18} />}
+              onOpen={() => open("Integrations")}
+            />
+            <KpiTile
+              label="Sync runs"
+              value={trendsReady ? model.runTotal : null}
+              detail={`${model.runFailed} failed · last ${days} days`}
+              tone={trendsReady && model.runTotal ? (model.runFailed ? "critical" : "good") : undefined}
+              icon={<Activity size={18} />}
+              series={model.runs.map((point) => point.primary)}
+              seriesLabel={`Sync runs per day, last ${days} days`}
+              onOpen={() => open("Integrations", "Sync activity")}
+            />
+          </>
+        )}
         <KpiTile
           label="AI runs"
           value={trendsReady ? model.aiTotal : null}
@@ -337,7 +345,7 @@ export function Dashboard() {
                 unit: "new users",
                 explain: "People added to your organization each day.",
               },
-            ]}
+            ].filter((item) => !mvp || item.key !== "runs")}
           />
         </Panel>
         <Panel eyebrow={`Last ${days} days`} title="At a glance" source={trends}>
@@ -346,9 +354,11 @@ export function Dashboard() {
             {model.seats.limit !== null ? (
               <RingMeter value={model.seats.used} total={model.seats.limit} label="Seats used" />
             ) : (
-              <RingMeter value={activeConnectors} total={connectorList.length} label="Connections active" />
+              !mvp && <RingMeter value={activeConnectors} total={connectorList.length} label="Connections active" />
             )}
-            <RingMeter value={model.runTotal - model.runFailed} total={model.runTotal} label="Syncs succeeded" />
+            {!mvp && (
+              <RingMeter value={model.runTotal - model.runFailed} total={model.runTotal} label="Syncs succeeded" />
+            )}
             <RingMeter value={model.aiTotal - model.aiFailed} total={model.aiTotal} label="AI runs completed" />
           </div>
         </Panel>

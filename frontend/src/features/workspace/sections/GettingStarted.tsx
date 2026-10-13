@@ -1,5 +1,14 @@
 import { useState } from "react";
-import { Bot, CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Upload } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  FlaskConical,
+  MessageSquare,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { BarList, Empty, Panel, RingMeter, StatTile, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import type { Slice } from "../../admin/console/dashboardModel";
@@ -10,6 +19,8 @@ import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
 import { BookDemo } from "./BookDemo";
+import { SampleDataPanel, scrollToSampleData } from "./SampleData";
+import type { SampleCounts } from "../sampleStory";
 import {
   CHAPTER_ACTION,
   TRIAL_STORY_PATH,
@@ -29,7 +40,7 @@ export type TrialStatus = {
   days_left?: number;
   limits?: { users: number; rows: number; file_bytes: number };
   usage?: { users: number; rows: number };
-  sample?: { products: number };
+  sample?: SampleCounts;
   own_data?: { products: number; lots: number; complaints: number };
   templates?: ImportTemplate[];
 };
@@ -74,6 +85,7 @@ export function GettingStartedSection() {
   const headline = storyHeadline(story.data);
   const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
   const talk = () => window.open("/contact", "_blank", "noopener");
+  const hasSample = (trial?.sample?.products ?? 0) > 0;
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
@@ -99,6 +111,11 @@ export function GettingStartedSection() {
           </button>
         )}
         <BookDemo chapters={chapters} />
+        {hasSample && (
+          <button type="button" className="ac-secondary" onClick={scrollToSampleData}>
+            <FlaskConical size={15} aria-hidden="true" /> About the sample data
+          </button>
+        )}
       </QualityLoop>
 
       <Panel
@@ -145,6 +162,14 @@ export function GettingStartedSection() {
         <p className="uw-trial-lede">
           Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records first and on your
           own export once you upload it. A chapter counts as tried when you act in it: decide, record, run or sign.
+          {hasSample && (
+            <>
+              {" "}
+              <button type="button" className="ac-link" onClick={scrollToSampleData}>
+                What is the sample data?
+              </button>
+            </>
+          )}
         </p>
         <ol className="uw-trial-steps uw-story-steps">
           {chapters.map((chapter) => (
@@ -174,6 +199,16 @@ export function GettingStartedSection() {
           </div>
         </div>
       </Panel>
+
+      {hasSample && (
+        <SampleDataPanel
+          counts={trial?.sample}
+          allowed={allowed}
+          onOpen={(opens) => {
+            if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+          }}
+        />
+      )}
 
       <ImportPanel
         id="trial-import"

@@ -144,7 +144,7 @@ export function SignatureVerificationWorkspace() {
           <h1>Signature verification</h1>
           <p>
             Check that every signature on a decision still matches the exact decision version that was signed. Signing
-            itself needs your password and authenticator code, and is done in Decisions.
+            itself needs your password and authenticator code, and is done on the case&apos;s decision.
           </p>
         </div>
         <span className="platform-admin-badge warning">Human approval only</span>

@@ -184,6 +184,23 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
 };
 
+/** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
+const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: string }>> = {
+  "My Work": {
+    description: "Your tasks, approvals and requests",
+    guide:
+      "Everything waiting for you: tasks assigned to you, work your roles can pick up, decisions awaiting your signature and evidence requests.",
+  },
+  Records: {
+    description: "CAPA checks, risk file, audit trail",
+    guide:
+      "What you hand an inspector or a management review: every CAPA's effectiveness check, signed with its result and the evidence seen; whether post-market data reached the risk file; the audit trail with each case's timeline; reports; and signature verification.",
+  },
+};
+
+/** A section's menu line and purpose under this feature set. */
+const navText = (section: WorkspaceSection, mvp: boolean) => (mvp && MVP_NAV[section]) || NAV[section];
+
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
 export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   home: ["Dashboard"],
@@ -444,7 +461,8 @@ export function UserWorkspace({
           <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
             <p className="ac-nav-label">Workspace</p>
             {visibleSections.map((name) => {
-              const { icon: Icon, description } = NAV[name];
+              const { icon: Icon } = NAV[name];
+              const { description } = navText(name, featureSet === "mvp");
               return (
                 <button
                   type="button"
@@ -473,7 +491,7 @@ export function UserWorkspace({
                 <h1 ref={heading} tabIndex={-1}>
                   {section}
                 </h1>
-                <p>{NAV[section].guide}</p>
+                <p>{navText(section, featureSet === "mvp").guide}</p>
               </div>
             </div>
             {NAV[section].context && <ContextBar />}
