@@ -65,7 +65,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "2 minutes",
     why: "Quality work is a team sport: a complaint handler and a regulatory colleague see the value from their own side.",
     actions: [
-      "In Getting started, scroll to Your team.",
+      "In Getting started, open the Team tab below the story.",
       "Enter your colleague's name and work email, then choose Invite colleague.",
       "Repeat for the second colleague. The trial has three seats: you and two others.",
       "If an invitation is not found, choose Resend invitation beside the colleague's name.",
@@ -80,7 +80,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "45 to 60 minutes",
     why: "The sample is a fictional manufacturer built from the pain points inspectors keep finding, so every screen has something to show from the first minute.",
     actions: [
-      "Read About the sample data in Getting started: seven points, each with what is in the sample, why it matters and a button to the screen that shows it.",
+      "In Getting started, open About the sample data: seven points, each with what is in the sample, why it matters and a button to the screen that shows it.",
       "Follow Your story, chapter by chapter. The quality loop at the top always names the next chapter; its button opens the right screen.",
       "A chapter counts as tried when you act in it: confirm or dismiss a record in the second look, record a reporting decision, open a case from a signal, ask MDARIX a question about the case, sign a decision, plan an effectiveness check, complete a risk review.",
       "Finish in Readiness: choose Download PDF for the readiness summary, or Inspection pack (ZIP) for the summary with every record behind each check, the files you would hand an inspector.",
@@ -95,7 +95,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "30 minutes",
     why: "The same checks then run on your records, and that is where MDARIX shows what it would find in your own quality system.",
     actions: [
-      "Open Import data (or the upload panel in Getting started): it opens on Complaints.",
+      "Open Import data (or the Your data tab in Getting started): it opens on Complaints.",
       "Choose your complaints export as it comes from your quality system, an Excel workbook or a CSV file. MDARIX reads its column names (Complaint Number, Product Code, Lot # and the like) and leaves out the columns it does not need, without storing them.",
       "Pick the date format of a CSV file (Excel dates are read as they are), then choose Check file: you see how each column was read, and the products and lots the file adds, before anything is saved.",
       "Then add your lots with their quantities, so trends are counted per unit in the field, and your investigations, CAPAs and risks, so every inspection check reads your own records. Download gives a template for any of them.",
@@ -123,7 +123,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "2 minutes",
     why: "In a one-to-one session the MDARIX team walks through what your trial found and how a pilot on your live data would run.",
     actions: [
-      "In Getting started, choose Book a one-to-one demo (in the quality loop at the top, or under the chapters).",
+      "In Getting started, choose Book a one-to-one demo, under the story's chapters.",
       "Give the times that suit you and, if you like, a phone number.",
       "Tick the chapters you want to focus on and add a note, for example an audit that is coming up.",
       "Choose Request the demo.",

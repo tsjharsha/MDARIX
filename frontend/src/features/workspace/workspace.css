@@ -2772,3 +2772,66 @@ div.uw-task-count:hover {
 .uw-import-read code {
   font-size: 12px;
 }
+
+/* Getting started, simplified: chapter details on request, the quick rating, the tabs below the story, and the
+   "chapter done" banner (sections/GettingStarted.tsx, sections/ChapterDone.tsx). */
+.uw-story-more {
+  margin-top: 4px;
+}
+.uw-story-more summary {
+  width: fit-content;
+  color: var(--ac-teal);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-story-more[open] summary {
+  margin-bottom: 4px;
+}
+.uw-quick-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-quick-rating.is-sent {
+  font-weight: 500;
+}
+.uw-quick-stars {
+  display: inline-flex;
+  gap: 2px;
+}
+.uw-quick-stars button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #d97706;
+  cursor: pointer;
+}
+.uw-quick-stars button:hover,
+.uw-quick-stars button:focus-visible {
+  background: #fff7ed;
+}
+.uw-trial-tabs {
+  margin-top: 4px;
+}
+.uw-chapter-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.uw-chapter-done > span {
+  flex: 1 1 260px;
+}

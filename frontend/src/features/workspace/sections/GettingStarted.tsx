@@ -1,18 +1,9 @@
 import { useState } from "react";
-import {
-  Bot,
-  CheckCircle2,
-  ChevronRight,
-  Circle,
-  FlaskConical,
-  MessageSquare,
-  ShieldCheck,
-  Upload,
-} from "lucide-react";
+import { Bot, CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
-import { BarList, Empty, Panel, RingMeter, StatTile, ToneBadge, type PanelSource } from "../../admin/console/charts";
+import { BarList, Empty, Panel, StatTile, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import type { Slice } from "../../admin/console/dashboardModel";
-import { useResource } from "../../customer-admin/shared";
+import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
@@ -22,7 +13,7 @@ import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
-import { SampleDataPanel, scrollToSampleData } from "./SampleData";
+import { SampleDataPanel } from "./SampleData";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
 import {
@@ -63,7 +54,10 @@ const slices = (items: { label: string; count: number }[]): Slice[] =>
   items.map((item) => ({ key: item.label, label: item.label, count: item.count, tone: "neutral" }));
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-const scrollToImport = () => scrollTo("trial-import");
+
+/** The tabs below the story: everything that is not the story itself, one click away. */
+export const TRIAL_TABS = ["Your data", "Team", "About the sample data", "Your trial"] as const;
+export type TrialTab = (typeof TRIAL_TABS)[number];
 
 /**
  * Getting started: the free trial as a story. The quality loop MDARIX closes, chapter by chapter, each with what the
@@ -80,8 +74,14 @@ export function GettingStartedSection() {
   const allowed = (section: string) =>
     section === "Getting started" ||
     sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
+  const [tab, setTab] = useState<TrialTab>("Your data");
+  // A tab below the story, opened and brought into view.
+  const showTab = (name: TrialTab) => {
+    setTab(name);
+    window.setTimeout(() => scrollTo("trial-tabs"), 0);
+  };
   const go = (chapter: Pick<StoryChapter, "code" | "opens"> & Partial<Pick<StoryChapter, "case">>) => {
-    if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return scrollToImport();
+    if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return showTab("Your data");
     if (!allowed(chapter.opens.section)) return;
     // A chapter about the guided investigation opens that case, whatever the context bar holds.
     const known = chapter.case ?? chapters.find((item) => item.code === chapter.code)?.case;
@@ -109,12 +109,14 @@ export function GettingStartedSection() {
     demoRequested: !!demo.data?.request,
   });
   const goJourney = (key: JourneyKey) => {
-    if (key === "team") return scrollTo("trial-team");
+    if (key === "team") return showTab("Team");
     if (key === "sample") return scrollTo("trial-story");
-    if (key === "own-data") return scrollToImport();
+    if (key === "own-data") return showTab("Your data");
     if (key === "feedback") return open("Share feedback");
     if (key === "demo") return scrollTo("trial-demo");
   };
+  const feedbackSent = (feedback.data?.submissions?.length ?? 0) > 0;
+  const tabs = TRIAL_TABS.filter((item) => item !== "About the sample data" || hasSample);
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
@@ -139,65 +141,19 @@ export function GettingStartedSection() {
             {CHAPTER_ACTION[next.code] ?? "Open"} <ChevronRight size={15} aria-hidden="true" />
           </button>
         )}
-        <BookDemo chapters={chapters} onBooked={demo.reload} />
-        {hasSample && (
-          <button type="button" className="ac-secondary" onClick={scrollToSampleData}>
-            <FlaskConical size={15} aria-hidden="true" /> About the sample data
-          </button>
-        )}
       </QualityLoop>
 
       <TrialJourney steps={journey} source={story} onGo={goJourney} />
-
-      <Panel
-        title={
-          trial?.days_left !== undefined
-            ? `${countOf(trial.days_left, "day")} left in your free trial`
-            : "Your free trial"
-        }
-        eyebrow="Getting started"
-        source={status}
-      >
-        <div className="uw-trial-head">
-          <RingMeter value={acted} total={total} label="chapters tried" />
-          <div className="uw-trial-stats">
-            <StatTile
-              label="Trial ends"
-              value={trial?.expires_at ? formatDay(trial.expires_at) : null}
-              detail={
-                trial?.data_deleted_at
-                  ? `Data is deleted on ${formatDay(trial.data_deleted_at)} unless you continue`
-                  : "Your data stays if you continue"
-              }
-              icon={<ShieldCheck size={18} />}
-            />
-            <StatTile
-              label="Users"
-              value={trial?.usage ? `${trial.usage.users} of ${trial.limits?.users}` : null}
-              detail={trial?.is_owner ? "Invite colleagues below" : "Your trial team"}
-              icon={<CheckCircle2 size={18} />}
-            />
-            <StatTile
-              label="Uploaded rows"
-              value={
-                trial?.usage ? `${trial.usage.rows.toLocaleString()} of ${trial.limits?.rows.toLocaleString()}` : null
-              }
-              detail="Sample data does not count"
-              icon={<Upload size={18} />}
-            />
-          </div>
-        </div>
-      </Panel>
 
       <div id="trial-story" className="uw-anchor" />
       <Panel title="Your story, chapter by chapter" eyebrow={`${acted} of ${total} tried`} source={story}>
         <p className="uw-trial-lede">
           Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records first and on your
-          own export once you upload it. A chapter counts as tried when you act in it: decide, record, run or sign.
+          own export once you upload it. It counts as tried when you act in it: decide, record, run or sign.
           {hasSample && (
             <>
               {" "}
-              <button type="button" className="ac-link" onClick={scrollToSampleData}>
+              <button type="button" className="ac-link" onClick={() => showTab("About the sample data")}>
                 What is the sample data?
               </button>
             </>
@@ -219,6 +175,9 @@ export function GettingStartedSection() {
             />
           ))}
         </ol>
+        {acted >= 3 && feedback.state === "ready" && !feedbackSent && (
+          <QuickRating onSent={feedback.reload} onMore={() => open("Share feedback")} />
+        )}
         <div id="trial-demo" className="uw-story-partner uw-anchor">
           <div>
             <strong>See it on your own records, one to one</strong>
@@ -236,37 +195,127 @@ export function GettingStartedSection() {
         </div>
       </Panel>
 
-      {hasSample && (
-        <SampleDataPanel
-          counts={trial?.sample}
-          allowed={allowed}
-          onOpen={(opens) => {
-            if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
-          }}
-        />
-      )}
-
-      <ImportPanel
-        id="trial-import"
-        complaintsAlone
-        templates={trial?.templates ?? []}
-        basePath="/api/v1/trial/imports"
-        fileLimitBytes={trial?.limits?.file_bytes}
-        onImported={() => {
-          status.reload();
-          insights.reload();
-          story.reload();
-          work.refreshProducts();
-        }}
-      />
-
-      <InsightsPanel insights={insights.data} source={insights} />
-
-      <div id="trial-team" className="uw-anchor">
-        <TeamPanel onChanged={status.reload} />
+      <div id="trial-tabs" className="uw-anchor uw-trial-tabs">
+        <Tabs tabs={tabs} active={tabs.includes(tab) ? tab : tabs[0]} onChange={setTab} label="Your trial">
+          {tab === "Your data" && (
+            <>
+              <ImportPanel
+                id="trial-import"
+                complaintsAlone
+                templates={trial?.templates ?? []}
+                basePath="/api/v1/trial/imports"
+                fileLimitBytes={trial?.limits?.file_bytes}
+                onImported={() => {
+                  status.reload();
+                  insights.reload();
+                  story.reload();
+                  work.refreshProducts();
+                }}
+              />
+              <InsightsPanel insights={insights.data} source={insights} />
+            </>
+          )}
+          {tab === "Team" && <TeamPanel onChanged={status.reload} />}
+          {tab === "About the sample data" && hasSample && (
+            <SampleDataPanel
+              counts={trial?.sample}
+              allowed={allowed}
+              onOpen={(opens) => {
+                if (allowed(opens.section)) open(opens.section as WorkspaceSection, opens.tab);
+              }}
+            />
+          )}
+          {tab === "Your trial" && (
+            <>
+              <Panel title="Your free trial" eyebrow="Dates and limits" source={status}>
+                <div className="uw-trial-stats">
+                  <StatTile
+                    label="Trial ends"
+                    value={trial?.expires_at ? formatDay(trial.expires_at) : null}
+                    detail={
+                      trial?.data_deleted_at
+                        ? `Data is deleted on ${formatDay(trial.data_deleted_at)} unless you continue`
+                        : "Your data stays if you continue"
+                    }
+                    icon={<ShieldCheck size={18} />}
+                  />
+                  <StatTile
+                    label="Users"
+                    value={trial?.usage ? `${trial.usage.users} of ${trial.limits?.users}` : null}
+                    detail={trial?.is_owner ? "Invite colleagues under Team" : "Your trial team"}
+                    icon={<Users size={18} />}
+                  />
+                  <StatTile
+                    label="Uploaded rows"
+                    value={
+                      trial?.usage
+                        ? `${trial.usage.rows.toLocaleString()} of ${trial.limits?.rows.toLocaleString()}`
+                        : null
+                    }
+                    detail="Sample data does not count"
+                    icon={<Upload size={18} />}
+                  />
+                </div>
+              </Panel>
+              <EndTrialPanel />
+            </>
+          )}
+        </Tabs>
       </div>
+    </div>
+  );
+}
 
-      <EndTrialPanel />
+/** One click on how useful MDARIX is so far, sent privately; the full feedback stays one more click away. */
+export function QuickRating({ onSent, onMore }: { onSent: () => void; onMore: () => void }) {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const rate = async (score: number) => {
+    setBusy(true);
+    setError("");
+    try {
+      await send("/api/v1/trial/feedback", "POST", { rating_overall: score, publish_consent: "PRIVATE" });
+      setSent(true);
+      onSent();
+    } catch (failure) {
+      setError(errorText(failure, "Your rating was not sent. Please try again."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (sent)
+    return (
+      <p className="uw-quick-rating is-sent" role="status">
+        <CheckCircle2 size={16} aria-hidden="true" /> Thank you.{" "}
+        <button type="button" className="ac-link" onClick={onMore}>
+          Tell us more in two minutes
+        </button>
+      </p>
+    );
+  return (
+    <div className="uw-quick-rating" role="group" aria-label="How useful is MDARIX so far?">
+      <span>How useful is MDARIX so far?</span>
+      <span className="uw-quick-stars">
+        {[1, 2, 3, 4, 5].map((score) => (
+          <button
+            key={score}
+            type="button"
+            disabled={busy}
+            onClick={() => void rate(score)}
+            aria-label={`${score} of 5`}
+            title={`${score} of 5`}
+          >
+            <Star size={18} aria-hidden="true" />
+          </button>
+        ))}
+      </span>
+      <small className="ac-muted">Private to the MDARIX team.</small>
+      {error && (
+        <p className="uw-flag-critical" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -296,20 +345,21 @@ export function ChapterRow({
         <strong>
           {chapter.number}. {chapter.title}
         </strong>
-        <p>{chapter.promise}</p>
         {finding && (
           <p className="uw-story-finding">
             <ToneBadge tone={chapterTone(chapter)} label={chapterStatus(chapter)} /> {finding}
           </p>
         )}
-        {templates?.length ? (
-          <p className="uw-story-templates">
-            Templates: {templateSummary(templates)}; download them in the import panel below.
+        <details className="uw-story-more">
+          <summary>What MDARIX does here, and why it matters</summary>
+          <p>{chapter.promise}</p>
+          {templates?.length ? (
+            <p className="uw-story-templates">Data: {templateSummary(templates)}, under Your data below.</p>
+          ) : null}
+          <p className="uw-story-pain">
+            <b>Why it matters:</b> {chapter.pain}
           </p>
-        ) : null}
-        <p className="uw-story-pain">
-          <b>Why it matters:</b> {chapter.pain}
-        </p>
+        </details>
       </div>
       <button
         type="button"

@@ -53,6 +53,8 @@ import { InvestigationsSection } from "./sections/Investigations";
 import { EvidenceSection } from "./sections/Evidence";
 import { DecisionsSection } from "./sections/Decisions";
 import { RecordsSection } from "./sections/Records";
+import { ChapterDone } from "./sections/ChapterDone";
+import type { StoryChapter } from "./trialStory";
 import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
@@ -303,6 +305,18 @@ export function UserWorkspace({
     [setLocation, featureSet],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+  // A trial's next chapter, opened from the "chapter done" banner: its screen (and its case), else Getting started.
+  const openChapter = (chapter: StoryChapter) => {
+    const section = chapter.opens.section as WorkspaceSection;
+    if (
+      chapter.code === "YOUR_DATA" ||
+      section === "Getting started" ||
+      !sectionAllowed(section, session?.allowed_menu, session?.business_permissions)
+    )
+      return open("Getting started");
+    if (chapter.case) work.setInvestigationId(chapter.case.id, chapter.case.product_id);
+    open(section, chapter.opens.tab ?? undefined);
+  };
   const reportStep = useCallback((tab: string) => setStep(tab), []);
 
   // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
@@ -498,6 +512,7 @@ export function UserWorkspace({
             {trial?.is_trial && section !== "Share feedback" && (
               <FeedbackPrompt onOpen={() => open("Share feedback")} />
             )}
+            {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
             {message && (
               <div className={`ac-message tone-${message.tone}`} role="status">
                 {message.text}
