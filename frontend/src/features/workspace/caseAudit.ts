@@ -143,9 +143,14 @@ export function parseTrustTab(value: string | null | undefined): {
 }
 
 /** The tab Trust & Audit opens on: the one asked for, else the case timeline when a case is chosen. */
-export function initialTrustTab(requested: TrustTab | null | undefined, hasCase: boolean): TrustTab {
+export function initialTrustTab(
+  requested: TrustTab | null | undefined,
+  hasCase: boolean,
+  // Without a case: AI assurance, or Audit trail where AI assurance is parked (the MVP feature set).
+  withoutCase: TrustTab = "AI assurance",
+): TrustTab {
   if (requested) return requested;
-  return hasCase ? "Case timeline" : "AI assurance";
+  return hasCase ? "Case timeline" : withoutCase;
 }
 
 // ---------------------------------------------------------------------------------------------------------------

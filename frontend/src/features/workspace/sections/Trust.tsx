@@ -4,7 +4,8 @@ import { Empty, Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Table, Tabs, listOf, useResource } from "../../customer-admin/shared";
 import { displayId } from "../../../app/displayId";
-import { useWorkspace } from "../workspaceContext";
+import { useFeatureSet, useWorkspace } from "../workspaceContext";
+import { tabsFor } from "../../../app/featureSet";
 import { CASE_TRUST_TABS, TRUST_TABS, initialTrustTab, parseTrustTab, type TrustTab } from "../caseAudit";
 import { NeedsProduct, ProvenanceTable } from "./common";
 import { Limitations } from "./Products";
@@ -33,14 +34,19 @@ export function TrustSection({ tab }: { tab?: string }) {
   const selected = work.investigations.find((item) => String(item.id) === caseId);
   const caseLabel =
     (selected ? displayId(selected, "investigation_identifier", "") : "") || opened?.label || "Selected investigation";
-  // Without a tab asked for, a chosen case opens on its timeline; otherwise AI assurance as before.
+  // Under the MVP feature set AI assurance is parked (featureSet.ts); a link to it opens the default tab instead.
+  const tabs = tabsFor("Trust & Audit", TRUST_TABS, useFeatureSet());
+  const requestedTab = requested.tab && tabs.includes(requested.tab) ? requested.tab : null;
+  // Without a tab asked for, a chosen case opens on its timeline; otherwise AI assurance as before (Audit trail
+  // where AI assurance is parked).
   const [chosen, setChosen] = useState<Tab | null>(null);
-  const active = chosen ?? initialTrustTab(requested.tab, !!caseId);
+  const active =
+    chosen ?? initialTrustTab(requestedTab, !!caseId, tabs.includes("AI assurance") ? "AI assurance" : "Audit trail");
   const [recordId, setRecordId] = useState<string | null>(null);
   const caseTab = CASE_TRUST_TABS.includes(active);
   return (
     <>
-      <Tabs tabs={TRUST_TABS} active={active} onChange={setChosen} label="Trust and audit sections">
+      <Tabs tabs={tabs} active={active} onChange={setChosen} label="Trust and audit sections">
         {caseTab && opened && opened.id !== work.investigationId && (
           <p className="ac-note" role="status">
             Opened from a decision. The context bar above still shows another case.

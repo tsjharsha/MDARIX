@@ -88,6 +88,7 @@ from backend.app import cell_link
 from backend.app.cell_link_api import admin_router as cell_admin_router, router as cell_link_router
 from backend.app.support_access_api import router as support_access_router
 from backend.app.deployment_role import is_cell, serves_path
+from backend.app import feature_set
 from backend.app.db.tenant_scope import bind_tenant, scoped_bind
 
 configure_logging()
@@ -270,6 +271,23 @@ async def deployment_role_gate(request: Request, call_next):
                 "detail": {
                     "code": "NOT_SERVED_BY_THIS_DEPLOYMENT",
                     "message": "This deployment does not serve that part of MDARIX",
+                }
+            },
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def feature_set_gate(request: Request, call_next):
+    """Under MDARIX_FEATURE_SET=mvp the routes of the parked areas answer 404 here, before any handler runs
+    (backend/app/feature_set.py); under ``full`` (the default) every route is served."""
+    if not feature_set.serves_path(request.url.path):
+        return JSONResponse(
+            status_code=404,
+            content={
+                "detail": {
+                    "code": "NOT_IN_THIS_FEATURE_SET",
+                    "message": "This part of MDARIX is not offered in this deployment",
                 }
             },
         )

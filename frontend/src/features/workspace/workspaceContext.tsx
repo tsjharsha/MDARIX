@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
+import { featureSetOf, type FeatureSet } from "../../app/featureSet";
 
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
@@ -63,6 +64,8 @@ export type SessionContext = {
   current_tenant?: { tenant_id?: string; tenant_name?: string; tenant_key?: string };
   plan?: { code?: string; name?: string; version?: string } | null;
   license?: { state?: string; effective?: boolean };
+  /** full or mvp (backend/app/feature_set.py): under mvp the parked tabs and screens are hidden (featureSet.ts). */
+  feature_set?: string;
 };
 
 export type WorkContext = {
@@ -122,6 +125,12 @@ export function useWorkspace(): WorkspaceApi {
   const value = useContext(WorkspaceContext);
   if (!value) throw new Error("useWorkspace must be used inside the user workspace");
   return value;
+}
+
+/** The server's feature set (session context `feature_set`); `full` outside the workspace or from older servers. */
+export function useFeatureSet(): FeatureSet {
+  const value = useContext(WorkspaceContext);
+  return featureSetOf(value?.session?.feature_set);
 }
 
 export type BusinessPermission =

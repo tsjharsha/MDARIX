@@ -150,6 +150,8 @@ type SecurityContext = {
   allowed_menu?: string[];
   environment?: string;
   deployment_role?: string;
+  /** full or mvp (backend/app/feature_set.py); under mvp the parked screens are not offered (featureSet.ts). */
+  feature_set?: string;
   memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
   current_tenant?: { tenant_id: string; tenant_name?: string };
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
@@ -176,7 +178,7 @@ export function PrivateApplication() {
           .trim()
           .toUpperCase();
         const current = viewFromPath(window.location.pathname);
-        const allowed = allowedViewsForRole(role, value.deployment_role);
+        const allowed = allowedViewsForRole(role, value.deployment_role, value.feature_set);
         let target: AppView = current;
         if (isPlatformAdminRole(role) && !allowed?.includes(current)) target = "admin";
         else if (isCustomerAdminRole(role)) {
@@ -226,7 +228,7 @@ export function PrivateApplication() {
   const activeRole = securityContext?.active_role?.trim().toUpperCase();
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
-  const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role);
+  const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role, securityContext?.feature_set);
 
   useEffect(() => {
     if (isPlatformAdmin && !allowedViews?.includes(activeView)) changeView("admin");

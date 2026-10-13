@@ -19,7 +19,8 @@ import {
 import { displayId, referenceId } from "../../../app/displayId";
 import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWorkspacePanel";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { useCan, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
+import { useCan, useFeatureSet, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
+import { tabsFor } from "../../../app/featureSet";
 import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
@@ -60,6 +61,10 @@ type Tab = (typeof TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const { work, open } = useWorkspace();
+  // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
+  // (featureSet.ts).
+  const featureSet = useFeatureSet();
+  const tabs = tabsFor("Investigations", TABS, featureSet);
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
@@ -76,7 +81,7 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const [active, setActive] = useState<Tab>(() =>
     prefill
       ? "All investigations"
-      : (TABS as readonly string[]).includes(tab ?? "")
+      : (tabs as readonly string[]).includes(tab ?? "")
         ? (tab as Tab)
         : "All investigations",
   );
@@ -123,7 +128,7 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   };
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Investigation sections">
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Investigation sections">
         {active === "All investigations" && canOpen && (
           <div className="ca-action-row">
             <button
@@ -246,7 +251,7 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                   investigationId={work.investigationId}
                   temporalMode={work.mode}
                   asOf={work.asOf}
-                  onOpenDecision={() => open("Decisions")}
+                  onOpenDecision={() => (featureSet === "mvp" ? setActive("Decision") : open("Decisions"))}
                   onOpenIntelligence={(view) => {
                     setIntelView(view);
                     setActive("Intelligence");
