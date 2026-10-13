@@ -65,6 +65,7 @@ from backend.app.complaints_router import router as complaints_router
 from backend.app.complaint_review.router import router as complaint_review_router
 from backend.app.reportability.router import router as reportability_router
 from backend.app.capa_effectiveness.router import router as capa_effectiveness_router
+from backend.app.case_ai.router import router as case_ai_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
 from backend.app.risk_router import router as risk_router
@@ -425,6 +426,7 @@ app.include_router(complaints_router)
 app.include_router(complaint_review_router)  # Second look and backlog board (md40)
 app.include_router(reportability_router)  # Reportability watch and reporting windows (md41)
 app.include_router(capa_effectiveness_router)  # CAPA effectiveness checks (md41)
+app.include_router(case_ai_router)  # The case AI run in one pass (md42)
 app.include_router(client_errors_router)
 app.include_router(support_router)
 app.include_router(risk_router)  # Risk & Traceability

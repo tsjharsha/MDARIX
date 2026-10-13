@@ -35,3 +35,4 @@ from backend.app.db.models.decision_outcomes import *
 from backend.app.db.models.complaint_review import *
 from backend.app.db.models.reportability import *
 from backend.app.db.models.capa_effectiveness import *
+from backend.app.db.models.case_ai import *

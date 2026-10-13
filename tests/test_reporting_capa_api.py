@@ -580,3 +580,28 @@ def test_a_capa_without_a_product_cannot_be_measured_and_a_cancelled_one_cannot_
     )
     assert late.status_code == 422 and late.json()["detail"]["code"] == "PLAN_INVALID"
     assert date.fromisoformat(plan["planned_on"]) > TODAY
+
+
+def test_a_case_regulatory_review_shows_each_complaint_s_reporting_clock(org, windows):
+    from backend.app.case_reviews.service import regulatory_context
+    from backend.app.db.models.foundation import Investigation
+
+    tenant, product = org["tenant_id"], _product(org["tenant_id"])
+    death = _complaint(tenant, product, aware_days_ago=5, country="US", death=True)
+    quiet = _complaint(tenant, product, aware_days_ago=5, country="US")
+    case = org["investigator"].post(
+        "/api/v1/investigations",
+        json={
+            "product_id": product,
+            "investigation_question": "Is this death reportable to the FDA?",
+            "complaint_ids": [death, quiet],
+        },
+    )
+    assert case.status_code in (200, 201), case.text
+    with SessionLocal() as db:
+        bind_tenant(db, tenant)
+        row = db.query(Investigation).filter(Investigation.id == uuid.UUID(case.json()["id"])).one()
+        clocks = regulatory_context(db, row)["reporting_clocks"]
+    assert [item["complaint"]["id"] for item in clocks] == [death]  # the quiet complaint starts no clock
+    assert clocks[0]["state"] == "RUNNING" and clocks[0]["binding"]["days_left"] == 25
+    assert clocks[0]["binding"]["window"] == watch_rules.TEMPLATES[0]["name"] and clocks[0]["decision"] is None

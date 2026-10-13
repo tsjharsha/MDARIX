@@ -359,3 +359,43 @@ def one(db: Session, tenant_id: uuid.UUID, complaint_id: uuid.UUID, today: date 
     windows = settings_of(db, tenant_id)["windows"]
     seen = assess(complaint, record, windows, _case_reviews(db, tenant_id, [complaint.id]).get(complaint.id), today)
     return complaint, record, seen, second_look
+
+
+def clocks_for(db: Session, tenant_id: uuid.UUID, complaints: list[Complaint], today: date | None = None) -> list[dict]:
+    """The reporting clock of each complaint (for a case's regulatory review): its binding window and due date, its
+    state, and the person's decision if any. Only complaints the watch follows are listed."""
+    today = today or today_utc()
+    windows = settings_of(db, tenant_id)["windows"]
+    ids = [row.id for row in complaints]
+    decisions = {
+        row.complaint_id: row
+        for row in (
+            db.query(ComplaintReportability)
+            .filter(ComplaintReportability.tenant_id == tenant_id, ComplaintReportability.complaint_id.in_(ids))
+            .all()
+            if ids
+            else []
+        )
+    }
+    found = []
+    for complaint in complaints:
+        record = _record(complaint, None, None)
+        if not rules.watched(record):
+            continue
+        seen = assess(complaint, record, windows, None, today)
+        decided = decisions.get(complaint.id)
+        binding = seen["binding"]
+        found.append(
+            {
+                "complaint": {"id": str(complaint.id), "business_id": complaint.business_id},
+                "state": rules.watch_state(
+                    binding["state"] if binding else None, decided is not None, False, bool(seen["triggers"])
+                ),
+                "binding": binding,
+                "aware_date": seen["aware_date"],
+                "follow_ups": seen["follow_ups"],
+                "decision": decided.decision if decided is not None else None,
+            }
+        )
+    order = {state: index for state, index in rules.STATE_ORDER.items()}
+    return sorted(found, key=lambda item: (order.get(item["state"], 9), (item["binding"] or {}).get("due_date") or ""))

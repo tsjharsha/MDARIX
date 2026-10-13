@@ -33,6 +33,7 @@ import { CaseIntelligencePanel } from "./CaseIntelligence";
 import { CaseReviewsPanel, ReviewDrawer } from "./CaseReviews";
 import { CaseDecisionBriefPanel } from "./CaseDecisionBrief";
 import { CaseDecisionPanel } from "./CaseDecision";
+import { CaseAiRunCard } from "./CaseAiRun";
 import { ClosureCriteria } from "./AfterDecision";
 import { parseReviewsTab } from "../reviews";
 import { parseDecisionTab } from "../decisionTabs";
@@ -90,6 +91,8 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
+  // Bumped when the case's AI run ends, so the results below are read again.
+  const [aiRound, setAiRound] = useState(0);
   // "Reviews?review=<id>" opens the Reviews tab on that review (a review task, the dashboard).
   const [requestedReview] = useState(() => parseReviewsTab(requested));
   // "Decision?follow_up=<id>" or "Decision?assessment=<id>" opens the Decision tab on that follow-up or assessment.
@@ -277,8 +280,14 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                   work.refreshInvestigations();
                 }}
               />
+              <CaseAiRunCard
+                key={`ai:${work.investigationId}`}
+                caseId={work.investigationId}
+                onFinished={() => setAiRound((value) => value + 1)}
+              />
               <Embedded>
                 <InvestigationWorkspacePanel
+                  key={`${work.investigationId}:${aiRound}`}
                   investigationId={work.investigationId}
                   temporalMode={work.mode}
                   asOf={work.asOf}

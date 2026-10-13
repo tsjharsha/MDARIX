@@ -303,19 +303,50 @@ def write_version(
     return row
 
 
+def lots_of_complaints(db: Session, tenant_id, complaint_ids) -> list[str]:
+    """The distinct lots the complaints name."""
+    from backend.app.db.models.foundation import Complaint
+
+    ids = wanted_ids(complaint_ids)
+    if not ids:
+        return []
+    rows = (
+        db.query(Complaint.lot_batch_id)
+        .filter(
+            Complaint.tenant_id == as_uuid(tenant_id),
+            Complaint.id.in_(list(ids)),
+            Complaint.lot_batch_id.isnot(None),
+        )
+        .distinct()
+        .all()
+    )
+    return sorted(id_list(row[0] for row in rows))
+
+
 def first_version(
-    db: Session, case, *, complaint_ids, actor_ref: str, actor_role: str | None, now: datetime
+    db: Session,
+    case,
+    *,
+    complaint_ids,
+    actor_ref: str,
+    actor_role: str | None,
+    now: datetime,
+    with_lots: bool = False,
 ) -> InvestigationScopeVersion:
-    """Version 1 of a newly opened case: its question, the complaints it was opened with and their versions."""
+    """Version 1 of a newly opened case: its question, the complaints it was opened with and their versions, and with
+    ``with_lots`` the lots those complaints name (a case opened from a signal in one step)."""
     included = id_list(complaint_ids)
+    data = {
+        "question": case.investigation_question,
+        "included_complaint_ids": included,
+        "product_version_ids": versions_of_complaints(db, case.tenant_id, included),
+    }
+    if with_lots:
+        data["lot_ids"] = lots_of_complaints(db, case.tenant_id, included)
     return write_version(
         db,
         case,
-        {
-            "question": case.investigation_question,
-            "included_complaint_ids": included,
-            "product_version_ids": versions_of_complaints(db, case.tenant_id, included),
-        },
+        data,
         actor_ref=actor_ref,
         actor_role=actor_role,
         now=now,

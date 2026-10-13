@@ -2098,3 +2098,85 @@ div.uw-task-count:hover {
   gap: 3px;
   color: var(--ac-ink-2);
 }
+
+/* Signals and AI: the signal summary with its cited complaints (sections/SignalInsight.tsx), the trend check
+   (TrendCheck.tsx) and the case's AI run (CaseAiRun.tsx). Every AI text carries its label; status colours come with
+   a label. */
+.uw-ai-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #efeafd;
+  color: #4b2fa8;
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-sum-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-sum-list li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ac-series);
+  border-radius: 4px;
+  background: var(--ac-page);
+}
+.uw-sum-cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.uw-sum-cites code {
+  padding: 1px 6px;
+  border: 1px solid var(--ac-line);
+  border-radius: 4px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font-size: 11px;
+}
+.uw-trend-line p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.uw-ai-run {
+  margin-bottom: 12px;
+}
+.uw-ai-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ai-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.uw-ai-step.is-pending {
+  color: var(--ac-muted);
+}
+.uw-spin {
+  animation: uw-spin 1.2s linear infinite;
+}
+@keyframes uw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-spin {
+    animation: none;
+  }
+}

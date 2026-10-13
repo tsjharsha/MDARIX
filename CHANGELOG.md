@@ -44,6 +44,32 @@ operator knows a release migrates the database.
   from the first minute (after `scripts/demo_tenant.py reset`).
 - Migration `md41` adds `reportability_settings`, `complaint_reportability` and `capa_effectiveness_checks` (dedicated
   legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Signals › one click to a case: "Open case" on a signal records the triage decision "investigation required" (when
+  still due, marked as a one-step decision with its reason) and opens the case with every complaint, their versions
+  and lots, for the person clicking, in one transaction (`POST /api/v1/triage/signals/{id}/open-case`,
+  investigation.create, so an investigator no longer waits for a triage lead); the case page opens straight away.
+- Signals › Trend check: every product version (or version and problem code, or complaint type) compared with its
+  own history: the last 30 days against up to 180 days before them (never before the release), with the exact
+  Poisson probability; significant below 1%, higher than usual below 5%, not assessed under 3 complaints or 60 days
+  of history. Every complaint counts whatever its status (records dismissed on the second look are left out). A
+  check beside the count rule: it raises no signal by itself; a triage lead raises one from a notable group.
+- Signals › what the complaints have in common: a summary from the records (period, harm, lots, markets, recurring
+  words, No Fault Found codes), every sentence citing its complaints, with the signal's own trend check; and an AI
+  summary on request (ai.run), kept sentence by sentence only when every cited complaint is the signal's and no
+  causal wording is used, recorded as an AI run. With AI off the records summary stands, with the reason.
+- The case's one AI run: the analysis, competing explanations, challenges, unknowns, failure chains and the
+  investigation brief in a single background pass for one point in time, each step reusing the one before, started by
+  itself the first time the case page opens (never repeated), followed step by step on the case page and run again
+  on demand (`/api/v1/investigations/{id}/ai-run`). Each step records whether AI or the rules wrote it.
+- The Decision Brief writes itself first: starting from the AI draft fills the problem statement from the case's
+  question and the recommended actions from the AI's next steps (only where empty; the conclusion stays the
+  author's), and flags a draft older than the case's latest evidence or scope. The decision form ticks the follow-ups
+  the recommended actions name (CAPA, risk file, regulatory action, field action, product change) for the decision
+  maker to confirm.
+- A case's regulatory review shows each complaint's reporting clock against the organization's windows (and any
+  decision recorded), with a link to the reportability watch.
+- Migration `md42` adds `case_ai_runs` (dedicated legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py
+--apply`).
 
 ## [0.9.0] - 2026-10-12
 

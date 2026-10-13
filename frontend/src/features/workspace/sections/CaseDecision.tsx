@@ -27,6 +27,7 @@ import {
   decisionFormProblems,
   decisionHistory,
   emptyDecisionForm,
+  followUpsFromActions,
   emptyFollowUp,
   followUpOptions,
   hashState,
@@ -542,7 +543,10 @@ function DecisionFormPanel({
   onRefused: (text: string) => void;
 }) {
   const { session, notify } = useWorkspace();
-  const [form, setForm] = useState<DecisionForm>(emptyDecisionForm);
+  // The brief writes the follow-ups first: those its recommended actions name are ticked, for the decision maker to
+  // confirm or untick, so nothing is typed twice.
+  const [prefilled] = useState(() => followUpsFromActions(recommendedActions(brief)));
+  const [form, setForm] = useState<DecisionForm>(() => ({ ...emptyDecisionForm(), followUps: prefilled }));
   const [touched, setTouched] = useState(false);
   const [signing, setSigning] = useState(false);
   const outcomes = outcomeOptions(context.outcomes);
@@ -637,6 +641,12 @@ function DecisionFormPanel({
         {rules.followUps && (
           <fieldset className="ca-fieldset uw-pick-fieldset">
             <legend>Follow-up actions required (optional)</legend>
+            {Object.keys(prefilled).length > 0 && (
+              <p className="uw-hint">
+                Ticked from the brief&apos;s recommended actions. Untick what does not apply; you confirm each one by
+                signing.
+              </p>
+            )}
             <ul className="uw-pick-list uw-decision-options">
               {followUps.map((option) => {
                 const choice = form.followUps[option.code] ?? emptyFollowUp();

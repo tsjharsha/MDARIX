@@ -499,7 +499,10 @@ def test_starting_from_the_ai_draft(org):
         content={
             "ai_brief": {
                 "headline": "Alarms rose after release B.",
-                "sections": {"what_we_know": [{"statement": "One complaint since May", "evidence": []}]},
+                "sections": {
+                    "what_we_know": [{"statement": "One complaint since May", "evidence": []}],
+                    "next_steps": [{"statement": "Review the release B change record", "evidence": []}],
+                },
             }
         },
         provenance={},
@@ -513,8 +516,12 @@ def test_starting_from_the_ai_draft(org):
     assert narrative["ai_draft_used"] is True and narrative["ai_draft_label"] == rules.AI_DRAFT_LABEL
     assert narrative["ai_draft_text"].startswith("Alarms rose after release B.")
     assert narrative["ai_draft_source"]["brief_version"] == 1
-    # The AI text is never put in the author's own fields.
-    assert narrative["problem_statement"] == "" and narrative["proposed_conclusion"] == ""
+    # The brief writes itself first: the problem statement is the case's question, the recommended actions are the
+    # AI's possible next steps; the proposed conclusion is never written for the author.
+    assert narrative["problem_statement"] == " ".join(QUESTION.split())
+    assert narrative["recommended_actions"] == ["Review the release B change record"]
+    assert narrative["proposed_conclusion"] == ""
+    assert narrative["ai_draft_source"]["out_of_date"] in (True, False)
     assert made.json()["source_ai_brief_id"] == str(brief_id)
     ai = made.json()["content"]["ai_assistance"]
     assert ai["ai_draft_used"] is True and "the author started the narrative from an AI draft" in ai["statement"]

@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import case, false, func, or_, select
 from sqlalchemy.orm import Session
 
-from backend.app.access.permissions import INVESTIGATION_CREATE, SIGNAL_TRIAGE, require_permission
+from backend.app.access.permissions import AI_RUN, INVESTIGATION_CREATE, SIGNAL_TRIAGE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import Product, ProductVersion
 from backend.app.db.models.signals import (
@@ -92,6 +92,10 @@ def _actions(actor, signal: Signal) -> dict:
         "can_add_complaints": triage and is_open,
         "can_create_investigation": actor.holds(INVESTIGATION_CREATE)
         and status in CASE_FROM
+        and signal.product_id is not None,
+        # One click from the signal to its case (POST .../open-case): before or after triage.
+        "can_open_case": actor.holds(INVESTIGATION_CREATE)
+        and (status in DISPOSITION_FROM or status in CASE_FROM)
         and signal.product_id is not None,
     }
 
@@ -813,15 +817,127 @@ def create_investigation(
     second case), with the signal's complaints unless others are named, for a colleague or the investigators' queue.
     Other open signals of the same product (``also_signal_ids``) are linked to the case too. The case is opened exactly
     as ``POST /api/v1/investigations`` opens one (backend/app/investigation_open_router.open_case)."""
+    return _open_case_from_signal(signal_id, payload, db, control_db, ctx)
+
+
+ONE_CLICK_REASON = "Investigation required: a case was opened from this signal in one step"
+
+
+class OpenCaseRequest(BaseModel):
+    investigation_question: str = Field(min_length=10, max_length=2000)
+    # The person opening the case takes it (when their role may work on cases); otherwise it waits in the queue.
+    assign_to_me: bool = True
+    # The triage decision's reason when the signal still awaits triage (a default reason is recorded otherwise).
+    reason: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("investigation_question")
+    @classmethod
+    def _question(cls, value: str) -> str:
+        text = " ".join(str(value or "").split())
+        if len(text) < 10:
+            raise ValueError("Ask the investigation question in at least 10 characters")
+        return text
+
+    @field_validator("reason")
+    @classmethod
+    def _reason(cls, value: str | None) -> str | None:
+        text = " ".join(str(value or "").split())
+        if text and len(text) < 10:
+            raise ValueError("Give the reason in at least 10 characters")
+        return text or None
+
+
+@router.post(
+    "/signals/{signal_id}/open-case",
+    status_code=201,
+    dependencies=[Depends(require_permission(INVESTIGATION_CREATE))],
+)
+def open_case_in_one_step(
+    signal_id: uuid.UUID,
+    payload: OpenCaseRequest,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """One click from a signal to its case: for a signal still awaiting triage (NEW, TRIAGE or MONITOR) the triage
+    decision "investigation required" is recorded first, with its reason and marked as a one-step decision; then the
+    case is opened with all the signal's complaints, their product versions and lots, for the person opening it (or
+    the investigators' queue when their role may not work on cases). One transaction: both are saved or neither."""
+    from backend.app.investigation_open_router import _can_work_cases
+    from backend.app.workflow.people import find_user
+
+    assignee = None
+    if payload.assign_to_me:
+        me = find_user(control_db, uuid.UUID(str(ctx.tenant_id)), ctx.user_id)
+        if me is not None and _can_work_cases(control_db, me):
+            assignee = me.id
+    request = CreateInvestigationRequest(
+        investigation_question=payload.investigation_question, complaint_ids=None, assignee_user_id=assignee
+    )
+    return _open_case_from_signal(
+        signal_id, request, db, control_db, ctx, one_click_reason=payload.reason or ONE_CLICK_REASON, with_lots=True
+    )
+
+
+def _open_case_from_signal(
+    signal_id: uuid.UUID,
+    payload: CreateInvestigationRequest,
+    db: Session,
+    control_db: Session,
+    ctx: AuthenticatedRequestContext,
+    *,
+    one_click_reason: str | None = None,
+    with_lots: bool = False,
+):
+    """Open a case from a signal (see create_investigation). With ``one_click_reason`` a signal still awaiting triage
+    is first triaged as INVESTIGATION_REQUIRED in the same transaction; with ``with_lots`` the case's first scope names
+    the lots of its complaints."""
     from backend.app.investigation_open_router import open_case
 
     actor = _actor(control_db, ctx)
     also = [item for item in dict.fromkeys(payload.also_signal_ids)]
+    triaged = False
     with _refusals():
         if signal_id in also:
             raise logic.SignalRuleError(422, "SIGNAL_LISTED_TWICE", "List other signals only in also_signal_ids")
         rows = {row.id: row for row in service.load_many(db, actor.tenant_id, [signal_id, *also], lock=True)}
         signal = rows[signal_id]
+        if one_click_reason and signal.status in DISPOSITION_FROM:
+            if signal.product_id is None:
+                raise logic.SignalRuleError(422, "SIGNAL_HAS_NO_PRODUCT", "The signal names no product to investigate")
+            now = service.now_utc()
+            logic.check_disposition(
+                "INVESTIGATION_REQUIRED",
+                signal.status,
+                signal_id=signal.id,
+                canonical=None,
+                canonical_signal_id=None,
+                monitor_review_date=None,
+                monitor_trigger=None,
+                today=now.date(),
+            )
+            triage_role = actor.role_for(INVESTIGATION_CREATE)
+            signal.disposition_reason = one_click_reason
+            signal.dispositioned_by = actor.user_id
+            signal.dispositioned_at = now
+            if signal.owner_user_id is None and actor.user_uuid is not None:
+                signal.owner_user_id = actor.user_uuid
+            service.set_status(
+                db,
+                signal,
+                "INVESTIGATION_REQUIRED",
+                "DISPOSITIONED",
+                actor_ref=actor.user_id,
+                actor_role=triage_role,
+                reason=one_click_reason,
+                details={"disposition": "INVESTIGATION_REQUIRED", "one_click": True},
+                correlation_id=ctx.correlation_id,
+                now=now,
+            )
+            service.finish_triage_tasks(
+                db, signal, outcome="INVESTIGATION_REQUIRED", actor_ref=actor.user_id, actor_role=triage_role
+            )
+            triaged = True
         if not logic.can_open_case(signal.status):
             raise logic.SignalRuleError(
                 409, "SIGNAL_STATE_CONFLICT", "Triage the signal as needing an investigation before opening one"
@@ -851,6 +967,7 @@ def create_investigation(
         priority=logic.effective_priority(signal.confirmed_priority, signal.suggested_priority),
         assigned_to_opener=person is not None and str(person.id) == str(ctx.user_id),
         actor_role=actor.role_for(INVESTIGATION_CREATE),
+        with_lots=with_lots,
     )
     role = actor.role_for(INVESTIGATION_CREATE)
     now = service.now_utc()
@@ -923,7 +1040,10 @@ def create_investigation(
             investigation_business_id=case_result["business_id"],
         ):
             control_db.commit()
-    return {"investigation": case_result, "signal": service.summaries(db, control_db, actor.tenant_id, [signal])[0]}
+    result = {"investigation": case_result, "signal": service.summaries(db, control_db, actor.tenant_id, [signal])[0]}
+    if one_click_reason:
+        result["triaged"] = triaged
+    return result
 
 
 # ---------------------------------------------------------------------------------------------------------- rules
@@ -1042,3 +1162,57 @@ def update_rule(
     )
     db.commit()
     return _rule_item(db, control_db, actor.tenant_id)
+
+
+# ------------------------------------------------------------------------------------------- trend check and summary
+
+
+@router.get("/trends")
+def trend_check(
+    group: str = Query("version", pattern="^(version|problem|type)$"),
+    product_id: uuid.UUID | None = None,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The statistical trend check of every product version (``group=version``), version and problem
+    (``problem``) or version and complaint type (``type``): the last 30 days against the version's own history. A
+    check beside the count rule; it never raises a signal (backend/app/signals/trend_rules.py)."""
+    from backend.app.signals import insight
+
+    return insight.trend_board(db, uuid.UUID(str(ctx.tenant_id)), grouping=group, product_id=product_id)
+
+
+@router.get("/signals/{signal_id}/insight")
+def signal_insight(
+    signal_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """What the signal's complaints have in common (from their records; every sentence cites its complaints) and the
+    trend check of its product version and problem."""
+    from backend.app.signals import insight
+
+    actor = _actor(control_db, ctx)
+    with _refusals():
+        signal = service.load(db, actor.tenant_id, signal_id)
+    return {"summary": insight.records_summary(db, signal), "trend": insight.trend_for_signal(db, signal)}
+
+
+@router.post("/signals/{signal_id}/summary", dependencies=[Depends(require_permission(AI_RUN))])
+def signal_ai_summary(
+    signal_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The AI summary of the signal's complaints, checked sentence by sentence against them; the records summary and
+    the reason when AI is off, unavailable or over budget. Recorded as an AI run."""
+    from backend.app.signals import insight
+
+    actor = _actor(control_db, ctx)
+    with _refusals():
+        signal = service.load(db, actor.tenant_id, signal_id)
+    result = insight.ai_summary(db, signal, actor_ref=actor.user_id)
+    db.commit()
+    return result
