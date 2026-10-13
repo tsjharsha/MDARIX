@@ -66,6 +66,7 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "investigations",
   "evidence",
   "decision",
+  "records",
   "assurance",
   "audit",
   "regulatory-copilot",

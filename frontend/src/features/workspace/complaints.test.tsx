@@ -54,9 +54,15 @@ const item = (overrides: Partial<SecondLookItem> = {}): SecondLookItem => ({
 });
 
 describe("the Complaints section", () => {
-  it("offers the second look, the backlog and the settings, opening the tab a link names", () => {
+  it("offers the second look, the backlog, the reportability watch and the settings, opening the tab a link names", () => {
     const tabs = (markup: string) => [...markup.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((match) => match[1]);
-    expect(tabs(render(<ComplaintsSection />))).toEqual(["Second look", "Backlog", "Review settings"]);
+    expect(tabs(render(<ComplaintsSection />))).toEqual([
+      "Second look",
+      "Backlog",
+      "Reportability",
+      "Review settings",
+      "Reporting windows",
+    ]);
     expect(render(<ComplaintsSection />)).toContain("Checking your records");
     expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Reading your open complaints");
     expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Checking your records");

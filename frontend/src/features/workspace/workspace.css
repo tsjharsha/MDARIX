@@ -1917,3 +1917,184 @@ div.uw-task-count:hover {
     padding: 0 14px 14px 0;
   }
 }
+
+/* Reporting and CAPA: the reportability watch and reporting windows (sections/ReportabilityWatch.tsx,
+   ReportingWindows.tsx) and CAPA effectiveness checks (sections/Records.tsx). Status colours always come with a label. */
+.uw-rw-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.uw-rw-callout > span {
+  flex: 1 1 260px;
+}
+.uw-rw-clock {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--ac-neutral);
+  border-radius: 6px;
+  background: var(--ac-page);
+}
+.uw-rw-clock strong {
+  font-size: 18px;
+  color: var(--ac-navy);
+}
+.uw-rw-clock span {
+  color: var(--ac-ink-2);
+  font-size: 12px;
+}
+.uw-rw-clock.tone-critical {
+  border-left-color: var(--ac-critical);
+  background: #fbeeee;
+}
+.uw-rw-clock.tone-warning {
+  border-left-color: var(--ac-warning);
+  background: #fef7e6;
+}
+.uw-rw-clock.tone-serious {
+  border-left-color: var(--ac-serious);
+}
+.uw-rw-clock.tone-good {
+  border-left-color: var(--ac-good);
+}
+.uw-rw-followups {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rw-followups li,
+.uw-rw-flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-cr-clip-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.uw-rw-choice {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-rw-choice legend,
+.uw-rw-triggers legend,
+.uw-rw-window > legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.uw-rw-choice .ca-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.uw-rw-window {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-rw-triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-rw-templates {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.uw-rw-windows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rw-windows li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-rw-windows span,
+.uw-rw-windows small {
+  color: var(--ac-ink-2);
+}
+.uw-ef-recurrence {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.uw-ef-bars {
+  display: grid;
+  gap: 8px;
+}
+.uw-ef-bar {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 2px 10px;
+}
+.uw-ef-bar small {
+  grid-column: 2 / -1;
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-ef-bar-label {
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
+.uw-ef-bar-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ac-track);
+}
+.uw-ef-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ac-neutral);
+}
+.uw-ef-bar-fill.tone-good {
+  background: var(--ac-good);
+}
+.uw-ef-bar-fill.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-ef-bar-fill.tone-critical {
+  background: var(--ac-critical);
+}
+.uw-ef-recurrence figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.uw-ef-rounds {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+.uw-ef-rounds li {
+  display: grid;
+  gap: 3px;
+  color: var(--ac-ink-2);
+}

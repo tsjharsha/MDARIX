@@ -42,6 +42,10 @@ TASK_TYPES: dict[str, TaskType] = {
     "FOLLOW_UP": TaskType("Follow-up", INVESTIGATION_WORK_PERMISSION, "INVESTIGATOR"),
     # A colleague (or anyone holding the role) asked for evidence on a case (Phase 3); finished by answering.
     "EVIDENCE_RESPONSE": TaskType("Provide evidence", EVIDENCE_REQUEST_PERMISSION, "INVESTIGATOR"),
+    # A complaint's reporting clock is due soon or overdue without a decision (md41); finished by the decision.
+    "REPORTABILITY_DECISION": TaskType("Reportability decision", REGULATORY_REVIEW_PERMISSION, "REGULATORY_REVIEWER"),
+    # A CAPA's effectiveness check is near or past its day (md41); finished by the signed result.
+    "EFFECTIVENESS_CHECK": TaskType("Effectiveness check", QUALITY_REVIEW_PERMISSION, "REVIEWER"),
 }
 
 # Task types a person finishes by hand (POST /api/v1/tasks/{id}/complete); every other type is finished by the
@@ -64,6 +68,10 @@ SOURCE_LABELS: dict[str, str] = {
     "ImpactAssessment": "Impact assessment",
     # A follow-up action chosen while signing a decision (Phase 6): its owner's FOLLOW_UP task.
     "DecisionFollowUp": "Decision follow-up",
+    # A complaint whose reportability needs a decision (md41): the regulatory reviewers' reminder.
+    "Complaint": "Complaint",
+    # A CAPA whose effectiveness check is due (md41): the quality reviewers' reminder.
+    "Capa": "CAPA",
 }
 
 # Used only when backend/app/role_codes.py does not carry ROLE_LABELS (an older build).

@@ -23,6 +23,27 @@ operator knows a release migrates the database.
 - Complaints › Review settings: the backlog target and the second look's words, changed by a triage lead with a reason,
   versioned and audited. Migration `md40` adds the `complaint_settings` and `complaint_second_looks` tables (dedicated
   legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Complaints › Reportability: every complaint that reports a death, a serious injury or a malfunction, or a patient
+  whose outcome is unknown, with its reporting clocks against the windows the organization entered from its own
+  procedure (per market, calendar or work days), most urgent first; missing answers flagged (patient outcome, country,
+  awareness date); records cancelled or logged as inquiries with harm counted and sent to the second look. A person
+  records the decision (reported, with the report's reference and filing day, or not reportable) with a rationale; its
+  timeliness against the binding window is kept and audited. A case's completed regulatory review with no reportability
+  concern settles its complaints. MDARIX never decides reportability and never submits a report.
+- Complaints › Reporting windows: the organization's windows, started from FDA and EU templates to check against the
+  procedure, changed with regulatory approval and a reason, versioned and audited. Nothing is set by default.
+- Records › Effectiveness checks: every CAPA's effectiveness check, including CAPAs closed without one and check days
+  imported from the quality system; a plan (criteria, check day, measurement start), re-planned with a reason; the
+  complaint recurrence before and since on the CAPA's product and problem codes (observed counts, not a statistical
+  test); and a signed result (effective or not effective) with password and authenticator code, recorded as a signed
+  approval record with the fingerprint of what was signed. After a failed check the next round is planned.
+- Reminders: the scheduler job `reporting_reminders` (every 6 hours) puts reporting clocks due soon or overdue in the
+  regulatory reviewers' queue (task REPORTABILITY_DECISION, at most 50 new a run) and checks due within 14 days in the
+  quality reviewers' queue (task EFFECTIVENESS_CHECK); each is completed by the decision or the signature.
+- The demo workspace shows hidden complaints, a recurring No Fault Found, reporting clocks and CAPAs without a check
+  from the first minute (after `scripts/demo_tenant.py reset`).
+- Migration `md41` adds `reportability_settings`, `complaint_reportability` and `capa_effectiveness_checks` (dedicated
+  legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
 
 ## [0.9.0] - 2026-10-12
 

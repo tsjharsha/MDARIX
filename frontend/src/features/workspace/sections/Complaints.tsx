@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -12,12 +12,14 @@ import {
   XCircle,
 } from "lucide-react";
 import { BarList, Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
-import type { Tone } from "../../admin/console/dashboardModel";
 import { Drawer, Table, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { offeredTab } from "../../../app/featureSet";
 import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { StatusBadge, countOf } from "./common";
+import { Hero, Pager, ProductFilter } from "./boardParts";
+import { ReportabilityWatch } from "./ReportabilityWatch";
+import { ReportingWindows } from "./ReportingWindows";
 import {
   BACKLOG_SHOWS,
   COMPLAINTS_TABS,
@@ -55,9 +57,10 @@ import {
 } from "../complaintReview";
 
 /**
- * Complaints: the second look (records cancelled, logged as inquiries or closed as a recurring No Fault Found that
- * carry signs of a complaint, for a person to decide on) and the backlog board (open complaints in no signal and no
- * case, against the organization's target). MDARIX never changes a record in the customer's system.
+ * Complaints: the second look (records cancelled or logged as inquiries that carry signs of a complaint, and recurring
+ * No Fault Found codes, for a person to decide on), the backlog board (open complaints in no signal and no case,
+ * against the organization's target) and the reportability watch (reporting clocks against the organization's own
+ * windows). MDARIX never changes a record in the customer's system and never submits a report.
  */
 export function ComplaintsSection({ tab }: { tab?: string }) {
   const [active, setActive] = useState<ComplaintsTab>(() => offeredTab(tab, COMPLAINTS_TABS, "Second look"));
@@ -65,7 +68,9 @@ export function ComplaintsSection({ tab }: { tab?: string }) {
     <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={setActive} label="Complaint sections">
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}
+      {active === "Reportability" && <ReportabilityWatch onOpenTab={setActive} />}
       {active === "Review settings" && <ReviewSettingsPanel />}
+      {active === "Reporting windows" && <ReportingWindows />}
     </Tabs>
   );
 }
@@ -76,69 +81,6 @@ function useCanDecide() {
   const create = useCan("investigation.create");
   const quality = useCan("quality.review");
   return triage || create || quality;
-}
-
-function ProductFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const { work } = useWorkspace();
-  return (
-    <select aria-label="Product" value={value} onChange={(event) => onChange(event.target.value)}>
-      <option value="">All products</option>
-      {work.products.map((item) => (
-        <option key={item.id} value={item.id}>
-          {item.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function Pager({ page, pages, onPage }: { page: number; pages: number; onPage: (page: number) => void }) {
-  if (pages <= 1) return null;
-  return (
-    <div className="ca-action-row">
-      <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-        Previous
-      </button>
-      <span className="ac-muted">
-        Page {page} of {pages}
-      </span>
-      <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-        Next
-      </button>
-    </div>
-  );
-}
-
-function Hero({
-  tone,
-  icon,
-  eyebrow,
-  title,
-  detail,
-  children,
-}: {
-  tone: Tone;
-  icon: ReactNode;
-  eyebrow: string;
-  title: string;
-  detail: string;
-  children?: ReactNode;
-}) {
-  return (
-    <section className={`ac-hero uw-cr-hero tone-${tone}`} aria-live="polite">
-      <div className="ac-hero-status">
-        <span className="ac-hero-icon" aria-hidden="true">
-          {icon}
-        </span>
-        <div>
-          <p className="ac-eyebrow">{eyebrow}</p>
-          <h2>{title}</h2>
-          <p>{detail}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
 }
 
 // The second look ----------------------------------------------------------------------------------------------------

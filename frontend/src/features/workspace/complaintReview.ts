@@ -4,7 +4,13 @@
 // records and decides every action; these only shape what the person sees and what is sent.
 import type { Slice, Tone } from "../admin/console/dashboardModel";
 
-export const COMPLAINTS_TABS = ["Second look", "Backlog", "Review settings"] as const;
+export const COMPLAINTS_TABS = [
+  "Second look",
+  "Backlog",
+  "Reportability",
+  "Review settings",
+  "Reporting windows",
+] as const;
 export type ComplaintsTab = (typeof COMPLAINTS_TABS)[number];
 
 /** The server's limits (backend/app/complaint_review/rules.py). */

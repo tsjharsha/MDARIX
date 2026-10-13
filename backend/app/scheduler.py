@@ -232,6 +232,15 @@ def late_evidence_sweep(db: Session, _state: dict) -> dict:
     return run_for_all_tenants(db)
 
 
+def reporting_reminders(db: Session, _state: dict) -> dict:
+    """Reminder tasks for reporting clocks due soon or overdue and for CAPA effectiveness checks near their day, for
+    every active organization (backend/app/reportability/reminders.py). Idempotent; each organization is committed on
+    its own."""
+    from backend.app.reportability.reminders import run_for_all_tenants
+
+    return run_for_all_tenants(db)
+
+
 def platform_sync(db: Session, _state: dict) -> dict:
     """A cell reports to the platform and fetches its licence and packages (backend/app/cell_link.py)."""
     from backend.app import cell_link
@@ -309,6 +318,13 @@ JOBS: tuple[Job, ...] = (
         timedelta(minutes=60),
         late_evidence_sweep,
         "Ask for an impact assessment of evidence that reached a decided case",
+        CELL_JOBS,
+    ),
+    Job(
+        "reporting_reminders",
+        timedelta(hours=6),
+        reporting_reminders,
+        "Remind reviewers of reporting clocks and CAPA effectiveness checks that are due",
         CELL_JOBS,
     ),
     Job(

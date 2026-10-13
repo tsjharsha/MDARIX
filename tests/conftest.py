@@ -145,6 +145,8 @@ DB_MODULES = {
     "test_signals_triage",
     # Lightweight MVP phase 2: the complaint second look and the backlog board (md40).
     "test_complaint_review_api",
+    # Lightweight MVP phase 3: the reportability watch and CAPA effectiveness checks (md41).
+    "test_reporting_capa_api",
     # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
     "test_case_workflow",
     # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.

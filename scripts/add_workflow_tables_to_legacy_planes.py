@@ -1,5 +1,5 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision) and md40 (complaint review).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review) and md41 (reporting and CAPA).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -116,6 +116,13 @@ STEPS = (
         "create_complaint_review_tables",
         ("complaint_settings", "complaint_second_looks"),
         ("tenants", "complaints"),
+    ),
+    Step(
+        "md41",
+        "md41_reporting_and_capa.py",
+        "create_reporting_and_capa_tables",
+        ("reportability_settings", "complaint_reportability", "capa_effectiveness_checks"),
+        ("tenants", "complaints", "capas"),
     ),
 )
 

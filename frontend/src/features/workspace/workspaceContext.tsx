@@ -14,6 +14,8 @@ export const WORKSPACE_SECTIONS = [
   "Investigations",
   "Evidence",
   "Decisions",
+  // What goes to an inspector or a management review: CAPA effectiveness checks.
+  "Records",
   "Intelligence",
   "Trust & Audit",
   // Shown to roles that may change records (see SECTION_PERMISSIONS).
@@ -38,6 +40,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Investigations: ["investigations"],
   Evidence: ["evidence"],
   Decisions: ["decision-center"],
+  Records: ["home"],
   Intelligence: ["home"],
   "Trust & Audit": ["assurance", "audit"],
   "Import data": ["products"],

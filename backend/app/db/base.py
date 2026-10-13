@@ -33,3 +33,5 @@ from backend.app.db.models.intelligence import *
 from backend.app.db.models.reviews import *
 from backend.app.db.models.decision_outcomes import *
 from backend.app.db.models.complaint_review import *
+from backend.app.db.models.reportability import *
+from backend.app.db.models.capa_effectiveness import *

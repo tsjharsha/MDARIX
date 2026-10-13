@@ -522,3 +522,154 @@ EVIDENCE = {
 # Evidence of the golden case that reaches it later in the story (backend/app/demo_golden_path/ attaches it to
 # the case at its moment): the answer to an evidence request, and evidence received after the decision was signed.
 GOLDEN_DEFERRED_EVIDENCE = frozenset({"ACD-EV-4016", "ACD-EV-4017"})
+
+
+# Complaints review and reporting (Complaints › Second look, Backlog and Reportability): records the quality system
+# cancelled or logged as inquiries although they carry signs of a complaint, a No Fault Found code that recurs, and
+# open complaints whose reporting clocks run against the demo organization's windows. Each has a problem code of its
+# own (and the No Fault Found records are months apart), so none raises a signal. None is linked to a case.
+# Fields: id suffix, product, version, lot, days since awareness, description, and the complaint's fields.
+REVIEW_EXAMPLES: list[tuple] = [
+    (
+        "R01",
+        _BZ,
+        "Rev 4",
+        "ACD-BZ-L2401",
+        9,
+        "Caregiver reports the ventilator stopped during the night; the patient was short of breath and taken to "
+        "hospital. Record cancelled as a suspected duplicate.",
+        {
+            "status": "Cancelled",
+            "problem_code": "VENT_STOP_NIGHT",
+            "country": "US",
+            "patient_involved": True,
+            "serious_injury": True,
+            "malfunction": True,
+        },
+    ),
+    (
+        "R02",
+        _PV,
+        "Rev D",
+        "ACD-PV-L2210",
+        6,
+        "Clinic asked how to clear error code E-41; the SpO2 reading had dropped while the patient was choking.",
+        {"complaint_type": "Inquiry", "country": "Germany", "patient_involved": True},
+    ),
+    (
+        "R03",
+        _FS,
+        "Rev B",
+        "ACD-FS-L2404",
+        20,
+        "Returned pump tested: no fault found. Customer reported intermittent alarms during infusion.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "R04",
+        _FS,
+        "Rev B",
+        "ACD-FS-L2404",
+        75,
+        "Returned pump tested: no fault found. Ward reported the pump stopped once.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "R05",
+        _FS,
+        "Rev B",
+        "ACD-FS-L2403",
+        110,
+        "Returned pump tested: no fault found. Alarm history showed one unexplained restart.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "R06",
+        _FS,
+        "Rev B",
+        "ACD-FS-L2405",
+        27,
+        "Heparin under-infused with no pump alarm; the patient was transferred to intensive care.",
+        {
+            "problem_code": "UNDER_INFUSION_NO_ALARM",
+            "country": "US",
+            "patient_involved": True,
+            "serious_injury": True,
+            "death": False,
+            "malfunction": True,
+            "severity": "Critical",
+        },
+    ),
+    (
+        "R07",
+        _BZ,
+        "Rev 4",
+        "ACD-BZ-L2401",
+        12,
+        "Battery depleted well before the displayed estimate; the patient desaturated and needed emergency care.",
+        {
+            "problem_code": "BATTERY_EARLY_DEPLETION",
+            "country": "France",
+            "patient_involved": True,
+            "serious_injury": True,
+            "death": False,
+            "malfunction": True,
+        },
+    ),
+    (
+        "R08",
+        _PV,
+        "Rev D",
+        "ACD-PV-L2210",
+        36,
+        "Monitor showed a frozen SpO2 value for several minutes; staff noticed and replaced the sensor. No harm.",
+        {
+            "problem_code": "SPO2_VALUE_FROZEN",
+            "country": "USA",
+            "patient_involved": True,
+            "serious_injury": False,
+            "death": False,
+            "malfunction": True,
+        },
+    ),
+    (
+        "R09",
+        _FS,
+        "Rev B",
+        "ACD-FS-L2405",
+        4,
+        "Nurse reports the pump free-flowed briefly after a door was opened; a patient was connected, outcome not "
+        "yet known.",
+        {"problem_code": "FREE_FLOW_DOOR", "country": "US", "patient_involved": True, "malfunction": True},
+    ),
+]
+
+# CAPAs from the quality system before MDARIX (Records › Effectiveness checks): one closed without an effectiveness
+# check, one whose check day came from the quality system. Fields: identifier, product, case or None, title, status,
+# opened days ago, due days ago, effectiveness check in days (None: none).
+EARLIER_CAPAS: list[tuple] = [
+    (
+        "ACD-CAPA-021",
+        _PV,
+        None,
+        "Tighten incoming inspection of SpO2 cable crimps",
+        "Closed",
+        200,
+        140,
+        None,
+    ),
+    (
+        "ACD-CAPA-022",
+        _BZ,
+        "ACD-INV-302",
+        "Replace the SP-1 alarm speaker with SP-2 and re-verify alarm loudness",
+        "Effectiveness check",
+        90,
+        30,
+        10,
+    ),
+]
+
+# The demo organization's reporting windows (Complaints › Reporting windows): the FDA and EU templates, as the
+# organization's procedure would state them.
+REPORTING_WINDOW_TEMPLATES = (0, 1, 2)

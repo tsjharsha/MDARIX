@@ -16,6 +16,7 @@ const SECTION_VIEW: Readonly<Record<string, AppView>> = {
   Investigations: "investigations",
   Evidence: "evidence",
   Decisions: "decision",
+  Records: "records",
   Intelligence: "ask",
   "Trust & Audit": "audit",
 };

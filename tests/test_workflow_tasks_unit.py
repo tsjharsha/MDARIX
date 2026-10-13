@@ -37,6 +37,9 @@ CONTRACT = {
     "FOLLOW_UP": ("investigation.work", "INVESTIGATOR"),
     # Phase 3: a colleague or a role asked for evidence answers it.
     "EVIDENCE_RESPONSE": ("evidence.request", "INVESTIGATOR"),
+    # Reporting and CAPA (md41): a reporting clock due without a decision; a CAPA's effectiveness check due.
+    "REPORTABILITY_DECISION": ("regulatory.review", "REGULATORY_REVIEWER"),
+    "EFFECTIVENESS_CHECK": ("quality.review", "REVIEWER"),
 }
 
 

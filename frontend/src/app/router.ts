@@ -10,6 +10,7 @@ export type AppView =
   | "investigations"
   | "evidence"
   | "decision"
+  | "records"
   | "assurance"
   | "audit"
   | "regulatory-copilot"
@@ -69,6 +70,7 @@ export const APP_ROUTES: Record<AppView, string> = {
   investigations: "/app/investigations",
   evidence: "/app/evidence",
   decision: "/app/decision",
+  records: "/app/records",
   assurance: "/app/assurance",
   audit: "/app/audit",
   "regulatory-copilot": "/app/regulatory-copilot",

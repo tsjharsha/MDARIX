@@ -43,6 +43,9 @@ EXEMPT = {
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
     ("GET", "/api/v1/stage3/compliance-report"): "administrators only, checked in the route",
     ("GET", "/api/v1/reports/catalog"): "read-only list of report types",
+    # "report" in "reportability": reads open to every member, like the complaint list; no export, no file.
+    ("GET", "/api/v1/complaints/reportability"): "read-only reportability watch of the organization's complaints",
+    ("GET", "/api/v1/complaints/reportability-settings"): "read-only reporting windows of the organization",
     ("POST", "/api/v1/ask/"): "AI permission checked in the route (Ask resolves its own session)",
     ("GET", "/api/v1/stage3/reports/jobs/{job_id}"): "read-only job status; the download is guarded",
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",

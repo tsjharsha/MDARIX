@@ -4,6 +4,7 @@ import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bot,
   Briefcase,
+  BadgeCheck,
   Building2,
   ClipboardList,
   FileSearch,
@@ -49,6 +50,7 @@ import { SignalsSection } from "./sections/Signals";
 import { InvestigationsSection } from "./sections/Investigations";
 import { EvidenceSection } from "./sections/Evidence";
 import { DecisionsSection } from "./sections/Decisions";
+import { RecordsSection } from "./sections/Records";
 import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
@@ -131,6 +133,13 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
       "Review decision briefs, record and sign decisions, and verify signatures. Only people with approval authority can sign, and each signature is recorded with the exact content approved.",
     context: true,
   },
+  Records: {
+    icon: BadgeCheck,
+    description: "CAPA effectiveness checks",
+    guide:
+      "What you hand an inspector or a management review: every CAPA's effectiveness check, planned with criteria and a date, reminded before the day, and signed with its result and the evidence seen.",
+    context: false,
+  },
   Intelligence: {
     icon: Bot,
     description: "Ask questions, regulatory, risk",
@@ -178,6 +187,7 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   investigations: ["Investigations"],
   evidence: ["Evidence"],
   decision: ["Decisions"],
+  records: ["Records"],
   assurance: ["Trust & Audit", "AI assurance"],
   audit: ["Trust & Audit", "Audit trail"],
   "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
@@ -479,6 +489,7 @@ export function UserWorkspace({
                   {section === "Investigations" && <InvestigationsSection tab={tab} />}
                   {section === "Evidence" && <EvidenceSection tab={tab} />}
                   {section === "Decisions" && <DecisionsSection tab={tab} />}
+                  {section === "Records" && <RecordsSection tab={tab} />}
                   {section === "Intelligence" && <IntelligenceSection tab={tab} />}
                   {section === "Trust & Audit" && <TrustSection tab={tab} />}
                   {section === "My Account" && <AccountSection tab={tab} />}

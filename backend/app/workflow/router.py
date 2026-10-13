@@ -244,7 +244,7 @@ def _column_sorts(query, control_db: Session, tenant_id) -> dict:
 
 
 def _source_models() -> dict:
-    from backend.app.db.models.foundation import Decision, Investigation, Risk
+    from backend.app.db.models.foundation import Capa, Complaint, Decision, Investigation, Risk
     from backend.app.db.models.signals import Signal
     from backend.app.db.models.stage3 import SupplierEvidenceRequest
 
@@ -264,6 +264,9 @@ def _source_models() -> dict:
         "ImpactAssessment": _impact_assessment_model(),
         # Follow-up actions chosen while signing a decision (Phase 6).
         "DecisionFollowUp": _decision_follow_up_model(),
+        # Reminders of the reportability watch and of CAPA effectiveness checks (md41).
+        "Complaint": Complaint,
+        "Capa": Capa,
     }
 
 
