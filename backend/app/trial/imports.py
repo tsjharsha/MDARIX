@@ -31,6 +31,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
 from backend.app.trial import business_imports
+from backend.app.trial.columns import examples as column_examples
+from backend.app.trial.columns import match as columns_match
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import TRIAL_FILE_LIMIT_BYTES, TRIAL_ROW_LIMIT
 
@@ -48,6 +50,9 @@ class ImportPolicy:
     file_limit_bytes: int = 10 * 1024 * 1024
     file_too_large: str = "Files can be up to 10 MB"
     limit_label: str = "your workspace"
+    # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
+    # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
+    create_references: bool = False
 
 
 TRIAL_POLICY = ImportPolicy(
@@ -56,9 +61,11 @@ TRIAL_POLICY = ImportPolicy(
     file_limit_bytes=TRIAL_FILE_LIMIT_BYTES,
     file_too_large="Files can be up to 2 MB during the free trial",
     limit_label="your trial",
+    create_references=True,
 )
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
-COMPLAINT_STATUSES = {"open", "closed", "under investigation"}
+# A complaint's status as its quality system names it (complaints.status holds 40 characters).
+COMPLAINT_STATUS_MAX = 40
 
 # What a column is for, in plain words, for the columns whose meaning changes what MDARIX finds (shown beside each
 # template in the import panel; templates_for() keeps only the template's own columns).
@@ -81,7 +88,10 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "death": "Y or N. A death reported starts the reporting clocks.",
         "serious_injury": "Y or N. A serious injury reported starts the reporting clocks.",
         "malfunction": "Y or N. A malfunction starts the reporting clocks of markets that report malfunctions.",
-        "status": "Cancelled records and inquiries stay visible: the second look checks them for complaint signs.",
+        "status": "Your quality system's status as it is (Open, Closed, Cancelled, Void, Inquiry...): cancelled records "
+        "and inquiries stay visible, and the second look checks them for complaint signs.",
+        "product_name": "The product's name. During a free trial a product, version or lot the complaints name but you "
+        "have not loaded is added from this file, under this name.",
         "problem_code": "Your problem code. Signals group by product version and problem code.",
     },
 }
@@ -139,6 +149,7 @@ TEMPLATES: dict[str, dict] = {
             "serious_injury",
             "death",
             "malfunction",
+            "product_name",
         ],
         "example": [
             [
@@ -163,6 +174,7 @@ TEMPLATES: dict[str, dict] = {
                 "N",
                 "N",
                 "Y",
+                "AquaFlow 200 Infusion Pump",
             ]
         ],
     },
@@ -291,21 +303,53 @@ def iso_date(value: str, date_format: str = "ISO") -> str | None:
 
 
 def _decode(raw: bytes, report: "_Report") -> str | None:
-    """The file as text: UTF-8, with or without a byte-order mark. Nothing is ever silently replaced."""
+    """The file as text: UTF-8 (with or without a byte-order mark), UTF-16 with its byte-order mark (Excel's "Unicode
+    text"), or else Windows-1252, the encoding Excel on Windows saves plain "CSV" in, said back to the uploader as a
+    note. Nothing is ever silently replaced: bytes no encoding defines refuse the file."""
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
-        report.add(None, None, "The file is saved as UTF-16 text. Save it as 'CSV UTF-8' and try again.")
-        return None
+        try:
+            return raw.decode("utf-16")
+        except UnicodeDecodeError:
+            report.add(None, None, "The file could not be read as UTF-16 text. Save it as 'CSV UTF-8' and try again.")
+            return None
     try:
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        line = raw[: exc.start].count(b"\n") + 1
-        report.add(
-            line,
-            None,
-            "The file is not UTF-8 text (for example it was saved as plain 'CSV' in Windows-1252). Save it as "
-            "'CSV UTF-8' and try again, so that accented letters and symbols are kept exactly.",
+        try:
+            text = raw.decode("cp1252")
+        except UnicodeDecodeError:
+            line = raw[: exc.start].count(b"\n") + 1
+            report.add(
+                line,
+                None,
+                "The file is not UTF-8 or Windows text. Save it as 'CSV UTF-8' and try again, so that accented letters "
+                "and symbols are kept exactly.",
+            )
+            return None
+        report.notes.append(
+            "Read as Windows text (Excel's plain CSV). Check accented letters in the preview; saving as 'CSV UTF-8' "
+            "avoids any doubt."
         )
+        return text
+
+
+def _table(raw: bytes, report: "_Report") -> list[list[str]] | None:
+    """The upload as rows of cells: an Excel workbook's first sheet (backend/app/trial/xlsx.py), else delimited text
+    (comma, semicolon or tab). None when it cannot be read (the reason is in the report)."""
+    from backend.app.trial import xlsx
+
+    if xlsx.is_xlsx(raw):
+        try:
+            rows = xlsx.read_rows(raw)
+        except xlsx.XlsxError as exc:
+            report.add(None, None, str(exc))
+            return None
+        report.notes.append("Read the first sheet of the Excel workbook.")
+        return rows
+    text = _decode(raw, report)
+    if text is None:
         return None
+    return list(csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text)))
 
 
 def _delimiter(text: str) -> str:
@@ -365,6 +409,12 @@ class _Report:
         # Values whose personal data was masked, and what they were (for the rejects file only; never saved).
         self.masked_values = 0
         self.originals: dict[tuple[int, str], str] = {}
+        # How the file was read, said back to the uploader: notes (an encoding read, a workbook sheet), the headers read
+        # under another name, the columns left out, and the products, versions and lots a complaints file adds.
+        self.notes: list[str] = []
+        self.mapping: list[dict] = []
+        self.ignored: list[str] = []
+        self.creates: dict[str, int] = {}
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -383,37 +433,41 @@ def _parse(
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     if len(raw) > policy.file_limit_bytes:
         raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
-    text = _decode(raw, report)
-    if text is None:
+    table = _table(raw, report)
+    if table is None:
         return []
-    reader = csv.reader(io.StringIO(text, newline=""), delimiter=_delimiter(text))
+    reader = iter(table)
     header = next(reader, None)
-    if not header:
+    if not header or not any(cell.strip() for cell in header):
         report.add(None, None, "The file is empty.")
         return []
     spec = TEMPLATES[entity]
-    columns = [cell.strip().lower() for cell in header]
     allowed = spec["required"] + spec["optional"]
-    for column in columns:
-        if column not in allowed:
-            report.add(
-                1, column, f"Column '{column}' is not in the template. Remove it; only template columns are accepted."
-            )
+    # The export's headers matched to the template (backend/app/trial/columns.py): a header under another name is
+    # read as its column, one the template does not know is left out (never stored) and listed back.
+    matched = columns_match(entity, [cell.strip() for cell in header], allowed)
+    fields = matched["fields"]
+    report.mapping = matched["mapping"]
+    report.ignored = matched["ignored"] + [item["header"] for item in matched["duplicates"]]
     for column in spec["required"]:
-        if column not in columns:
-            report.add(1, column, f"Required column '{column}' is missing.")
-    if len(set(columns)) != len(columns):
-        report.add(1, None, "A column appears more than once.")
+        if column not in fields:
+            names = column_examples(entity, column)
+            hint = f" (for example {' or '.join(repr(name) for name in names)})" if names else ""
+            report.add(1, column, f"Required column '{column}'{hint} is missing.")
     if report.error_count:
         return []
     rows = []
     for line_number, cells in enumerate(reader, 2):
         if not any(cell.strip() for cell in cells):
             continue
-        if len(cells) > len(columns):
+        if any(cell.strip() for cell in cells[len(fields) :]):
             report.add(line_number, None, "This row has more values than the header has columns.")
             continue
-        row = {column: (cells[i].strip() if i < len(cells) else "") for i, column in enumerate(columns)}
+        row = {
+            column: (cells[i].strip() if i < len(cells) else "")
+            for i, column in enumerate(fields)
+            if column is not None
+        }
         for column, value in row.items():
             # Dates in the declared order become YYYY-MM-DD here; a value that is not one is left as typed and
             # reported by _check_values with the expected format.
@@ -481,8 +535,10 @@ def _check_values(
                     report.add(line, column, f"This looks like it contains {found}. {advice}")
                 if _spreadsheet_formula(value):
                     report.add(line, column, "Text cannot start with =, +, @ or a formula; spreadsheets would run it.")
-        if entity == "complaints" and row.get("status") and row["status"].lower() not in COMPLAINT_STATUSES:
-            report.add(line, "status", "Status must be open, closed or under investigation.")
+        # The quality system's own status is kept (Cancelled, Void, Closed - no action, Inquiry...): the second look
+        # reads those words to find complaints that were closed off (backend/app/complaint_review/rules.py).
+        if entity == "complaints" and len(row.get("status") or "") > COMPLAINT_STATUS_MAX:
+            report.add(line, "status", f"Keep the status under {COMPLAINT_STATUS_MAX} characters.")
         if identity_columns:
             identity = tuple(row.get(column) for column in identity_columns)
         else:
@@ -542,10 +598,14 @@ class _Lookup:
         return self.lots[identifier]
 
 
-def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> int:
-    """Validate references and count the rows that would be new records."""
+def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, create: bool = False) -> int:
+    """Validate references and count the rows that would be new records. With ``create`` (a free trial) a complaints
+    file may name products, versions and lots not loaded yet: they are counted as records it adds
+    (``report.creates``) instead of refused."""
     if entity in business_imports.TEMPLATES:
         return business_imports.check(entity, rows, lookup, report)
+    if create and entity == "complaints":
+        return _check_complaints_creating(rows, lookup, report)
     new = 0
     new_products: set[str] = set()
     for line, row in rows:
@@ -593,6 +653,51 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report) -> in
         if exists is None:
             new += 1
     return new
+
+
+def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
+    """A complaints file that also adds the products, versions and lots it names (``_check_references`` with create):
+    each is counted once; a lot the workspace already holds must still belong to the complaint's product."""
+    new = 0
+    products: set[str] = set()
+    versions: set[tuple[str, str]] = set()
+    lots: dict[str, str] = {}
+    for line, row in rows:
+        product_id = row["product_id"]
+        product = lookup.product(product_id)
+        if product is None and product_id not in products:
+            products.add(product_id)
+        version_id = row.get("version")
+        if version_id and (product is None or lookup.version(product, version_id) is None):
+            versions.add((product_id, version_id))
+        lot_id = row.get("lot_id")
+        if lot_id:
+            lot = lookup.lot(lot_id)
+            if lot is None:
+                if lots.setdefault(lot_id, product_id) != product_id:
+                    report.add(line, "lot_id", f"Lot '{lot_id}' is named for two products in this file.")
+            else:
+                # A lot tied to a version belongs to that version's product; a lot without a version belongs to none.
+                lot_version = (
+                    lookup.db.query(ProductVersion).filter(ProductVersion.id == lot.product_version_id).first()
+                    if lot.product_version_id
+                    else None
+                )
+                if lot_version is not None and (product is None or lot_version.product_id != product.id):
+                    report.add(line, "lot_id", f"Lot '{lot_id}' belongs to a different product.")
+        exists = (
+            lookup.db.query(Complaint.id)
+            .filter(Complaint.tenant_id == lookup.tenant_id, Complaint.complaint_identifier == row["complaint_id"])
+            .first()
+        )
+        if exists is None:
+            new += 1
+    report.creates = {
+        key: value
+        for key, value in (("products", len(products)), ("versions", len(versions)), ("lots", len(lots)))
+        if value
+    }
+    return new + len(products) + len(versions) + len(lots)
 
 
 def rows_from_records(entity: str, records: list[dict], report: _Report) -> list[tuple[int, dict]]:
@@ -723,17 +828,22 @@ def _check_rows(
         )
     if rows and not oversized:
         _check_values(entity, rows, report, date_format, mask_personal_data)
+        create = policy.create_references
         if skip_problem_rows:
             if not report.file_problems:
                 kept = [(line, row) for line, row in rows if line not in report.row_problems]
                 if kept:
-                    new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), report)
+                    new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), report, create)
                     if any(line in report.row_problems for line, _ in kept):
                         # A row whose references do not resolve is set aside too; the rest are counted again.
                         kept = [(line, row) for line, row in kept if line not in report.row_problems]
-                        new_rows = _check_references(entity, kept, _Lookup(db, tenant_id), _Report()) if kept else 0
+                        recount = _Report()
+                        new_rows = (
+                            _check_references(entity, kept, _Lookup(db, tenant_id), recount, create) if kept else 0
+                        )
+                        report.creates = recount.creates
         elif not report.error_count:
-            new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report)
+            new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report, create)
     used = uploaded_rows(db, tenant_id, policy.source)
     if policy.row_limit is not None and new_rows and used + new_rows > policy.row_limit:
         report.add(
@@ -751,7 +861,10 @@ def _check_rows(
         "entity": entity,
         "rows": len(rows),
         "new_records": new_rows,
-        "updated_records": max(len(kept) - new_rows, 0) if entity != "products" else None,
+        # Rows that update a record already there (the products, versions and lots a file adds are not rows).
+        "updated_records": max(len(kept) - (new_rows - sum(report.creates.values())), 0)
+        if entity != "products"
+        else None,
         "error_count": report.error_count,
         "issues": report.issues,
         "ready": ready,
@@ -763,6 +876,12 @@ def _check_rows(
         "rows_to_import": len(kept) if ready else 0,
         "rejected_rows": rejected,
         "masked_values": report.masked_values,
+        # How the file was read: headers read under another name, columns left out, notes, and what a complaints file
+        # adds besides its complaints (a free trial).
+        "columns": report.mapping,
+        "ignored_columns": report.ignored,
+        "notes": report.notes,
+        "also_creates": report.creates,
     }
     if skip_problem_rows and rejected and not report.file_problems:
         result["rejects_csv"] = _rejects_csv(rows, report)
@@ -877,6 +996,9 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 updated += 1
             db.flush()
             continue
+        if entity == "complaints" and policy.create_references:
+            # A free trial's complaints file adds the products, versions and lots it names that are not loaded yet.
+            created += _add_named_references(db, tenant_id, row, lookup, now, source)
         product = lookup.product(row["product_id"])
         version = lookup.version(product, row["version"]) if row.get("version") else None
         if entity == "lots":
@@ -947,6 +1069,59 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         db.flush()
         _index_complaint(db, tenant_id, complaint, row, product, version, lot, source)
     return {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+
+
+def _add_named_references(db: Session, tenant_id, row: dict, lookup: _Lookup, now: datetime, source: str) -> int:
+    """The product, version and lot a complaint row names, added when not loaded yet (marked as uploaded, like every
+    imported record). Returns how many were added."""
+    added = 0
+    product = lookup.product(row["product_id"])
+    if product is None:
+        product = Product(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            product_identifier=row["product_id"],
+            name=(row.get("product_name") or row["product_id"])[:255],
+            lifecycle_status="active",
+            source_identifier=row["product_id"],
+            **_stamp(now, None, source),
+        )
+        db.add(product)
+        db.flush()
+        lookup.products[row["product_id"]] = product
+        added += 1
+    version = None
+    if row.get("version"):
+        version = lookup.version(product, row["version"])
+        if version is None:
+            version = ProductVersion(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                product_id=product.id,
+                version_identifier=row["version"],
+                lifecycle_status="active",
+                source_identifier=f"{row['product_id']}:{row['version']}",
+                **_stamp(now, None, source),
+            )
+            db.add(version)
+            db.flush()
+            lookup.versions[(row["product_id"], row["version"])] = version
+            added += 1
+    if row.get("lot_id") and lookup.lot(row["lot_id"]) is None:
+        lot = LotBatch(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            lot_identifier=row["lot_id"],
+            product_version_id=version.id if version else None,
+            status="active",
+            source_identifier=row["lot_id"],
+            **_stamp(now, None, source),
+        )
+        db.add(lot)
+        db.flush()
+        lookup.lots[row["lot_id"]] = lot
+        added += 1
+    return added
 
 
 def _complaint_details(row: dict) -> dict:

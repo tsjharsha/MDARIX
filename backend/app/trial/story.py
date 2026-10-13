@@ -103,8 +103,9 @@ CHAPTERS = (
     (
         "YOUR_DATA",
         "See it on your own data",
-        "Upload an anonymized export of products, lots and complaints: each file is checked for problems and personal "
-        "data before anything is saved, and every chapter above reads it.",
+        "Upload your complaints export as it comes from your quality system (Excel or CSV): MDARIX reads its column "
+        "names, adds the products and lots it names, and checks every file for problems and personal data before "
+        "anything is saved; every chapter above then reads it.",
         "Data spread across systems; teams spend hours a month on manual compilation.",
         {"section": "Getting started", "tab": None},
         None,

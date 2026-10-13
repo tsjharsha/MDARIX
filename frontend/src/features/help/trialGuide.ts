@@ -95,15 +95,14 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "30 minutes",
     why: "The same checks then run on your records, and that is where MDARIX shows what it would find in your own quality system.",
     actions: [
-      "Open Import data (or the upload panel in Getting started).",
-      "Load the six data types in the order shown: products and versions, lots and batches, complaints, then investigations, CAPAs and risks.",
-      "For each, choose Download to get the template, fill it from your system's export, and pick the date format your file uses.",
-      "Choose a CSV file, then Check file. Nothing is saved until the check passes, unless you choose to import the rows that pass and get the others back to fix.",
-      "Add a quantity to each lot, so trends are counted per unit in the field from day one.",
+      "Open Import data (or the upload panel in Getting started): it opens on Complaints.",
+      "Choose your complaints export as it comes from your quality system, an Excel workbook or a CSV file. MDARIX reads its column names (Complaint Number, Product Code, Lot # and the like) and leaves out the columns it does not need, without storing them.",
+      "Pick the date format of a CSV file (Excel dates are read as they are), then choose Check file: you see how each column was read, and the products and lots the file adds, before anything is saved.",
+      "Then add your lots with their quantities, so trends are counted per unit in the field, and your investigations, CAPAs and risks, so every inspection check reads your own records. Download gives a template for any of them.",
     ],
     result:
       "Your records sit beside the sample, and Readiness, Complaints, Signals and Records show findings from your own data. The chapter See it on your own data is ticked.",
-    tip: "Remove personal details first, or choose to have them replaced by placeholders such as [PERSON]. The sample never counts toward your 5,000 rows.",
+    tip: "Keep your quality system's own statuses (Cancelled, Void, Inquiry...): the second look reads them to find complaints that were closed off. Personal details in the text can be replaced by placeholders such as [PERSON]. The sample never counts toward your 5,000 rows.",
   },
   {
     key: "feedback",

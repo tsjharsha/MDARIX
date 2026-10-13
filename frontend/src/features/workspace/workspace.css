@@ -2755,3 +2755,20 @@ div.uw-task-count:hover {
 .uw-exit-button {
   color: var(--ac-critical);
 }
+
+/* How an upload was read (sections/ImportData.tsx HowItWasRead): notes, the columns matched and those left out. */
+.uw-import-read {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.uw-import-read p {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.uw-import-read code {
+  font-size: 12px;
+}

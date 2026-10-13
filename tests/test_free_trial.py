@@ -233,10 +233,12 @@ def test_csv_import_checks_everything_before_saving():
     lots = "lot_id,product_id,version\nL-100,PUMP-1,Rev B\n"
     assert user.post("/api/v1/trial/imports/lots", content=lots).status_code == 200
 
-    # Extra columns, unknown products and personal data are all refused, and nothing is saved.
-    bad = "complaint_id,product_id,description,patient_name\nC-1,PUMP-1,Alarm,Jane\n"
-    report = user.post("/api/v1/trial/imports/complaints/check", content=bad).json()
-    assert not report["ready"] and "patient_name" in report["issues"][0]["message"]
+    # A column the template does not know (here a person's name) is left out, said back and never stored; personal
+    # data in the columns that are read is refused, and nothing is saved.
+    extra = "complaint_id,product_id,description,patient_name\nC-1,PUMP-1,Alarm,Jane\n"
+    report = user.post("/api/v1/trial/imports/complaints/check", content=extra).json()
+    assert report["ready"] and report["ignored_columns"] == ["patient_name"]
+    assert "Jane" not in str(report["preview"])
     personal = (
         "complaint_id,product_id,description\n"
         "C-1,PUMP-1,Reported by Dr. Smith on 555-123-4567\n"
@@ -261,6 +263,42 @@ def test_csv_import_checks_everything_before_saving():
     status = user.get("/api/v1/trial/status").json()
     assert status["own_data"] == {"products": 1, "lots": 1, "complaints": 2}
     assert status["usage"]["rows"] == 6
+
+
+def test_a_quality_system_export_uploads_as_it_comes_and_the_second_look_reads_it():
+    """One complaints export, with the quality system's own headers, an extra column, products and lots not loaded and
+    its own statuses: the trial reads it, adds what it names, and the second look finds the cancelled harm record."""
+    user, _approval, _ = _approved_trial_client()
+    export = (
+        "Complaint Number,Product Code,Product Name,Complaint Description,Lot #,Date Received,State,Serious Injury,"
+        "Patient Name\n"
+        "TW-0001,ACME-PUMP,Acme Infusion Pump,Pump stopped during infusion and the patient was injured. Duplicate.,"
+        "LOT-77,2026-08-02,Cancelled,Y,J. Doe\n"
+        "TW-0002,ACME-PUMP,Acme Infusion Pump,Display flickers at start-up,LOT-77,2026-08-09,Open,N,\n"
+    )
+    check = user.post("/api/v1/trial/imports/complaints/check", content=export).json()
+    assert check["ready"], check["issues"]
+    assert check["ignored_columns"] == ["Patient Name"]
+    assert {"header": "Complaint Number", "column": "complaint_id"} in check["columns"]
+    assert check["also_creates"] == {"products": 1, "lots": 1}
+    assert check["new_records"] == 4  # two complaints, the product and the lot
+    imported = user.post("/api/v1/trial/imports/complaints", content=export)
+    assert imported.status_code == 200, imported.text
+    db = SessionLocal()
+    try:
+        product = (
+            db.query(Product)
+            .filter(Product.product_identifier == "ACME-PUMP")
+            .order_by(Product.created_at.desc())
+            .first()
+        )
+        assert product.name == "Acme Infusion Pump"
+        complaint = db.query(Complaint).filter(Complaint.complaint_identifier == "TW-0001").one()
+        assert complaint.status == "cancelled" and complaint.serious_injury is True
+    finally:
+        db.close()
+    flagged = {item["complaint_identifier"] for item in user.get("/api/v1/complaints/second-look").json()["items"]}
+    assert "TW-0001" in flagged and "TW-0002" not in flagged
 
 
 def test_import_is_only_for_trial_workspaces():

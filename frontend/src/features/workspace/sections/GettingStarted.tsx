@@ -248,6 +248,7 @@ export function GettingStartedSection() {
 
       <ImportPanel
         id="trial-import"
+        complaintsAlone
         templates={trial?.templates ?? []}
         basePath="/api/v1/trial/imports"
         fileLimitBytes={trial?.limits?.file_bytes}

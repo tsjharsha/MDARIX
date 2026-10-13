@@ -49,6 +49,8 @@ def import_templates(ctx: AuthenticatedRequestContext = Depends(get_request_cont
     return {
         "row_limit": policy.row_limit,
         "file_limit_bytes": policy.file_limit_bytes,
+        # A free trial may start from one complaints export: the products, versions and lots it names are added.
+        "creates_references": policy.create_references,
         "templates": [
             {
                 "entity": entity,
