@@ -41,8 +41,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
       "Choose Request free trial. Sending the request accepts the Terms of Service and the Free Trial Agreement.",
     ],
     result:
-      "Request received. We review every request, usually within one business day, and email you an invitation once it is approved.",
-    tip: "Use your work email: the invitation and every trial message go there.",
+      "With a company email your workspace is prepared at once and the activation email arrives within minutes. Other requests are reviewed, usually within one business day.",
+    tip: "Use your work email: a company email gets its trial at once, and every trial message goes there.",
   },
   {
     key: "sign-in",

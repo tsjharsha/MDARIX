@@ -84,6 +84,8 @@ export function SignupForm() {
   const [profile, setProfile] = useState<TrialProfile>(EMPTY_PROFILE);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  // A company email's trial is prepared at once (the server says TRIAL_APPROVING); any other waits for review.
+  const [approving, setApproving] = useState(false);
   const [message, setMessage] = useState("");
   const [problem, setProblem] = useState("");
   const stepOne = useRef<HTMLFieldSetElement>(null);
@@ -151,6 +153,7 @@ export function SignupForm() {
         setMessage(MESSAGES[code] || data.detail?.message || "The request could not be completed.");
         return;
       }
+      setApproving(data?.status === "TRIAL_APPROVING");
       setDone(true);
     } finally {
       setBusy(false);
@@ -161,13 +164,24 @@ export function SignupForm() {
     return (
       <div className="auth-card su-card su-done" role="status">
         <CheckCircle2 size={40} aria-hidden="true" />
-        <h1>Request received</h1>
-        <p className="auth-lead">
-          Thank you. We review every request, usually within one business day, and email <strong>{email}</strong> an
-          invitation once it is approved.
-        </p>
+        <h1>{approving ? "Your trial is being prepared" : "Request received"}</h1>
+        {approving ? (
+          <p className="auth-lead">
+            Thank you. Your workspace is being prepared with sample data. Within a few minutes we email{" "}
+            <strong>{email}</strong> the link to activate your account.
+          </p>
+        ) : (
+          <p className="auth-lead">
+            Thank you. We review every request, usually within one business day, and email <strong>{email}</strong> an
+            invitation once it is approved.
+          </p>
+        )}
         <ol className="su-next">
-          <li>We review your request and prepare your workspace with sample data.</li>
+          <li>
+            {approving
+              ? "Your workspace is prepared with sample data that tells the whole story."
+              : "We review your request and prepare your workspace with sample data."}
+          </li>
           <li>You set your own password from the invitation email. MDARIX never sees it.</li>
           <li>You sign in, explore the sample investigation, then upload your own exports.</li>
         </ol>

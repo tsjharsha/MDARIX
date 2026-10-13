@@ -502,6 +502,13 @@ SIGNUP_ACCEPTED = {
     "tenant_created": False,
     "next_step": "We review every request, usually within one business day, and email an invitation once approved.",
 }
+# A company email is approved at once (backend/app/trial/auto_approval.py): the workspace is prepared after this answer.
+SIGNUP_APPROVING = {
+    "status": "TRIAL_APPROVING",
+    "tenant_created": False,
+    "next_step": "Your trial workspace is being prepared. Within a few minutes we email you the link to activate your "
+    "account.",
+}
 
 
 @router.post("/signup")
@@ -543,7 +550,14 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
         db.add(row)
         db.commit()
         background.add_task(_alert_trial_request, row.organization, row.display_name, email, profile)
-        # Only a newly stored request is acknowledged (a known email was refused above), after the response.
+        from backend.app.trial import auto_approval
+
+        # A company email is approved at once, after the response (its invitation is the next email); any other
+        # request is acknowledged and waits for review. Only a newly stored request gets either.
+        approving, _why = auto_approval.eligible(db, row.id)
+        if approving:
+            background.add_task(auto_approval.approve_or_acknowledge, row.id, row.organization, row.display_name, email)
+            return dict(SIGNUP_APPROVING)
         from backend.app.trial.service import acknowledge_trial_request
 
         background.add_task(acknowledge_trial_request, row.organization, row.display_name, email)

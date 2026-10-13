@@ -204,6 +204,41 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 
+def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monkeypatch):
+    """A company domain is approved right after sign-up by the automatic-approval account; a second colleague of the
+    same company, a free-mail address and anything over the day's cap wait for a Platform Administrator."""
+    from backend.app.trial import auto_approval
+
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE", "company-domains")
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "100000")
+    company = f"acme-{uuid.uuid4().hex[:8]}.com"
+
+    def sign_up(email: str) -> str:
+        response = TestClient(app).post(
+            "/api/v1/auth/signup",
+            json={"email": email, "display_name": "Taylor Quality", "organization": "Acme Devices", **PROFILE},
+        )
+        assert response.status_code == 200, response.text
+        return response.json()["status"]
+
+    first = f"quality.lead@{company}"
+    assert sign_up(first) == "TRIAL_APPROVING"
+    db = SessionLocal()
+    try:
+        row = db.query(OnboardingRequest).filter(OnboardingRequest.email == first).one()
+        approver = db.query(AuthUser).filter(AuthUser.username == auto_approval.APPROVER_USERNAME).one()
+        assert row.status == "APPROVED" and row.tenant_id is not None and row.reviewed_by == approver.id
+        assert approver.status == "DISABLED"
+        assert trial_subscription(db, row.tenant_id) is not None
+    finally:
+        db.close()
+    # The second person of the same company is invited by the first; a free-mail address is reviewed by a person.
+    assert sign_up(f"colleague@{company}") == "ONBOARDING_REQUEST_ACCEPTED"
+    assert sign_up(f"trial.{uuid.uuid4().hex[:8]}@gmail.com") == "ONBOARDING_REQUEST_ACCEPTED"
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "0")
+    assert sign_up(f"lead@other-{uuid.uuid4().hex[:8]}.com") == "ONBOARDING_REQUEST_ACCEPTED"
+
+
 def test_a_request_cannot_be_approved_twice_or_after_decline():
     admin = authenticated_client()
     email = _request_trial()
