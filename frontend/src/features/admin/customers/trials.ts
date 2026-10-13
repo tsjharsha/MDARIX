@@ -29,6 +29,8 @@ export type TrialItem = {
   feedback: { responses: number; overall: number | null; recommend: number | null } | null;
   // The trial's latest one-to-one demo request (booked from Getting started), or null.
   demo_request?: { status: string; created_at: string | null; business_id: string | null } | null;
+  /** What the organization said it was cited for (its Getting started), to prepare the demo. */
+  cited_for?: string[];
 };
 
 export type TrialOverview = {

@@ -80,6 +80,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "45 to 60 minutes",
     why: "The sample is a fictional manufacturer built from the pain points inspectors keep finding, so every screen has something to show from the first minute.",
     actions: [
+      "At the top of Getting started, tick what FDA, a notified body or your own audit cited you for: the story starts with those chapters.",
       "In Getting started, open About the sample data: seven points, each with what is in the sample, why it matters and a button to the screen that shows it.",
       "Follow Your story, chapter by chapter. The quality loop at the top always names the next chapter; its button opens the right screen.",
       "A chapter counts as tried when you act in it: confirm or dismiss a record in the second look, record a reporting decision, open a case from a signal, ask MDARIX a question about the case, sign a decision, plan an effectiveness check, complete a risk review.",

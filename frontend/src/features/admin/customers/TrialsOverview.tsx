@@ -215,6 +215,11 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
                   : "Not yet",
             },
             {
+              key: "cited",
+              label: "Cited for",
+              render: (row) => (row.cited_for?.length ? row.cited_for.join("; ") : "—"),
+            },
+            {
               key: "feedback",
               label: "Feedback",
               render: (row) =>

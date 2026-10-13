@@ -62,6 +62,10 @@ EXEMPT = {
         "/api/v1/trial/exit-request",
     ): "the owner's own request to end the trial; owner only, checked in the route",
     ("POST", "/api/v1/trial/exit-request/withdraw"): "the owner's own request; owner only, checked in the route",
+    (
+        "PUT",
+        "/api/v1/trial/focus",
+    ): "what the trial organization was cited for; trial workspaces only, checked in the route",
     ("POST", "/api/v1/client-errors"): "public by design: the browser's error boundary reports from the sign-in page "
     "and after a session ended; stores no business data, body capped, rate limited per address",
     (

@@ -12,6 +12,7 @@ import { QualityLoop } from "./QualityLoop";
 import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
+import { CitedFor } from "./CitedFor";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel } from "./SampleData";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
@@ -142,6 +143,8 @@ export function GettingStartedSection() {
           </button>
         )}
       </QualityLoop>
+
+      <CitedFor onSaved={story.reload} />
 
       <TrialJourney steps={journey} source={story} onGo={goJourney} />
 
@@ -344,6 +347,7 @@ export function ChapterRow({
       <div className="uw-story-body">
         <strong>
           {chapter.number}. {chapter.title}
+          {chapter.cited && <span className="uw-cited-badge">You were cited for this</span>}
         </strong>
         {finding && (
           <p className="uw-story-finding">

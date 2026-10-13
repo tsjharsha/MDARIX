@@ -294,10 +294,13 @@ def _sample_case(db: Session, tenant_id: uuid.UUID) -> dict | None:
     return {"id": str(case.id), "product_id": str(case.product_id) if case.product_id else None}
 
 
-def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready: bool = False) -> dict:
+def story(
+    db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready: bool = False, cited: tuple = ()
+) -> dict:
     """Every chapter with its finding from the organization's records and whether it acted on it. ``ai_ready``: AI
     answers for this organization now (backend/app/ai_settings.py ai_ready); without it the investigation chapter
-    says what the case page does by itself."""
+    says what the case page does by itself. ``cited``: the chapters answering what the organization was cited for
+    (backend/app/trial/citations.py): they are marked, and the next step is the first of them not yet tried."""
     from backend.app.readiness_home.service import readiness
 
     today = today or datetime.now(timezone.utc).date()
@@ -357,14 +360,17 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None, ai_ready
                 "acted": {"done": bool(counts.get(code)), "count": counts.get(code, 0)},
                 # The case these chapters are about (the guided investigation), so its button opens that case.
                 "case": sample_case if code in CASE_CHAPTERS else None,
+                "cited": code in cited,
             }
         )
     acted = sum(1 for chapter in chapters if chapter["acted"]["done"])
+    waiting = [chapter["code"] for chapter in chapters if not chapter["acted"]["done"]]
     return {
         "as_of": today.isoformat(),
         "acted": acted,
         "total": len(chapters),
-        "next": next((chapter["code"] for chapter in chapters if not chapter["acted"]["done"]), None),
+        # What the organization was cited for comes first, then the story's order.
+        "next": next((code for code in waiting if code in cited), waiting[0] if waiting else None),
         "chapters": chapters,
     }
 
@@ -378,6 +384,8 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
     from backend.app.ai_settings import _models_in_use
 
     ai_on_server = bool(_models_in_use())
+    from backend.app.trial import citations
+    from backend.app.trial.team import trial_request
     from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
     from backend.app.db.models.foundation import AuthUser, PlanDefinition, Tenant
@@ -410,12 +418,14 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
             .filter(AuthUser.tenant_id == tenant.id, AuthUser.status.in_(["ACTIVE", "INVITED"]))
             .scalar()
         )
+        # The first person of the trial (the sample author, an account nobody signs in with, is not one).
         owner = (
             db.query(AuthUser.username, AuthUser.display_name, AuthUser.status)
-            .filter(AuthUser.tenant_id == tenant.id)
+            .filter(AuthUser.tenant_id == tenant.id, ~AuthUser.username.like("sample-author+%"))
             .order_by(AuthUser.created_at)
             .first()
         )
+        request = trial_request(db, tenant.id)
         with Session(bind=db.get_bind(), autoflush=False) as session:
             bind_tenant(session, tenant.id)
             reached = progress(session, tenant.id)
@@ -441,6 +451,8 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
                 "story": reached,
                 "feedback": feedback.get(tenant.id),
                 "demo_request": demos.get(tenant.id),
+                # What the organization said it was cited for (Getting started), to prepare the demo.
+                "cited_for": citations.labels((request.profile or {}).get("citations") if request else ()),
             }
         )
     active = [item for item in items if item["state"] != "ENDED"]

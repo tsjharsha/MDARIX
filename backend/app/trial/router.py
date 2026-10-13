@@ -305,11 +305,68 @@ def trial_story_chapters(
 ):
     """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it."""
     from backend.app.ai_settings import ai_ready
-    from backend.app.trial import story
+    from backend.app.trial import citations, story
 
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return story.story(data, tenant_id, ai_ready=ai_ready(db, tenant_id))
+    request = team.trial_request(db, tenant_id)
+    cited = citations.chapters_for((request.profile or {}).get("citations") if request else ())
+    return story.story(data, tenant_id, ai_ready=ai_ready(db, tenant_id), cited=tuple(cited))
+
+
+class TrialFocus(BaseModel):
+    """What the organization was cited for (backend/app/trial/citations.py codes)."""
+
+    citations: list[str] = Field(default_factory=list, max_length=20)
+
+
+@router.get("/trial/focus")
+def trial_focus(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    """The themes offered, and those the organization said it was cited for."""
+    from backend.app.trial import citations
+
+    _require_trial(db, ctx)
+    request = team.trial_request(db, uuid.UUID(str(ctx.tenant_id)))
+    chosen = citations.clean((request.profile or {}).get("citations") if request else ())
+    return {"citations": chosen, "options": citations.options()}
+
+
+@router.put("/trial/focus")
+def set_trial_focus(
+    payload: TrialFocus,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """Record what the organization was cited for: the story marks those chapters and starts with them. Any person
+    of the trial may set it; audited."""
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import citations
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    unknown = [code for code in payload.citations if code not in citations.CITATIONS]
+    if unknown:
+        raise HTTPException(422, detail={"code": "TRIAL_FOCUS_UNKNOWN", "message": "Choose from the listed themes"})
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
+    chosen = citations.clean(payload.citations)
+    request.profile = {**(request.profile or {}), "citations": chosen}
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(_current_user(db, ctx).id),
+            action="TRIAL_FOCUS_SET",
+            entity_type="OnboardingRequest",
+            entity_id=request.id,
+            details={"citations": chosen},
+            correlation_id=ctx.correlation_id,
+        )
+    )
+    db.commit()
+    return {"citations": chosen, "options": citations.options()}
 
 
 class TrialDemoRequest(BaseModel):

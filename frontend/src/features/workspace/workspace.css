@@ -2835,3 +2835,66 @@ div.uw-task-count:hover {
 .uw-chapter-done > span {
   flex: 1 1 260px;
 }
+
+/* "What were you cited for?" (sections/CitedFor.tsx) and the chapters it marks. */
+.uw-cited-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.uw-cited-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  cursor: pointer;
+}
+.uw-cited-options label.is-on {
+  border-color: var(--ac-teal);
+  background: var(--ac-teal-wash);
+}
+.uw-cited-options input {
+  margin-top: 3px;
+}
+.uw-cited-options span {
+  display: grid;
+  gap: 2px;
+  color: var(--ac-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.uw-cited-options small {
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.uw-cited-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-cited-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 2px;
+}

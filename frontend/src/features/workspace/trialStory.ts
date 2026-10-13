@@ -16,6 +16,8 @@ export type StoryChapter = {
   acted: { done: boolean; count: number };
   /** The case the chapter is about (the guided investigation), opened with it; null when there is none. */
   case?: { id: string; product_id: string | null } | null;
+  /** The chapter answers what the organization was cited for (Getting started, "What were you cited for?"). */
+  cited?: boolean;
 };
 
 export type TrialStory = {

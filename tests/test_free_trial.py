@@ -239,6 +239,31 @@ def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monke
     assert sign_up(f"lead@other-{uuid.uuid4().hex[:8]}.com") == "ONBOARDING_REQUEST_ACCEPTED"
 
 
+def test_what_the_organization_was_cited_for_leads_the_story():
+    """Ticking what FDA or a notified body cited marks the chapters that answer it and makes the first of them the
+    next step; the MDARIX team sees it, and the trial's own person as its owner (never the sample author)."""
+    user, approval, email = _approved_trial_client()
+    focus = user.get("/api/v1/trial/focus").json()
+    assert focus["citations"] == [] and {item["code"] for item in focus["options"]} >= {
+        "CAPA_EFFECTIVENESS",
+        "RISK_FILE",
+    }
+    assert user.put("/api/v1/trial/focus", json={"citations": ["NOT_A_THEME"]}).status_code == 422
+    saved = user.put("/api/v1/trial/focus", json={"citations": ["RISK_FILE", "CAPA_EFFECTIVENESS", "RISK_FILE"]})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["citations"] == ["CAPA_EFFECTIVENESS", "RISK_FILE"]  # story order, once each
+    story = user.get("/api/v1/trial/story").json()
+    cited = [chapter["code"] for chapter in story["chapters"] if chapter["cited"]]
+    assert cited == ["CAPA_EFFECTIVE", "RISK_FILE"] and story["next"] == "CAPA_EFFECTIVE"
+    overview = authenticated_client().get("/api/v1/platform-admin/trials").json()
+    item = next(entry for entry in overview["items"] if entry["tenant_key"] == approval["tenant_key"])
+    assert item["cited_for"] == [
+        "CAPAs closed without verifying they were effective",
+        "Risk management file not updated with post-market data",
+    ]
+    assert item["owner"]["email"] == email
+
+
 def test_a_request_cannot_be_approved_twice_or_after_decline():
     admin = authenticated_client()
     email = _request_trial()
