@@ -566,6 +566,16 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
         return
     organization = _organization(db, row.tenant_id)
     delete_on = _long_date(row.expires_at + timedelta(days=30))
+    if payload.get("stage") == "ENDED" and payload.get("early"):
+        # Ended early at the owner's request, data kept until the usual date (backend/app/trial/early_exit.py).
+        _deliver(
+            lambda recipient, **kw: emailer.send_trial_ended_early(recipient, **kw),
+            [request.email],
+            organization=organization,
+            data_deleted=False,
+            delete_on=delete_on,
+        )
+        return
     if payload.get("stage") == "ENDED":
         _deliver(
             lambda recipient, **kw: emailer.send_trial_ended(recipient, **kw),
@@ -774,6 +784,10 @@ def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
         .all()
     )
     for row in trials:
+        # A trial whose data has been deleted (ended early, or purged) gets no more reminders: its people are gone.
+        tenant = db.get(Tenant, row.tenant_id)
+        if tenant is not None and str(tenant.status).upper() in ("ARCHIVED", "PURGING"):
+            continue
         remaining = row.expires_at - now
         if remaining <= timedelta(0):
             stage = "ENDED" if -remaining <= timedelta(days=7) else None

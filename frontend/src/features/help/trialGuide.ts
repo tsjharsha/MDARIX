@@ -139,6 +139,7 @@ export const AFTER_THE_TRIAL: readonly string[] = [
   "The trial runs for 30 days. The days left are shown at the top of every screen.",
   "When it ends, the workspace closes and your trial data is kept for 30 more days, then deleted, unless you continue.",
   "To continue, ask for a pilot on your live data in your one-to-one demo: your records stay where they are.",
+  "To stop sooner, the person who started the trial chooses End my trial early at the bottom of Getting started. The MDARIX team confirms it by email and, if you ask, deletes all your trial data.",
 ];
 
 /** What Getting started knows about the trial, to tick the journey's steps. */

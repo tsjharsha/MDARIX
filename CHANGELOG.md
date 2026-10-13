@@ -185,6 +185,17 @@ operator knows a release migrates the database.
   button beside "Request a demo".
 - Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
   time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Ending a free trial early: the person who started the trial asks from Getting started (End my trial early), with an
+  optional reason and whether to delete the data (ticked by default), and may withdraw the request while it waits.
+  Platform Admin (Customers & Tenants > Trials) approves, which ends the trial at once and, when chosen, purges its
+  data (`tenant_purge`; a legal hold refuses), or declines with a note emailed to the owner. A trial ended with its data
+  kept can have it deleted there before the usual 30 days. The owner is emailed that the trial has ended, whether the
+  data is gone, and asked to reply with why they left; the MDARIX team is alerted to each request
+  (`MDARIX_TRIAL_ALERT_EMAIL`). Migration `md45` adds `trial_exit_requests` (keyed by `trial_tenant_id`, no names or
+  addresses, so the request and its reason remain after a purge). Audited as `TRIAL_EXIT_REQUESTED`,
+  `TRIAL_EXIT_WITHDRAWN`, `TRIAL_ENDED_EARLY` and `TRIAL_EXIT_DECLINED`.
+- Sign-in, account activation and password reset have a show/hide button on the password field. The free trial
+  sign-up lists countries by name only (the dialing code still starts the phone number).
 - The free trial user guide at `/help/trial-guide`: seven steps from requesting the trial to the one-to-one demo
   (request, activate and sign in, invite two colleagues, the sample data story, your own data, feedback, the demo),
   each with what to do, what you will see and an illustrated, animated picture of the screen (still under reduced
@@ -201,6 +212,8 @@ operator knows a release migrates the database.
 
 ### Fixed
 
+- A purge now also deletes the demo requests a free trial booked (they name the person who asked), and the trial
+  reminders skip an organization whose data has been deleted.
 - The AI release gate's first bar ("a contracted AI provider with zero data retention") is read from the contract
   settings themselves (`MDARIX_GENAI_CONTRACTED_PROVIDERS` and the provider's ZDR setting). Outside production the
   provider policy allows any provider, so a free development provider showed the bar as met.

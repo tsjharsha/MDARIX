@@ -117,15 +117,16 @@ export function signupBody(email: string, name: string, company: string, profile
 export type Country = { code: string; name: string; dial: string; label: string };
 
 /**
- * Every country and territory for the sign-up dropdown, sorted by name and shown as "+91 - India": the dialing code
- * from libphonenumber's metadata (dialingCodes.ts), the name from the browser's standard English region names.
+ * Every country and territory for the sign-up dropdown, sorted and shown by name ("India"), with its dialing code
+ * from libphonenumber's metadata (dialingCodes.ts) to start the phone number; the name is the browser's standard English
+ * region name.
  */
 export function countries(locale = "en"): Country[] {
   const names =
     typeof Intl !== "undefined" && "DisplayNames" in Intl ? new Intl.DisplayNames([locale], { type: "region" }) : null;
   return DIALING_CODES.map(([code, dial]) => {
     const name = names?.of(code) ?? code;
-    return { code, name, dial, label: `${dial} - ${name}` };
+    return { code, name, dial, label: name };
   }).sort((a, b) => a.name.localeCompare(b.name, locale));
 }
 

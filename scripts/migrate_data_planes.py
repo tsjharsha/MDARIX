@@ -54,6 +54,7 @@ CONTROL_ONLY = (
     "persona_assignments",
     "onboarding_requests",
     "demo_requests",
+    "trial_exit_requests",
     "trial_feedback",
     "subscription_lifecycles",
     "subscription_versions",

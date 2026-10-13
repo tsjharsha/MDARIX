@@ -20,6 +20,7 @@ import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
 import { BookDemo, DEMO_REQUEST_PATH, type TrialDemoRequest } from "./BookDemo";
 import { TrialJourney } from "./TrialJourney";
+import { EndTrialPanel } from "./EndTrial";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel, scrollToSampleData } from "./SampleData";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
@@ -259,6 +260,8 @@ export function GettingStartedSection() {
       <div id="trial-team" className="uw-anchor">
         <TeamPanel onChanged={status.reload} />
       </div>
+
+      <EndTrialPanel />
     </div>
   );
 }

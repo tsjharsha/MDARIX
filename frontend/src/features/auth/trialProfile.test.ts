@@ -62,12 +62,13 @@ describe("trial request profile", () => {
 });
 
 describe("country and phone", () => {
-  it("lists every country with its dialing code, sorted by name, as '+code - name'", async () => {
+  it("lists every country by name, sorted, with its dialing code kept for the phone", async () => {
     const { countries } = await import("./trialProfile");
     const list = countries();
     expect(list.length).toBeGreaterThan(240);
     const byCode = Object.fromEntries(list.map((country) => [country.code, country]));
-    expect(byCode.IN).toMatchObject({ name: "India", dial: "+91", label: "+91 - India" });
+    expect(byCode.IN).toMatchObject({ name: "India", dial: "+91", label: "India" });
+    expect(list.some((country) => country.label.includes("+"))).toBe(false);
     expect(byCode.US.dial).toBe("+1");
     expect(byCode.GB.dial).toBe("+44");
     expect(byCode.DE.dial).toBe("+49");

@@ -778,3 +778,163 @@ def test_a_trial_books_a_one_to_one_demo_and_mdarix_sees_its_progress(monkeypatc
             db.commit()
         finally:
             db.close()
+
+
+def _forget_exit_requests(tenant_ids):
+    from backend.app.db.models.stage2 import TrialExitRequest
+
+    db = SessionLocal()
+    try:
+        db.query(TrialExitRequest).filter(TrialExitRequest.trial_tenant_id.in_(tenant_ids)).delete(
+            synchronize_session=False
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_the_owner_ends_the_trial_early_and_its_data_is_deleted(monkeypatch):
+    """The owner asks to end early with a reason; Platform Admin approves with deletion: the trial ends, everything it
+    stored is purged (the demo it booked too), the request and its reason remain, and the owner is emailed."""
+    from auth import emailer
+    from backend.app.db.models.stage2 import DemoRequest, TrialExitRequest
+
+    sent = []
+    monkeypatch.setattr(emailer, "send_trial_ended_early", lambda *args, **kwargs: sent.append((args, kwargs)))
+    monkeypatch.setattr(emailer, "send_trial_exit_request_alert", lambda *args, **kwargs: None)
+    monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "trials@mdarix.invalid")
+    user, approval, email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    try:
+        state = user.get("/api/v1/trial/exit-request").json()
+        assert state["is_owner"] is True and state["request"] is None and "MISSING" in state["reasons"]
+        assert user.post("/api/v1/trial/demo-request", json={"preferred_time": "Monday"}).status_code == 200
+
+        asked = user.post(
+            "/api/v1/trial/exit-request",
+            json={"reason_code": "MISSING", "reason": "We need our QMS connected first.", "delete_data": True},
+        )
+        assert asked.status_code == 200, asked.text
+        assert asked.json()["status"] == "REQUESTED"
+        again = user.post("/api/v1/trial/exit-request", json={"reason_code": "OTHER"}).json()
+        assert again["status"] == "ALREADY_REQUESTED" and again["request"]["reason_code"] == "MISSING"
+        # Withdrawn, then asked again; an unknown reason is refused.
+        assert user.post("/api/v1/trial/exit-request/withdraw").json()["status"] == "WITHDRAWN"
+        assert user.post("/api/v1/trial/exit-request", json={"reason_code": "BORED"}).status_code == 422
+        asked = user.post(
+            "/api/v1/trial/exit-request",
+            json={"reason_code": "MISSING", "reason": "We need our QMS connected first.", "delete_data": True},
+        ).json()
+        request_id = asked["request"]["id"]
+
+        admin = authenticated_client()
+        assert TestClient(app).get("/api/v1/platform-admin/trial-exit-requests").status_code == 401
+        listed = admin.get("/api/v1/platform-admin/trial-exit-requests").json()
+        item = next(row for row in listed["items"] if row["id"] == request_id)
+        assert item["status"] == "PENDING" and item["reason_label"] == "Something we need is missing"
+        assert item["requested_by"] and item["days_left"] == 30 and listed["pending"] >= 1
+
+        decided = admin.post(
+            f"/api/v1/platform-admin/trial-exit-requests/{request_id}/approve", json={"delete_data": True}
+        )
+        assert decided.status_code == 200, decided.text
+        assert decided.json()["data_deleted"] is True and "notify" not in decided.json()
+        assert sent and sent[0][0][0] == email and sent[0][1] == {"data_deleted": True}
+        # Decided once only.
+        assert (
+            admin.post(f"/api/v1/platform-admin/trial-exit-requests/{request_id}/approve", json={}).status_code == 409
+        )
+
+        db = SessionLocal()
+        try:
+            assert db.query(Tenant).filter(Tenant.id == tenant_id).one().status == "ARCHIVED"
+            assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 0
+            assert db.query(AuthUser).filter(AuthUser.username == email).count() == 0
+            assert db.query(DemoRequest).filter(DemoRequest.trial_tenant_id == tenant_id).count() == 0
+            kept = db.query(TrialExitRequest).filter(TrialExitRequest.id == uuid.UUID(request_id)).one()
+            assert kept.status == "APPROVED" and kept.data_deleted and kept.reason == "We need our QMS connected first."
+        finally:
+            db.close()
+        assert user.get("/api/v1/trial/status").status_code == 401
+    finally:
+        _forget_exit_requests([tenant_id])
+
+
+def test_a_declined_request_keeps_the_trial_and_an_approved_one_can_keep_the_data(monkeypatch):
+    """Declining needs a note for the owner and the trial continues; approving without deletion ends the trial, keeps
+    the data for the usual 30 days and queues the owner's email; the data can then be deleted early."""
+    from auth import emailer
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.notifications import queue_trial_reminders
+
+    declined, ended = [], []
+    monkeypatch.setattr(emailer, "send_trial_exit_declined", lambda *args, **kwargs: declined.append((args, kwargs)))
+    monkeypatch.setattr(emailer, "send_trial_ended_early", lambda *args, **kwargs: ended.append((args, kwargs)))
+    monkeypatch.delenv("MDARIX_TRIAL_ALERT_EMAIL", raising=False)
+    user, approval, email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    admin = authenticated_client()
+    started = datetime.now(timezone.utc)
+    try:
+        request_id = user.post("/api/v1/trial/exit-request", json={"delete_data": False}).json()["request"]["id"]
+        path = f"/api/v1/platform-admin/trial-exit-requests/{request_id}"
+        assert admin.post(f"{path}/decline", json={"note": "Call?"}).status_code == 422
+        note = "We would like a short call first; could you reply with a time?"
+        assert admin.post(f"{path}/decline", json={"note": note}).json()["status"] == "DECLINED"
+        assert declined[0][0][0] == email and declined[0][1] == {"note": note}
+        shown = user.get("/api/v1/trial/exit-request").json()["request"]
+        assert shown["status"] == "DECLINED" and shown["decision_note"] == note
+        assert user.get("/api/v1/trial/status").status_code == 200
+
+        request_id = user.post("/api/v1/trial/exit-request", json={"delete_data": False}).json()["request"]["id"]
+        path = f"/api/v1/platform-admin/trial-exit-requests/{request_id}"
+        decided = admin.post(f"{path}/approve", json={"delete_data": False}).json()
+        assert decided["data_deleted"] is False and not ended
+        db = SessionLocal()
+        try:
+            subscription = trial_subscription(db, tenant_id)
+            assert subscription.expires_at <= datetime.now(timezone.utc) and subscription.status == "EXPIRED"
+            assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 3
+            early = (
+                db.query(OutboxEvent)
+                .filter(OutboxEvent.tenant_id == tenant_id, OutboxEvent.event_name == "TRIAL_REMINDER")
+                .all()
+            )
+            assert [event.payload.get("early") for event in early] == [True]
+            # The scheduler sends no second "trial ended" email.
+            queue_trial_reminders(db)
+            db.commit()
+            assert (
+                db.query(OutboxEvent)
+                .filter(OutboxEvent.tenant_id == tenant_id, OutboxEvent.event_name == "TRIAL_REMINDER")
+                .count()
+                == 1
+            )
+        finally:
+            db.close()
+        assert user.get("/api/v1/trial/status").status_code == 403
+
+        deleted = admin.post(f"{path}/delete-data")
+        assert deleted.status_code == 200, deleted.text
+        assert deleted.json()["data_deleted"] is True and ended[0][0][0] == email
+        assert admin.post(f"{path}/delete-data").status_code == 409
+        db = SessionLocal()
+        try:
+            assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 0
+            # An archived trial gets no more reminders.
+            queue_trial_reminders(db)
+            db.commit()
+            assert db.query(OutboxEvent).filter(OutboxEvent.tenant_id == tenant_id).count() == 0
+        finally:
+            db.close()
+    finally:
+        _forget_exit_requests([tenant_id])
+        # Reminders this test queued for other trial workspaces in the test database.
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM event_outbox WHERE event_name = 'TRIAL_REMINDER' AND occurred_at >= :started "
+                    "AND tenant_id IN (SELECT id FROM tenants WHERE tenant_key LIKE :pattern)"
+                ),
+                {"started": started, "pattern": "TRIAL\\_%"},
+            )

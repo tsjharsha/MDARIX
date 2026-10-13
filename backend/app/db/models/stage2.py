@@ -239,6 +239,36 @@ class DemoRequest(Base):
     )
 
 
+class TrialExitRequest(Base):
+    """A free trial's request to end early (md45; backend/app/trial/early_exit.py). The organization is
+    ``trial_tenant_id`` (not ``tenant_id``), so the request and its reason outlive a purge of the trial's data; it holds
+    no name or email address."""
+
+    __tablename__ = "trial_exit_requests"
+    id = _id()
+    trial_tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    organization: Mapped[str] = mapped_column(String(160), nullable=False)
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reason_code: Mapped[str | None] = mapped_column(String(40))
+    reason: Mapped[str | None] = mapped_column(String(1000))
+    # What the owner asked for; the administrator decides when approving.
+    delete_data: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="PENDING")
+    data_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    decided_at = _ts()
+    decision_note: Mapped[str | None] = mapped_column(String(500))
+    created_at = _ts(False)
+    updated_at = _ts(False)
+    __table_args__ = (
+        Index("ix_trial_exit_requests_trial", "trial_tenant_id", "created_at"),
+        Index("ix_trial_exit_requests_status", "status", "created_at"),
+        CheckConstraint(
+            "status IN ('PENDING', 'APPROVED', 'DECLINED', 'WITHDRAWN')", name="ck_trial_exit_requests_status"
+        ),
+    )
+
+
 class TrialFeedback(Base):
     """A free-trial user's feedback on MDARIX, with their consent for showing it on the website.
 

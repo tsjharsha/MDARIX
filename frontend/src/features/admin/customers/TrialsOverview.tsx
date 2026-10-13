@@ -11,6 +11,7 @@ import {
   type TrialItem,
   type TrialOverview,
 } from "./trials";
+import { TrialExitRequests } from "./TrialExitRequests";
 
 /**
  * Trials: every free trial still holding data, as MDARIX staff need to see it to help a prospect succeed. How many
@@ -103,6 +104,7 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
           {!items.some((item) => item.state !== "ENDED") && <p className="ac-muted">No active trial.</p>}
         </Panel>
       </div>
+      <TrialExitRequests onChanged={overview.reload} />
       <Panel eyebrow="Every trial" title="Trials holding data" source={overview}>
         <Table<TrialItem>
           caption="Free trials"

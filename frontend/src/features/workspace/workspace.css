@@ -2738,3 +2738,20 @@ div.uw-task-count:hover {
 .uw-journey-step button {
   margin-top: auto;
 }
+
+/* Ending the trial early (sections/EndTrial.tsx). */
+.uw-exit-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-exit-status.is-pending {
+  background: #fffbeb;
+  color: #713f12;
+}
+.uw-exit-button {
+  color: var(--ac-critical);
+}

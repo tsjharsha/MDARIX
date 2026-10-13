@@ -342,6 +342,87 @@ def send_trial_ended(recipient: str, organization: str, *, delete_on: str) -> st
     )
 
 
+def send_trial_ended_early(recipient: str, organization: str, *, data_deleted: bool, delete_on: str = "") -> str:
+    """Tell the trial owner that the trial ended early as they asked, whether its data is gone or kept until a date,
+    and ask, simply by replying, why they ended it (backend/app/trial/early_exit.py)."""
+    if data_deleted:
+        data = (
+            "Everything your organization stored in the trial has been deleted: its records, uploads and files, and "
+            "your team's accounts. Only a minimal record that the trial existed is kept, without names or email "
+            "addresses, as the trial terms describe.",
+        )
+        details: tuple[tuple[str, str], ...] = ()
+    else:
+        data = ("Your workspace is closed. Your data is kept until the date below, then deleted for good.",)
+        details = (("Data deleted on", delete_on),) if delete_on else ()
+    return _send(
+        recipient,
+        Message(
+            subject="Your MDARIX trial has ended",
+            heading=f"The MDARIX trial for {organization} has ended, as you asked",
+            paragraphs=(
+                "We have ended your free trial early, as you asked.",
+                *data,
+                "Would you tell us why you ended the trial early? Simply reply to this email: a line or two about what "
+                "did not work for you, or what was missing, helps us make MDARIX better for quality teams like yours.",
+            ),
+            details=details,
+            closing=("Thank you for trying MDARIX.",),
+            reason="You are receiving this email because you asked to end your free MDARIX trial.",
+        ),
+    )
+
+
+def send_trial_exit_declined(recipient: str, organization: str, *, note: str) -> str:
+    """Tell the trial owner that their request to end early was not approved yet, with the MDARIX team's message.
+    The trial continues."""
+    return _send(
+        recipient,
+        Message(
+            subject="Your request to end your MDARIX trial",
+            heading=f"About ending the MDARIX trial for {organization}",
+            paragraphs=(
+                "We have not ended your trial yet. A message from the MDARIX team:",
+                note,
+                "Your trial continues until its end date. Reply to this email if you still want to end it early.",
+            ),
+            button=("Open MDARIX", f"{company().app_url}/app"),
+            reason="You are receiving this email because you asked to end your free MDARIX trial.",
+        ),
+    )
+
+
+def send_trial_exit_request_alert(
+    recipient: str,
+    *,
+    organization: str,
+    requested_by: str,
+    reason: str = "",
+    delete_data: bool = True,
+    days_left: int = 0,
+) -> str:
+    """Tell the MDARIX team that a trial owner asked to end the trial early (to approve in Platform Admin)."""
+    details = [
+        ("Organization", organization),
+        ("Asked by", requested_by),
+        ("Their data", "Delete it" if delete_data else "Keep it until the usual deletion date"),
+        ("Days left", str(days_left)),
+    ]
+    if reason:
+        details.append(("Why", reason))
+    return _send(
+        recipient,
+        Message(
+            subject=f"Trial early end requested: {organization}",
+            heading="A free trial asked to end early. Please review it.",
+            details=tuple(details),
+            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
+            closing=("Approve or decline it in Platform Admin > Customers & Tenants > Trials.",),
+            reason="You are receiving this email because you handle MDARIX free trials.",
+        ),
+    )
+
+
 # ------------------------------------------------------------------------------------------- customer administrators
 
 

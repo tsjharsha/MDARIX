@@ -461,6 +461,175 @@ def _alert_trial_demo(recipient: str, details: dict) -> None:
         logging.getLogger(__name__).warning("Trial demo request alert failed: %s", type(exc).__name__)
 
 
+# ------------------------------------------------------------------------------------------- Ending a trial early
+
+
+class TrialExitAsk(BaseModel):
+    """The owner's request to end the trial early: why (optional) and whether to delete the data."""
+
+    reason_code: str | None = Field(default=None, max_length=40)
+    reason: str | None = Field(default=None, max_length=1000)
+    delete_data: bool = True
+
+
+class TrialExitApproval(BaseModel):
+    delete_data: bool = True
+    note: str | None = Field(default=None, max_length=500)
+
+
+class TrialExitDecline(BaseModel):
+    note: str = Field(default="", max_length=500)
+
+
+def _send_quietly(send, *args, **kwargs) -> None:
+    """Send an email after the response; a failure is only logged (the decision is saved)."""
+    import logging
+
+    try:
+        send(*args, **kwargs)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial early-end email failed: %s", type(exc).__name__)
+
+
+@router.get("/trial/exit-request")
+def trial_exit_request_status(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    """The trial's latest request to end early, whether the viewer may ask (the owner), and the reasons offered."""
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {
+        "request": early_exit.view(early_exit.latest(db, tenant_id)),
+        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+        "reasons": early_exit.EXIT_REASONS,
+    }
+
+
+@router.post("/trial/exit-request")
+def ask_to_end_trial(
+    payload: TrialExitAsk,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner asks to end the trial early. The MDARIX team approves or declines it in Platform Admin
+    (Customers & Tenants > Trials) and is told by email. A pending request is returned unchanged."""
+    import os
+
+    from auth.emailer import send_trial_exit_request_alert
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    row, created = early_exit.request_exit(
+        db,
+        tenant_id,
+        user,
+        reason_code=payload.reason_code,
+        reason=payload.reason,
+        delete_data=payload.delete_data,
+    )
+    recipient = (os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
+    if created and recipient:
+        label = early_exit.EXIT_REASONS.get(row.reason_code or "")
+        why = "; ".join(part for part in (label, row.reason) if part)
+        background.add_task(
+            _send_quietly,
+            send_trial_exit_request_alert,
+            recipient,
+            organization=row.organization,
+            requested_by=f"{user.display_name or user.username} ({user.username})",
+            reason=why,
+            delete_data=row.delete_data,
+            days_left=early_exit.days_left(db, tenant_id),
+        )
+    return {"status": "REQUESTED" if created else "ALREADY_REQUESTED", "request": early_exit.view(row)}
+
+
+@router.post("/trial/exit-request/withdraw")
+def withdraw_trial_exit(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    """The owner withdraws a pending request; the trial continues."""
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    row = early_exit.withdraw(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx))
+    return {"status": row.status, "request": early_exit.view(row)}
+
+
+@router.get("/platform-admin/trial-exit-requests")
+def list_trial_exit_requests(request: Request, db: Session = Depends(get_db)):
+    from backend.app.trial import early_exit
+
+    _require_platform_admin(request, db)
+    items = early_exit.overview(db)
+    return {"items": items, "pending": sum(1 for item in items if item["status"] == "PENDING")}
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/approve")
+def approve_trial_exit(
+    request_id: uuid.UUID,
+    payload: TrialExitApproval,
+    background: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """End the trial now and, with ``delete_data``, delete its data at once. The owner is emailed and asked why."""
+    from auth.emailer import send_trial_ended_early
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.approve(db, request_id, admin, delete_data=payload.delete_data, note=payload.note)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_ended_early, notify["recipient"], notify["organization"], data_deleted=True
+        )
+    return outcome
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/delete-data")
+def delete_ended_trial_data(
+    request_id: uuid.UUID, background: BackgroundTasks, request: Request, db: Session = Depends(get_db)
+):
+    """Delete the data of a trial ended early whose data was kept, now rather than after 30 days."""
+    from auth.emailer import send_trial_ended_early
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.delete_data_now(db, request_id, admin)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_ended_early, notify["recipient"], notify["organization"], data_deleted=True
+        )
+    return outcome
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/decline")
+def decline_trial_exit(
+    request_id: uuid.UUID,
+    payload: TrialExitDecline,
+    background: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Keep the trial running; the note is emailed to the owner and shown in Getting started."""
+    from auth.emailer import send_trial_exit_declined
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.decline(db, request_id, admin, note=payload.note)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_exit_declined, notify["recipient"], notify["organization"], note=notify["note"]
+        )
+    return outcome
+
+
 @router.get("/platform-admin/trials")
 def platform_trial_overview(request: Request, db: Session = Depends(get_db)):
     """Every free trial still holding data: dates, usage, how far into the story it went, and its feedback."""

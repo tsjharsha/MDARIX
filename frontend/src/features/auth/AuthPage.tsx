@@ -1,5 +1,5 @@
 import React, { useState, type ReactNode } from "react";
-import { CalendarCheck, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+import { CalendarCheck, Eye, EyeOff, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
 import { SignupForm } from "./SignupForm";
 import { SignupMotion } from "./SignupMotion";
 
@@ -523,14 +523,11 @@ export function AuthPage({ mode }: { mode: string }) {
             {(mode === "signin" || isTokenPassword) && (
               <label className="auth-field">
                 {isTokenPassword ? "New password" : "Password"}
-                <input
-                  required
+                <PasswordInput
                   minLength={isTokenPassword ? 12 : 1}
-                  maxLength={128}
-                  type="password"
                   autoComplete={isTokenPassword ? "new-password" : "current-password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={setPassword}
                 />
                 {isTokenPassword && <small>Only you know it: administrators never see passwords.</small>}
               </label>
@@ -589,5 +586,53 @@ export function AuthPage({ mode }: { mode: string }) {
         )}
       </form>
     </AuthFrame>
+  );
+}
+
+/**
+ * A password field with an eye button that shows what was typed, to check it before signing in or setting it; it is
+ * hidden again whenever the form is sent (exported for its test).
+ */
+export function PasswordInput({
+  value,
+  onChange,
+  minLength,
+  autoComplete,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minLength: number;
+  autoComplete: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="auth-password">
+      <input
+        required
+        minLength={minLength}
+        maxLength={128}
+        type={visible ? "text" : "password"}
+        autoComplete={autoComplete}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => {
+          // Leaving the form (sending it, or going elsewhere) hides the password again.
+          if (!event.currentTarget.form?.contains(event.relatedTarget as Node | null)) setVisible(false);
+        }}
+      />
+      <button
+        type="button"
+        className="auth-password-toggle"
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        title={visible ? "Hide password" : "Show password"}
+        onClick={() => setVisible((shown) => !shown)}
+      >
+        {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+      </button>
+    </span>
   );
 }
