@@ -82,7 +82,34 @@ operator knows a release migrates the database.
   Regulations 2002 as amended, regulation 44ZH) and Canada (Health Canada: 10 days for a death or serious
   deterioration, 30 days for an incident that could cause one if it recurred; SOR/98-282 section 60).
 - Migration `md42` adds `case_ai_runs` (dedicated legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py
---apply`).
+  --apply`).
+- Records › Risk file input (ISO 14971:2019 clause 10): for every product, what post-market data said in the period
+  (complaints reporting harm or a malfunction, a rising trend, decided signals) beside what reached its risk file
+  (completed risk reviews, the risks they assessed, the outcomes, reassessments open or overdue). Each product shows
+  one state, most urgent first: post-market data not reviewed against the risk file, reassessment overdue,
+  reassessment open, no risk register, reviewed or quiet; the product view lists each risk with the reviews that
+  assessed it, never-assessed risks first (`GET /api/v1/post-market/risk-file`, `.../risk-file/{product_id}`, 90 days
+  to 3 years, rules only, no new tables).
+- Readiness: a check for products whose post-market data has not reached the risk file (critical when not reviewed or
+  a reassessment is overdue), opening Records › Risk file input; the management review summary PDF gains section 5,
+  "Post-market data and the risk file".
+
+### Changed
+
+- Production runs one `background` service instead of `worker` and `scheduler`: `scripts/run_background.py` starts the
+  outbox worker and the scheduler unchanged as two processes, passes a stop signal to both and exits when either
+  stops, so Docker restarts the container; its health check needs both heartbeats (1.5 GB, 60 s stop period). After
+  upgrading, `docker compose up -d --remove-orphans` removes the old containers; `dc exec background python
+  scripts/run_scheduler.py --list` replaces `dc exec scheduler ...`.
+- ClamAV reloads its signatures in place (`CLAMD_CONF_ConcurrentDatabaseReload: "no"`), so its limit drops from 2 GB to
+  1.5 GB; scans pause for a few seconds during the daily update. The long-running services now need 5.25 GB (was
+  6.75 GB), plus 1 GB while the backup runs.
+- CI: a pull request runs the fast checks (backend, frontend, security, image scan, production compose and stack, the
+  desktop browser profile); dedicated data planes, data-plane routing, deployment roles, container and simulator
+  validation and the mobile browser profile run after every merge to main, nightly (was weekly security scans only) and
+  on demand. The release gate accepts those as skipped only on a pull request.
+- Dependabot proposes updates monthly (was weekly), grouped (Python and npm minor and patch updates, the base images,
+  the GitHub Actions); security updates still arrive as soon as an advisory is published.
 
 ## [0.9.0] - 2026-10-12
 

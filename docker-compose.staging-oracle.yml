@@ -66,7 +66,7 @@ services:
       driver: json-file
       options: {max-size: "20m", max-file: "10"}
 
-  # The schema job waits for the database; the API, worker and scheduler already wait for the schema job.
+  # The schema job waits for the database; the API and the background service already wait for the schema job.
   migrate:
     depends_on:
       postgres: {condition: service_healthy}

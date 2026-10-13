@@ -52,7 +52,7 @@ exactly that organization and no business records, invites the first Customer Ad
 activation link is printed; send it securely) and writes `acme/cell.env`: the complete environment of the cell's
 containers (deployment role, organization, database login, every key and secret, the pinned platform key).
 
-Give `cell.env` to the `api`, `worker` and `scheduler` services as their environment file. Keep it as the cell's
+Give `cell.env` to the `api` and `background` services as their environment file. Keep it as the cell's
 secret: it is the only copy of the cell's keys.
 
 ## 4. Moving an existing organization into a cell

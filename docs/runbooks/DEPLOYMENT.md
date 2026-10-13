@@ -1,15 +1,15 @@
 # Deploying MDARIX for design partners
 
-One Linux VM runs everything except the database: Caddy (HTTPS front door), the API, the background worker, the
-scheduler and ClamAV. Postgres is a managed service with point-in-time recovery; uploaded files live in an S3 bucket.
+One Linux VM runs everything except the database: Caddy (HTTPS front door), the API, the background service (the
+outbox worker and the scheduler in one container) and ClamAV. Postgres is a managed service with point-in-time recovery; uploaded files live in an S3 bucket.
 Everything is defined in `docker-compose.prod.yml`. Settings live in two files on the VM:
 
 | File | Template | Read by | Holds |
 |---|---|---|---|
-| `.env.production` | `.env.production.example` | api, worker, scheduler (and migrate, backup) | everything except the secrets below |
+| `.env.production` | `.env.production.example` | api, background (and migrate, backup) | everything except the secrets below |
 | `.env.migrate` | `.env.migrate.example` | the one-shot `migrate` job and the `backup` job only | the database owner's password, dedicated-plane owner URLs, the backup login, the off-site bucket keys |
 
-The API, worker and scheduler refuse to start if an owner or backup password reaches their environment, so a
+The API, worker and scheduler processes refuse to start if an owner or backup password reaches their environment, so a
 compromised long-running service never holds credentials that bypass row-level security.
 
 Staging runs the same stack on a free Oracle Cloud ARM server, with Postgres on the server: see
@@ -28,7 +28,7 @@ export COMPOSE_FILE=docker-compose.prod.yml COMPOSE_ENV_FILES=.env.production   
 
 | Item | Recommendation |
 |---|---|
-| VM | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 80 GB disk. The compose limits add up to about 7 GB (ClamAV 2 GB, API 2 GB, worker 1.5 GB, scheduler 1 GB, backup 1 GB, Caddy 256 MB). |
+| VM | Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 80 GB disk. The compose limits add up to 5.25 GB for the services that always run (ClamAV 1.5 GB, API 2 GB, background service 1.5 GB, Caddy 256 MB), plus 1 GB while the nightly backup runs. ClamAV reloads its signatures in place (`ConcurrentDatabaseReload` off), so it never holds two copies in memory; scans pause for a few seconds during the daily update. |
 | Database | Managed PostgreSQL 16 with the `pgvector` and `pgcrypto` extensions, point-in-time recovery on (7+ days), automated daily snapshots, TLS required (AWS RDS, Azure Database for PostgreSQL Flexible Server, Google Cloud SQL). **Direct connection only, no transaction-mode pooler** (PgBouncer in transaction mode, RDS Proxy pinning aside): the scheduler holds session-level advisory locks, which a transaction pooler would hand to other clients. |
 | Files | An S3 bucket in the same region (versioning on, private, SSE), `MDARIX_OBJECT_STORAGE_PROVIDER=s3`. The provider keeps uploaded files durable on its own; see BACKUP_AND_RESTORE.md for the file RPO. |
 | DNS | An A record (and AAAA if IPv6) for the app domain pointing at the VM. With `MDARIX_WWW_REDIRECT=on`, also `www` (CNAME to the domain): Caddy obtains its certificate too and redirects it to the domain. At Cloudflare, leave both records "DNS only" so Caddy's certificates reach browsers |
@@ -114,8 +114,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec api py
 ```
 
 `migrate` runs on every `up`: it applies new migrations, gives the runtime role its login, grants the application
-privileges, stores the system-scope token and migrates any dedicated customer databases. The API, worker and
-scheduler wait for it. It connects as the owner (`MDARIX_DB_OWNER_USER` with the password from `.env.migrate`).
+privileges, stores the system-scope token and migrates any dedicated customer databases. The API and the
+background service wait for it. It connects as the owner (`MDARIX_DB_OWNER_USER` with the password from `.env.migrate`).
 
 ### 2.5 Platform administrators, backups, monitoring
 
@@ -189,11 +189,11 @@ All commands run in `~/mdarix`; `dc` stands for `docker compose -f docker-compos
 
 | Task | Command |
 |---|---|
-| Logs (JSON, one line per request, with request id) | `dc logs -f api` (also `worker`, `scheduler`, `web`) |
+| Logs (JSON, one line per request, with request id) | `dc logs -f api` (also `background`, the outbox worker and the scheduler, and `web`) |
 | Find a customer's error | search the logs for the `request_id` shown in their error message |
 | Readiness detail (components, errors) | `dc exec api python -c "from backend.app.readiness import readiness_report as r; import json; print(json.dumps(r(), indent=1))"` |
-| Scheduled jobs and their last run | `dc exec scheduler python scripts/run_scheduler.py --list` |
-| Run every due job now | `dc exec scheduler python scripts/run_scheduler.py --once` |
+| Scheduled jobs and their last run | `dc exec background python scripts/run_scheduler.py --list` |
+| Run every due job now | `dc exec background python scripts/run_scheduler.py --once` |
 | Configuration check | `dc exec api python -m backend.app.config_check` |
 | Test the alert channels | `dc exec api python scripts/send_test_alert.py` |
 | Backup now | `dc --profile backup run --rm backup` |
@@ -228,7 +228,7 @@ note it in the ticket.
 | Database | the provider's metrics: CPU, storage, connections, replication/PITR status | storage over 80 %, connections over 80 % of the limit, PITR off |
 | TLS certificate | the uptime monitor's certificate check (Caddy renews 30 days ahead) | expires within 14 days |
 | ClamAV | `dc ps clamav` health; the API refuses uploads it cannot scan | unhealthy (signatures stale or daemon down) |
-| Containers | `dc ps -a`: every long-running service has a health check (api, worker, scheduler, web, clamav) | any unhealthy or restarting |
+| Containers | `dc ps -a`: every long-running service has a health check (api, background, web, clamav; background is healthy only while both the worker and the scheduler write their heartbeats) | any unhealthy or restarting |
 
 Logs: every service writes JSON to Docker's `json-file` driver, at most 10 files of 20 MB per container, so a chatty
 service cannot fill the disk. To keep logs in the host journal instead (one place for `journalctl`, shipping with the

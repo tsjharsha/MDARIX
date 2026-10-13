@@ -101,7 +101,7 @@ there: choose one close to you that offers Ampere A1 (most commercial regions do
 | Boot volume | 100 GB (Always Free covers 200 GB of block storage in total) |
 
 2 OCPUs and 12 GB is the Always Free allowance since Oracle reduced it in 2026 (from 4 and 24). The stack needs about
-9 GB under its memory limits (API 2, worker 1.5, scheduler 1, ClamAV 2, Postgres 2, Caddy 0.25), so it fits, with a
+7.25 GB under its memory limits (API 2, background service 1.5, ClamAV 1.5, Postgres 2, Caddy 0.25), so it fits, with a
 swap file for spikes. If your console still allows 4 and 24 at no cost, 2 and 12 is still enough.
 
 **"Out of capacity"** means the region has no free ARM capacity at that moment. Try another availability domain, or
@@ -226,7 +226,7 @@ the `postgres` user signs in over the socket (`infrastructure/staging/pg_hba.con
 docker compose build api web                          # ARM images: mdarix/api and mdarix/web, tagged MDARIX_RELEASE
 ```
 
-The `migrate`, `worker` and `scheduler` services run the `api` image. The first build downloads the dependencies and
+The `migrate` and `background` services run the `api` image. The first build downloads the dependencies and
 the embedding model, and takes a while on two cores.
 
 ## 7. Check the settings, start, and create the administrators
@@ -293,8 +293,8 @@ The alert arrives in the webhook channel and/or the mailbox, and the script exit
 2. Create a heartbeat check with a period of 5 minutes and a grace time of 5 minutes (the scheduler pings every 5
    minutes), and put its ping address in `MDARIX_SCHEDULER_HEARTBEAT_URL`. Restart with
    `docker compose up -d --no-build --wait`.
-3. Drill: `docker compose stop scheduler` and wait for the heartbeat monitor's alert. Then
-   `docker compose start scheduler` and wait for the recovery notice.
+3. Drill: `docker compose stop background` (the outbox worker and the scheduler) and wait for the heartbeat
+   monitor's alert. Then `docker compose start background` and wait for the recovery notice.
 
 ### 8.4 Two application instances on one database
 
