@@ -31,8 +31,8 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 /**
- * The sample data, explained: what the trial's sample holds, the pain point each part re-creates with the requirement
- * behind it and the screen that shows it, and how the sample was made. Shown in Getting started while the workspace
+ * The sample data, explained point by point: what the trial's sample holds, the pain point each part re-creates with the
+ * requirement behind it and the screen that shows it, and how the sample was made. Shown in Getting started while the workspace
  * holds the sample (its products are counted by the trial's status).
  */
 export function SampleDataPanel({
@@ -66,25 +66,32 @@ export function SampleDataPanel({
             ))}
           </ul>
         )}
-        <ol className="uw-sample-grid">
+        <ol className="uw-sample-list">
           {SAMPLE_PAINS.map((pain, index) => {
             const Icon = ICONS[pain.key] ?? FlaskConical;
             const canOpen = allowed(pain.opens.section);
             return (
-              <li key={pain.key} className="uw-sample-card" style={{ "--i": index } as CSSProperties}>
-                <span className="uw-sample-icon" aria-hidden="true">
-                  <Icon size={18} />
+              <li key={pain.key} className="uw-sample-point" style={{ "--i": index } as CSSProperties}>
+                <span className="uw-sample-number" aria-hidden="true">
+                  {index + 1}
                 </span>
-                <strong>{pain.title}</strong>
-                <p>
-                  <b>In the sample:</b> {pain.inSample}
-                </p>
-                <p className="uw-sample-why">
-                  <b>Why it matters:</b> {pain.requirement}
-                </p>
+                <div className="uw-sample-body">
+                  <h3>
+                    <Icon size={17} aria-hidden="true" /> {pain.title}
+                  </h3>
+                  <p className="uw-sample-label">In the sample</p>
+                  <ul>
+                    {pain.inSample.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                  <p className="uw-sample-why">
+                    <b>Why it matters:</b> {pain.requirement} <span className="uw-sample-ref">{pain.reference}</span>
+                  </p>
+                </div>
                 <button
                   type="button"
-                  className="ac-link"
+                  className="ac-secondary uw-sample-open"
                   onClick={() => onOpen(pain.opens)}
                   disabled={!canOpen}
                   title={canOpen ? undefined : "Your role does not include this screen"}

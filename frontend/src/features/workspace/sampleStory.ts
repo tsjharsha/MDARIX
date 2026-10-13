@@ -15,10 +15,12 @@ export type SampleCounts = {
 export type SamplePain = {
   key: string;
   title: string;
-  /** What the sample holds for this pain, as loaded at the start of the trial. */
-  inSample: string;
-  /** Why it matters: the requirement an inspector or notified body checks. */
+  /** What the sample holds for this pain, point by point, as loaded at the start of the trial. */
+  inSample: readonly string[];
+  /** Why it matters: what an inspector or notified body checks, in one sentence. */
   requirement: string;
+  /** The requirement it comes from. */
+  reference: string;
   opens: { section: string; tab?: string };
   action: string;
 };
@@ -27,69 +29,90 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
   {
     key: "hidden",
     title: "Complaints hidden in plain sight",
-    inSample:
-      "SAMPLE-RV-01, a serious injury cancelled as a suspected duplicate; SAMPLE-RV-02, an inquiry that describes a patient choking; three No Fault Found returns on OrbitCare 300 within a year (SAMPLE-RV-03 to 05).",
-    requirement:
-      "Every complaint is evaluated, and investigated where the device may have failed (ISO 13485 clause 8.2.2, part of FDA's QMSR since 2 February 2026).",
+    inSample: [
+      "SAMPLE-RV-01: a serious injury cancelled as a suspected duplicate.",
+      "SAMPLE-RV-02: an inquiry that describes a patient choking.",
+      "SAMPLE-RV-03 to 05: three No Fault Found returns on OrbitCare 300 within a year.",
+    ],
+    requirement: "Every complaint is evaluated, and investigated where the device may have failed.",
+    reference: "ISO 13485 clause 8.2.2, part of FDA's QMSR since 2 February 2026",
     opens: { section: "Complaints", tab: "Second look" },
     action: "Open the second look",
   },
   {
     key: "clocks",
     title: "Reporting clocks already running",
-    inSample:
-      "Harm and malfunction complaints with clocks running: SAMPLE-RV-06 (no occlusion alarm, patient moved to intensive care), SAMPLE-RV-07 (zero flow reading in France) and SAMPLE-RV-08 (free flow, outcome not yet known), with sample FDA and EU windows of 30, 15 and 10 days.",
+    inSample: [
+      "SAMPLE-RV-06: no occlusion alarm, patient moved to intensive care.",
+      "SAMPLE-RV-07: zero flow for 40 seconds, staff switched to manual ventilation (France).",
+      "SAMPLE-RV-08: free flow, patient outcome not yet known.",
+      "Sample FDA and EU reporting windows of 30, 15 and 10 days.",
+    ],
     requirement:
-      "FDA medical device reports within 30 calendar days, or 5 work days when remedial action is needed (21 CFR 803); EU serious incidents within 15 days at the latest, sooner for a death (EU MDR Article 87).",
+      "FDA reports within 30 calendar days (5 work days when remedial action is needed); EU serious incidents within 15 days, sooner for a death.",
+    reference: "21 CFR 803; EU MDR Article 87",
     opens: { section: "Complaints", tab: "Reportability" },
     action: "Open the reportability watch",
   },
   {
     key: "harm-closed",
     title: "Harm closed without an investigation",
-    inSample:
-      "SAMPLE-RV-09: an alarm too quiet to hear on a busy ward, a patient who needed oxygen, and a record closed after a training call.",
-    requirement:
-      "A complaint that involves injury is investigated, and the reason for any decision not to is recorded (ISO 13485 clause 8.2.2).",
+    inSample: [
+      "SAMPLE-RV-09: an alarm too quiet to hear on a busy ward.",
+      "The patient needed oxygen; the record was closed after a training call.",
+    ],
+    requirement: "A complaint that involves injury is investigated, or the reason it is not is recorded.",
+    reference: "ISO 13485 clause 8.2.2",
     opens: { section: "Readiness" },
     action: "See the inspection check",
   },
   {
     key: "trend",
     title: "A trend that started with a change",
-    inSample:
-      "OrbitCare 300 Rev B moved its pressure sensor to a new supplier and cut incoming inspection from 32 to 13 units per lot (SAMPLE-CHG-014). Pressure-alarm complaints rose afterwards, mostly from lots 003 and 004. Lots carry quantities, so the rate is counted per unit in the field. PulseWatch 410 and VentraLink 250 stay flat as a background.",
-    requirement:
-      "Complaint data is analysed for trends (ISO 13485 clause 8.4), and a significant increase is reported (EU MDR Article 88).",
+    inSample: [
+      "SAMPLE-CHG-014: OrbitCare 300 Rev B moved its pressure sensor to a new supplier and cut incoming inspection from 32 to 13 units per lot.",
+      "Pressure-alarm complaints rose afterwards, mostly from lots 003 and 004.",
+      "Lots carry quantities, so the rate is counted per unit in the field.",
+      "PulseWatch 410 and VentraLink 250 stay flat, as a background.",
+    ],
+    requirement: "Complaint data is analysed for trends, and a significant increase is reported.",
+    reference: "ISO 13485 clause 8.4; EU MDR Article 88",
     opens: { section: "Signals", tab: "Trend check" },
     action: "Open the trend check",
   },
   {
     key: "investigate",
     title: "An investigation with its evidence",
-    inSample:
-      "SAMPLE-INV-001 asks why pressure alarms rose after Rev B, with the supplier change, the incoming inspection results for lots 003 and 004 and the complaint trend as evidence.",
-    requirement:
-      "The cause is found and recorded before action is taken, and every conclusion traces back to its evidence.",
+    inSample: [
+      "SAMPLE-INV-001: why did pressure alarms rise after Rev B?",
+      "Evidence: the supplier change, the incoming inspection results for lots 003 and 004, and the complaint trend.",
+    ],
+    requirement: "The cause is found before action is taken, and every conclusion traces back to its evidence.",
+    reference: "ISO 13485 clauses 8.2.2 and 8.5.2",
     opens: { section: "Investigations" },
     action: "Open the investigation",
   },
   {
     key: "capa",
     title: "CAPAs closed without proof they worked",
-    inSample: "SAMPLE-CAPA-01 was closed without an effectiveness check; SAMPLE-CAPA-02 has its check due in 12 days.",
-    requirement:
-      "Corrective action is verified to be effective and to have no adverse effect (ISO 13485 clause 8.5.2).",
+    inSample: [
+      "SAMPLE-CAPA-01: closed without an effectiveness check.",
+      "SAMPLE-CAPA-02: its effectiveness check is due in 12 days.",
+    ],
+    requirement: "Corrective action is verified to be effective and to have no adverse effect.",
+    reference: "ISO 13485 clause 8.5.2",
     opens: { section: "Records", tab: "Effectiveness checks" },
     action: "Open the effectiveness checks",
   },
   {
     key: "risk",
     title: "Post-market data that never reached the risk file",
-    inSample:
-      "Three risks (SAMPLE-RSK-01 to 03) that no review has reassessed since the harm and malfunction complaints, and PulseWatch 410 with no risk in MDARIX at all.",
-    requirement:
-      "Production and post-production information is fed back into the risk file (ISO 14971:2019 clause 10).",
+    inSample: [
+      "SAMPLE-RSK-01 to 03: risks no review has reassessed since the harm and malfunction complaints.",
+      "PulseWatch 410: no risk recorded in MDARIX at all.",
+    ],
+    requirement: "Production and post-production information is fed back into the risk file.",
+    reference: "ISO 14971:2019 clause 10",
     opens: { section: "Records", tab: "Risk file input" },
     action: "Open the risk file input",
   },

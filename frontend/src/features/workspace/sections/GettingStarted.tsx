@@ -20,6 +20,7 @@ import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
 import { BookDemo } from "./BookDemo";
 import { SampleDataPanel, scrollToSampleData } from "./SampleData";
+import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
 import {
   CHAPTER_ACTION,
@@ -178,7 +179,11 @@ export function GettingStartedSection() {
               chapter={chapter}
               isNext={chapter.code === story.data?.next}
               allowed={allowed(chapter.opens.section)}
-              templates={chapter.code === "YOUR_DATA" ? trial?.templates : undefined}
+              templates={
+                chapter.code === "YOUR_DATA"
+                  ? importTemplatesFor(trial?.templates ?? [], featureSetOf(session?.feature_set)).core
+                  : undefined
+              }
               onOpen={() => go(chapter)}
             />
           ))}

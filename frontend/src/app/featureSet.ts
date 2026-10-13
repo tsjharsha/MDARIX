@@ -98,6 +98,33 @@ export function adminAreasFor<T extends readonly [string, string, unknown, reado
     });
 }
 
+/**
+ * The data the MVP's screens read, in loading order: products, lots (with quantities, for per-unit trends), complaints,
+ * then the investigations, CAPAs and risks that refer to them (the readiness checks, effectiveness checks and risk file
+ * input). Under mvp the other templates (components, suppliers, bill of materials…) are offered on request only.
+ */
+export const MVP_IMPORT_ENTITIES: readonly string[] = [
+  "products",
+  "lots",
+  "complaints",
+  "investigations",
+  "capas",
+  "risks",
+];
+
+/** The import templates to show first, and the ones offered on request, for this feature set. */
+export function importTemplatesFor<T extends { entity: string }>(
+  templates: readonly T[],
+  featureSet: FeatureSet,
+): { core: T[]; more: T[] } {
+  if (featureSet !== "mvp") return { core: [...templates], more: [] };
+  const rank = (item: T) => MVP_IMPORT_ENTITIES.indexOf(item.entity);
+  return {
+    core: templates.filter((item) => rank(item) >= 0).sort((left, right) => rank(left) - rank(right)),
+    more: templates.filter((item) => rank(item) < 0),
+  };
+}
+
 /** A tab's name and what it carries after "?" (a case, a request, a view). */
 function tabParts(tab: string | undefined): { name: string; query: string } {
   const text = tab ?? "";

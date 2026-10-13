@@ -5,6 +5,7 @@ import {
   PARKED_VIEWS,
   adminAreasFor,
   featureSetOf,
+  importTemplatesFor,
   offeredTab,
   recordsAuditView,
   routeFor,
@@ -155,6 +156,22 @@ describe("feature set", () => {
     expect(plans?.[1]).toBe("Plans and subscriptions");
     const operations = mvp.find((area) => area[0] === "Operations");
     expect(operations?.[3]).toEqual(["System health", "Queues & jobs", "Email & notifications"]);
+  });
+
+  it("offers the six data types the MVP reads first, in loading order, and the rest on request", () => {
+    const entities = ["products", "lots", "complaints", "components", "suppliers", "risks", "investigations", "capas"];
+    const templates = entities.map((entity) => ({ entity }));
+    expect(importTemplatesFor(templates, "full")).toEqual({ core: templates, more: [] });
+    const { core, more } = importTemplatesFor(templates, "mvp");
+    expect(core.map((item) => item.entity)).toEqual([
+      "products",
+      "lots",
+      "complaints",
+      "investigations",
+      "capas",
+      "risks",
+    ]);
+    expect(more.map((item) => item.entity)).toEqual(["components", "suppliers"]);
   });
 
   it("parks the customer's source-system connections and mapping under mvp only", () => {

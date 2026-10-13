@@ -4,7 +4,8 @@ import { requestJson } from "../../../app/apiClient";
 import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { importTemplatesFor } from "../../../app/featureSet";
 import { countOf } from "./common";
 
 /*
@@ -110,6 +111,10 @@ export function ImportPanel({
   eyebrow?: string;
 }) {
   const [entity, setEntity] = useState("products");
+  // Under the MVP feature set the six data types its screens read come first; the others are offered on request.
+  const { core, more } = importTemplatesFor(templates, useFeatureSet());
+  const [showMore, setShowMore] = useState(false);
+  const shown = showMore ? [...core, ...more] : core;
   const [file, setFile] = useState<File | null>(null);
   const [dateFormat, setDateFormat] = useState<DateFormat>("ISO");
   const [options, setOptions] = useState<ImportOptions>(NO_OPTIONS);
@@ -204,7 +209,7 @@ export function ImportPanel({
         them. Comma, semicolon and tab separated files are all read; save them as CSV UTF-8.
       </p>
       <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
-        {templates.map((item, index) => (
+        {shown.map((item, index) => (
           <button
             key={item.entity}
             type="button"
@@ -217,6 +222,23 @@ export function ImportPanel({
           </button>
         ))}
       </div>
+      {more.length > 0 && (
+        <button
+          type="button"
+          className="ac-link uw-import-more"
+          aria-expanded={showMore}
+          disabled={busy}
+          onClick={() => {
+            // Hiding the extra types while one is chosen goes back to the first template.
+            if (showMore && more.some((item) => item.entity === entity)) setEntity(core[0]?.entity ?? "products");
+            setShowMore((value) => !value);
+          }}
+        >
+          {showMore
+            ? "Show only the six data types the checks read"
+            : `Show ${more.length} more data types for deeper investigations (components, suppliers, changes…)`}
+        </button>
+      )}
       {template && (
         <div className="uw-trial-template">
           <div>
