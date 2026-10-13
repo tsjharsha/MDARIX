@@ -16,7 +16,9 @@ import {
   type Readiness,
   type ReadinessCheck,
 } from "../readiness";
-import { Hero, InlineError } from "./boardParts";
+import { InlineError } from "./boardParts";
+import { QualityLoop } from "./QualityLoop";
+import { loopFromReadiness } from "../qualityLoop";
 
 const HOME_ICONS: Record<string, typeof ScanSearch> = {
   COMPLAINTS_TO_RECHECK: ScanSearch,
@@ -42,15 +44,18 @@ export function ReadinessSection() {
   );
   return (
     <div className="ac-overview">
-      <Hero
-        tone={data.data ? headline.tone : "neutral"}
-        icon={<ShieldCheck size={28} />}
+      <QualityLoop
+        stations={loopFromReadiness(data.data)}
         eyebrow={`Inspection readiness${data.data ? ` · ${data.data.as_of}` : ""}`}
         title={headline.title}
         detail={headline.detail}
+        doneLabel="clear"
+        onOpen={(station) =>
+          station.opens && open(station.opens.section as WorkspaceSection, station.opens.tab ?? undefined)
+        }
       >
         <SummaryDownload />
-      </Hero>
+      </QualityLoop>
       <div className="uw-rd-home" aria-label="The four numbers">
         {(data.data?.home ?? []).map((check) => (
           <HomeTile key={check.code} check={check} onOpen={() => go(check)} />

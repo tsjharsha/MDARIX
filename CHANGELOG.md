@@ -121,8 +121,34 @@ operator knows a release migrates the database.
   dataset. Neither file exists yet: the dataset awaits a person's sign-off, and the evaluation awaits the contracted
   provider.
 
+- The quality loop, an animated hero on Readiness, the Dashboard and Getting started. The inspection checks are
+  drawn as stations on one closed loop, in the order a complaint travels: hidden complaints found, handled on time,
+  reported in window, harm investigated, signals triaged, trends acted on, CAPAs proven, risk file fed. A pulse
+  travels the loop and stations that need attention pulse; the weakest link is named. A list beside it says the same
+  in words and opens each station's records. The picture is still and complete under reduced motion.
+- The free trial's story (`GET /api/v1/trial/story`, `backend/app/trial/story.py`): nine chapters of the loop. Each
+  shows what the trial's records hold, the 2026 inspection pain it answers, and whether the organization acted in it.
+  A chapter counts only on a record the organization created (a second-look decision, a reporting decision, a case
+  from a signal, an AI run or Ask answer, a signed decision, an effectiveness check, a completed risk review, a
+  summary download, its own imported complaints), never on page views.
+- Platform Admin › Customers & Tenants › Trials (`GET /api/v1/platform-admin/trials`): every free trial holding data,
+  with its days left, users and rows against the limits, and how far into the story it went. Each row shows the
+  chapter to try next, the last activity and the trial's feedback. Figures show active trials, those ending within 7
+  days, those that acted, engaged and uploaded their own data. A per-chapter funnel shows where trials stop, and a
+  list names who needs attention first. A tenant's AI processing panel now shows the AI release gate.
+- New free trials get the rest of the sample story at approval (`seed_story_examples`): 9 complaints, 2 CAPAs, 3 risks
+  and sample FDA and EU reporting windows, all marked `MDARIX_SAMPLE`. The complaints cover a cancelled record and an
+  inquiry with harm or complaint signs, a recurring No Fault Found, harm and malfunction complaints with running
+  reporting clocks, and a harm complaint closed without an investigation. One CAPA was closed without an effectiveness
+  check, one has its check due. Complaints, Records and Readiness therefore show findings from the first minute.
+  `scripts/refresh_trial_story.py [--apply]` adds the same records once to trials approved earlier. It never changes a
+  trial's own records or reporting windows.
+
 ### Changed
 
+- Getting started tells the trial as a story. The quality loop names the next chapter, and each chapter shows its
+  live finding, why it matters and where to try it. Progress comes from the server (what the organization did), not
+  from the browser. The import, insights and team panels are unchanged.
 - Under the `mvp` feature set the template engines that only looked like AI are hidden. The case AI run skips the
   failure-chain step (a fixed two-link template) and says why; the investigation panel no longer generates template
   chains; the static agent catalog (`GET /api/v1/ai/agents/catalog`) is parked, and the AI Control Center shows the

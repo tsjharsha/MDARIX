@@ -1,0 +1,109 @@
+"""Add the rest of the sample story to free trials approved before it existed.
+
+    python scripts/refresh_trial_story.py            # list what would be added, change nothing
+    python scripts/refresh_trial_story.py --apply    # add it
+
+New trials get the whole story at approval (backend/app/trial/sample_data.py). A trial approved earlier holds the
+sample products, complaints and the guided investigation, but not the hidden complaints, reporting clocks, CAPAs, risk
+register and sample reporting windows that Complaints, Records and Readiness show. This adds exactly those sample
+records (marked MDARIX_SAMPLE), once, to every trial that still holds its sample data; a trial's own records and its own
+reporting windows are never changed. Each trial is committed on its own, with an audit event.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from sqlalchemy.orm import Session  # noqa: E402
+
+from backend.app.db.session import SessionLocal  # noqa: E402
+
+
+def trials(db: Session) -> list[tuple]:
+    """(tenant id, tenant key, name) of every Free Trial still holding data, on the shared plane."""
+    from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
+    from backend.app.db.models.customer_lifecycle import TenantDataPlane
+    from backend.app.db.models.foundation import PlanDefinition, Tenant
+    from backend.app.db.models.stage2 import SubscriptionLifecycle
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.trial.service import FREE_TRIAL_PLAN
+
+    bind_system(db, "refresh the free trials' sample story")
+    rows = (
+        db.query(Tenant.id, Tenant.tenant_key, Tenant.name)
+        .join(SubscriptionLifecycle, SubscriptionLifecycle.tenant_id == Tenant.id)
+        .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+        .join(TenantDataPlane, TenantDataPlane.tenant_id == Tenant.id)
+        .filter(
+            PlanDefinition.code == FREE_TRIAL_PLAN,
+            TenantDataPlane.connection_secret_ref == TRIAL_SHARED_DATA_PLANE,
+            Tenant.status != "ARCHIVED",
+        )
+        .order_by(Tenant.tenant_key)
+        .all()
+    )
+    return [tuple(row) for row in rows]
+
+
+def refresh(db: Session, apply: bool) -> list[dict]:
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial.sample_data import has_sample_data, has_story_examples, seed_story_examples
+
+    results = []
+    for tenant_id, tenant_key, name in trials(db):
+        with Session(bind=db.get_bind(), autoflush=False) as session:
+            bind_tenant(session, tenant_id)
+            if not has_sample_data(session, tenant_id):
+                results.append({"tenant": tenant_key, "name": name, "result": "no sample data (left as it is)"})
+                continue
+            if has_story_examples(session, tenant_id):
+                results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
+                continue
+            if not apply:
+                results.append({"tenant": tenant_key, "name": name, "result": "would add the story"})
+                continue
+            now = datetime.now(timezone.utc)
+            added = seed_story_examples(session, tenant_id, now)
+            session.add(
+                make_audit_event(
+                    tenant_id=tenant_id,
+                    actor_ref="system:trial-sample",
+                    action="TRIAL_SAMPLE_STORY_ADDED",
+                    entity_type="Tenant",
+                    entity_id=tenant_id,
+                    details={key: value for key, value in added.items() if key != "created"},
+                    created_at=now,
+                )
+            )
+            session.commit()
+            results.append({"tenant": tenant_key, "name": name, "result": f"added {added}"})
+    return results
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--apply", action="store_true", help="add the story (without it, only list what would change)")
+    args = parser.parse_args()
+    db = SessionLocal()
+    try:
+        results = refresh(db, args.apply)
+    finally:
+        db.close()
+    for item in results:
+        print(f"{item['tenant']:<40} {item['name'][:40]:<40} {item['result']}")
+    if not results:
+        print("No free trial holds data.")
+    elif not args.apply:
+        print("\nNothing was changed. Run again with --apply to add the story.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -526,3 +526,43 @@ dl.cw-review {
     grid-column: 1 / -1;
   }
 }
+
+/* Trials (TrialsOverview.tsx): who needs attention, and each trial's progress through the story's chapters. */
+.cc-trial-attention {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-trial-attention li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cc-trial-attention span {
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}
+.cc-trial-org {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cc-trial-org small {
+  color: var(--ac-muted);
+}
+.cc-trial-progress {
+  display: inline-flex;
+  gap: 3px;
+}
+.cc-trial-progress span {
+  width: 12px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--ac-track);
+}
+.cc-trial-progress span.is-on {
+  background: var(--ac-teal);
+}

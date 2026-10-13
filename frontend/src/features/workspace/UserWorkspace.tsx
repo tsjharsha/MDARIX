@@ -78,8 +78,9 @@ import {
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; guide: string; context: boolean }> = {
   "Getting started": {
     icon: Rocket,
-    description: "Your free trial, step by step",
-    guide: "Set up your trial one step at a time: add your data, invite your team and try a first investigation.",
+    description: "Your free trial, as a story",
+    guide:
+      "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care in 2026, and where to try it. Start with the sample data, then upload your own export.",
     context: false,
   },
   Readiness: {

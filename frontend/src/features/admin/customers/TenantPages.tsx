@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { AiReleaseGate, type ReleaseGate } from "../../customer-admin/sections/AiReleaseGate";
 import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../../customer-admin/aiSettings";
 import { ArrowLeft, Ban, Globe2, Lock, PauseCircle, Pencil, PlayCircle, Plus, Unlock } from "lucide-react";
 import { Panel, ToneBadge } from "../console/charts";
@@ -465,6 +466,8 @@ type AiSettings = {
   models: { provider: string; model: string }[];
   provider_name: string | null;
   masking: boolean;
+  /** The four bars AI must pass before a pilot; production refuses switching AI on until they are met. */
+  release_gate?: ReleaseGate;
 };
 
 /** The AI provider named once: the configured provider's name, else the providers of the models in use. */
@@ -597,6 +600,7 @@ function TenantAiSettings({
           </div>
         </form>
       </Panel>
+      <AiReleaseGate gate={settings.data?.release_gate} showActions />
       <ConfirmDialog
         request={confirm}
         onClose={() => setConfirm(null)}

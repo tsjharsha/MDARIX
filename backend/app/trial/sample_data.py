@@ -59,6 +59,164 @@ _PRODUCTS = [
 ]
 
 
+# The rest of the story (Complaints, Records and Readiness show findings from the first minute; MDARIX Final
+# Lightweight MVP Plan, pains P1-P5). Records the quality system cancelled or logged as an inquiry although they carry
+# signs of a complaint, a No Fault Found code that recurs, harm and malfunction complaints whose reporting clocks run,
+# one closed without an investigation. Each has a problem code of its own, so none raises a signal, and none is in the
+# guided investigation. Fields: identifier, product, version, lot number, days since awareness, description, fields.
+STORY_MARKER = "SAMPLE-RV-01"
+_STORY_COMPLAINTS = [
+    (
+        "SAMPLE-RV-01",
+        "SAMPLE-PULSE-410",
+        "Rev B",
+        5,
+        9,
+        "Monitor's SpO2 reading dropped out overnight; the patient desaturated and was moved to intensive care. "
+        "Record cancelled as a suspected duplicate.",
+        {
+            "status": "Cancelled",
+            "problem_code": "SPO2_DROPOUT_HARM",
+            "country": "US",
+            "patient_involved": True,
+            "serious_injury": True,
+            "malfunction": True,
+        },
+    ),
+    (
+        "SAMPLE-RV-02",
+        "SAMPLE-VENTRA-250",
+        "Rev B",
+        5,
+        6,
+        "Respiratory therapist asked how to clear alarm A-17; the flow reading had spiked while the patient was "
+        "choking.",
+        {"complaint_type": "Inquiry", "country": "Germany", "patient_involved": True},
+    ),
+    (
+        "SAMPLE-RV-03",
+        "SAMPLE-ORBIT-300",
+        "Rev B",
+        5,
+        20,
+        "Returned pump tested: no fault found. Ward reported intermittent pressure alarms during infusion.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "SAMPLE-RV-04",
+        "SAMPLE-ORBIT-300",
+        "Rev A",
+        2,
+        88,
+        "Returned pump tested: no fault found. Nurse reported the pump stopped once.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "SAMPLE-RV-05",
+        "SAMPLE-ORBIT-300",
+        "Rev A",
+        1,
+        130,
+        "Returned pump tested: no fault found. Alarm history showed one unexplained restart.",
+        {"status": "Closed", "problem_code": "NFF", "country": "US"},
+    ),
+    (
+        "SAMPLE-RV-06",
+        "SAMPLE-ORBIT-300",
+        "Rev B",
+        4,
+        24,
+        "The pressure alarm did not sound during an occlusion; heparin was under-infused and the patient was moved "
+        "to intensive care.",
+        {
+            "problem_code": "UNDER_INFUSION_NO_ALARM",
+            "country": "US",
+            "patient_involved": True,
+            "serious_injury": True,
+            "death": False,
+            "malfunction": True,
+            "severity": "Critical",
+        },
+    ),
+    (
+        "SAMPLE-RV-07",
+        "SAMPLE-VENTRA-250",
+        "Rev B",
+        4,
+        12,
+        "Flow sensor showed zero flow for 40 seconds; staff switched to manual ventilation. No harm.",
+        {
+            "problem_code": "FLOW_ZERO_READING",
+            "country": "France",
+            "patient_involved": True,
+            "serious_injury": False,
+            "death": False,
+            "malfunction": True,
+        },
+    ),
+    (
+        "SAMPLE-RV-08",
+        "SAMPLE-ORBIT-300",
+        "Rev B",
+        5,
+        3,
+        "Nurse reports the pump free-flowed briefly after the door was opened; a patient was connected, outcome not "
+        "yet known.",
+        {"problem_code": "FREE_FLOW_DOOR", "country": "US", "patient_involved": True, "malfunction": True},
+    ),
+    (
+        "SAMPLE-RV-09",
+        "SAMPLE-PULSE-410",
+        "Rev B",
+        3,
+        40,
+        "Alarm volume too low to hear on a busy ward; the patient's desaturation was found late and needed oxygen "
+        "therapy. Closed after a training call.",
+        {
+            "status": "Closed",
+            "problem_code": "ALARM_VOLUME_LOW",
+            "country": "US",
+            "patient_involved": True,
+            "serious_injury": True,
+            "malfunction": True,
+        },
+    ),
+]
+# CAPAs from the quality system (Records › Effectiveness checks): one closed without an effectiveness check, one
+# whose check is due soon. Fields: identifier, product, title, status, opened days ago, due days ago, check in days.
+_STORY_CAPAS = [
+    (
+        "SAMPLE-CAPA-01",
+        "SAMPLE-PULSE-410",
+        "Tighten incoming inspection of SpO2 sensor cables (Sample)",
+        "Closed",
+        200,
+        140,
+        None,
+    ),
+    (
+        "SAMPLE-CAPA-02",
+        "SAMPLE-ORBIT-300",
+        "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors (Sample)",
+        "Effectiveness check",
+        40,
+        10,
+        12,
+    ),
+]
+# The risk register (Records › Risk file input): OrbitCare and VentraLink have risks no review has assessed since their
+# harm and malfunction complaints; PulseWatch has none in MDARIX. Fields: identifier, product, description.
+_STORY_RISKS = [
+    ("SAMPLE-RSK-01", "SAMPLE-ORBIT-300", "False pressure alarm interrupts infusion and delays therapy."),
+    ("SAMPLE-RSK-02", "SAMPLE-ORBIT-300", "Missed true occlusion leads to under-infusion."),
+    ("SAMPLE-RSK-03", "SAMPLE-VENTRA-250", "Wrong flow reading delays detection of hypoventilation."),
+]
+# The FDA and EU reporting-window templates (reportability/rules.py), as a sample procedure would state them; a trial
+# organization that set its own windows keeps them.
+_STORY_WINDOW_TEMPLATES = (0, 1, 2)
+STORY_WINDOWS_BY = "system:trial-sample"
+
+
 def _stamp(now: datetime, days_ago: int) -> dict:
     value = now - timedelta(days=days_ago)
     return {
@@ -335,5 +493,117 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                 )
             )
             counts["evidence"] += 1
+    db.flush()
+    return {"created": True, **counts}
+
+
+def has_story_examples(db: Session, tenant_id) -> bool:
+    return (
+        db.query(Complaint.id)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == STORY_MARKER)
+        .first()
+        is not None
+    )
+
+
+def seed_story_examples(db: Session, tenant_id, now: datetime | None = None) -> dict:
+    """Add the rest of the story (hidden complaints, reporting clocks, CAPAs, the risk register and the sample
+    reporting windows) to a workspace that holds the sample dataset. Idempotent: a workspace without the sample
+    products, or with the examples already, is left as it is. Flushes but never commits."""
+    from backend.app.db.models.foundation import Capa, Risk
+    from backend.app.db.models.reportability import ReportabilitySettings
+    from backend.app.reportability.rules import TEMPLATES, clean_window
+
+    if not has_sample_data(db, tenant_id) or has_story_examples(db, tenant_id):
+        return {"created": False}
+    now = now or datetime.now(timezone.utc)
+    products = {
+        row.product_identifier: row
+        for row in db.query(Product).filter(Product.tenant_id == tenant_id, Product.source_system == SAMPLE_SOURCE)
+    }
+    if {code for code, *_ in _PRODUCTS} - set(products):
+        return {"created": False}
+    versions = {
+        (product.product_identifier, version.version_identifier): version
+        for product in products.values()
+        for version in db.query(ProductVersion).filter(
+            ProductVersion.tenant_id == tenant_id, ProductVersion.product_id == product.id
+        )
+    }
+    lots = {
+        row.lot_identifier: row
+        for row in db.query(LotBatch).filter(LotBatch.tenant_id == tenant_id, LotBatch.source_system == SAMPLE_SOURCE)
+    }
+    counts = {"complaints": 0, "capas": 0, "risks": 0, "reporting_windows": 0}
+    for identifier, product_code, revision, lot_number, days, description, fields in _STORY_COMPLAINTS:
+        aware = now - timedelta(days=days)
+        version = versions.get((product_code, revision))
+        lot = lots.get(f"{product_code}-LOT-{lot_number:03d}")
+        db.add(
+            Complaint(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                complaint_identifier=identifier,
+                product_id=products[product_code].id,
+                product_version_id=version.id if version else None,
+                lot_batch_id=lot.id if lot else None,
+                event_timestamp=aware - timedelta(days=1),
+                complaint_timestamp=aware,
+                awareness_timestamp=aware,
+                description=description,
+                source_identifier=identifier,
+                **{"status": "open", **fields},
+                **_stamp(now, days),
+            )
+        )
+        counts["complaints"] += 1
+    for identifier, product_code, title, status, opened, due, check_in in _STORY_CAPAS:
+        db.add(
+            Capa(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                capa_identifier=identifier,
+                title=title,
+                action_type="CORRECTIVE",
+                source_type="QUALITY_SYSTEM",
+                product_id=products[product_code].id,
+                investigation_id=None,
+                status=status,
+                opened_at=now - timedelta(days=opened),
+                due_at=now - timedelta(days=due),
+                effectiveness_check_at=(now + timedelta(days=check_in)) if check_in is not None else None,
+                source_identifier=identifier,
+                **_stamp(now, opened),
+            )
+        )
+        counts["capas"] += 1
+    for identifier, product_code, description in _STORY_RISKS:
+        db.add(
+            Risk(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                risk_identifier=identifier,
+                product_id=products[product_code].id,
+                description=f"{description} (Sample)",
+                source_identifier=identifier,
+                **_stamp(now, 360),
+            )
+        )
+        counts["risks"] += 1
+    has_windows = (
+        db.query(ReportabilitySettings.id).filter(ReportabilitySettings.tenant_id == tenant_id).first() is not None
+    )
+    if not has_windows:
+        db.add(
+            ReportabilitySettings(
+                tenant_id=tenant_id,
+                windows=[clean_window(TEMPLATES[index]) for index in _STORY_WINDOW_TEMPLATES],
+                lookback_days=365,
+                version=1,
+                updated_by=STORY_WINDOWS_BY,
+                updated_at=now,
+            )
+        )
+        counts["reporting_windows"] = len(_STORY_WINDOW_TEMPLATES)
     db.flush()
     return {"created": True, **counts}

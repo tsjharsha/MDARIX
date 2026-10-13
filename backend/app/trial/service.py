@@ -34,7 +34,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import OnboardingRequest, SubscriptionLifecycle
 from backend.app.trial.request_profile import describe as describe_profile
-from backend.app.trial.sample_data import seed_sample_workspace
+from backend.app.trial.sample_data import seed_sample_workspace, seed_story_examples
 from backend.app.runtime_env import is_development
 
 FREE_TRIAL_PLAN = "FREE_TRIAL"
@@ -283,6 +283,9 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
             )
         )
         sample = seed_sample_workspace(db, tenant.id, now)
+        # The rest of the story: hidden complaints, reporting clocks, CAPAs, the risk register and sample reporting
+        # windows, so Complaints, Records and Readiness show findings from the first minute.
+        sample["story"] = seed_story_examples(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

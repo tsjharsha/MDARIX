@@ -34,6 +34,9 @@ import {
   workspaceAttention,
 } from "../workspaceModel";
 import { CaseStateBadge } from "./CaseHeader";
+import { QualityLoop } from "./QualityLoop";
+import { loopFromReadiness } from "../qualityLoop";
+import { READINESS_PATH, readinessHeadline, type Readiness } from "../readiness";
 import { MyInvestigationsPanel } from "./MyInvestigations";
 import { displayId, safeText } from "../../../app/displayId";
 import { roleLabels } from "../../../app/roles";
@@ -288,6 +291,8 @@ export function DashboardSection() {
         </div>
         <PlatformPulse nodes={pulse} />
       </section>
+
+      {sectionAllowed("Readiness", session?.allowed_menu, session?.business_permissions) && <DashboardLoop />}
 
       <nav className="ac-jump" aria-label="On this page">
         {[
@@ -679,5 +684,32 @@ function OpenLink({ onClick }: { onClick: () => void }) {
     <button type="button" className="ac-link" onClick={onClick}>
       Open <ChevronRight size={14} aria-hidden="true" />
     </button>
+  );
+}
+
+/**
+ * The quality loop on the dashboard: where every complaint stands, from found to risk file, as one closed loop (the
+ * inspection checks Readiness reads). Each station opens its records. Hidden until the checks have been read.
+ */
+function DashboardLoop() {
+  const { open } = useWorkspace();
+  const readiness = useResource<Readiness>(READINESS_PATH);
+  if (!readiness.data) return null;
+  const headline = readinessHeadline(readiness.data);
+  return (
+    <QualityLoop
+      stations={loopFromReadiness(readiness.data)}
+      eyebrow="Your quality loop"
+      title={headline.title}
+      detail="From the complaint that comes in to the risk file it must reach: where your records stand today, read from them. Each station opens the records behind it."
+      doneLabel="clear"
+      onOpen={(station) =>
+        station.opens && open(station.opens.section as WorkspaceSection, station.opens.tab ?? undefined)
+      }
+    >
+      <button type="button" className="ac-primary" onClick={() => open("Readiness")}>
+        Open Readiness
+      </button>
+    </QualityLoop>
   );
 }

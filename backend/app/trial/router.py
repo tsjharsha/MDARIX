@@ -272,6 +272,28 @@ def trial_insights(
     return imports.insights(data, uuid.UUID(str(ctx.tenant_id)))
 
 
+@router.get("/trial/story")
+def trial_story_chapters(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it."""
+    from backend.app.trial import story
+
+    _require_trial(db, ctx)
+    return story.story(data, uuid.UUID(str(ctx.tenant_id)))
+
+
+@router.get("/platform-admin/trials")
+def platform_trial_overview(request: Request, db: Session = Depends(get_db)):
+    """Every free trial still holding data: dates, usage, how far into the story it went, and its feedback."""
+    from backend.app.trial import story
+
+    _require_platform_admin(request, db)
+    return story.trial_overview(db)
+
+
 # ------------------------------------------------------------------------------------------- Trial team
 
 

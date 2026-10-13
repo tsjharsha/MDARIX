@@ -90,6 +90,7 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
   "Customers & Tenants": {
     Customers: "Every customer organization and its status. Open one to see its tenants and administrators.",
     Tenants: "Each customer's separate workspaces: their plan, administrators, sign-in, AI use and data.",
+    Trials: "Every free trial: days left, usage, how far into the story it went and the chapter it should try next.",
     Feedback: "What trial users told us about MDARIX, and the quotes that may appear on the website.",
   },
   "Plans & Licensing": {

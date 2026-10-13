@@ -1,23 +1,24 @@
 import { useState } from "react";
-import {
-  Bot,
-  CheckCircle2,
-  Circle,
-  Download,
-  FileSearch,
-  LayoutDashboard,
-  MessageSquare,
-  ShieldCheck,
-  Upload,
-} from "lucide-react";
+import { Bot, CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Upload } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
-import { BarList, Empty, Panel, RingMeter, StatTile, type PanelSource } from "../../admin/console/charts";
+import { BarList, Empty, Panel, RingMeter, StatTile, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import type { Slice } from "../../admin/console/dashboardModel";
 import { useResource } from "../../customer-admin/shared";
-import { useWorkspace, type WorkspaceSection } from "../workspaceContext";
+import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
+import { QualityLoop } from "./QualityLoop";
+import {
+  CHAPTER_ACTION,
+  TRIAL_STORY_PATH,
+  chapterStatus,
+  chapterTone,
+  loopFromStory,
+  storyHeadline,
+  type StoryChapter,
+  type TrialStory,
+} from "../trialStory";
 
 export type TrialStatus = {
   is_trial: boolean;
@@ -42,118 +43,65 @@ type Insights = {
   note: string;
 };
 
-const VISITED_KEY = "mdarix.trial.visited";
-const readVisited = (): string[] => {
-  try {
-    return JSON.parse(window.localStorage.getItem(VISITED_KEY) ?? "[]");
-  } catch {
-    return [];
-  }
-};
-const markVisited = (step: string) => {
-  try {
-    window.localStorage.setItem(VISITED_KEY, JSON.stringify([...new Set([...readVisited(), step])]));
-  } catch {
-    // Progress ticks are a convenience; the checklist still works without browser storage.
-  }
-};
 const slices = (items: { label: string; count: number }[]): Slice[] =>
   items.map((item) => ({ key: item.label, label: item.label, count: item.count, tone: "neutral" }));
 
+const scrollToImport = () => document.getElementById("trial-import")?.scrollIntoView({ behavior: "smooth" });
+
+/**
+ * Getting started: the free trial as a story. The quality loop MDARIX closes, chapter by chapter, each with what the
+ * trial's records show (the sample data first, its own export later), why it matters to inspectors in 2026 and where
+ * to try it. A chapter is done when the organization acted in it (a record it created in MDARIX), so the progress here
+ * is the progress MDARIX sees (/api/v1/trial/story).
+ */
 export function GettingStartedSection() {
-  const { open, work } = useWorkspace();
+  const { open, work, session } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
-  const [visited, setVisited] = useState<string[]>(readVisited);
+  const story = useResource<TrialStory>(TRIAL_STORY_PATH);
   const trial = status.data;
-
-  const go = (step: string, section: WorkspaceSection, tab?: string) => {
-    markVisited(step);
-    setVisited(readVisited());
-    open(section, tab);
+  const allowed = (section: string) =>
+    section === "Getting started" ||
+    sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
+  const go = (chapter: Pick<StoryChapter, "code" | "opens">) => {
+    if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return scrollToImport();
+    if (allowed(chapter.opens.section)) open(chapter.opens.section as WorkspaceSection, chapter.opens.tab ?? undefined);
   };
-  const ownComplaints = trial?.own_data?.complaints ?? 0;
-  const steps: {
-    id: string;
-    title: string;
-    detail: string;
-    icon: typeof Bot;
-    done: boolean;
-    action: () => void;
-    label: string;
-  }[] = [
-    {
-      id: "overview",
-      title: "Look at the Dashboard",
-      detail: "Signals, investigations and evidence from the sample data, in one view.",
-      icon: LayoutDashboard,
-      done: visited.includes("overview"),
-      action: () => go("overview", "Dashboard"),
-      label: "Open Dashboard",
-    },
-    {
-      id: "investigation",
-      title: "Open the guided investigation",
-      detail: "Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?",
-      icon: FileSearch,
-      done: visited.includes("investigation"),
-      action: () => go("investigation", "Investigations"),
-      label: "Open investigation",
-    },
-    {
-      id: "ask",
-      title: "Ask MDARIX a question",
-      detail: "Every answer cites the evidence it used, and says what is still unknown.",
-      icon: Bot,
-      done: visited.includes("ask"),
-      action: () => go("ask", "Intelligence", "Ask MDARIX"),
-      label: "Ask MDARIX",
-    },
-    {
-      id: "templates",
-      title: "Download the CSV templates",
-      detail: `${
-        trial?.templates?.length ? templateSummary(trial.templates) : "Products, lots, complaints and more"
-      }: fill them from an export of your own system.`.replace(/^./, (letter) => letter.toUpperCase()),
-      icon: Download,
-      done: visited.includes("templates"),
-      action: () => {
-        markVisited("templates");
-        setVisited(readVisited());
-        document.getElementById("trial-import")?.scrollIntoView({ behavior: "smooth" });
-      },
-      label: "Go to templates",
-    },
-    {
-      id: "upload",
-      title: "Upload your data and review the insights",
-      detail: "Each file is checked for problems and personal data before anything is saved.",
-      icon: Upload,
-      done: ownComplaints > 0,
-      action: () => document.getElementById("trial-import")?.scrollIntoView({ behavior: "smooth" }),
-      label: "Upload data",
-    },
-    {
-      id: "talk",
-      title: "Talk to us about becoming a design partner",
-      detail: "Live connections to your QMS, PLM and ERP, and onboarding support.",
-      icon: MessageSquare,
-      done: visited.includes("talk"),
-      action: () => {
-        markVisited("talk");
-        setVisited(readVisited());
-        window.open("/contact", "_blank", "noopener");
-      },
-      label: "Contact us",
-    },
-  ];
-  const doneCount = steps.filter((step) => step.done).length;
+  const chapters = story.data?.chapters ?? [];
+  const acted = story.data?.acted ?? 0;
+  const total = story.data?.total ?? 9;
+  const headline = storyHeadline(story.data);
+  const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
+  const talk = () => window.open("/contact", "_blank", "noopener");
 
   if (status.state === "ready" && trial && !trial.is_trial)
     return <Empty title="Not a trial workspace" detail="Getting started is shown during a free trial." />;
 
   return (
     <div className="ac-overview uw-trial">
+      <QualityLoop
+        stations={loopFromStory(story.data)}
+        eyebrow={
+          trial?.days_left !== undefined
+            ? `Your free trial · ${countOf(trial.days_left, "day")} left`
+            : "Your free trial"
+        }
+        title={headline.title}
+        detail={headline.detail}
+        doneLabel="tried"
+        focusKey={story.data?.next}
+        onOpen={(station) => station.opens && go({ code: station.key, opens: station.opens as StoryChapter["opens"] })}
+      >
+        {next && (
+          <button type="button" className="ac-primary" onClick={() => go(next)} disabled={!allowed(next.opens.section)}>
+            {CHAPTER_ACTION[next.code] ?? "Open"} <ChevronRight size={15} aria-hidden="true" />
+          </button>
+        )}
+        <button type="button" className="ac-secondary" onClick={talk}>
+          <MessageSquare size={15} aria-hidden="true" /> Talk to us
+        </button>
+      </QualityLoop>
+
       <Panel
         title={
           trial?.days_left !== undefined
@@ -164,7 +112,7 @@ export function GettingStartedSection() {
         source={status}
       >
         <div className="uw-trial-head">
-          <RingMeter value={doneCount} total={steps.length} label="checklist done" />
+          <RingMeter value={acted} total={total} label="chapters tried" />
           <div className="uw-trial-stats">
             <StatTile
               label="Trial ends"
@@ -194,26 +142,32 @@ export function GettingStartedSection() {
         </div>
       </Panel>
 
-      <Panel title="Your first steps" eyebrow={`${doneCount} of ${steps.length} done`}>
-        <ol className="uw-trial-steps">
-          {steps.map((step, index) => (
-            <li key={step.id} className={step.done ? "is-done" : ""}>
-              <span className="uw-trial-step-mark" aria-hidden="true">
-                {step.done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
-              </span>
-              <div>
-                <strong>
-                  {index + 1}. {step.title}
-                </strong>
-                <p>{step.detail}</p>
-              </div>
-              <button type="button" className={step.done ? "ac-secondary" : "ac-primary"} onClick={step.action}>
-                <step.icon size={15} aria-hidden="true" /> {step.label}
-              </button>
-              <span className="ca-sr-only">{step.done ? "Done" : "Not done yet"}</span>
-            </li>
+      <Panel title="Your story, chapter by chapter" eyebrow={`${acted} of ${total} tried`} source={story}>
+        <p className="uw-trial-lede">
+          Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records first and on your
+          own export once you upload it. A chapter counts as tried when you act in it: decide, record, run or sign.
+        </p>
+        <ol className="uw-trial-steps uw-story-steps">
+          {chapters.map((chapter) => (
+            <ChapterRow
+              key={chapter.code}
+              chapter={chapter}
+              isNext={chapter.code === story.data?.next}
+              allowed={allowed(chapter.opens.section)}
+              templates={chapter.code === "YOUR_DATA" ? trial?.templates : undefined}
+              onOpen={() => go(chapter)}
+            />
           ))}
         </ol>
+        <div className="uw-story-partner">
+          <div>
+            <strong>Ready to run it on your live systems?</strong>
+            <p>Live connections to your QMS, PLM and ERP, onboarding support, and a design-partner price.</p>
+          </div>
+          <button type="button" className="ac-secondary" onClick={talk}>
+            <MessageSquare size={15} aria-hidden="true" /> Talk to us about becoming a design partner
+          </button>
+        </div>
       </Panel>
 
       <ImportPanel
@@ -224,6 +178,7 @@ export function GettingStartedSection() {
         onImported={() => {
           status.reload();
           insights.reload();
+          story.reload();
           work.refreshProducts();
         }}
       />
@@ -232,6 +187,60 @@ export function GettingStartedSection() {
 
       <TeamPanel onChanged={status.reload} />
     </div>
+  );
+}
+
+/** One chapter: what it does, what your records show, why it matters, and where to try it (exported for its test). */
+export function ChapterRow({
+  chapter,
+  isNext,
+  allowed,
+  templates,
+  onOpen,
+}: {
+  chapter: StoryChapter;
+  isNext: boolean;
+  allowed: boolean;
+  templates?: ImportTemplate[];
+  onOpen: () => void;
+}) {
+  const done = chapter.acted.done;
+  const finding = chapter.finding.text;
+  return (
+    <li className={`uw-story-step${done ? " is-done" : ""}${isNext ? " is-next" : ""}`}>
+      <span className="uw-trial-step-mark" aria-hidden="true">
+        {done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+      </span>
+      <div className="uw-story-body">
+        <strong>
+          {chapter.number}. {chapter.title}
+        </strong>
+        <p>{chapter.promise}</p>
+        {finding && (
+          <p className="uw-story-finding">
+            <ToneBadge tone={chapterTone(chapter)} label={chapterStatus(chapter)} /> {finding}
+          </p>
+        )}
+        {templates?.length ? (
+          <p className="uw-story-templates">
+            Templates: {templateSummary(templates)}; download them in the import panel below.
+          </p>
+        ) : null}
+        <p className="uw-story-pain">
+          <b>Why it matters:</b> {chapter.pain}
+        </p>
+      </div>
+      <button
+        type="button"
+        className={done ? "ac-secondary" : "ac-primary"}
+        onClick={onOpen}
+        disabled={!allowed}
+        title={allowed ? undefined : "Your role does not include this screen"}
+      >
+        {done ? "Open again" : (CHAPTER_ACTION[chapter.code] ?? "Open")}
+      </button>
+      <span className="ca-sr-only">{done ? "Tried" : "Not tried yet"}</span>
+    </li>
   );
 }
 

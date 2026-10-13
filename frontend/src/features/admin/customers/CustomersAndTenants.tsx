@@ -6,6 +6,7 @@ import { CustomerDirectory } from "./CustomerDirectory";
 import { CustomerPage } from "./CustomerPage";
 import type { Section } from "./model";
 import { TenantDirectory, TenantPage } from "./TenantPages";
+import { TrialsOverview } from "./TrialsOverview";
 import { ColumnScopeProvider } from "../../tables/ColumnChooser";
 import "../../customer-admin/customer-admin.css";
 import "./customers.css";
@@ -13,7 +14,8 @@ import "./customers.css";
 type Open = { kind: "customer"; id: string } | { kind: "tenant"; id: string; from?: string } | null;
 
 /**
- * The platform administrator's Customers & Tenants area: the customer and tenant records (and trial feedback). A
+ * The platform administrator's Customers & Tenants area: the customer and tenant records, the free trials and how far
+ * into the story each went, and trial feedback. A
  * customer or tenant opens as one page; switching section always returns to that section's list. People's requests
  * (demo and trial requests) and every kind of account are under Identity & Access.
  */
@@ -85,6 +87,8 @@ export function CustomersAndTenants({
           <CustomerDirectory onOpen={(id) => setOpen({ kind: "customer", id })} onCreate={() => setCreating(true)} />
         ) : section === "Tenants" ? (
           <TenantDirectory onOpen={(id) => setOpen({ kind: "tenant", id })} />
+        ) : section === "Trials" ? (
+          <TrialsOverview onOpenTenant={(id) => setOpen({ kind: "tenant", id })} />
         ) : (
           <div className="cc-page">
             <div className="cc-title">

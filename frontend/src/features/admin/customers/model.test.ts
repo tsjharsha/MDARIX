@@ -29,7 +29,7 @@ import {
 
 describe("Customers & Tenants model", () => {
   it("has five sections instead of fourteen", () => {
-    expect(SECTIONS).toEqual(["Customers", "Tenants", "Feedback"]);
+    expect(SECTIONS).toEqual(["Customers", "Tenants", "Trials", "Feedback"]);
   });
 
   it("offers only the standing change that is valid", () => {

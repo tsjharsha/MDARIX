@@ -30,6 +30,13 @@ _TRIAL_BUSINESS_TABLES = (
     "investigation_signals",
     "signals",
     "signal_rules",
+    # The rest of the sample story (backend/app/trial/sample_data.py seed_story_examples) and what people do with it.
+    "complaint_second_looks",
+    "complaint_reportability",
+    "capa_effectiveness_checks",
+    "capas",
+    "risks",
+    "reportability_settings",
     "retrieval_queries",  # Ask logs its evidence search against the investigation
     "evidence_entity_links",  # imported records are linked to their evidence for AI search
     "evidence_chunk_embeddings",
@@ -143,7 +150,8 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
         plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()
         assert plane.status == "ACTIVE"
         assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 3
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 28
+        # 28 sample complaints and the 9 of the rest of the story (hidden complaints, reporting clocks).
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 37
     finally:
         db.close()
 
@@ -154,7 +162,7 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert deleted - ends == timedelta(days=30)
     # The workspace dashboard reads the trial's own data, not another tenant's.
     counts = user.get("/api/v1/analytics/command-center").json()["counts"]
-    assert counts["products"] == 3 and counts["complaints"] == 28
+    assert counts["products"] == 3 and counts["complaints"] == 37
     insights = user.get("/api/v1/trial/insights").json()
     assert insights["scope"] == "sample data" and insights["findings"]
 
@@ -443,3 +451,99 @@ def test_the_review_queue_shows_what_the_requester_told_us():
     assert lines["Highest device class"] == "Class II"
     assert lines["Markets"] == "United States (FDA), European Union (MDR/IVDR)"
     assert lines["Trial data"] == "Our anonymized exports"
+
+
+# ------------------------------------------------------------------------------------- the story from the first minute
+
+
+def test_the_trial_tells_the_whole_story_from_the_first_minute():
+    """Every chapter of the quality loop has a finding in the sample data, the trial sees which chapters it acted in,
+    and the Platform Admin sees the same progress for every trial."""
+    user, approval, _email = _approved_trial_client()
+    tenant_key = approval["tenant_key"]
+
+    second_look = user.get("/api/v1/complaints/second-look").json()
+    flagged = {item["complaint_identifier"]: item for item in second_look["items"]}
+    assert {"SAMPLE-RV-01", "SAMPLE-RV-02", "SAMPLE-RV-03", "SAMPLE-RV-04", "SAMPLE-RV-05"} <= set(flagged)
+    assert flagged["SAMPLE-RV-01"]["reasons"][0]["code"] == "CANCELLED"
+    assert flagged["SAMPLE-RV-03"]["reasons"][0]["code"] == "NFF_RECURRING"
+
+    readiness = {check["code"]: check for check in user.get("/api/v1/readiness").json()["checks"]}
+    assert readiness["REPORTING_CLOCKS"]["state"] != "NOT_SET" and readiness["REPORTING_CLOCKS"]["value"] >= 1
+    assert readiness["HARM_CLOSED_WITHOUT_CASE"]["value"] == 1  # SAMPLE-RV-09, closed after a training call
+    assert readiness["CAPA_EFFECTIVENESS"]["state"] == "CRITICAL"  # a CAPA closed without a check
+    assert readiness["RISK_FILE_INPUT"]["value"] == 3 and readiness["RISK_FILE_INPUT"]["state"] == "CRITICAL"
+
+    story = user.get("/api/v1/trial/story")
+    assert story.status_code == 200, story.text
+    body = story.json()
+    assert [chapter["code"] for chapter in body["chapters"]] == [
+        "HIDDEN_COMPLAINTS",
+        "REPORTING_CLOCKS",
+        "TRENDS_TO_CASES",
+        "INVESTIGATE_WITH_AI",
+        "DECIDE_AND_SIGN",
+        "CAPA_EFFECTIVE",
+        "RISK_FILE",
+        "SHOW_THE_INSPECTOR",
+        "YOUR_DATA",
+    ]
+    assert body["acted"] == 0 and body["next"] == "HIDDEN_COMPLAINTS"
+    chapters = {chapter["code"]: chapter for chapter in body["chapters"]}
+    assert chapters["HIDDEN_COMPLAINTS"]["finding"]["value"] >= 5
+    assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
+    assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
+    assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])
+
+    # A person decides one hidden complaint: the first chapter is acted on.
+    record = flagged["SAMPLE-RV-01"]["id"]
+    decided = user.post(
+        f"/api/v1/complaints/{record}/second-look",
+        json={"decision": "CONFIRMED", "reason": "Meets our complaint definition: harm reported"},
+    )
+    assert decided.status_code == 200, decided.text
+    body = user.get("/api/v1/trial/story").json()
+    assert body["acted"] == 1 and body["next"] == "REPORTING_CLOCKS"
+    assert body["chapters"][0]["acted"] == {"done": True, "count": 1}
+
+    # The Platform Admin sees the trial, its usage and how far into the story it went; the trial user does not.
+    assert user.get("/api/v1/platform-admin/trials").status_code in (401, 403)
+    overview = authenticated_client().get("/api/v1/platform-admin/trials")
+    assert overview.status_code == 200, overview.text
+    item = next(entry for entry in overview.json()["items"] if entry["tenant_key"] == tenant_key)
+    assert item["story"]["acted"] == ["HIDDEN_COMPLAINTS"] and item["story"]["total"] == 9
+    assert item["users"] == {"used": 1, "limit": 3} and item["days_left"] == 30 and item["state"] == "ACTIVE"
+    assert item["story"]["last_activity"]
+    summary = overview.json()["summary"]
+    assert summary["active"] >= 1 and summary["acted"] >= 1 and summary["chapters"]["HIDDEN_COMPLAINTS"] >= 1
+    assert [chapter["code"] for chapter in overview.json()["chapters"]][0] == "HIDDEN_COMPLAINTS"
+
+
+def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
+    import importlib.util
+
+    from backend.app.db.tenant_scope import bind_tenant
+    from backend.app.db.models.reportability import ReportabilitySettings
+    from backend.app.trial.sample_data import STORY_WINDOWS_BY, seed_story_examples
+
+    _user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        bind_tenant(db, tenant_id)
+        assert seed_story_examples(db, tenant_id) == {"created": False}
+        windows = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
+        assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 3
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 37
+    finally:
+        db.close()
+
+    spec = importlib.util.spec_from_file_location("refresh_trial_story", "scripts/refresh_trial_story.py")
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    db = SessionLocal()
+    try:
+        results = {item["tenant"]: item["result"] for item in script.refresh(db, apply=False)}
+    finally:
+        db.close()
+    assert results[approval["tenant_key"]] == "already has the story"
