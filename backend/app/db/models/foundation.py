@@ -216,6 +216,8 @@ class LotBatch(TenantOwned, Base):
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     manufacturing_site_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
+    # md43: devices the lot released (the trend check's denominator, signals/trend_rules.py); null when not known.
+    quantity: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]

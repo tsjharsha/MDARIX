@@ -111,8 +111,14 @@ until they are; staging shows the gate without enforcing it, so the rehearsal ca
 bars under Security › AI processing; MDARIX staff see them, with what to do, in the AI Control Center overview
 (`GET /api/v1/ai/release-gate`).
 
-1. **A contracted provider with zero data retention**: configured as above and allowed by the provider policy.
-2. **The golden dataset signed off by a person**: after reviewing the 15 scenarios, the reviewer runs, themselves:
+1. **A contracted provider with zero data retention**: configured as above, listed in
+   `MDARIX_GENAI_CONTRACTED_PROVIDERS` with its ZDR setting (read from those settings, never from the development
+   policy, which allows any provider). `python scripts/ai_provider_preflight.py` checks every setting, sends nothing
+   and says what to fix.
+2. **The golden dataset signed off by a person**: `python scripts/golden_review_pack.py` writes the review pack
+   (`artifacts/golden-dataset-review-pack.md`: each scenario's question, evidence, expected findings, forbidden
+   conclusions and adversarial check, with a checklist; about two minutes a scenario). After reviewing it, the
+   reviewer runs, themselves:
 
    ```bash
    python scripts/qualify_ai_golden_dataset.py --human-sign-off --name "First Last" --role "Head of Quality" --confirm

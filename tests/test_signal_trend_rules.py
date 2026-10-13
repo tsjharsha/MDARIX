@@ -70,3 +70,48 @@ def test_the_sentence_says_what_was_compared():
     assert "chance of at least this many if nothing changed" in text
     assert "too few" in trend.sentence("X", trend.check(2, 5, 180))
     assert "not compared" in trend.sentence("X", trend.check(5, 5, 30))
+
+
+# ------------------------------------------------------------------------------------- units and new versions (md43)
+
+
+def test_unit_days_count_each_lot_from_its_release_for_its_quantity():
+    from datetime import date
+
+    start, end = date(2026, 1, 1), date(2026, 1, 30)
+    # 100 units in the field all window long, 50 more from day 21 (10 days): 3000 + 500.
+    lots = [(date(2025, 12, 1), 100), (date(2026, 1, 21), 50), (date(2026, 2, 5), 999)]
+    assert trend.unit_days(lots, start, end) == 3500
+    assert trend.unit_days([(date(2025, 12, 1), None)], start, end) is None  # a quantity not known: the calendar
+    assert trend.unit_days([(None, 100)], start, end) is None
+    assert trend.unit_days([], start, end) is None
+    assert trend.unit_days([(date(2026, 3, 1), 100)], start, end) is None  # nothing in the field yet
+    assert trend.unit_days(lots, end, start) is None
+
+
+def test_a_scale_by_units_replaces_the_calendar():
+    by_time = trend.check(recent=4, history=6, days_of_history=180)
+    assert by_time.basis == trend.TIME and by_time.expected == pytest.approx(1.0)
+    # The installed base doubled: twice the unit-days in the recent window per day, so twice the expected number.
+    by_units = trend.check(recent=4, history=6, days_of_history=180, scale=2 * 30 / 180)
+    assert by_units.basis == trend.UNITS and by_units.expected == pytest.approx(2.0)
+    assert by_units.p_value > by_time.p_value
+    assert by_units.as_dict()["basis"] == "UNITS"
+    assert trend.sentence("Pump Rev B", by_units).endswith("Scaled by the units in the field (lot quantities).")
+    assert "Scaled by" not in trend.sentence("Pump Rev B", by_time)
+
+
+def test_a_new_version_is_compared_with_the_one_it_replaced():
+    found = trend.check(
+        recent=6, history=4, days_of_history=180, baseline=trend.PREVIOUS_VERSION, baseline_name="Pump Rev A"
+    )
+    assert found.result == trend.SIGNIFICANT
+    shown = found.as_dict()
+    assert shown["label"] == "Rate significantly higher than the previous version"
+    assert shown["baseline"] == "PREVIOUS_VERSION" and shown["baseline_name"] == "Pump Rev A"
+    text = trend.sentence("Pump Rev B", found)
+    assert "expected from Pump Rev A over the 180 days before this version's release (4 complaints)" in text
+    # Own history keeps its label and sentence exactly as before.
+    own = trend.check(recent=6, history=6, days_of_history=180)
+    assert own.as_dict()["label"] == "Rate significantly higher than its history"
+    assert own.as_dict()["baseline"] == "OWN_HISTORY" and own.as_dict()["baseline_name"] is None

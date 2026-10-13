@@ -547,3 +547,43 @@ def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
     finally:
         db.close()
     assert results[approval["tenant_key"]] == "already has the story"
+
+
+def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minute():
+    """The sample lots carry quantities (md43): the young OrbitCare Rev B is compared with Rev A per unit in the field
+    and found significantly higher; the count rule's signal is detected at approval, so the third chapter has work."""
+    user, approval, _email = _approved_trial_client()
+    board = user.get("/api/v1/triage/trends", params={"group": "version"})
+    assert board.status_code == 200, board.text
+    orbit = next(item for item in board.json()["items"] if item["name"] == "OrbitCare 300 Infusion Pump (Sample) Rev B")
+    assert orbit["result"] == "SIGNIFICANT", orbit
+    assert orbit["baseline"] == "PREVIOUS_VERSION" and orbit["baseline_name"].endswith("Rev A")
+    assert orbit["basis"] == "UNITS" and orbit["label"] == "Rate significantly higher than the previous version"
+    assert "Scaled by the units in the field" in orbit["sentence"]
+    assert board.json()["basis"]["units"] >= 1
+
+    chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
+    trends = chapters["TRENDS_TO_CASES"]["finding"]
+    assert trends["value"] >= 1 and "waiting for a decision or a case" in trends["text"], trends
+    assert chapters["TRENDS_TO_CASES"]["acted"]["done"] is False  # detection is not a person's action
+
+    # A lot's quantity comes in with the lot import, checked before anything is saved.
+    bad = "lot_id,product_id,version,quantity\nL-Q1,SAMPLE-ORBIT-300,Rev B,-5\nL-Q2,SAMPLE-ORBIT-300,Rev B,lots\n"
+    report = user.post("/api/v1/trial/imports/lots/check", content=bad).json()
+    assert not report["ready"] and len(report["issues"]) == 2
+    assert "whole number" in report["issues"][0]["message"]
+    good = 'lot_id,product_id,version,quantity\nL-Q1,SAMPLE-ORBIT-300,Rev B,"1,250"\n'
+    imported = user.post("/api/v1/trial/imports/lots", content=good)
+    assert imported.status_code == 200, imported.text
+    db = SessionLocal()
+    try:
+        from backend.app.db.models.foundation import LotBatch
+
+        lot = (
+            db.query(LotBatch)
+            .filter(LotBatch.tenant_id == uuid.UUID(approval["tenant_id"]), LotBatch.lot_identifier == "L-Q1")
+            .one()
+        )
+        assert lot.quantity == 1250
+    finally:
+        db.close()

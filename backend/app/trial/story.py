@@ -51,7 +51,7 @@ CHAPTERS = (
         "history, and Open case starts the investigation with every complaint attached.",
         "Trends counted on a subset of complaints, or by root-cause code, hide real rises until they are cited.",
         {"section": "Signals", "tab": "Signal inbox"},
-        "TRENDS_WITHOUT_ACTION",
+        None,
     ),
     (
         "INVESTIGATE_WITH_AI",
@@ -209,6 +209,39 @@ def _decisions_open(db: Session, tenant_id: uuid.UUID) -> int:
     )
 
 
+# Signals still waiting for a person: not yet triaged, or decided for investigation but not yet in a case.
+WAITING_SIGNAL_STATUSES = ("NEW", "TRIAGE", "INVESTIGATION_REQUIRED", "ESCALATED")
+
+
+def _signals_waiting(db: Session, tenant_id: uuid.UUID) -> int:
+    from backend.app.db.models.signals import InvestigationSignal, Signal
+
+    linked = db.query(InvestigationSignal.signal_id).filter(InvestigationSignal.tenant_id == tenant_id)
+    return _count(
+        db,
+        db.query(func.count(Signal.id)).filter(
+            Signal.tenant_id == tenant_id,
+            Signal.status.in_(WAITING_SIGNAL_STATUSES),
+            Signal.id.notin_(linked),
+        ),
+    )
+
+
+def _trends_finding(db: Session, tenant_id: uuid.UUID, trends: dict | None) -> dict:
+    """Signals waiting for a decision or a case, and trends with no CAPA or risk review (the readiness check)."""
+    waiting = _signals_waiting(db, tenant_id)
+    without_action = int((trends or {}).get("value") or 0)
+    parts = [f"{_plural(waiting, 'signal')} waiting for a decision or a case"]
+    if without_action:
+        parts.append(f"{_plural(without_action, 'trend')} with no CAPA or risk review")
+    state = (trends or {}).get("state")
+    return {
+        "value": waiting + without_action,
+        "text": "; ".join(parts),
+        "state": "CRITICAL" if state == "CRITICAL" else "ATTENTION" if waiting or without_action else "CLEAR",
+    }
+
+
 def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}{'' if count == 1 else 's'}"
 
@@ -240,7 +273,9 @@ def story(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> dict:
     chapters = []
     for number, (code, title, promise, pain, opens, check_code) in enumerate(CHAPTERS, 1):
         check = checks.get(check_code) if check_code else None
-        if code == "SHOW_THE_INSPECTOR":
+        if code == "TRENDS_TO_CASES":
+            finding = _trends_finding(db, tenant_id, checks.get("TRENDS_WITHOUT_ACTION"))
+        elif code == "SHOW_THE_INSPECTOR":
             needing = [item for item in checks.values() if item.get("state") in ("CRITICAL", "ATTENTION")]
             finding = {
                 "value": len(needing),

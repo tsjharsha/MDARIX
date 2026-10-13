@@ -1,8 +1,8 @@
 """The AI release gate: the four bars AI must pass before it is switched on for a pilot (MDARIX Final Lightweight MVP
 Plan, "AI analysis that earns trust").
 
-1. ``PROVIDER_CONTRACTED``: a provider is configured and allowed here (contracted, zero data retention or retention
-   accepted; genai.policy).
+1. ``PROVIDER_CONTRACTED``: a provider is configured here, listed as contracted, with zero data retention confirmed
+   or retention accepted (genai.policy; read from those settings, never from the development policy that allows any).
 2. ``DATASET_SIGNED_OFF``: a named person signed off the golden dataset lock (evaluation/release_record.py).
 3. ``GOLDEN_EVALUATION_PASSED``: the full golden evaluation (15 of 15, the model writing every analysis) passed with
    the configured model, on that signed-off dataset (evaluation/AI_RELEASE_RECORD.json).
@@ -36,6 +36,21 @@ def _models() -> list[dict]:
     return _models_in_use()
 
 
+def _contract_problem(provider: str) -> str | None:
+    """Why ``provider`` does not count as contracted with zero data retention, or None. Read from the contract
+    settings themselves, not from whether the provider policy allows it here (outside production it allows any)."""
+    from genai.policy import SELF_HOSTED, contracted_providers, retention_cleared
+
+    name = str(provider or "").strip().lower()
+    if name in SELF_HOSTED:
+        return None
+    if name not in contracted_providers():
+        return "it is not listed as a contracted provider (MDARIX_GENAI_CONTRACTED_PROVIDERS)."
+    if not retention_cleared(name):
+        return f"zero data retention is not confirmed for it (MDARIX_GENAI_{name.upper()}_ZDR)."
+    return None
+
+
 def _bar(code: str, met: bool, detail: str, action: str | None = None) -> dict:
     return {
         "code": code,
@@ -56,8 +71,19 @@ def status(models: list[dict] | None = None, files: tuple | None = None) -> dict
     lock, sign_off, record = load() if files is None else files
     primary = models[0] if models else None
     bars = []
-    if primary:
+    contract_issue = _contract_problem(primary["provider"]) if primary else None
+    if primary and contract_issue is None:
         bars.append(_bar("PROVIDER_CONTRACTED", True, f"{primary['provider']} {primary['model']}"))
+    elif primary:
+        bars.append(
+            _bar(
+                "PROVIDER_CONTRACTED",
+                False,
+                f"{primary['provider']} {primary['model']} is configured, but {contract_issue}",
+                "Once the contract is signed: list the provider in MDARIX_GENAI_CONTRACTED_PROVIDERS and set its ZDR "
+                "setting (docs/runbooks/AI_PROVIDERS.md); python scripts/ai_provider_preflight.py checks every setting.",
+            )
+        )
     else:
         bars.append(
             _bar(

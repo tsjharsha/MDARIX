@@ -72,7 +72,14 @@ def list_trial_requests(request: Request, db: Session = Depends(get_db)):
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
 def approve_trial_request(request_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     admin = _require_platform_admin(request, db)
-    return approve_request(db, request_id, admin)
+    approved = approve_request(db, request_id, admin)
+    # The sample's signals now, rather than at the scheduler's next run: the count rule over the sample complaints, in
+    # a session of its own (a failure is logged and never fails the approval, which is committed).
+    if approved.get("tenant_id"):
+        from backend.app.signals.hooks import seed_demo_signals
+
+        seed_demo_signals(db, uuid.UUID(str(approved["tenant_id"])))
+    return approved
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/decline")

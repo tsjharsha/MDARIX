@@ -96,6 +96,33 @@ def test_a_full_pass_on_the_signed_off_dataset_becomes_the_release_record():
     assert "changed since" in release_record.record_problem(record, changed, _sign_off())
 
 
+@pytest.fixture
+def contracted(monkeypatch):
+    """Anthropic under contract with zero data retention confirmed (groq left uncontracted)."""
+    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "anthropic")
+    monkeypatch.setenv("MDARIX_GENAI_ANTHROPIC_ZDR", "true")
+    monkeypatch.delenv("MDARIX_GENAI_ACCEPT_RETENTION", raising=False)
+
+
+def test_a_configured_provider_counts_only_under_contract_with_zero_retention(monkeypatch):
+    """Outside production the provider policy allows any provider; the gate reads the contract settings instead."""
+    monkeypatch.delenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", raising=False)
+    monkeypatch.delenv("MDARIX_GENAI_ANTHROPIC_ZDR", raising=False)
+    monkeypatch.delenv("MDARIX_GENAI_ACCEPT_RETENTION", raising=False)
+
+    def provider_bar():
+        gate = ai_release_gate.status(models=[MODEL], files=(LOCK, None, None))
+        return next(bar for bar in gate["bars"] if bar["code"] == "PROVIDER_CONTRACTED")
+
+    assert provider_bar()["status"] == "NOT_MET" and "not listed as a contracted provider" in provider_bar()["detail"]
+    monkeypatch.setenv("MDARIX_GENAI_CONTRACTED_PROVIDERS", "anthropic")
+    assert provider_bar()["status"] == "NOT_MET" and "zero data retention is not confirmed" in provider_bar()["detail"]
+    monkeypatch.setenv("MDARIX_GENAI_ANTHROPIC_ZDR", "true")
+    assert provider_bar()["status"] == "MET"
+    self_hosted = ai_release_gate.status(models=[{"provider": "ollama", "model": "llama3.2"}], files=(LOCK, None, None))
+    assert next(bar for bar in self_hosted["bars"] if bar["code"] == "PROVIDER_CONTRACTED")["status"] == "MET"
+
+
 def _bars(gate: dict) -> dict[str, str]:
     return {bar["code"]: bar["status"] for bar in gate["bars"]}
 
@@ -113,7 +140,7 @@ def test_today_only_the_automatic_trust_check_is_met():
     assert gate["enforced"] is False  # tests run as MDARIX_ENV=test; production enforces
 
 
-def test_every_bar_met_with_the_released_model():
+def test_every_bar_met_with_the_released_model(contracted):
     record = release_record.build_record(_report(), LOCK, _sign_off(), now=NOW)
     gate = ai_release_gate.status(models=[MODEL], files=(LOCK, _sign_off(), record))
     assert gate["ready"] is True and set(_bars(gate).values()) == {"MET"}
@@ -121,7 +148,7 @@ def test_every_bar_met_with_the_released_model():
     assert passed["detail"].startswith("15 of 15 with anthropic claude-sonnet-5-5")
 
 
-def test_another_model_than_the_released_one_is_not_released():
+def test_another_model_than_the_released_one_is_not_released(contracted):
     record = release_record.build_record(_report(), LOCK, _sign_off(), now=NOW)
     gate = ai_release_gate.status(
         models=[{"provider": "groq", "model": "openai/gpt-oss-120b"}], files=(LOCK, _sign_off(), record)

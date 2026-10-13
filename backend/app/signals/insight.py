@@ -123,6 +123,105 @@ def _version_ages(db: Session, tenant_id: uuid.UUID, version_ids, today: date) -
     return ages
 
 
+def _lot_releases(db: Session, tenant_id: uuid.UUID, version_ids) -> dict:
+    """``{version id: [(release day, quantity)]}``: each lot of the versions, released on its manufacture date (else
+    the day it was recorded), with the devices it released (md43; None when not known)."""
+    ids = [item for item in version_ids if item is not None]
+    found: dict = defaultdict(list)
+    if not ids:
+        return found
+    for version_id, effective, created, quantity in (
+        db.query(LotBatch.product_version_id, LotBatch.effective_timestamp, LotBatch.created_at, LotBatch.quantity)
+        .filter(LotBatch.tenant_id == tenant_id, LotBatch.product_version_id.in_(ids))
+        .all()
+    ):
+        found[version_id].append((_day(effective or created), quantity))
+    return found
+
+
+def _previous_versions(db: Session, tenant_id: uuid.UUID, version_ids) -> dict:
+    """``{version id: {id, name, released, this_released}}`` for each released version whose product has an earlier
+    released version: the one it replaced (the latest released before it)."""
+    ids = [item for item in version_ids if item is not None]
+    if not ids:
+        return {}
+    mine = (
+        db.query(ProductVersion.id, ProductVersion.product_id, ProductVersion.release_timestamp)
+        .filter(ProductVersion.tenant_id == tenant_id, ProductVersion.id.in_(ids))
+        .all()
+    )
+    released_products = {row.product_id for row in mine if row.release_timestamp is not None}
+    if not released_products:
+        return {}
+    siblings = (
+        db.query(
+            ProductVersion.id,
+            ProductVersion.product_id,
+            ProductVersion.version_identifier,
+            ProductVersion.release_timestamp,
+        )
+        .filter(
+            ProductVersion.tenant_id == tenant_id,
+            ProductVersion.product_id.in_(released_products),
+            ProductVersion.release_timestamp.isnot(None),
+        )
+        .all()
+    )
+    found = {}
+    for row in mine:
+        if row.release_timestamp is None:
+            continue
+        released = _day(row.release_timestamp)
+        earlier = [
+            item
+            for item in siblings
+            if item.product_id == row.product_id and item.id != row.id and _day(item.release_timestamp) < released
+        ]
+        if earlier:
+            prior = max(earlier, key=lambda item: _day(item.release_timestamp))
+            found[row.id] = {
+                "id": prior.id,
+                "name": prior.version_identifier,
+                "released": _day(prior.release_timestamp),
+                "this_released": released,
+            }
+    return found
+
+
+def _version_rows(db: Session, tenant_id: uuid.UUID, version_id: uuid.UUID, start: date, end: date) -> list:
+    """The complaints of one version with events from ``start`` to ``end`` (both included), except those dismissed on
+    the second look: the previous version's baseline."""
+    return (
+        db.query(
+            Complaint.id,
+            Complaint.business_id,
+            Complaint.product_id,
+            Complaint.product_version_id,
+            Complaint.problem_code,
+            Complaint.complaint_type,
+            EVENT_AT.label("event_at"),
+        )
+        .outerjoin(
+            ComplaintSecondLook,
+            (ComplaintSecondLook.tenant_id == Complaint.tenant_id) & (ComplaintSecondLook.complaint_id == Complaint.id),
+        )
+        .filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.product_version_id == version_id,
+            EVENT_AT >= _midnight(start),
+            EVENT_AT < _midnight(end + timedelta(days=1)),
+            (ComplaintSecondLook.decision.is_(None)) | (ComplaintSecondLook.decision != "DISMISSED"),
+        )
+        .limit(READ_LIMIT)
+        .all()
+    )
+
+
+def _scale(recent_units: float | None, baseline_units: float | None) -> float | None:
+    """The recent window's unit-days over the baseline's, when both are known."""
+    return recent_units / baseline_units if recent_units and baseline_units else None
+
+
 def _names(db: Session, tenant_id: uuid.UUID, product_ids, version_ids) -> tuple[dict, dict]:
     products = {
         row.id: row
@@ -192,16 +291,51 @@ def trend_board(
     ages = _version_ages(db, tenant_id, version_ids, today)
     products, versions = _names(db, tenant_id, {key[0] for key in groups}, version_ids)
     signals = _open_signals(db, tenant_id) if grouping == "problem" else {}
+    lots = _lot_releases(db, tenant_id, version_ids)
+    previous = _previous_versions(db, tenant_id, version_ids)
+    baselines: dict = {}
     items = []
     for key, bucket in groups.items():
         product_ref, version_ref, problem = key
         days_of_history = trend_rules.history_days(ages.get(version_ref))
-        history = [
-            row for row in bucket["history"] if _day(row.event_at) >= recent_start - timedelta(days=days_of_history)
-        ]
-        result = trend_rules.check(len(bucket["recent"]), len(history), days_of_history)
         product = products.get(product_ref)
         version = versions.get(version_ref)
+        recent_units = trend_rules.unit_days(lots.get(version_ref), recent_start, today)
+        result = None
+        prior = previous.get(version_ref) if days_of_history < trend_rules.MIN_HISTORY_DAYS else None
+        if prior:
+            # A new version: compared with the one it replaced, over the days before its release.
+            window = min(trend_rules.HISTORY_DAYS, (prior["this_released"] - prior["released"]).days)
+            if window >= trend_rules.MIN_HISTORY_DAYS:
+                start = prior["this_released"] - timedelta(days=window)
+                end = prior["this_released"] - timedelta(days=1)
+                if prior["id"] not in baselines:
+                    baselines[prior["id"]] = _version_rows(db, tenant_id, prior["id"], start, end)
+                baseline = [row for row in baselines[prior["id"]] if _group_key(grouping, row)[2] == problem]
+                result = trend_rules.check(
+                    len(bucket["recent"]),
+                    len(baseline),
+                    window,
+                    scale=_scale(recent_units, trend_rules.unit_days(lots.get(prior["id"]), start, end)),
+                    baseline=trend_rules.PREVIOUS_VERSION,
+                    baseline_name=f"{product.name if product else 'Product'} {prior['name']}",
+                )
+        if result is None:
+            history = [
+                row for row in bucket["history"] if _day(row.event_at) >= recent_start - timedelta(days=days_of_history)
+            ]
+            history_units = (
+                trend_rules.unit_days(
+                    lots.get(version_ref),
+                    recent_start - timedelta(days=days_of_history),
+                    recent_start - timedelta(days=1),
+                )
+                if days_of_history
+                else None
+            )
+            result = trend_rules.check(
+                len(bucket["recent"]), len(history), days_of_history, scale=_scale(recent_units, history_units)
+            )
         name = f"{product.name if product else 'Product'} {version.version_identifier if version else '(version not recorded)'}"
         if problem:
             label = "no problem code" if problem == logic.UNSPECIFIED_PROBLEM else problem.replace("_", " ").lower()
@@ -256,9 +390,16 @@ def trend_board(
         },
         "truncated": truncated,
         "note": (
-            "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own history "
-            "and never raises a signal by itself. Numbers of devices in use are not known to MDARIX."
+            "A check beside the count rule, never a verdict: it compares each group's last 30 days with its own history, "
+            "or a new version with the version it replaced, and never raises a signal by itself. Where every lot has a "
+            "quantity, the comparison follows the units in the field; elsewhere it counts by calendar days, so a version "
+            "shipped in growing numbers can show a higher rate for that reason alone. Add lot quantities to your lot "
+            "import to count per unit."
         ),
+        "basis": {
+            "units": sum(1 for item in items if item["basis"] == trend_rules.UNITS),
+            "time": sum(1 for item in items if item["basis"] == trend_rules.TIME),
+        },
         "items": items,
     }
 

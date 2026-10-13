@@ -144,6 +144,32 @@ operator knows a release migrates the database.
   `scripts/refresh_trial_story.py [--apply]` adds the same records once to trials approved earlier. It never changes a
   trial's own records or reporting windows.
 
+- The trend check counts per unit in the field (md43 `lot_batches.quantity`). When every lot of the versions compared
+  has a quantity, the expected number follows unit-days (each lot counted from its release for its quantity), so a
+  version shipped in growing numbers no longer looks like a rising trend for that reason alone. Without quantities it
+  counts by calendar days and says so. The lot import takes an optional `quantity` (a whole number, checked before
+  saving; synonyms such as lot size and qty are matched in mapping). Legacy dedicated databases get the column from
+  `scripts/add_workflow_tables_to_legacy_planes.py`.
+- A new version is compared with the version it replaced. Too young for its own history, it was "not assessed" before.
+  Now its last 30 days are compared with the previous version's complaints over the 180 days before its release: is
+  the new version worse than the one it replaced? Trend check shows what each group was compared with and how it was
+  counted.
+- Free trials: the sample lots carry quantities, and signal detection runs at approval, so the trend chapter has a
+  finding from the first minute. OrbitCare 300 Rev B is significantly higher than Rev A per unit in the field, with its
+  count-rule signal waiting. The trial story's trend chapter counts signals waiting for a decision or a case.
+  `scripts/refresh_trial_story.py --apply` adds the quantities and runs detection for trials approved earlier.
+- AI go-live tools. `scripts/ai_provider_preflight.py` checks every provider setting (provider, key, contract, zero
+  data retention, price, production policy) and lists the release gate's bars; it sends nothing and changes nothing.
+  `scripts/golden_review_pack.py` writes the reviewer's pack for the golden dataset sign-off: each of the 15
+  scenarios with its evidence, expected findings, forbidden conclusions and adversarial check, then the sign-off
+  statement and command.
+
+### Fixed
+
+- The AI release gate's first bar ("a contracted AI provider with zero data retention") is read from the contract
+  settings themselves (`MDARIX_GENAI_CONTRACTED_PROVIDERS` and the provider's ZDR setting). Outside production the
+  provider policy allows any provider, so a free development provider showed the bar as met.
+
 ### Changed
 
 - Getting started tells the trial as a story. The quality loop names the next chapter, and each chapter shows its

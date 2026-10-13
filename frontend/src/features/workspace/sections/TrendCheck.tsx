@@ -13,6 +13,9 @@ import {
   trendPath,
   trendResultOf,
   type TrendBoard,
+  trendBaselineText,
+  trendBasisText,
+  trendResultLabel,
   type TrendGroup,
   type TrendItem,
 } from "../signalAi";
@@ -106,7 +109,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
               label: "Result",
               render: (row: TrendItem) => {
                 const result = trendResultOf(row.result);
-                return <ToneBadge tone={result.tone} label={result.label} />;
+                return <ToneBadge tone={result.tone} label={trendResultLabel(row)} />;
               },
             },
             {
@@ -117,9 +120,13 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
             },
             {
               key: "history",
-              label: "History",
-              numeric: true,
-              render: (row: TrendItem) => `${row.history} in ${row.history_days} days`,
+              label: "Compared with",
+              render: (row: TrendItem) => trendBaselineText(row),
+            },
+            {
+              key: "basis",
+              label: "Counted",
+              render: (row: TrendItem) => trendBasisText(row),
             },
             { key: "p_value", label: "Chance", render: (row: TrendItem) => pValueText(row.p_value) },
             {

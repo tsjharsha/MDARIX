@@ -74,10 +74,11 @@ TEMPLATES: dict[str, dict] = {
     "lots": {
         "title": "Lots and batches",
         "required": ["lot_id", "product_id", "version"],
-        "optional": ["manufacture_date", "site_id"],
+        # quantity: devices the lot released; the trend check then counts complaints per unit in the field.
+        "optional": ["manufacture_date", "site_id", "quantity"],
         "example": [
-            ["L24-0815", "PUMP-200", "Rev D", "2026-07-20", ""],
-            ["L24-0902", "PUMP-200", "Rev D", "2026-08-11", ""],
+            ["L24-0815", "PUMP-200", "Rev D", "2026-07-20", "", "250"],
+            ["L24-0902", "PUMP-200", "Rev D", "2026-08-11", "", "300"],
         ],
     },
     "complaints": {
@@ -192,6 +193,20 @@ def _mask(value: str) -> str:
     from genai.pii import mask_text
 
     return mask_text(value)
+
+
+# Whole-number columns (a lot's quantity): digits only, separators allowed ("1,250", "1 250").
+COUNT_COLUMNS = frozenset({"quantity"})
+COUNT_MAX = 10_000_000
+
+
+def _count(value: str) -> int | None:
+    """A whole number from 0 to COUNT_MAX, else None."""
+    text = str(value or "").strip().replace(",", "").replace(" ", "").replace("_", "")
+    if not text.isdigit():
+        return None
+    number = int(text)
+    return number if number <= COUNT_MAX else None
 
 
 def _date(value: str) -> datetime | None:
@@ -404,6 +419,9 @@ def _check_values(
             elif column in FLAG_COLUMNS:
                 if value.lower() not in FLAG_VALUES:
                     report.add(line, column, "Use Y or N.")
+            elif column in COUNT_COLUMNS:
+                if _count(value) is None:
+                    report.add(line, column, f"Use a whole number from 0 to {COUNT_MAX:,}.")
             elif column.endswith("_date"):
                 if iso_date(value) is None:
                     expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
@@ -829,6 +847,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         if entity == "lots":
             built = _date(row["manufacture_date"]) if row.get("manufacture_date") else None
             site = lookup.site(row["site_id"]) if row.get("site_id") else None
+            quantity = _count(row["quantity"]) if row.get("quantity") else None
             lot = lookup.lot(row["lot_id"])
             if lot is None:
                 lot = LotBatch(
@@ -838,6 +857,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                     product_version_id=version.id if version else None,
                     manufacturing_site_id=site.id if site else None,
                     status="active",
+                    quantity=quantity,
                     source_identifier=row["lot_id"],
                     **_stamp(now, built, source),
                 )
@@ -849,6 +869,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 lot.manufacturing_site_id = site.id if site else lot.manufacturing_site_id
                 if built:
                     lot.effective_timestamp = built
+                if quantity is not None:
+                    lot.quantity = quantity
                 lot.updated_at = now
                 updated += 1
             db.flush()

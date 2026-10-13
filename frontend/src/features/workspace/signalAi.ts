@@ -26,6 +26,11 @@ export type TrendItem = {
   sentence: string;
   recent_complaints: Array<{ id: string; business_id: string | null }>;
   open_signals: Array<{ id: string; business_id: string | null; status: string }>;
+  // md43: what the expected number follows (units in the field from lot quantities, or calendar days), and what the
+  // group is compared with (its own history, or the version it replaced when it is too young for its own).
+  basis?: "UNITS" | "TIME";
+  baseline?: "OWN_HISTORY" | "PREVIOUS_VERSION";
+  baseline_name?: string | null;
 };
 
 export type TrendBoard = {
@@ -44,6 +49,8 @@ export type TrendBoard = {
   };
   truncated: boolean;
   note: string;
+  // How many groups were counted per unit in the field, and how many by calendar days.
+  basis?: { units: number; time: number };
   items: TrendItem[];
 };
 
@@ -66,6 +73,23 @@ export const TREND_RESULT: Record<TrendResult, { label: string; tone: Tone }> = 
   TOO_FEW: { label: "Too few to assess", tone: "neutral" },
   SHORT_HISTORY: { label: "History too short", tone: "neutral" },
 };
+
+/** What a group was compared with: its own history, or the version it replaced (a version too young for its own). */
+export function trendBaselineText(item: Pick<TrendItem, "baseline" | "baseline_name" | "history" | "history_days">) {
+  if (item.baseline === "PREVIOUS_VERSION")
+    return `${item.baseline_name ?? "The previous version"}: ${item.history} in the ${item.history_days} days before this version's release`;
+  return `Own history: ${item.history} in ${item.history_days} days`;
+}
+
+/** What the expected number follows: units in the field (lot quantities) or calendar days. */
+export const trendBasisText = (item: Pick<TrendItem, "basis">) =>
+  item.basis === "UNITS" ? "Per unit in the field" : "Per calendar day";
+
+/** The result's label, saying "the previous version" when that is what the group was compared with. */
+export function trendResultLabel(item: Pick<TrendItem, "result" | "baseline">): string {
+  const label = trendResultOf(item.result).label;
+  return item.baseline === "PREVIOUS_VERSION" && item.result === "STEADY" ? "In line with the previous version" : label;
+}
 
 export const trendResultOf = (result: string | null | undefined) =>
   TREND_RESULT[(result ?? "") as TrendResult] ?? { label: "—", tone: "neutral" as Tone };

@@ -5,9 +5,11 @@
 
 New trials get the whole story at approval (backend/app/trial/sample_data.py). A trial approved earlier holds the
 sample products, complaints and the guided investigation, but not the hidden complaints, reporting clocks, CAPAs, risk
-register and sample reporting windows that Complaints, Records and Readiness show. This adds exactly those sample
-records (marked MDARIX_SAMPLE), once, to every trial that still holds its sample data; a trial's own records and its own
-reporting windows are never changed. Each trial is committed on its own, with an audit event.
+register and sample reporting windows that Complaints, Records and Readiness show, nor the units per sample lot the
+trend check counts by (md43), and its signals wait for the scheduler. This adds exactly those sample records (marked
+MDARIX_SAMPLE) and quantities, once, to every trial that still holds its sample data, then runs signal detection; a
+trial's own records and its own reporting windows are never changed. Each trial is committed on its own, with an
+audit event.
 """
 
 from __future__ import annotations
@@ -54,7 +56,15 @@ def trials(db: Session) -> list[tuple]:
 def refresh(db: Session, apply: bool) -> list[dict]:
     from backend.app.db.tenant_scope import bind_tenant
     from backend.app.enterprise_audit import make_audit_event
-    from backend.app.trial.sample_data import has_sample_data, has_story_examples, seed_story_examples
+    from backend.app.db.models.foundation import LotBatch
+    from backend.app.signals.hooks import seed_demo_signals
+    from backend.app.trial.sample_data import (
+        SAMPLE_SOURCE,
+        has_sample_data,
+        has_story_examples,
+        seed_lot_quantities,
+        seed_story_examples,
+    )
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -63,14 +73,29 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             if not has_sample_data(session, tenant_id):
                 results.append({"tenant": tenant_key, "name": name, "result": "no sample data (left as it is)"})
                 continue
-            if has_story_examples(session, tenant_id):
+            story_missing = not has_story_examples(session, tenant_id)
+            lots_missing = (
+                session.query(LotBatch.id)
+                .filter(
+                    LotBatch.tenant_id == tenant_id,
+                    LotBatch.source_system == SAMPLE_SOURCE,
+                    LotBatch.quantity.is_(None),
+                )
+                .count()
+            )
+            if not story_missing and not lots_missing:
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
             if not apply:
-                results.append({"tenant": tenant_key, "name": name, "result": "would add the story"})
+                wanted = [
+                    *(["the story"] if story_missing else []),
+                    *([f"quantities for {lots_missing} sample lots"] if lots_missing else []),
+                ]
+                results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
             now = datetime.now(timezone.utc)
-            added = seed_story_examples(session, tenant_id, now)
+            added = seed_story_examples(session, tenant_id, now) if story_missing else {"created": False}
+            added["lot_quantities"] = seed_lot_quantities(session, tenant_id)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,
@@ -83,6 +108,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 )
             )
             session.commit()
+            # The sample's signals now, rather than at the scheduler's next run (logged, never fatal).
+            seed_demo_signals(session, tenant_id)
             results.append({"tenant": tenant_key, "name": name, "result": f"added {added}"})
     return results
 

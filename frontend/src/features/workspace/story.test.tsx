@@ -267,3 +267,26 @@ describe("the Platform Admin trial overview", () => {
     expect(chapterFunnel(null)).toEqual([]);
   });
 });
+
+describe("the trend check per unit and against the previous version", () => {
+  it("says what a group was compared with and how it was counted", async () => {
+    const { trendBaselineText, trendBasisText, trendResultLabel } = await import("./signalAi");
+    const young = {
+      baseline: "PREVIOUS_VERSION" as const,
+      baseline_name: "OrbitCare 300 Rev A",
+      history: 6,
+      history_days: 180,
+      basis: "UNITS" as const,
+    };
+    expect(trendBaselineText(young)).toBe("OrbitCare 300 Rev A: 6 in the 180 days before this version's release");
+    expect(trendBasisText(young)).toBe("Per unit in the field");
+    expect(trendResultLabel({ result: "STEADY", baseline: "PREVIOUS_VERSION" })).toBe(
+      "In line with the previous version",
+    );
+    expect(trendResultLabel({ result: "SIGNIFICANT", baseline: "PREVIOUS_VERSION" })).toBe("Significant rise");
+    // Older data without the new fields reads as before.
+    expect(trendBaselineText({ history: 4, history_days: 90 })).toBe("Own history: 4 in 90 days");
+    expect(trendBasisText({})).toBe("Per calendar day");
+    expect(trendResultLabel({ result: "STEADY" })).toBe("In line with history");
+  });
+});

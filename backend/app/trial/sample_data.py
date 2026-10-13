@@ -497,6 +497,27 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
     return {"created": True, **counts}
 
 
+# Devices each sample lot released (md43): the mature Rev A lots ship more than the Rev B lots ramping up, so the trend
+# check counts per unit in the field and the OrbitCare rise is a rise per device, not a growing installed base.
+_SAMPLE_LOT_QUANTITY = {1: 400, 2: 400, 3: 150, 4: 150, 5: 150}
+
+
+def seed_lot_quantities(db: Session, tenant_id) -> int:
+    """Give the sample lots their quantities where none is set (trials approved before md43 included). Idempotent;
+    never touches a lot the organization imported. Flushes but never commits. Returns the lots updated."""
+    updated = 0
+    for lot in db.query(LotBatch).filter(
+        LotBatch.tenant_id == tenant_id, LotBatch.source_system == SAMPLE_SOURCE, LotBatch.quantity.is_(None)
+    ):
+        number = lot.lot_identifier.rsplit("-", 1)[-1]
+        quantity = _SAMPLE_LOT_QUANTITY.get(int(number)) if number.isdigit() else None
+        if quantity is not None:
+            lot.quantity = quantity
+            updated += 1
+    db.flush()
+    return updated
+
+
 def has_story_examples(db: Session, tenant_id) -> bool:
     return (
         db.query(Complaint.id)
