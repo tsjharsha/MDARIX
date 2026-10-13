@@ -49,6 +49,22 @@ export function tabsFor<T extends string>(section: string, tabs: readonly T[], f
   return tabs.filter((tab) => !parked.includes(tab));
 }
 
+/**
+ * Where a workspace link goes under this feature set. Under `mvp` a case's evidence is a step of the case page
+ * (Investigations › Evidence) rather than another section, so links to it (the dashboard, products, tasks, the case
+ * stepper) open the case page; the Evidence section's other tabs stay where they are.
+ */
+export function routeFor(
+  section: string,
+  tab: string | undefined,
+  featureSet: FeatureSet,
+): { section: string; tab: string | undefined } {
+  const caseEvidence = !tab || tab === "Case evidence" || tab.startsWith("Case evidence?");
+  if (featureSet === "mvp" && section === "Evidence" && caseEvidence)
+    return { section: "Investigations", tab: "Evidence" };
+  return { section, tab };
+}
+
 /** The requested tab when the section offers it, else the fallback when offered, else the first tab. */
 export function offeredTab<T extends string>(requested: string | null | undefined, tabs: readonly T[], fallback: T): T {
   if (requested && (tabs as readonly string[]).includes(requested)) return requested as T;

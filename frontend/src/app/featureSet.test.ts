@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { PARKED_VIEWS, featureSetOf, offeredTab, tabsFor, viewsForFeatureSet } from "./featureSet";
+import { PARKED_VIEWS, featureSetOf, offeredTab, routeFor, tabsFor, viewsForFeatureSet } from "./featureSet";
 import { allowedViewsForRole } from "./navigationPolicy";
 import { initialTrustTab, TRUST_TABS } from "../features/workspace/caseAudit";
 
@@ -56,6 +56,20 @@ describe("feature set", () => {
     expect(allowedViewsForRole("INVESTIGATOR", "MULTI", "mvp")).toBeNull();
     expect(viewsForFeatureSet(null, "mvp")).toBeNull();
     expect(PARKED_VIEWS.every((view) => !mvp.includes(view))).toBe(true);
+  });
+
+  it("sends links to a case's evidence to the one case page under mvp only", () => {
+    for (const tab of [undefined, "Case evidence", "Case evidence?item=EV000012"])
+      expect(routeFor("Evidence", tab, "mvp")).toEqual({ section: "Investigations", tab: "Evidence" });
+    // The Evidence section's other tabs stay where they are, and full changes nothing.
+    expect(routeFor("Evidence", "Requests?request=RQ000003", "mvp")).toEqual({
+      section: "Evidence",
+      tab: "Requests?request=RQ000003",
+    });
+    expect(routeFor("Evidence", "Evidence library", "mvp")).toEqual({ section: "Evidence", tab: "Evidence library" });
+    expect(routeFor("Evidence", "Case evidence", "full")).toEqual({ section: "Evidence", tab: "Case evidence" });
+    expect(routeFor("Evidence", undefined, "full")).toEqual({ section: "Evidence", tab: undefined });
+    expect(routeFor("Signals", "Signal inbox", "mvp")).toEqual({ section: "Signals", tab: "Signal inbox" });
   });
 
   it("opens Trust & Audit on the audit trail when AI assurance is parked", () => {

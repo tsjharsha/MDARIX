@@ -57,6 +57,7 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
+import { featureSetOf, routeFor } from "../../app/featureSet";
 
 /**
  * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
@@ -183,9 +184,13 @@ export function UserWorkspace({
   // A link to a signal (/app/signals?signal=SIG000023) opens that signal in Signals (the case link wins over it).
   const [signalLink] = useState(() => (caseLink ? null : signalFromSearch(window.location.search)));
   const work = useWorkContext(caseLink);
+  // Under the MVP feature set a case's evidence is a step of the case page (app/featureSet.ts routeFor).
+  const featureSet = featureSetOf(session?.feature_set);
   const [start] = useState(() => {
     const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
-    return caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
+    const [section, tab] = caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
+    const routed = routeFor(section, tab, featureSet);
+    return [routed.section as WorkspaceSection, routed.tab] as const;
   });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
@@ -216,12 +221,17 @@ export function UserWorkspace({
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
-      setLocation((current) => ({ section, tab, key: current.key + 1 }));
+      const routed = routeFor(section, tab, featureSet);
+      setLocation((current) => ({
+        section: routed.section as WorkspaceSection,
+        tab: routed.tab,
+        key: current.key + 1,
+      }));
       setMenuOpen(false);
       setMessage(null);
       window.scrollTo({ top: 0 });
     },
-    [setLocation],
+    [setLocation, featureSet],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
 

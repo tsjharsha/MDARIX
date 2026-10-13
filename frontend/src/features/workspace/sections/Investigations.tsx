@@ -21,6 +21,10 @@ import { InvestigationWorkspacePanel } from "../../investigator/InvestigationWor
 import { Stage2Experience } from "../../stage2/Stage2Experience";
 import { useCan, useFeatureSet, useWorkspace, type OpenInvestigationRequest } from "../workspaceContext";
 import { tabsFor } from "../../../app/featureSet";
+import { CaseEvidencePanel } from "./CaseEvidence";
+import { AskMdarixPage } from "../../ask/AskMdarixPage";
+import { CaseRecordDownload } from "../../reports/CaseRecordDownload";
+import { trustTab } from "../caseAudit";
 import { Embedded, StatusBadge } from "./common";
 import { localDay } from "../workspaceModel";
 import { CaseDue, CaseHeader, CasePriority, CaseStateBadge } from "./CaseHeader";
@@ -57,14 +61,32 @@ const TABS = [
   "Story",
   "CAPAs",
 ] as const;
-type Tab = (typeof TABS)[number];
+
+/**
+ * Under the MVP feature set this section is the one case page (app/featureSet.ts): every step of a case is a tab
+ * here, including its evidence, Ask MDARIX about it and its record, so working a case never leaves the page.
+ */
+const CASE_PAGE_TABS = [
+  "All investigations",
+  "Workspace",
+  "Evidence",
+  "Intelligence",
+  "Ask MDARIX",
+  "Scope",
+  "Reviews",
+  "Decision Brief",
+  "Decision",
+  "Record",
+  "CAPAs",
+] as const;
+type Tab = (typeof TABS)[number] | (typeof CASE_PAGE_TABS)[number];
 
 export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   const { work, open } = useWorkspace();
   // Under the MVP feature set the case story is parked and the decision is taken on this case's Decision tab
   // (featureSet.ts).
   const featureSet = useFeatureSet();
-  const tabs = tabsFor("Investigations", TABS, featureSet);
+  const tabs: readonly Tab[] = featureSet === "mvp" ? CASE_PAGE_TABS : tabsFor("Investigations", TABS, featureSet);
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
@@ -105,6 +127,11 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   };
   // A step of the case stepper: a tab here, a part of the workspace panel, or another section.
   const goToStep = (destination: StepDestination) => {
+    // On the one case page the evidence is a step of the case, not another section.
+    if (featureSet === "mvp" && destination.section === "Evidence") {
+      setActive("Evidence");
+      return;
+    }
     if (
       destination.section === "Investigations" &&
       (destination.tab === "Scope" ||
@@ -371,6 +398,36 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               />
             </Panel>
           ))}
+        {active === "Evidence" &&
+          (work.investigationId ? (
+            <CaseEvidencePanel
+              key={work.investigationId}
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+            />
+          ) : (
+            <NoCase detail="Case evidence belongs to one investigation. Pick one in the context bar above, or open one from the list." />
+          ))}
+        {active === "Ask MDARIX" && (
+          <Embedded>
+            <AskMdarixPage
+              investigationId={work.investigationId || undefined}
+              productVersionId={(work.view?.selected_version?.id as string | undefined) ?? undefined}
+            />
+          </Embedded>
+        )}
+        {active === "Record" &&
+          (work.investigationId ? (
+            <CaseRecord
+              investigationId={work.investigationId}
+              caseLabel={selected ? displayId(selected, "investigation_identifier") : "this case"}
+              onTimeline={(caseId, caseLabel) =>
+                open("Trust & Audit", trustTab({ tab: "Case timeline", caseId, caseLabel }))
+              }
+            />
+          ) : (
+            <NoCase detail="The record belongs to one investigation. Pick one in the context bar above, or open one from the list." />
+          ))}
         {active === "CAPAs" && <Capas />}
         {selected && active !== "All investigations" && active !== "CAPAs" && (
           <p className="ac-note">
@@ -379,6 +436,49 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
         )}
       </Tabs>
     </>
+  );
+}
+
+/** A case step shown while no case is chosen. */
+function NoCase({ detail }: { detail: string }) {
+  return (
+    <Panel title="No investigation selected">
+      <Empty title="Choose an investigation" detail={detail} />
+    </Panel>
+  );
+}
+
+/**
+ * The case's record on the one case page: the signed, complete record to download (PDF for people, CSV and JSON for
+ * systems) and its timeline in Trust & Audit.
+ */
+function CaseRecord({
+  investigationId,
+  caseLabel,
+  onTimeline,
+}: {
+  investigationId: string;
+  caseLabel: string;
+  onTimeline: (caseId: string, caseLabel: string) => void;
+}) {
+  const canExport = useCan("data.export");
+  return (
+    <Panel eyebrow="Record" title={`The record of ${caseLabel}`}>
+      <p className="ac-muted">
+        Everything this case holds, from its question and evidence to its reviews, decision and audit trail, in one
+        record you can hand an inspector.
+      </p>
+      {canExport ? (
+        <CaseRecordDownload investigationId={investigationId} label={caseLabel} />
+      ) : (
+        <p className="ac-note">Your role cannot download case records. A colleague with export rights can.</p>
+      )}
+      <div className="ca-action-row">
+        <button type="button" className="ac-secondary" onClick={() => onTimeline(investigationId, caseLabel)}>
+          Open the case timeline
+        </button>
+      </div>
+    </Panel>
   );
 }
 
