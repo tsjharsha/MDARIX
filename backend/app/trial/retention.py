@@ -34,6 +34,9 @@ TRIAL_DATA_TABLES = (
     "investigation_signals",
     "signals",
     "signal_rules",
+    # Complaint review (md40): decisions on complaints listed below, and the organization's settings.
+    "complaint_second_looks",
+    "complaint_settings",
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
     "evidence_review_events",
     "investigation_scope_versions",

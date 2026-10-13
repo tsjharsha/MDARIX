@@ -10,6 +10,20 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Added
+
+- Complaints › Second look: records cancelled or logged as inquiries or service records that carry a sign of a
+  complaint (harm, a malfunction, a serious severity, a problem code or one of the organization's words), and No Fault
+  Found or User Error codes that recur (3 or more on one product in 12 months), are listed most serious first, each
+  with why it was flagged and its matched words marked. A person confirms or dismisses each with a reason, and may
+  revise it; both are in the audit trail. MDARIX never changes the record in the source system.
+- Complaints › Backlog: open complaints in no signal and no case, oldest first, against the organization's target
+  (30 days by default), with past-target and due-soon counts and age bands; a record confirmed on the second look
+  counts until it is closed.
+- Complaints › Review settings: the backlog target and the second look's words, changed by a triage lead with a reason,
+  versioned and audited. Migration `md40` adds the `complaint_settings` and `complaint_second_looks` tables (dedicated
+  legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+
 ## [0.9.0] - 2026-10-12
 
 The design-partner pilot readiness release.

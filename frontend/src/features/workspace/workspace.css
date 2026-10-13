@@ -1700,3 +1700,220 @@ div.uw-task-count:hover {
   font-weight: 600;
   margin-bottom: 8px;
 }
+
+/* Complaints: the second look and the backlog board (sections/Complaints.tsx). Status colours always come with an
+   icon and a text label; the coloured edge of a card repeats the most serious sign listed on it. */
+.uw-cr-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.uw-cr-split {
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  align-items: start;
+}
+.uw-cr-hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+.uw-cr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.uw-cr-toolbar .ca-chips {
+  margin: 0;
+}
+.uw-cr-toolbar select {
+  min-height: 36px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.uw-cr-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-cr-card {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+.uw-cr-card:hover {
+  border-color: var(--ac-axis);
+  box-shadow: 0 4px 14px rgb(16 32 47 / 8%);
+}
+.uw-cr-rail {
+  background: var(--ac-neutral);
+}
+.uw-cr-rail.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-cr-rail.tone-serious {
+  background: var(--ac-serious);
+}
+.uw-cr-rail.tone-critical {
+  background: var(--ac-critical);
+}
+.uw-cr-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 0;
+}
+.uw-cr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.uw-cr-id {
+  color: var(--ac-navy);
+  font-size: 15px;
+}
+.uw-cr-meta {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-cr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-cr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-cr-chip.is-reason {
+  border-color: #b9d3e8;
+  background: #eef5fb;
+  color: var(--ac-navy);
+}
+.uw-cr-chip.tone-warning {
+  background: #fdf1d3;
+  border-color: transparent;
+}
+.uw-cr-chip.tone-serious {
+  background: #fbe6dc;
+  border-color: transparent;
+}
+.uw-cr-chip.tone-critical {
+  background: #f8e1e1;
+  border-color: transparent;
+}
+.uw-cr-text {
+  color: var(--ac-ink-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.uw-cr-text mark {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #fdf1d3;
+  box-shadow: inset 0 -2px 0 #e3a21a;
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-cr-decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+}
+.uw-cr-decision q {
+  flex-basis: 100%;
+  color: var(--ac-ink-2);
+  font-style: italic;
+}
+.uw-cr-actions {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 14px 14px 0;
+}
+.uw-cr-actions .ac-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.uw-cr-clip {
+  display: -webkit-box;
+  max-width: 34ch;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.uw-cr-age {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+  text-align: left;
+}
+.uw-cr-age-track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ac-track);
+}
+.uw-cr-age-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ac-good);
+}
+.uw-cr-age-fill.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-cr-age-fill.tone-critical {
+  background: var(--ac-critical);
+}
+@media (max-width: 1080px) {
+  .uw-cr-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .uw-cr-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .uw-cr-card {
+    grid-template-columns: 6px minmax(0, 1fr);
+  }
+  .uw-cr-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0 14px 14px 0;
+  }
+}

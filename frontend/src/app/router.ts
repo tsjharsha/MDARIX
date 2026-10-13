@@ -2,6 +2,7 @@ export type AppView =
   | "home"
   | "my-work"
   | "products"
+  | "complaints"
   | "signals"
   | "story"
   | "persona"
@@ -60,6 +61,7 @@ export const APP_ROUTES: Record<AppView, string> = {
   home: "/app",
   "my-work": "/app/my-work",
   products: "/app/products",
+  complaints: "/app/complaints",
   signals: "/app/signals",
   story: "/app/story",
   persona: "/app/persona",

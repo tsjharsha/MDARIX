@@ -62,6 +62,7 @@ from backend.app.investigation_open_router import assignees_router as investigat
 from backend.app.investigation_open_router import router as investigation_open_router
 from backend.app.case_workflow.router import router as case_workflow_router
 from backend.app.complaints_router import router as complaints_router
+from backend.app.complaint_review.router import router as complaint_review_router
 from backend.app.client_errors import router as client_errors_router
 from backend.app.support_api import router as support_router
 from backend.app.risk_router import router as risk_router
@@ -419,6 +420,7 @@ app.include_router(data_import_router)
 app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
+app.include_router(complaint_review_router)  # Second look and backlog board (md40)
 app.include_router(client_errors_router)
 app.include_router(support_router)
 app.include_router(risk_router)  # Risk & Traceability

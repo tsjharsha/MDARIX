@@ -5,6 +5,7 @@ import {
   Bot,
   Briefcase,
   Building2,
+  ClipboardList,
   FileSearch,
   Gavel,
   LayoutDashboard,
@@ -43,6 +44,7 @@ import { DashboardSection } from "./sections/Dashboard";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { MyWorkSection } from "./sections/MyWork";
 import { ProductsSection } from "./sections/Products";
+import { ComplaintsSection } from "./sections/Complaints";
 import { SignalsSection } from "./sections/Signals";
 import { InvestigationsSection } from "./sections/Investigations";
 import { EvidenceSection } from "./sections/Evidence";
@@ -93,6 +95,13 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     description: "Products, versions and lots",
     guide: "One view of the selected product version: its parts, lots, suppliers, complaints and known data gaps.",
     context: true,
+  },
+  Complaints: {
+    icon: ClipboardList,
+    description: "Second look and backlog",
+    guide:
+      "Find complaints hidden as cancellations, inquiries or No Fault Found, and see which open complaints wait in no signal and no case past your target. A person decides; MDARIX never changes your records.",
+    context: false,
   },
   Signals: {
     icon: Radio,
@@ -161,6 +170,7 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   home: ["Dashboard"],
   "my-work": ["My Work"],
   products: ["Products"],
+  complaints: ["Complaints"],
   signals: ["Signals"],
   story: ["Investigations", "Story"],
   persona: ["Dashboard"],
@@ -464,6 +474,7 @@ export function UserWorkspace({
                   {section === "Dashboard" && <DashboardSection />}
                   {section === "My Work" && <MyWorkSection tab={tab} />}
                   {section === "Products" && <ProductsSection tab={tab} />}
+                  {section === "Complaints" && <ComplaintsSection tab={tab} />}
                   {section === "Signals" && <SignalsSection tab={tab} />}
                   {section === "Investigations" && <InvestigationsSection tab={tab} />}
                   {section === "Evidence" && <EvidenceSection tab={tab} />}

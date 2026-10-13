@@ -8,6 +8,8 @@ export const WORKSPACE_SECTIONS = [
   "Dashboard",
   "My Work",
   "Products",
+  // The second look at possible hidden complaints and the complaint backlog board.
+  "Complaints",
   "Signals",
   "Investigations",
   "Evidence",
@@ -31,6 +33,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   Dashboard: ["home"],
   "My Work": ["home", "investigations"],
   Products: ["products"],
+  Complaints: ["products"],
   Signals: ["products"],
   Investigations: ["investigations"],
   Evidence: ["evidence"],

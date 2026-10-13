@@ -143,6 +143,8 @@ DB_MODULES = {
     "test_workflow_tasks",
     # Phase 2: signals and triage: the triage API, detection, cases from signals and their lifecycle.
     "test_signals_triage",
+    # Lightweight MVP phase 2: the complaint second look and the backlog board (md40).
+    "test_complaint_review_api",
     # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
     "test_case_workflow",
     # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.

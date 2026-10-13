@@ -11,6 +11,7 @@ const SECTION_VIEW: Readonly<Record<string, AppView>> = {
   Dashboard: "home",
   "My Work": "my-work",
   Products: "products",
+  Complaints: "complaints",
   Signals: "signals",
   Investigations: "investigations",
   Evidence: "evidence",

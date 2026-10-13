@@ -58,6 +58,7 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "home",
   "my-work",
   "products",
+  "complaints",
   "signals",
   "story",
   "persona",
