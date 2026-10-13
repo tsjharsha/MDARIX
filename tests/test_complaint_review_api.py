@@ -309,3 +309,83 @@ def test_another_organization_sees_and_decides_nothing_of_this_one(org):
         f"/api/v1/complaints/{record}/second-look", json={"decision": "DISMISSED", "reason": REASON}
     )
     assert refused.status_code == 404
+
+
+# ------------------------------------------------------------------------- the AI explanation (Phase 6, AI proof)
+
+
+def test_the_ai_explains_a_flagged_record_quoting_its_own_words(org, monkeypatch):
+    import json
+
+    from genai.provider import GenAIProvider, GenAIResult
+
+    tenant, product = org["tenant_id"], _product(org["tenant_id"])
+    record = _complaint(
+        tenant,
+        product,
+        complaint_type="Inquiry",
+        description="Customer says the pump stopped and the patient was choking",
+    )
+    explain_path = f"/api/v1/complaints/{record}/second-look/explain"
+
+    # AI off for the organization (the default): the rules' reasons stand alone, with why.
+    off = org["investigator"].post(explain_path)
+    assert off.status_code == 200, off.text
+    assert off.json()["author"] == "RULES" and off.json()["ai"]["status"] != "COMPLETED"
+
+    reply = {
+        "sentences": [
+            {
+                "text": "The description alleges a failure during use with harm to a patient.",
+                "quotes": [{"field": "description", "text": "the pump stopped and the patient was choking"}],
+            },
+            {
+                "text": "The record mentions a fire.",
+                "quotes": [{"field": "description", "text": "the pump caught fire"}],
+            },
+            {
+                "text": "This is a complaint and must be handled as one.",
+                "quotes": [{"field": "complaint_type", "text": "Inquiry"}],
+            },
+            {
+                "text": "The stopped pump caused the choking.",
+                "quotes": [{"field": "description", "text": "patient was choking"}],
+            },
+        ]
+    }
+
+    def answer(self, prompt, context=None, **kwargs):
+        assert "Description: Customer says the pump stopped" in json.dumps(kwargs.get("evidence"))
+        return GenAIResult("anthropic", "claude-sonnet-5-5", "1", {"answer": json.dumps(reply)}, 10, 10, 0, 5)
+
+    monkeypatch.setattr(GenAIProvider, "complete", answer)
+    assert org["viewer"].post(explain_path).status_code == 403
+    response = org["investigator"].post(explain_path)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["author"] == "AI" and body["ai"]["status"] == "COMPLETED"
+    assert [sentence["text"] for sentence in body["sentences"]] == [
+        "The description alleges a failure during use with harm to a patient."
+    ]
+    assert body["sentences"][0]["quotes"] == [
+        {"field": "description", "label": "Description", "text": "the pump stopped and the patient was choking"}
+    ]
+    assert {item["reason"] for item in body["ai"]["dropped"]} == {
+        "QUOTE_NOT_IN_RECORD",
+        "DECISION_CLAIM",
+        "CAUSAL_CLAIM",
+    }
+    assert body["ai"]["trust"]["status"] == "PASS" and body["ai"]["trust"]["author"] == "AI"
+    assert "person decides" in body["ai"]["label"]
+
+    # The list shows the latest explanation beside the rules' reasons; the record itself is unchanged.
+    listed = org["viewer"].get(SECOND_LOOK, params={"product_id": product}).json()
+    item = next(entry for entry in listed["items"] if entry["id"] == record)
+    assert item["explanation"]["sentences"] == body["sentences"]
+    assert item["explanation"]["ai"]["trust"] == {"status": "PASS", "label": "Trust check passed"}
+    assert item["decision"] is None and item["reasons"][0]["code"] == "INQUIRY"
+
+    plain = _complaint(tenant, product, description="Asked for the manual")
+    assert org["investigator"].post(f"/api/v1/complaints/{plain}/second-look/explain").status_code == 409
+    other = _client(org["other_id"], "INVESTIGATOR")
+    assert other.post(explain_path).status_code == 404

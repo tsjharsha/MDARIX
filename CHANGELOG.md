@@ -93,8 +93,40 @@ operator knows a release migrates the database.
 - Readiness: a check for products whose post-market data has not reached the risk file (critical when not reviewed or
   a reassessment is overdue), opening Records › Risk file input; the management review summary PDF gains section 5,
   "Post-market data and the risk file".
+- The automatic trust check (policy `MDARIX_AI_TRUST_POLICY_R1_V2`, `trust_engine/auto.py`): every AI result is checked
+  as it is saved, not only when the API is asked. It covers the case's AI run, signal summaries, model-drafted briefs
+  and second-look explanations. The checks are: every cited source exists (the case's evidence, including linked
+  records, the signal's complaints, the complaint's own fields); no stated root cause, causal proof, probability, or
+  decision that belongs to people; no asserted certainty (a warning); provider and model recorded; the right
+  organization. Only what the reader sees is checked, never what the feature's checks already removed. The verdict
+  (passed, passed with limitations, blocked) is saved with the result (`assurance_results`, `assurance_checks`), and
+  every case AI step, signal summary and second-look explanation shows it as a badge that opens its checks. Ask answers
+  carry the same verdict, judged on the answer as shown. A model-drafted investigation brief is now saved as an AI
+  result (`InvestigationBrief.ai_execution_id`), so it is checked too. `GET /api/v1/ai/trust-policy` describes the
+  checks.
+- Complaints › Second look › Explain with AI (`POST /api/v1/complaints/{id}/second-look/explain`, ai.run): at most
+  three sentences on why a flagged record may meet the complaint definition (ISO 13485:2016, 3.4), each quoting the
+  record's own fields word for word. A sentence is dropped when a quote is not in the record, when it says the record is
+  or is not a complaint, is reportable or needs a recall, or when it states a cause. Saved as an AI result with its
+  trust check and shown beside the rules' reasons; when AI is off or unavailable, the reasons stand alone and the screen
+  says why. The record and the decision are never changed.
+- The AI release gate (`backend/app/ai_release_gate.py`, `GET /api/v1/ai/release-gate`). It has four bars: a contracted
+  provider with zero data retention; the golden dataset signed off by a named person; the full golden evaluation (15 of
+  15, model-written) passed with the configured model; the automatic trust check. In production, switching AI on for an
+  organization is refused (`AI_RELEASE_GATE_NOT_MET`) until all four are met. Administrators see the bars under
+  Security › AI processing, and MDARIX staff see them, with what to do, in the AI Control Center.
+  `scripts/qualify_ai_golden_dataset.py --human-sign-off --name --role --confirm` records a person's sign-off bound to
+  the lock's hashes, refusing names that read as a tool or an agent. `scripts/run_real_evaluation.py --gate
+  --require-model --release-record` writes `evaluation/AI_RELEASE_RECORD.json` only for a full pass on the signed-off
+  dataset. Neither file exists yet: the dataset awaits a person's sign-off, and the evaluation awaits the contracted
+  provider.
 
 ### Changed
+
+- Under the `mvp` feature set the template engines that only looked like AI are hidden. The case AI run skips the
+  failure-chain step (a fixed two-link template) and says why; the investigation panel no longer generates template
+  chains; the static agent catalog (`GET /api/v1/ai/agents/catalog`) is parked, and the AI Control Center shows the
+  trust check's policy instead. Chains people build on the case, and the full product, are unchanged.
 
 - Production runs one `background` service instead of `worker` and `scheduler`: `scripts/run_background.py` starts the
   outbox worker and the scheduler unchanged as two processes, passes a stop signal to both and exits when either

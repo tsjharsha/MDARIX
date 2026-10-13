@@ -36,6 +36,16 @@ def assure(
         raise fail(e) from e
 
 
+@router.get("/ai/trust-policy", dependencies=[Depends(get_request_context)])
+def trust_policy():
+    """The automatic trust check every AI result gets (trust_engine/auto.py), as people read it, and the feature set
+    (the static agent catalog is shown only in the full product). Any signed-in user."""
+    from backend.app.feature_set import feature_set
+    from trust_engine.auto import describe
+
+    return {**describe(), "feature_set": feature_set()}
+
+
 @router.get("/ai-executions/{execution_id}/assurance", response_model=AssuranceResponse)
 def get_assurance(
     execution_id: uuid.UUID,

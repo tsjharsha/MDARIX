@@ -213,13 +213,50 @@ def qualify() -> dict[str, Any]:
     }
 
 
+def human_sign_off(name: str | None, role: str | None, confirmed: bool) -> int:
+    """A named person signs off the current, valid lock (evaluation/release_record.py). Refused for an invalid
+    dataset or lock, without --confirm, or for a name that is not a person's."""
+    sys.path.insert(0, str(ROOT))
+    from evaluation.release_record import SIGN_OFF, SIGN_OFF_STATEMENT, build_sign_off, write
+
+    report = qualify()
+    if report["status"] != "PASS":
+        print("The dataset or its lock does not pass; fix it before signing off:", file=sys.stderr)
+        print("\n".join(f"- {error}" for error in report["errors"]), file=sys.stderr)
+        return 1
+    if not confirmed:
+        print(f"Sign-off statement:\n  {SIGN_OFF_STATEMENT}\nRun again with --confirm to sign it.", file=sys.stderr)
+        return 1
+    try:
+        sign_off = build_sign_off(read_json(LOCK), name=name or "", role=role or "")
+    except ValueError as exc:
+        print(f"Not signed: {exc}", file=sys.stderr)
+        return 1
+    write(SIGN_OFF, sign_off)
+    print(f"Signed off by {sign_off['approved_by']} ({sign_off['role']}) at {sign_off['approved_at']}: {SIGN_OFF}")
+    print("Commit the file with the change that needed it; a changed dataset needs a new sign-off.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--approve", action="store_true", help="write a reviewed qualification lock")
     parser.add_argument("--reviewer", default="MDARIX Engineering")
     parser.add_argument("--change-control", default="MVP-AI-GOLDEN-001")
     parser.add_argument("--report", default=str(DEFAULT_REPORT))
+    parser.add_argument(
+        "--human-sign-off",
+        action="store_true",
+        help="record YOUR sign-off of the current lock (evaluation/GOLDEN_DATASET_HUMAN_SIGN_OFF.json); run it "
+        "yourself after reviewing the 15 scenarios, with --name, --role and --confirm",
+    )
+    parser.add_argument("--name", help="your full name, for --human-sign-off")
+    parser.add_argument("--role", help="your role, for --human-sign-off (for example Head of Quality)")
+    parser.add_argument("--confirm", action="store_true", help="confirm the sign-off statement printed by --help")
     args = parser.parse_args()
+
+    if args.human_sign_off:
+        return human_sign_off(args.name, args.role, args.confirm)
 
     if args.approve:
         temporary = qualify()

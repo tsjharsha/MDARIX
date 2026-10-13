@@ -10,6 +10,10 @@ Analyses are not saved; --record saves the evaluation report itself so the Trust
 1 unless every scenario with specific expectations passes, at least --min-passed scenarios pass (default: all), and,
 with --require-model, every analysis was written by the language model rather than the rules.
 
+--release-record (with --gate --require-model): when the full suite passes on the golden dataset a person signed off,
+write evaluation/AI_RELEASE_RECORD.json naming the provider and model; production switches AI on for an organization
+only with that model (backend/app/ai_release_gate.py). Commit the record with the release.
+
 --switch-ai-on: the synthetic golden organization starts with AI processing off, like every new organization (md23),
 so the model would be refused. This switches it on the way an administrator does: an audited
 AI_PROCESSING_SETTING_CHANGED event with the acknowledgement and the provider's name. Only the synthetic golden
@@ -87,7 +91,15 @@ def main() -> int:
     parser.add_argument(
         "--switch-ai-on", action="store_true", help="switch AI on for the synthetic golden organization (audited)"
     )
+    parser.add_argument(
+        "--release-record",
+        action="store_true",
+        help="with --gate --require-model: when the full suite passes on the signed-off dataset, write "
+        "evaluation/AI_RELEASE_RECORD.json (what production checks before AI is switched on)",
+    )
     args = parser.parse_args()
+    if args.release_record and not (args.gate and args.require_model):
+        parser.error("--release-record needs --gate and --require-model")
     started = datetime.now(timezone.utc)
     db = SessionLocal()
     try:
@@ -129,6 +141,24 @@ def main() -> int:
         if problems:
             return 1
         print("GATE PASSED")
+        if args.release_record:
+            return write_release_record(report)
+    return 0
+
+
+def write_release_record(report: dict) -> int:
+    """Write the release record for a passing run (evaluation/release_record.py), or say why it cannot be."""
+    from evaluation.release_record import RECORD, build_record, load, release_problems, write
+
+    lock, sign_off, _ = load()
+    problems = release_problems(report, lock, sign_off)
+    for problem in problems:
+        print(f"RELEASE RECORD NOT WRITTEN: {problem}")
+    if problems:
+        return 1
+    record = build_record(report, lock, sign_off)
+    write(RECORD, record)
+    print(f"Release record written for {record['provider']} {record['model']}: {RECORD}")
     return 0
 
 

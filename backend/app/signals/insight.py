@@ -469,7 +469,12 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
         orchestration_version=AI_VERSION,
         context_refs={"signal_id": str(signal.id), "signal": signal.business_id},
         evidence_refs={"complaints": sorted(known)},
-        structured_output={"sentences": kept, "dropped": dropped},
+        structured_output={
+            "sentences": kept,
+            "dropped": dropped,
+            # Who wrote it, for the automatic trust check (the provider column names this feature).
+            "model": {"provider": result.provider, "model": result.model},
+        },
         validation_status="VALIDATED" if kept else "REJECTED",
         latency_ms=result.latency_ms,
         requestor_ref=str(actor_ref),
@@ -477,7 +482,12 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
     if not kept:
         return {
             **fallback,
-            "ai": {"status": "NOTHING_KEPT", "reason": "Every sentence failed a check", "dropped": dropped},
+            "ai": {
+                "status": "NOTHING_KEPT",
+                "reason": "Every sentence failed a check",
+                "dropped": dropped,
+                "trust": getattr(execution, "trust", None),
+            },
         }
     return {
         "author": "AI",
@@ -490,6 +500,7 @@ def ai_summary(db: Session, signal: Signal, *, actor_ref: str, provider=None) ->
             "model": result.model,
             "ai_execution_id": str(execution.id),
             "dropped": dropped,
+            "trust": getattr(execution, "trust", None),
             "label": "AI interpretation: written by AI from the complaints cited, checked sentence by sentence; a "
             "person decides",
         },

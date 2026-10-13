@@ -8,6 +8,10 @@ organization and set its monthly token budget. Every change is audited with its 
 Switching AI processing on needs ``acknowledgement: true``: the administrator confirms that the organization's
 records may go to the contracted provider named on the screen (masked first). The audit event records the
 acknowledgement and that provider's name, and every answer says which provider is in use and that masking is on.
+
+In production, switching AI processing on is also refused until the AI release gate is met (ai_release_gate.py:
+contracted provider, golden dataset signed off by a person, golden evaluation passed with this model, automatic trust
+check); every answer carries the gate's four bars.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.app import support_access
+from backend.app.ai_release_gate import require_for_switch_on as require_release_gate
 from backend.app.access.authz import _admin_tenant, _require_platform_admin
 from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import get_db
@@ -69,12 +74,16 @@ def _provider_name(models: list[dict] | None = None) -> str | None:
 
 
 def _settings(db: Session, tenant_id) -> dict:
+    from backend.app.ai_release_gate import status as release_gate
+
     models = _models_in_use()
     return {
         **governance.usage(db, tenant_id),
         "models": models,
         "provider_name": _provider_name(models),
         "masking": pii.enabled(),
+        # The four bars AI must pass before a pilot (enforced in production when switching AI on).
+        "release_gate": release_gate(models),
     }
 
 
@@ -112,6 +121,7 @@ def update_customer_ai_settings(payload: CustomerAiSettings, request: Request, d
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
     switching_on = payload.ai_processing_allowed and not tenant.ai_processing_allowed
     _require_acknowledgement(switching_on, payload.acknowledgement)
+    require_release_gate(switching_on)
     before = {"ai_processing_allowed": tenant.ai_processing_allowed}
     tenant.ai_processing_allowed = payload.ai_processing_allowed
     tenant.updated_at = datetime.now(timezone.utc)
@@ -168,6 +178,7 @@ def update_platform_ai_settings(
     }
     switching_on = bool(payload.ai_processing_allowed) and not tenant.ai_processing_allowed
     _require_acknowledgement(switching_on, payload.acknowledgement)
+    require_release_gate(switching_on)
     if payload.ai_processing_allowed is not None:
         tenant.ai_processing_allowed = payload.ai_processing_allowed
     if payload.use_default_budget:

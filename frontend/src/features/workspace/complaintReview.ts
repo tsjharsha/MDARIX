@@ -3,6 +3,7 @@
 // the settings sends and when it may be sent. The server (/api/v1/complaints, backend/app/complaint_review) finds the
 // records and decides every action; these only shape what the person sees and what is sent.
 import type { Slice, Tone } from "../admin/console/dashboardModel";
+import type { TrustSummary } from "./trust";
 
 export const COMPLAINTS_TABS = [
   "Second look",
@@ -58,7 +59,57 @@ export type SecondLookItem = ReviewRecord & {
   words: string[];
   score: number;
   decision: SecondLookDecision | null;
+  // The latest AI explanation of the record, when someone asked for one (Phase 6).
+  explanation?: SecondLookExplanation | null;
 };
+
+/** A quote the AI took word for word from one of the record's fields (checked by the server). */
+export type ExplanationQuote = { field: string; label: string; text: string };
+export type ExplanationSentence = { text: string; quotes: ExplanationQuote[]; fields?: string[] };
+
+/**
+ * The AI's explanation of why a flagged record may meet the complaint definition: at most three sentences, each quoting
+ * the record's own words (backend/app/complaint_review/explain.py). ``author: "RULES"`` with no sentences when AI is
+ * off, unavailable or over budget, with why in ``ai``.
+ */
+export type SecondLookExplanation = {
+  author: "AI" | "RULES";
+  sentences: ExplanationSentence[];
+  ai: {
+    status: string;
+    reason?: string | null;
+    message?: string | null;
+    provider?: string | null;
+    model?: string | null;
+    ai_execution_id?: string;
+    explained_at?: string | null;
+    dropped?: Array<{ text: string; reason: string }>;
+    trust?: TrustSummary | null;
+    label?: string;
+  };
+};
+
+export const explainPath = (complaintId: string) =>
+  `/api/v1/complaints/${encodeURIComponent(complaintId)}/second-look/explain`;
+
+const EXPLANATION_REASONS: Record<string, string> = {
+  PROVIDER_NOT_CONFIGURED: "No AI provider is set up yet, so the reasons above come from the rules.",
+  NOTHING_TO_EXPLAIN: "The record has no description or harm flags for AI to explain.",
+  NOTHING_KEPT: "AI wrote nothing that passed the checks (every quote must be the record's own words).",
+  UNREADABLE: "AI's reply could not be read; the reasons above come from the rules.",
+};
+
+/** Why there is no AI explanation, in plain words; null when there is one. */
+export function explanationNote(explanation: SecondLookExplanation | null | undefined): string | null {
+  if (!explanation || explanation.author === "AI") return null;
+  const ai = explanation.ai ?? { status: "" };
+  return (
+    ai.message ??
+    EXPLANATION_REASONS[ai.reason ?? ""] ??
+    EXPLANATION_REASONS[ai.status] ??
+    "AI is not available right now; the reasons above come from the rules."
+  );
+}
 
 export type SecondLookSummary = {
   to_review: number;

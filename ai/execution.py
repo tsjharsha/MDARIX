@@ -51,4 +51,8 @@ def record_ai_execution(
 
     db.add(execution_record)
     db.flush()
+    # Every saved AI result gets its trust check as it is saved (trust_engine/auto.py); the check never raises.
+    from trust_engine.auto import check_saved
+
+    execution_record.trust = check_saved(db, execution_record)
     return execution_record

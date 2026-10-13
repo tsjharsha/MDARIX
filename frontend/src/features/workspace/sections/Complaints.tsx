@@ -8,6 +8,7 @@ import {
   Hourglass,
   Inbox,
   ScanSearch,
+  Sparkles,
   Timer,
   XCircle,
 } from "lucide-react";
@@ -17,7 +18,8 @@ import { formatDay } from "../../../app/dates";
 import { offeredTab } from "../../../app/featureSet";
 import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { StatusBadge, countOf } from "./common";
-import { Hero, Pager, ProductFilter } from "./boardParts";
+import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
+import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { ReportingWindows } from "./ReportingWindows";
 import {
@@ -32,6 +34,8 @@ import {
   decisionBody,
   decisionProblem,
   decisionText,
+  explainPath,
+  explanationNote,
   highlightParts,
   otherDecision,
   reasonSlices,
@@ -51,6 +55,7 @@ import {
   type BacklogShow,
   type ComplaintsTab,
   type ReviewSettings,
+  type SecondLookExplanation,
   type SecondLookItem,
   type SecondLookList,
   type SettingsForm,
@@ -271,6 +276,7 @@ export function SecondLookCard({
         <p className="uw-cr-text">
           <Highlighted text={item.description} words={item.words} />
         </p>
+        <ExplainWithAi item={item} name={name} />
         {item.decision && decided && (
           <div className="uw-cr-decision">
             <ToneBadge tone={decided.tone} label={decided.badge} />
@@ -319,6 +325,85 @@ export function SecondLookCard({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * The AI's explanation of a flagged record, on request: at most three sentences, each with the record's own words it
+ * quotes (checked by the server), and its trust check. When AI is off or unavailable, it says why; the rules' reasons
+ * above stand either way, and a person decides (exported for its unit test).
+ */
+export function ExplainWithAi({ item, name }: { item: SecondLookItem; name: string }) {
+  const canRun = useCan("ai.run");
+  const [explanation, setExplanation] = useState<SecondLookExplanation | null>(item.explanation ?? null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const explain = async () => {
+    setBusy(true);
+    setError("");
+    setNote(null);
+    try {
+      const result = await send<SecondLookExplanation>(explainPath(item.id), "POST");
+      if (result.author === "AI") setExplanation(result);
+      else setNote(explanationNote(result));
+    } catch (failure) {
+      setError(errorText(failure, "The explanation could not be made."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const shown = explanation?.author === "AI" ? explanation : null;
+  if (!shown && !canRun) return null;
+  const dropped = shown?.ai.dropped?.length ?? 0;
+  return (
+    <div className="uw-cr-explain" aria-live="polite">
+      {shown && (
+        <>
+          <div className="uw-ai-head">
+            <p className="uw-ai-label">
+              <Sparkles size={14} aria-hidden="true" /> {shown.ai.label ?? "AI interpretation: a person decides"}
+            </p>
+            <TrustBadge trust={shown.ai.trust} />
+          </div>
+          <ul className="uw-cr-explain-list">
+            {shown.sentences.map((sentence, index) => (
+              <li key={index}>
+                <span>{sentence.text}</span>
+                {sentence.quotes.map((quote, position) => (
+                  <q key={position} className="uw-cr-quote">
+                    <b>{quote.label}:</b> {quote.text}
+                  </q>
+                ))}
+              </li>
+            ))}
+          </ul>
+          {dropped > 0 && (
+            <p className="ac-muted">
+              {dropped} sentence{dropped === 1 ? "" : "s"} left out: a quote not in the record, a decision or a stated
+              cause.
+            </p>
+          )}
+        </>
+      )}
+      {note && (
+        <p className="ac-muted" role="status">
+          {note}
+        </p>
+      )}
+      {canRun && (
+        <button
+          type="button"
+          className="ac-link"
+          disabled={busy}
+          onClick={() => void explain()}
+          aria-label={`${name}: ${shown ? "explain again with AI" : "explain with AI why it may be a complaint"}`}
+        >
+          <Sparkles size={15} aria-hidden="true" /> {busy ? "Explaining…" : shown ? "Explain again" : "Explain with AI"}
+        </button>
+      )}
+      <InlineError text={error} />
+    </div>
   );
 }
 

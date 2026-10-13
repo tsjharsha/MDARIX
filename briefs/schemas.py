@@ -27,6 +27,9 @@ class BriefResponse(BaseModel):
     provenance: dict[str, Any]
     limitations: dict[str, Any] | None
     created_at: datetime | None
+    # Phase 6 (additive): the saved AI result of a model-drafted brief (its trust check is kept with it); None when
+    # the rules assembled the brief.
+    ai_execution_id: uuid.UUID | None = None
     # Phase 4 (additive): what this brief is, and why AI did not contribute when rules assembled it (read from the
     # brief's own ai_brief and ai_advisory content, which stay unchanged).
     epistemic: AIEpistemicLabel = ai_label_field()

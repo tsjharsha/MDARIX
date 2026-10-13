@@ -169,8 +169,8 @@ export function InvestigationWorkspacePanel({
   /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
   onOpenIntelligence?: (view: IntelligenceView) => void;
 }) {
-  // Under the MVP feature set the counterfactual is parked and the decision is taken on the case's own Decision tab
-  // (app/featureSet.ts).
+  // Under the MVP feature set the counterfactual and the template failure chains are parked and the decision is taken
+  // on the case's own Decision tab (app/featureSet.ts).
   const mvp = useFeatureSet() === "mvp";
   const decisionLabel = mvp ? "Open the decision" : "Open Decision Center";
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
@@ -344,7 +344,9 @@ export function InvestigationWorkspacePanel({
     const sequence = requestSequence.current;
     const current = () => sequence === requestSequence.current;
     setPendingAction("Run Unknowns & Chain");
-    setActionStatus("RUNNING: Evaluating Unknowns Radar and Failure Chain...");
+    setActionStatus(
+      mvp ? "RUNNING: Evaluating the Unknowns Radar..." : "RUNNING: Evaluating Unknowns Radar and Failure Chain...",
+    );
     setError("");
     const body = { investigation_id: investigationId, ...temporal() };
     try {
@@ -360,6 +362,13 @@ export function InvestigationWorkspacePanel({
       if (!current()) return;
       setUnknownSet(unknowns.unknown_set);
       remember("unknowns", unknowns);
+      if (mvp) {
+        // The automatic failure chains were a fixed two-link template; the MVP does not generate them.
+        setActionStatus("SUCCESS: Unknowns results are displayed below.");
+        setPendingAction(null);
+        setError("");
+        return;
+      }
       const chains = await ai<any>("failure-chains", body);
       if (!current()) return;
       setFailureChains(chains.failure_chain_set);
@@ -488,7 +497,13 @@ export function InvestigationWorkspacePanel({
                 aria-describedby={runDescribedBy}
               >
                 {" "}
-                {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
+                {pendingAction === "Run Unknowns & Chain"
+                  ? mvp
+                    ? "Running Unknowns…"
+                    : "Running Unknowns & Chain…"
+                  : mvp
+                    ? "Run Unknowns"
+                    : "Run Unknowns & Chain"}
               </button>
               <button
                 className="primary-action"
@@ -547,7 +562,7 @@ export function InvestigationWorkspacePanel({
             "decision",
           ] as const
         )
-          .filter((tab) => !(mvp && tab === "counterfactual"))
+          .filter((tab) => !(mvp && (tab === "counterfactual" || tab === "failure-chain")))
           .map((tab) => (
             <button
               key={tab}
@@ -703,7 +718,9 @@ export function InvestigationWorkspacePanel({
           >
             {pendingAction === "Run Unknowns & Chain"
               ? "Running controlled checks…"
-              : "Run Challenger, Unknowns & Chain"}
+              : mvp
+                ? "Run Challenger & Unknowns"
+                : "Run Challenger, Unknowns & Chain"}
           </button>
         )}
       </section>
@@ -722,30 +739,32 @@ export function InvestigationWorkspacePanel({
             <AiBlockNote label={labels.unknowns} onJudge={judge("Unknowns")} />
             <UnknownsBoard set={unknownSet} />
           </Panel>
-          <div id="workflow-failure-chain">
-            <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
-              <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
-              <div className="analysis-list">
-                {!failureChains?.chains.length && (
-                  <p className="empty">
-                    No supportable failure chain is available for this context. The chain remains unresolved.
-                  </p>
-                )}
-                {failureChains?.chains.map((chain) => (
-                  <article key={chain.chain_id}>
-                    <span>{chain.overall_status}</span>
-                    <p>{chain.chain_statement}</p>
-                    {chain.links.map((link) => (
-                      <small key={link.link_id}>
-                        {link.from_entity_or_state} — {link.relationship} → {link.to_entity_or_state} [
-                        {link.epistemic_status}]
-                      </small>
-                    ))}
-                  </article>
-                ))}
-              </div>
-            </Panel>
-          </div>
+          {!mvp && (
+            <div id="workflow-failure-chain">
+              <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
+                <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
+                <div className="analysis-list">
+                  {!failureChains?.chains.length && (
+                    <p className="empty">
+                      No supportable failure chain is available for this context. The chain remains unresolved.
+                    </p>
+                  )}
+                  {failureChains?.chains.map((chain) => (
+                    <article key={chain.chain_id}>
+                      <span>{chain.overall_status}</span>
+                      <p>{chain.chain_statement}</p>
+                      {chain.links.map((link) => (
+                        <small key={link.link_id}>
+                          {link.from_entity_or_state} — {link.relationship} → {link.to_entity_or_state} [
+                          {link.epistemic_status}]
+                        </small>
+                      ))}
+                    </article>
+                  ))}
+                </div>
+              </Panel>
+            </div>
+          )}
         </div>
       )}
       <section id="workflow-evidence" className="panel empty-state">

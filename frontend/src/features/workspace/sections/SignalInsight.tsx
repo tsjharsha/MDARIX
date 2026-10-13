@@ -15,6 +15,7 @@ import {
   type TrendItem,
 } from "../signalAi";
 import { InlineError } from "./boardParts";
+import { TrustBadge } from "./TrustBadge";
 
 /**
  * What a signal's complaints have in common (from their records, or written by AI and checked sentence by sentence;
@@ -72,6 +73,11 @@ export function SummaryView({ summary }: { summary: SignalSummary }) {
         <p className="uw-ai-label">
           <Sparkles size={14} aria-hidden="true" /> {summary.ai.label}
         </p>
+      )}
+      {summary.author === "AI" && summary.ai?.trust && (
+        <div className="uw-ai-head">
+          <TrustBadge trust={summary.ai.trust} />
+        </div>
       )}
       <ul className="uw-sum-list">
         {summary.sentences.map((sentence, index) => (

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, CircleDashed, Loader2, RefreshCw, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, CircleSlash, Loader2, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { useCan } from "../workspaceContext";
 import { isRunning, runHeadline, runPath, runProgress, type CaseAiRun, type CaseAiRunStep } from "../signalAi";
 import { InlineError } from "./boardParts";
+import { TrustBadge } from "./TrustBadge";
 
 const POLL_MS = 3000;
 
@@ -127,6 +128,8 @@ function StepItem({ step }: { step: CaseAiRunStep }) {
       <CheckCircle2 size={15} className="ac-tone-icon tone-good" aria-hidden="true" />
     ) : step.status === "FAILED" ? (
       <XCircle size={15} className="ac-tone-icon tone-critical" aria-hidden="true" />
+    ) : step.status === "SKIPPED" ? (
+      <CircleSlash size={15} className="ac-tone-icon tone-neutral" aria-hidden="true" />
     ) : (
       <CircleDashed size={15} className="ac-tone-icon tone-neutral" aria-hidden="true" />
     );
@@ -136,6 +139,10 @@ function StepItem({ step }: { step: CaseAiRunStep }) {
       <span>{step.label}</span>
       {step.status === "DONE" && (
         <ToneBadge tone="neutral" label={step.author === "AI" ? "Written by AI" : "From the rules"} />
+      )}
+      {step.status === "DONE" && step.trust && <TrustBadge trust={step.trust} />}
+      {step.status === "SKIPPED" && (
+        <small className="ac-muted">Not run in this edition: a fixed template, not an analysis</small>
       )}
       {step.status === "FAILED" && <small className="uw-flag-critical">{step.error ?? "Failed"}</small>}
     </li>

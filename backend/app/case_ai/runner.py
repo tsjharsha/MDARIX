@@ -5,7 +5,9 @@ step runs the earlier ones again): the analysis, the competing explanations, the
 chains and the investigation brief, all for one point in time (the run's ``as_of``). Each step keeps working exactly as
 before: written by the language model when AI is on and available, by the rules otherwise (AI off, over budget, no
 provider, no evidence yet), and checked as before. The run records each step's outcome; the steps' results are stored
-where they always were, so the case page, the readiness checks and the Decision Brief read them as before.
+where they always were, so the case page, the readiness checks and the Decision Brief read them as before. Each
+step's outcome carries the automatic trust check saved with its AI result (trust_engine/auto.py). Under the ``mvp``
+feature set the failure-chain step is skipped (``PARKED_STEPS``): its chains were a fixed template.
 
 Runs in the background after the request that queued it (FastAPI background task), in its own session on the
 organization's data plane and in the organization's AI scope (genai.governance.tenant_scope).
@@ -33,6 +35,12 @@ STEPS = (
     ("BRIEF", "Investigation brief"),
 )
 STEP_LABELS = dict(STEPS)
+# Steps the lightweight MVP does not run (backend/app/feature_set.py): the failure chains are a fixed two-link
+# template, not analysis. People still build chains from the evidence on the case.
+PARKED_STEPS = {
+    "FAILURE_CHAINS": "Not run in this edition: the automatic chains were a fixed template, not an analysis. Build "
+    "a failure chain from the evidence on the case if the investigation needs one.",
+}
 ACTIVE = ("QUEUED", "RUNNING")
 # A run still QUEUED or RUNNING after this long is taken to have stopped (a restarted server); a new one may start.
 STALE_AFTER = timedelta(minutes=30)
@@ -181,6 +189,26 @@ def _error_code(exc: Exception) -> str:
     return str(getattr(exc, "code", None) or getattr(exc, "reason", None) or type(exc).__name__)[:120]
 
 
+def parked_steps() -> dict[str, str]:
+    """The steps this deployment's feature set does not run, with the reason shown in their place."""
+    from backend.app.feature_set import is_mvp
+
+    return dict(PARKED_STEPS) if is_mvp() else {}
+
+
+def _trust(db: Session, tenant_id: uuid.UUID, execution_id: str | None) -> dict | None:
+    """The automatic trust check saved with the step's AI result (trust_engine/auto.py), or None."""
+    if not execution_id:
+        return None
+    try:
+        from trust_engine.auto import latest
+
+        return latest(db, tenant_id, execution_id)
+    except Exception:  # reading the check must never fail the step
+        logger.exception("Case AI run: the trust check of %s could not be read", execution_id)
+        return None
+
+
 def execute(db: Session, run_id: uuid.UUID) -> CaseAiRun | None:
     """Run the steps of a queued run, saving each step's outcome as it finishes. A failing step stops the run (the
     steps after it need its result); what was done stays. Never raises."""
@@ -192,10 +220,19 @@ def execute(db: Session, run_id: uuid.UUID) -> CaseAiRun | None:
     db.commit()
     outcomes: list[dict] = []
     failed = None
+    parked = parked_steps()
     for code, step in _steps(db, tenant_id, investigation_id, run.as_of, run.requested_by):
         started = now_utc()
+        if code in parked:
+            outcome = {"step": code, "status": "SKIPPED", "notice": parked[code], "seconds": 0.0}
+            outcomes.append(outcome)
+            run = db.query(CaseAiRun).filter(CaseAiRun.id == run_id).first()
+            run.steps = list(outcomes)
+            db.commit()
+            continue
         try:
             outcome = step()
+            outcome["trust"] = _trust(db, tenant_id, outcome.get("ai_execution_id"))
             db.commit()
         except Exception as exc:  # a step's own refusal or failure: recorded, never raised
             db.rollback()
@@ -225,7 +262,13 @@ def execute(db: Session, run_id: uuid.UUID) -> CaseAiRun | None:
                 "status": run.status,
                 "trigger": run.trigger,
                 "steps": [
-                    {"step": item["step"], "status": item["status"], "author": item.get("author")} for item in outcomes
+                    {
+                        "step": item["step"],
+                        "status": item["status"],
+                        "author": item.get("author"),
+                        "trust": (item.get("trust") or {}).get("status"),
+                    }
+                    for item in outcomes
                 ],
             },
             created_at=run.finished_at,

@@ -3,6 +3,7 @@
 // one AI run. The server (/api/v1/triage/..., /api/v1/investigations/{id}/ai-run) computes and decides; these only
 // shape what the person sees and what is sent.
 import type { Tone } from "../admin/console/dashboardModel";
+import type { TrustSummary } from "./trust";
 
 export type TrendResult = "SIGNIFICANT" | "ELEVATED" | "STEADY" | "TOO_FEW" | "SHORT_HISTORY";
 export type TrendGroup = "version" | "problem" | "type";
@@ -136,6 +137,7 @@ export type SignalSummary = {
     label?: string;
     model?: string;
     dropped?: Array<{ text: string; reason: string }>;
+    trust?: TrustSummary | null;
   };
 };
 
@@ -183,7 +185,7 @@ export function oneClickQuestion(
 
 // The case AI run ---------------------------------------------------------------------------------------------------
 
-export type RunStepStatus = "PENDING" | "DONE" | "FAILED";
+export type RunStepStatus = "PENDING" | "DONE" | "FAILED" | "SKIPPED";
 export type CaseAiRunStep = {
   step: string;
   label: string;
@@ -193,6 +195,8 @@ export type CaseAiRunStep = {
   reason_code?: string | null;
   error?: string;
   seconds?: number;
+  // The automatic trust check saved with the step's AI result (trust.ts); null when the step saved no AI result.
+  trust?: TrustSummary | null;
 };
 export type CaseAiRun = {
   id: string;
@@ -211,8 +215,19 @@ export const runPath = (caseId: string) => `/api/v1/investigations/${encodeURICo
 export const isRunning = (run: CaseAiRun | null | undefined) => run?.status === "QUEUED" || run?.status === "RUNNING";
 
 export function runProgress(run: CaseAiRun | null | undefined): { done: number; total: number } {
-  const steps = run?.steps ?? [];
+  // A step this edition does not run (SKIPPED) is not counted.
+  const steps = (run?.steps ?? []).filter((step) => step.status !== "SKIPPED");
   return { done: steps.filter((step) => step.status === "DONE").length, total: steps.length || 6 };
+}
+
+/** The run's trust checks: how many AI results were checked, and how many were blocked or limited. */
+export function runTrust(run: CaseAiRun | null | undefined): { checked: number; blocked: number; limited: number } {
+  const trusts = (run?.steps ?? []).map((step) => step.trust).filter((trust): trust is TrustSummary => Boolean(trust));
+  return {
+    checked: trusts.length,
+    blocked: trusts.filter((trust) => trust.status === "BLOCKED").length,
+    limited: trusts.filter((trust) => trust.status === "PASS_WITH_LIMITATIONS").length,
+  };
 }
 
 /** Who wrote the run's results: AI for every step, the rules for every step (AI off or unavailable), or both. */
@@ -244,8 +259,22 @@ export function runHeadline(run: CaseAiRun | null | undefined): { title: string;
       : author === "RULES"
         ? "Assembled by the rules from the case's records (AI is off or unavailable)."
         : "Part by AI, part by the rules where AI was unavailable.";
+  const trust = runTrust(run);
+  const plural = (count: number) => (count === 1 ? "" : "s");
+  if (run.status === "COMPLETED" && trust.blocked)
+    return {
+      title: `AI analysis ready: ${trust.blocked} result${plural(trust.blocked)} blocked by the trust check`,
+      detail: `${by} Open the blocked step's trust check and review it against the records before relying on it.`,
+      tone: "warning",
+    };
   if (run.status === "COMPLETED")
-    return { title: "AI analysis ready: judge each explanation below", detail: by, tone: "good" };
+    return {
+      title: "AI analysis ready: judge each explanation below",
+      detail: trust.checked
+        ? `${by} ${trust.checked} result${plural(trust.checked)} checked automatically for sources, wording and provenance.`
+        : by,
+      tone: "good",
+    };
   if (run.status === "PARTIAL")
     return { title: `AI analysis stopped after ${done} of ${total} steps`, detail: run.error ?? by, tone: "warning" };
   return {

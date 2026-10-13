@@ -35,6 +35,14 @@ canonical dataset lists the scenario on it), and every scenario has at least one
    provider policy. `scripts/run_real_evaluation.py --gate` requires every scenario (all 15) to pass, every scenario
    with specific expectations among them, with model-authored analyses (`--require-model`).
 
+4. A named person signs off the lock: `python scripts/qualify_ai_golden_dataset.py --human-sign-off --name "First
+   Last" --role "<role>" --confirm` writes `evaluation/GOLDEN_DATASET_HUMAN_SIGN_OFF.json`, bound to the lock's
+   hashes. The current lock's reviewer reads "ai-governance agent (human review pending)": it is not signed off until
+   a person does this.
+5. `run_real_evaluation.py --gate --require-model --release-record` writes `evaluation/AI_RELEASE_RECORD.json` only for
+   a full pass on the signed-off dataset; production switches AI on for an organization only with the model it names
+   (`backend/app/ai_release_gate.py`, docs/runbooks/AI_PROVIDERS.md).
+
 Dataset qualification proves that the test oracle is controlled and reviewable. It does not prove that a model
 passes the oracle. These are separate controls and both are required for model promotion.
 

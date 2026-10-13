@@ -138,6 +138,20 @@
 .ar-no {
   color: var(--ac-ink-2);
 }
+.ar-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ac-ink-2);
+}
+.ar-warn svg {
+  color: var(--ac-warning);
+}
+.ar-muted {
+  margin: 8px 0 0;
+  color: var(--ac-muted);
+  font-size: 0.85em;
+}
 .ar-insert {
   display: flex;
   flex-wrap: wrap;

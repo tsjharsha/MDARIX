@@ -22,7 +22,12 @@ KEPT = (
     "/api/v1/investigations/{investigation_id}/decision-brief",
     "/api/v1/investigations/{investigation_id}/unknowns",
     "/api/v1/investigations/{investigation_id}/failure-chains",
+    # The automatic trust check's policy replaces the static agent catalog on the AI guardrails screen.
+    "/api/v1/ai/trust-policy",
+    "/api/v1/ai/release-gate",
 )
+# The static agent catalog (fixed text describing "agents"), parked on its own (Phase 6).
+AGENT_CATALOG = "/api/v1/ai/agents/catalog"
 
 
 def _paths() -> list[str]:
@@ -50,7 +55,7 @@ def test_mvp_parks_exactly_the_routes_of_the_parked_areas(mvp):
     parked = {path for path in _paths() if not sets.serves_path(path)}
     expected = _router_paths(
         regulatory_router, risk_router, counterfactual_router, scenario_router, legacy_decision_router
-    )
+    ) | {AGENT_CATALOG}
     assert parked == expected
     assert len(parked) >= 15
     for path in KEPT:

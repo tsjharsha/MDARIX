@@ -16,7 +16,13 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from backend.app.access.permissions import INVESTIGATION_CREATE, QUALITY_REVIEW, SIGNAL_TRIAGE, require_permission
+from backend.app.access.permissions import (
+    AI_RUN,
+    INVESTIGATION_CREATE,
+    QUALITY_REVIEW,
+    SIGNAL_TRIAGE,
+    require_permission,
+)
 from backend.app.complaint_review import rules, service
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.complaint_review import SECOND_LOOK_DECISIONS, ComplaintSecondLook, ComplaintSettings
@@ -79,16 +85,57 @@ def second_look(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """Records that may be hidden complaints, most serious first, each with why it was flagged."""
-    return service.second_look(
+    """Records that may be hidden complaints, most serious first, each with why it was flagged (and the latest AI
+    explanation of it, when someone asked for one)."""
+    from backend.app.complaint_review import explain
+
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    result = service.second_look(
         db,
         control_db,
-        uuid.UUID(ctx.tenant_id),
+        tenant_id,
         state=state,
         product_id=product_id,
         page=page,
         page_size=page_size,
     )
+    explained = explain.latest(db, tenant_id, [item["id"] for item in result["items"]])
+    for item in result["items"]:
+        item["explanation"] = explained.get(item["id"])
+    return result
+
+
+@router.post("/{complaint_id}/second-look/explain", dependencies=[Depends(require_permission(AI_RUN))])
+def explain_second_look(
+    complaint_id: uuid.UUID,
+    db: Session = Depends(get_data_plane_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """The AI's explanation of why a flagged record may meet the definition of a complaint: at most three sentences,
+    each quoting the record's own fields, checked before it is shown and saved as an AI result with its trust check.
+    When AI is off, unavailable or over budget, the rules' reasons stand alone and the answer says why."""
+    from backend.app.complaint_review import explain
+
+    tenant_id = uuid.UUID(ctx.tenant_id)
+    record, flagged = service.assess(db, tenant_id, complaint_id)
+    if record is None:
+        raise _error(404, "COMPLAINT_NOT_FOUND", "No such complaint in your organization")
+    if flagged is None:
+        existing = (
+            db.query(ComplaintSecondLook)
+            .filter(ComplaintSecondLook.tenant_id == tenant_id, ComplaintSecondLook.complaint_id == complaint_id)
+            .first()
+        )
+        if existing is None:
+            raise _error(
+                409, "NOT_ON_SECOND_LOOK", "This record is not on the second look, so there is nothing to explain"
+            )
+        shown = dict(existing.flagged or {})
+    else:
+        shown = flagged.as_dict()
+    result = explain.explain(db, tenant_id, record, shown, actor_ref=ctx.user_id)
+    db.commit()
+    return {"complaint_id": record["id"], **result}
 
 
 @router.post(

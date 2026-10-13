@@ -1839,6 +1839,45 @@ div.uw-task-count:hover {
   color: var(--ac-ink);
   font-weight: 600;
 }
+/* The AI's explanation of a flagged record (Complaints.tsx ExplainWithAi): sentences with the record's own words. */
+.uw-cr-explain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.uw-ai-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.uw-ai-head .uw-ai-label {
+  margin: 0;
+}
+.uw-cr-explain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ac-ink);
+  line-height: 1.5;
+}
+.uw-cr-explain-list li > span {
+  margin-right: 6px;
+}
+.uw-cr-quote {
+  display: inline-block;
+  margin: 2px 6px 0 0;
+  padding: 1px 8px;
+  border-left: 3px solid #7b61d8;
+  border-radius: 3px;
+  background: #f5f2fd;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
 .uw-cr-decision {
   display: flex;
   flex-wrap: wrap;
@@ -2164,8 +2203,63 @@ div.uw-task-count:hover {
   gap: 6px;
   font-size: 13px;
 }
-.uw-ai-step.is-pending {
+.uw-ai-step.is-pending,
+.uw-ai-step.is-skipped {
   color: var(--ac-muted);
+}
+
+/* The automatic trust check of an AI result (sections/TrustBadge.tsx): a badge that opens its checks. */
+.uw-trust {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+}
+.uw-trust-badge {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-trust-badge:focus-visible {
+  outline: 2px solid var(--ac-teal);
+  outline-offset: 2px;
+}
+.uw-trust-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 400;
+}
+.uw-trust-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uw-trust-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--ac-good);
+}
+.uw-trust-check.is-warning {
+  border-left-color: var(--ac-warning);
+}
+.uw-trust-check.is-blocked {
+  border-left-color: var(--ac-critical);
+}
+.uw-trust-check span {
+  color: var(--ac-ink-2);
 }
 .uw-spin {
   animation: uw-spin 1.2s linear infinite;

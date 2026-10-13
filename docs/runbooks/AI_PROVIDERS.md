@@ -103,6 +103,38 @@ supported by `genai/provider.py` today.
 Keep a second paid provider as the fallback in production, configured the same way (its own
 `MDARIX_GENAI_<NAME>_ZDR`).
 
+## The AI release gate: before AI is switched on for a pilot
+
+AI stays off for pilots until four bars are met (`backend/app/ai_release_gate.py`). In production
+(`MDARIX_ENV=production`) switching AI processing on for an organization is refused with `AI_RELEASE_GATE_NOT_MET`
+until they are; staging shows the gate without enforcing it, so the rehearsal can run. Administrators see the four
+bars under Security › AI processing; MDARIX staff see them, with what to do, in the AI Control Center overview
+(`GET /api/v1/ai/release-gate`).
+
+1. **A contracted provider with zero data retention**: configured as above and allowed by the provider policy.
+2. **The golden dataset signed off by a person**: after reviewing the 15 scenarios, the reviewer runs, themselves:
+
+   ```bash
+   python scripts/qualify_ai_golden_dataset.py --human-sign-off --name "First Last" --role "Head of Quality" --confirm
+   ```
+
+   This writes `evaluation/GOLDEN_DATASET_HUMAN_SIGN_OFF.json`, bound to the lock's hashes; a changed dataset needs a
+   new sign-off. Names that read as a tool, an agent or a team are refused. Nobody signs on someone else's behalf.
+3. **The golden evaluation passed with this model**: on staging, with the contracted provider configured:
+
+   ```bash
+   python scripts/run_real_evaluation.py --pause 5 --gate --require-model --switch-ai-on --release-record
+   ```
+
+   Only a run where all 15 scenarios pass, every analysis written by the model, on the signed-off dataset, writes
+   `evaluation/AI_RELEASE_RECORD.json` with the provider and model. Production accepts only that model: changing the
+   provider or the model needs a new passing run.
+4. **Every AI result checked automatically**: built in (`trust_engine/auto.py`). Every AI result is checked as it is
+   saved (sources exist, no stated cause or decision, no asserted certainty, provenance) and shows its trust check.
+
+Commit the sign-off and the release record with the release; the API image ships them. An organization that already
+had AI on keeps it; the screens show the gate's state.
+
 ## Refusals people see
 
 When no model may answer, MDARIX answers from rules and says why with a stable code

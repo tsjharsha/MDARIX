@@ -444,3 +444,113 @@ def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org):
     assert manual.status_code == 202 and manual.json()["run"]["trigger"] == "MANUAL"
     assert org["other"][0].get(path).status_code == 404
     assert client.get(path).json()["run"]["id"] == manual.json()["run"]["id"]
+
+
+# ------------------------------------------------------------------------------- the automatic trust check (Phase 6)
+
+
+def _fake_summary(reply: dict):
+    import json
+
+    return SimpleNamespace(
+        complete=lambda *args, **kwargs: SimpleNamespace(
+            provider="anthropic",
+            model="claude-sonnet-5-5",
+            model_version="1",
+            output={"status": "PROVIDER_COMPLETED", "answer": json.dumps(reply)},
+            latency_ms=5,
+        )
+    )
+
+
+def test_every_saved_ai_result_gets_its_trust_check_as_it_is_saved(org):
+    from ai.execution import record_ai_execution
+    from backend.app.db.models.foundation import AssuranceCheck, AssuranceResult
+    from backend.app.signals import insight
+    from trust_engine import auto
+
+    tenant = org["tenant_id"]
+    item = _product(tenant)
+    complaints = [_complaint(tenant, item, days_ago=days, malfunction=True) for days in (2, 5)]
+    signal_id = _signal(org, item, complaints)
+    with SessionLocal() as db:
+        bind_tenant(db, tenant)
+        signal = db.query(Signal).filter(Signal.id == uuid.UUID(signal_id)).one()
+        refs = [
+            row.business_id for row in db.query(Complaint).filter(Complaint.id.in_([uuid.UUID(c) for c in complaints]))
+        ]
+        reply = {"sentences": [{"text": "Both complaints report a malfunction.", "complaints": refs}]}
+        result = insight.ai_summary(db, signal, actor_ref="test", provider=_fake_summary(reply))
+        db.commit()
+        trust = result["ai"]["trust"]
+        assert trust["status"] == auto.STATUS_PASS and trust["policy"] == auto.POLICY and trust["author"] == auto.AI
+        assert {check["check"] for check in trust["checks"]} >= {
+            "EVIDENCE_GROUNDING",
+            "RESTRICTED_CLAIMS",
+            "PROVENANCE",
+        }
+        assert "Written by anthropic claude-sonnet-5-5." in [check["message"] for check in trust["checks"]]
+        saved = db.query(AssuranceResult).filter(AssuranceResult.id == uuid.UUID(trust["id"])).one()
+        assert saved.ai_execution_id == uuid.UUID(result["ai"]["ai_execution_id"])
+        assert saved.output_type == "SIGNAL_SUMMARY" and saved.trust_policy_version == auto.POLICY
+        assert db.query(AssuranceCheck).filter(AssuranceCheck.assurance_result_id == saved.id).count() == 5
+        assert auto.latest(db, tenant, result["ai"]["ai_execution_id"])["status"] == auto.STATUS_PASS
+
+        # A result saved with a source that does not exist is blocked, and the block is saved with it.
+        execution = record_ai_execution(
+            db,
+            tenant,
+            provider=auto.SIGNAL_SUMMARY,
+            model_name="claude-sonnet-5-5",
+            evidence_refs={"complaints": refs},
+            structured_output={
+                "sentences": [{"text": "A complaint reports a leak.", "complaints": ["CMP-NOT-HERE"]}],
+                "model": {"provider": "anthropic", "model": "claude-sonnet-5-5"},
+            },
+        )
+        db.commit()
+        assert execution.trust["status"] == auto.STATUS_BLOCKED
+        assert auto.latest(db, tenant, execution.id)["status"] == auto.STATUS_BLOCKED
+        # The trust check is the organization's own: another organization never reads it.
+        assert auto.latest(db, org["other_id"], execution.id) is None
+
+
+def test_each_case_ai_run_step_carries_its_trust_check_and_the_mvp_skips_template_chains(org, monkeypatch):
+    from trust_engine import auto
+
+    tenant = org["tenant_id"]
+    item = _product(tenant)
+    complaints = [_complaint(tenant, item, days_ago=days) for days in (3, 8)]
+    client, _ = org["investigator"]
+    case = client.post(
+        "/api/v1/investigations",
+        json={
+            "product_id": item["product"],
+            "investigation_question": "Why do occlusion alarms rise on Rev B?",
+            "complaint_ids": complaints,
+        },
+    )
+    assert case.status_code in (200, 201), case.text
+    path = f"/api/v1/investigations/{case.json()['id']}/ai-run"
+    monkeypatch.setenv("MDARIX_FEATURE_SET", "mvp")
+    assert client.post(path, json={"trigger": "AUTO"}).status_code == 202
+    run = client.get(path).json()["run"]
+    assert run["status"] == "COMPLETED", run
+    steps = {step["step"]: step for step in run["steps"]}
+    assert steps["FAILURE_CHAINS"]["status"] == "SKIPPED"
+    assert "fixed template" in steps["FAILURE_CHAINS"]["notice"]
+    assert "trust" not in steps["FAILURE_CHAINS"]
+    for code in ("ANALYSIS", "HYPOTHESES", "CHALLENGES", "UNKNOWNS"):
+        trust = steps[code]["trust"]
+        assert steps[code]["status"] == "DONE" and trust is not None, steps[code]
+        # No model in tests: the rules wrote every step, and every source they cite resolves.
+        assert trust["author"] == auto.RULES and trust["status"] in (auto.STATUS_PASS, auto.STATUS_LIMITED), trust
+        assert trust["policy"] == auto.POLICY
+    # The rules brief is not an AI result, so it has no trust check of its own.
+    assert steps["BRIEF"]["status"] == "DONE" and steps["BRIEF"]["trust"] is None
+
+    monkeypatch.setenv("MDARIX_FEATURE_SET", "full")
+    manual = client.post(path, json={"trigger": "MANUAL"})
+    assert manual.status_code == 202
+    run = client.get(path).json()["run"]
+    assert run["status"] == "COMPLETED" and all(step["status"] == "DONE" for step in run["steps"]), run["steps"]
