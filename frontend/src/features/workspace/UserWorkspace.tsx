@@ -269,6 +269,7 @@ export function UserWorkspace({
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
+  const [trialChecked, setTrialChecked] = useState(false);
   const idle = useIdleSignOut();
   const heading = useRef<HTMLHeadingElement>(null);
   useFocusOnChange(heading, location.key);
@@ -276,8 +277,12 @@ export function UserWorkspace({
   useEffect(() => {
     requestJson<TrialStatus>("/api/v1/trial/status")
       .then(setTrial)
-      .catch(() => setTrial(null));
+      .catch(() => setTrial(null))
+      .finally(() => setTrialChecked(true));
   }, []);
+  // The default start screen waits for the trial status: a trial starts on Getting started, so showing the usual first
+  // screen meanwhile made it flash before Getting started.
+  const choosingStart = !trialChecked && (initialView ?? "home") === "home" && !addressed;
 
   const visibleSections = useMemo(
     () =>
@@ -499,51 +504,64 @@ export function UserWorkspace({
           </nav>
 
           <main className="ac-main" id="app-main" tabIndex={-1} data-workspace-section={section}>
-            <div className="ac-page-head">
-              <div>
-                <p className="ac-eyebrow">{tenantName}</p>
-                <h1 ref={heading} tabIndex={-1}>
-                  {section}
-                </h1>
-                <p>{navText(section, featureSet === "mvp").guide}</p>
-              </div>
-            </div>
-            {NAV[section].context && <ContextBar />}
-            {trial?.is_trial && section !== "Share feedback" && (
-              <FeedbackPrompt onOpen={() => open("Share feedback")} />
-            )}
-            {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
-            {message && (
-              <div className={`ac-message tone-${message.tone}`} role="status">
-                {message.text}
-                <button type="button" className="ac-link" onClick={() => setMessage(null)} aria-label="Dismiss message">
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
-            <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
-              <SectionErrorBoundary name={section} resetKey={location.key}>
-                <div className="ca-section">
-                  {section === "Getting started" && <GettingStartedSection />}
-                  {section === "Readiness" && <ReadinessSection />}
-                  {section === "Dashboard" && <DashboardSection />}
-                  {section === "My Work" && <MyWorkSection tab={tab} />}
-                  {section === "Products" && <ProductsSection tab={tab} />}
-                  {section === "Complaints" && <ComplaintsSection tab={tab} />}
-                  {section === "Signals" && <SignalsSection tab={tab} />}
-                  {section === "Investigations" && <InvestigationsSection tab={tab} />}
-                  {section === "Evidence" && <EvidenceSection tab={tab} />}
-                  {section === "Decisions" && <DecisionsSection tab={tab} />}
-                  {section === "Records" && <RecordsSection tab={tab} />}
-                  {section === "Intelligence" && <IntelligenceSection tab={tab} />}
-                  {section === "Trust & Audit" && <TrustSection tab={tab} />}
-                  {section === "My Account" && <AccountSection tab={tab} />}
-                  {section === "Import data" && <ImportDataSection />}
-                  {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+            {choosingStart ? (
+              <p className="ac-empty" role="status">
+                Opening your workspace…
+              </p>
+            ) : (
+              <>
+                <div className="ac-page-head">
+                  <div>
+                    <p className="ac-eyebrow">{tenantName}</p>
+                    <h1 ref={heading} tabIndex={-1}>
+                      {section}
+                    </h1>
+                    <p>{navText(section, featureSet === "mvp").guide}</p>
+                  </div>
                 </div>
-              </SectionErrorBoundary>
-            </ColumnScopeProvider>
+                {NAV[section].context && <ContextBar />}
+                {trial?.is_trial && section !== "Share feedback" && (
+                  <FeedbackPrompt onOpen={() => open("Share feedback")} />
+                )}
+                {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
+                {message && (
+                  <div className={`ac-message tone-${message.tone}`} role="status">
+                    {message.text}
+                    <button
+                      type="button"
+                      className="ac-link"
+                      onClick={() => setMessage(null)}
+                      aria-label="Dismiss message"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+                {/* Every list on a page offers the field chooser; each page remembers its own choice of columns. */}
+                <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
+                  <SectionErrorBoundary name={section} resetKey={location.key}>
+                    <div className="ca-section">
+                      {section === "Getting started" && <GettingStartedSection />}
+                      {section === "Readiness" && <ReadinessSection />}
+                      {section === "Dashboard" && <DashboardSection />}
+                      {section === "My Work" && <MyWorkSection tab={tab} />}
+                      {section === "Products" && <ProductsSection tab={tab} />}
+                      {section === "Complaints" && <ComplaintsSection tab={tab} />}
+                      {section === "Signals" && <SignalsSection tab={tab} />}
+                      {section === "Investigations" && <InvestigationsSection tab={tab} />}
+                      {section === "Evidence" && <EvidenceSection tab={tab} />}
+                      {section === "Decisions" && <DecisionsSection tab={tab} />}
+                      {section === "Records" && <RecordsSection tab={tab} />}
+                      {section === "Intelligence" && <IntelligenceSection tab={tab} />}
+                      {section === "Trust & Audit" && <TrustSection tab={tab} />}
+                      {section === "My Account" && <AccountSection tab={tab} />}
+                      {section === "Import data" && <ImportDataSection />}
+                      {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+                    </div>
+                  </SectionErrorBoundary>
+                </ColumnScopeProvider>
+              </>
+            )}
           </main>
         </div>
         <SessionTimeoutWarning session={idle} />
