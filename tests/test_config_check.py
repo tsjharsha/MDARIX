@@ -381,14 +381,31 @@ def test_links_and_ordinary_brackets_are_not_placeholders(production):
     assert config_check.problems(offline=True) == []
 
 
-def test_the_draft_legal_documents_in_the_repository_are_refused(production):
-    """The drafts in legal/ are for the lawyer: a server pointed at them must not start, even with approval set."""
-    from pathlib import Path
+def _draft_legal_documents(folder):
+    """Legal documents as they are before approval: the DRAFT banner and a [PLACEHOLDER] left for the lawyer."""
+    folder.mkdir(exist_ok=True)
+    for name in ("privacy.md", "terms.md", "trial-agreement.md"):
+        (folder / name).write_text(
+            "# Title\n\n**DRAFT FOR LEGAL REVIEW. Not yet in effect.**\n\nOperated by [COMPANY LEGAL NAME].\n",
+            encoding="utf-8",
+        )
+    return folder
 
-    production.setenv("MDARIX_LEGAL_DIR", str(Path(__file__).resolve().parents[1] / "legal"))
+
+def test_draft_legal_documents_are_refused(production, tmp_path):
+    """Drafts are for the lawyer: a server pointed at them must not start, even with approval set."""
+    production.setenv("MDARIX_LEGAL_DIR", str(_draft_legal_documents(tmp_path / "drafts")))
     problems = found()
     for name in ("privacy.md", "terms.md", "trial-agreement.md"):
         assert f"{name} (the DRAFT banner and" in problems
+
+
+def test_the_legal_documents_in_the_repository_are_final(production):
+    """legal/ holds the approved texts (validation phase, approved 2026-10-14): no DRAFT banner, no placeholder."""
+    from pathlib import Path
+
+    production.setenv("MDARIX_LEGAL_DIR", str(Path(__file__).resolve().parents[1] / "legal"))
+    assert config_check._legal_documents_problem() is None
 
 
 # ------------------------------------------------------------------ private staging (ADR-017)
@@ -398,15 +415,13 @@ BCRYPT = "$2a$14$T2K1p8dlCjsXSQmMSsUtHO8ZF6iDppTB6EFbgBd.IeF0yw/oaOc5m"
 
 
 @pytest.fixture
-def private_staging(production):
-    """A staging server behind Caddy's login, with the repository's draft legal texts and no company details."""
-    from pathlib import Path
-
+def private_staging(production, tmp_path):
+    """A staging server behind Caddy's login, with draft legal texts and no company details."""
     production.setenv("MDARIX_ENV", "staging")
     for name in ("MDARIX_BACKUP_AGE_RECIPIENT", "MDARIX_BACKUP_HEARTBEAT_URL", "MDARIX_SCHEDULER_HEARTBEAT_URL"):
         production.delenv(name)
     production.delenv("MDARIX_BACKUP_S3_URI")
-    production.setenv("MDARIX_LEGAL_DIR", str(Path(__file__).resolve().parents[1] / "legal"))
+    production.setenv("MDARIX_LEGAL_DIR", str(_draft_legal_documents(tmp_path / "drafts")))
     production.setenv("MDARIX_LEGAL_TEXT_APPROVED", "false")
     production.delenv("MDARIX_COMPANY_LEGAL_NAME")
     production.delenv("MDARIX_COMPANY_ADDRESS")
