@@ -143,3 +143,23 @@ def test_invalid_structured_response_is_retried_before_fallback(monkeypatch):
 
     assert calls == 2
     assert json.loads(result.output["answer"]) == {"summary": "repaired"}
+
+
+def test_empty_numeric_settings_mean_the_defaults(monkeypatch):
+    """The production template leaves MDARIX_GENAI_COST_PER_1K_TOKENS empty: the API must start, not crash on it."""
+    for name in (
+        "MDARIX_GENAI_TIMEOUT_SECONDS",
+        "MDARIX_GENAI_MAX_RETRIES",
+        "MDARIX_GENAI_MAX_INPUT_TOKENS",
+        "MDARIX_GENAI_MAX_OUTPUT_TOKENS",
+        "MDARIX_GENAI_COST_PER_1K_TOKENS",
+    ):
+        monkeypatch.setenv(name, "")
+    provider = GenAIProvider(provider_name="controlled", fallbacks=[])
+    assert (provider.timeout, provider.retries, provider.max_input, provider.max_output, provider.cost_per_1k) == (
+        20,
+        2,
+        4000,
+        1000,
+        0.0,
+    )

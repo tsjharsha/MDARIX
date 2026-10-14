@@ -10,6 +10,12 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- The API stopped at start-up when `MDARIX_GENAI_COST_PER_1K_TOKENS` was left empty, as the production template
+  leaves it (found on the first Google Cloud rehearsal); empty AI cost, timeout and token settings now mean their
+  defaults.
+
 ## [0.10.0] - 2026-10-14
 
 The lightweight MVP and free trial release: five screens for trials and pilots, the free trial as a nine-chapter

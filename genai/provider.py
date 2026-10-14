@@ -199,11 +199,12 @@ class GenAIProvider:
         self.model = model or os.getenv(prefix + "MODEL", known_model)
         self.model_version = os.getenv(prefix + "MODEL_VERSION", "unconfigured")
         default_timeout = "120" if self.provider_name == "ollama" else "20"
-        self.timeout = int(timeout_seconds or os.getenv("MDARIX_GENAI_TIMEOUT_SECONDS", default_timeout))
-        self.retries = int(max_retries if max_retries is not None else os.getenv("MDARIX_GENAI_MAX_RETRIES", "2"))
-        self.max_input = int(max_input_tokens or os.getenv("MDARIX_GENAI_MAX_INPUT_TOKENS", "4000"))
-        self.max_output = int(max_output_tokens or os.getenv("MDARIX_GENAI_MAX_OUTPUT_TOKENS", "1000"))
-        self.cost_per_1k = float(cost_per_1k_tokens or os.getenv("MDARIX_GENAI_COST_PER_1K_TOKENS", "0"))
+        # An empty setting (the production template leaves MDARIX_GENAI_COST_PER_1K_TOKENS empty) means the default.
+        self.timeout = int(timeout_seconds or os.getenv("MDARIX_GENAI_TIMEOUT_SECONDS") or default_timeout)
+        self.retries = int(max_retries if max_retries is not None else os.getenv("MDARIX_GENAI_MAX_RETRIES") or "2")
+        self.max_input = int(max_input_tokens or os.getenv("MDARIX_GENAI_MAX_INPUT_TOKENS") or "4000")
+        self.max_output = int(max_output_tokens or os.getenv("MDARIX_GENAI_MAX_OUTPUT_TOKENS") or "1000")
+        self.cost_per_1k = float(cost_per_1k_tokens or os.getenv("MDARIX_GENAI_COST_PER_1K_TOKENS") or "0")
         # Fallbacks only for the primary provider (a fallback never has fallbacks of its own).
         self.fallbacks = fallbacks if fallbacks is not None else ([] if provider_name else fallback_chain(self))
 
