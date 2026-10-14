@@ -87,6 +87,18 @@ describe("country and phone", () => {
     expect(isInternationalPhone("+91 98765 43210 12345")).toBe(false);
   });
 
+  it("keeps the phone optional after a country is chosen: the dialling code alone is no phone", async () => {
+    const { isInternationalPhone, phoneWithDialCode, signupBody } = await import("./trialProfile");
+    const phone = phoneWithDialCode("", "+91"); // what choosing India puts in the field
+    expect(isInternationalPhone(phone)).toBe(true);
+    expect(isInternationalPhone("+1")).toBe(true);
+    const profile = { phone } as Parameters<typeof signupBody>[3];
+    expect(signupBody("qa@example.com", "Asha Rao", "Acme Devices", profile).phone).toBe("");
+    expect(
+      signupBody("qa@example.com", "Asha Rao", "Acme Devices", { ...profile, phone: " +91 98765 43210 " }).phone,
+    ).toBe("+91 98765 43210");
+  });
+
   it("starts the phone with the chosen country's code, without overwriting a typed number", async () => {
     const { phoneWithDialCode } = await import("./trialProfile");
     expect(phoneWithDialCode("", "+91")).toBe("+91 ");

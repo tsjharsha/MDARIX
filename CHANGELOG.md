@@ -10,6 +10,11 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- Sign-up: choosing a country put its dialling code in the optional phone field, and the form then refused to
+  continue without a full number. A dialling code alone now counts as no phone, and nothing is sent.
+
 ## [0.10.1] - 2026-10-14
 
 The validation-phase release: the approved legal texts, the start-up fix found on the first Google Cloud

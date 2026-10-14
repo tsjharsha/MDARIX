@@ -101,7 +101,7 @@ export function signupBody(email: string, name: string, company: string, profile
     organization: company,
     job_title: profile.jobTitle,
     country: profile.country,
-    phone: profile.phone,
+    phone: onlyDialCode(profile.phone) ? "" : profile.phone.trim(),
     company_size: profile.companySize,
     device_types: profile.deviceTypes,
     device_class: profile.deviceClass,
@@ -132,9 +132,15 @@ export function countries(locale = "en"): Country[] {
 
 /** The same check the server makes (backend/app/trial/request_profile.py): +, the country code, then 8 to 15 digits in
  * all; an empty phone is fine (it is optional). */
+/** Only a dialling code ("+91"): what choosing a country puts in the phone field. The phone is optional, so this
+ * counts as no phone at all. */
+export function onlyDialCode(value: string): boolean {
+  return /^\+\d{1,4}$/.test(value.trim());
+}
+
 export function isInternationalPhone(value: string): boolean {
   const phone = value.trim();
-  if (!phone) return true;
+  if (!phone || onlyDialCode(phone)) return true;
   const digits = phone.replace(/\D/g, "").length;
   return /^\+[1-9][0-9 ().-]*$/.test(phone) && digits >= 8 && digits <= 15;
 }
