@@ -10,6 +10,12 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
+The lightweight MVP and free trial release: five screens for trials and pilots, the free trial as a nine-chapter
+story with its user guide, uploads as quality systems export them, and the end-to-end trial journey tested in a
+browser. Migrations md40 to md45.
+
 ### Added
 
 - Complaints › Second look: records cancelled or logged as inquiries or service records that carry a sign of a
