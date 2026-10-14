@@ -237,6 +237,11 @@ operator knows a release migrates the database.
 
 ### Fixed
 
+- A free trial's complaints upload said "9 new" for 4 complaints: the products and lots the file names are now
+  told apart ("4 new, 0 updated, and 2 products and 3 lots they name"; the import answers `also_created`).
+- The one-click rating in Getting started vanished as it was sent: its thank-you and "Tell us more" now stay in view.
+- Browser tests: the sign-in helpers find the password field exactly (the show/hide button also names "password");
+  a new trial-journey test runs the free trial end to end (`frontend/e2e/trial-journey.spec.ts`).
 - Platform Admin > Trials named the sample author as a trial's owner when the sample decision is staged; it names
   the trial's own first person.
 - A purge now also deletes the demo requests a free trial booked (they name the person who asked), and the trial

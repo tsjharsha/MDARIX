@@ -943,6 +943,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     lookup = _Lookup(db, tenant_id)
     now = datetime.now(timezone.utc)
     created = updated = 0
+    also_created: dict[str, int] = {}
     if entity in business_imports.TEMPLATES:
         created, updated = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
@@ -997,8 +998,11 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             db.flush()
             continue
         if entity == "complaints" and policy.create_references:
-            # A free trial's complaints file adds the products, versions and lots it names that are not loaded yet.
-            created += _add_named_references(db, tenant_id, row, lookup, now, source)
+            # A free trial's complaints file adds the products, versions and lots it names that are not loaded yet;
+            # they count as created, and are also told apart (``also_created``) so the complaints are not overstated.
+            for kind, count in _add_named_references(db, tenant_id, row, lookup, now, source).items():
+                also_created[kind] = also_created.get(kind, 0) + count
+                created += count
         product = lookup.product(row["product_id"])
         version = lookup.version(product, row["version"]) if row.get("version") else None
         if entity == "lots":
@@ -1068,13 +1072,18 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             updated += 1
         db.flush()
         _index_complaint(db, tenant_id, complaint, row, product, version, lot, source)
-    return {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+    result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
+    if also_created:
+        result["also_created"] = also_created
+    return result
 
 
-def _add_named_references(db: Session, tenant_id, row: dict, lookup: _Lookup, now: datetime, source: str) -> int:
+def _add_named_references(
+    db: Session, tenant_id, row: dict, lookup: _Lookup, now: datetime, source: str
+) -> dict[str, int]:
     """The product, version and lot a complaint row names, added when not loaded yet (marked as uploaded, like every
-    imported record). Returns how many were added."""
-    added = 0
+    imported record). Returns how many of each were added, keyed like the check's ``also_creates``."""
+    added: dict[str, int] = {}
     product = lookup.product(row["product_id"])
     if product is None:
         product = Product(
@@ -1089,7 +1098,7 @@ def _add_named_references(db: Session, tenant_id, row: dict, lookup: _Lookup, no
         db.add(product)
         db.flush()
         lookup.products[row["product_id"]] = product
-        added += 1
+        added["products"] = 1
     version = None
     if row.get("version"):
         version = lookup.version(product, row["version"])
@@ -1106,7 +1115,7 @@ def _add_named_references(db: Session, tenant_id, row: dict, lookup: _Lookup, no
             db.add(version)
             db.flush()
             lookup.versions[(row["product_id"], row["version"])] = version
-            added += 1
+            added["versions"] = 1
     if row.get("lot_id") and lookup.lot(row["lot_id"]) is None:
         lot = LotBatch(
             id=uuid.uuid4(),
@@ -1120,7 +1129,7 @@ def _add_named_references(db: Session, tenant_id, row: dict, lookup: _Lookup, no
         db.add(lot)
         db.flush()
         lookup.lots[row["lot_id"]] = lot
-        added += 1
+        added["lots"] = 1
     return added
 
 

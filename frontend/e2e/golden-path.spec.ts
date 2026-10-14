@@ -20,7 +20,7 @@ test.skip(!DEMO_PASSWORD, "Set E2E_DEMO_PASSWORD (and load the demo workspace) t
 async function signIn(page: Page, email: string) {
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(DEMO_PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
   const consent = page.getByRole("dialog", { name: /privacy/i });

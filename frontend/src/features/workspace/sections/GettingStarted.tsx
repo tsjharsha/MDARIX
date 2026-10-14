@@ -118,6 +118,9 @@ export function GettingStartedSection() {
     if (key === "demo") return scrollTo("trial-demo");
   };
   const feedbackSent = (feedback.data?.submissions?.length ?? 0) > 0;
+  // Rated during this visit: the rating stays on screen with its thank-you and "tell us more", though the feedback
+  // reloaded after it now holds a submission.
+  const [ratedNow, setRatedNow] = useState(false);
   const tabs = TRIAL_TABS.filter((item) => item !== "About the sample data" || hasSample);
 
   if (status.state === "ready" && trial && !trial.is_trial)
@@ -179,8 +182,14 @@ export function GettingStartedSection() {
             />
           ))}
         </ol>
-        {acted >= 3 && feedback.state === "ready" && !feedbackSent && (
-          <QuickRating onSent={feedback.reload} onMore={() => open("Share feedback")} />
+        {quickRatingShown({ acted, feedbackLoaded: feedback.state === "ready", feedbackSent, ratedNow }) && (
+          <QuickRating
+            onSent={() => {
+              setRatedNow(true);
+              feedback.reload();
+            }}
+            onMore={() => open("Share feedback")}
+          />
         )}
         <div id="trial-demo" className="uw-story-partner uw-anchor">
           <div>
@@ -288,6 +297,19 @@ export function GettingStartedSection() {
       </div>
     </div>
   );
+}
+
+/**
+ * Whether the one-click rating shows: after three chapters tried, until feedback is sent; and, once rated during this
+ * visit, still, so its thank-you and "tell us more" stay in view (exported for its test).
+ */
+export function quickRatingShown(state: {
+  acted: number;
+  feedbackLoaded: boolean;
+  feedbackSent: boolean;
+  ratedNow: boolean;
+}): boolean {
+  return state.ratedNow || (state.acted >= 3 && state.feedbackLoaded && !state.feedbackSent);
 }
 
 /** One click on how useful MDARIX is so far, sent privately; the full feedback stays one more click away. */

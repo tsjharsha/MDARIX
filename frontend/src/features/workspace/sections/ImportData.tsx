@@ -61,6 +61,30 @@ export function alsoCreatesText(creates: Record<string, number> | null | undefin
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
+export type ImportResult = {
+  created?: number;
+  updated?: number;
+  /** The products, versions and lots a free trial's complaints file added (counted in ``created`` too). */
+  also_created?: Record<string, number>;
+  rejected_rows?: number;
+  masked_values?: number;
+};
+
+/** "Imported complaints: 4 new, 0 updated, and 2 products and 3 lots they name." (exported for its test). */
+export function importedText(title: string, result: ImportResult): string {
+  const also = alsoCreatesText(result.also_created);
+  const added = Object.values(result.also_created ?? {}).reduce((sum, count) => sum + count, 0);
+  const notes = [
+    also ? `and ${also} they name` : "",
+    result.rejected_rows ? `${countOf(result.rejected_rows, "row")} set aside to fix` : "",
+    result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
+  ].filter(Boolean);
+  const [first, ...rest] = notes;
+  return `Imported ${title.toLowerCase()}: ${(result.created ?? 0) - added} new, ${result.updated ?? 0} updated${
+    first ? `${also ? ", " : "; "}${first}` : ""
+  }${rest.length ? `; ${rest.join("; ")}` : ""}.`;
+}
+
 /** What to do with rows that have a problem, and with personal data in the text. */
 export type ImportOptions = { skipProblems: boolean; maskPersonal: boolean };
 export const NO_OPTIONS: ImportOptions = { skipProblems: false, maskPersonal: false };
@@ -203,16 +227,7 @@ export function ImportPanel({
     try {
       const result = await send("import");
       if (result) {
-        const notes = [
-          result.rejected_rows ? `${countOf(result.rejected_rows, "row")} set aside to fix` : "",
-          result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
-        ].filter(Boolean);
-        setMessage({
-          tone: "good",
-          text: `Imported ${template?.title.toLowerCase()}: ${result.created ?? 0} new, ${result.updated ?? 0} updated${
-            notes.length ? `; ${notes.join("; ")}` : ""
-          }.`,
-        });
+        setMessage({ tone: "good", text: importedText(template?.title ?? "data", result) });
         setRejects(result.rejects_csv ? { csv: result.rejects_csv, rows: result.rejected_rows ?? 0 } : null);
         setReport(null);
         setFile(null);

@@ -15,7 +15,7 @@ async function signIn(page: Page, email: string) {
     throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(E2E_PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
   const consent = page.getByRole("dialog", { name: /privacy/i });

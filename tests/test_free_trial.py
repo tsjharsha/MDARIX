@@ -404,6 +404,9 @@ def test_a_quality_system_export_uploads_as_it_comes_and_the_second_look_reads_i
     assert check["new_records"] == 4  # two complaints, the product and the lot
     imported = user.post("/api/v1/trial/imports/complaints", content=export)
     assert imported.status_code == 200, imported.text
+    # The product and lot it named count as created, and are told apart so the complaints are not overstated.
+    assert imported.json()["created"] == 4
+    assert imported.json()["also_created"] == {"products": 1, "lots": 1}
     db = SessionLocal()
     try:
         product = (

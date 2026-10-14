@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { newlyTried } from "./sections/ChapterDone";
-import { ChapterRow, QuickRating, TRIAL_TABS } from "./sections/GettingStarted";
+import { ChapterRow, QuickRating, TRIAL_TABS, quickRatingShown } from "./sections/GettingStarted";
 import type { StoryChapter, TrialStory } from "./trialStory";
 
 const chapter = (code: string, number: number, done: boolean): StoryChapter => ({
@@ -47,6 +47,17 @@ describe("Getting started, simplified", () => {
     expect(html).toContain("How useful is MDARIX so far?");
     expect(html.match(/aria-label="\d of 5"/g)).toHaveLength(5);
     expect(html).toContain("Private to the MDARIX team.");
+  });
+
+  it("offers the rating after three chapters and keeps its thank-you in view once rated", () => {
+    const state = { acted: 3, feedbackLoaded: true, feedbackSent: false, ratedNow: false };
+    expect(quickRatingShown(state)).toBe(true);
+    expect(quickRatingShown({ ...state, acted: 2 })).toBe(false);
+    expect(quickRatingShown({ ...state, feedbackLoaded: false })).toBe(false);
+    expect(quickRatingShown({ ...state, feedbackSent: true })).toBe(false);
+    // Rated now: the feedback reloads (loading, then sent) and the thank-you with "tell us more" stays.
+    expect(quickRatingShown({ ...state, feedbackLoaded: false, ratedNow: true })).toBe(true);
+    expect(quickRatingShown({ ...state, feedbackSent: true, ratedNow: true })).toBe(true);
   });
 
   it("keeps everything but the story in four tabs", () => {

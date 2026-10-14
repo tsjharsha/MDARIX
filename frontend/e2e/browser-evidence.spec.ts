@@ -15,7 +15,7 @@ async function signIn(page: any, email: string, password: string) {
   if (!email || !password) throw new Error("Set E2E_PASSWORD (or DAY35_FIXTURE_PASSWORD) and the E2E_* user emails.");
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   // Signing in checks the password with a deliberately slow hash; allow for a busy test server.
   await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
@@ -43,7 +43,7 @@ test.describe("MDARIX browser evidence", () => {
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
     await page.getByLabel("Work email").fill("invalid@example.invalid");
-    await page.getByLabel("Password").fill("InvalidPassword123!");
+    await page.getByLabel("Password", { exact: true }).fill("InvalidPassword123!");
     await page.getByRole("button", { name: /sign in/i }).click();
     // The browser job may run without the backend. In that case the app must
     // remain on a usable, non-authenticated sign-in state rather than showing
@@ -407,7 +407,7 @@ test.describe("MDARIX browser evidence", () => {
     await expect(page).toHaveURL(/\/signin\?reason=expired&returnTo=%2Fapp%2Fsignals/, { timeout: 20_000 });
     await expect(page.getByRole("status")).toContainText(/session has ended/i);
     await page.getByLabel("Work email").fill(INVESTIGATOR_EMAIL);
-    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: /sign in/i }).click();
     await expect(page).toHaveURL(/\/app\/signals$/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Signals" })).toBeVisible({ timeout: 20_000 });
