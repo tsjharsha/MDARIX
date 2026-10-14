@@ -64,4 +64,4 @@ Some features may be limited or unavailable during the trial. AI features are of
 
 ## 7. Contact
 
-Srinivas Telikicherla, operating MDARIX, Rajapusha Regalia, Kokapet, Hyderabad, Telangana 500075, India. Trial questions: support@mdarix.in. Privacy questions: privacy@mdarix.in.
+Srinivas Telikicherla, operating MDARIX, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. Trial questions: support@mdarix.in. Privacy questions: privacy@mdarix.in.

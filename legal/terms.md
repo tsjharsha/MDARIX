@@ -105,4 +105,4 @@ We may update these terms. We will tell you about significant changes at least 3
 
 ## Contact
 
-Srinivas Telikicherla, operating MDARIX, Rajapusha Regalia, Kokapet, Hyderabad, Telangana 500075, India. Email: support@mdarix.in.
+Srinivas Telikicherla, operating MDARIX, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. Email: support@mdarix.in.

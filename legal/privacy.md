@@ -10,7 +10,7 @@ This policy explains how Srinivas Telikicherla, operating MDARIX ("MDARIX", "we"
 
 ## Who we are
 
-MDARIX is operated by Srinivas Telikicherla, Rajapusha Regalia, Kokapet, Hyderabad, Telangana 500075, India. The company that will operate MDARIX is not yet registered; registration is in progress.
+MDARIX is operated by Srinivas Telikicherla, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. The company that will operate MDARIX is not yet registered; registration is in progress.
 
 Questions about this policy or your personal data: privacy@mdarix.in.
 
@@ -55,13 +55,13 @@ AI features are off for a new organization until its administrator switches them
 We use service providers to run the Service. Each receives only what it needs for its task and is bound by its terms to protect it. Today they are:
 
 - **Google Cloud** (Google Cloud India Private Limited): hosting, database, file storage and encrypted backups, in India.
-- **Resend** (United States): delivery of the emails we send, such as invitations, password resets and trial reminders. It receives the recipient's name and email address and the email's content. Quality records are never sent by email.
+- **Zoho** (Zoho Corporation Private Limited, India): delivery of the emails we send, such as invitations, password resets and trial reminders (ZeptoMail), and our mailboxes, such as support@mdarix.in and privacy@mdarix.in (Zoho Mail), from Zoho's data centres in India. ZeptoMail receives the recipient's name and email address and the email's content. Quality records are never sent by email.
 
 We will update this list before any other provider receives personal data. We may also disclose personal data where the law requires it, or to protect our rights, our users or the public.
 
 ## Where it is processed
 
-The Service and its data are hosted in India, by Google Cloud in its Mumbai region, with encrypted backup copies in its Delhi region. The emails we send are delivered through Resend in the United States, as described above. We do not otherwise transfer personal data outside India.
+The Service and its data are hosted in India, by Google Cloud in its Mumbai region, with encrypted backup copies in its Delhi region. Our emails are sent and received through Zoho's data centres in India. We do not transfer personal data outside India.
 
 ## How long we keep it
 
@@ -120,4 +120,4 @@ If we change this policy we will update the date above and, for significant chan
 
 ## Contact
 
-Srinivas Telikicherla, operating MDARIX, Rajapusha Regalia, Kokapet, Hyderabad, Telangana 500075, India. Privacy questions: privacy@mdarix.in. Everything else: support@mdarix.in.
+Srinivas Telikicherla, operating MDARIX, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. Privacy questions: privacy@mdarix.in. Everything else: support@mdarix.in.
