@@ -180,7 +180,11 @@ describe("the second look's AI explanation", () => {
     );
     expect(explanationNote(explanation)).toBeNull();
     expect(
-      explanationNote({ author: "RULES", sentences: [], ai: { status: "NO_ANSWER", reason: "PROVIDER_NOT_CONFIGURED" } }),
+      explanationNote({
+        author: "RULES",
+        sentences: [],
+        ai: { status: "NO_ANSWER", reason: "PROVIDER_NOT_CONFIGURED" },
+      }),
     ).toBe("No AI provider is set up yet, so the reasons above come from the rules.");
     expect(
       explanationNote({
