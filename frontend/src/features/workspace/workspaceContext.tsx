@@ -1,16 +1,23 @@
 import { createContext, useContext } from "react";
 import type { InvestigationSummary, Product, Product360, TemporalMode } from "../../app/types";
+import { featureSetOf, type FeatureSet } from "../../app/featureSet";
 
 export const WORKSPACE_SECTIONS = [
   // Shown only in free-trial workspaces (see UserWorkspace).
   "Getting started",
+  // What an inspector would find today (the home of the lightweight MVP).
+  "Readiness",
   "Dashboard",
   "My Work",
   "Products",
+  // The second look at possible hidden complaints and the complaint backlog board.
+  "Complaints",
   "Signals",
   "Investigations",
   "Evidence",
   "Decisions",
+  // What goes to an inspector or a management review: CAPA effectiveness checks.
+  "Records",
   "Intelligence",
   "Trust & Audit",
   // Shown to roles that may change records (see SECTION_PERMISSIONS).
@@ -27,13 +34,16 @@ export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 /** Server menu keys (session context `allowed_menu`) that grant each section. My Account is always available. */
 export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Getting started": ["home"],
+  Readiness: ["home"],
   Dashboard: ["home"],
   "My Work": ["home", "investigations"],
   Products: ["products"],
+  Complaints: ["products"],
   Signals: ["products"],
   Investigations: ["investigations"],
   Evidence: ["evidence"],
   Decisions: ["decision-center"],
+  Records: ["home"],
   Intelligence: ["home"],
   "Trust & Audit": ["assurance", "audit"],
   "Import data": ["products"],
@@ -63,6 +73,8 @@ export type SessionContext = {
   current_tenant?: { tenant_id?: string; tenant_name?: string; tenant_key?: string };
   plan?: { code?: string; name?: string; version?: string } | null;
   license?: { state?: string; effective?: boolean };
+  /** full or mvp (backend/app/feature_set.py): under mvp the parked tabs and screens are hidden (featureSet.ts). */
+  feature_set?: string;
 };
 
 export type WorkContext = {
@@ -114,6 +126,8 @@ export type WorkspaceApi = {
   work: WorkContext;
   open: (section: WorkspaceSection, tab?: string) => void;
   notify: (text: string, tone?: "good" | "critical") => void;
+  /** The case page reports the step it shows, for the screen's address (workspaceAddress.ts). */
+  reportStep?: (tab: string) => void;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
@@ -122,6 +136,12 @@ export function useWorkspace(): WorkspaceApi {
   const value = useContext(WorkspaceContext);
   if (!value) throw new Error("useWorkspace must be used inside the user workspace");
   return value;
+}
+
+/** The server's feature set (session context `feature_set`); `full` outside the workspace or from older servers. */
+export function useFeatureSet(): FeatureSet {
+  const value = useContext(WorkspaceContext);
+  return featureSetOf(value?.session?.feature_set);
 }
 
 export type BusinessPermission =

@@ -1,8 +1,9 @@
 # Background worker (outbox) and scheduler
 
-Two long-running services do the work that does not happen inside a web request: the **worker** (`worker` in
-`docker-compose.prod.yml`, `scripts/run_outbox_worker.py`) and the **scheduler** (`scheduler`,
-`scripts/run_scheduler.py`). Both refuse to start with an unsafe staging/production configuration
+Two long-running processes do the work that does not happen inside a web request: the **worker**
+(`scripts/run_outbox_worker.py`) and the **scheduler** (`scripts/run_scheduler.py`). In `docker-compose.prod.yml`
+both run in the one `background` service (`scripts/run_background.py` starts them, passes a stop signal to both,
+and exits if either stops, so Docker restarts the container; its health check needs both heartbeats). Both refuse to start with an unsafe staging/production configuration
 (`backend/app/config_check.py`), the same gate the API applies.
 
 Below, `docker compose` means `docker compose -f docker-compose.prod.yml --env-file .env.production` (or plain
@@ -37,7 +38,7 @@ Each cycle the worker also runs pending report jobs in every active data plane.
    what it already delivered.
 4. Write the heartbeat (file and database), then wait `MDARIX_OUTBOX_INTERVAL_SECONDS`.
 
-A stop signal (SIGTERM/SIGINT, e.g. `docker compose stop worker`) is honoured between events: the event in hand is
+A stop signal (SIGTERM/SIGINT, e.g. `docker compose stop background`) is honoured between events: the event in hand is
 finished, nothing new is started. Two workers can run side by side safely.
 
 ### Retry schedule
@@ -136,6 +137,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `export-expiry` | 1 h | Delete data exports after their download period |
 | `connector-sync` | 15 min | Sync connections that have a sync schedule |
 | `audit-chain-verification` | 24 h | Verify every organization's tamper-evident audit trail |
+| `readiness-digest` | 6 h | Once per ISO week (from Monday 06:00 UTC): queue each organization's weekly readiness email (`READINESS_DIGEST`) to its quality leads |
 
 Every run is recorded in `scheduler_runs` (status, result, error type, consecutive failures). Jobs run in system
 scope and write their own audit events.
@@ -170,10 +172,10 @@ A scheduler that has stopped cannot alert about itself. Three outside checks cov
 ### Commands
 
 ```bash
-docker compose ps scheduler worker
-docker compose logs --since 1h scheduler
-docker compose exec scheduler python scripts/run_scheduler.py --list   # each job, its interval, last status and time
-docker compose exec scheduler python scripts/run_scheduler.py --once   # run every due job once; exit 1 if any failed
+docker compose ps background
+docker compose logs --since 1h background
+docker compose exec background python scripts/run_scheduler.py --list   # each job, its interval, last status and time
+docker compose exec background python scripts/run_scheduler.py --once   # run every due job once; exit 1 if any failed
 ```
 
 `--once` runs only jobs that are due and skips any job another instance holds; it prints each outcome as JSON. The

@@ -4,7 +4,8 @@ import { Tabs } from "../../customer-admin/shared";
 import { DecisionCenterView } from "../../investigator/DecisionCenterView";
 import { SignatureVerificationWorkspace } from "../../signature/SignatureVerificationWorkspace";
 import { displayId } from "../../../app/displayId";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { offeredTab, tabsFor } from "../../../app/featureSet";
 import { Embedded } from "./common";
 import { NextStepsPanel } from "./NextSteps";
 import { ApprovalsPanel } from "./DecisionApprovals";
@@ -19,10 +20,19 @@ export function DecisionsSection({ tab }: { tab?: string }) {
   const { work } = useWorkspace();
   // Approvals (the queue of briefs awaiting a signature) is for people who may sign; it is their first tab.
   const canSign = useCan("decision.sign");
-  const tabs = TABS.filter((item) => item !== "Approvals" || canSign);
+  // Under the MVP feature set the legacy Decision center is parked (featureSet.ts).
+  const tabs = tabsFor(
+    "Decisions",
+    TABS.filter((item) => item !== "Approvals" || canSign),
+    useFeatureSet(),
+  );
   const requested = tabName(tab);
   const [active, setActive] = useState<Tab>(() =>
-    (tabs as readonly string[]).includes(requested) ? (requested as Tab) : canSign ? "Approvals" : "Decision center",
+    (tabs as readonly string[]).includes(requested)
+      ? (requested as Tab)
+      : canSign
+        ? "Approvals"
+        : offeredTab(null, tabs, "Decision center"),
   );
   // A case opened from the approvals queue or the dashboard, which the context bar may not hold (another product).
   const [opened, setOpened] = useState<{ id: string; label: string | null } | null>(() => {

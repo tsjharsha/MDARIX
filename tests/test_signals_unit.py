@@ -269,6 +269,12 @@ def test_actions_follow_permissions_and_status():
     escalated = SimpleNamespace(status="ESCALATED", product_id=uuid.uuid4())
     investigator = _actions(_actor("investigation.create"), escalated)
     assert investigator["can_create_investigation"] and not investigator["can_disposition"]
+    # One click opens a case before triage as well, for anyone who may open cases.
+    assert _actions(_actor("investigation.create"), signal)["can_open_case"]
+    assert investigator["can_open_case"]
+    assert not _actions(_actor("signal.triage"), signal)["can_open_case"]
+    closed = SimpleNamespace(status="NO_ACTION", product_id=uuid.uuid4())
+    assert not _actions(_actor("investigation.create"), closed)["can_open_case"]
     assert _actions(_actor("signal.triage"), escalated)["can_disposition"]
     merged = _actions(
         _actor("signal.triage", "investigation.create"), SimpleNamespace(status="MERGED", product_id=None)
@@ -364,6 +370,8 @@ def test_the_triage_routes_are_registered_and_writes_are_guarded():
         ("POST", "/api/v1/triage/signals/{signal_id}/merge"): "signal.triage",
         ("POST", "/api/v1/triage/signals/{signal_id}/complaints"): "signal.triage",
         ("POST", "/api/v1/triage/signals/{signal_id}/create-investigation"): "investigation.create",
+        ("POST", "/api/v1/triage/signals/{signal_id}/open-case"): "investigation.create",
+        ("POST", "/api/v1/triage/signals/{signal_id}/summary"): "ai.run",
         ("PUT", "/api/v1/triage/rules/{rule_code}"): "signal.triage",
         ("POST", "/api/v1/triage/rules/run"): "signal.triage",
     }
@@ -376,6 +384,8 @@ def test_the_triage_routes_are_registered_and_writes_are_guarded():
         ("GET", "/api/v1/triage/signals/{signal_id}"),
         ("GET", "/api/v1/triage/summary"),
         ("GET", "/api/v1/triage/rules"),
+        ("GET", "/api/v1/triage/trends"),
+        ("GET", "/api/v1/triage/signals/{signal_id}/insight"),
     ):
         assert key in routes, key
 

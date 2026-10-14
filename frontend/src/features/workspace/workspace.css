@@ -213,6 +213,57 @@
   color: var(--ac-ink-2);
   font-size: 14px;
 }
+/* The trial's story (GettingStarted.tsx): chapters with their finding, why they matter, and the next one marked. */
+.uw-trial-lede {
+  margin: 0 0 8px;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.uw-story-steps li {
+  align-items: start;
+}
+.uw-story-steps li.is-next {
+  margin: 4px 0;
+  padding: 12px;
+  border: 1px solid var(--ac-teal);
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+}
+.uw-story-body {
+  min-width: 0;
+}
+.uw-story-steps .uw-story-finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-story-steps .uw-story-pain,
+.uw-story-steps .uw-story-templates {
+  margin-top: 4px;
+  color: var(--ac-muted);
+  font-size: 13px;
+}
+.uw-story-partner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+}
+.uw-story-partner p {
+  margin: 2px 0 0;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+}
 .uw-trial-template {
   display: flex;
   flex-wrap: wrap;
@@ -1699,4 +1750,1189 @@ div.uw-task-count:hover {
   cursor: pointer;
   font-weight: 600;
   margin-bottom: 8px;
+}
+
+/* Complaints: the second look and the backlog board (sections/Complaints.tsx). Status colours always come with an
+   icon and a text label; the coloured edge of a card repeats the most serious sign listed on it. */
+.uw-cr-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.uw-cr-split {
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  align-items: start;
+}
+.uw-cr-hero {
+  grid-template-columns: minmax(0, 1fr);
+}
+.uw-cr-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.uw-cr-toolbar .ca-chips {
+  margin: 0;
+}
+.uw-cr-toolbar select {
+  min-height: 36px;
+  max-width: 100%;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+}
+.uw-cr-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-cr-card {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  overflow: hidden;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+.uw-cr-card:hover {
+  border-color: var(--ac-axis);
+  box-shadow: 0 4px 14px rgb(16 32 47 / 8%);
+}
+.uw-cr-rail {
+  background: var(--ac-neutral);
+}
+.uw-cr-rail.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-cr-rail.tone-serious {
+  background: var(--ac-serious);
+}
+.uw-cr-rail.tone-critical {
+  background: var(--ac-critical);
+}
+.uw-cr-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 0;
+}
+.uw-cr-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+.uw-cr-id {
+  color: var(--ac-navy);
+  font-size: 15px;
+}
+.uw-cr-meta {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-cr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-cr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-cr-chip.is-reason {
+  border-color: #b9d3e8;
+  background: #eef5fb;
+  color: var(--ac-navy);
+}
+.uw-cr-chip.tone-warning {
+  background: #fdf1d3;
+  border-color: transparent;
+}
+.uw-cr-chip.tone-serious {
+  background: #fbe6dc;
+  border-color: transparent;
+}
+.uw-cr-chip.tone-critical {
+  background: #f8e1e1;
+  border-color: transparent;
+}
+.uw-cr-text {
+  color: var(--ac-ink-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.uw-cr-text mark {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #fdf1d3;
+  box-shadow: inset 0 -2px 0 #e3a21a;
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+/* The AI's explanation of a flagged record (Complaints.tsx ExplainWithAi): sentences with the record's own words. */
+.uw-cr-explain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.uw-ai-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.uw-ai-head .uw-ai-label {
+  margin: 0;
+}
+.uw-cr-explain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ac-ink);
+  line-height: 1.5;
+}
+.uw-cr-explain-list li > span {
+  margin-right: 6px;
+}
+.uw-cr-quote {
+  display: inline-block;
+  margin: 2px 6px 0 0;
+  padding: 1px 8px;
+  border-left: 3px solid #7b61d8;
+  border-radius: 3px;
+  background: #f5f2fd;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.uw-cr-decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 10px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+}
+.uw-cr-decision q {
+  flex-basis: 100%;
+  color: var(--ac-ink-2);
+  font-style: italic;
+}
+.uw-cr-actions {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 14px 14px 0;
+}
+.uw-cr-actions .ac-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.uw-cr-clip {
+  display: -webkit-box;
+  max-width: 34ch;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.uw-cr-age {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+  text-align: left;
+}
+.uw-cr-age-track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ac-track);
+}
+.uw-cr-age-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ac-good);
+}
+.uw-cr-age-fill.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-cr-age-fill.tone-critical {
+  background: var(--ac-critical);
+}
+@media (max-width: 1080px) {
+  .uw-cr-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .uw-cr-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .uw-cr-card {
+    grid-template-columns: 6px minmax(0, 1fr);
+  }
+  .uw-cr-actions {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    padding: 0 14px 14px 0;
+  }
+}
+
+/* Reporting and CAPA: the reportability watch and reporting windows (sections/ReportabilityWatch.tsx,
+   ReportingWindows.tsx) and CAPA effectiveness checks (sections/Records.tsx). Status colours always come with a label. */
+.uw-rw-callout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.uw-rw-callout > span {
+  flex: 1 1 260px;
+}
+.uw-rw-clock {
+  display: grid;
+  gap: 2px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--ac-neutral);
+  border-radius: 6px;
+  background: var(--ac-page);
+}
+.uw-rw-clock strong {
+  font-size: 18px;
+  color: var(--ac-navy);
+}
+.uw-rw-clock span {
+  color: var(--ac-ink-2);
+  font-size: 12px;
+}
+.uw-rw-clock.tone-critical {
+  border-left-color: var(--ac-critical);
+  background: #fbeeee;
+}
+.uw-rw-clock.tone-warning {
+  border-left-color: var(--ac-warning);
+  background: #fef7e6;
+}
+.uw-rw-clock.tone-serious {
+  border-left-color: var(--ac-serious);
+}
+.uw-rw-clock.tone-good {
+  border-left-color: var(--ac-good);
+}
+.uw-rw-followups {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rw-followups li,
+.uw-rw-flag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-cr-clip-3 {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.uw-rw-choice {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-rw-choice legend,
+.uw-rw-triggers legend,
+.uw-rw-window > legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.uw-rw-choice .ca-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.uw-rw-window {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-rw-triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-rw-templates {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.uw-rw-windows {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rw-windows li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-rw-windows span,
+.uw-rw-windows small {
+  color: var(--ac-ink-2);
+}
+.uw-ef-recurrence {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.uw-ef-bars {
+  display: grid;
+  gap: 8px;
+}
+.uw-ef-bar {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 2px 10px;
+}
+.uw-ef-bar small {
+  grid-column: 2 / -1;
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-ef-bar-label {
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
+.uw-ef-bar-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ac-track);
+}
+.uw-ef-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ac-neutral);
+}
+.uw-ef-bar-fill.tone-good {
+  background: var(--ac-good);
+}
+.uw-ef-bar-fill.tone-warning {
+  background: var(--ac-warning);
+}
+.uw-ef-bar-fill.tone-critical {
+  background: var(--ac-critical);
+}
+.uw-ef-recurrence figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.uw-ef-rounds {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+.uw-ef-rounds li {
+  display: grid;
+  gap: 3px;
+  color: var(--ac-ink-2);
+}
+
+/* Signals and AI: the signal summary with its cited complaints (sections/SignalInsight.tsx), the trend check
+   (TrendCheck.tsx) and the case's AI run (CaseAiRun.tsx). Every AI text carries its label; status colours come with
+   a label. */
+.uw-ai-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #efeafd;
+  color: #4b2fa8;
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-sum-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-sum-list li {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ac-series);
+  border-radius: 4px;
+  background: var(--ac-page);
+}
+.uw-sum-cites {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.uw-sum-cites code {
+  padding: 1px 6px;
+  border: 1px solid var(--ac-line);
+  border-radius: 4px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font-size: 11px;
+}
+.uw-trend-line p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.uw-ai-run {
+  margin-bottom: 12px;
+}
+.uw-ai-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ai-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.uw-ai-step.is-pending,
+.uw-ai-step.is-skipped {
+  color: var(--ac-muted);
+}
+
+/* The automatic trust check of an AI result (sections/TrustBadge.tsx): a badge that opens its checks. */
+.uw-trust {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+}
+.uw-trust-badge {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-trust-badge:focus-visible {
+  outline: 2px solid var(--ac-teal);
+  outline-offset: 2px;
+}
+.uw-trust-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 400;
+}
+.uw-trust-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.uw-trust-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--ac-good);
+}
+.uw-trust-check.is-warning {
+  border-left-color: var(--ac-warning);
+}
+.uw-trust-check.is-blocked {
+  border-left-color: var(--ac-critical);
+}
+.uw-trust-check span {
+  color: var(--ac-ink-2);
+}
+.uw-spin {
+  animation: uw-spin 1.2s linear infinite;
+}
+@keyframes uw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-spin {
+    animation: none;
+  }
+}
+
+/* Readiness (sections/Readiness.tsx): the four home numbers as large tiles, each opening the records behind it, and
+   the further inspection checks. The tone is repeated by a text label on every tile. */
+.uw-rd-home {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.uw-rd-tile {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--ac-line);
+  border-top: 5px solid var(--ac-neutral);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+}
+.uw-rd-tile:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgb(16 32 47 / 10%);
+}
+.uw-rd-tile:disabled {
+  cursor: default;
+}
+.uw-rd-tile.tone-good {
+  border-top-color: var(--ac-good);
+}
+.uw-rd-tile.tone-warning {
+  border-top-color: var(--ac-warning);
+}
+.uw-rd-tile.tone-serious {
+  border-top-color: var(--ac-serious);
+}
+.uw-rd-tile.tone-critical {
+  border-top-color: var(--ac-critical);
+}
+.uw-rd-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
+.uw-rd-value {
+  font-size: 36px;
+  line-height: 1;
+  color: var(--ac-navy);
+}
+.uw-rd-detail {
+  color: var(--ac-ink-2);
+  font-size: 13px;
+}
+.uw-rd-refs {
+  color: var(--ac-ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+.uw-rd-why {
+  color: var(--ac-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.uw-rd-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ac-teal);
+  font-weight: 600;
+}
+.uw-rd-checks {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-rd-download {
+  align-items: end;
+}
+@media (max-width: 1080px) {
+  .uw-rd-home {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .uw-rd-home {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The import panel's column guide (ImportData.tsx ColumnGuide): what the key columns do; per-unit trends for lots. */
+.uw-import-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.uw-import-callout {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--ac-teal);
+  border-radius: 6px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.uw-import-guide summary {
+  cursor: pointer;
+  color: var(--ac-teal);
+  font-weight: 600;
+}
+.uw-import-guide dl {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+.uw-import-guide dl div {
+  display: grid;
+  grid-template-columns: minmax(140px, 200px) 1fr;
+  gap: 8px;
+}
+.uw-import-guide dt {
+  margin: 0;
+}
+.uw-import-guide dd {
+  margin: 0;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+}
+@media (max-width: 700px) {
+  .uw-import-guide dl div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+/* Trend check: how to count per unit in the field when lots have no quantity (TrendCheck.tsx). */
+.uw-trend-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ac-page);
+  color: var(--ac-ink-2);
+  font-size: 14px;
+}
+.uw-trend-hint p {
+  flex: 1 1 320px;
+  margin: 0;
+}
+
+/* Book a one-to-one demo (BookDemo.tsx): the chapters to focus on, and the closing call to action. */
+.uw-story-partner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.uw-demo-focus {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+}
+.uw-demo-focus legend {
+  padding: 0 4px;
+  font-weight: 600;
+}
+
+/* The sample data, explained (sections/SampleData.tsx): the pain point each part of the trial's sample re-creates. */
+.uw-sample {
+  scroll-margin-top: 96px;
+}
+.uw-sample-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.uw-sample-badge {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-teal);
+}
+.uw-sample-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+.uw-sample-facts li {
+  padding: 4px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-page);
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-sample-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-sample-point {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--ac-line);
+  border-left: 3px solid var(--ac-teal);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  animation: uw-sample-in 420ms ease-out both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.uw-sample-number {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--ac-teal);
+  color: #fff;
+  font-weight: 700;
+}
+.uw-sample-body {
+  min-width: 0;
+}
+.uw-sample-body h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  color: var(--ac-ink);
+  font-size: 16px;
+}
+.uw-sample-body h3 svg {
+  flex: none;
+  color: var(--ac-teal);
+}
+.uw-sample-label {
+  margin: 0 0 4px;
+  color: var(--ac-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.uw-sample-body ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.uw-sample-body li + li {
+  margin-top: 2px;
+}
+.uw-sample-why {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.uw-sample-ref {
+  display: inline-block;
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-sample-open {
+  align-self: center;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .uw-sample-point {
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+  .uw-sample-open {
+    grid-column: 2;
+    justify-self: start;
+    white-space: normal;
+  }
+}
+.uw-sample-made {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+}
+.uw-sample-made summary {
+  color: var(--ac-ink);
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-sample-made ul {
+  margin: 8px 0 2px;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.uw-sample-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+.uw-import-more {
+  margin: 8px 0 4px;
+}
+@keyframes uw-sample-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-sample-point {
+    animation: none;
+  }
+}
+
+/* The trial journey (sections/TrialJourney.tsx): the free trial user guide's seven steps, ticked as they are done. */
+.uw-anchor {
+  scroll-margin-top: 96px;
+}
+.uw-journey {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-journey-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-journey-step.is-done {
+  background: var(--ac-teal-wash);
+  border-color: transparent;
+}
+.uw-journey-step.is-next {
+  border-color: var(--ac-teal);
+  box-shadow: 0 0 0 3px rgb(13 148 136 / 15%);
+}
+.uw-journey-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ac-page);
+  color: var(--ac-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.uw-journey-step.is-done .uw-journey-mark {
+  background: var(--ac-teal);
+  color: #fff;
+}
+.uw-journey-step.is-next .uw-journey-mark {
+  background: var(--ac-teal);
+  color: #fff;
+}
+.uw-journey-step strong {
+  color: var(--ac-ink);
+  font-size: 13px;
+  line-height: 1.3;
+}
+.uw-journey-step small {
+  color: var(--ac-muted);
+  font-size: 12px;
+}
+.uw-journey-step button {
+  margin-top: auto;
+}
+
+/* Ending the trial early (sections/EndTrial.tsx). */
+.uw-exit-status {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-exit-status.is-pending {
+  background: #fffbeb;
+  color: #713f12;
+}
+.uw-exit-button {
+  color: var(--ac-critical);
+}
+
+/* How an upload was read (sections/ImportData.tsx HowItWasRead): notes, the columns matched and those left out. */
+.uw-import-read {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.uw-import-read p {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+.uw-import-read code {
+  font-size: 12px;
+}
+
+/* Getting started, simplified: chapter details on request, the quick rating, the tabs below the story, and the
+   "chapter done" banner (sections/GettingStarted.tsx, sections/ChapterDone.tsx). */
+.uw-story-more {
+  margin-top: 4px;
+}
+.uw-story-more summary {
+  width: fit-content;
+  color: var(--ac-teal);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.uw-story-more[open] summary {
+  margin-bottom: 4px;
+}
+.uw-quick-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-quick-rating.is-sent {
+  font-weight: 500;
+}
+.uw-quick-stars {
+  display: inline-flex;
+  gap: 2px;
+}
+.uw-quick-stars button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #d97706;
+  cursor: pointer;
+}
+.uw-quick-stars button:hover,
+.uw-quick-stars button:focus-visible {
+  background: #fff7ed;
+}
+.uw-trial-tabs {
+  margin-top: 4px;
+}
+.uw-chapter-done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.uw-chapter-done > span {
+  flex: 1 1 260px;
+}
+
+/* "What were you cited for?" (sections/CitedFor.tsx) and the chapters it marks. */
+.uw-cited-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.uw-cited-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  cursor: pointer;
+}
+.uw-cited-options label.is-on {
+  border-color: var(--ac-teal);
+  background: var(--ac-teal-wash);
+}
+.uw-cited-options input {
+  margin-top: 3px;
+}
+.uw-cited-options span {
+  display: grid;
+  gap: 2px;
+  color: var(--ac-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.uw-cited-options small {
+  color: var(--ac-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.uw-cited-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-cited-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: 2px;
+}
+
+/* Removing the sample data (sections/RemoveSample.tsx). */
+.uw-remove-sample {
+  margin: 8px 0 12px;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* Sentence starters under a reason field (sections/Starters.tsx). */
+.uw-starters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+  font-size: 13px;
+}
+.uw-starters > span {
+  color: var(--ac-muted);
+}
+.uw-starter {
+  padding: 4px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-starter:hover,
+.uw-starter:focus-visible {
+  border-color: var(--ac-teal);
+  background: var(--ac-teal-wash);
 }

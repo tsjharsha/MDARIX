@@ -75,6 +75,41 @@ class BriefService:
         except ModelAnalysisUnavailable as exc:
             return None, {**sources, "fallback_reason": exc.reason}
 
+    @staticmethod
+    def _record_draft(db, tenant_id, investigation_id, ai_brief: dict, request, version_num: int) -> uuid.UUID:
+        from ai.execution import record_ai_execution
+        from trust_engine.auto import INVESTIGATION_BRIEF
+
+        model = ai_brief.get("model") if isinstance(ai_brief.get("model"), dict) else {}
+        sections = ai_brief.get("sections") if isinstance(ai_brief.get("sections"), dict) else {}
+        cited = sorted(
+            {
+                str(ref)
+                for items in sections.values()
+                if isinstance(items, list)
+                for item in items
+                if isinstance(item, dict)
+                for ref in item.get("evidence") or []
+            }
+        )
+        execution = record_ai_execution(
+            db,
+            tenant_id,
+            provider=INVESTIGATION_BRIEF,
+            model_name=str(model.get("model") or "unknown"),
+            model_version=model.get("model_version"),
+            prompt_template_version=model.get("prompt_template_version") or "brief",
+            orchestration_version="R1-MVP-P6-Brief",
+            investigation_id=investigation_id,
+            context_refs={"temporal_mode": request.temporal_mode, "brief_version": version_num},
+            evidence_refs={"evidence_identifiers": cited},
+            structured_output={key: value for key, value in ai_brief.items() if key != "label"},
+            validation_status="VALIDATED",
+            latency_ms=model.get("latency_ms"),
+            requestor_ref=str(request.generated_by),
+        )
+        return execution.id
+
     def _investigation(self, db, tenant_id, investigation_id):
         row = (
             db.query(Investigation)
@@ -101,6 +136,7 @@ class BriefService:
             "provenance": row.provenance,
             "limitations": row.limitations,
             "created_at": row.created_at,
+            "ai_execution_id": row.ai_execution_id,
         }
 
     def generate(self, db: Session, tenant_id: uuid.UUID, investigation_id: uuid.UUID, request) -> dict[str, Any]:
@@ -323,6 +359,12 @@ class BriefService:
                     question=inv.investigation_question,
                 ),
             }
+        ai_execution_id = None
+        if ai_brief is not None:
+            # The model's draft is an AI result like any other: saved with its provenance and the evidence it cites,
+            # which gives it the automatic trust check (trust_engine/auto.py).
+            ai_execution_id = self._record_draft(db, tenant_id, inv.id, ai_brief, request, version_num)
+            content["ai_brief"]["ai_execution_id"] = str(ai_execution_id)
         provenance = {
             "investigation_id": str(inv.id),
             "product_id": str(inv.product_id),
@@ -352,6 +394,7 @@ class BriefService:
             temporal_cutoff=cutoff,
             human_review_state="NOT_REVIEWED",
             decision_id=decision.id if decision else None,
+            ai_execution_id=ai_execution_id,
             limitations={"items": limitations},
             content=content,
             provenance=provenance,

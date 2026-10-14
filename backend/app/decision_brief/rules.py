@@ -265,6 +265,25 @@ def ai_draft_text(ai_brief_content: dict | None) -> str | None:
     return text[:NARRATIVE_TEXT_MAX] or None
 
 
+def ai_draft_actions(ai_brief_content: dict | None) -> list[str]:
+    """The AI brief's possible next steps as recommended actions for the author to start from (the language model's
+    next_steps), at most ACTIONS_MAX; empty when the brief has none (a rule-assembled brief)."""
+    content = ai_brief_content if isinstance(ai_brief_content, dict) else {}
+    model = content.get("ai_brief") if isinstance(content.get("ai_brief"), dict) else {}
+    sections = model.get("sections") if isinstance(model.get("sections"), dict) else {}
+    actions: list[str] = []
+    for item in sections.get("next_steps") or ():
+        text = " ".join(_clean(item.get("statement")).split()) if isinstance(item, dict) else ""
+        if text and text not in actions:
+            actions.append(text[:ACTION_TEXT_MAX])
+    return actions[:ACTIONS_MAX]
+
+
+def problem_statement_from(question: str | None) -> str:
+    """The case's question as the brief's problem statement, for the author to refine (never an AI text)."""
+    return " ".join(_clean(question).split())[:NARRATIVE_TEXT_MAX]
+
+
 # ------------------------------------------------------------------------------------------------------- gate
 
 # Checks of the case's readiness the brief itself answers (its own review, the decision after it).

@@ -21,6 +21,8 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
   ``MDARIX_SUPPORT_EMAIL``).
 * ``SECURITY_NOTICE`` (``notify_security_notice``): the account's owner (auth/security_notices.py builds it).
 * ``SUPPORT_PROBLEM_REPORTED`` (backend/app/support_api.py): the support team.
+* ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
+  Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
 """
 
 from __future__ import annotations
@@ -564,6 +566,16 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
         return
     organization = _organization(db, row.tenant_id)
     delete_on = _long_date(row.expires_at + timedelta(days=30))
+    if payload.get("stage") == "ENDED" and payload.get("early"):
+        # Ended early at the owner's request, data kept until the usual date (backend/app/trial/early_exit.py).
+        _deliver(
+            lambda recipient, **kw: emailer.send_trial_ended_early(recipient, **kw),
+            [request.email],
+            organization=organization,
+            data_deleted=False,
+            delete_on=delete_on,
+        )
+        return
     if payload.get("stage") == "ENDED":
         _deliver(
             lambda recipient, **kw: emailer.send_trial_ended(recipient, **kw),
@@ -737,6 +749,11 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
     if event_name == SUPPORT_ACCESS_AWAITING_CUSTOMER:
         _support_access_request(db, payload, emailer)
         return True
+    if event_name == "READINESS_DIGEST":
+        from backend.app.readiness_home.digest import deliver
+
+        deliver(db, payload)
+        return True
     from auth.security_notices import handle_security_notice
 
     if handle_security_notice(db, event_name, payload):
@@ -767,6 +784,10 @@ def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
         .all()
     )
     for row in trials:
+        # A trial whose data has been deleted (ended early, or purged) gets no more reminders: its people are gone.
+        tenant = db.get(Tenant, row.tenant_id)
+        if tenant is not None and str(tenant.status).upper() in ("ARCHIVED", "PURGING"):
+            continue
         remaining = row.expires_at - now
         if remaining <= timedelta(0):
             stage = "ENDED" if -remaining <= timedelta(days=7) else None

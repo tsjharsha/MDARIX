@@ -1,0 +1,401 @@
+"""The rules of the reportability watch, as plain functions.
+
+Why it matters (FDA warning letters, 2026): a manufacturer filed a Medical Device Report about nine months late
+against a 30-day deadline, another never followed up choking complaints and filed none. The watch shows, for every
+complaint that reports a death, a serious injury or a malfunction, how many days are left in the reporting windows
+the organization entered from its own procedure, and flags complaints whose answers are missing (a patient was
+involved, but nobody recorded whether they were injured). A person decides reportability; MDARIX keeps the clock, never
+decides, and never submits a report.
+
+The windows are the organization's, not MDARIX's: nothing is set until someone enters them. ``TEMPLATES`` offers the
+FDA and EU windows that complaint fields can start (to check against the procedure before saving); windows that rest on
+a judgment (an FDA 5-work-day report, an EU serious public health threat) cannot be read from complaint fields and are
+left to the reviewer.
+
+A clock starts at the day the organization became aware of the complaint (the earliest of its awareness, received
+and recorded days, as the case's regulatory review reads it) and ends at that day plus the window's days: calendar days, or work days (Monday to Friday;
+public holidays are not known to MDARIX and are counted as work days, which only makes a due date earlier).
+"""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from datetime import date, timedelta
+
+DEATH, SERIOUS_INJURY, MALFUNCTION = "DEATH", "SERIOUS_INJURY", "MALFUNCTION"
+TRIGGERS = (DEATH, SERIOUS_INJURY, MALFUNCTION)
+TRIGGER_LABELS = {DEATH: "a death", SERIOUS_INJURY: "a serious injury", MALFUNCTION: "a malfunction"}
+CALENDAR, WORK = "CALENDAR", "WORK"
+DAY_BASES = (CALENDAR, WORK)
+
+WINDOWS_MAX = 20
+NAME_MIN, NAME_MAX = 3, 100
+MARKETS_MAX = 100
+MARKET_MAX_LENGTH = 60
+NOTE_MAX = 300
+DAYS_MIN, DAYS_MAX = 1, 365
+LOOKBACK_DEFAULT, LOOKBACK_MIN, LOOKBACK_MAX = 365, 30, 3650
+REASON_MIN = 10
+REFERENCE_MAX = 120
+
+# The person's decision on a complaint's reportability.
+REPORTED, NOT_REPORTABLE = "REPORTED", "NOT_REPORTABLE"
+DECISIONS = (REPORTED, NOT_REPORTABLE)
+
+# A clock's state, most urgent first.
+OVERDUE, DUE_SOON, RUNNING = "OVERDUE", "DUE_SOON", "RUNNING"
+# A watched complaint's state: one of the clock states, or
+IN_REVIEW = "IN_REVIEW"  # its case's regulatory review is requested or in progress (the clock still runs)
+NO_WINDOW = "NO_WINDOW"  # it reports harm, but no window of the organization applies to it
+FOLLOW_UP = "FOLLOW_UP"  # answers are missing and nothing starts a clock yet
+DECIDED = "DECIDED"
+STATE_ORDER = {OVERDUE: 0, DUE_SOON: 1, IN_REVIEW: 2, RUNNING: 3, NO_WINDOW: 4, FOLLOW_UP: 5, DECIDED: 6}
+
+# Regulatory review outcomes of a case (backend/app/db/models/reviews.py) that settle a complaint's reportability;
+# "reporting required" does not: the clock runs until the report is recorded as filed.
+SETTLING_OUTCOMES = frozenset({"NO_REPORTABILITY_CONCERN_IDENTIFIED", "REPORTABILITY_ASSESSMENT_COMPLETE"})
+
+_US = ["US", "USA", "United States", "United States of America"]
+# EU member states and the EEA countries where the EU MDR applies, by name and by code.
+_EU = [
+    "EU",
+    "European Union",
+    "Austria",
+    "AT",
+    "Belgium",
+    "BE",
+    "Bulgaria",
+    "BG",
+    "Croatia",
+    "HR",
+    "Cyprus",
+    "CY",
+    "Czechia",
+    "Czech Republic",
+    "CZ",
+    "Denmark",
+    "DK",
+    "Estonia",
+    "EE",
+    "Finland",
+    "FI",
+    "France",
+    "FR",
+    "Germany",
+    "DE",
+    "Greece",
+    "GR",
+    "EL",
+    "Hungary",
+    "HU",
+    "Ireland",
+    "IE",
+    "Italy",
+    "IT",
+    "Latvia",
+    "LV",
+    "Lithuania",
+    "LT",
+    "Luxembourg",
+    "LU",
+    "Malta",
+    "MT",
+    "Netherlands",
+    "NL",
+    "Poland",
+    "PL",
+    "Portugal",
+    "PT",
+    "Romania",
+    "RO",
+    "Slovakia",
+    "SK",
+    "Slovenia",
+    "SI",
+    "Spain",
+    "ES",
+    "Sweden",
+    "SE",
+    "Iceland",
+    "IS",
+    "Liechtenstein",
+    "LI",
+    "Norway",
+    "NO",
+]
+
+_GB = ["United Kingdom", "UK", "GB", "Great Britain", "England", "Scotland", "Wales"]
+_CA = ["Canada", "CA", "CAN"]
+
+# Starting points to check against the organization's procedure; never applied until a person saves them. Sources:
+# 21 CFR 803.50 and 803.53 (FDA); EU MDR Article 87; GB Medical Devices Regulations 2002 as amended, regulation 44ZH
+# (from 16 June 2025); Canada Medical Devices Regulations SOR/98-282 section 60 (calendar days).
+TEMPLATES = (
+    {
+        "name": "FDA MDR: death, serious injury or malfunction (30 calendar days)",
+        "markets": _US,
+        "triggers": [DEATH, SERIOUS_INJURY, MALFUNCTION],
+        "days": 30,
+        "day_basis": CALENDAR,
+        "note": "A 5-work-day report (remedial action to prevent an unreasonable risk of substantial harm, or an FDA "
+        "request) rests on a judgment; your reviewer applies it.",
+    },
+    {
+        "name": "EU MDR: serious incident (15 days)",
+        "markets": _EU,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 15,
+        "day_basis": CALENDAR,
+        "note": "A malfunction can also be a serious incident when it might have led to death or serious "
+        "deterioration; a serious public health threat is 2 days. Your reviewer applies both.",
+    },
+    {
+        "name": "EU MDR: death (10 days)",
+        "markets": _EU,
+        "triggers": [DEATH],
+        "days": 10,
+        "day_basis": CALENDAR,
+        "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+    },
+    {
+        "name": "MHRA (Great Britain): serious incident (15 days)",
+        "markets": _GB,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 15,
+        "day_basis": CALENDAR,
+        "note": "A serious public health threat is 2 days, and a malfunction can be a serious incident; your reviewer "
+        "applies both. Northern Ireland follows the EU MDR but reports to the MHRA.",
+    },
+    {
+        "name": "MHRA (Great Britain): death (10 days)",
+        "markets": _GB,
+        "triggers": [DEATH],
+        "days": 10,
+        "day_basis": CALENDAR,
+        "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+    },
+    {
+        "name": "Health Canada: death or serious deterioration (10 days)",
+        "markets": _CA,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 10,
+        "day_basis": CALENDAR,
+        "note": "For an incident in Canada; a foreign incident is reported as soon as possible after the decision.",
+    },
+    {
+        "name": "Health Canada: could cause death or serious deterioration if it recurred (30 days)",
+        "markets": _CA,
+        "triggers": [MALFUNCTION],
+        "days": 30,
+        "day_basis": CALENDAR,
+        "note": "Whether a recurrence could cause death or serious deterioration rests on a judgment; your reviewer "
+        "applies it.",
+    },
+)
+
+
+def normalize(value: object) -> str:
+    """Lower case, dots removed, separators as spaces, single spaces: "U.S.A." and "usa" are the same market."""
+    text = str(value or "").lower().replace(".", "")
+    text = re.sub(r"[_\-/,;:]+", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _clean_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def clean_window(raw: dict) -> dict:
+    """One window as stored: name and note tidied, markets tidied without repeats, triggers in their order."""
+    markets: list[str] = []
+    seen: set[str] = set()
+    for market in raw.get("markets") or []:
+        text = _clean_text(market)
+        if text and normalize(text) not in seen:
+            seen.add(normalize(text))
+            markets.append(text)
+    triggers = [code for code in TRIGGERS if code in {str(item).strip().upper() for item in raw.get("triggers") or []}]
+    note = _clean_text(raw.get("note")) or None
+    return {
+        "name": _clean_text(raw.get("name")),
+        "markets": markets,
+        "triggers": triggers,
+        "days": raw.get("days"),
+        "day_basis": str(raw.get("day_basis") or CALENDAR).strip().upper(),
+        "note": note,
+    }
+
+
+def windows_problem(windows: list[dict]) -> str | None:
+    """Why a list of cleaned windows cannot be saved, or None."""
+    if len(windows) > WINDOWS_MAX:
+        return f"Keep at most {WINDOWS_MAX} windows"
+    names: set[str] = set()
+    for index, window in enumerate(windows, 1):
+        label = f"Window {index}"
+        name = window["name"]
+        if not NAME_MIN <= len(name) <= NAME_MAX:
+            return f"{label}: give it a name of {NAME_MIN} to {NAME_MAX} characters"
+        if name.lower() in names:
+            return f'{label}: another window is already called "{name}"'
+        names.add(name.lower())
+        if len(window["markets"]) > MARKETS_MAX:
+            return f"{label}: keep at most {MARKETS_MAX} markets"
+        long = next((market for market in window["markets"] if len(market) > MARKET_MAX_LENGTH), None)
+        if long:
+            return f'{label}: "{long[:20]}…" is longer than {MARKET_MAX_LENGTH} characters'
+        if not window["triggers"]:
+            return f"{label}: choose what starts its clock (a death, a serious injury or a malfunction)"
+        days = window["days"]
+        if isinstance(days, bool) or not isinstance(days, int) or not DAYS_MIN <= days <= DAYS_MAX:
+            return f"{label}: the window is a whole number of days from {DAYS_MIN} to {DAYS_MAX}"
+        if window["day_basis"] not in DAY_BASES:
+            return f"{label}: count calendar days or work days"
+        if window["note"] and len(window["note"]) > NOTE_MAX:
+            return f"{label}: keep the note under {NOTE_MAX} characters"
+    return None
+
+
+def triggers_of(record: dict) -> list[str]:
+    """What a complaint reports that can start a clock, in the order of TRIGGERS."""
+    return [code for code in TRIGGERS if record.get(code.lower())]
+
+
+def applies(window: dict, record: dict) -> bool:
+    """Whether ``window`` covers the complaint: one of its triggers is reported, and the complaint's country is one of
+    the window's markets (a window without markets covers every market, a complaint without a country included)."""
+    if not set(window["triggers"]) & set(triggers_of(record)):
+        return False
+    if not window["markets"]:
+        return True
+    country = normalize(record.get("country"))
+    return bool(country) and country in {normalize(market) for market in window["markets"]}
+
+
+def add_work_days(start: date, days: int) -> date:
+    """``days`` work days (Monday to Friday) after ``start``."""
+    current = start
+    left = days
+    while left > 0:
+        current += timedelta(days=1)
+        if current.weekday() < 5:
+            left -= 1
+    return current
+
+
+def due_date(aware: date, window: dict) -> date:
+    if window["day_basis"] == WORK:
+        return add_work_days(aware, window["days"])
+    return aware + timedelta(days=window["days"])
+
+
+def soon_days(window_days: int) -> int:
+    """Days left at which a clock is "due soon": 5, or half a short window (at least 1)."""
+    return max(1, min(5, window_days // 2))
+
+
+def clock_state(due: date, today: date, window_days: int) -> str:
+    left = (due - today).days
+    if left < 0:
+        return OVERDUE
+    if left <= soon_days(window_days):
+        return DUE_SOON
+    return RUNNING
+
+
+@dataclass(frozen=True)
+class Clock:
+    name: str
+    days: int
+    day_basis: str
+    due: date
+    state: str
+    days_left: int
+    triggers: tuple[str, ...]
+
+    def as_dict(self) -> dict:
+        return {
+            "window": self.name,
+            "days": self.days,
+            "day_basis": self.day_basis,
+            "due_date": self.due.isoformat(),
+            "state": self.state,
+            "days_left": self.days_left,
+            "triggers": list(self.triggers),
+        }
+
+
+def clocks(record: dict, windows: list[dict], aware: date | None, today: date) -> list[Clock]:
+    """The clocks the complaint's windows start, the earliest due date first; none without an awareness day."""
+    if aware is None:
+        return []
+    found = []
+    reported = set(triggers_of(record))
+    for window in windows:
+        if not applies(window, record):
+            continue
+        due = due_date(aware, window)
+        found.append(
+            Clock(
+                name=window["name"],
+                days=window["days"],
+                day_basis=window["day_basis"],
+                due=due,
+                state=clock_state(due, today, window["days"]),
+                days_left=(due - today).days,
+                triggers=tuple(code for code in window["triggers"] if code in reported),
+            )
+        )
+    return sorted(found, key=lambda clock: (clock.due, clock.name))
+
+
+def follow_ups(record: dict, windows: list[dict], aware_recorded: bool) -> list[dict]:
+    """The answers a complaint is missing for its reportability to be judged."""
+    found = []
+    if record.get("patient_involved") and (record.get("serious_injury") is None or record.get("death") is None):
+        found.append(
+            {
+                "code": "PATIENT_OUTCOME",
+                "label": "A patient was involved, but whether anyone was seriously injured or died is not recorded",
+            }
+        )
+    harm = bool(triggers_of(record))
+    if harm and not normalize(record.get("country")) and any(window["markets"] for window in windows):
+        found.append(
+            {"code": "NO_COUNTRY", "label": "No country recorded, so no market's reporting window can be applied"}
+        )
+    if harm and not aware_recorded:
+        found.append(
+            {"code": "NO_AWARENESS_DATE", "label": "No awareness date recorded: the clock starts on the received date"}
+        )
+    return found
+
+
+def watched(record: dict) -> bool:
+    """Whether a complaint belongs on the watch: it reports harm or a malfunction, or a patient's outcome is unknown."""
+    if triggers_of(record):
+        return True
+    return bool(record.get("patient_involved")) and (
+        record.get("serious_injury") is None or record.get("death") is None
+    )
+
+
+def watch_state(binding_state: str | None, decided: bool, in_review: bool, harm: bool) -> str:
+    """A watched complaint's state from its binding (earliest) clock's state, if any."""
+    if decided:
+        return DECIDED
+    if binding_state:
+        if binding_state in (OVERDUE, DUE_SOON):
+            return binding_state
+        return IN_REVIEW if in_review else RUNNING
+    if in_review:
+        return IN_REVIEW
+    return NO_WINDOW if harm else FOLLOW_UP
+
+
+def on_time(decided_on: date | None, due: date | None) -> bool | None:
+    """Whether a decision (or the filed report) came inside the binding window; None without a window."""
+    if decided_on is None or due is None:
+        return None
+    return decided_on <= due

@@ -859,8 +859,20 @@ def regulatory_context(db: Session, case: Investigation) -> dict:
             else None
         ),
         "earliest_awareness_date": _iso(earliest[0]) if earliest is not None else None,
+        # Each complaint's reporting clock against the organization's own windows (the reportability watch, md41):
+        # the reviewer sees what is due when; MDARIX still computes no obligation and decides nothing.
+        "reporting_clocks": readiness.safely(
+            db, "reporting clocks", lambda session: _reporting_clocks(session, case.tenant_id, complaints), default=[]
+        )
+        or [],
         "note": rules.REGULATORY_NOTE,
     }
+
+
+def _reporting_clocks(db: Session, tenant_id, complaints: list[Complaint]) -> list[dict]:
+    from backend.app.reportability.service import clocks_for
+
+    return clocks_for(db, tenant_id, complaints)
 
 
 def review_context(db: Session, review: CaseReview) -> dict | None:

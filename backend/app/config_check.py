@@ -105,6 +105,7 @@ def problems(*, offline: bool = False) -> list[str]:
             found.append(problem)
 
     found.extend(_deployment_role_problems())
+    add(_feature_set_problem())
     app_url = urlparse(_get("MDARIX_APP_URL"))
     if app_url.scheme != "https" or not app_url.netloc:
         add("MDARIX_APP_URL must be the https address people use, e.g. https://app.example.com")
@@ -182,6 +183,16 @@ def problems(*, offline: bool = False) -> list[str]:
         if not _deployment_role_problems():
             add(_cell_tenant_problem())
     return found
+
+
+def _feature_set_problem() -> str | None:
+    """MDARIX_FEATURE_SET (backend/app/feature_set.py): full (the default) or mvp."""
+    from backend.app import feature_set as sets
+
+    value = _get("MDARIX_FEATURE_SET").lower() or sets.FULL
+    if value not in sets.FEATURE_SETS:
+        return f"MDARIX_FEATURE_SET must be full or mvp (got {_get('MDARIX_FEATURE_SET')})"
+    return None
 
 
 def _deployment_role_problems() -> list[str]:

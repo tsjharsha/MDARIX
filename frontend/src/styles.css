@@ -11331,3 +11331,53 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   font-size: 13px;
   overflow-wrap: anywhere;
 }
+
+/* A password field with a show/hide button (features/auth/AuthPage.tsx PasswordInput). */
+.auth-password {
+  position: relative;
+  display: block;
+}
+.auth-password input {
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 46px;
+}
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6b7b;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.auth-password-toggle:hover {
+  background: #eef4f6;
+  color: #183249;
+}
+.auth-password-toggle:focus-visible {
+  outline: 3px solid #157b7533;
+}
+
+/* The authenticator setup's QR code (features/auth/AuthPage.tsx, app/QrCodeSvg.tsx). */
+.mfa-setup .qr-code {
+  display: block;
+  width: 184px;
+  max-width: 100%;
+  height: auto;
+  margin: 4px auto 10px;
+  border: 1px solid #dbe4eb;
+  border-radius: 10px;
+}
+.mfa-key-label {
+  margin: 4px 0 2px;
+  color: #5b6b7b;
+  font-size: 13px;
+}

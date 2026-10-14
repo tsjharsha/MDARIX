@@ -216,6 +216,8 @@ class LotBatch(TenantOwned, Base):
     product_version_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     manufacturing_site_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     status: Mapped[str] = mapped_column(String(40), nullable=False, server_default="active")
+    # md43: devices the lot released (the trend check's denominator, signals/trend_rules.py); null when not known.
+    quantity: Mapped[int | None] = mapped_column(Integer)
     __table_args__ = (
         ForeignKeyConstraint(
             ["tenant_id", "product_version_id"], ["product_versions.tenant_id", "product_versions.id"]
@@ -768,6 +770,8 @@ class AuthUser(Base):
     mfa_pending_secret_encrypted: Mapped[str | None] = mapped_column(Text)
     mfa_last_step: Mapped[int | None] = mapped_column(BigInteger)
     mfa_recovery_hashes: Mapped[list | None] = mapped_column(JSONB)
+    # md44: the person's email choices; {"weekly_readiness": false} stops the weekly readiness email.
+    email_preferences: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     password_changed_at = tz(True)
     password_expires_at = tz(True)
     created_at = tz(False)

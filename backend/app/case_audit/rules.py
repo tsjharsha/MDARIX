@@ -537,6 +537,7 @@ _PROVIDER_KINDS = {
     "mdarix-controlled-unknowns-radar": "unknowns",
     "mdarix-controlled-failure-chain": "failure_chain",
     "mdarix-controlled-decision-advisory": "decision_advisory",
+    "mdarix-investigation-brief": "brief",
 }
 _TEMPLATE_KINDS = (
     ("investigator", "analysis"),

@@ -7,6 +7,7 @@ import { Table, Tabs, formatDate, listOf, send, useResource } from "../shared";
 import { plural, readable } from "../labels";
 import { awaitingCount, type SupportGrant } from "../supportAccessModel";
 import { SupportAccess } from "./SupportAccess";
+import { AiReleaseGate, gateBlocksSwitchOn, type ReleaseGate } from "./AiReleaseGate";
 
 const TABS = ["Posture", "Support access", "AI processing", "Single sign-on", "Security events"] as const;
 type Tab = (typeof TABS)[number];
@@ -117,6 +118,8 @@ type AiSettings = {
   /** The provider content is sent to when AI is on (named in the acknowledgement); null when none is configured. */
   provider_name: string | null;
   masking: boolean;
+  /** The four bars AI must pass before a pilot; production refuses switching AI on until they are met. */
+  release_gate?: ReleaseGate;
 };
 
 /** Whether this organization's content may be sent to an AI model, and how much of the monthly allowance is used. */
@@ -176,10 +179,20 @@ function AiProcessing() {
               : "AI processing is off: nothing from your organization is sent to an AI model, and every feature answers from rules."}
           </p>
           <div className="ca-action-row">
-            <button type="button" className={on ? "ac-secondary" : "ac-primary"} onClick={change} disabled={!data}>
+            <button
+              type="button"
+              className={on ? "ac-secondary" : "ac-primary"}
+              onClick={change}
+              disabled={!data || (!on && gateBlocksSwitchOn(data.release_gate))}
+            >
               {on ? "Turn AI off" : "Turn AI on"}
             </button>
           </div>
+          {!on && gateBlocksSwitchOn(data?.release_gate) && (
+            <p className="ac-muted" role="note">
+              AI can be turned on once the AI release gate below is met.
+            </p>
+          )}
           <p className="ac-muted">
             When the monthly allowance is used up, features answer from rules until next month.
           </p>
@@ -200,6 +213,7 @@ function AiProcessing() {
           </p>
         </Panel>
       </div>
+      <AiReleaseGate gate={data?.release_gate} />
     </>
   );
 }

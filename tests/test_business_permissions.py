@@ -43,6 +43,9 @@ EXEMPT = {
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
     ("GET", "/api/v1/stage3/compliance-report"): "administrators only, checked in the route",
     ("GET", "/api/v1/reports/catalog"): "read-only list of report types",
+    # "report" in "reportability": reads open to every member, like the complaint list; no export, no file.
+    ("GET", "/api/v1/complaints/reportability"): "read-only reportability watch of the organization's complaints",
+    ("GET", "/api/v1/complaints/reportability-settings"): "read-only reporting windows of the organization",
     ("POST", "/api/v1/ask/"): "AI permission checked in the route (Ask resolves its own session)",
     ("GET", "/api/v1/stage3/reports/jobs/{job_id}"): "read-only job status; the download is guarded",
     ("GET", "/api/v1/trial/templates/{entity}.csv"): "blank CSV template, no customer data",
@@ -50,6 +53,23 @@ EXEMPT = {
     ("POST", "/api/v1/public/demo-requests"): "public website form; stores contact details only, rate limited",
     ("POST", "/api/v1/trial/feedback"): "the trial user's own feedback; trial workspaces only, checked in the route",
     ("POST", "/api/v1/trial/feedback/{feedback_id}/withdraw-consent"): "the user's own feedback only",
+    (
+        "POST",
+        "/api/v1/trial/demo-request",
+    ): "the trial user's own demo request; trial workspaces only, checked in the route",
+    (
+        "POST",
+        "/api/v1/trial/exit-request",
+    ): "the owner's own request to end the trial; owner only, checked in the route",
+    ("POST", "/api/v1/trial/exit-request/withdraw"): "the owner's own request; owner only, checked in the route",
+    (
+        "PUT",
+        "/api/v1/trial/focus",
+    ): "what the trial organization was cited for; trial workspaces only, checked in the route",
+    (
+        "POST",
+        "/api/v1/trial/sample-data/removal",
+    ): "the trial's own sample data; the trial owner only, checked in the route",
     ("POST", "/api/v1/client-errors"): "public by design: the browser's error boundary reports from the sign-in page "
     "and after a session ended; stores no business data, body capped, rate limited per address",
     (

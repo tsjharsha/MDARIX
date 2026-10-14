@@ -6,6 +6,7 @@ import { refusalOf, scopeLabel } from "./refusal";
 import { StatementKind } from "../shared/StatementKind";
 import { answerOriginText, hasStructuredContent, structuredOf } from "./structuredModel";
 import { StructuredAnswerView } from "./StructuredAnswer";
+import { TrustBadge } from "../workspace/sections/TrustBadge";
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -169,6 +170,8 @@ function AskAnswer({ result }: { result: any }) {
           ) : structured?.aiUsed === true ? (
             <StatementKind kind="AI_INTERPRETATION" origin="AI" />
           ) : null}
+          {/* The automatic trust check of a model-written answer (sources, wording, provenance). */}
+          {response.trust?.author === "AI" && <TrustBadge trust={response.trust} />}
         </div>
       </header>
 

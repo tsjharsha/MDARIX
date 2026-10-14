@@ -63,6 +63,8 @@ import {
   type SignalSummary,
 } from "../signals";
 import { StatusBadge, countOf } from "./common";
+import { SignalInsightPanel } from "./SignalInsight";
+import { oneClickQuestion, openCasePath } from "../signalAi";
 
 /** The status of a signal, as a badge with its label (never colour alone). */
 export function SignalStatusBadge({ signal }: { signal: Pick<SignalSummary, "status" | "status_label"> }) {
@@ -169,6 +171,7 @@ function SignalBody({
   const [mode, setMode] = useState<ActionMode | null>(null);
   const [starting, setStarting] = useState(false);
   const [created, setCreated] = useState<CreatedCase | null>(null);
+  const [opening, setOpening] = useState(false);
   const actions = signal.actions ?? {};
   const name = safeText(signal.business_id) ?? "The signal";
   const reference = (item: SignalRef) => safeText(item.business_id) ?? String(item.id);
@@ -188,6 +191,34 @@ function SignalBody({
       notify(errorText(reason, "Triage could not be started."), "critical");
     } finally {
       setStarting(false);
+    }
+  };
+
+  // One click from the signal to its case: the triage decision (when still due) and the case, with every complaint,
+  // for the person clicking; then straight to the case page, where the AI analysis starts by itself.
+  const openCaseNow = async () => {
+    setOpening(true);
+    try {
+      const result = await send<{ investigation: CreatedCase; triaged?: boolean }>(
+        openCasePath(String(signal.id)),
+        "POST",
+        {
+          investigation_question: oneClickQuestion(defaultInvestigationQuestion(signal), signal),
+        },
+      );
+      const kase = result?.investigation;
+      notify(
+        `${safeText(kase?.business_id) ?? "The case"} was opened for ${name}${result?.triaged ? " and the signal triaged as needing an investigation" : ""}.`,
+      );
+      if (kase?.id && casesAllowed) openCase(kase);
+      else {
+        if (kase) setCreated(kase);
+        reload();
+      }
+    } catch (reason) {
+      notify(errorText(reason, "The case could not be opened."), "critical");
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -216,7 +247,7 @@ function SignalBody({
     actions.can_disposition ||
     actions.can_merge ||
     actions.can_add_complaints ||
-    (actions.can_create_investigation && canCreateCase);
+    ((actions.can_create_investigation || actions.can_open_case) && canCreateCase);
 
   return (
     <div className="uw-signal">
@@ -272,6 +303,7 @@ function SignalBody({
       </dl>
 
       {safeText(signal.description) && <p className="uw-signal-text">{signal.description}</p>}
+      <SignalInsightPanel signalId={String(signal.id)} />
       {safeText(signal.priority_reason) && (
         <p className="ac-muted">
           <strong>Why this priority:</strong> {signal.priority_reason}
@@ -297,6 +329,11 @@ function SignalBody({
       <section className="ca-drawer-section" aria-label="Triage actions">
         <h3>Triage</h3>
         <div className="ca-action-row">
+          {actions.can_open_case && canCreateCase && (
+            <button type="button" className="ac-primary" disabled={opening} onClick={() => void openCaseNow()}>
+              <FileSearch size={16} aria-hidden="true" /> {opening ? "Opening the case…" : "Open case"}
+            </button>
+          )}
           {actions.can_start && (
             <button type="button" className="ac-primary" disabled={starting} onClick={() => void start()}>
               {starting ? "Starting…" : "Start triage"}
@@ -323,8 +360,8 @@ function SignalBody({
             </button>
           )}
           {actions.can_create_investigation && canCreateCase && (
-            <button type="button" className="ac-primary" onClick={() => setMode("investigation")}>
-              Create investigation
+            <button type="button" className="ac-secondary" onClick={() => setMode("investigation")}>
+              {actions.can_open_case ? "Open case with options…" : "Create investigation"}
             </button>
           )}
           {!anyAction && <p className="ac-muted">Nothing for you to do on this signal right now.</p>}

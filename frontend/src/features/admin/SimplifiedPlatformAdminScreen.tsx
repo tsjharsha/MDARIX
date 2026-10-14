@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useMemo, useState } from "react";
+import { PARKED_ADMIN_FALLBACK, adminAreasFor, featureSetOf } from "../../app/featureSet";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
@@ -20,7 +21,7 @@ import { SECTIONS as CUSTOMER_TENANT_SECTIONS, type Section as CustomerTenantSec
 import "./console/admin-console.css";
 
 type Props = {
-  securityContext: { display_name: string; active_role: string | null } | null;
+  securityContext: { display_name: string; active_role: string | null; feature_set?: string } | null;
   initialSection?: string;
 };
 
@@ -32,9 +33,11 @@ const CUSTOMERS_AND_TENANTS = "Customers & Tenants";
 /** The initial section that opens the new-customer wizard (App.tsx, the former create-customer screen). */
 const NEW_CUSTOMER = "New customer";
 // "Platform Overview" is replaced by the dashboard below; every other domain keeps its real workspaces.
-const SECTIONS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
+const ALL_AREAS = DOMAINS.filter((domain) => domain[0] !== "Platform Overview");
+type Area = (typeof ALL_AREAS)[number];
 
-function locationFor(target: OverviewTarget | string): Location {
+/** Where a target opens among the areas this feature set offers (a parked area opens the dashboard). */
+function locationFor(target: OverviewTarget | string, SECTIONS: readonly Area[]): Location {
   // A string is a domain, or "Domain:Section" for a deep link.
   const [requestedDomain, deepItem] =
     typeof target === "string" ? (target.split(":", 2) as [string, string | undefined]) : [target.domain, target.item];
@@ -44,17 +47,22 @@ function locationFor(target: OverviewTarget | string): Location {
   if (!domain) return { domain: OVERVIEW, item: OVERVIEW };
   const items = domain[3] as readonly string[];
   // Old section names (bookmarks, links from other screens) land on the section that replaced them.
-  const requested = deepItem && !items.includes(deepItem) ? LEGACY_SECTIONS[deepItem] : deepItem;
+  // A section the MVP parks opens the one that replaces it (renewals: subscriptions), else the area's first.
+  const requested =
+    deepItem && !items.includes(deepItem) ? (LEGACY_SECTIONS[deepItem] ?? PARKED_ADMIN_FALLBACK[deepItem]) : deepItem;
   return { domain: domain[0], item: requested && items.includes(requested) ? requested : items[0] };
 }
 
 export function SimplifiedPlatformAdminScreen({ securityContext, initialSection = OVERVIEW }: Props) {
+  // Under the MVP feature set some areas and sections are parked (app/featureSet.ts adminAreasFor).
+  const featureSet = featureSetOf(securityContext?.feature_set);
+  const SECTIONS = useMemo(() => adminAreasFor(ALL_AREAS, featureSet), [featureSet]);
   const [location, setLocation] = useState<Location>(() =>
     initialSection === NEW_CUSTOMER
-      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" })
+      ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" }, SECTIONS)
       : (CUSTOMER_TENANT_SECTIONS as readonly string[]).includes(initialSection)
-        ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection })
-        : locationFor(initialSection),
+        ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: initialSection }, SECTIONS)
+        : locationFor(initialSection, SECTIONS),
   );
   // "New customer" (the dashboard button, or the former create-customer screen) opens the wizard on Customers.
   const [createCustomer, setCreateCustomer] = useState(initialSection === NEW_CUSTOMER);
@@ -73,10 +81,10 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
     )
       .filter(({ domain, description, item }) => `${domain} ${description} ${item}`.toLowerCase().includes(term))
       .slice(0, 8);
-  }, [query]);
+  }, [query, SECTIONS]);
 
   const open = (target: OverviewTarget | string) => {
-    setLocation(locationFor(target));
+    setLocation(locationFor(target, SECTIONS));
     setMenuOpen(false);
     setQuery("");
     setMessage(null);
@@ -227,6 +235,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                     open({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" });
                   }}
                   onUpdated={setUpdatedAt}
+                  integrations={SECTIONS.some((area) => area[0] === "Data & Integrations")}
                 />
               </SectionErrorBoundary>
               <section className="ac-areas" aria-label="Administration areas">

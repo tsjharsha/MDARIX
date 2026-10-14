@@ -1,5 +1,5 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief) and md33 (the human decision).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot) and md44 (email preferences, trial demo requests).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -109,6 +109,49 @@ STEPS = (
         "apply_decision_changes",
         ("decision_follow_ups", "impact_assessments"),
         ("tenants", "investigations", "decisions", "business_id_counters"),
+    ),
+    Step(
+        "md40",
+        "md40_complaint_review.py",
+        "create_complaint_review_tables",
+        ("complaint_settings", "complaint_second_looks"),
+        ("tenants", "complaints"),
+    ),
+    Step(
+        "md41",
+        "md41_reporting_and_capa.py",
+        "create_reporting_and_capa_tables",
+        ("reportability_settings", "complaint_reportability", "capa_effectiveness_checks"),
+        ("tenants", "complaints", "capas"),
+    ),
+    Step(
+        "md42",
+        "md42_case_ai_run.py",
+        "create_case_ai_run_table",
+        ("case_ai_runs",),
+        ("tenants", "investigations"),
+    ),
+    Step(
+        "md43",
+        "md43_lot_quantity.py",
+        "add_lot_quantity",
+        (),
+        ("lot_batches",),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'lot_batches' AND column_name = 'quantity')"
+        ),
+    ),
+    Step(
+        "md44",
+        "md44_digest_and_demo_requests.py",
+        "add_digest_and_demo_columns",
+        (),
+        ("auth_users", "demo_requests"),
+        done_sql=(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
+            "AND table_name = 'demo_requests' AND column_name = 'trial_tenant_id')"
+        ),
     ),
 )
 

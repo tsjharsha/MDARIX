@@ -22,7 +22,16 @@ from sqlalchemy.orm import Session
 from backend.app.access.authz import _require_platform_admin
 from backend.app.db.data_plane import get_data_plane_db, open_tenant_data_session
 from retrieval.record_evidence import embed_tenant_evidence
-from backend.app.db.models.foundation import AuditEvent, AuthUser, Complaint, LotBatch, Product
+from backend.app.db.models.foundation import (
+    AuditEvent,
+    AuthUser,
+    Capa,
+    Complaint,
+    Investigation,
+    LotBatch,
+    Product,
+    Risk,
+)
 from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
@@ -72,7 +81,14 @@ def list_trial_requests(request: Request, db: Session = Depends(get_db)):
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
 def approve_trial_request(request_id: uuid.UUID, request: Request, db: Session = Depends(get_db)):
     admin = _require_platform_admin(request, db)
-    return approve_request(db, request_id, admin)
+    approved = approve_request(db, request_id, admin)
+    # The sample's signals now, rather than at the scheduler's next run: the count rule over the sample complaints, in
+    # a session of its own (a failure is logged and never fails the approval, which is committed).
+    if approved.get("tenant_id"):
+        from backend.app.signals.hooks import seed_demo_signals
+
+        seed_demo_signals(db, uuid.UUID(str(approved["tenant_id"])))
+    return approved
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/decline")
@@ -135,7 +151,15 @@ def trial_status(
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": imports.uploaded_rows(data, tenant_id)},
-        "sample": {"products": _count(data, Product, tenant_id, SAMPLE_SOURCE)},
+        # The sample dataset's records (Getting started explains what each part is for).
+        "sample": {
+            "products": _count(data, Product, tenant_id, SAMPLE_SOURCE),
+            "lots": _count(data, LotBatch, tenant_id, SAMPLE_SOURCE),
+            "complaints": _count(data, Complaint, tenant_id, SAMPLE_SOURCE),
+            "investigations": _count(data, Investigation, tenant_id, SAMPLE_SOURCE),
+            "capas": _count(data, Capa, tenant_id, SAMPLE_SOURCE),
+            "risks": _count(data, Risk, tenant_id, SAMPLE_SOURCE),
+        },
         "own_data": {
             "products": _count(data, Product, tenant_id, imports.UPLOAD_SOURCE),
             "lots": _count(data, LotBatch, tenant_id, imports.UPLOAD_SOURCE),
@@ -147,6 +171,7 @@ def trial_status(
                 "title": spec["title"],
                 "required": spec["required"],
                 "optional": spec["optional"],
+                "help": imports.column_help(entity),
                 "download": f"/api/v1/trial/templates/{entity}.csv",
             }
             for entity, spec in imports.TEMPLATES.items()
@@ -270,6 +295,487 @@ def trial_insights(
 ):
     _require_trial(db, ctx)
     return imports.insights(data, uuid.UUID(str(ctx.tenant_id)))
+
+
+@router.get("/trial/story")
+def trial_story_chapters(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it."""
+    from backend.app.ai_settings import ai_ready
+    from backend.app.trial import citations, story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    request = team.trial_request(db, tenant_id)
+    profile = request.profile if request else None
+    cited = citations.chapters_for((profile or {}).get("citations"))
+    return story.story(
+        data, tenant_id, ai_ready=ai_ready(db, tenant_id), cited=tuple(cited), tried_before=story.remembered(profile)
+    )
+
+
+class SampleRemoval(BaseModel):
+    confirm: bool = False
+
+
+@router.get("/trial/sample-data/removal")
+def sample_removal_preview(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """What removing the sample data would delete (backend/app/trial/sample_removal.py), and whether the viewer may
+    do it (the person who started the trial)."""
+    from backend.app.trial import sample_removal
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {
+        **sample_removal.preview(data, tenant_id),
+        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+    }
+
+
+@router.post("/trial/sample-data/removal")
+def remove_sample_data(
+    payload: SampleRemoval,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Remove the sample data and everything done with it; the organization's own data stays and the chapters
+    already tried stay counted. The trial owner only, after confirming; audited as TRIAL_SAMPLE_REMOVED."""
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import sample_removal, story
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    if not team.is_trial_owner(db, tenant_id, user):
+        raise HTTPException(
+            403, detail={"code": "TRIAL_OWNER_ONLY", "message": "Only the person who started the trial can remove it"}
+        )
+    if not payload.confirm:
+        raise HTTPException(422, detail={"code": "CONFIRMATION_REQUIRED", "message": "Confirm the removal first"})
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
+    before = story.progress(data, tenant_id, story.remembered(request.profile))
+    try:
+        result = sample_removal.remove(data, tenant_id, before["acted"])
+    except RuntimeError as exc:
+        raise HTTPException(
+            409,
+            detail={
+                "code": "SAMPLE_REMOVAL_INCOMPLETE",
+                "message": "The sample data could not be removed; nothing was changed",
+            },
+        ) from exc
+    data.commit()
+    request.profile = {**(request.profile or {}), story.REMEMBERED: before["acted"]}
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(user.id),
+            action="TRIAL_SAMPLE_REMOVED",
+            entity_type="Tenant",
+            entity_id=tenant_id,
+            details={"deleted": result["deleted"], "chapters_kept": before["acted"]},
+            correlation_id=ctx.correlation_id,
+        )
+    )
+    db.commit()
+    return {"status": "SAMPLE_REMOVED", "deleted": result["deleted"], "chapters_kept": before["acted"]}
+
+
+class TrialFocus(BaseModel):
+    """What the organization was cited for (backend/app/trial/citations.py codes)."""
+
+    citations: list[str] = Field(default_factory=list, max_length=20)
+
+
+@router.get("/trial/focus")
+def trial_focus(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    """The themes offered, and those the organization said it was cited for."""
+    from backend.app.trial import citations
+
+    _require_trial(db, ctx)
+    request = team.trial_request(db, uuid.UUID(str(ctx.tenant_id)))
+    chosen = citations.clean((request.profile or {}).get("citations") if request else ())
+    return {"citations": chosen, "options": citations.options()}
+
+
+@router.put("/trial/focus")
+def set_trial_focus(
+    payload: TrialFocus,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """Record what the organization was cited for: the story marks those chapters and starts with them. Any person
+    of the trial may set it; audited."""
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import citations
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    unknown = [code for code in payload.citations if code not in citations.CITATIONS]
+    if unknown:
+        raise HTTPException(422, detail={"code": "TRIAL_FOCUS_UNKNOWN", "message": "Choose from the listed themes"})
+    request = team.trial_request(db, tenant_id)
+    if request is None:
+        raise HTTPException(
+            404, detail={"code": "NOT_A_TRIAL_WORKSPACE", "message": "This workspace is not on the free trial"}
+        )
+    chosen = citations.clean(payload.citations)
+    request.profile = {**(request.profile or {}), "citations": chosen}
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(_current_user(db, ctx).id),
+            action="TRIAL_FOCUS_SET",
+            entity_type="OnboardingRequest",
+            entity_id=request.id,
+            details={"citations": chosen},
+            correlation_id=ctx.correlation_id,
+        )
+    )
+    db.commit()
+    return {"citations": chosen, "options": citations.options()}
+
+
+class TrialDemoRequest(BaseModel):
+    """A one-to-one demo booked from inside the trial: when suits, what to focus on, anything else."""
+
+    preferred_time: str | None = Field(default=None, max_length=200)
+    phone: str | None = Field(default=None, max_length=30)
+    focus: list[str] = Field(default_factory=list, max_length=9)
+    note: str | None = Field(default=None, max_length=1000)
+
+
+DEMO_REPEAT_DAYS = 14
+
+
+def _demo_view(row) -> dict | None:
+    if row is None:
+        return None
+    return {
+        "id": str(row.id),
+        "business_id": row.business_id,
+        "status": row.status,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "preferred_time": row.preferred_time,
+    }
+
+
+def _latest_trial_demo(db: Session, tenant_id: uuid.UUID):
+    from backend.app.db.models.stage2 import DemoRequest
+
+    return (
+        db.query(DemoRequest)
+        .filter(DemoRequest.trial_tenant_id == tenant_id, DemoRequest.source == "TRIAL")
+        .order_by(DemoRequest.created_at.desc())
+        .first()
+    )
+
+
+@router.get("/trial/demo-request")
+def trial_demo_request_status(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    """The trial's latest one-to-one demo request, or null."""
+    _require_trial(db, ctx)
+    return {"request": _demo_view(_latest_trial_demo(db, uuid.UUID(str(ctx.tenant_id))))}
+
+
+@router.post("/trial/demo-request")
+def book_trial_demo(
+    payload: TrialDemoRequest,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Book a one-to-one demo from inside the trial. The MDARIX team gets it in Platform Admin (Onboarding, marked as
+    from a trial, with the organization and how far into the story it went) and by email. One open request per trial
+    at a time: asking again within 14 days while it is open returns that request."""
+    import os
+    import re
+
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.models.stage2 import DemoRequest
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.trial import story
+
+    subscription = _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    now = datetime.now(timezone.utc)
+    latest = _latest_trial_demo(db, tenant_id)
+    if latest is not None and latest.status == "NEW" and latest.created_at >= now - timedelta(days=DEMO_REPEAT_DAYS):
+        return {"status": "ALREADY_REQUESTED", "request": _demo_view(latest)}
+    phone = " ".join((payload.phone or "").split())
+    if phone and (not re.fullmatch(r"\+?[0-9 ()\-.]{7,30}", phone) or len(re.sub(r"\D", "", phone)) < 7):
+        raise HTTPException(
+            422, detail={"code": "DEMO_REQUEST_INVALID", "field": "phone", "message": "Enter a valid phone number"}
+        )
+    titles = {code: title for code, title, *_ in story.CHAPTERS}
+    focus = [titles[code] for code in dict.fromkeys(payload.focus) if code in titles]
+    request_row = team.trial_request(db, tenant_id)
+    reached = story.progress(data, tenant_id, story.remembered(request_row.profile if request_row else None))
+    tenant = db.get(Tenant, tenant_id)
+    organization = (tenant.name if tenant else None) or user.company or "Trial organization"
+    seconds_left = (subscription.expires_at - now).total_seconds()
+    context = {
+        "chapters_tried": reached["acted_count"],
+        "chapters_total": reached["total"],
+        "acted": reached["acted"],
+        "own_data": bool(reached["counts"].get("YOUR_DATA")),
+        "days_left": max(0, int(-(-seconds_left // 86400))),
+        "focus": focus,
+    }
+    row = DemoRequest(
+        id=uuid.uuid4(),
+        display_name=(user.display_name or user.username)[:120],
+        email=user.username,
+        phone=phone,
+        status="NEW",
+        source="TRIAL",
+        trial_tenant_id=tenant_id,
+        organization=organization[:160],
+        preferred_time=" ".join((payload.preferred_time or "").split())[:200] or None,
+        note=" ".join((payload.note or "").split())[:1000] or None,
+        context=context,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(user.id),
+            action="TRIAL_DEMO_REQUESTED",
+            entity_type="DemoRequest",
+            entity_id=row.id,
+            correlation_id=ctx.correlation_id,
+            details={"chapters_tried": reached["acted_count"], "focus": focus},
+            created_at=now,
+        )
+    )
+    db.commit()
+    db.refresh(row)
+    recipient = (os.getenv("MDARIX_DEMO_ALERT_EMAIL") or os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
+    if recipient:
+        background.add_task(
+            _alert_trial_demo,
+            recipient,
+            {
+                "display_name": row.display_name,
+                "email": row.email,
+                "organization": organization,
+                "phone": phone,
+                "preferred_time": row.preferred_time or "",
+                "progress": f"{reached['acted_count']} of {reached['total']} story chapters tried, "
+                f"{context['days_left']} days left" + (", own data uploaded" if context["own_data"] else ""),
+                "focus": tuple(focus),
+                "note": row.note or "",
+            },
+        )
+    return {"status": "DEMO_REQUESTED", "request": _demo_view(row)}
+
+
+def _alert_trial_demo(recipient: str, details: dict) -> None:
+    """Email the MDARIX team after the response; a failure is only logged (the request is saved)."""
+    import logging
+
+    from auth.emailer import send_trial_demo_request_alert
+
+    try:
+        send_trial_demo_request_alert(recipient, **details)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial demo request alert failed: %s", type(exc).__name__)
+
+
+# ------------------------------------------------------------------------------------------- Ending a trial early
+
+
+class TrialExitAsk(BaseModel):
+    """The owner's request to end the trial early: why (optional) and whether to delete the data."""
+
+    reason_code: str | None = Field(default=None, max_length=40)
+    reason: str | None = Field(default=None, max_length=1000)
+    delete_data: bool = True
+
+
+class TrialExitApproval(BaseModel):
+    delete_data: bool = True
+    note: str | None = Field(default=None, max_length=500)
+
+
+class TrialExitDecline(BaseModel):
+    note: str = Field(default="", max_length=500)
+
+
+def _send_quietly(send, *args, **kwargs) -> None:
+    """Send an email after the response; a failure is only logged (the decision is saved)."""
+    import logging
+
+    try:
+        send(*args, **kwargs)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial early-end email failed: %s", type(exc).__name__)
+
+
+@router.get("/trial/exit-request")
+def trial_exit_request_status(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    """The trial's latest request to end early, whether the viewer may ask (the owner), and the reasons offered."""
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {
+        "request": early_exit.view(early_exit.latest(db, tenant_id)),
+        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+        "reasons": early_exit.EXIT_REASONS,
+    }
+
+
+@router.post("/trial/exit-request")
+def ask_to_end_trial(
+    payload: TrialExitAsk,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner asks to end the trial early. The MDARIX team approves or declines it in Platform Admin
+    (Customers & Tenants > Trials) and is told by email. A pending request is returned unchanged."""
+    import os
+
+    from auth.emailer import send_trial_exit_request_alert
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    row, created = early_exit.request_exit(
+        db,
+        tenant_id,
+        user,
+        reason_code=payload.reason_code,
+        reason=payload.reason,
+        delete_data=payload.delete_data,
+    )
+    recipient = (os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
+    if created and recipient:
+        label = early_exit.EXIT_REASONS.get(row.reason_code or "")
+        why = "; ".join(part for part in (label, row.reason) if part)
+        background.add_task(
+            _send_quietly,
+            send_trial_exit_request_alert,
+            recipient,
+            organization=row.organization,
+            requested_by=f"{user.display_name or user.username} ({user.username})",
+            reason=why,
+            delete_data=row.delete_data,
+            days_left=early_exit.days_left(db, tenant_id),
+        )
+    return {"status": "REQUESTED" if created else "ALREADY_REQUESTED", "request": early_exit.view(row)}
+
+
+@router.post("/trial/exit-request/withdraw")
+def withdraw_trial_exit(ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)):
+    """The owner withdraws a pending request; the trial continues."""
+    from backend.app.trial import early_exit
+
+    _require_trial(db, ctx)
+    row = early_exit.withdraw(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx))
+    return {"status": row.status, "request": early_exit.view(row)}
+
+
+@router.get("/platform-admin/trial-exit-requests")
+def list_trial_exit_requests(request: Request, db: Session = Depends(get_db)):
+    from backend.app.trial import early_exit
+
+    _require_platform_admin(request, db)
+    items = early_exit.overview(db)
+    return {"items": items, "pending": sum(1 for item in items if item["status"] == "PENDING")}
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/approve")
+def approve_trial_exit(
+    request_id: uuid.UUID,
+    payload: TrialExitApproval,
+    background: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """End the trial now and, with ``delete_data``, delete its data at once. The owner is emailed and asked why."""
+    from auth.emailer import send_trial_ended_early
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.approve(db, request_id, admin, delete_data=payload.delete_data, note=payload.note)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_ended_early, notify["recipient"], notify["organization"], data_deleted=True
+        )
+    return outcome
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/delete-data")
+def delete_ended_trial_data(
+    request_id: uuid.UUID, background: BackgroundTasks, request: Request, db: Session = Depends(get_db)
+):
+    """Delete the data of a trial ended early whose data was kept, now rather than after 30 days."""
+    from auth.emailer import send_trial_ended_early
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.delete_data_now(db, request_id, admin)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_ended_early, notify["recipient"], notify["organization"], data_deleted=True
+        )
+    return outcome
+
+
+@router.post("/platform-admin/trial-exit-requests/{request_id}/decline")
+def decline_trial_exit(
+    request_id: uuid.UUID,
+    payload: TrialExitDecline,
+    background: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Keep the trial running; the note is emailed to the owner and shown in Getting started."""
+    from auth.emailer import send_trial_exit_declined
+    from backend.app.trial import early_exit
+
+    admin = _require_platform_admin(request, db)
+    outcome = early_exit.decline(db, request_id, admin, note=payload.note)
+    notify = outcome.pop("notify", None)
+    if notify:
+        background.add_task(
+            _send_quietly, send_trial_exit_declined, notify["recipient"], notify["organization"], note=notify["note"]
+        )
+    return outcome
+
+
+@router.get("/platform-admin/trials")
+def platform_trial_overview(request: Request, db: Session = Depends(get_db)):
+    """Every free trial still holding data: dates, usage, how far into the story it went, and its feedback."""
+    from backend.app.trial import story
+
+    _require_platform_admin(request, db)
+    return story.trial_overview(db)
 
 
 # ------------------------------------------------------------------------------------------- Trial team

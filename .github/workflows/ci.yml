@@ -4,10 +4,13 @@ on:
   push:
     branches: [main]
   pull_request:
-  # Weekly: the dependency audits, secret scan and image scans run again, so an advisory published after a merge is
-  # noticed without waiting for the next change. Only the security and image-scan jobs run on this schedule.
+  # Nightly: the full suite. A pull request runs the fast checks (backend, frontend, security, image scan, production
+  # compose and stack, the desktop browser profile); the heavy ones (dedicated data planes, data-plane routing,
+  # deployment roles, container and simulator validation, the mobile browser profile) run after every merge to main,
+  # every night and on demand. The nightly run also repeats the dependency audits, secret scan and image scans, so an
+  # advisory published after a merge is noticed without waiting for the next change.
   schedule:
-    - cron: '41 4 * * 1'
+    - cron: '41 2 * * *'
 permissions:
   contents: read
 concurrency:
@@ -17,7 +20,6 @@ concurrency:
 jobs:
   ai-golden-qualification:
     name: AI golden dataset qualification
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -39,7 +41,6 @@ jobs:
           path: artifacts/ai-golden-dataset-qualification.json
           if-no-files-found: error
   backend:
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -105,7 +106,8 @@ jobs:
         run: docker compose config --quiet
   dedicated-plane:
     name: Dedicated data plane
-    if: github.event_name != 'schedule'
+    # Heavy: after merges to main, nightly and on demand; not on pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -163,7 +165,8 @@ jobs:
 
   deployment-roles:
     name: Deployment roles (the same build as a cell and as the platform)
-    if: github.event_name != 'schedule'
+    # Heavy: after merges to main, nightly and on demand; not on pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -229,7 +232,8 @@ jobs:
 
   dataplane-tests:
     name: Data-plane routing (four tenant databases)
-    if: github.event_name != 'schedule'
+    # Heavy: after merges to main, nightly and on demand; not on pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -313,7 +317,6 @@ jobs:
 
   production-mode:
     name: Production mode
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -420,7 +423,6 @@ jobs:
 
   prod-compose-config:
     name: Production compose definition
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -457,7 +459,6 @@ jobs:
 
   prod-stack:
     name: Production stack (Caddy, TLS database, smoke test, scheduler, backup and restore)
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 60
     env:
@@ -493,12 +494,12 @@ jobs:
           chmod 644 "$RUNNER_TEMP/keys/backup.key"
           recipient=$(grep -o 'age1[0-9a-z]*' "$RUNNER_TEMP/keys/backup.key")
           sed -i "s/^MDARIX_BACKUP_AGE_RECIPIENT=.*/MDARIX_BACKUP_AGE_RECIPIENT=$recipient/" .env.production
-      - name: Start the stack (migrate, API, worker, scheduler, ClamAV, Caddy)
+      - name: Start the stack (migrate, API, background service, ClamAV, Caddy)
         run: |
           docker compose up --no-start
           internal_network=$(docker compose config --format json | python3 -c "import json,sys; print(json.load(sys.stdin)['networks']['internal']['name'])")
           docker network connect --alias db "$internal_network" pg
-          docker compose up -d --no-build --wait --wait-timeout 1200 api worker scheduler web
+          docker compose up -d --no-build --wait --wait-timeout 1200 api background web
           docker compose ps -a
       - name: Production checks through Caddy
         run: |
@@ -509,7 +510,7 @@ jobs:
           SSL_CERT_FILE=caddy-root.crt python scripts/production_smoke.py --front-door --base https://localhost \
             --origin https://localhost --email admin@mdarix-ci.test --token "${link#token=}"
       - name: Every due scheduled job runs once without failing
-        run: docker compose exec -T scheduler python scripts/run_scheduler.py --once
+        run: docker compose exec -T background python scripts/run_scheduler.py --once
       - name: Backup with the BYPASSRLS backup login, restored into a scratch database
         run: |
           set -o pipefail
@@ -563,7 +564,6 @@ jobs:
           docker rm -f pg 2>/dev/null || true
 
   frontend:
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_WINDOWS_RUNNER || 'windows-latest' }}
     defaults:
       run:
@@ -589,7 +589,6 @@ jobs:
 
   browser:
     name: Browser and accessibility evidence
-    if: github.event_name != 'schedule'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     needs: frontend
     env:
@@ -659,7 +658,8 @@ jobs:
           # Every screen, tab and safe button for a platform administrator and an investigator.
           E2E_DEEP_PERSONAS: e2e/personas.ci.json
           E2E_DEEP_REPORT: ../artifacts/deep-crawl.json
-        run: npm --prefix frontend run test:e2e
+        # A pull request runs the desktop profile; merges to main, the nightly run and manual runs add mobile.
+        run: npm --prefix frontend run test:e2e -- ${{ github.event_name == 'pull_request' && '--project=chromium' || '' }}
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -676,7 +676,8 @@ jobs:
 
   container-validation:
     name: Container and simulator validation
-    if: github.event_name != 'schedule'
+    # Heavy: after merges to main, nightly and on demand; not on pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -771,7 +772,8 @@ jobs:
 
   integration:
     name: Simulator and integration gates
-    if: github.event_name != 'schedule'
+    # Heavy: after merges to main, nightly and on demand; not on pull requests.
+    if: github.event_name != 'pull_request'
     runs-on: ${{ vars.CI_LINUX_RUNNER || 'ubuntu-latest' }}
     env:
       POSTGRES_USER: mdarix_app
@@ -859,25 +861,31 @@ jobs:
         integration,
         ai-golden-qualification,
       ]
-    # The weekly scheduled run only re-scans; it is not release evidence.
+    # Release evidence comes from pull requests and merges; the nightly run reports through its own jobs.
     if: always() && github.event_name != 'schedule'
     steps:
       - name: Enforce required CI jobs
         shell: bash
         run: |
+          # The heavy jobs do not run on a pull request (they run after the merge, nightly and on demand): there they
+          # may be skipped, nowhere else, and they must never fail.
+          heavy() {
+            test "$1" = success && return 0
+            test "${{ github.event_name }}" = pull_request && test "$1" = skipped
+          }
           test "${{ needs.backend.result }}" = success
-          test "${{ needs.dedicated-plane.result }}" = success
-          test "${{ needs.dataplane-tests.result }}" = success
-          test "${{ needs.deployment-roles.result }}" = success
+          heavy "${{ needs.dedicated-plane.result }}"
+          heavy "${{ needs.dataplane-tests.result }}"
+          heavy "${{ needs.deployment-roles.result }}"
           test "${{ needs.production-mode.result }}" = success
           test "${{ needs.prod-compose-config.result }}" = success
           test "${{ needs.prod-stack.result }}" = success
           test "${{ needs.image-scan.result }}" = success
           test "${{ needs.frontend.result }}" = success
           test "${{ needs.browser.result }}" = success
-          test "${{ needs.container-validation.result }}" = success
+          heavy "${{ needs.container-validation.result }}"
           test "${{ needs.security.result }}" = success
-          test "${{ needs.integration.result }}" = success
+          heavy "${{ needs.integration.result }}"
           test "${{ needs.ai-golden-qualification.result }}" = success
       - name: Publish workflow summary
         shell: bash
@@ -885,7 +893,7 @@ jobs:
           {
             echo '## MDARIX R1 CI/CD validation'
             echo '- Backend tests, migrations (with a downgrade/upgrade round trip), dependency checks, and compose validation: passed'
-            echo '- Data-plane routing against four tenant databases: passed'
+            echo '- Data-plane routing, dedicated planes, deployment roles and simulators: passed (skipped on pull requests; run after merges, nightly and on demand)'
             echo '- Production mode, production compose definition and the full production stack (smoke test, scheduler, backup and restore): passed'
             echo '- Frontend tests, audit, and production build: passed'
             echo '- Worker and simulator container builds; api, web and backup image scans: passed'

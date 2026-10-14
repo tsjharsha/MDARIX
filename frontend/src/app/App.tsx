@@ -29,6 +29,8 @@ import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministr
 import { AuthPage } from "../features/auth/AuthPage";
 import { RequestDemoPage } from "../features/auth/RequestDemoPage";
 import { PilotGuidePage } from "../features/help/PilotGuidePage";
+import { TrialGuidePage } from "../features/help/TrialGuidePage";
+import { TRIAL_GUIDE_PATH } from "../features/help/trialGuide";
 
 export function App() {
   const publicPath = window.location.pathname;
@@ -36,6 +38,7 @@ export function App() {
     return <AuthPage mode={publicPath.slice(1)} />;
   if (publicPath === "/request-demo") return <RequestDemoPage />;
   if (publicPath === "/help/pilot-guide") return <PilotGuidePage />;
+  if (publicPath === TRIAL_GUIDE_PATH) return <TrialGuidePage />;
   // The signed-in application lives under /app and /platform-admin (router.ts). Match whole path segments, so a
   // website page such as /platform is never mistaken for /platform-admin.
   if (["/app", "/platform-admin"].some((root) => publicPath === root || publicPath.startsWith(`${root}/`)))
@@ -150,6 +153,8 @@ type SecurityContext = {
   allowed_menu?: string[];
   environment?: string;
   deployment_role?: string;
+  /** full or mvp (backend/app/feature_set.py); under mvp the parked screens are not offered (featureSet.ts). */
+  feature_set?: string;
   memberships?: Array<{ tenant_id: string; tenant_key: string; tenant_name: string; is_default: boolean }>;
   current_tenant?: { tenant_id: string; tenant_name?: string };
   entitlements?: Array<{ feature_code: string; enabled: boolean; limits?: Record<string, unknown> }>;
@@ -176,7 +181,7 @@ export function PrivateApplication() {
           .trim()
           .toUpperCase();
         const current = viewFromPath(window.location.pathname);
-        const allowed = allowedViewsForRole(role, value.deployment_role);
+        const allowed = allowedViewsForRole(role, value.deployment_role, value.feature_set);
         let target: AppView = current;
         if (isPlatformAdminRole(role) && !allowed?.includes(current)) target = "admin";
         else if (isCustomerAdminRole(role)) {
@@ -226,7 +231,7 @@ export function PrivateApplication() {
   const activeRole = securityContext?.active_role?.trim().toUpperCase();
   const isPlatformAdmin = isPlatformAdminRole(activeRole);
   const isCustomerAdmin = isCustomerAdminRole(activeRole);
-  const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role);
+  const allowedViews = allowedViewsForRole(activeRole, securityContext?.deployment_role, securityContext?.feature_set);
 
   useEffect(() => {
     if (isPlatformAdmin && !allowedViews?.includes(activeView)) changeView("admin");

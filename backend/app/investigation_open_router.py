@@ -102,6 +102,7 @@ def open_case(
     priority: str | None = None,
     assigned_to_opener: bool | None = None,
     actor_role: str | None = None,
+    with_lots: bool = False,
 ) -> tuple[Investigation, Product, list]:
     """Open a case for one of the tenant's products: checks the product and the complaints (all of that product),
     the identifier (generated when none is given; refused when taken), then writes the investigation, its complaint
@@ -184,7 +185,13 @@ def open_case(
             )
         )
     case_scope.first_version(
-        db, investigation, complaint_ids=complaint_ids, actor_ref=str(actor_ref), actor_role=actor_role, now=now
+        db,
+        investigation,
+        complaint_ids=complaint_ids,
+        actor_ref=str(actor_ref),
+        actor_role=actor_role,
+        now=now,
+        with_lots=with_lots,
     )
     db.add(
         AuditEvent(

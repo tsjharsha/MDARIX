@@ -27,6 +27,7 @@ from backend.app.access.authz import _authenticated_user, _is_customer_admin, _i
 from backend.app.access.permissions import normalize_role, permissions_for_roles, role_of_user, roles_of_user
 from backend.app.cell_link import licence_state
 from backend.app.deployment_role import deployment_role
+from backend.app.feature_set import for_tenant
 from backend.app.role_codes import role_label
 from backend.app.runtime_env import environment
 
@@ -285,6 +286,9 @@ def session_context(request: Request, db: Session = Depends(get_db)):
         # MULTI, PLATFORM or CELL (backend/app/deployment_role.py): the interface shows only the screens this
         # deployment serves.
         "deployment_role": deployment_role(),
+        # full or mvp (backend/app/feature_set.py): under mvp the interface hides the parked areas; a free trial
+        # always shows the MVP.
+        "feature_set": for_tenant(db, user.tenant_id),
         # A cell's licence: VALID, GRACE, EXPIRED (read-only), SUSPENDED, or NONE outside a cell.
         "licence": licence_state(db, user.tenant_id),
     }

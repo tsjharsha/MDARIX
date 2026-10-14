@@ -23,6 +23,7 @@ from auth.service import _hash
 from backend.app.db.models.evidence_intelligence import EvidenceEntityLink
 from backend.app.db.models.foundation import (
     AIExecution,
+    AssuranceCheck,
     AssuranceResult,
     AuditEvent,
     AuthUser,
@@ -432,6 +433,12 @@ def cleanup(seed: dict) -> None:
             db.query(FailureChain).filter(FailureChain.investigation_id.in_(cases)),
             db.query(Hypothesis).filter(Hypothesis.id.in_(hypotheses)),
             db.query(Scenario).filter(Scenario.investigation_id.in_(cases)),
+            # The automatic trust check's per-check rows point at the result: they go first.
+            db.query(AssuranceCheck).filter(
+                AssuranceCheck.assurance_result_id.in_(
+                    db.query(AssuranceResult.id).filter(AssuranceResult.ai_execution_id.in_(executions))
+                )
+            ),
             db.query(AssuranceResult).filter(AssuranceResult.ai_execution_id.in_(executions)),
             db.query(AIExecution).filter(AIExecution.id.in_(executions)),
             db.query(HumanReview).filter(HumanReview.decision_id.in_(decisions)),

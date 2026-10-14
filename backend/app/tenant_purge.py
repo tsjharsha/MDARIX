@@ -494,6 +494,12 @@ def purge_tenant(
         ).rowcount
         if feedback:
             deleted["trial_feedback"] = feedback
+        # A demo booked from inside a free trial names the person who asked (md44 ``trial_tenant_id``): it goes too.
+        demos = db.execute(
+            text("DELETE FROM demo_requests WHERE trial_tenant_id = :tenant"), {"tenant": tenant_id}
+        ).rowcount
+        if demos:
+            deleted["demo_requests"] = demos
         if remaining:
             raise PurgeFailed(f"ROWS_REMAIN:{','.join(sorted(remaining))}")
         people = _pseudonymize_people(db, tenant_id, now)

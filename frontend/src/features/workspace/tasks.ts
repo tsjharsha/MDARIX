@@ -9,6 +9,7 @@ import type { WorkspaceSection } from "./workspaceContext";
 import { signalsTab } from "./signals";
 import { reviewsTab } from "./reviews";
 import { decisionTab } from "./decisionTabs";
+import { recordsTab } from "./effectiveness";
 
 export type TaskView = "assigned" | "queue" | "waiting" | "returned" | "due_soon" | "overdue" | "completed" | "created";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -240,6 +241,12 @@ export function taskDestination(
       return task.investigation
         ? { section: "Investigations", tab: "Workspace" }
         : { section: "My Work", tab: "Evidence requests" };
+  }
+  // A reporting clock due soon or overdue opens the reportability watch; a CAPA's effectiveness check opens that CAPA.
+  if (type === "REPORTABILITY_DECISION") return { section: "Complaints", tab: "Reportability" };
+  if (type === "EFFECTIVENESS_CHECK") {
+    const capa = typeof task.details?.capa_id === "string" ? task.details.capa_id : null;
+    return { section: "Records", tab: recordsTab(capa) };
   }
   switch (type) {
     case "SIGNAL_TRIAGE": {

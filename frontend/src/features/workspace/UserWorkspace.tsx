@@ -4,7 +4,9 @@ import { HelpMenu } from "../shared/HelpMenu";
 import {
   Bot,
   Briefcase,
+  BadgeCheck,
   Building2,
+  ClipboardList,
   FileSearch,
   Gavel,
   LayoutDashboard,
@@ -17,6 +19,7 @@ import {
   Search,
   Settings2,
   ShieldCheck,
+  ShieldAlert,
   Upload,
   UserRound,
   X,
@@ -40,13 +43,18 @@ import {
 import { useWorkContext } from "./useWorkContext";
 import { ContextBar } from "./ContextBar";
 import { DashboardSection } from "./sections/Dashboard";
+import { ReadinessSection } from "./sections/Readiness";
 import { ColumnScopeProvider } from "../tables/ColumnChooser";
 import { MyWorkSection } from "./sections/MyWork";
 import { ProductsSection } from "./sections/Products";
+import { ComplaintsSection } from "./sections/Complaints";
 import { SignalsSection } from "./sections/Signals";
 import { InvestigationsSection } from "./sections/Investigations";
 import { EvidenceSection } from "./sections/Evidence";
 import { DecisionsSection } from "./sections/Decisions";
+import { RecordsSection } from "./sections/Records";
+import { ChapterDone } from "./sections/ChapterDone";
+import type { StoryChapter } from "./trialStory";
 import { IntelligenceSection } from "./sections/Intelligence";
 import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
@@ -57,6 +65,13 @@ import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
 import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signals";
+import { PARKED_SECTIONS, featureSetOf, routeFor } from "../../app/featureSet";
+import {
+  addressFor,
+  isWorkspaceHistoryState,
+  locationFromAddress,
+  type WorkspaceHistoryState,
+} from "./workspaceAddress";
 
 /**
  * Each section's menu entry: `description` is the short line under its name in the menu, `guide` the one-line purpose
@@ -65,8 +80,16 @@ import { searchWithoutSignal, signalFromSearch, signalLinkStart } from "./signal
 const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string; guide: string; context: boolean }> = {
   "Getting started": {
     icon: Rocket,
-    description: "Your free trial, step by step",
-    guide: "Set up your trial one step at a time: add your data, invite your team and try a first investigation.",
+    description: "Your free trial, as a story",
+    guide:
+      "The quality loop MDARIX closes, chapter by chapter: what your records show in each, why inspectors care in 2026, and where to try it. Start with the sample data, then upload your own export.",
+    context: false,
+  },
+  Readiness: {
+    icon: ShieldAlert,
+    description: "What an inspector would find",
+    guide:
+      "What an FDA investigator or a notified-body auditor would find in your complaints, reports, trends and CAPAs today, read from your own records. Every number opens the records behind it.",
     context: false,
   },
   Dashboard: {
@@ -86,6 +109,13 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     description: "Products, versions and lots",
     guide: "One view of the selected product version: its parts, lots, suppliers, complaints and known data gaps.",
     context: true,
+  },
+  Complaints: {
+    icon: ClipboardList,
+    description: "Second look and backlog",
+    guide:
+      "Find complaints hidden as cancellations, inquiries or No Fault Found, and see which open complaints wait in no signal and no case past your target. A person decides; MDARIX never changes your records.",
+    context: false,
   },
   Signals: {
     icon: Radio,
@@ -114,6 +144,13 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     guide:
       "Review decision briefs, record and sign decisions, and verify signatures. Only people with approval authority can sign, and each signature is recorded with the exact content approved.",
     context: true,
+  },
+  Records: {
+    icon: BadgeCheck,
+    description: "CAPA checks, risk file input",
+    guide:
+      "What you hand an inspector or a management review: every CAPA's effectiveness check, planned with criteria and a date, reminded before the day, and signed with its result and the evidence seen; and whether each product's post-market data reached its risk file.",
+    context: false,
   },
   Intelligence: {
     icon: Bot,
@@ -149,11 +186,30 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
 };
 
+/** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
+const MVP_NAV: Partial<Record<WorkspaceSection, { description: string; guide: string }>> = {
+  "My Work": {
+    description: "Your tasks, approvals and requests",
+    guide:
+      "Everything waiting for you: tasks assigned to you, work your roles can pick up, decisions awaiting your signature and evidence requests.",
+  },
+  Records: {
+    description: "CAPA checks, risk file, audit trail",
+    guide:
+      "What you hand an inspector or a management review: every CAPA's effectiveness check, signed with its result and the evidence seen; whether post-market data reached the risk file; the audit trail with each case's timeline; reports; and signature verification.",
+  },
+};
+
+/** A section's menu line and purpose under this feature set. */
+const navText = (section: WorkspaceSection, mvp: boolean) => (mvp && MVP_NAV[section]) || NAV[section];
+
 /** Legacy URL views map onto the new sections, so existing links and bookmarks keep working. */
 export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   home: ["Dashboard"],
+  readiness: ["Readiness"],
   "my-work": ["My Work"],
   products: ["Products"],
+  complaints: ["Complaints"],
   signals: ["Signals"],
   story: ["Investigations", "Story"],
   persona: ["Dashboard"],
@@ -161,6 +217,7 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   investigations: ["Investigations"],
   evidence: ["Evidence"],
   decision: ["Decisions"],
+  records: ["Records"],
   assurance: ["Trust & Audit", "AI assurance"],
   audit: ["Trust & Audit", "Audit trail"],
   "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
@@ -183,15 +240,32 @@ export function UserWorkspace({
   // A link to a signal (/app/signals?signal=SIG000023) opens that signal in Signals (the case link wins over it).
   const [signalLink] = useState(() => (caseLink ? null : signalFromSearch(window.location.search)));
   const work = useWorkContext(caseLink);
+  // Under the MVP feature set a case's evidence is a step of the case page (app/featureSet.ts routeFor), and every
+  // screen has its own address (workspaceAddress.ts).
+  const featureSet = featureSetOf(session?.feature_set);
+  // The screen the address names (?section=, ?step=, ?tab=), under the MVP feature set only.
+  const [addressed] = useState(() =>
+    featureSet === "mvp"
+      ? locationFromAddress(window.location.pathname, window.location.search, VIEW_TO_SECTION, WORKSPACE_SECTIONS)
+      : null,
+  );
   const [start] = useState(() => {
     const base = VIEW_TO_SECTION[initialView ?? "home"] ?? ["Dashboard"];
-    return caseLink ? caseLinkStart(initialView, base) : signalLinkStart(initialView, base, signalLink);
+    const [section, tab] = addressed
+      ? [addressed.section, addressed.tab]
+      : caseLink
+        ? caseLinkStart(initialView, base)
+        : signalLinkStart(initialView, base, signalLink);
+    const routed = routeFor(section, tab, featureSet);
+    return [routed.section as WorkspaceSection, routed.tab] as const;
   });
   const [location, setLocation] = useState<{ section: WorkspaceSection; tab?: string; key: number }>({
     section: start[0],
     tab: start[1],
     key: 0,
   });
+  // The step the case page shows (it reports each change), for its address.
+  const [step, setStep] = useState<string | undefined>(undefined);
   const [menuOpen, setMenuOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "good" | "critical" } | null>(null);
   const [trial, setTrial] = useState<TrialStatus | null>(null);
@@ -210,28 +284,51 @@ export function UserWorkspace({
       WORKSPACE_SECTIONS.filter(
         (section) =>
           (!TRIAL_ONLY_SECTIONS.includes(section) || trial?.is_trial) &&
+          !(featureSet === "mvp" && PARKED_SECTIONS.includes(section)) &&
           sectionAllowed(section, session?.allowed_menu, session?.business_permissions),
       ),
-    [session?.allowed_menu, session?.business_permissions, trial?.is_trial],
+    [session?.allowed_menu, session?.business_permissions, trial?.is_trial, featureSet],
   );
   const open = useCallback(
     (section: WorkspaceSection, tab?: string) => {
-      setLocation((current) => ({ section, tab, key: current.key + 1 }));
+      const routed = routeFor(section, tab, featureSet);
+      setLocation((current) => ({
+        section: routed.section as WorkspaceSection,
+        tab: routed.tab,
+        key: current.key + 1,
+      }));
+      setStep(undefined);
       setMenuOpen(false);
       setMessage(null);
       window.scrollTo({ top: 0 });
     },
-    [setLocation],
+    [setLocation, featureSet],
   );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
+  // A trial's next chapter, opened from the "chapter done" banner: its screen (and its case), else Getting started.
+  const openChapter = (chapter: StoryChapter) => {
+    const section = chapter.opens.section as WorkspaceSection;
+    if (
+      chapter.code === "YOUR_DATA" ||
+      section === "Getting started" ||
+      !sectionAllowed(section, session?.allowed_menu, session?.business_permissions)
+    )
+      return open("Getting started");
+    if (chapter.case) work.setInvestigationId(chapter.case.id, chapter.case.product_id);
+    open(section, chapter.opens.tab ?? undefined);
+  };
+  const reportStep = useCallback((tab: string) => setStep(tab), []);
 
   // Once the case link is resolved it leaves the address (a reload then starts from the saved context), and a case
   // that could not be opened is said so.
   const caseLinkState = work.caseLink?.state;
   useEffect(() => {
     if (!caseLink || !caseLinkState || caseLinkState === "resolving") return;
-    const { pathname, search, hash } = window.location;
-    window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    // Under the MVP feature set the address keeps naming the case (workspaceAddress.ts), so it stays.
+    if (featureSet !== "mvp") {
+      const { pathname, search, hash } = window.location;
+      window.history.replaceState(window.history.state, "", `${pathname}${searchWithoutCase(search)}${hash}`);
+    }
     if (caseLinkState === "not-found")
       notify(`${caseLink} was not found in your organization, or your role cannot open it.`, "critical");
     else if (caseLinkState === "failed")
@@ -248,9 +345,57 @@ export function UserWorkspace({
 
   // A free-trial user starts on Getting started, unless they followed a link to a specific screen.
   useEffect(() => {
-    if (trial?.is_trial && (initialView ?? "home") === "home")
+    if (trial?.is_trial && (initialView ?? "home") === "home" && !addressed)
       setLocation((current) => (current.key === 0 ? { ...current, section: "Getting started" } : current));
   }, [trial?.is_trial]);
+
+  // Under the MVP feature set the address follows the screen: the section, and on the case page the case and its step
+  // (workspaceAddress.ts). Each move is a new history entry, so Back returns to the previous screen; the first
+  // address, and one restored by Back or Forward, replace the current entry instead.
+  const selectedCase = work.investigations.find((item) => String(item.id) === work.investigationId);
+  const caseRef = selectedCase ? (selectedCase.business_id ?? selectedCase.investigation_identifier ?? null) : null;
+  const addressSynced = useRef(false);
+  const restoring = useRef(false);
+  const caseResolving = work.caseLink?.state === "resolving";
+  useEffect(() => {
+    if (featureSet !== "mvp" || caseResolving) return;
+    const onCasePage = location.section === "Investigations";
+    const tab = onCasePage ? (step ?? location.tab) : location.tab;
+    const next = addressFor({ section: location.section, tab, caseRef: onCasePage ? caseRef : null });
+    const { pathname, search, hash } = window.location;
+    if (next !== `${pathname}${search}`) {
+      const state: WorkspaceHistoryState = {
+        mdarixWorkspace: true,
+        section: location.section,
+        tab,
+        caseId: work.investigationId || null,
+        productId: work.productId || null,
+      };
+      if (addressSynced.current && !restoring.current) window.history.pushState(state, "", `${next}${hash}`);
+      else window.history.replaceState(state, "", `${next}${hash}`);
+    }
+    addressSynced.current = true;
+    restoring.current = false;
+  }, [featureSet, caseResolving, location.key, location.section, location.tab, step, caseRef]);
+
+  // Back and Forward restore the screen and its case from what the history entry kept.
+  const workRef = useRef(work);
+  workRef.current = work;
+  useEffect(() => {
+    if (featureSet !== "mvp") return;
+    const onPopState = (event: PopStateEvent) => {
+      if (!isWorkspaceHistoryState(event.state)) return;
+      const state = event.state;
+      restoring.current = true;
+      setLocation((current) => ({ section: state.section, tab: state.tab, key: current.key + 1 }));
+      setStep(state.tab);
+      const current = workRef.current;
+      if (state.caseId && state.caseId !== current.investigationId)
+        current.setInvestigationId(state.caseId, state.productId ?? undefined);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [featureSet]);
 
   // A section the server's menu does not grant is never rendered, even from an old link.
   useEffect(() => {
@@ -258,7 +403,7 @@ export function UserWorkspace({
   }, [visibleSections, location.section]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
-  const api: WorkspaceApi = { session, work, open, notify };
+  const api: WorkspaceApi = { session, work, open, notify, reportStep };
   const { section, tab } = location;
 
   return (
@@ -330,7 +475,8 @@ export function UserWorkspace({
           <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Workspace navigation">
             <p className="ac-nav-label">Workspace</p>
             {visibleSections.map((name) => {
-              const { icon: Icon, description } = NAV[name];
+              const { icon: Icon } = NAV[name];
+              const { description } = navText(name, featureSet === "mvp");
               return (
                 <button
                   type="button"
@@ -359,13 +505,14 @@ export function UserWorkspace({
                 <h1 ref={heading} tabIndex={-1}>
                   {section}
                 </h1>
-                <p>{NAV[section].guide}</p>
+                <p>{navText(section, featureSet === "mvp").guide}</p>
               </div>
             </div>
             {NAV[section].context && <ContextBar />}
             {trial?.is_trial && section !== "Share feedback" && (
               <FeedbackPrompt onOpen={() => open("Share feedback")} />
             )}
+            {trial?.is_trial && <ChapterDone refreshKey={location.key} onOpen={openChapter} />}
             {message && (
               <div className={`ac-message tone-${message.tone}`} role="status">
                 {message.text}
@@ -379,13 +526,16 @@ export function UserWorkspace({
               <SectionErrorBoundary name={section} resetKey={location.key}>
                 <div className="ca-section">
                   {section === "Getting started" && <GettingStartedSection />}
+                  {section === "Readiness" && <ReadinessSection />}
                   {section === "Dashboard" && <DashboardSection />}
                   {section === "My Work" && <MyWorkSection tab={tab} />}
                   {section === "Products" && <ProductsSection tab={tab} />}
+                  {section === "Complaints" && <ComplaintsSection tab={tab} />}
                   {section === "Signals" && <SignalsSection tab={tab} />}
                   {section === "Investigations" && <InvestigationsSection tab={tab} />}
                   {section === "Evidence" && <EvidenceSection tab={tab} />}
                   {section === "Decisions" && <DecisionsSection tab={tab} />}
+                  {section === "Records" && <RecordsSection tab={tab} />}
                   {section === "Intelligence" && <IntelligenceSection tab={tab} />}
                   {section === "Trust & Audit" && <TrustSection tab={tab} />}
                   {section === "My Account" && <AccountSection tab={tab} />}

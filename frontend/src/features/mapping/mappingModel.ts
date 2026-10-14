@@ -38,6 +38,7 @@ const SYNONYMS: Record<string, string[]> = {
   received_date: ["received_date", "receipt_date", "awareness_date", "opened_date"],
   status: ["status", "state", "complaint_status"],
   manufacture_date: ["manufacture_date", "manufacturing_date", "production_date"],
+  quantity: ["quantity", "lot_quantity", "lot_size", "batch_size", "units", "qty"],
   product_family: ["product_family", "family", "product_line"],
   version_release_date: ["version_release_date", "release_date"],
 };

@@ -108,6 +108,8 @@ export type SignalActions = {
   can_merge?: boolean;
   can_add_complaints?: boolean;
   can_create_investigation?: boolean;
+  /** One click from the signal to its case (POST .../open-case), before or after triage. */
+  can_open_case?: boolean;
 };
 
 export type VersionSplitRow = {
@@ -204,6 +206,8 @@ export const SIGNALS_TABS = [
   "Complaint list",
   "Recent complaints",
   "Trends",
+  // Each product version against its own history (signalAi.ts): a check beside the count rule.
+  "Trend check",
   "Detection rules",
 ] as const;
 export type SignalsTab = (typeof SIGNALS_TABS)[number];

@@ -198,6 +198,9 @@ def create_interaction(
     grounded: dict | None = None
     search: dict | None = None
     reading = None
+    # The answer as shown (the model's checked text) and the records it may cite, for the trust check below.
+    shown_answer: str | None = None
+    shown_known: set[str] = set()
     ai_note: str | None = None
     reason_code: str | None = None
     try:
@@ -270,6 +273,7 @@ def create_interaction(
             answer, checked_text = raw_answer, raw_answer
         response["provider_output"] = {**result.output, "answer": answer}
         answer_check = check_answer(checked_text, known)
+        shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check
         response["search"] = {
             "status": search["status"],
@@ -336,6 +340,18 @@ def create_interaction(
         ai_note=ai_note or structured_module.AI_NOTE_UNAVAILABLE,
         reason_code=reason_code,
         temporal_mode=payload.temporal_mode,
+    )
+    # Phase 6: the automatic trust check of the answer as shown (trust_engine/auto.py), with Ask's own checks: what
+    # the reading already left out is not held against it. A records-only answer (no model) is the rules'.
+    from genai.ask import check_answer as check_shown
+    from trust_engine.auto import assess_answer
+
+    model_answered = bool(shown_answer) and provenance.get("provider") not in (None, "unavailable", "controlled")
+    response["trust"] = assess_answer(
+        check_shown(shown_answer, shown_known) if model_answered else {},
+        provider=provenance.get("provider"),
+        model=provenance.get("model"),
+        model_written=model_answered,
     )
     row = AIInteraction(
         id=uuid.uuid4(),

@@ -4,20 +4,21 @@ import { AskMdarixPage } from "../../ask/AskMdarixPage";
 import { RegulatoryCopilot } from "../../regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "../../risk/RiskTraceabilityWorkspace";
 import { ReportsPanel } from "../../reports/ReportsPanel";
-import { useWorkspace } from "../workspaceContext";
+import { useFeatureSet, useWorkspace } from "../workspaceContext";
+import { offeredTab, tabsFor } from "../../../app/featureSet";
 import { Embedded } from "./common";
 
 const TABS = ["Ask MDARIX", "Regulatory copilot", "Risk & traceability", "Reports"] as const;
 type Tab = (typeof TABS)[number];
 
 export function IntelligenceSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<Tab>(
-    (TABS as readonly string[]).includes(tab ?? "") ? (tab as Tab) : "Ask MDARIX",
-  );
+  // Under the MVP feature set the regulatory copilot and risk & traceability are parked (featureSet.ts).
+  const tabs = tabsFor("Intelligence", TABS, useFeatureSet());
+  const [active, setActive] = useState<Tab>(() => offeredTab(tab, tabs, "Ask MDARIX"));
   const { work } = useWorkspace();
   return (
     <>
-      <Tabs tabs={TABS} active={active} onChange={setActive} label="Intelligence sections">
+      <Tabs tabs={tabs} active={active} onChange={setActive} label="Intelligence sections">
         <Embedded>
           {active === "Ask MDARIX" && (
             <AskMdarixPage

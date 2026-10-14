@@ -11,6 +11,7 @@ import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
 import { SIGNALS_TABS, parseSignalsTab, type SignalsTab } from "../signals";
 import { SignalInbox } from "./SignalInbox";
 import { DetectionRules } from "./DetectionRules";
+import { TrendCheck } from "./TrendCheck";
 
 /**
  * Signals: the signal inbox (triage), the complaints behind signals, and their trends. `tab` may carry the inbox's
@@ -68,6 +69,7 @@ export function SignalsSection({ tab }: { tab?: string }) {
         )}
         {active === "Complaint list" && <ComplaintList />}
         {active === "Trends" && <Trends />}
+        {active === "Trend check" && <TrendCheck onOpenSignal={openSignal} />}
         {active === "Detection rules" && <DetectionRules onOpenSignal={openSignal} />}
       </Tabs>
     </>

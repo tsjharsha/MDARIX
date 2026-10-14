@@ -380,6 +380,12 @@ function NarrativePanel({
           <p className="ac-muted">
             The author must review and edit this text. It is not a fact, not a finding and not a decision.
           </p>
+          {draftOutOfDate(narrative) && (
+            <p className="uw-hint">
+              The case&apos;s evidence or scope changed after this draft was made. Run the AI analysis again on the case
+              page, then start a new draft.
+            </p>
+          )}
           {editable && draft && (
             <div className="ca-action-row">
               <button type="button" className="ac-secondary" onClick={() => set({ proposedConclusion: draft })}>
@@ -999,4 +1005,10 @@ function BriefCompare({ investigationId, left, right }: { investigationId: strin
       </table>
     </div>
   );
+}
+
+/** Whether the AI draft the narrative started from was made before the case's latest evidence or scope change. */
+function draftOutOfDate(narrative: unknown): boolean {
+  const source = (narrative as { ai_draft_source?: { out_of_date?: unknown } } | null | undefined)?.ai_draft_source;
+  return source?.out_of_date === true;
 }

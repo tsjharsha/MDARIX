@@ -207,6 +207,31 @@ def test_a_brief_is_drafted_only_from_an_analysis_of_the_same_point_in_time(clea
     assert other["content"]["ai_brief"] == {"author": "RULES", "fallback_reason": "ANALYSIS_FOR_ANOTHER_TIME"}
 
 
+def test_a_model_drafted_brief_is_saved_as_an_ai_result_with_its_trust_check(cleanup_ai_hypotheses):
+    from trust_engine import auto
+
+    model = FullModel()
+    _challenge(model, persist=True)  # persists the model analysis, hypotheses and challenges
+    tenant_id, investigation_id = context()
+    db = SessionLocal()
+    try:
+        brief = BriefService(model_writer=ModelBriefWriter(model)).generate(
+            db, tenant_id, investigation_id, BriefCreateRequest()
+        )
+        execution_id = brief["ai_execution_id"]
+        assert execution_id and brief["content"]["ai_brief"]["ai_execution_id"] == str(execution_id)
+        trust = auto.latest(db, tenant_id, execution_id)
+        analysis = EvidenceGroundedInvestigatorService().latest(db, tenant_id, investigation_id)
+        analysis_trust = auto.latest(db, tenant_id, analysis.analysis.ai_execution_id)
+    finally:
+        db.close()
+    assert trust["author"] == auto.AI and trust["status"] in (auto.STATUS_PASS, auto.STATUS_LIMITED), trust
+    assert "Written by groq openai/gpt-oss-120b." in [check["message"] for check in trust["checks"]]
+    # The analysis the brief was drafted from was checked as it was saved, by the same policy.
+    assert analysis_trust["author"] == auto.AI and analysis_trust["policy"] == auto.POLICY
+    assert analysis_trust["status"] != auto.NOT_CHECKED
+
+
 def test_brief_checks():
     brief, dropped = check_brief(
         {

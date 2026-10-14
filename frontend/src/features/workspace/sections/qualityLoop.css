@@ -1,0 +1,300 @@
+/* The quality loop (sections/QualityLoop.tsx): the hero picture of the closed loop, a pulse travelling it, stations
+   that need attention pulsing. Bright tones on the navy hero; every tone also has a text label in the list. */
+.ql-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(220px, 320px) minmax(0, 1fr);
+  align-items: center;
+  gap: 20px 28px;
+  margin-bottom: 16px;
+  padding: 24px;
+  overflow: hidden;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 62% 38%, rgba(8, 123, 120, 0.45), transparent 55%),
+    linear-gradient(135deg, #0d2238 0%, #183249 60%, #0d3b4a 100%);
+  color: #e6f0f7;
+}
+.ql-copy {
+  min-width: 0;
+}
+.ql-eyebrow {
+  margin: 0;
+  color: #5eead4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ql-hero h2 {
+  margin: 6px 0 8px;
+  color: #ffffff;
+  font-size: 24px;
+  line-height: 1.25;
+}
+.ql-detail {
+  margin: 0;
+  color: rgba(230, 240, 247, 0.85);
+  line-height: 1.5;
+}
+.ql-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.ql-actions .ca-field,
+.ql-actions .ac-muted {
+  color: rgba(230, 240, 247, 0.9);
+}
+.ql-actions .uw-rd-download {
+  margin: 0;
+}
+.ql-focus {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(230, 240, 247, 0.92);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.ql-focus strong {
+  color: #ffffff;
+  white-space: nowrap;
+}
+.ql-visual {
+  min-width: 0;
+}
+.ql-svg {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  overflow: visible;
+}
+.ql-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 12;
+}
+.ql-flow {
+  fill: none;
+  stroke: rgba(94, 234, 212, 0.55);
+  stroke-width: 2;
+  stroke-dasharray: 3 11;
+  animation: ql-flow 6s linear infinite;
+}
+.ql-comet {
+  fill: #e0fffb;
+  transform-box: view-box;
+  transform-origin: 160px 160px;
+  animation: ql-orbit var(--ql-seconds, 14s) linear infinite;
+  filter: drop-shadow(0 0 6px rgba(94, 234, 212, 0.9));
+}
+.ql-station {
+  color: #94a3b8;
+  animation: ql-appear 0.6s ease-out both;
+  animation-delay: calc(var(--ql-i, 0) * 80ms);
+}
+.ql-station.tone-good {
+  color: #34d399;
+}
+.ql-station.tone-warning {
+  color: #fbbf24;
+}
+.ql-station.tone-serious {
+  color: #fb923c;
+}
+.ql-station.tone-critical {
+  color: #f87171;
+}
+.ql-halo {
+  fill: currentColor;
+  opacity: 0.18;
+}
+.ql-station.is-alarm .ql-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ql-ping 2.2s ease-out infinite;
+}
+.ql-core {
+  fill: currentColor;
+  stroke: rgba(11, 29, 44, 0.65);
+  stroke-width: 2;
+}
+.ql-station.is-focus .ql-core {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+.ql-num {
+  fill: #0b1d2c;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ql-center-value {
+  fill: #ffffff;
+  font-size: 40px;
+  font-weight: 800;
+}
+.ql-center-label {
+  fill: rgba(230, 240, 247, 0.75);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ql-counter {
+  margin: 6px 0 0;
+  color: rgba(230, 240, 247, 0.75);
+  font-size: 12px;
+  text-align: center;
+}
+.ql-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ql-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto 14px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+.ql-step:hover,
+.ql-step.is-focus {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+}
+.ql-step:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 2px;
+}
+.ql-step:disabled {
+  cursor: default;
+}
+.ql-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ql-step-value {
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.ql-step-state {
+  color: rgba(230, 240, 247, 0.72);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+.ql-dot {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #94a3b8;
+  color: #0b1d2c;
+  font-size: 12px;
+  font-weight: 700;
+}
+.ql-focus .ql-dot {
+  min-width: 10px;
+  width: 10px;
+  height: 10px;
+}
+.ql-dot.tone-good {
+  background: #34d399;
+}
+.ql-dot.tone-warning {
+  background: #fbbf24;
+}
+.ql-dot.tone-serious {
+  background: #fb923c;
+}
+.ql-dot.tone-critical {
+  background: #f87171;
+}
+@keyframes ql-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ql-flow {
+  to {
+    stroke-dashoffset: -140;
+  }
+}
+@keyframes ql-ping {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.55;
+  }
+  80%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+@keyframes ql-appear {
+  from {
+    opacity: 0;
+  }
+}
+@media (max-width: 1100px) {
+  .ql-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 280px);
+  }
+  .ql-legend {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .ql-hero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 18px 16px;
+  }
+  .ql-svg {
+    max-width: 260px;
+  }
+  .ql-step {
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+  }
+  .ql-step-state {
+    grid-column: 2 / -1;
+  }
+  .ql-step svg {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ql-comet {
+    display: none;
+  }
+  .ql-flow,
+  .ql-station,
+  .ql-station .ql-halo {
+    animation: none !important;
+  }
+}

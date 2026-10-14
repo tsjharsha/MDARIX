@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import {
@@ -21,6 +21,7 @@ import { signOut } from "../shared/session";
 import { useFocusOnChange } from "../shared/focus";
 import { SessionTimeoutWarning, useIdleSignOut } from "../shared/SessionTimeout";
 import { SectionErrorBoundary } from "../../app/ErrorBoundary";
+import { PARKED_CUSTOMER_ADMIN_SECTIONS, featureSetOf } from "../../app/featureSet";
 import "../admin/console/admin-console.css";
 import "./customer-admin.css";
 import { ConsoleContext, SECTIONS, type ConsoleApi, type Section, type TenantContext } from "./context";
@@ -92,6 +93,12 @@ const NAV: Record<Section, { icon: typeof Users; description: string; purpose: s
   },
 };
 
+/** The sections this feature set offers (app/featureSet.ts): under mvp the connections and mapping are parked. */
+export function customerAdminSections(featureSet: string | null | undefined): readonly Section[] {
+  if (featureSetOf(featureSet) !== "mvp") return SECTIONS;
+  return SECTIONS.filter((name) => !PARKED_CUSTOMER_ADMIN_SECTIONS.includes(name));
+}
+
 export function CustomerAdminControlPlane({
   securityContext,
   onOpenWorkspace,
@@ -114,12 +121,23 @@ export function CustomerAdminControlPlane({
   const heading = useRef<HTMLHeadingElement>(null);
   useFocusOnChange(heading, location.key);
 
-  const open = useCallback((section: Section, tab?: string) => {
-    setLocation((current) => ({ section, tab, key: current.key + 1 }));
-    setMenuOpen(false);
-    setMessage(null);
-    window.scrollTo({ top: 0 });
-  }, []);
+  const featureSet = securityContext?.feature_set;
+  const sections = useMemo(() => customerAdminSections(featureSet), [featureSet]);
+  const open = useCallback(
+    (section: Section, tab?: string) => {
+      // A parked section (an old link, a dashboard tile) opens the dashboard instead.
+      const offered = sections.includes(section);
+      setLocation((current) => ({
+        section: offered ? section : "Dashboard",
+        tab: offered ? tab : undefined,
+        key: current.key + 1,
+      }));
+      setMenuOpen(false);
+      setMessage(null);
+      window.scrollTo({ top: 0 });
+    },
+    [sections],
+  );
   const notify = useCallback((text: string, tone: "good" | "critical" = "good") => setMessage({ text, tone }), []);
 
   // The workspace side navigation (App.tsx) can still request a section by name.
@@ -188,7 +206,7 @@ export function CustomerAdminControlPlane({
         <div className="ac-body">
           <nav className={`ac-nav ${menuOpen ? "open" : ""}`} aria-label="Customer administration navigation">
             <p className="ac-nav-label">{tenantName}</p>
-            {SECTIONS.map((name) => {
+            {sections.map((name) => {
               const { icon: Icon, description } = NAV[name];
               return (
                 <button

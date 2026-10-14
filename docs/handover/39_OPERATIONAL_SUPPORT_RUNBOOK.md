@@ -37,8 +37,8 @@ never customer records.
 | Alert | Meaning | What to do |
 |---|---|---|
 | Event dead-lettered / Dead-letter queue grew | Outbox events failed all 12 attempts (about 5 hours) | Platform Admin > Operations > Queues & jobs > "Gave up after retries": read the error, fix the cause (often SMTP), Retry. |
-| Background worker stopped / recovered | No worker heartbeat for over a minute | `docker compose ps worker`, then its logs. |
-| Scheduled job failing / recovered: `<job>` | A job failed three times in a row | `docker compose exec scheduler python scripts/run_scheduler.py --list` shows each job's last result; the scheduler log has the error. |
+| Background worker stopped / recovered | No worker heartbeat for over a minute | `docker compose ps background`, then its logs. |
+| Scheduled job failing / recovered: `<job>` | A job failed three times in a row | `docker compose exec background python scripts/run_scheduler.py --list` shows each job's last result; the scheduler log has the error. |
 | Scheduled job missed / running again: `<job>` | A job has not run within twice its interval | Is the scheduler running? Is a second instance holding the lock, or one job running very long? |
 | Trial data could not be deleted | A trial past its retention could not be purged completely; nothing was changed | Read the error (`ROWS_REMAIN:<tables>` names a table holding rows a foreign key keeps); fix and let the job retry. |
 | Audit trail integrity check failed | An organization's hash chain no longer verifies (`CHAIN_BROKEN` or `ANCHOR_CHANGED`) | SEV1: preserve the database and logs, do not change data, follow [INCIDENT_RESPONSE.md](../runbooks/INCIDENT_RESPONSE.md). |
@@ -50,7 +50,7 @@ Two failures cannot alert from inside MDARIX, so outside monitors must cover the
 | Outside monitor | Fires when | What to do |
 |---|---|---|
 | Uptime monitor on `/health/status` | `down` (503) or no answer | SEV1: [INCIDENT_RESPONSE.md](../runbooks/INCIDENT_RESPONSE.md). |
-| Dead-man's switch at `MDARIX_SCHEDULER_HEARTBEAT_URL` | No ping from the scheduler (every 5 minutes) | `docker compose ps scheduler`, then its logs. The scheduler also raises the worker and dead-letter alerts, so they are silent while it is down. |
+| Dead-man's switch at `MDARIX_SCHEDULER_HEARTBEAT_URL` | No ping from the scheduler (every 5 minutes) | `docker compose ps background`, then its logs. The scheduler also raises the worker and dead-letter alerts, so they are silent while it is down. |
 | Dead-man's switch at `MDARIX_BACKUP_HEARTBEAT_URL` (optional) | No successful backup ping | As for "Backup failed". |
 
 ## Break-glass: platform administrator lost MFA

@@ -429,3 +429,47 @@
 .ca-summary-charts[open] > summary {
   margin-bottom: 6px;
 }
+
+/* The AI release gate (sections/AiReleaseGate.tsx): the four bars before AI goes to a pilot. */
+.ca-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ca-gate-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.ca-gate-bar > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ca-gate-bar span {
+  color: var(--ac-ink-2);
+  overflow-wrap: anywhere;
+}
+.ca-gate-bar small {
+  color: var(--ac-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .ca-gate-bar {
+    grid-template-columns: auto 1fr;
+  }
+  .ca-gate-bar .ac-badge {
+    grid-column: 2;
+    justify-self: start;
+  }
+}

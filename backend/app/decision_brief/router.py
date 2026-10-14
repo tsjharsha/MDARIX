@@ -333,7 +333,29 @@ def get_decision_brief_version(
 # ------------------------------------------------------------------------------------------------- writing
 
 
-def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID]:
+def _out_of_date(db: Session, case: Investigation, made_at) -> bool:
+    """Whether the case's scope or evidence changed after the AI brief was made (then the draft may miss them)."""
+    from backend.app.db.models.foundation import InvestigationEvidence
+    from backend.app.db.models.case_scope import InvestigationScopeVersion
+
+    if made_at is None:
+        return False
+    latest_scope = (
+        db.query(func.max(InvestigationScopeVersion.created_at))
+        .filter(
+            InvestigationScopeVersion.tenant_id == case.tenant_id, InvestigationScopeVersion.investigation_id == case.id
+        )
+        .scalar()
+    )
+    latest_evidence = (
+        db.query(func.max(InvestigationEvidence.created_at))
+        .filter(InvestigationEvidence.tenant_id == case.tenant_id, InvestigationEvidence.investigation_id == case.id)
+        .scalar()
+    )
+    return any(moment is not None and moment > made_at for moment in (latest_scope, latest_evidence))
+
+
+def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID, list[str]]:
     brief = composer.latest_ai_brief(db, case)
     text = rules.ai_draft_text(brief.content if brief is not None else None)
     if brief is None or not text:
@@ -350,9 +372,13 @@ def _ai_draft(db: Session, case: Investigation) -> tuple[dict, uuid.UUID]:
                 "business_id": brief.business_id,
                 "brief_version": brief.brief_version,
                 "ai_execution_id": str(brief.ai_execution_id) if brief.ai_execution_id else None,
+                "made_at": brief.created_at.isoformat() if brief.created_at else None,
+                # The case changed after the AI brief was made: run the case AI again for a fresh draft.
+                "out_of_date": _out_of_date(db, case, brief.created_at),
             },
         },
         brief.id,
+        rules.ai_draft_actions(brief.content),
     )
 
 
@@ -380,8 +406,15 @@ def create_decision_brief(
     narrative = rules.normalize_narrative(latest.narrative if latest is not None else None)
     source_ai_brief_id = latest.source_ai_brief_id if latest is not None else None
     if payload.use_ai_draft:
-        draft, source_ai_brief_id = _ai_draft(db, case)
+        draft, source_ai_brief_id, actions = _ai_draft(db, case)
         narrative.update(draft)
+        # The brief writes itself first: the problem statement from the case's question, the recommended actions from
+        # the AI's possible next steps, each only where the author has written nothing. The proposed conclusion is
+        # always the author's own.
+        if not narrative["problem_statement"]:
+            narrative["problem_statement"] = rules.problem_statement_from(case.investigation_question)
+        if not narrative["recommended_actions"] and actions:
+            narrative["recommended_actions"] = actions
     narrative = rules.with_contributor(narrative, person.user_id)
     now = states.now_utc()
     content, state = composer.compose(db, control_db, case, now=now, ai_draft_used=narrative["ai_draft_used"])

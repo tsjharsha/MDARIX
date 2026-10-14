@@ -167,11 +167,14 @@ export function AdminOverview({
   onOpen,
   onCreateCustomer,
   onUpdated,
+  integrations = true,
 }: {
   refreshKey: number;
   onOpen: (target: OverviewTarget) => void;
   onCreateCustomer: () => void;
   onUpdated: (at: Date) => void;
+  /** False where Data & Integrations is parked (the MVP feature set): integration runs are not shown. */
+  integrations?: boolean;
 }) {
   const [range, setRange] = useState<Range>(30);
   const { sources, refreshing } = useSources(refreshKey, range);
@@ -332,7 +335,7 @@ export function AdminOverview({
       activity: busyness(rates.events, busiest),
       onOpen: () => onOpen({ domain: "Security", item: "Audit trail" }),
     },
-  ];
+  ].filter((item) => integrations || item.key !== "data");
 
   return (
     <div className={`ac-overview ac-dashboard ${refreshing && !loading ? "is-refreshing" : ""}`}>
@@ -425,16 +428,18 @@ export function AdminOverview({
           seriesLabel={`AI runs per day, last ${days} days`}
           onOpen={() => onOpen({ domain: "AI Control Center", item: "Executions" })}
         />
-        <KpiTile
-          label="Integration runs"
-          value={trendsReady ? model.runTotal : null}
-          detail={`${model.runFailed} failed · last ${days} days`}
-          tone={trendsReady ? (model.runFailed ? "critical" : "good") : undefined}
-          icon={<Plug size={18} />}
-          series={model.runs.map((point) => point.primary)}
-          seriesLabel={`Integration runs per day, last ${days} days`}
-          onOpen={() => onOpen({ domain: "Data & Integrations", item: "Runs & failures" })}
-        />
+        {integrations && (
+          <KpiTile
+            label="Integration runs"
+            value={trendsReady ? model.runTotal : null}
+            detail={`${model.runFailed} failed · last ${days} days`}
+            tone={trendsReady ? (model.runFailed ? "critical" : "good") : undefined}
+            icon={<Plug size={18} />}
+            series={model.runs.map((point) => point.primary)}
+            seriesLabel={`Integration runs per day, last ${days} days`}
+            onOpen={() => onOpen({ domain: "Data & Integrations", item: "Runs & failures" })}
+          />
+        )}
         <KpiTile
           label="Audit events"
           value={trendsReady ? model.eventTotal : null}

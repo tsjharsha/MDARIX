@@ -24,6 +24,8 @@ os.environ.setdefault("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
 # (tests/test_auth_hardening.py). Password hashing uses a lower scrypt cost so the suite stays fast; production
 # refuses a cost below 2^17.
 os.environ.setdefault("MDARIX_RATE_LIMITS_ENABLED", "false")
+# Trial requests wait for review in tests unless a test switches automatic approval on (backend/app/trial/auto_approval.py).
+os.environ.setdefault("MDARIX_TRIAL_AUTO_APPROVE", "off")
 os.environ.setdefault("MDARIX_PASSWORD_SCRYPT_LOG2_N", "14")
 # Provider rest periods stay per process in tests (test_ai_controls.py exercises the shared table itself).
 os.environ.setdefault("MDARIX_GENAI_SHARED_REST", "false")
@@ -143,6 +145,16 @@ DB_MODULES = {
     "test_workflow_tasks",
     # Phase 2: signals and triage: the triage API, detection, cases from signals and their lifecycle.
     "test_signals_triage",
+    # Lightweight MVP phase 2: the complaint second look and the backlog board (md40).
+    "test_complaint_review_api",
+    # Lightweight MVP phase 3: the reportability watch and CAPA effectiveness checks (md41).
+    "test_reporting_capa_api",
+    # Lightweight MVP phase 4: one-click case, trend check, signal summary and the case AI run (md42).
+    "test_signals_ai_api",
+    # Lightweight MVP phase 5: readiness checks and the management review summary.
+    "test_readiness_api",
+    # Post-market data and the risk file, per product.
+    "test_risk_file_api",
     # Phase 3: case workflow states, versioned scope, readiness and the investigator's own cases.
     "test_case_workflow",
     # Phase 3: case evidence (inventory, links, review, provenance) and evidence requests to colleagues and suppliers.

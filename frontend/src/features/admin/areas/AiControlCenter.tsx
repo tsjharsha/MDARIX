@@ -7,6 +7,7 @@ import { TrustEvaluation } from "../../workspace/sections/TrustEvaluation";
 import { displayCode, titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, TenantCell } from "./common";
+import { AiReleaseGate, type ReleaseGate } from "../../customer-admin/sections/AiReleaseGate";
 
 type Model = {
   provider: string;
@@ -87,6 +88,7 @@ function Overview() {
   }));
   return (
     <div className="ac-grid">
+      <ReleaseGateStatus />
       <section className="ac-stats ar-stats-4" aria-label="AI in the last 30 days">
         <StatTile
           label="Model"
@@ -292,10 +294,65 @@ function Executions() {
   );
 }
 
-type Agent = { code: string; label: string; allowed: string[]; forbidden: string[] };
+/** The AI release gate's four bars, with what to do for each open one (MDARIX staff operate the server). */
+function ReleaseGateStatus() {
+  const gate = useResource<ReleaseGate>("/api/v1/ai/release-gate");
+  return <AiReleaseGate gate={gate.data} showActions />;
+}
 
-/** The AI agents, what each may do, and what is always left to people. */
+type Agent = { code: string; label: string; allowed: string[]; forbidden: string[] };
+type TrustPolicy = {
+  policy: string;
+  applies_to: string[];
+  checks: { check: string; title: string; what: string; on_failure: "BLOCKED" | "WARNING" }[];
+  limitation: string;
+  feature_set: string;
+};
+
+/** The guardrails: the trust check every AI result gets as it is saved, and (full product only) the agent catalog. */
 function Agents() {
+  const policy = useResource<TrustPolicy>("/api/v1/ai/trust-policy");
+  return (
+    <>
+      <Panel eyebrow="Checked on every AI result" title="Automatic trust check" source={policy}>
+        {policy.data && (
+          <>
+            <p className="ar-notice" role="note">
+              <ShieldCheck size={16} aria-hidden="true" /> Every AI result is checked as it is saved, before anyone
+              reads it: {policy.data.applies_to.join("; ")}. {policy.data.limitation}
+            </p>
+            <div className="ar-cards">
+              {policy.data.checks.map((check) => (
+                <article key={check.check} className="ar-card">
+                  <header>
+                    <strong>{check.title}</strong>
+                  </header>
+                  <p>{check.what}</p>
+                  <p>
+                    {check.on_failure === "BLOCKED" ? (
+                      <span className="ar-no">
+                        <CircleSlash size={14} aria-hidden="true" /> Blocks the result when it fails
+                      </span>
+                    ) : (
+                      <span className="ar-warn">
+                        <AlertTriangle size={14} aria-hidden="true" /> Warns the reader when it fails
+                      </span>
+                    )}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <p className="ar-muted">Policy {policy.data.policy}</p>
+          </>
+        )}
+      </Panel>
+      {policy.data?.feature_set === "full" && <AgentCatalog />}
+    </>
+  );
+}
+
+/** The AI agents, what each may do, and what is always left to people (the full product only). */
+function AgentCatalog() {
   const catalog = useResource<{ agents: Agent[]; human_authority_required?: boolean }>("/api/v1/ai/agents/catalog");
   const agents = catalog.data?.agents ?? [];
   return (

@@ -9,6 +9,7 @@ import { useCan, useWorkspace } from "../workspaceContext";
 import { localDay } from "../workspaceModel";
 import { dueAtFromDay } from "../caseWorkflow";
 import { dueState, dueText } from "../tasks";
+import { clockText, watchStateOf, type Clock, type WatchState } from "../reportability";
 import {
   EMPTY_COMPLETE,
   NOTES_MAX,
@@ -773,6 +774,7 @@ function RegulatoryContextView({ context }: { context: unknown }) {
           <dd>{regulatory.earliestAwareness ? formatDate(regulatory.earliestAwareness) : "—"}</dd>
         </div>
       </dl>
+      <ReportingClocks context={context} />
       {regulatory.markets.length > 0 && (
         <div className="uw-related">
           <h4>Complaints per market</h4>
@@ -819,5 +821,55 @@ function RegulatoryContextView({ context }: { context: unknown }) {
         <Empty title="No complaints in scope" detail="The case's scope lists no complaints yet." />
       )}
     </section>
+  );
+}
+
+type ReportingClock = {
+  complaint: { id: string; business_id: string | null };
+  state: WatchState;
+  binding: Clock | null;
+  decision: "REPORTED" | "NOT_REPORTABLE" | null;
+};
+
+/** Each complaint's reporting clock against the organization's own windows (exported for its unit test). */
+export function ReportingClocks({ context }: { context: unknown }) {
+  const { open } = useWorkspace();
+  const clocks = listOf((context as { reporting_clocks?: unknown } | null)?.reporting_clocks) as ReportingClock[];
+  if (!clocks.length) return null;
+  return (
+    <div className="uw-related">
+      <h4>Reporting clocks (your organization&apos;s windows)</h4>
+      <ul className="uw-intel-list">
+        {clocks.map((item) => {
+          const state = watchStateOf(item.state);
+          return (
+            <li key={item.complaint.id}>
+              <strong>{item.complaint.business_id ?? "Complaint"}</strong>{" "}
+              <ToneBadge
+                tone={state.tone}
+                label={
+                  item.decision
+                    ? item.decision === "REPORTED"
+                      ? "Reported"
+                      : "Not reportable"
+                    : item.binding
+                      ? clockText(item.binding)
+                      : state.label
+                }
+              />
+              {item.binding && !item.decision && (
+                <small>
+                  {" "}
+                  {item.binding.window} · due {item.binding.due_date}
+                </small>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <button type="button" className="ac-link" onClick={() => open("Complaints", "Reportability")}>
+        Record decisions on the reportability watch
+      </button>
+    </div>
   );
 }

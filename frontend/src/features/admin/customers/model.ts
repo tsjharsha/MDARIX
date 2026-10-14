@@ -2,7 +2,7 @@
 
 import { describeError } from "../../../app/apiClient";
 
-export const SECTIONS = ["Customers", "Tenants", "Feedback"] as const;
+export const SECTIONS = ["Customers", "Tenants", "Trials", "Feedback"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export type CustomerAdmin = {

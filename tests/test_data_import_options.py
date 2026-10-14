@@ -161,9 +161,11 @@ def test_mask_and_skip_together_set_aside_only_the_rows_with_other_problems(inve
 
 
 def test_a_problem_of_the_file_itself_stops_everything_even_when_skipping(investigator, product):
-    body = f"complaint_id,product_id,description,notes\nC-{product}-X,{product},Alarm,extra\n"
+    # A required column is missing: no row can be imported, whatever the choice for problem rows.
+    body = f"complaint_id,product_id,notes\nC-{product}-X,{product},extra\n"
     check = investigator.post(CHECK, params={"on_problems": "skip"}, content=body).json()
     assert not check["ready"] and check["rows_to_import"] == 0 and "rejects_csv" not in check
+    assert any("'description'" in issue["message"] for issue in check["issues"])
     assert investigator.post(IMPORT, params={"on_problems": "skip"}, content=body).status_code == 422
     assert _stored([f"C-{product}-X"]) == {}
 

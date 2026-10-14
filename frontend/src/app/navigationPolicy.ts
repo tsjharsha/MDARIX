@@ -1,4 +1,5 @@
 import type { AppView } from "./router";
+import { featureSetOf, viewsForFeatureSet } from "./featureSet";
 
 export const AUTH_ENDPOINTS = {
   session: "/api/v1/auth/session",
@@ -55,8 +56,10 @@ export const PLATFORM_ADMIN_VIEWS: readonly AppView[] = [
 /** The investigation workspace an Investigator works in (UserWorkspace and the screens it opens). */
 export const WORKSPACE_VIEWS: readonly AppView[] = [
   "home",
+  "readiness",
   "my-work",
   "products",
+  "complaints",
   "signals",
   "story",
   "persona",
@@ -64,6 +67,7 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "investigations",
   "evidence",
   "decision",
+  "records",
   "assurance",
   "audit",
   "regulatory-copilot",
@@ -102,9 +106,18 @@ export function viewsForDeployment(
   return views;
 }
 
-export function allowedViewsForRole(role?: string | null, deploymentRole?: string | null): readonly AppView[] | null {
-  if (isPlatformAdminRole(role)) return viewsForDeployment(PLATFORM_ADMIN_VIEWS, deploymentRole);
-  if (isCustomerAdminRole(role)) return viewsForDeployment(CUSTOMER_ADMIN_VIEWS, deploymentRole);
+/** The views a role may open on this deployment; under the `mvp` feature set the parked views are left out
+ * (featureSet.ts). Null for business roles: their workspace filters its own sections and tabs. */
+export function allowedViewsForRole(
+  role?: string | null,
+  deploymentRole?: string | null,
+  featureSet?: string | null,
+): readonly AppView[] | null {
+  const features = featureSetOf(featureSet);
+  if (isPlatformAdminRole(role))
+    return viewsForFeatureSet(viewsForDeployment(PLATFORM_ADMIN_VIEWS, deploymentRole), features);
+  if (isCustomerAdminRole(role))
+    return viewsForFeatureSet(viewsForDeployment(CUSTOMER_ADMIN_VIEWS, deploymentRole), features);
   return null;
 }
 

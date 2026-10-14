@@ -256,9 +256,66 @@ def test_ai_status_for_the_signed_in_organization(investigator):
     body = status.json()
     assert set(body) >= {"enabled", "available", "budget", "reason_code", "message", "manual_paths"}
     assert body["reason_code"] in {None, "AI_DISABLED", "PROVIDER_UNAVAILABLE", "BUDGET_EXHAUSTED"}
-    assert (body["reason_code"] == "AI_DISABLED") == (body["enabled"] is False)
+    # The first reason that applies: no AI service on this server, then AI switched off for the organization.
+    if not body["available"]:
+        assert body["reason_code"] == "PROVIDER_UNAVAILABLE"
+    elif not body["enabled"]:
+        assert body["reason_code"] == "AI_DISABLED"
     assert body["manual_paths"]["ask"] == "record-based answers" and body["manual_paths"]["hypotheses"] is True
     budget = body["budget"]
     assert budget["remaining"] == max(0, budget["limit"] - budget["used"])
     assert body["message"]
     assert TestClient(app).get("/api/v1/ai/status").status_code == 401
+
+
+def test_every_answer_carries_its_trust_check_on_what_is_shown(monkeypatch, case, investigator):
+    """Phase 6: the automatic trust check judges the answer as shown. A statement the reading already left out (an
+    invented source) is not held against it; a shown citation of a record that does not exist blocks it."""
+    tag = case["tag"]
+
+    def checked(self, prompt, context=None, **kwargs):
+        reply = {
+            "summary": "A bench test shows the sensor reading high.",
+            "known_facts": [
+                {"statement": "The bench test found the sensor reading high.", "sources": [f"EV-{tag}-1"]},
+                {"statement": "Every pump is affected.", "sources": ["EV-NOT-GIVEN-9"]},
+            ],
+            "supporting_evidence": [],
+            "contradicting_evidence": [],
+            "unknowns": [],
+            "missing_evidence": [],
+            "limitations": [],
+            "next_steps": [],
+        }
+        return GenAIResult(
+            "anthropic", "claude-sonnet-5-5", "1", {"answer": json.dumps(reply), "limitations": []}, 10, 10, 0, 5
+        )
+
+    monkeypatch.setattr(GenAIProvider, "complete", checked)
+    body = investigator.post(
+        ASK, json={"prompt": "What do we know?", "investigation_id": case["investigation_id"]}
+    ).json()
+    trust = body["response"]["trust"]
+    assert trust["author"] == "AI" and trust["status"] == "PASS", trust
+    assert "Written by anthropic claude-sonnet-5-5." in [check["message"] for check in trust["checks"]]
+
+    def plain(self, prompt, context=None, **kwargs):
+        text = f"The bench test [EV-{tag}-1] and a service note [EV-NOT-GIVEN-9] both describe high readings."
+        return GenAIResult("anthropic", "claude-sonnet-5-5", "1", {"answer": text, "limitations": []}, 10, 10, 0, 5)
+
+    monkeypatch.setattr(GenAIProvider, "complete", plain)
+    body = investigator.post(
+        ASK, json={"prompt": "What do we know?", "investigation_id": case["investigation_id"]}
+    ).json()
+    trust = body["response"]["trust"]
+    assert trust["status"] == "BLOCKED", trust
+    grounding = next(check for check in trust["checks"] if check["check"] == "EVIDENCE_GROUNDING")
+    assert "EV-NOT-GIVEN-9" in grounding["message"]
+    stored = investigator.get(ASK).json()
+    assert next(entry for entry in stored if entry["id"] == body["interaction_id"])["response"]["trust"] == trust
+
+    _refuse(monkeypatch)
+    body = investigator.post(
+        ASK, json={"prompt": "What do we know?", "investigation_id": case["investigation_id"]}
+    ).json()
+    assert body["response"]["trust"]["author"] == "RULES" and body["response"]["trust"]["status"] == "PASS"

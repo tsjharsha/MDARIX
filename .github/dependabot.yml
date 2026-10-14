@@ -1,17 +1,22 @@
-# Weekly update proposals for every pinned dependency: Python (hashed lock requirements.txt), the frontend's npm lock,
-# base images (Dockerfile.api, Dockerfile.web, Dockerfile.worker, the backup image, the compose files) and the
-# SHA-pinned GitHub Actions.
-# Each proposal runs the full CI, including the image scans, before anyone merges it.
+# Monthly, grouped update proposals for every pinned dependency: Python (hashed lock requirements.txt), the frontend's
+# npm lock, base images (Dockerfile.api, Dockerfile.web, Dockerfile.worker, the backup image, the compose files) and
+# the SHA-pinned GitHub Actions. Security updates for a published advisory still arrive as soon as GitHub raises them,
+# and the nightly CI repeats the dependency audits and image scans.
+# Each proposal runs the pull-request checks, image scans included, before anyone merges it; the heavy checks follow
+# the merge.
 version: 2
 updates:
   - package-ecosystem: pip
     directory: /
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     open-pull-requests-limit: 5
     labels: [dependencies]
+    groups:
+      python-minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /frontend
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     open-pull-requests-limit: 5
     labels: [dependencies]
     groups:
@@ -19,20 +24,23 @@ updates:
         update-types: [minor, patch]
   - package-ecosystem: docker
     directory: /
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     labels: [dependencies]
+    groups:
+      base-images:
+        patterns: ["*"]
   # The ClamAV image pinned by digest in docker-compose.prod.yml.
   - package-ecosystem: docker-compose
     directory: /
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     labels: [dependencies]
   - package-ecosystem: docker
     directory: /infrastructure/docker/backup
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     labels: [dependencies]
   - package-ecosystem: github-actions
     directory: /
-    schedule: {interval: weekly, day: monday}
+    schedule: {interval: monthly}
     labels: [dependencies]
     groups:
       actions:

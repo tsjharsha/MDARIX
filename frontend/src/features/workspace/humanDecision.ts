@@ -403,6 +403,46 @@ export const emptyFollowUp = (): FollowUpChoice => ({
   dueDay: "",
 });
 
+/**
+ * Which follow-up actions a recommended action of the brief names, by its words (most specific first); none when no
+ * word clearly applies. The decision maker still confirms each one before signing.
+ */
+const FOLLOW_UP_WORDS: ReadonlyArray<[FollowUpAction, RegExp]> = [
+  [
+    "REGULATORY_ACTION_REQUIRED",
+    /\b(mdr|vigilance|regulator\w*|fda|notified body|competent authority|report(ing)? to)\b/i,
+  ],
+  [
+    "FIELD_ACTION_REVIEW_REQUIRED",
+    /\b(recall|field (action|safety|correction)|fsca|fsn|advisory notice|customer notification|quarantine|contain\w*)\b/i,
+  ],
+  ["RISK_REASSESSMENT_REQUIRED", /\b(risk (file|assessment|analysis|management|reassess\w*)|fmea|hazard analysis)\b/i],
+  [
+    "PRODUCT_CHANGE_REQUIRED",
+    /\b(design change|product change|firmware|software update|engineering change|change request|redesign|tool(ing)? change|specification change)\b/i,
+  ],
+  ["CAPA_REQUIRED", /\b(capa|corrective|preventive)\b/i],
+];
+
+export function followUpTypesOf(action: string): FollowUpAction[] {
+  return FOLLOW_UP_WORDS.filter(([, words]) => words.test(action)).map(([code]) => code);
+}
+
+/** The follow-ups the brief's recommended actions name, ticked, with the actions as their titles. */
+export function followUpsFromActions(actions: readonly string[]): Record<string, FollowUpChoice> {
+  const found: Record<string, FollowUpChoice> = {};
+  for (const action of actions) {
+    const text = action.replace(/\s+/g, " ").trim();
+    if (!text) continue;
+    for (const code of followUpTypesOf(text)) {
+      const current = found[code];
+      const title = current?.title ? `${current.title}; ${text}` : text;
+      found[code] = { ...emptyFollowUp(), selected: true, title: title.slice(0, FOLLOW_UP_TITLE_MAX) };
+    }
+  }
+  return found;
+}
+
 export const emptyDecisionForm = (): DecisionForm => ({
   outcome: "",
   rationale: "",
@@ -841,8 +881,8 @@ const CHECK_LABELS: Record<string, string> = {
   SNAPSHOT_HASH: "The evidence snapshot is intact",
   EVIDENCE_SNAPSHOT: "The evidence snapshot is intact",
   SIGNER_AUTHORITY: "The signer held approval authority when signing",
-  SEGREGATION_OF_DUTIES: "The signer did not prepare or review the brief",
-  SIGNER_NOT_AUTHOR: "The signer did not prepare or review the brief",
+  SEGREGATION_OF_DUTIES: "The signer did not write or submit the brief",
+  SIGNER_NOT_AUTHOR: "The signer did not write or submit the brief",
 };
 
 export type VerificationCheck = { key: string; label: string; ok: boolean; detail: string | null };

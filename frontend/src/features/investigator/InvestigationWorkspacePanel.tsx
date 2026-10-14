@@ -15,7 +15,7 @@ import {
 } from "../../app/types";
 import { api } from "../../app/api";
 import { AI_TIMEOUT_MS, describeError, postJson } from "../../app/apiClient";
-import { useCan } from "../workspace/workspaceContext";
+import { useCan, useFeatureSet } from "../workspace/workspaceContext";
 import { CaseRecordDownload } from "../reports/CaseRecordDownload";
 import { displayId } from "../../app/displayId";
 import { hasSavedResults, loadSavedResults } from "./savedResults";
@@ -53,6 +53,7 @@ export function InvestigationTabSummary({
   failureChains,
   brief,
   onOpenDecision,
+  decisionLabel = "Open Decision Center",
 }: {
   activeTab: string;
   workspace: InvestigationWorkspace | null;
@@ -62,6 +63,8 @@ export function InvestigationTabSummary({
   failureChains: FailureChainSet | null;
   brief: InvestigationBrief | null;
   onOpenDecision: () => void;
+  /** The decision action's name: the Decision Center, or the case's own decision under the MVP feature set. */
+  decisionLabel?: string;
 }) {
   const summaries: Record<string, { title: string; description: string; count: string; state: string }> = {
     overview: {
@@ -128,7 +131,7 @@ export function InvestigationTabSummary({
       title: "Decision readiness",
       description: "Prepare the case for an authorized reviewer; MDARIX never makes the regulated decision.",
       count: "Human authority",
-      state: "Open Decision Center",
+      state: decisionLabel,
     },
   };
   const summary = summaries[activeTab] ?? summaries.overview;
@@ -144,7 +147,7 @@ export function InvestigationTabSummary({
         <span>{summary.state}</span>
         {activeTab === "decision" && (
           <button className="primary-action" onClick={onOpenDecision}>
-            Open Decision Center
+            {decisionLabel}
           </button>
         )}
       </div>
@@ -166,6 +169,10 @@ export function InvestigationWorkspacePanel({
   /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
   onOpenIntelligence?: (view: IntelligenceView) => void;
 }) {
+  // Under the MVP feature set the counterfactual and the template failure chains are parked and the decision is taken
+  // on the case's own Decision tab (app/featureSet.ts).
+  const mvp = useFeatureSet() === "mvp";
+  const decisionLabel = mvp ? "Open the decision" : "Open Decision Center";
   const [workspace, setWorkspace] = useState<InvestigationWorkspace | null>(null);
   const [analysis, setAnalysis] = useState<InvestigationAnalysis | null>(null);
   const [hypothesisSet, setHypothesisSet] = useState<HypothesisSet | null>(null);
@@ -337,7 +344,9 @@ export function InvestigationWorkspacePanel({
     const sequence = requestSequence.current;
     const current = () => sequence === requestSequence.current;
     setPendingAction("Run Unknowns & Chain");
-    setActionStatus("RUNNING: Evaluating Unknowns Radar and Failure Chain...");
+    setActionStatus(
+      mvp ? "RUNNING: Evaluating the Unknowns Radar..." : "RUNNING: Evaluating Unknowns Radar and Failure Chain...",
+    );
     setError("");
     const body = { investigation_id: investigationId, ...temporal() };
     try {
@@ -353,6 +362,13 @@ export function InvestigationWorkspacePanel({
       if (!current()) return;
       setUnknownSet(unknowns.unknown_set);
       remember("unknowns", unknowns);
+      if (mvp) {
+        // The automatic failure chains were a fixed two-link template; the MVP does not generate them.
+        setActionStatus("SUCCESS: Unknowns results are displayed below.");
+        setPendingAction(null);
+        setError("");
+        return;
+      }
       const chains = await ai<any>("failure-chains", body);
       if (!current()) return;
       setFailureChains(chains.failure_chain_set);
@@ -481,7 +497,13 @@ export function InvestigationWorkspacePanel({
                 aria-describedby={runDescribedBy}
               >
                 {" "}
-                {pendingAction === "Run Unknowns & Chain" ? "Running Unknowns & Chain…" : "Run Unknowns & Chain"}
+                {pendingAction === "Run Unknowns & Chain"
+                  ? mvp
+                    ? "Running Unknowns…"
+                    : "Running Unknowns & Chain…"
+                  : mvp
+                    ? "Run Unknowns"
+                    : "Run Unknowns & Chain"}
               </button>
               <button
                 className="primary-action"
@@ -539,20 +561,22 @@ export function InvestigationWorkspacePanel({
             "assurance",
             "decision",
           ] as const
-        ).map((tab) => (
-          <button
-            key={tab}
-            role="tab"
-            aria-selected={activeTab === tab}
-            className={activeTab === tab ? "active" : ""}
-            onClick={() => {
-              setActiveTab(tab);
-              document.getElementById(`workflow-${tab}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }}
-          >
-            {humanize(tab)}
-          </button>
-        ))}
+        )
+          .filter((tab) => !(mvp && (tab === "counterfactual" || tab === "failure-chain")))
+          .map((tab) => (
+            <button
+              key={tab}
+              role="tab"
+              aria-selected={activeTab === tab}
+              className={activeTab === tab ? "active" : ""}
+              onClick={() => {
+                setActiveTab(tab);
+                document.getElementById(`workflow-${tab}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              {humanize(tab)}
+            </button>
+          ))}
       </div>
       <InvestigationTabSummary
         activeTab={activeTab}
@@ -563,6 +587,7 @@ export function InvestigationWorkspacePanel({
         failureChains={failureChains}
         brief={brief}
         onOpenDecision={onOpenDecision}
+        decisionLabel={decisionLabel}
       />
       {(actionStatus || pendingAction) && (
         <div className={`action-feedback ${actionStatus.startsWith("BACKEND") ? "error-feedback" : ""}`} role="status">
@@ -693,7 +718,9 @@ export function InvestigationWorkspacePanel({
           >
             {pendingAction === "Run Unknowns & Chain"
               ? "Running controlled checks…"
-              : "Run Challenger, Unknowns & Chain"}
+              : mvp
+                ? "Run Challenger & Unknowns"
+                : "Run Challenger, Unknowns & Chain"}
           </button>
         )}
       </section>
@@ -712,30 +739,32 @@ export function InvestigationWorkspacePanel({
             <AiBlockNote label={labels.unknowns} onJudge={judge("Unknowns")} />
             <UnknownsBoard set={unknownSet} />
           </Panel>
-          <div id="workflow-failure-chain">
-            <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
-              <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
-              <div className="analysis-list">
-                {!failureChains?.chains.length && (
-                  <p className="empty">
-                    No supportable failure chain is available for this context. The chain remains unresolved.
-                  </p>
-                )}
-                {failureChains?.chains.map((chain) => (
-                  <article key={chain.chain_id}>
-                    <span>{chain.overall_status}</span>
-                    <p>{chain.chain_statement}</p>
-                    {chain.links.map((link) => (
-                      <small key={link.link_id}>
-                        {link.from_entity_or_state} — {link.relationship} → {link.to_entity_or_state} [
-                        {link.epistemic_status}]
-                      </small>
-                    ))}
-                  </article>
-                ))}
-              </div>
-            </Panel>
-          </div>
+          {!mvp && (
+            <div id="workflow-failure-chain">
+              <Panel title="Failure Chain Intelligence" icon={<GitBranch />}>
+                <AiBlockNote label={labels.failureChains} onJudge={judge("Failure chain")} />
+                <div className="analysis-list">
+                  {!failureChains?.chains.length && (
+                    <p className="empty">
+                      No supportable failure chain is available for this context. The chain remains unresolved.
+                    </p>
+                  )}
+                  {failureChains?.chains.map((chain) => (
+                    <article key={chain.chain_id}>
+                      <span>{chain.overall_status}</span>
+                      <p>{chain.chain_statement}</p>
+                      {chain.links.map((link) => (
+                        <small key={link.link_id}>
+                          {link.from_entity_or_state} — {link.relationship} → {link.to_entity_or_state} [
+                          {link.epistemic_status}]
+                        </small>
+                      ))}
+                    </article>
+                  ))}
+                </div>
+              </Panel>
+            </div>
+          )}
         </div>
       )}
       <section id="workflow-evidence" className="panel empty-state">
@@ -745,80 +774,82 @@ export function InvestigationWorkspacePanel({
           investigation.
         </p>
       </section>
-      <section id="workflow-counterfactual" className="panel counterfactual-panel">
-        <div className="section-title">
-          <GitBranch size={18} /> Constrained Counterfactual
-        </div>
-        <p className="helper-copy">
-          Explore how the current explanation changes under a controlled alternative condition. Results are hypothetical
-          and are not observed evidence.
-        </p>
-        <div className="counterfactual-controls">
-          <select
-            value={counterfactualType}
-            onChange={(event) => setCounterfactualType(event.target.value)}
-            aria-label="Intervention type"
-          >
-            <option value="REMOVE_CHANGE">Remove change</option>
-            <option value="REPLACE_COMPONENT_REVISION">Replace component revision</option>
-            <option value="REMOVE_SUPPLIER_CHANGE">Remove supplier change</option>
-            <option value="REMOVE_FAILURE_CHAIN_LINK">Remove failure-chain link</option>
-          </select>
-          <input
-            value={counterfactualTarget}
-            onChange={(event) => setCounterfactualTarget(event.target.value)}
-            aria-label="Counterfactual target"
-            placeholder="What to take away, e.g. a component revision or supplier change"
-          />
-          {canRun && (
-            <button
-              className="primary-action"
-              onClick={runCounterfactual}
-              disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim() || aiBlocked}
-              title={runTitle}
-              aria-describedby={runDescribedBy}
-            >
-              {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
-            </button>
-          )}
-        </div>
-        <p className="action-feedback" role="status">
-          Status: {counterfactualStatus}
-        </p>
-        {counterfactual && (
-          <div className="counterfactual-result">
-            <AiBlockNote label={labels.counterfactual} />
-            <strong>{counterfactual.label}</strong>
-            <h3>What stays the same</h3>
-            <ul>
-              {counterfactual.invariants?.map((item: string) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <h3>What changes / becomes unsupported</h3>
-            <ul>
-              {counterfactual.relationships_no_longer_supported?.map((item: string) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <h3>What remains unexplained</h3>
-            <ul>
-              {counterfactual.observations_still_unexplained?.map((item: string) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            <h3>Limitations</h3>
-            <ul>
-              {counterfactual.limitations?.map((item: any, index: number) => (
-                <li key={index}>{typeof item === "string" ? item : item.description}</li>
-              ))}
-            </ul>
-            <p>
-              <strong>Conclusion:</strong> {counterfactual.conclusion}
-            </p>
+      {!mvp && (
+        <section id="workflow-counterfactual" className="panel counterfactual-panel">
+          <div className="section-title">
+            <GitBranch size={18} /> Constrained Counterfactual
           </div>
-        )}
-      </section>
+          <p className="helper-copy">
+            Explore how the current explanation changes under a controlled alternative condition. Results are
+            hypothetical and are not observed evidence.
+          </p>
+          <div className="counterfactual-controls">
+            <select
+              value={counterfactualType}
+              onChange={(event) => setCounterfactualType(event.target.value)}
+              aria-label="Intervention type"
+            >
+              <option value="REMOVE_CHANGE">Remove change</option>
+              <option value="REPLACE_COMPONENT_REVISION">Replace component revision</option>
+              <option value="REMOVE_SUPPLIER_CHANGE">Remove supplier change</option>
+              <option value="REMOVE_FAILURE_CHAIN_LINK">Remove failure-chain link</option>
+            </select>
+            <input
+              value={counterfactualTarget}
+              onChange={(event) => setCounterfactualTarget(event.target.value)}
+              aria-label="Counterfactual target"
+              placeholder="What to take away, e.g. a component revision or supplier change"
+            />
+            {canRun && (
+              <button
+                className="primary-action"
+                onClick={runCounterfactual}
+                disabled={counterfactualStatus === "VALIDATING" || !counterfactualTarget.trim() || aiBlocked}
+                title={runTitle}
+                aria-describedby={runDescribedBy}
+              >
+                {counterfactualStatus === "VALIDATING" ? "Validating…" : "Run Counterfactual"}
+              </button>
+            )}
+          </div>
+          <p className="action-feedback" role="status">
+            Status: {counterfactualStatus}
+          </p>
+          {counterfactual && (
+            <div className="counterfactual-result">
+              <AiBlockNote label={labels.counterfactual} />
+              <strong>{counterfactual.label}</strong>
+              <h3>What stays the same</h3>
+              <ul>
+                {counterfactual.invariants?.map((item: string) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <h3>What changes / becomes unsupported</h3>
+              <ul>
+                {counterfactual.relationships_no_longer_supported?.map((item: string) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <h3>What remains unexplained</h3>
+              <ul>
+                {counterfactual.observations_still_unexplained?.map((item: string) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+              <h3>Limitations</h3>
+              <ul>
+                {counterfactual.limitations?.map((item: any, index: number) => (
+                  <li key={index}>{typeof item === "string" ? item : item.description}</li>
+                ))}
+              </ul>
+              <p>
+                <strong>Conclusion:</strong> {counterfactual.conclusion}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
       <section id="workflow-brief" className="panel brief-panel">
         <div className="section-title">
           <FileText size={18} /> Investigation Brief
@@ -877,9 +908,12 @@ export function InvestigationWorkspacePanel({
       </section>
       <section id="workflow-decision" className="panel empty-state">
         <h3>Decision readiness</h3>
-        <p>AI outputs inform the workflow. Authorized humans record decisions in the Decision Center.</p>
+        <p>
+          AI outputs inform the workflow. Authorized humans record decisions{" "}
+          {mvp ? "on this case's Decision tab" : "in the Decision Center"}.
+        </p>
         <button className="primary-action" onClick={onOpenDecision}>
-          Open Decision Center
+          {decisionLabel}
         </button>
       </section>
     </section>

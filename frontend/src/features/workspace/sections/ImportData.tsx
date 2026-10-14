@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Download, Upload } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { importTemplatesFor } from "../../../app/featureSet";
 import { countOf } from "./common";
 
 /*
@@ -20,6 +21,8 @@ export type ImportTemplate = {
   title: string;
   required: string[];
   optional: string[];
+  /** What the columns that change MDARIX's findings are for (lot quantity, awareness date, harm flags, ...). */
+  help?: Record<string, string>;
   download: string;
 };
 type CheckReport = {
@@ -35,7 +38,52 @@ type CheckReport = {
   masked_values?: number;
   /** The rows set aside, with their problems (only when problem rows are skipped); never stored on the server. */
   rejects_csv?: string;
+  /** How the export was read: its headers read under a template name, the columns left out (never stored), notes
+   * (an encoding, a workbook sheet) and what a complaints file adds besides its complaints (a free trial). */
+  columns?: { header: string; column: string }[];
+  ignored_columns?: string[];
+  notes?: string[];
+  also_creates?: Record<string, number>;
 };
+
+const CREATES: [string, string, string][] = [
+  ["products", "product", "products"],
+  ["versions", "version", "versions"],
+  ["lots", "lot", "lots"],
+];
+
+/** "1 product and 2 lots": what a complaints file adds besides its complaints, or "" when nothing. */
+export function alsoCreatesText(creates: Record<string, number> | null | undefined): string {
+  const parts = CREATES.filter(([key]) => (creates?.[key] ?? 0) > 0).map(
+    ([key, one, many]) => `${creates?.[key]} ${creates?.[key] === 1 ? one : many}`,
+  );
+  if (!parts.length) return "";
+  return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+export type ImportResult = {
+  created?: number;
+  updated?: number;
+  /** The products, versions and lots a free trial's complaints file added (counted in ``created`` too). */
+  also_created?: Record<string, number>;
+  rejected_rows?: number;
+  masked_values?: number;
+};
+
+/** "Imported complaints: 4 new, 0 updated, and 2 products and 3 lots they name." (exported for its test). */
+export function importedText(title: string, result: ImportResult): string {
+  const also = alsoCreatesText(result.also_created);
+  const added = Object.values(result.also_created ?? {}).reduce((sum, count) => sum + count, 0);
+  const notes = [
+    also ? `and ${also} they name` : "",
+    result.rejected_rows ? `${countOf(result.rejected_rows, "row")} set aside to fix` : "",
+    result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
+  ].filter(Boolean);
+  const [first, ...rest] = notes;
+  return `Imported ${title.toLowerCase()}: ${(result.created ?? 0) - added} new, ${result.updated ?? 0} updated${
+    first ? `${also ? ", " : "; "}${first}` : ""
+  }${rest.length ? `; ${rest.join("; ")}` : ""}.`;
+}
 
 /** What to do with rows that have a problem, and with personal data in the text. */
 export type ImportOptions = { skipProblems: boolean; maskPersonal: boolean };
@@ -98,6 +146,7 @@ export function ImportPanel({
   onImported,
   id = "data-import",
   eyebrow = "Bring your own data",
+  complaintsAlone = false,
 }: {
   templates: ImportTemplate[];
   /** /api/v1/data/import for every organization; /api/v1/trial/imports for the free trial's own limits. */
@@ -106,8 +155,21 @@ export function ImportPanel({
   onImported: () => void;
   id?: string;
   eyebrow?: string;
+  /** A complaints export alone is enough (a free trial): the products, versions and lots it names are added. */
+  complaintsAlone?: boolean;
 }) {
+  // Where a complaints export alone is enough, the panel opens on it (once the templates are there), until the person
+  // chooses another.
   const [entity, setEntity] = useState("products");
+  const chosen = useRef(false);
+  const offersComplaints = templates.some((item) => item.entity === "complaints");
+  useEffect(() => {
+    if (complaintsAlone && offersComplaints && !chosen.current) setEntity("complaints");
+  }, [complaintsAlone, offersComplaints]);
+  // Under the MVP feature set the six data types its screens read come first; the others are offered on request.
+  const { core, more } = importTemplatesFor(templates, useFeatureSet());
+  const [showMore, setShowMore] = useState(false);
+  const shown = showMore ? [...core, ...more] : core;
   const [file, setFile] = useState<File | null>(null);
   const [dateFormat, setDateFormat] = useState<DateFormat>("ISO");
   const [options, setOptions] = useState<ImportOptions>(NO_OPTIONS);
@@ -141,11 +203,11 @@ export function ImportPanel({
       });
       return null;
     }
-    // The file goes as it is (bytes): the server reads its encoding and its separator (comma, semicolon or tab).
+    // The file goes as it is (bytes): the server reads an Excel workbook, or text in its encoding and separator.
     return requestJson<any>(importUrl(basePath, template.entity, mode, dateFormat, options), {
       method: "POST",
       body: file,
-      headers: { "Content-Type": "text/csv" },
+      headers: { "Content-Type": isWorkbook(file) ? XLSX_TYPE : "text/csv" },
       timeoutMs: 60_000,
     });
   };
@@ -165,16 +227,7 @@ export function ImportPanel({
     try {
       const result = await send("import");
       if (result) {
-        const notes = [
-          result.rejected_rows ? `${countOf(result.rejected_rows, "row")} set aside to fix` : "",
-          result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
-        ].filter(Boolean);
-        setMessage({
-          tone: "good",
-          text: `Imported ${template?.title.toLowerCase()}: ${result.created ?? 0} new, ${result.updated ?? 0} updated${
-            notes.length ? `; ${notes.join("; ")}` : ""
-          }.`,
-        });
+        setMessage({ tone: "good", text: importedText(template?.title ?? "data", result) });
         setRejects(result.rejects_csv ? { csv: result.rejects_csv, rows: result.rejected_rows ?? 0 } : null);
         setReport(null);
         setFile(null);
@@ -192,29 +245,53 @@ export function ImportPanel({
       <header className="ac-panel-head">
         <div>
           <p className="ac-eyebrow">{eyebrow}</p>
-          <h2 id={`${id}-title`}>Upload a CSV file</h2>
+          <h2 id={`${id}-title`}>Upload your export</h2>
         </div>
       </header>
       <p className="uw-trial-note">
-        Load the templates in the order shown: products first, then lots, then complaints, then the others that refer to
-        them. Only template columns are accepted. By default a file with any problem imports nothing; below you can
-        choose to import the rows that pass and get the others back, and to replace personal details instead of refusing
-        them. Comma, semicolon and tab separated files are all read; save them as CSV UTF-8.
+        Upload the export as it comes from your quality system, as an Excel workbook or a CSV file: MDARIX reads its
+        column names (Complaint Number, Product Code, Lot # and the like) and leaves out the columns it does not need,
+        without storing them.{" "}
+        {complaintsAlone
+          ? "A complaints export alone is enough to start: the products and lots it names are added. Load products and lots too for versions and per-unit trends."
+          : "Load products first, then lots, then complaints, then the others that refer to them."}{" "}
+        By default a file with any problem imports nothing; below you can choose to import the rows that pass and get
+        the others back, and to replace personal details instead of refusing them.
       </p>
       <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
-        {templates.map((item, index) => (
+        {shown.map((item, index) => (
           <button
             key={item.entity}
             type="button"
             aria-pressed={template?.entity === item.entity}
             className={template?.entity === item.entity ? "selected" : ""}
             disabled={busy}
-            onClick={() => setEntity(item.entity)}
+            onClick={() => {
+              chosen.current = true;
+              setEntity(item.entity);
+            }}
           >
             {index + 1}. {item.title}
           </button>
         ))}
       </div>
+      {more.length > 0 && (
+        <button
+          type="button"
+          className="ac-link uw-import-more"
+          aria-expanded={showMore}
+          disabled={busy}
+          onClick={() => {
+            // Hiding the extra types while one is chosen goes back to the first template.
+            if (showMore && more.some((item) => item.entity === entity)) setEntity(core[0]?.entity ?? "products");
+            setShowMore((value) => !value);
+          }}
+        >
+          {showMore
+            ? "Show only the six data types the checks read"
+            : `Show ${more.length} more data types for deeper investigations (components, suppliers, changes…)`}
+        </button>
+      )}
       {template && (
         <div className="uw-trial-template">
           <div>
@@ -227,6 +304,7 @@ export function ImportPanel({
           </a>
         </div>
       )}
+      {template && <ColumnGuide template={template} />}
       <div className="uw-trial-upload">
         <label className="ca-field uw-import-dates">
           Dates in the file
@@ -265,11 +343,11 @@ export function ImportPanel({
           </select>
         </label>
         <label className="ac-secondary">
-          <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a CSV file"}
+          <Upload size={15} aria-hidden="true" /> {file ? file.name : "Choose a file (Excel or CSV)"}
           <input
             type="file"
-            accept=".csv,.txt,text/csv"
-            aria-label={`Choose a ${template?.entity ?? "data"} CSV file`}
+            accept={`.xlsx,.csv,.txt,text/csv,${XLSX_TYPE}`}
+            aria-label={`Choose a ${template?.entity ?? "data"} file (Excel or CSV)`}
             onChange={(event) => {
               setFile(event.target.files?.[0] ?? null);
               setReport(null);
@@ -299,6 +377,7 @@ export function ImportPanel({
       )}
       {report && (
         <div className="uw-trial-report" role="status">
+          <HowItWasRead report={report} />
           {report.ready ? (
             <>
               <p className="uw-trial-message is-good">
@@ -306,6 +385,9 @@ export function ImportPanel({
                 ready to import ({countOf(report.new_records, "new record")})
                 {report.masked_values
                   ? `; personal data will be replaced in ${countOf(report.masked_values, "value")}`
+                  : ""}
+                {alsoCreatesText(report.also_creates)
+                  ? `, including ${alsoCreatesText(report.also_creates)} the complaints name`
                   : ""}
                 .
               </p>
@@ -364,7 +446,48 @@ export function ImportPanel({
   );
 }
 
-type Templates = { row_limit: number | null; file_limit_bytes: number; templates: ImportTemplate[] };
+const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const isWorkbook = (file: File) => file.type === XLSX_TYPE || file.name.toLowerCase().endsWith(".xlsx");
+
+/** How the server read the export: notes, the headers read under a template name, and the columns left out. */
+export function HowItWasRead({ report }: { report: Pick<CheckReport, "columns" | "ignored_columns" | "notes"> }) {
+  const mapped = report.columns ?? [];
+  const ignored = report.ignored_columns ?? [];
+  const notes = report.notes ?? [];
+  if (!mapped.length && !ignored.length && !notes.length) return null;
+  return (
+    <div className="uw-import-read">
+      {notes.map((note) => (
+        <p key={note} className="ac-muted">
+          {note}
+        </p>
+      ))}
+      {mapped.length > 0 && (
+        <p>
+          <b>Read your columns as:</b>{" "}
+          {mapped.map((item, index) => (
+            <span key={item.header}>
+              {index ? ", " : ""}
+              {item.header} → <code>{item.column}</code>
+            </span>
+          ))}
+        </p>
+      )}
+      {ignored.length > 0 && (
+        <p>
+          <b>Left out, not stored:</b> {ignored.join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+type Templates = {
+  row_limit: number | null;
+  file_limit_bytes: number;
+  creates_references?: boolean;
+  templates: ImportTemplate[];
+};
 
 /** "Import data": the organization's CSV import, for everyone whose role may change records. */
 export function ImportDataSection() {
@@ -390,6 +513,7 @@ export function ImportDataSection() {
             fileLimitBytes={templates.data.file_limit_bytes}
             onImported={work.refreshProducts}
             eyebrow="Import data"
+            complaintsAlone={!!templates.data.creates_references}
           />
         </>
       )}
@@ -422,6 +546,41 @@ function FilePreviewTable({ rows }: { rows: Record<string, string>[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/**
+ * What the template's key columns are for, beside the template. For lots, a callout first: a quantity on every lot
+ * turns the trend check from per calendar day into per unit in the field (exported for its test).
+ */
+export function ColumnGuide({ template }: { template: ImportTemplate }) {
+  const entries = Object.entries(template.help ?? {});
+  if (!entries.length) return null;
+  const perUnit = template.entity === "lots" && Boolean(template.help?.quantity);
+  return (
+    <div className="uw-import-guide">
+      {perUnit && (
+        <p className="uw-import-callout" role="note">
+          <strong>Per-unit trends from day one:</strong> add <code>quantity</code> (devices released) and{" "}
+          <code>manufacture_date</code> to every lot. The trend check then counts complaints per unit in the field, so a
+          version shipped in growing numbers is not mistaken for a rising trend. Lots already loaded can be updated by
+          uploading them again with the quantity.
+        </p>
+      )}
+      <details open={perUnit}>
+        <summary>What the key columns do</summary>
+        <dl>
+          {entries.map(([column, text]) => (
+            <div key={column}>
+              <dt>
+                <code>{column}</code>
+              </dt>
+              <dd>{text}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
     </div>
   );
 }

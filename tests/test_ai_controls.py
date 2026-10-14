@@ -345,6 +345,37 @@ def test_switching_ai_on_needs_an_acknowledgement_that_the_audit_keeps(tenant):
     )
 
 
+def test_in_production_ai_is_switched_on_only_when_the_release_gate_is_met(tenant, monkeypatch):
+    from backend.app import ai_release_gate
+    from tests.test_business_permissions import _client_with_role
+
+    _set(tenant, ai_processing_allowed=False)
+    admin = _client_with_role("CUSTOMER_ADMIN")
+    gate = admin.get("/api/v1/ai/release-gate")
+    assert gate.status_code == 200 and gate.json()["total"] == 4 and gate.json()["ready"] is False
+    assert admin.get("/api/v1/admin/ai-settings").json()["release_gate"]["bars"] == gate.json()["bars"]
+
+    monkeypatch.setattr(ai_release_gate, "enforced", lambda: True)  # as MDARIX_ENV=production
+    body = {"ai_processing_allowed": True, "reason": "Pilot agreed to AI processing", "acknowledgement": True}
+    refused = admin.put("/api/v1/admin/ai-settings", json=body)
+    assert refused.status_code == 409 and refused.json()["detail"]["code"] == "AI_RELEASE_GATE_NOT_MET"
+    assert "The golden dataset signed off by a person" in refused.json()["detail"]["message"]
+    assert _usage(tenant)["ai_processing_allowed"] is False
+    platform = authenticated_client().put(
+        f"/api/v1/platform-admin/tenants/{tenant}/ai-settings", json={**body, "use_default_budget": True}
+    )
+    assert platform.status_code == 409 and _usage(tenant)["ai_processing_allowed"] is False
+
+    ready = {"ready": True, "met": 4, "total": 4, "enforced": True, "bars": [], "message": "ready"}
+    monkeypatch.setattr(ai_release_gate, "status", lambda models=None, files=None: ready)
+    switched = admin.put("/api/v1/admin/ai-settings", json=body)
+    assert switched.status_code == 200 and switched.json()["ai_processing_allowed"] is True, switched.text
+    # Switching off is never gated.
+    monkeypatch.setattr(ai_release_gate, "status", lambda models=None, files=None: {**ready, "ready": False})
+    off = admin.put("/api/v1/admin/ai-settings", json={"ai_processing_allowed": False, "reason": "Pilot paused AI"})
+    assert off.status_code == 200 and off.json()["ai_processing_allowed"] is False
+
+
 def test_a_new_organization_starts_with_ai_off_and_its_platform_switch_needs_the_acknowledgement():
     platform = authenticated_client()
     code = f"AIOFF{uuid.uuid4().hex[:6].upper()}"

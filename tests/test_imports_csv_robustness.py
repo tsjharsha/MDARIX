@@ -1,5 +1,6 @@
-"""CSV imports read real-world files exactly: strict UTF-8 (with or without BOM), comma, semicolon or tab, a raw
-body or a multipart upload, and day/month order only when the uploader declares it."""
+"""CSV imports read real-world files exactly: UTF-8 (with or without BOM), UTF-16 with its BOM, or Windows text
+(said back as a note), comma, semicolon or tab, a raw body or a multipart upload, and day/month order only when the
+uploader declares it."""
 
 import pytest
 from fastapi import HTTPException
@@ -30,14 +31,19 @@ def test_utf8_with_a_byte_order_mark_keeps_every_character():
     assert rows[0][1] == {"product_id": "P-1", "product_name": "Gerät für Ärzte – Größe M"}
 
 
-def test_a_file_that_is_not_utf8_is_refused_with_instructions_not_garbled():
-    raw = "product_id,product_name\nP-1,Gerät\n".encode("cp1252")
+def test_windows_and_utf16_text_are_read_exactly_and_unknown_bytes_are_refused():
+    # Excel on Windows saves plain "CSV" as Windows-1252: read exactly, with a note to check the preview.
+    raw = "product_id,product_name\nP-1,Gerät für Ärzte\n".encode("cp1252")
     rows, report = _rows(raw)
-    assert rows == [] and report.error_count == 1
-    assert report.issues[0]["row"] == 2 and "CSV UTF-8" in report.issues[0]["message"]
-    utf16 = "product_id,product_name\nP-1,X\n".encode("utf-16")
+    assert report.error_count == 0 and rows[0][1] == {"product_id": "P-1", "product_name": "Gerät für Ärzte"}
+    assert "Windows text" in report.notes[0]
+    # Excel's "Unicode text" is UTF-16 with a byte-order mark.
+    utf16 = "product_id\tproduct_name\nP-1\tPompe à perfusion\n".encode("utf-16")
     rows, report = _rows(utf16)
-    assert rows == [] and "UTF-16" in report.issues[0]["message"]
+    assert report.error_count == 0 and rows[0][1]["product_name"] == "Pompe à perfusion"
+    # A byte no encoding defines is never guessed at.
+    rows, report = _rows(b"product_id,product_name\nP-1,G\x81t\n")
+    assert rows == [] and report.error_count == 1 and "CSV UTF-8" in report.issues[0]["message"]
 
 
 def test_dates_are_iso_unless_the_order_is_declared():
@@ -104,8 +110,11 @@ def test_a_raw_body_still_works_and_a_bad_form_or_format_is_refused():
     assert wrong_field.status_code == 422 and wrong_field.json()["detail"]["code"] == "UPLOAD_INVALID"
     bad_format = investigator.post("/api/v1/data/import/products/check?date_format=YMD", content=b"x")
     assert bad_format.status_code == 422 and bad_format.json()["detail"]["code"] == "DATE_FORMAT_INVALID"
-    garbled = investigator.post(
+    windows = investigator.post(
         "/api/v1/data/import/products/check", content="product_id,product_name\nP,Gerät\n".encode("cp1252")
     )
+    assert windows.status_code == 200 and windows.json()["ready"]
+    assert windows.json()["preview"][0]["product_name"] == "Gerät" and windows.json()["notes"]
+    garbled = investigator.post("/api/v1/data/import/products/check", content=b"product_id,product_name\nP,G\x81\n")
     assert garbled.status_code == 200 and not garbled.json()["ready"]
     assert "CSV UTF-8" in garbled.json()["issues"][0]["message"]

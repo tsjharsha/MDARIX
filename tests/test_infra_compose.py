@@ -18,7 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = yaml.safe_load((ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8"))
 SERVICES = COMPOSE["services"]
-LONG_RUNNING = ("api", "worker", "scheduler", "web", "clamav")
+LONG_RUNNING = ("api", "background", "web", "clamav")
 CADDYFILE = (ROOT / "infrastructure" / "docker" / "Caddyfile").read_text(encoding="utf-8")
 
 
@@ -31,7 +31,7 @@ def test_only_the_migrate_and_backup_jobs_load_the_owner_settings():
     for name, service in SERVICES.items():
         loads = ".env.migrate" in _env_files(service)
         assert loads == (name in {"migrate", "backup"}), name
-    for name in ("api", "worker", "scheduler"):
+    for name in ("api", "background"):
         assert _env_files(SERVICES[name]) == [".env.production"], name
     # Caddy needs no application settings at all.
     assert not _env_files(SERVICES["web"])
@@ -50,14 +50,14 @@ def test_no_service_names_the_owner_password_in_its_environment():
     assert 'POSTGRES_PASSWORD="$$MDARIX_DB_OWNER_PASSWORD"' in entrypoint
 
 
-@pytest.mark.parametrize("name,grace", [("api", "30s"), ("worker", "60s"), ("scheduler", "60s")])
+@pytest.mark.parametrize("name,grace", [("api", "30s"), ("background", "60s")])
 def test_services_stop_gracefully(name, grace):
     assert SERVICES[name]["stop_grace_period"] == grace
 
 
 @pytest.mark.parametrize(
     "name,memory",
-    [("clamav", "2g"), ("api", "2g"), ("worker", "1536m"), ("scheduler", "1g"), ("web", "256m"), ("backup", "1g")],
+    [("clamav", "1536m"), ("api", "2g"), ("background", "1536m"), ("web", "256m"), ("backup", "1g")],
 )
 def test_every_service_has_memory_and_cpu_limits(name, memory):
     assert SERVICES[name]["mem_limit"] == memory
@@ -80,13 +80,47 @@ def test_every_long_running_service_has_a_health_check():
     assert "HEALTHCHECK" in (ROOT / "Dockerfile.api").read_text(encoding="utf-8")
 
 
-def test_the_scheduler_health_check_reads_the_heartbeat_the_scheduler_writes():
+def test_the_background_health_check_needs_both_heartbeats():
     from backend.app.scheduler import DEFAULT_HEARTBEAT_FILE
 
-    scheduler = SERVICES["scheduler"]
-    assert scheduler["environment"]["MDARIX_SCHEDULER_HEARTBEAT_FILE"] == DEFAULT_HEARTBEAT_FILE
-    test = " ".join(scheduler["healthcheck"]["test"])
+    background = SERVICES["background"]
+    environment = background["environment"]
+    assert environment["MDARIX_SCHEDULER_HEARTBEAT_FILE"] == DEFAULT_HEARTBEAT_FILE
+    test = " ".join(background["healthcheck"]["test"])
     assert DEFAULT_HEARTBEAT_FILE in test and "< 120" in test
+    assert environment["MDARIX_OUTBOX_HEARTBEAT_FILE"] in test and "< 60" in test
+    assert "worker and scheduler" in test
+
+
+def test_one_background_service_runs_the_worker_and_the_scheduler():
+    """The MVP slim-down: one container for the outbox worker and the scheduler (scripts/run_background.py)."""
+    assert "worker" not in SERVICES and "scheduler" not in SERVICES
+    background = SERVICES["background"]
+    assert background["command"] == ["python", "scripts/run_background.py"]
+    supervisor = _load("run_background")
+    assert [path.name for _, path in supervisor.CHILDREN] == ["run_outbox_worker.py", "run_scheduler.py"]
+    assert all(path.exists() for _, path in supervisor.CHILDREN)
+    # Both loops' volumes: uploaded objects (scans, exports) and the report folder the API shares.
+    volumes = [str(volume) for volume in background["volumes"]]
+    assert any(volume.startswith("objects:") for volume in volumes)
+    assert any(volume.startswith("reports:") for volume in volumes)
+    assert supervisor.GRACE_SECONDS < 60  # inside the container's stop_grace_period
+
+
+def test_clamav_reloads_its_signatures_without_a_second_copy_in_memory():
+    assert SERVICES["clamav"]["environment"]["CLAMD_CONF_ConcurrentDatabaseReload"] == "no"
+
+
+def _gigabytes(value: str) -> float:
+    number, unit = re.fullmatch(r"(\d+)([mg])", value).groups()
+    return int(number) / (1024 if unit == "m" else 1)
+
+
+def test_the_long_running_services_fit_the_slim_server():
+    """5.25 GB of memory limits for the services that always run, down from 6.75 GB (MVP slim-down plan); the nightly
+    backup job's 1 GB comes on top and still leaves the operating system room on an 8 GB server."""
+    total = sum(_gigabytes(SERVICES[name]["mem_limit"]) for name in LONG_RUNNING)
+    assert total == pytest.approx(5.25)
 
 
 def test_the_web_container_is_locked_down():
@@ -111,7 +145,7 @@ def test_third_party_images_are_pinned_by_digest():
 
 
 def test_the_database_ca_is_mounted_wherever_the_database_is_reached():
-    for name in ("migrate", "api", "worker", "scheduler", "backup"):
+    for name in ("migrate", "api", "background", "backup"):
         assert any(str(volume).endswith(":/etc/mdarix/certs:ro") for volume in SERVICES[name]["volumes"]), name
 
 
@@ -178,3 +212,36 @@ def test_the_runtime_role_script_names_only_attributes_it_must_remove():
     assert runtime_role._removals(clean) == ""
     dirty = SimpleNamespace(rolsuper=True, rolbypassrls=True, rolcreatedb=False, rolcreaterole=True)
     assert runtime_role._removals(dirty) == "NOSUPERUSER NOBYPASSRLS NOCREATEROLE "
+
+
+WORKFLOW = yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
+HEAVY_JOBS = ("dedicated-plane", "dataplane-tests", "deployment-roles", "container-validation", "integration")
+
+
+def test_pull_requests_run_the_fast_checks_and_the_heavy_ones_run_after_merge_and_nightly():
+    jobs = WORKFLOW["jobs"]
+    triggers = WORKFLOW[True] if True in WORKFLOW else WORKFLOW["on"]
+    assert triggers["schedule"] == [{"cron": "41 2 * * *"}]
+    for name in HEAVY_JOBS:
+        assert jobs[name]["if"] == "github.event_name != 'pull_request'", name
+    for name in ("backend", "frontend", "browser", "security", "image-scan", "prod-compose-config", "prod-stack"):
+        assert "if" not in jobs[name], name
+    gate = " ".join(step.get("run", "") for step in jobs["release-report"]["steps"])
+    for name in HEAVY_JOBS:
+        assert f'heavy "${{{{ needs.{name}.result }}}}"' in gate, name
+    assert 'test "${{ github.event_name }}" = pull_request && test "$1" = skipped' in gate
+    browser = " ".join(step.get("run", "") for step in jobs["browser"]["steps"])
+    assert "github.event_name == 'pull_request' && '--project=chromium'" in browser
+
+
+def test_the_production_stack_job_starts_the_background_service():
+    steps = " ".join(step.get("run", "") for step in WORKFLOW["jobs"]["prod-stack"]["steps"])
+    assert "up -d --no-build --wait --wait-timeout 1200 api background web" in steps
+    assert "exec -T background python scripts/run_scheduler.py --once" in steps
+
+
+def test_dependabot_proposes_monthly_grouped_updates():
+    config = yaml.safe_load((ROOT / ".github" / "dependabot.yml").read_text(encoding="utf-8"))
+    assert all(update["schedule"] == {"interval": "monthly"} for update in config["updates"])
+    grouped = {update["package-ecosystem"] for update in config["updates"] if update.get("groups")}
+    assert {"pip", "npm", "github-actions"} <= grouped

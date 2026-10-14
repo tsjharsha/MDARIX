@@ -178,6 +178,13 @@ def _serialize(row: DemoRequest) -> dict:
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "handled_at": row.handled_at.isoformat() if row.handled_at else None,
         "note": row.note,
+        # md44: where the request came from; a trial's request names the organization, the times that suit and how
+        # far into the story the trial went (backend/app/trial/router.py book_trial_demo).
+        "source": getattr(row, "source", None) or "WEBSITE",
+        "organization": getattr(row, "organization", None),
+        "trial_tenant_id": str(row.trial_tenant_id) if getattr(row, "trial_tenant_id", None) else None,
+        "preferred_time": getattr(row, "preferred_time", None),
+        "context": getattr(row, "context", None),
     }
 
 

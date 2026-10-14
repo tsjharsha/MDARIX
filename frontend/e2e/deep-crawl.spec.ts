@@ -64,7 +64,9 @@ async function signIn(page: Page, persona: any) {
   await page.goto("/signin");
   await page.getByLabel("Work email").fill(persona.email);
   // The personas file committed for CI holds no password; the run supplies it (E2E_PASSWORD).
-  await page.getByLabel("Password").fill(persona.password ?? config.password ?? process.env.E2E_PASSWORD ?? "");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill(persona.password ?? config.password ?? process.env.E2E_PASSWORD ?? "");
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL(/\/(app|mfa)/, { timeout: 30_000 });
   if (page.url().includes("/mfa")) {

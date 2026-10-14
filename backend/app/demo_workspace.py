@@ -620,12 +620,71 @@ def load_story(db: Session, tenant_id: uuid.UUID, now: datetime | None = None) -
                 )
             evidence_count += 1
     db.flush()
+    _load_review_examples(db, tenant_id, products, versions, lots, investigations, now, stamp)
     return {
         "products": len(products),
         "investigations": len(investigations),
-        "complaints": len(story.COMPLAINTS),
+        "complaints": len(story.COMPLAINTS) + len(story.REVIEW_EXAMPLES),
         "evidence": evidence_count,
     }
+
+
+def _load_review_examples(db: Session, tenant_id, products, versions, lots, investigations, now: datetime, stamp):
+    """The complaint review, reporting and CAPA examples of the story (story.REVIEW_EXAMPLES, story.EARLIER_CAPAS)
+    and the demo organization's reporting windows, so Complaints and Records show findings from the first minute.
+    Does not commit."""
+    from backend.app.db.models.foundation import Capa
+    from backend.app.db.models.reportability import ReportabilitySettings
+    from backend.app.reportability.rules import TEMPLATES, clean_window
+
+    for suffix, product_code, revision, lot_code, days, description, fields in story.REVIEW_EXAMPLES:
+        aware = now - timedelta(days=days)
+        identifier = f"ACD-CMP-{suffix}"
+        db.add(
+            Complaint(
+                id=uuid.uuid4(),
+                complaint_identifier=identifier,
+                product_id=products[product_code].id,
+                product_version_id=versions[(product_code, revision)].id,
+                lot_batch_id=lots[lot_code].id,
+                event_timestamp=aware - timedelta(days=1),
+                complaint_timestamp=aware,
+                awareness_timestamp=aware,
+                description=description,
+                source_identifier=identifier,
+                **{"status": "open", **fields},
+                **stamp(days),
+            )
+        )
+    for code, product_code, case_code, title, status, opened, due, check_in in story.EARLIER_CAPAS:
+        db.add(
+            Capa(
+                id=uuid.uuid4(),
+                capa_identifier=code,
+                title=title,
+                action_type="CORRECTIVE",
+                source_type="QUALITY_SYSTEM",
+                product_id=products[product_code].id,
+                investigation_id=investigations[case_code].id if case_code else None,
+                status=status,
+                opened_at=now - timedelta(days=opened),
+                due_at=now - timedelta(days=due),
+                effectiveness_check_at=(now + timedelta(days=check_in)) if check_in is not None else None,
+                source_identifier=code,
+                **stamp(opened),
+            )
+        )
+    db.add(
+        ReportabilitySettings(
+            tenant_id=tenant_id,
+            windows=[clean_window(TEMPLATES[index]) for index in story.REPORTING_WINDOW_TEMPLATES],
+            lookback_days=365,
+            version=1,
+            updated_by="system:demo-setup",
+            updated_at=now,
+        )
+    )
+    db.flush()
 
 
 def status(db: Session) -> dict:

@@ -10,6 +10,283 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Added
+
+- Complaints › Second look: records cancelled or logged as inquiries or service records that carry a sign of a
+  complaint (harm, a malfunction, a serious severity, a problem code or one of the organization's words), and No Fault
+  Found or User Error codes that recur (3 or more on one product in 12 months), are listed most serious first, each
+  with why it was flagged and its matched words marked. A person confirms or dismisses each with a reason, and may
+  revise it; both are in the audit trail. MDARIX never changes the record in the source system.
+- Complaints › Backlog: open complaints in no signal and no case, oldest first, against the organization's target
+  (30 days by default), with past-target and due-soon counts and age bands; a record confirmed on the second look
+  counts until it is closed.
+- Complaints › Review settings: the backlog target and the second look's words, changed by a triage lead with a reason,
+  versioned and audited. Migration `md40` adds the `complaint_settings` and `complaint_second_looks` tables (dedicated
+  legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Complaints › Reportability: every complaint that reports a death, a serious injury or a malfunction, or a patient
+  whose outcome is unknown, with its reporting clocks against the windows the organization entered from its own
+  procedure (per market, calendar or work days), most urgent first; missing answers flagged (patient outcome, country,
+  awareness date); records cancelled or logged as inquiries with harm counted and sent to the second look. A person
+  records the decision (reported, with the report's reference and filing day, or not reportable) with a rationale; its
+  timeliness against the binding window is kept and audited. A case's completed regulatory review with no reportability
+  concern settles its complaints. MDARIX never decides reportability and never submits a report.
+- Complaints › Reporting windows: the organization's windows, started from FDA and EU templates to check against the
+  procedure, changed with regulatory approval and a reason, versioned and audited. Nothing is set by default.
+- Records › Effectiveness checks: every CAPA's effectiveness check, including CAPAs closed without one and check days
+  imported from the quality system; a plan (criteria, check day, measurement start), re-planned with a reason; the
+  complaint recurrence before and since on the CAPA's product and problem codes (observed counts, not a statistical
+  test); and a signed result (effective or not effective) with password and authenticator code, recorded as a signed
+  approval record with the fingerprint of what was signed. After a failed check the next round is planned.
+- Reminders: the scheduler job `reporting_reminders` (every 6 hours) puts reporting clocks due soon or overdue in the
+  regulatory reviewers' queue (task REPORTABILITY_DECISION, at most 50 new a run) and checks due within 14 days in the
+  quality reviewers' queue (task EFFECTIVENESS_CHECK); each is completed by the decision or the signature.
+- The demo workspace shows hidden complaints, a recurring No Fault Found, reporting clocks and CAPAs without a check
+  from the first minute (after `scripts/demo_tenant.py reset`).
+- Migration `md41` adds `reportability_settings`, `complaint_reportability` and `capa_effectiveness_checks` (dedicated
+  legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Signals › one click to a case: "Open case" on a signal records the triage decision "investigation required" (when
+  still due, marked as a one-step decision with its reason) and opens the case with every complaint, their versions
+  and lots, for the person clicking, in one transaction (`POST /api/v1/triage/signals/{id}/open-case`,
+  investigation.create, so an investigator no longer waits for a triage lead); the case page opens straight away.
+- Signals › Trend check: every product version (or version and problem code, or complaint type) compared with its
+  own history: the last 30 days against up to 180 days before them (never before the release), with the exact
+  Poisson probability; significant below 1%, higher than usual below 5%, not assessed under 3 complaints or 60 days
+  of history. Every complaint counts whatever its status (records dismissed on the second look are left out). A
+  check beside the count rule: it raises no signal by itself; a triage lead raises one from a notable group.
+- Signals › what the complaints have in common: a summary from the records (period, harm, lots, markets, recurring
+  words, No Fault Found codes), every sentence citing its complaints, with the signal's own trend check; and an AI
+  summary on request (ai.run), kept sentence by sentence only when every cited complaint is the signal's and no
+  causal wording is used, recorded as an AI run. With AI off the records summary stands, with the reason.
+- The case's one AI run: the analysis, competing explanations, challenges, unknowns, failure chains and the
+  investigation brief in a single background pass for one point in time, each step reusing the one before, started by
+  itself the first time the case page opens (never repeated), followed step by step on the case page and run again
+  on demand (`/api/v1/investigations/{id}/ai-run`). Each step records whether AI or the rules wrote it.
+- The Decision Brief writes itself first: starting from the AI draft fills the problem statement from the case's
+  question and the recommended actions from the AI's next steps (only where empty; the conclusion stays the
+  author's), and flags a draft older than the case's latest evidence or scope. The decision form ticks the follow-ups
+  the recommended actions name (CAPA, risk file, regulatory action, field action, product change) for the decision
+  maker to confirm.
+- A case's regulatory review shows each complaint's reporting clock against the organization's windows (and any
+  decision recorded), with a link to the reportability watch.
+- Readiness (the home of the lightweight MVP): what an FDA investigator or a notified-body auditor would find today,
+  read from the organization's records (rules only): the four numbers (complaints to recheck, complaints past target,
+  reporting clocks, trends without CAPA or risk review) and further checks drawn from 2025-2026 findings (harm
+  complaints closed without an investigation, CAPAs without a verified effect, signals past their triage date); each
+  says why it matters and opens the records behind it (`GET /api/v1/readiness`). Under the `mvp` feature set it
+  replaces the Dashboard as home.
+- The readiness summary for management review as a PDF (`GET /api/v1/readiness/summary.pdf`, data.export, audited),
+  for 90 days to 3 years: readiness checks, complaint handling by product version, second-look outcomes,
+  reportability decisions and their timeliness, signals and trend check results, CAPAs and effectiveness checks,
+  organized by the management review inputs of ISO 13485:2016 clause 5.6.2.
+- Reporting window templates for Great Britain (MHRA: 15 days for a serious incident, 10 for a death; Medical Devices
+  Regulations 2002 as amended, regulation 44ZH) and Canada (Health Canada: 10 days for a death or serious
+  deterioration, 30 days for an incident that could cause one if it recurred; SOR/98-282 section 60).
+- Migration `md42` adds `case_ai_runs` (dedicated legacy databases: `scripts/add_workflow_tables_to_legacy_planes.py
+  --apply`).
+- Records › Risk file input (ISO 14971:2019 clause 10): for every product, what post-market data said in the period
+  (complaints reporting harm or a malfunction, a rising trend, decided signals) beside what reached its risk file
+  (completed risk reviews, the risks they assessed, the outcomes, reassessments open or overdue). Each product shows
+  one state, most urgent first: post-market data not reviewed against the risk file, reassessment overdue,
+  reassessment open, no risk register, reviewed or quiet; the product view lists each risk with the reviews that
+  assessed it, never-assessed risks first (`GET /api/v1/post-market/risk-file`, `.../risk-file/{product_id}`, 90 days
+  to 3 years, rules only, no new tables).
+- Readiness: a check for products whose post-market data has not reached the risk file (critical when not reviewed or
+  a reassessment is overdue), opening Records › Risk file input; the management review summary PDF gains section 5,
+  "Post-market data and the risk file".
+- The automatic trust check (policy `MDARIX_AI_TRUST_POLICY_R1_V2`, `trust_engine/auto.py`): every AI result is checked
+  as it is saved, not only when the API is asked. It covers the case's AI run, signal summaries, model-drafted briefs
+  and second-look explanations. The checks are: every cited source exists (the case's evidence, including linked
+  records, the signal's complaints, the complaint's own fields); no stated root cause, causal proof, probability, or
+  decision that belongs to people; no asserted certainty (a warning); provider and model recorded; the right
+  organization. Only what the reader sees is checked, never what the feature's checks already removed. The verdict
+  (passed, passed with limitations, blocked) is saved with the result (`assurance_results`, `assurance_checks`), and
+  every case AI step, signal summary and second-look explanation shows it as a badge that opens its checks. Ask answers
+  carry the same verdict, judged on the answer as shown. A model-drafted investigation brief is now saved as an AI
+  result (`InvestigationBrief.ai_execution_id`), so it is checked too. `GET /api/v1/ai/trust-policy` describes the
+  checks.
+- Complaints › Second look › Explain with AI (`POST /api/v1/complaints/{id}/second-look/explain`, ai.run): at most
+  three sentences on why a flagged record may meet the complaint definition (ISO 13485:2016, 3.4), each quoting the
+  record's own fields word for word. A sentence is dropped when a quote is not in the record, when it says the record is
+  or is not a complaint, is reportable or needs a recall, or when it states a cause. Saved as an AI result with its
+  trust check and shown beside the rules' reasons; when AI is off or unavailable, the reasons stand alone and the screen
+  says why. The record and the decision are never changed.
+- The AI release gate (`backend/app/ai_release_gate.py`, `GET /api/v1/ai/release-gate`). It has four bars: a contracted
+  provider with zero data retention; the golden dataset signed off by a named person; the full golden evaluation (15 of
+  15, model-written) passed with the configured model; the automatic trust check. In production, switching AI on for an
+  organization is refused (`AI_RELEASE_GATE_NOT_MET`) until all four are met. Administrators see the bars under
+  Security › AI processing, and MDARIX staff see them, with what to do, in the AI Control Center.
+  `scripts/qualify_ai_golden_dataset.py --human-sign-off --name --role --confirm` records a person's sign-off bound to
+  the lock's hashes, refusing names that read as a tool or an agent. `scripts/run_real_evaluation.py --gate
+  --require-model --release-record` writes `evaluation/AI_RELEASE_RECORD.json` only for a full pass on the signed-off
+  dataset. Neither file exists yet: the dataset awaits a person's sign-off, and the evaluation awaits the contracted
+  provider.
+
+- The quality loop, an animated hero on Readiness, the Dashboard and Getting started. The inspection checks are
+  drawn as stations on one closed loop, in the order a complaint travels: hidden complaints found, handled on time,
+  reported in window, harm investigated, signals triaged, trends acted on, CAPAs proven, risk file fed. A pulse
+  travels the loop and stations that need attention pulse; the weakest link is named. A list beside it says the same
+  in words and opens each station's records. The picture is still and complete under reduced motion.
+- The free trial's story (`GET /api/v1/trial/story`, `backend/app/trial/story.py`): nine chapters of the loop. Each
+  shows what the trial's records hold, the 2026 inspection pain it answers, and whether the organization acted in it.
+  A chapter counts only on a record the organization created (a second-look decision, a reporting decision, a case
+  from a signal, an AI run or Ask answer, a signed decision, an effectiveness check, a completed risk review, a
+  summary download, its own imported complaints), never on page views.
+- Platform Admin › Customers & Tenants › Trials (`GET /api/v1/platform-admin/trials`): every free trial holding data,
+  with its days left, users and rows against the limits, and how far into the story it went. Each row shows the
+  chapter to try next, the last activity and the trial's feedback. Figures show active trials, those ending within 7
+  days, those that acted, engaged and uploaded their own data. A per-chapter funnel shows where trials stop, and a
+  list names who needs attention first. A tenant's AI processing panel now shows the AI release gate.
+- New free trials get the rest of the sample story at approval (`seed_story_examples`): 9 complaints, 2 CAPAs, 3 risks
+  and sample FDA and EU reporting windows, all marked `MDARIX_SAMPLE`. The complaints cover a cancelled record and an
+  inquiry with harm or complaint signs, a recurring No Fault Found, harm and malfunction complaints with running
+  reporting clocks, and a harm complaint closed without an investigation. One CAPA was closed without an effectiveness
+  check, one has its check due. Complaints, Records and Readiness therefore show findings from the first minute.
+  `scripts/refresh_trial_story.py [--apply]` adds the same records once to trials approved earlier. It never changes a
+  trial's own records or reporting windows.
+
+- The trend check counts per unit in the field (md43 `lot_batches.quantity`). When every lot of the versions compared
+  has a quantity, the expected number follows unit-days (each lot counted from its release for its quantity), so a
+  version shipped in growing numbers no longer looks like a rising trend for that reason alone. Without quantities it
+  counts by calendar days and says so. The lot import takes an optional `quantity` (a whole number, checked before
+  saving; synonyms such as lot size and qty are matched in mapping). Legacy dedicated databases get the column from
+  `scripts/add_workflow_tables_to_legacy_planes.py`.
+- A new version is compared with the version it replaced. Too young for its own history, it was "not assessed" before.
+  Now its last 30 days are compared with the previous version's complaints over the 180 days before its release: is
+  the new version worse than the one it replaced? Trend check shows what each group was compared with and how it was
+  counted.
+- Free trials: the sample lots carry quantities, and signal detection runs at approval, so the trend chapter has a
+  finding from the first minute. OrbitCare 300 Rev B is significantly higher than Rev A per unit in the field, with its
+  count-rule signal waiting. The trial story's trend chapter counts signals waiting for a decision or a case.
+  `scripts/refresh_trial_story.py --apply` adds the quantities and runs detection for trials approved earlier.
+- AI go-live tools. `scripts/ai_provider_preflight.py` checks every provider setting (provider, key, contract, zero
+  data retention, price, production policy) and lists the release gate's bars; it sends nothing and changes nothing.
+  `scripts/golden_review_pack.py` writes the reviewer's pack for the golden dataset sign-off: each of the 15
+  scenarios with its evidence, expected findings, forbidden conclusions and adversarial check, then the sign-off
+  statement and command.
+- Readiness › Inspection pack (ZIP): the readiness summary PDF, the eight checks as a table, one CSV per check with
+  every record behind it (with the source system's identifier), a README and a manifest with each file's SHA-256, for
+  the day an inspector arrives (`GET /api/v1/readiness/inspection-pack.zip`, data export permission, audited as
+  `READINESS_INSPECTION_PACK_EXPORTED`). A list that cannot be read is named in the pack instead of failing it. The
+  trial story's "Show the inspector" chapter counts the pack as well as the PDF.
+- The weekly readiness email: on Monday from 06:00 UTC each organization's quality leads (Leader and Reviewer) get
+  their quality loop (the eight checks in story order), what changed since last week and the weakest link, with a
+  link to Readiness. The scheduler job `readiness-digest` (every 6 hours) queues it once per organization and ISO
+  week through the outbox, which holds no email addresses. My Account › Profile lets each person switch it off
+  (`GET/PUT /api/v1/me/email-preferences`, audited as `EMAIL_PREFERENCES_CHANGED`).
+- Per-unit trends from day one: Import data explains the key columns of each template, and the lots template says
+  what `quantity` does; Trend check, when it counts by calendar days, says so and opens Import data. Guide:
+  `docs/user-guide/PER_UNIT_TRENDS.md`.
+- Free trials book a one-to-one demo from Getting started: times that suit, an optional phone number, the chapters to
+  focus on and a note (`GET/POST /api/v1/trial/demo-request`, one open request per trial, audited as
+  `TRIAL_DEMO_REQUESTED`). The MDARIX team sees it in Platform Admin › Onboarding, marked as from a trial with the
+  organization and how far into the story it went, and by email (`MDARIX_DEMO_ALERT_EMAIL`, else
+  `MDARIX_TRIAL_ALERT_EMAIL`). Platform Admin › Trials counts the trials that booked a demo and shows each one's.
+- Website home: the quality loop, drawn with illustrative synthetic values and labelled so, and a "Start free trial"
+  button beside "Request a demo".
+- Migration `md44` adds `auth_users.email_preferences` and the demo request's source, trial, organization, preferred
+  time and context (legacy dedicated databases: `scripts/add_workflow_tables_to_legacy_planes.py --apply`).
+- Free trials, after a founder's review of the whole journey:
+  - Upload a quality system's export as it comes: headers are matched by the names QMS exports use (Complaint Number,
+    Product Code, Lot #...), columns the template does not know are left out and never stored, Excel workbooks
+    (.xlsx) are read, Windows and UTF-16 text is read exactly, and the quality system's own complaint status is kept
+    (so the second look works on the customer's own data). In a trial a complaints export alone is enough: the
+    products, versions and lots it names are added.
+  - The sample case's Decision Brief arrives written and submitted by a sample author (an account nobody signs in
+    with): one trial user reviews it and signs; whoever writes a brief still never reviews or signs it.
+  - Authenticator setup shows a QR code (a dependency-free encoder); activating an account goes straight on to sign-in
+    and authenticator setup.
+  - A company email's trial is approved at once (`MDARIX_TRIAL_AUTO_APPROVE`, `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX`);
+    free mail, a second request from the same company and anything over the day's cap wait for review.
+  - Getting started in three parts: the loop with one next step, the journey and a compact chapter list (details on
+    request), and tabs for data, team, the sample explained and the trial's dates. A "chapter done, next" banner
+    follows the trial user anywhere; a one-click rating after three chapters.
+  - "What were you cited for?": the warning letter, form 483 and notified body themes, each tied to the chapter that
+    answers it; those chapters are marked and come first, and Platform Admin > Trials shows them.
+  - The trial owner can remove the sample data once their own is in: the sample and the work done on it go (found by
+    the database's own links), their own data, reporting windows and the chapters already tried stay; a preview says
+    all of it first.
+  - Reasons on the second look and the reportability watch offer sentence starters to finish in one's own words; a
+    starter alone is never accepted.
+  - AI honesty: while AI does not answer for the organization, the investigation chapter reads "Investigate with
+    evidence you can trace" and counts only a person's own action, and the AI status says "no AI service here" before
+    "switched off".
+- Ending a free trial early: the person who started the trial asks from Getting started (End my trial early), with an
+  optional reason and whether to delete the data (ticked by default), and may withdraw the request while it waits.
+  Platform Admin (Customers & Tenants > Trials) approves, which ends the trial at once and, when chosen, purges its
+  data (`tenant_purge`; a legal hold refuses), or declines with a note emailed to the owner. A trial ended with its data
+  kept can have it deleted there before the usual 30 days. The owner is emailed that the trial has ended, whether the
+  data is gone, and asked to reply with why they left; the MDARIX team is alerted to each request
+  (`MDARIX_TRIAL_ALERT_EMAIL`). Migration `md45` adds `trial_exit_requests` (keyed by `trial_tenant_id`, no names or
+  addresses, so the request and its reason remain after a purge). Audited as `TRIAL_EXIT_REQUESTED`,
+  `TRIAL_EXIT_WITHDRAWN`, `TRIAL_ENDED_EARLY` and `TRIAL_EXIT_DECLINED`.
+- Sign-in, account activation and password reset have a show/hide button on the password field. The free trial
+  sign-up lists countries by name only (the dialing code still starts the phone number).
+- The free trial user guide at `/help/trial-guide`: seven steps from requesting the trial to the one-to-one demo
+  (request, activate and sign in, invite two colleagues, the sample data story, your own data, feedback, the demo),
+  each with what to do, what you will see and an illustrated, animated picture of the screen (still under reduced
+  motion and in print). It opens without signing in, saves as a PDF (`docs/user-guide/MDARIX_Free_Trial_User_Guide.pdf`
+  is that PDF), and is linked from the sign-up confirmation, the trial's Help menu and Getting started.
+- Getting started shows the trial journey: the guide's seven steps, each ticked from the trial's own records (two
+  colleagues invited, three chapters tried, own data uploaded, feedback sent, demo requested), with a button for the
+  next step. The decide-and-sign chapter's button says "Open the case decision".
+- Getting started explains the sample data: what it holds (counted live), the pain point each part re-creates (hidden
+  complaints, running reporting clocks, harm closed without an investigation, a trend after a supplier change, an
+  investigation with its evidence, CAPAs without proof they worked, post-market data missing from the risk file), the
+  requirement behind each (ISO 13485, 21 CFR 803, EU MDR, ISO 14971) with a button to the screen that shows it, and how
+  the sample was made. The trial status counts the sample's lots, complaints, investigations, CAPAs and risks.
+
+### Fixed
+
+- A free trial's complaints upload said "9 new" for 4 complaints: the products and lots the file names are now
+  told apart ("4 new, 0 updated, and 2 products and 3 lots they name"; the import answers `also_created`).
+- The one-click rating in Getting started vanished as it was sent: its thank-you and "Tell us more" now stay in view.
+- Browser tests: the sign-in helpers find the password field exactly (the show/hide button also names "password");
+  a new trial-journey test runs the free trial end to end (`frontend/e2e/trial-journey.spec.ts`).
+- Platform Admin > Trials named the sample author as a trial's owner when the sample decision is staged; it names
+  the trial's own first person.
+- A purge now also deletes the demo requests a free trial booked (they name the person who asked), and the trial
+  reminders skip an organization whose data has been deleted.
+- The AI release gate's first bar ("a contracted AI provider with zero data retention") is read from the contract
+  settings themselves (`MDARIX_GENAI_CONTRACTED_PROVIDERS` and the provider's ZDR setting). Outside production the
+  provider policy allows any provider, so a free development provider showed the bar as met.
+- The readiness summary PDF no longer says the numbers of devices in use are unknown when lot quantities are
+  imported; it says how the trends were counted (per unit in the field, by calendar days, or both).
+
+### Changed
+
+- The MVP is five screens. Under `MDARIX_FEATURE_SET=mvp`, and always in a free trial, the workspace menu is Readiness,
+  Complaints, Signals, Investigations (the one case page), Records, My Work, Import data and My Account. Dashboard,
+  Products, Evidence, Decisions, Intelligence and Trust & Audit are parked, and every link into them opens the screen
+  that now holds the work: a case's evidence, Ask MDARIX, reviews and decision are steps of the case page; approvals
+  are a My Work tab for people who may sign; the audit trail (with each case's timeline, replay, AI runs and
+  integrity), reports and signature verification are Records tabs, each shown only to roles whose menu held the
+  section. Customer administration parks Integrations and Data Mapping (no simulated source-system connection is
+  shown) and the dashboard's connection and sync tiles. Platform administration parks Data & Integrations, Renewals,
+  Reminders (a link opens Subscriptions), Tenant cells and Developer API. Under `full` nothing changes; the parked code
+  and routes stay. `.env.production.example` now sets `mvp` for pilots.
+- Getting started tells the trial as a story. The quality loop names the next chapter, and each chapter shows its
+  live finding, why it matters and where to try it. Progress comes from the server (what the organization did), not
+  from the browser. The import, insights and team panels are unchanged.
+- Under the `mvp` feature set the template engines that only looked like AI are hidden. The case AI run skips the
+  failure-chain step (a fixed two-link template) and says why; the investigation panel no longer generates template
+  chains; the static agent catalog (`GET /api/v1/ai/agents/catalog`) is parked, and the AI Control Center shows the
+  trust check's policy instead. Chains people build on the case, and the full product, are unchanged.
+
+- Production runs one `background` service instead of `worker` and `scheduler`: `scripts/run_background.py` starts the
+  outbox worker and the scheduler unchanged as two processes, passes a stop signal to both and exits when either
+  stops, so Docker restarts the container; its health check needs both heartbeats (1.5 GB, 60 s stop period). After
+  upgrading, `docker compose up -d --remove-orphans` removes the old containers; `dc exec background python
+  scripts/run_scheduler.py --list` replaces `dc exec scheduler ...`.
+- ClamAV reloads its signatures in place (`CLAMD_CONF_ConcurrentDatabaseReload: "no"`), so its limit drops from 2 GB to
+  1.5 GB; scans pause for a few seconds during the daily update. The long-running services now need 5.25 GB (was
+  6.75 GB), plus 1 GB while the backup runs.
+- CI: a pull request runs the fast checks (backend, frontend, security, image scan, production compose and stack, the
+  desktop browser profile); dedicated data planes, data-plane routing, deployment roles, container and simulator
+  validation and the mobile browser profile run after every merge to main, nightly (was weekly security scans only) and
+  on demand. The release gate accepts those as skipped only on a pull request.
+- Dependabot proposes updates monthly (was weekly), grouped (Python and npm minor and patch updates, the base images,
+  the GitHub Actions); security updates still arrive as soon as an advisory is published.
+
 ## [0.9.0] - 2026-10-12
 
 The design-partner pilot readiness release.

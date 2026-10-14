@@ -34,6 +34,16 @@ TRIAL_DATA_TABLES = (
     "investigation_signals",
     "signals",
     "signal_rules",
+    # Complaint review (md40): decisions on complaints listed below, and the organization's settings.
+    "complaint_second_looks",
+    "complaint_settings",
+    # Reporting and CAPA (md41): reportability decisions on complaints and CAPA effectiveness checks listed below,
+    # and the organization's reporting windows.
+    "complaint_reportability",
+    "reportability_settings",
+    "capa_effectiveness_checks",
+    # The case AI run (md42): about the cases listed below.
+    "case_ai_runs",
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.
     "evidence_review_events",
     "investigation_scope_versions",

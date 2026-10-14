@@ -8,11 +8,12 @@
 # never from the env_file entries below, so without it a fresh VM stops with "required variable ... is missing".
 #
 # Postgres is a managed service with point-in-time recovery (not in this file). Only Caddy is reachable from the
-# internet (80/443); the API, worker, scheduler and virus scanner talk on a private network. No simulators, no mail
+# internet (80/443); the API, the background service (outbox worker and scheduler) and the virus scanner talk on a
+# private network. No simulators, no mail
 # catcher, no published database ports, and no default passwords. Settings live in two files:
-#   .env.production  every long-running service (api, worker, scheduler); no owner or backup database secrets.
+#   .env.production  every long-running service (api, background); no owner or backup database secrets.
 #   .env.migrate     the database owner's password, dedicated-plane owner URLs, the backup login and the off-site
-#                    bucket keys; loaded only by the one-shot migrate and backup jobs. The API, worker and scheduler
+#                    bucket keys; loaded only by the one-shot migrate and backup jobs. The API and the background service
 #                    refuse to start if any of these reaches them (backend/app/config_check.py).
 
 name: mdarix
@@ -91,7 +92,7 @@ services:
     logging: *logging
 
   # One-shot: schema migrations, the least-privilege runtime role, the application grants and the system-scope token.
-  # Runs before every start of the API, worker and scheduler. It is the only service besides backup that loads
+  # Runs before every start of the API and the background service. It is the only service besides backup that loads
   # .env.migrate: the owner's credentials (MDARIX_DB_OWNER_USER from .env.production, MDARIX_DB_OWNER_PASSWORD from
   # .env.migrate) become its POSTGRES_USER / POSTGRES_PASSWORD, so anything run in it, such as
   #   docker compose -f docker-compose.prod.yml --env-file .env.production run --rm migrate python scripts/create_platform_admin.py ...
@@ -149,9 +150,13 @@ services:
       migrate: {condition: service_completed_successfully}
       clamav: {condition: service_healthy}
 
-  worker:
+  # The one background service (ADR: MVP slim-down): the outbox worker (emails, report jobs, exports) and the scheduler
+  # (detection, reminders, retention, audit-chain checks) as two processes in one container (scripts/run_background.py).
+  # Each keeps its own loop and heartbeat file; the health check needs both, and if either process stops the container
+  # exits and Docker restarts it. The scheduler's external heartbeat (MDARIX_SCHEDULER_HEARTBEAT_URL) alerts as before.
+  background:
     <<: *app
-    command: ["python", "scripts/run_outbox_worker.py"]
+    command: ["python", "scripts/run_background.py"]
     volumes:
       - objects:/var/lib/mdarix/objects
       - reports:/var/lib/mdarix/reports
@@ -163,42 +168,19 @@ services:
       MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
       MDARIX_REPORT_TEMP_ROOT: /var/lib/mdarix/reports
       MDARIX_OUTBOX_HEARTBEAT_FILE: /tmp/mdarix-outbox-heartbeat.json
-    healthcheck:
-      test: ["CMD", "python", "-c", "import json,time,datetime; d=json.load(open('/tmp/mdarix-outbox-heartbeat.json')); assert time.time()-datetime.datetime.fromisoformat(d['updated_at']).timestamp() < 60"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    # SIGTERM lets the worker finish the event (or report) in hand before it stops; a report can take a while.
-    stop_grace_period: 60s
-    mem_limit: 1536m
-    cpus: 1.0
-    depends_on:
-      migrate: {condition: service_completed_successfully}
-
-  scheduler:
-    <<: *app
-    command: ["python", "scripts/run_scheduler.py"]
-    volumes:
-      - objects:/var/lib/mdarix/objects
-      - *db-ca
-      # Every process passes the same configuration gate, which reads the legal documents (config_check.py).
-      - ./legal:/var/lib/mdarix/legal:ro
-    environment:
-      MDARIX_LEGAL_DIR: /var/lib/mdarix/legal
-      MDARIX_OBJECT_STORAGE_ROOT: /var/lib/mdarix/objects
       MDARIX_SCHEDULER_HEARTBEAT_FILE: /tmp/mdarix-scheduler-heartbeat
     healthcheck:
-      # The loop rewrites the file after every cycle (every 30 s); two minutes without one means it is stuck.
-      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/mdarix-scheduler-heartbeat') < 120 else 1)"]
+      # Healthy only when both loops are alive: the worker writes its heartbeat every cycle (stale after 60 s), the
+      # scheduler touches its file after every cycle of 30 s (stale after 120 s).
+      test: ["CMD", "python", "-c", "import datetime,json,os,sys,time; d=json.load(open('/tmp/mdarix-outbox-heartbeat.json')); worker=time.time()-datetime.datetime.fromisoformat(d['updated_at']).timestamp() < 60; scheduler=time.time()-os.path.getmtime('/tmp/mdarix-scheduler-heartbeat') < 120; sys.exit(0 if worker and scheduler else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 120s
-    # SIGTERM stops the loop after the job in hand.
+    # SIGTERM is passed to both processes, which finish the event, report or job in hand before they stop.
     stop_grace_period: 60s
-    mem_limit: 1g
-    cpus: 1.0
+    mem_limit: 1536m
+    cpus: 1.5
     depends_on:
       migrate: {condition: service_completed_successfully}
 
@@ -211,7 +193,12 @@ services:
     networks: [internal]
     volumes:
       - clamav_db:/var/lib/clamav
-    mem_limit: 2g
+    environment:
+      # The image writes CLAMD_CONF_* settings into clamd.conf at start. With the parallel reload off, clamd does not
+      # hold two signature databases in memory during the daily update (scans pause for a few seconds instead), so
+      # its limit drops from 2 GB to 1.5 GB.
+      CLAMD_CONF_ConcurrentDatabaseReload: "no"
+    mem_limit: 1536m
     cpus: 1.0
     healthcheck:
       test: ["CMD", "clamdcheck.sh"]

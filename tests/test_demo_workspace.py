@@ -26,7 +26,7 @@ from backend.app.role_codes import canonical_stored_role
 PASSWORD = "Demo workspace test 2026!"
 STORY = {
     "products": len(story.PRODUCTS),
-    "complaints": len(story.COMPLAINTS),
+    "complaints": len(story.COMPLAINTS) + len(story.REVIEW_EXAMPLES),
     "investigations": len(story.INVESTIGATIONS),
     "evidence": sum(len(records) for records in story.EVIDENCE.values()),
     "changes": len(story.CHANGES),

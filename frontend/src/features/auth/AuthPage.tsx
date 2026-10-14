@@ -1,7 +1,8 @@
-import React, { useState, type ReactNode } from "react";
-import { CalendarCheck, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+import React, { useEffect, useRef, useState, type ReactNode } from "react";
+import { CalendarCheck, Eye, EyeOff, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
 import { SignupForm } from "./SignupForm";
 import { SignupMotion } from "./SignupMotion";
+import { QrCodeSvg } from "../../app/QrCodeSvg";
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
   signin: {
@@ -169,6 +170,41 @@ export function AuthPage({ mode }: { mode: string }) {
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [mfaEnrollment] = useState(query.get("setup") === "1");
+  // Setting up the authenticator: the setup key (and its QR code) is asked for as the screen opens; a new one on request.
+  const generateKey = async () => {
+    const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" }).catch(() => null);
+    if (!response) {
+      setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
+      return;
+    }
+    const data = await response.json().catch(() => ({}));
+    setMfaSecret(data.secret ?? "");
+    setMfaUri(data.otpauth_uri ?? "");
+    setMessage(
+      response.ok
+        ? data.development_code
+          ? `Development code: ${data.development_code}`
+          : ""
+        : problemMessage(data, "MFA setup is unavailable."),
+    );
+  };
+  const keyAsked = useRef(false);
+  useEffect(() => {
+    if (!isMfa || !mfaEnrollment || keyAsked.current) return;
+    keyAsked.current = true;
+    void generateKey();
+  }, [isMfa, mfaEnrollment]);
+  // After activating the account: sign in with the invited email and the password just chosen, then straight on to
+  // authenticator setup; null when that cannot be done here (the person signs in themselves).
+  const signInAfterActivation = async (activated: string) => {
+    const response = await fetch("/api/v1/auth/signin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: activated, password }),
+    }).catch(() => null);
+    const data = response?.ok ? await response.json().catch(() => null) : null;
+    return data && data.status !== "TENANT_SELECTION_REQUIRED" ? data : null;
+  };
   const afterSignin = (data: { mfa_enrollment_required?: boolean; mfa_required?: boolean }) => {
     const next = encodeURIComponent(returnTo);
     window.location.href = data.mfa_enrollment_required
@@ -262,6 +298,8 @@ export function AuthPage({ mode }: { mode: string }) {
         `Thank you. We review every request, usually within one business day. Once it is approved, we email ${email} an invitation to your free trial workspace.`,
       );
     } else if (mode === "activate-account") {
+      const signedIn = typeof data.email === "string" ? await signInAfterActivation(data.email) : null;
+      if (signedIn) return afterSignin(signedIn);
       setDone(true);
       setMessage("Account activated. You can now sign in with your email and new password.");
     } else if (mode === "reset-password") {
@@ -365,36 +403,17 @@ export function AuthPage({ mode }: { mode: string }) {
           <h1>{mfaEnrollment ? "Set up your authenticator app" : "Verify your identity"}</h1>
           <p>
             {mfaEnrollment
-              ? "Add MDARIX to an authenticator app (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
+              ? "Scan the QR code with an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
               : useRecovery
                 ? "Enter one of your recovery codes. Each code works once."
                 : "Enter the 6-digit code from your authenticator app to continue."}
           </p>
           {mfaEnrollment && (
             <>
-              <button
-                className="secondary-link"
-                type="button"
-                onClick={async () => {
-                  const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" }).catch(() => null);
-                  if (!response) {
-                    setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
-                    return;
-                  }
-                  const data = await response.json().catch(() => ({}));
-                  setMfaSecret(data.secret ?? "");
-                  setMfaUri(data.otpauth_uri ?? "");
-                  setMessage(
-                    response.ok
-                      ? `Add the key below to your authenticator app.${data.development_code ? ` Development code: ${data.development_code}` : ""}`
-                      : problemMessage(data, "MFA setup is unavailable."),
-                  );
-                }}
-              >
-                {mfaSecret ? "Generate a new key" : "Generate my setup key"}
-              </button>
-              {mfaSecret && (
+              {mfaSecret ? (
                 <div className="mfa-setup">
+                  {mfaUri && <QrCodeSvg text={mfaUri} label="QR code to add MDARIX to your authenticator app" />}
+                  <p className="mfa-key-label">No camera? Type this key into the app instead:</p>
                   <p className="mfa-secret" aria-label="Authenticator setup key">
                     {mfaSecret.replace(/(.{4})/g, "$1 ").trim()}
                   </p>
@@ -402,7 +421,12 @@ export function AuthPage({ mode }: { mode: string }) {
                     Open in an authenticator app on this device
                   </a>
                 </div>
+              ) : (
+                <p className="mfa-key-label">Preparing your setup key…</p>
               )}
+              <button className="secondary-link" type="button" onClick={() => void generateKey()}>
+                {mfaSecret ? "Generate a new key" : "Try again"}
+              </button>
             </>
           )}
           <label className="auth-field">
@@ -523,14 +547,11 @@ export function AuthPage({ mode }: { mode: string }) {
             {(mode === "signin" || isTokenPassword) && (
               <label className="auth-field">
                 {isTokenPassword ? "New password" : "Password"}
-                <input
-                  required
+                <PasswordInput
                   minLength={isTokenPassword ? 12 : 1}
-                  maxLength={128}
-                  type="password"
                   autoComplete={isTokenPassword ? "new-password" : "current-password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={setPassword}
                 />
                 {isTokenPassword && <small>Only you know it: administrators never see passwords.</small>}
               </label>
@@ -589,5 +610,53 @@ export function AuthPage({ mode }: { mode: string }) {
         )}
       </form>
     </AuthFrame>
+  );
+}
+
+/**
+ * A password field with an eye button that shows what was typed, to check it before signing in or setting it; it is
+ * hidden again whenever the form is sent (exported for its test).
+ */
+export function PasswordInput({
+  value,
+  onChange,
+  minLength,
+  autoComplete,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minLength: number;
+  autoComplete: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span className="auth-password">
+      <input
+        required
+        minLength={minLength}
+        maxLength={128}
+        type={visible ? "text" : "password"}
+        autoComplete={autoComplete}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={(event) => {
+          // Leaving the form (sending it, or going elsewhere) hides the password again.
+          if (!event.currentTarget.form?.contains(event.relatedTarget as Node | null)) setVisible(false);
+        }}
+      />
+      <button
+        type="button"
+        className="auth-password-toggle"
+        aria-label={visible ? "Hide password" : "Show password"}
+        aria-pressed={visible}
+        title={visible ? "Hide password" : "Show password"}
+        onClick={() => setVisible((shown) => !shown)}
+      >
+        {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+      </button>
+    </span>
   );
 }

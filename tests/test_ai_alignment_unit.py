@@ -410,6 +410,8 @@ def test_brief_and_counterfactual_responses_carry_the_label():
     "allowed, models, used, limit, reason",
     [
         (False, [{"provider": "groq"}], 0, 100, "AI_DISABLED"),
+        # No AI service here is said first: switching the organization on would change nothing.
+        (False, [], 0, 100, "PROVIDER_UNAVAILABLE"),
         (True, [], 0, 100, "PROVIDER_UNAVAILABLE"),
         (True, [{"provider": "groq"}], 100, 100, "BUDGET_EXHAUSTED"),
         (True, [{"provider": "groq"}], 10, 100, None),
