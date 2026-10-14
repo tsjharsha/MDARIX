@@ -10,6 +10,8 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-10-15
+
 ### Fixed
 
 - Workspace: a free-trial user saw the Readiness screen for a moment after signing in, before Getting started. The
