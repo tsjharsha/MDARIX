@@ -10,6 +10,11 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+### Fixed
+
+- Workspace: a free-trial user saw the Readiness screen for a moment after signing in, before Getting started. The
+  first screen now waits for the trial status, showing "Opening your workspace…", and opens Getting started directly.
+
 ## [0.10.2] - 2026-10-14
 
 ### Fixed
