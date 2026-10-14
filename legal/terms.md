@@ -1,7 +1,5 @@
 # Terms of service
 
-**DRAFT FOR LEGAL REVIEW. Not yet in effect.** This draft becomes the published terms once the operator approves them.
-
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by Srinivas Telikicherla, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial and no fees are charged. Once the company is registered, these terms will be updated with the company's details and we will tell you by email.
 
 Last updated: 14 October 2026
