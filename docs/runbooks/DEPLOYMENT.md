@@ -14,6 +14,8 @@ compromised long-running service never holds credentials that bypass row-level s
 
 Staging runs the same stack on a free Oracle Cloud ARM server, with Postgres on the server: see
 [STAGING_ORACLE.md](STAGING_ORACLE.md) (ADR-017).
+On Google Cloud in India (Mumbai, Cloud SQL, Cloud Storage), follow [GCP_DEPLOYMENT.md](GCP_DEPLOYMENT.md) for the
+Google parts and the order.
 
 **Every compose command passes `--env-file .env.production`.** Compose fills the `${...}` values in
 `docker-compose.prod.yml` (image tags, domain, backup folder) only from that file, never from the services'
