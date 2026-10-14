@@ -586,7 +586,9 @@ def _ai_off(org) -> dict:
     )
     assert settings["ai_processing_allowed"] is False
     status = _ok(org["investigator"][0].get("/api/v1/ai/status"))
-    assert status["enabled"] is False and status["reason_code"] == "AI_DISABLED" and status["message"]
+    # Switched off; a server without any AI service says that first (switching on would change nothing).
+    expected = "AI_DISABLED" if status["available"] else "PROVIDER_UNAVAILABLE"
+    assert status["enabled"] is False and status["reason_code"] == expected and status["message"]
     return status
 
 

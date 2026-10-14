@@ -256,7 +256,11 @@ def test_ai_status_for_the_signed_in_organization(investigator):
     body = status.json()
     assert set(body) >= {"enabled", "available", "budget", "reason_code", "message", "manual_paths"}
     assert body["reason_code"] in {None, "AI_DISABLED", "PROVIDER_UNAVAILABLE", "BUDGET_EXHAUSTED"}
-    assert (body["reason_code"] == "AI_DISABLED") == (body["enabled"] is False)
+    # The first reason that applies: no AI service on this server, then AI switched off for the organization.
+    if not body["available"]:
+        assert body["reason_code"] == "PROVIDER_UNAVAILABLE"
+    elif not body["enabled"]:
+        assert body["reason_code"] == "AI_DISABLED"
     assert body["manual_paths"]["ask"] == "record-based answers" and body["manual_paths"]["hypotheses"] is True
     budget = body["budget"]
     assert budget["remaining"] == max(0, budget["limit"] - budget["used"])
