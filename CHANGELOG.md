@@ -10,10 +10,15 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-14
+
 ### Fixed
 
 - Sign-up: choosing a country put its dialling code in the optional phone field, and the form then refused to
   continue without a full number. A dialling code alone now counts as no phone, and nothing is sent.
+- `VERSION` now says 0.10.2. The v0.10.0 and v0.10.1 tags were made with `VERSION` still at 0.9.0, so
+  `release.yml` would refuse them and a server without `MDARIX_RELEASE` would report v0.9.0. The rehearsal server
+  sets `MDARIX_RELEASE`, so it reported the right release.
 
 ## [0.10.1] - 2026-10-14
 
