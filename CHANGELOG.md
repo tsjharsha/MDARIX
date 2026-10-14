@@ -10,6 +10,25 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-14
+
+The validation-phase release: the approved legal texts, the start-up fix found on the first Google Cloud
+rehearsal, and the Google Cloud runbook.
+
+### Added
+
+- `docs/runbooks/GCP_DEPLOYMENT.md`: MDARIX on Google Cloud in Mumbai for the validation phase (one VM with
+  PostgreSQL, keyless off-site backups to Delhi, IAP-only SSH, uptime and heartbeat monitoring), the private
+  rehearsal, go-live, and the move to Cloud SQL when design partners pay.
+
+### Changed
+
+- The privacy policy, terms of service and free trial agreement are final for the product validation phase,
+  approved by the operator on 2026-10-14: operated by Srinivas Telikicherla while the company is registered,
+  hosting and email in India (Google Cloud Mumbai and Delhi, Zoho), Indian law and the DPDP Act, Hyderabad courts,
+  the trial as it works today (instant approval for company email, early exit). `legal/SUBPROCESSORS.md` names
+  the providers.
+
 ### Fixed
 
 - The API stopped at start-up when `MDARIX_GENAI_COST_PER_1K_TOKENS` was left empty, as the production template
