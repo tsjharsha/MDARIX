@@ -59,6 +59,7 @@ export const SITE_PAGES = [
   "/trust",
   "/resources",
   "/company",
+  "/videos",
 ] as const;
 export type SitePage = (typeof SITE_PAGES)[number];
 
@@ -229,6 +230,9 @@ export function HomePage() {
                   Request a demo
                 </a>
               )}
+              <a className="ms-btn ms-btn-ghost-light" href="/videos">
+                Watch the videos
+              </a>
               <a className="ms-btn ms-btn-ghost-light" href="/platform">
                 Explore the platform
               </a>
@@ -973,6 +977,16 @@ export function ResourcesPage() {
             </Reveal>
           ))}
         </div>
+      </section>
+      <section className="ms-section">
+        <SectionHead
+          eyebrow="Free trial videos"
+          title="Watch the free trial, step by step."
+          copy="Fourteen short videos follow a quality manager through the 30-day trial, from signing up to every chapter of the story, with English captions."
+        />
+        <a className="ms-link" href="/videos">
+          Watch the videos <ArrowRight size={14} aria-hidden="true" />
+        </a>
       </section>
       <section className="ms-section ms-band">
         <SectionHead

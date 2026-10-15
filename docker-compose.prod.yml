@@ -72,6 +72,8 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      # The free-trial videos the website shows at /videos (videos/README.md).
+      - ./videos:/media/videos:ro
     security_opt:
       - no-new-privileges:true
     cap_drop: [ALL]

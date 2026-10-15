@@ -10,6 +10,17 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-10-15
+
+### Added
+
+- Website: a "Free trial videos" page at `/videos` lists the fourteen-video series "MDARIX Free Trial, Step by Step".
+  A ready video plays in its card with English captions (WebVTT); the others say "Coming soon". Linked from the home
+  page ("Watch the videos"), the Resources page and the footer.
+- Server: the web container serves the repository's `videos/` folder, mounted read-only, at `/media/videos/`
+  (`docker-compose.prod.yml`, `infrastructure/docker/Caddyfile`). A video is published by copying its MP4, captions,
+  poster and the `videos.json` list there, with no release (`videos/README.md`). The media files are not kept in git.
+
 ## [0.10.5] - 2026-10-15
 
 ### Changed
