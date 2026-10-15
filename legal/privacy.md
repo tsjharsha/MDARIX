@@ -1,14 +1,14 @@
 # Privacy policy
 
-**Product validation phase.** MDARIX is in a product validation phase. It is operated by Srinivas Telikicherla, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
+**Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
 
-Last updated: 14 October 2026
+Last updated: 15 October 2026
 
-This policy explains how Srinivas Telikicherla, operating MDARIX ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a demo or a free trial, or use the MDARIX product investigation platform (the "Service").
+This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a demo or a free trial, or use the MDARIX product investigation platform (the "Service").
 
 ## Who we are
 
-MDARIX is operated by Srinivas Telikicherla, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. The company that will operate MDARIX is not yet registered; registration is in progress.
+MDARIX is operated by its founder (Product and Regulatory Quality: 26+ years in enterprise technology and MedTech / life sciences; director-level responsibility for regulatory quality and post-market surveillance; EU MDR, FDA vigilance, CAPA and recalls), in Hyderabad, India. The company that will operate MDARIX is not yet registered; registration is in progress.
 
 Questions about this policy or your personal data: privacy@mdarix.in.
 
@@ -104,7 +104,7 @@ Depending on where you live, you may have the right to:
 - nominate another person to exercise your rights if you die or become unable to;
 - have a grievance about our handling of your data addressed.
 
-To use these rights, email privacy@mdarix.in. Our contact for grievances under India's Digital Personal Data Protection Act, 2023 is Srinivas Telikicherla, at that address. If your data is part of a customer's content, we will pass your request to that customer and help them respond.
+To use these rights, email privacy@mdarix.in. Our contact for grievances under India's Digital Personal Data Protection Act, 2023 is the founder of MDARIX, at that address. If your data is part of a customer's content, we will pass your request to that customer and help them respond.
 
 If you are not satisfied with our answer, you can complain to the Data Protection Board of India. If you are in the European Economic Area or the United Kingdom, you can also complain to your local data protection authority.
 
@@ -118,4 +118,4 @@ If we change this policy we will update the date above and, for significant chan
 
 ## Contact
 
-Srinivas Telikicherla, operating MDARIX, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. Privacy questions: privacy@mdarix.in. Everything else: support@mdarix.in.
+MDARIX, Hyderabad, India. Privacy questions: privacy@mdarix.in. Everything else: support@mdarix.in.

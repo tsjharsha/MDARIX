@@ -10,6 +10,16 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-10-15
+
+### Changed
+
+- Legal pages (privacy policy, terms of service, free trial agreement): the operator is now described as MDARIX's
+  founder, with their background in product and regulatory quality, instead of by name, and the contact sections give
+  "MDARIX, Hyderabad, India" with the privacy and support addresses instead of a street address. "Last updated" is
+  15 October 2026. Operators: set `MDARIX_COMPANY_LEGAL_NAME` and `MDARIX_COMPANY_ADDRESS` to match, since the
+  footer, the contact page and every email show them.
+
 ## [0.10.3] - 2026-10-15
 
 ### Fixed

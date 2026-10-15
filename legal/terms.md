@@ -1,10 +1,10 @@
 # Terms of service
 
-**Product validation phase.** MDARIX is in a product validation phase. It is operated by Srinivas Telikicherla, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial and no fees are charged. Once the company is registered, these terms will be updated with the company's details and we will tell you by email.
+**Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial and no fees are charged. Once the company is registered, these terms will be updated with the company's details and we will tell you by email.
 
-Last updated: 14 October 2026
+Last updated: 15 October 2026
 
-These terms govern your organization's use of the MDARIX product investigation platform (the "Service"), which Srinivas Telikicherla, operating MDARIX ("MDARIX", "we", "us"), provides. "Customer" or "you" means the organization that signs up for the Service. "Users" are the people the customer allows to use it.
+These terms govern your organization's use of the MDARIX product investigation platform (the "Service"), which the founder of MDARIX, operating it ("MDARIX", "we", "us"), provides. "Customer" or "you" means the organization that signs up for the Service. "Users" are the people the customer allows to use it.
 
 By creating an account or using the Service, you agree to these terms. If you accept them for an organization, you confirm that you have authority to bind it.
 
@@ -103,4 +103,4 @@ We may update these terms. We will tell you about significant changes at least 3
 
 ## Contact
 
-Srinivas Telikicherla, operating MDARIX, Rajapushpa Regalia, Kokapet, Hyderabad, Telangana 500075, India. Email: support@mdarix.in.
+MDARIX, Hyderabad, India. Email: support@mdarix.in.
