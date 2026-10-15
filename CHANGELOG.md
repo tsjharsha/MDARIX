@@ -10,6 +10,25 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.9] - 2026-10-15
+
+### Changed
+
+- Website: "Know what is available today" now matches the free trial. "Available today" lists what every workspace,
+  the 30-day free trial included, can use (the second look, reporting clocks, signals and trend checks,
+  investigations, signed decisions, CAPA effectiveness checks, risk-file input, the inspector summary, CSV import,
+  roles and MFA). AI assistance moved to "With design partners": it is switched on once it is validated. A new "In your
+  free trial" block under the columns says what the trial gives (30 days, 3 users, 5,000 uploaded rows, the nine-chapter
+  sample story, fourteen videos) and that AI is off during the trial.
+- Website `/product-lifecycle`: Signal Intelligence and CAPA Intelligence are shown as current capability, described as
+  they work today; the current and future roadmap cards list what the product does now.
+- Website: claims of AI as available now say it is switched on per organization and off in the free trial (home page,
+  `/trust`, `/security`, the trial-agreement summary); the home hero says "Every finding links to its records".
+- Website `/trust`: sessions are described as they work (sign-out after 30 minutes without activity, 12 hours at
+  most); live connections and the Product 360 system handoff are described as built with design partners; `/company`
+  no longer mentions regulatory drafts.
+- Sign-in and sign-up pages: "Every finding cites its records" and "5,000 uploaded rows", as on the website.
+
 ## [0.10.8] - 2026-10-15
 
 ### Fixed

@@ -11,7 +11,7 @@ import {
   Sparkles,
   UserCheck,
 } from "lucide-react";
-import { menus, pages, postMarketResources } from "./legacyContent";
+import { menus, pages, postMarketResources, trialIncludes } from "./legacyContent";
 import { DEMO_REQUESTS_OFFERED } from "./offer";
 import {
   capabilityStatus,
@@ -156,7 +156,7 @@ function ScopeClarity() {
         eyebrow="What you get"
         title="Know what is available today."
         id="scope-title"
-        copy="What works in every workspace now, what we build with design partners, and what is still planned."
+        copy="What works in every workspace now, the free trial included, what we build with design partners, and what is still planned."
       />
       <div className="ms-grid-3">
         {capabilityStatus.map((status, index) => (
@@ -174,6 +174,21 @@ function ScopeClarity() {
           </Reveal>
         ))}
       </div>
+      <Reveal className="ms-card ms-card-flat ms-scope-trial">
+        <strong>In your free trial</strong>
+        <p>Everything under “Available today”, on sample data first and then on your own exports.</p>
+        <ul className="ms-check-list">
+          {trialIncludes.map((item) => (
+            <li key={item}>
+              <Check size={16} aria-hidden="true" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+        <a className="ms-btn ms-btn-primary" href="/signup">
+          Start free trial <ArrowRight size={16} aria-hidden="true" />
+        </a>
+      </Reveal>
     </section>
   );
 }
@@ -242,7 +257,7 @@ export function HomePage() {
                 <Check size={15} aria-hidden="true" /> Works above QMS, PLM, ERP and supplier systems
               </li>
               <li>
-                <Check size={15} aria-hidden="true" /> AI answers show their evidence
+                <Check size={15} aria-hidden="true" /> Every finding links to its records
               </li>
               <li>
                 <Check size={15} aria-hidden="true" /> Authorized humans decide and sign
@@ -333,7 +348,7 @@ export function HomePage() {
             [
               Sparkles,
               "AI you can inspect",
-              "Show grounding, temporal context, ProductVersion validation, provenance, and limitations.",
+              "When AI is switched on, each answer shows its evidence, time view, product version, provenance and limits. It is off in the free trial.",
             ],
             [UserCheck, "Humans decide", "AI supports investigation. Authorized humans make controlled decisions."],
           ].map(([Icon, title, text], index) => {
@@ -432,7 +447,7 @@ export function HomePage() {
             [
               ShieldCheck,
               "Grounded, bounded AI",
-              "Answers cite authorized evidence and hold back when the evidence is thin.",
+              "When switched on, answers cite authorized evidence and hold back when it is thin. AI is off in the free trial.",
             ],
             [
               BadgeCheck,
@@ -693,16 +708,18 @@ export function LifecyclePage() {
             <span className="ms-badge ms-badge-current">Available</span>
             <h3>Current capabilities</h3>
             <p>
-              Product 360, Product Reality Graph, temporal context, evidence intelligence, investigation, hypotheses,
-              challenger, unknowns, failure chain, counterfactuals, decisions, assurance, and governance foundations.
+              Product 360, temporal context, the second look at closed complaints, reporting clocks, signals and trend
+              checks, investigations with evidence, hypotheses and open questions, signed decisions, CAPA effectiveness
+              checks, risk-file input, the inspector summary, and the audit trail.
             </p>
           </Reveal>
           <Reveal className="ms-card" delay={100}>
             <span className="ms-badge ms-badge-future">Future</span>
             <h3>Broader lifecycle intelligence</h3>
             <p>
-              Strategy, requirements, design controls, regulatory, clinical, manufacturing operations, CAPA, recall,
-              continuous monitoring, and retirement remain roadmap areas.
+              Strategy, requirements, design controls, regulatory, clinical, manufacturing operations, field actions and
+              recalls, continuous monitoring, and retirement remain roadmap areas. AI assistance is switched on with
+              design partners once it is validated.
             </p>
           </Reveal>
         </div>
@@ -807,6 +824,13 @@ export function TrustPage() {
               <Check size={16} aria-hidden="true" />
               <span>Authorized humans review, decide and sign.</span>
             </li>
+            <li>
+              <Check size={16} aria-hidden="true" />
+              <span>
+                AI is switched on per organization by its administrator. It is off in the free trial while it is
+                validated, and every step works by hand.
+              </span>
+            </li>
           </ul>
         </Reveal>
         <Reveal delay={120}>
@@ -828,7 +852,7 @@ export function TrustPage() {
             [
               UserCheck,
               "Identity and sessions",
-              "Authenticator-app MFA (single sign-on is planned), 60-minute sessions, idle sign-out, and immediate sign-out when access is suspended.",
+              "Authenticator-app MFA (single sign-on is planned), sign-out after 30 minutes without activity, a 12-hour limit on any session, and immediate sign-out when access is suspended.",
             ],
             [
               ShieldCheck,
@@ -891,7 +915,7 @@ export function TrustPage() {
             <li>
               <Check size={16} aria-hidden="true" />
               <span>
-                Start with file exports from your existing systems; move to live connections when you are ready.
+                Start with file exports from your existing systems; live connections are built with design partners.
               </span>
             </li>
             <li>
@@ -1081,7 +1105,7 @@ export function CompanyPage() {
             ],
             [
               "What MDARIX is not",
-              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system: its regulatory drafts are a starting point that your team reviews, edits and approves. Those systems stay the record; MDARIX connects them for investigation.",
+              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system: it never submits anything to a regulator. Those systems stay the record; MDARIX connects them for investigation.",
             ],
             [
               "Design-partner outcome",

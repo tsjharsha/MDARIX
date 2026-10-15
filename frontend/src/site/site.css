@@ -809,6 +809,19 @@
 .ms-band .ms-card-flat {
   background: #fff;
 }
+/* The free trial under the capability columns: teal-edged, its list in two columns where there is room. */
+.ms-scope-trial {
+  margin-top: 20px;
+  border-left: 4px solid var(--ms-teal);
+}
+.ms-scope-trial .ms-check-list {
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  margin-top: 6px;
+}
+.ms-scope-trial .ms-btn {
+  justify-self: start;
+  margin-top: 8px;
+}
 .ms-card-diagram img {
   margin-top: 10px;
   border-radius: 10px;

@@ -146,9 +146,9 @@ export const menus: Record<string, MenuGroup[]> = {
       items: [
         current("Complaint Intelligence", "/solutions#complaints"),
         current("Post-Market Investigation", "/platform/investigation"),
-        future("Signal Intelligence", "signal"),
+        current("Signal Intelligence", "/product-lifecycle#signal"),
         current("Evidence Intelligence", "/platform/evidence"),
-        future("CAPA Intelligence", "capa"),
+        current("CAPA Intelligence", "/product-lifecycle#capa"),
         future("Field Action / Recall Intelligence", "recall"),
         current("Product Change Intelligence", "/platform/timeline"),
         future("Continuous Monitoring", "monitoring"),
@@ -420,18 +420,21 @@ export const capabilityCopy: Record<string, { eyebrow: string; title: string; co
   },
 };
 
-// What a design partner can use today, what is built together during a pilot, and what is planned. Keep this in
-// step with the product: nothing moves to "Available today" until it works for a customer.
+// What every workspace can use today (the free trial included), what is built together during a pilot, and what is
+// planned. Keep this in step with the product: nothing moves to "Available today" until it works for a customer, and
+// AI stays out of it until it is switched on for customers.
 export const capabilityStatus: { label: string; text: string; items: string[] }[] = [
   {
     label: "Available today",
-    text: "In every workspace, including the free trial.",
+    text: "In every workspace, including the 30-day free trial.",
     items: [
       "Product 360: products, versions, lots, components and suppliers",
-      "Complaint signals and investigations with competing hypotheses",
-      "Evidence, contradictions and open questions kept side by side",
-      "AI answers that show the evidence they used and flag anything unverified",
+      "A second look at complaints closed as inquiries or “no fault found”",
+      "Reporting clocks for the FDA, EU, UK and Canada",
+      "Complaint signals from a count rule and a trend check per product version",
+      "Investigations with evidence, competing hypotheses and open questions side by side",
       "Human decisions with electronic signatures and an audit trail",
+      "CAPA effectiveness checks, risk-file input and the inspector summary",
       "CSV import with templates and a personal-data check",
       "Roles, customer administration and authenticator-app MFA",
     ],
@@ -442,6 +445,7 @@ export const capabilityStatus: { label: string; text: string; items: string[] }[
     items: [
       "Live connections to your QMS, PLM, ERP and supplier systems",
       "Mapping your fields and reference data to the MDARIX model",
+      "AI assistance that cites its evidence, switched on once it is validated with your team",
     ],
   },
   {
@@ -453,6 +457,16 @@ export const capabilityStatus: { label: string; text: string; items: string[] }[
       "A dedicated database for each customer",
     ],
   },
+];
+
+// What the free trial gives a team, in the words of the trial agreement (legal/trial-agreement.md).
+export const trialIncludes: string[] = [
+  "30 days, free, with no credit card",
+  "Up to 3 users and 5,000 uploaded rows",
+  "Sample data that tells the quality story in nine chapters",
+  "Your own CSV exports, checked for problems and personal data before import",
+  "Fourteen step-by-step videos",
+  "AI is off during the trial: every step works by hand",
 ];
 
 export const lifecycleContent: Record<string, { eyebrow: string; title: string; copy: string }> = {
@@ -503,13 +517,13 @@ export const lifecycleContent: Record<string, { eyebrow: string; title: string; 
   },
   signal: {
     eyebrow: "Product lifecycle · Monitor",
-    title: "Detect and investigate signals across the installed product base.",
-    copy: "Combine complaints, service data, adverse events, returns, trends, and product-version context to distinguish emerging signals from isolated observations.",
+    title: "Catch a rising trend before the next lot ships.",
+    copy: "A count rule and a trend check compare each product version's last 30 days with its own history, counted per unit in the field. A signal opens a case in one click with every complaint attached. Service, return and adverse-event feeds come later.",
   },
   capa: {
     eyebrow: "Product lifecycle · Improve",
-    title: "Move from a confirmed issue to controlled improvement.",
-    copy: "Link investigation findings to containment, root-cause analysis, corrective and preventive actions, effectiveness checks, owners, and approval evidence.",
+    title: "Prove that each corrective action worked.",
+    copy: "A signed decision opens its CAPA, and MDARIX shows which CAPAs were closed without an effectiveness check, which checks are overdue and which have none planned. The full CAPA workflow stays in your QMS.",
   },
   recall: {
     eyebrow: "Product lifecycle · Act",
@@ -847,7 +861,7 @@ export const platformCapabilityData: Record<
       },
       {
         title: "Connected system handoff",
-        text: "Use governed APIs and versioned mappings to exchange context with PLM, QMS, ERP/MES, and supplier systems while preserving ownership of source data.",
+        text: "Bring context from PLM, QMS, ERP/MES, and supplier systems through versioned mappings: CSV exports today, live connections with design partners. Each system keeps ownership of its data.",
       },
     ],
     steps: [
