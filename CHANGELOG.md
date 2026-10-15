@@ -10,6 +10,20 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.8] - 2026-10-15
+
+### Fixed
+
+- Opening a case no longer starts its AI analysis while AI does not answer for the organization (switched off, no
+  service available, or the allowance used up, as in every free trial). Before, the case page started a run by itself
+  and the rules wrote an analysis, hypotheses, challenges and unknowns into the case under an "AI analysis" card. Now
+  `POST /api/v1/investigations/{id}/ai-run` with `trigger=AUTO` answers `started: false` with reason `AI_NOT_READY`,
+  and the case page shows no AI card until AI answers. A person can still run the steps by hand.
+- The case AI run says "AI" for a step only when the language model wrote its result. Unknowns, which the rules always
+  write, were shown as written by AI.
+- Generating the investigation brief, and the counterfactual and scenario views, read the product from the
+  organization's own data plane. On a server that enforces row-level security they failed with `PRODUCT_NOT_FOUND`.
+
 ## [0.10.7] - 2026-10-15
 
 ### Fixed

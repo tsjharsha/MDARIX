@@ -20,7 +20,7 @@ import {
 } from "./signalAi";
 import { followUpTypesOf, followUpsFromActions } from "./humanDecision";
 import { SummaryView, TrendLine } from "./sections/SignalInsight";
-import { RunView } from "./sections/CaseAiRun";
+import { RunView, cardShown, startsByItself } from "./sections/CaseAiRun";
 import { SIGNALS_TABS } from "./signals";
 import { taskDestination } from "./tasks";
 
@@ -225,6 +225,21 @@ describe("the case AI run", () => {
       <RunView run={run()} running={false} canRun={false} busy={false} error="" onRun={vi.fn()} />,
     );
     expect(viewer).not.toContain("Run the analysis again");
+  });
+
+  it("starts by itself and shows only while AI answers for the organization", () => {
+    const at = { canRun: true, aiReady: true as boolean | null, loaded: true, run: null as CaseAiRun | null };
+    expect(startsByItself(at)).toBe(true);
+    // AI off, not available or used up, or its status still loading: opening the case starts nothing.
+    expect(startsByItself({ ...at, aiReady: false })).toBe(false);
+    expect(startsByItself({ ...at, aiReady: null })).toBe(false);
+    expect(startsByItself({ ...at, canRun: false })).toBe(false);
+    expect(startsByItself({ ...at, loaded: false })).toBe(false);
+    expect(startsByItself({ ...at, run: run() })).toBe(false);
+    expect(cardShown(true, false)).toBe(true);
+    expect(cardShown(false, false)).toBe(false);
+    expect(cardShown(null, false)).toBe(false);
+    expect(cardShown(false, true)).toBe(true);
   });
 });
 

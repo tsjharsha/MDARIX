@@ -16,6 +16,7 @@ from backend.app.db.models.foundation import (
     FailureChain,
     Scenario,
 )
+from backend.app.db.tenant_scope import scoped_bind
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceService, InvestigationWorkspaceError
 
@@ -155,6 +156,8 @@ class BriefService:
                     as_of=cutoff,
                     include_retrieval=True,
                 ),
+                # Read Product 360 from the same tenant data plane as the investigation.
+                data_plane_engine=scoped_bind(db),
             )
         except InvestigationWorkspaceError as exc:
             raise BriefError(exc.code, exc.message) from exc

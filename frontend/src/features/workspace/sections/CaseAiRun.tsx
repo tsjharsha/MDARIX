@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CircleDashed, CircleSlash, Loader2, RefreshCw, Sparkles, XCircle } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
+import { useAiReady } from "../useAiStatus";
 import { useCan } from "../workspaceContext";
 import { isRunning, runHeadline, runPath, runProgress, type CaseAiRun, type CaseAiRunStep } from "../signalAi";
 import { InlineError } from "./boardParts";
@@ -12,10 +13,12 @@ const POLL_MS = 3000;
 /**
  * The case's AI analysis in one run: it starts by itself the first time the case opens (for someone allowed to run
  * AI, when the case has no AI work yet), shows each step as it finishes, and can be run again after new evidence.
- * ``onFinished`` lets the page reload the results below once a run ends.
+ * While AI does not answer for the organization (off, not available or used up) the card is not shown and nothing
+ * starts: every step still works by hand. ``onFinished`` lets the page reload the results below once a run ends.
  */
 export function CaseAiRunCard({ caseId, onFinished }: { caseId: string; onFinished: () => void }) {
   const canRun = useCan("ai.run");
+  const aiReady = useAiReady();
   const state = useResource<{ run: CaseAiRun | null }>(runPath(caseId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,10 +42,10 @@ export function CaseAiRunCard({ caseId, onFinished }: { caseId: string; onFinish
 
   // The first time the case opens with no AI work yet, the analysis starts by itself (the server never repeats it).
   useEffect(() => {
-    if (!canRun || autoTried.current || state.state !== "ready" || run) return;
+    if (autoTried.current || !startsByItself({ canRun, aiReady, loaded: state.state === "ready", run })) return;
     autoTried.current = true;
     void start("AUTO");
-  }, [canRun, state.state, run]);
+  }, [canRun, aiReady, state.state, run]);
 
   // While it runs, follow it; when it ends, the results below are reloaded.
   useEffect(() => {
@@ -59,9 +62,26 @@ export function CaseAiRunCard({ caseId, onFinished }: { caseId: string; onFinish
   }, [running, run?.steps?.length, run?.status]);
 
   if (state.state !== "ready" && !run) return null;
+  if (!cardShown(aiReady, running)) return null;
   return (
     <RunView run={run} running={running} canRun={canRun} busy={busy} error={error} onRun={() => void start("MANUAL")} />
   );
+}
+
+/** Whether opening the case starts its AI analysis: someone allowed to run AI, AI answering for the organization now,
+ * and no run yet. */
+export function startsByItself(at: {
+  canRun: boolean;
+  aiReady: boolean | null;
+  loaded: boolean;
+  run: CaseAiRun | null;
+}) {
+  return at.canRun && at.aiReady === true && at.loaded && !at.run;
+}
+
+/** Whether the card shows: while AI answers for the organization, or while a run is still going. */
+export function cardShown(aiReady: boolean | null, running: boolean) {
+  return aiReady === true || running;
 }
 
 /** The run's headline and steps (exported for its unit test). */

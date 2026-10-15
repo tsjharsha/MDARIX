@@ -2,7 +2,9 @@
 
 - ``POST /api/v1/investigations/{id}/ai-run`` (ai.run): queues a run and starts it in the background (202).
   ``trigger=AUTO`` (the case page, the first time it opens) starts one only when the case has neither a run nor a
-  saved analysis; otherwise it answers with what exists (200), so opening a case page never repeats the AI's work.
+  saved analysis, and only when AI really answers for the organization (a provider configured and allowed, AI switched
+  on, allowance left); otherwise it answers with what exists (200), so opening a case page never repeats the AI's work
+  and never writes rule results in the AI's name when AI is off.
   A run already queued or running is answered as it is (409 for a person's MANUAL request).
 - ``GET /api/v1/investigations/{id}/ai-run``: the latest run with each step's outcome (``run`` is null without one).
 
@@ -24,6 +26,7 @@ from backend.app.case_ai import runner
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.case_ai import CaseAiRun
 from backend.app.db.models.foundation import Investigation
+from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 
@@ -73,8 +76,11 @@ def start_run(
     payload: RunRequest,
     background: BackgroundTasks,
     db: Session = Depends(get_data_plane_db),
+    control: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
+    from backend.app.ai_settings import ai_ready
+
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     case = (
         db.query(Investigation)
@@ -96,6 +102,9 @@ def start_run(
     if payload.trigger == "AUTO" and (current is not None or _has_analysis(db, tenant_id, investigation_id)):
         # The case's AI work exists already: opening its page never repeats it.
         return {"started": False, "run": runner.view(current)}
+    if payload.trigger == "AUTO" and not ai_ready(control, tenant_id):
+        # AI is off, not available or used up: opening the case page starts nothing (the steps work by hand).
+        return {"started": False, "run": runner.view(current), "reason": "AI_NOT_READY"}
     if current is not None and runner.is_stale(current):
         current.status, current.error = "FAILED", "The run stopped before it finished"
         current.finished_at = runner.now_utc()

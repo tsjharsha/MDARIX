@@ -84,12 +84,30 @@ def view(run: CaseAiRun | None) -> dict | None:
     }
 
 
+RESULT_FIELDS = ("analysis", "hypothesis_set", "challenge_set", "unknown_set", "failure_chain_set")
+
+
+def _model_wrote(response) -> bool:
+    """Whether the language model wrote the step's result, as the result itself records it (its author or its
+    provenance's author). A result that does not say so was written by the rules: unknowns, for one, are always rules."""
+    for field in RESULT_FIELDS:
+        result = getattr(response, field, None)
+        if result is None:
+            continue
+        author = getattr(result, "analysis_author", None)
+        if author is not None:
+            return author == "LANGUAGE_MODEL"
+        provenance = getattr(result, "provenance", None)
+        return isinstance(provenance, dict) and provenance.get("author") == "LANGUAGE_MODEL"
+    return False
+
+
 def _outcome(response, *, result_id) -> dict:
     """What a step's response says: who wrote it, its AI run, why AI did not contribute (if so)."""
     notice = getattr(response, "ai_notice", None)
     return {
         "status": "DONE",
-        "author": "RULES" if notice is not None else "AI",
+        "author": "AI" if notice is None and _model_wrote(response) else "RULES",
         "notice": getattr(notice, "message", None) if notice is not None else None,
         "reason_code": getattr(notice, "reason_code", None) if notice is not None else None,
         "ai_execution_id": str(response.ai_execution_id) if getattr(response, "ai_execution_id", None) else None,

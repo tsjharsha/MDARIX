@@ -403,7 +403,7 @@ def test_the_signal_summary_cites_its_complaints_and_ai_is_checked(org):
 # ------------------------------------------------------------------------------------------- the case AI run
 
 
-def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org):
+def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org, monkeypatch):
     tenant = org["tenant_id"]
     item = _product(tenant)
     complaints = [_complaint(tenant, item, days_ago=days) for days in (3, 6)]
@@ -421,6 +421,13 @@ def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org):
     assert client.get(path).json()["run"] is None
     assert org["viewer"][0].post(path, json={"trigger": "AUTO"}).status_code == 403
 
+    # AI off, not available or used up: opening the case page starts nothing and writes nothing.
+    quiet = client.post(path, json={"trigger": "AUTO"})
+    assert quiet.status_code == 200 and quiet.json()["started"] is False, quiet.text
+    assert quiet.json()["reason"] == "AI_NOT_READY"
+    assert client.get(path).json()["run"] is None
+
+    monkeypatch.setattr("backend.app.ai_settings.ai_ready", lambda db, tenant_id: True)
     started = client.post(path, json={"trigger": "AUTO"})
     assert started.status_code == 202, started.text
     assert started.json()["started"] is True and started.json()["run"]["trigger"] == "AUTO"
@@ -437,6 +444,8 @@ def test_the_case_ai_run_starts_by_itself_once_and_reports_each_step(org):
     ]
     assert run["steps"][0]["status"] == "DONE" and run["steps"][0]["author"] == "RULES"
     assert run["steps"][0]["ai_execution_id"]
+    # No model in tests: every step says the rules wrote it (unknowns too, which carry no fallback notice).
+    assert {step["author"] for step in run["steps"]} == {"RULES"}, run["steps"]
 
     again = client.post(path, json={"trigger": "AUTO"})
     assert again.status_code == 200 and again.json()["started"] is False
@@ -533,6 +542,7 @@ def test_each_case_ai_run_step_carries_its_trust_check_and_the_mvp_skips_templat
     assert case.status_code in (200, 201), case.text
     path = f"/api/v1/investigations/{case.json()['id']}/ai-run"
     monkeypatch.setenv("MDARIX_FEATURE_SET", "mvp")
+    monkeypatch.setattr("backend.app.ai_settings.ai_ready", lambda db, tenant_id: True)
     assert client.post(path, json={"trigger": "AUTO"}).status_code == 202
     run = client.get(path).json()["run"]
     assert run["status"] == "COMPLETED", run
