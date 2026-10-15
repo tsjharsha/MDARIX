@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AIExecution, Investigation, Scenario, ProductVersion
+from backend.app.db.tenant_scope import scoped_bind
 from investigation_workspace.schemas import InvestigationWorkspaceRequest
 from investigation_workspace.service import InvestigationWorkspaceService
 from .schemas import CounterfactualRequest, SUPPORTED_INTERVENTIONS
@@ -64,6 +65,8 @@ class CounterfactualService:
                 include_retrieval=True,
                 retrieval_top_k=8,
             ),
+            # Read Product 360 from the same tenant data plane as the investigation.
+            data_plane_engine=scoped_bind(db),
         ).model_dump(mode="json")
         target = request.intervention_target.casefold()
         labels = self._labels(baseline)
