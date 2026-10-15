@@ -87,6 +87,14 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 		}
 	}
 
+	# The free-trial videos for the website's /videos page (MP4, WebVTT captions, posters and videos.json), from the
+	# server's videos/ folder mounted read-only (videos/README.md): a video is published by copying its files there.
+	handle_path /media/videos/* {
+		header Cache-Control "public, max-age=3600"
+		root * /media/videos
+		file_server
+	}
+
 	# Built assets carry a content hash in their names: cache them for a year. Pages are revalidated every time,
 	# so a deploy reaches everyone at once.
 	handle /assets/* {

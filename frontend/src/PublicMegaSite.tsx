@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
+import { VideosPage } from "./site/videos";
 import { lifecycleStages, platformGroups, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
 import {
   CompanyPage,
@@ -164,6 +165,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     links: [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
+      ["Free trial videos", "/videos"],
       ...(DEMO_REQUESTS_OFFERED ? [["Request a demo", "/request-demo"] as [string, string]] : []),
       ["Contact", "/contact"],
     ],
@@ -306,6 +308,7 @@ export function PublicMegaSite({ path }: { path: string }) {
         {page === "/trust" && <TrustPage />}
         {page === "/resources" && <ResourcesPage />}
         {page === "/company" && <CompanyPage />}
+        {page === "/videos" && <VideosPage />}
         {page in LEGAL_PAGES && <LegalDocumentPage path={page as LegalPath} />}
         {page === "/security" && <SecurityPage />}
         {page === "/contact" && <ContactPage />}
@@ -369,6 +372,7 @@ function pageTitle(page: Page) {
     "/trust": "Trust",
     "/resources": "Resources",
     "/company": "Company",
+    "/videos": "Free trial videos",
     "/privacy": LEGAL_PAGES["/privacy"].title,
     "/terms": LEGAL_PAGES["/terms"].title,
     "/trial-agreement": LEGAL_PAGES["/trial-agreement"].title,
