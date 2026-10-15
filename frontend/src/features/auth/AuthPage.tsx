@@ -15,7 +15,7 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
         "Evidence-linked investigations",
         "Complaints, versions, lots and suppliers connected in one place.",
       ],
-      [UserCheck, "People make the decisions", "AI suggests and cites its evidence; authorized reviewers decide."],
+      [UserCheck, "People make the decisions", "Every finding cites its records; authorized reviewers decide."],
     ],
   },
   signup: {

@@ -444,8 +444,6 @@ export const FUTURE_LIFECYCLE = new Set([
   "clinical",
   "regulatory",
   "manufacturing",
-  "signal",
-  "capa",
   "recall",
   "monitoring",
   "retirement",

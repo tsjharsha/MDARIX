@@ -211,8 +211,8 @@ export function SignupForm() {
       <span className="eyebrow">Request access</span>
       <h1>Start your free trial</h1>
       <p className="auth-lead">
-        30 days, up to 3 users and 5,000 records, no credit card. You set your own password from the invitation email;
-        MDARIX never sees it.
+        30 days, up to 3 users and 5,000 uploaded rows, no credit card. You set your own password from the invitation
+        email; MDARIX never sees it.
       </p>
       <ol className="su-steps" aria-label="Request steps">
         <li className={step === 1 ? "is-current" : "is-done"} aria-current={step === 1 ? "step" : undefined}>
