@@ -28,6 +28,7 @@ import { UserWorkspace } from "../features/workspace/UserWorkspace";
 import { PlatformAdministrationAudit } from "../features/admin/PlatformAdministrationAudit";
 import { AuthPage } from "../features/auth/AuthPage";
 import { RequestDemoPage } from "../features/auth/RequestDemoPage";
+import { DEMO_REQUESTS_OFFERED } from "../site/offer";
 import { PilotGuidePage } from "../features/help/PilotGuidePage";
 import { TrialGuidePage } from "../features/help/TrialGuidePage";
 import { TRIAL_GUIDE_PATH } from "../features/help/trialGuide";
@@ -36,7 +37,7 @@ export function App() {
   const publicPath = window.location.pathname;
   if (["/signin", "/signup", "/forgot-password", "/activate-account", "/reset-password", "/mfa"].includes(publicPath))
     return <AuthPage mode={publicPath.slice(1)} />;
-  if (publicPath === "/request-demo") return <RequestDemoPage />;
+  if (publicPath === "/request-demo") return DEMO_REQUESTS_OFFERED ? <RequestDemoPage /> : <AuthPage mode="signup" />;
   if (publicPath === "/help/pilot-guide") return <PilotGuidePage />;
   if (publicPath === TRIAL_GUIDE_PATH) return <TrialGuidePage />;
   // The signed-in application lives under /app and /platform-admin (router.ts). Match whole path segments, so a
