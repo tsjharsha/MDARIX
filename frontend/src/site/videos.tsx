@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Clock, PlayCircle } from "lucide-react";
 
 /**
- * The free-trial video series on the website (/videos): fourteen short videos, each with English captions. The
+ * The free-trial video series on the website (/videos): fourteen short videos, their English captions part of the
+ * picture (so no caption track is added: the browser would show the text a second time). The
  * titles and what each one teaches are listed here; which videos are ready comes from the server's video folder
  * (videos/README.md), so a finished video is published by copying its files there, without a release. A video not
  * listed there shows as coming soon.
@@ -84,7 +85,7 @@ export const TRIAL_VIDEOS: readonly { number: number; title: string; summary: st
 ];
 
 /** A ready video, as the server's videos.json lists it: file names inside VIDEO_BASE. */
-export type ReadyVideo = { number: number; file: string; captions?: string; poster?: string; minutes?: number };
+export type ReadyVideo = { number: number; file: string; poster?: string; minutes?: number };
 
 const SAFE_FILE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
 
@@ -95,7 +96,7 @@ export function readyVideos(document: unknown): Map<number, ReadyVideo> {
   if (!Array.isArray(list)) return ready;
   for (const entry of list) {
     if (!entry || typeof entry !== "object") continue;
-    const { number, file, captions, poster, minutes } = entry as Record<string, unknown>;
+    const { number, file, poster, minutes } = entry as Record<string, unknown>;
     if (typeof number !== "number" || !TRIAL_VIDEOS.some((video) => video.number === number)) continue;
     if (typeof file !== "string" || !SAFE_FILE.test(file) || !file.toLowerCase().endsWith(".mp4")) continue;
     const safe = (name: unknown, ending: string) =>
@@ -103,7 +104,6 @@ export function readyVideos(document: unknown): Map<number, ReadyVideo> {
     ready.set(number, {
       number,
       file,
-      captions: safe(captions, ".vtt"),
       poster: safe(poster, ".jpg"),
       minutes: typeof minutes === "number" && minutes > 0 && minutes < 60 ? minutes : undefined,
     });
@@ -126,11 +126,7 @@ export function VideoCards({ ready }: { ready: Map<number, ReadyVideo> }) {
                 src={VIDEO_BASE + item.file}
                 poster={item.poster ? VIDEO_BASE + item.poster : undefined}
                 aria-label={`Video ${video.number}: ${video.title}`}
-              >
-                {item.captions && (
-                  <track kind="captions" srcLang="en" label="English" src={VIDEO_BASE + item.captions} default />
-                )}
-              </video>
+              />
             ) : (
               <div className="ms-video-soon" aria-hidden="true">
                 <PlayCircle size={40} />

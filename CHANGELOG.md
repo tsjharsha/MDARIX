@@ -10,6 +10,14 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.7] - 2026-10-15
+
+### Fixed
+
+- Website `/videos`: the captions showed twice, once in the picture and once from the browser's caption track. The
+  videos carry their English captions in the picture, so the page no longer adds a caption track, and `videos/README.md`
+  no longer asks for a `.vtt` file.
+
 ## [0.10.6] - 2026-10-15
 
 ### Added
