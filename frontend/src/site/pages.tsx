@@ -12,6 +12,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { menus, pages, postMarketResources } from "./legacyContent";
+import { DEMO_REQUESTS_OFFERED } from "./offer";
 import {
   capabilityStatus,
   img,
@@ -132,11 +133,14 @@ function CtaBand() {
           are.
         </p>
         <div className="ms-cta-row">
-          <a className="ms-btn ms-btn-light" href="/request-demo">
-            Request a demo <ArrowRight size={16} aria-hidden="true" />
-          </a>
-          <a className="ms-btn ms-btn-ghost-light" href="/signup">
+          {DEMO_REQUESTS_OFFERED && (
+            <a className="ms-btn ms-btn-light" href="/request-demo">
+              Request a demo <ArrowRight size={16} aria-hidden="true" />
+            </a>
+          )}
+          <a className={`ms-btn ${DEMO_REQUESTS_OFFERED ? "ms-btn-ghost-light" : "ms-btn-light"}`} href="/signup">
             Start free trial
+            {!DEMO_REQUESTS_OFFERED && <ArrowRight size={16} aria-hidden="true" />}
           </a>
         </div>
       </Reveal>
@@ -220,9 +224,11 @@ export function HomePage() {
               <a className="ms-btn ms-btn-light" href="/signup">
                 Start free trial <ArrowRight size={16} aria-hidden="true" />
               </a>
-              <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
-                Request a demo
-              </a>
+              {DEMO_REQUESTS_OFFERED && (
+                <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
+                  Request a demo
+                </a>
+              )}
               <a className="ms-btn ms-btn-ghost-light" href="/platform">
                 Explore the platform
               </a>
@@ -260,9 +266,11 @@ export function HomePage() {
             <a className="ms-btn ms-btn-light" href="/signup">
               Start free trial <ArrowRight size={16} aria-hidden="true" />
             </a>
-            <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
-              Book a one-to-one demo
-            </a>
+            {DEMO_REQUESTS_OFFERED && (
+              <a className="ms-btn ms-btn-ghost-light" href="/request-demo">
+                Book a one-to-one demo
+              </a>
+            )}
           </QualityLoop>
         </Reveal>
       </section>

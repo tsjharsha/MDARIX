@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
+import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { lifecycleStages, platformGroups, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
 import {
   CompanyPage,
@@ -163,7 +164,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     links: [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
-      ["Request a demo", "/request-demo"],
+      ...(DEMO_REQUESTS_OFFERED ? [["Request a demo", "/request-demo"] as [string, string]] : []),
       ["Contact", "/contact"],
     ],
   },
@@ -263,9 +264,15 @@ export function PublicMegaSite({ path }: { path: string }) {
           </a>
           <div className="ms-nav-actions">
             <a href="/signin">Sign in</a>
-            <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={closeMenus}>
-              Request a demo
-            </a>
+            {DEMO_REQUESTS_OFFERED ? (
+              <a className="ms-btn ms-btn-primary" href="/request-demo" onClick={closeMenus}>
+                Request a demo
+              </a>
+            ) : (
+              <a className="ms-btn ms-btn-primary" href="/signup" onClick={closeMenus}>
+                Start free trial
+              </a>
+            )}
           </div>
         </nav>
         {activeMenu && (

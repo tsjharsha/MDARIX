@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Mail, MapPin } from "lucide-react";
 import { Markdown } from "./markdown";
+import { DEMO_REQUESTS_OFFERED } from "./offer";
 
 /*
  * Company details and legal documents come from the server (backend/app/site_info.py), so they are set once in the
@@ -324,7 +325,10 @@ export function ContactPage() {
       <div className="ms-contact-topics">
         <div>
           <strong>Product and design partnerships</strong>
-          <span>Discuss post-market surveillance, investigation workflows, evidence review, or a controlled demo.</span>
+          <span>
+            Discuss post-market surveillance, investigation workflows, evidence review
+            {DEMO_REQUESTS_OFFERED ? ", or a controlled demo." : ", or a design partnership."}
+          </span>
         </div>
         <div>
           <strong>Support and account help</strong>
@@ -340,11 +344,14 @@ export function ContactPage() {
         </div>
       </div>
       <div className="ms-cta-row">
-        <a className="ms-btn ms-btn-primary" href="/request-demo">
-          Request a demo <ArrowRight size={16} aria-hidden="true" />
-        </a>
-        <a className="ms-btn ms-btn-outline" href="/signup">
+        {DEMO_REQUESTS_OFFERED && (
+          <a className="ms-btn ms-btn-primary" href="/request-demo">
+            Request a demo <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        )}
+        <a className={`ms-btn ${DEMO_REQUESTS_OFFERED ? "ms-btn-outline" : "ms-btn-primary"}`} href="/signup">
           Start free trial
+          {!DEMO_REQUESTS_OFFERED && <ArrowRight size={16} aria-hidden="true" />}
         </a>
       </div>
       <LegalLinks current="/contact" />

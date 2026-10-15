@@ -207,7 +207,7 @@ export const menus: Record<string, MenuGroup[]> = {
       items: [
         current("Why MDARIX", "/why-mdarix", "Evidence-first investigation intelligence for medical-device teams."),
         current("Our approach", "/company", "A governed intelligence layer above existing systems of record."),
-        current("Contact", "/request-demo", "Discuss your investigation workflow with MDARIX."),
+        current("Contact", "/contact", "Discuss your investigation workflow with MDARIX."),
       ],
     },
     {

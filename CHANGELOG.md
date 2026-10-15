@@ -10,6 +10,17 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-10-15
+
+### Changed
+
+- Website: during the product validation phase only the 30-day free trial is offered, so the demo request is hidden:
+  "Request a demo" in the header (now "Start free trial"), on the home page, the design-partner band, the contact page
+  and the footer, and "Book a one-to-one demo" under the home page's quality loop. `/request-demo` opens the trial
+  sign-up. One switch, `DEMO_REQUESTS_OFFERED` in `frontend/src/site/offer.ts`, brings them back. The in-trial
+  "Book a one-to-one demo" (Getting started) is unchanged.
+- Website menu: "Contact" under Company led to the demo request; it now opens the contact page.
+
 ## [0.10.4] - 2026-10-15
 
 ### Changed
