@@ -235,7 +235,7 @@ function Security() {
       <Panel eyebrow="Sessions" title="How your session is protected">
         <ul className="ca-check-list">
           <li>You are signed out after 30 minutes without activity.</li>
-          <li>Every session ends after 60 minutes, even when active.</li>
+          <li>No session lasts longer than 12 hours, even when active.</li>
           <li>If your administrator suspends your account, you are signed out everywhere immediately.</li>
         </ul>
         <div className="ca-action-row">

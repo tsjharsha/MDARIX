@@ -1,6 +1,7 @@
-import { BookOpen, CheckCircle2, ChevronRight } from "lucide-react";
+import { BookOpen, CheckCircle2, ChevronRight, ListChecks } from "lucide-react";
 import { Panel, type PanelSource } from "../../admin/console/charts";
 import { TRIAL_GUIDE_PATH, type JourneyKey, type JourneyStep } from "../../help/trialGuide";
+import { USER_GUIDE_PATH } from "../../help/userGuide";
 
 /** What each unfinished step's button says. */
 const GO: Partial<Record<JourneyKey, string>> = {
@@ -32,9 +33,14 @@ export function TrialJourney({
       title={next ? `${done} of ${steps.length} steps done · next: ${next.title.toLowerCase()}` : "Every step done"}
       source={source}
       action={
-        <a className="ac-secondary" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
-          <BookOpen size={15} aria-hidden="true" /> Free trial user guide
-        </a>
+        <span className="uw-journey-guides">
+          <a className="ac-secondary" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
+            <BookOpen size={15} aria-hidden="true" /> Free trial user guide
+          </a>
+          <a className="ac-secondary" href={USER_GUIDE_PATH} target="_blank" rel="noopener">
+            <ListChecks size={15} aria-hidden="true" /> Step-by-step user guide
+          </a>
+        </span>
       }
     >
       <ol className="uw-journey">

@@ -2679,6 +2679,12 @@ div.uw-task-count:hover {
 .uw-anchor {
   scroll-margin-top: 96px;
 }
+/* The two guides beside Your trial journey: the trial's seven steps, and every screen task by task. */
+.uw-journey-guides {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .uw-journey {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
