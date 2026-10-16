@@ -19,8 +19,10 @@ customer sees every use of the access they granted.
 Not behind a grant, by design: the platform's own organization; the platform's records about an organization
 (registry, lifecycle, plan, subscription, usage counts); legal hold and the final purge (lifecycle duties with their
 own safeguards); problem reports a customer chose to send to MDARIX; what MDARIX staff themselves did inside an
-organization (staff accountability); and two continuity cases where nobody in the organization could act:
-recovering the only active Customer Administrator's authenticator, and activating the first one.
+organization (staff accountability); and the continuity cases where nobody in the organization could act:
+recovering the only active Customer Administrator's authenticator, activating the first one, and recovering the
+authenticator of a free trial's people (a trial has no administrator; backend/app/access/platform_customer_admins.py).
+In a free trial, its owner decides on support access in place of a Customer Administrator (support_access_api.py).
 """
 
 from __future__ import annotations

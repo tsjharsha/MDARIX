@@ -72,7 +72,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     ],
     result:
       "Both colleagues are listed as Invited, then Active once they set their own password from their email (the link is valid for 48 hours).",
-    tip: "Only the person who started the trial can invite. Each colleague chooses their own password; nobody shares one.",
+    tip: "Only the person who started the trial can invite. Each colleague chooses their own password; nobody shares one. If someone leaves, choose Remove from trial to free their seat.",
   },
   {
     key: "sample",

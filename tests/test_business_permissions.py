@@ -41,6 +41,14 @@ EXEMPT = {
     ("POST", "/api/v1/stage3/interactions/{interaction_id}/feedback"): "feedback on the user's own AI answer",
     ("POST", "/api/v1/trial/team"): "trial owner only, checked in the route",
     ("POST", "/api/v1/trial/team/{user_id}/resend-invitation"): "trial owner only, checked in the route",
+    ("POST", "/api/v1/trial/team/{user_id}/remove"): "trial owner only, own trial's people, checked in the route",
+    ("POST", "/api/v1/trial/team/{user_id}/mfa-reset"): "trial owner only, own trial's people, checked in the route",
+    (
+        "POST",
+        "/api/v1/trial/support-access/{grant_id}/approve",
+    ): "trial owner only (in place of a Customer Administrator) with an authenticator code, checked in the route",
+    ("POST", "/api/v1/trial/support-access/{grant_id}/deny"): "trial owner only, checked in the route",
+    ("POST", "/api/v1/trial/support-access/{grant_id}/revoke"): "trial owner only, checked in the route",
     ("GET", "/api/v1/stage3/compliance-report"): "administrators only, checked in the route",
     ("GET", "/api/v1/reports/catalog"): "read-only list of report types",
     # "report" in "reportability": reads open to every member, like the complaint list; no export, no file.

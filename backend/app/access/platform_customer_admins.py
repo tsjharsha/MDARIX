@@ -477,8 +477,10 @@ def reset_user_mfa(
     user_id: uuid.UUID, payload: CustomerAdminActionRequest, request: Request, db: Session = Depends(get_db)
 ):
     """Remove any account's authenticator after it was lost with its recovery codes (for example a customer
-    administrator, or a colleague on the platform team). Not one's own: another administrator must do that."""
+    administrator, a free trial's owner, or a colleague on the platform team). Not one's own: another administrator
+    must do that."""
     from backend.app import mfa
+    from backend.app.trial.service import trial_subscription
 
     platform_admin = _require_platform_admin(request, db)
     if user_id == platform_admin.id:
@@ -488,9 +490,13 @@ def reset_user_mfa(
     user = db.query(AuthUser).filter(AuthUser.id == user_id).first()
     if user is None:
         raise HTTPException(404, detail={"code": "USER_NOT_FOUND", "message": "User is not available"})
-    # Colleagues on the platform team, and an organization's only active Customer Administrator, are MDARIX's to
-    # recover; anyone else, under the People access the organization's administrators approved.
-    support_access.require_people_access(db, platform_admin, user, continuity=True, request=request)
+    # A free trial's people are MDARIX's to recover: a trial has no administrator, and its owner's own MFA nobody
+    # inside it can reset. Elsewhere, colleagues on the platform team and an organization's only active Customer
+    # Administrator are MDARIX's to recover; anyone else, under the People access the organization's administrators
+    # approved.
+    trial_user = trial_subscription(db, user.tenant_id) is not None
+    if not trial_user:
+        support_access.require_people_access(db, platform_admin, user, continuity=True, request=request)
     now = datetime.now(timezone.utc)
     revoked = mfa.reset(db, user, now)
     _audit(
@@ -499,7 +505,7 @@ def reset_user_mfa(
         platform_admin,
         "USER_MFA_RESET",
         user.id,
-        {"reason": payload.reason, "sessions_revoked": revoked},
+        {"reason": payload.reason, "sessions_revoked": revoked, **({"trial_user": True} if trial_user else {})},
         now,
     )
     db.commit()

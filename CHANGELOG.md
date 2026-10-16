@@ -10,6 +10,29 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.18] - 2026-10-17
+
+### Added
+
+- A free trial's owner looks after the trial team in Getting started › Team. "Remove from trial" takes a colleague
+  off the trial, or withdraws an invitation not yet accepted: they are signed out at once and can no longer sign in,
+  everything they did stays under their name, and their seat is free for someone new. "Reset MFA" (with a reason)
+  removes the authenticator of a colleague who lost it and their recovery codes: they are signed out and set up a new
+  one at their next sign-in. The owner's own authenticator is still replaced in My Account › Security. Both are the
+  owner's only, for people of their own trial, refused once the trial has ended, and audited
+  (`TRIAL_COLLEAGUE_REMOVED`, `USER_MFA_RESET` with the source `TRIAL_OWNER`). API: `POST
+  /api/v1/trial/team/{user_id}/remove`, `POST /api/v1/trial/team/{user_id}/mfa-reset`.
+- When MDARIX support asks for access to a trial's data, the trial owner sees the request under Support access in
+  the Team tab and chooses Approve (with a reason and an authenticator code), Deny or Revoke, with the same rules and
+  audit events as a customer's administrators. API: `GET /api/v1/trial/support-access`, `POST
+  /api/v1/trial/support-access/{grant_id}/approve|deny|revoke`.
+- Platform Admin › Customers & Tenants › Trials lists each trial's people, with "Reset MFA" for those who have
+  activated their account. A trial's people are MDARIX's to recover (a trial has no administrator, and nobody in it
+  can reset its owner's MFA), so this needs no support access grant; it still needs a reason, never applies to one's
+  own account, signs the person out and is audited in the trial's trail as `USER_MFA_RESET` marked `trial_user`.
+  Other organizations keep the existing rule. The trials overview answer now carries each person's `id` and a
+  `people` list.
+
 ## [0.10.17] - 2026-10-16
 
 ### Added

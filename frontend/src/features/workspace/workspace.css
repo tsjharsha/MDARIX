@@ -1060,6 +1060,35 @@
 .uw-trial-message:has(.uw-team-link) {
   flex-wrap: wrap;
 }
+.uw-team-danger {
+  color: var(--ac-critical) !important;
+}
+/* Free trial: the support access MDARIX asks for, decided by the trial owner. */
+.uw-support {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-support li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--ac-grid);
+}
+.uw-support li > div {
+  display: grid;
+  flex: 1 1 260px;
+  gap: 2px;
+  min-width: 0;
+}
+.uw-support small {
+  color: var(--ac-muted);
+  overflow-wrap: anywhere;
+}
 
 /*
  * Older screens shown inside the workspace (investigation workspace, story, signals, evidence library, decisions,

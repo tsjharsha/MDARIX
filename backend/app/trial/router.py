@@ -4,7 +4,8 @@ Trial endpoints take the tenant only from the signed-in session and refuse tenan
 plan. Every organization (trial or not) imports through /api/v1/data/import (backend/app/data_import_router.py);
 the trial routes here keep the trial's own limits and the Getting started page. Inviting colleagues is a trial
 feature too: in a paying organization its Customer Administrators invite users (/api/v1/admin/identity/users), and a
-converted trial's owner becomes one (backend/app/access/platform_subscriptions.py).
+converted trial's owner becomes one (backend/app/access/platform_subscriptions.py). With no admin console in a trial,
+its owner also removes colleagues, resets their MFA and decides on support access (/trial/team, /trial/support-access).
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from backend.app.db.models.foundation import (
     Risk,
 )
 from backend.app.db.session import get_db
+from backend.app import support_access_api
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports, retention, team
 from backend.app.trial.sample_data import SAMPLE_SOURCE
@@ -838,6 +840,99 @@ def resend_trial_colleague_invitation(
 ):
     _require_trial(db, ctx)
     return team.resend_colleague_invitation(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id)
+
+
+@router.post("/trial/team/{user_id}/remove")
+def remove_trial_colleague(
+    user_id: uuid.UUID,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner takes a colleague off the trial (or withdraws an invitation): the seat is free again, the
+    account can no longer sign in, and what they did stays (backend/app/trial/team.py)."""
+    _require_trial(db, ctx)
+    return team.remove_colleague(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id, request)
+
+
+class ColleagueMfaReset(BaseModel):
+    # Why the authenticator is being removed; kept in the audit trail (as MfaResetRequest).
+    reason: str = Field(min_length=5, max_length=500)
+
+
+@router.post("/trial/team/{user_id}/mfa-reset")
+def reset_trial_colleague_mfa(
+    user_id: uuid.UUID,
+    payload: ColleagueMfaReset,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The trial owner resets the MFA of a colleague who lost their authenticator and recovery codes."""
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return team.reset_colleague_mfa(db, tenant_id, _current_user(db, ctx), user_id, payload.reason, request)
+
+
+# ------------------------------------------------------------------------------------------- Support access
+# A trial has no Customer Administrators: its owner decides on the support access MDARIX asks for, with the same
+# functions and rules as a customer's administrators (backend/app/support_access_api.py).
+
+
+def _trial_owner(db: Session, ctx: AuthenticatedRequestContext) -> AuthUser:
+    _require_trial(db, ctx)
+    user = _current_user(db, ctx)
+    team.require_owner(
+        db, uuid.UUID(str(ctx.tenant_id)), user, "Only the person who started this trial decides on support access"
+    )
+    return user
+
+
+@router.get("/trial/support-access")
+def trial_support_access(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context), db: Session = Depends(get_db)
+):
+    """Every request MDARIX approved on its side for this trial, newest first, and how many waits for a decision."""
+    _trial_owner(db, ctx)
+    return support_access_api.grants_of(db, uuid.UUID(str(ctx.tenant_id)))
+
+
+@router.post("/trial/support-access/{grant_id}/approve")
+def approve_trial_support_access(
+    grant_id: uuid.UUID,
+    payload: support_access_api.CustomerApproval,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """Approve with a current authenticator code; audited as SUPPORT_ACCESS_CUSTOMER_APPROVED."""
+    owner = _trial_owner(db, ctx)
+    return support_access_api.approve_grant(db, owner, grant_id, payload.reason, payload.mfa_code, request, team.SOURCE)
+
+
+@router.post("/trial/support-access/{grant_id}/deny")
+def deny_trial_support_access(
+    grant_id: uuid.UUID,
+    payload: support_access_api.CustomerDecision,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    owner = _trial_owner(db, ctx)
+    return support_access_api.deny_grant(db, owner, grant_id, payload.reason, request, team.SOURCE)
+
+
+@router.post("/trial/support-access/{grant_id}/revoke")
+def revoke_trial_support_access(
+    grant_id: uuid.UUID,
+    payload: support_access_api.CustomerDecision,
+    request: Request,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """End a request or an approved access at once."""
+    owner = _trial_owner(db, ctx)
+    return support_access_api.revoke_grant(db, owner, grant_id, payload.reason, request, team.SOURCE)
 
 
 # ------------------------------------------------------------------------------------------- Data retention

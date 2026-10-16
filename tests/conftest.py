@@ -194,6 +194,9 @@ DB_MODULES = {
     "test_data_import_options",
     # A full export and a purge also need a current authenticator code.
     "test_export_purge_mfa",
+    # A free trial's owner removes colleagues, resets their MFA and decides on support access; MDARIX resets a trial
+    # user's MFA without a grant.
+    "test_trial_self_admin",
 }
 # Modules that additionally need the four tenant data-plane databases.
 DATAPLANE_MODULES = {"test_data_plane_routing"}

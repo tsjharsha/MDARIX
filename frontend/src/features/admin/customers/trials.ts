@@ -7,12 +7,16 @@ import type { Slice, Tone } from "../console/dashboardModel";
 
 export type TrialState = "ACTIVE" | "ENDING_SOON" | "ENDED";
 
+export type TrialPerson = { id?: string; email: string; name: string | null; status: string };
+
 export type TrialItem = {
   tenant_id: string;
   tenant_business_id?: string | null;
   tenant_key: string;
   name: string;
-  owner: { email: string; name: string | null; status: string } | null;
+  owner: TrialPerson | null;
+  /** The people holding a seat (active or invited), owner first: Platform Admin may reset one's MFA. */
+  people?: TrialPerson[];
   starts_at: string | null;
   expires_at: string;
   data_deleted_at: string;

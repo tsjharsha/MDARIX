@@ -4,6 +4,10 @@ A Customer Administrator sees every request MDARIX approved for their organizati
 whether changes are allowed, why and until when. They approve it (with their authenticator code: consent to data
 access is as strong as a signature), deny it, or revoke it at any time, and see every use made of it, as recorded in
 their own audit trail. Platform administrators cannot decide for a customer, even in an organization they belong to.
+
+A free trial has no Customer Administrators: there its owner decides, from Getting started › Team
+(backend/app/trial/router.py), through the same functions below and with the same rules (an authenticator code to
+approve, a reason for every decision, the same audit events, marked with the source TRIAL_OWNER).
 """
 
 from __future__ import annotations
@@ -134,7 +138,19 @@ def describe(row: SupportAccessGrant, people: dict, uses: dict, now: datetime) -
     }
 
 
-def _audit(db: Session, admin: AuthUser, row: SupportAccessGrant, action: str, reason: str, request, details=None):
+CUSTOMER_ADMIN = "CUSTOMER_ADMIN"
+
+
+def _audit(
+    db: Session,
+    admin: AuthUser,
+    row: SupportAccessGrant,
+    action: str,
+    reason: str,
+    request,
+    details=None,
+    source: str = CUSTOMER_ADMIN,
+):
     db.add(
         make_audit_event(
             tenant_id=admin.tenant_id,
@@ -142,7 +158,7 @@ def _audit(db: Session, admin: AuthUser, row: SupportAccessGrant, action: str, r
             action=action,
             entity_type="SupportAccessGrant",
             entity_id=row.id,
-            details={"source": "CUSTOMER_ADMIN", **(details or {})},
+            details={"source": source, **(details or {})},
             reason=reason,
             request=request,
         )
@@ -153,11 +169,17 @@ def _audit(db: Session, admin: AuthUser, row: SupportAccessGrant, action: str, r
 def list_support_access(request: Request, db: Session = Depends(get_db)):
     """Every request MDARIX approved for this organization, newest first, and how many waits for a decision."""
     admin = _customer_admin(request, db)
-    access.expire(db, admin.tenant_id)
+    return grants_of(db, admin.tenant_id)
+
+
+def grants_of(db: Session, tenant_id) -> dict:
+    """Every request MDARIX approved for ``tenant_id``, as its decision makers read them (expired ones closed first;
+    commits)."""
+    access.expire(db, tenant_id)
     db.commit()
     rows = (
         db.query(SupportAccessGrant)
-        .filter(SupportAccessGrant.tenant_id == admin.tenant_id, SupportAccessGrant.approved_at.isnot(None))
+        .filter(SupportAccessGrant.tenant_id == tenant_id, SupportAccessGrant.approved_at.isnot(None))
         .order_by(SupportAccessGrant.created_at.desc())
         .limit(200)
         .all()
@@ -170,7 +192,7 @@ def list_support_access(request: Request, db: Session = Depends(get_db)):
             for value in (row.platform_user_id, row.requested_by, row.approved_by, row.customer_decided_by)
         },
     )
-    uses = _uses(db, admin.tenant_id, [row.id for row in rows])
+    uses = _uses(db, tenant_id, [row.id for row in rows])
     now = datetime.now(timezone.utc)
     items = [describe(row, people, uses, now) for row in rows]
     return {
@@ -196,11 +218,11 @@ def _awaiting(row: SupportAccessGrant, now: datetime) -> None:
         )
 
 
-@router.post("/admin/support-access/{grant_id}/approve")
-def approve_support_access(
-    grant_id: uuid.UUID, payload: CustomerApproval, request: Request, db: Session = Depends(get_db)
-):
-    admin = _customer_admin(request, db)
+def approve_grant(
+    db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, mfa_code: str | None, request, source: str
+) -> dict:
+    """The organization's approval (one of its Customer Administrators, or a trial's owner): with a current
+    authenticator code, for a request MDARIX approved that names at least one area and is still inside its window."""
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     _awaiting(row, now)
@@ -213,12 +235,12 @@ def approve_support_access(
             },
         )
     confirm_with_authenticator(
-        db, admin, payload.mfa_code, tenant_id=admin.tenant_id, action="SUPPORT_ACCESS_APPROVE", request=request
+        db, admin, mfa_code, tenant_id=admin.tenant_id, action="SUPPORT_ACCESS_APPROVE", request=request
     )
     row.status = access.APPROVED
     row.customer_decided_by = admin.id
     row.customer_decided_at = now
-    row.customer_decision_reason = payload.reason.strip()
+    row.customer_decision_reason = reason.strip()
     row.updated_at = now
     _audit(
         db,
@@ -228,35 +250,28 @@ def approve_support_access(
         row.customer_decision_reason,
         request,
         {**access.SupportScope.stored(row.scope).as_dict(), "expires_at": row.expires_at.isoformat()},
+        source=source,
     )
     db.commit()
     return _decided(db, admin, row)
 
 
-@router.post("/admin/support-access/{grant_id}/deny")
-def deny_support_access(
-    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
-):
-    admin = _customer_admin(request, db)
+def deny_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, request, source: str) -> dict:
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     _awaiting(row, now)
     row.status = access.DENIED
     row.customer_decided_by = admin.id
     row.customer_decided_at = now
-    row.customer_decision_reason = payload.reason.strip()
+    row.customer_decision_reason = reason.strip()
     row.updated_at = now
-    _audit(db, admin, row, "SUPPORT_ACCESS_DENIED", row.customer_decision_reason, request)
+    _audit(db, admin, row, "SUPPORT_ACCESS_DENIED", row.customer_decision_reason, request, source=source)
     db.commit()
     return _decided(db, admin, row)
 
 
-@router.post("/admin/support-access/{grant_id}/revoke")
-def revoke_support_access(
-    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
-):
+def revoke_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, request, source: str) -> dict:
     """End a request or an approved access at once, whatever its window says."""
-    admin = _customer_admin(request, db)
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     if row.status not in {access.AWAITING_CUSTOMER, access.APPROVED} or access._aware(row.expires_at) <= now:
@@ -268,9 +283,34 @@ def revoke_support_access(
     row.revoked_at = now
     row.revoked_by = admin.id
     row.updated_at = now
-    _audit(db, admin, row, "SUPPORT_ACCESS_REVOKED", payload.reason.strip(), request)
+    _audit(db, admin, row, "SUPPORT_ACCESS_REVOKED", reason.strip(), request, source=source)
     db.commit()
     return _decided(db, admin, row)
+
+
+@router.post("/admin/support-access/{grant_id}/approve")
+def approve_support_access(
+    grant_id: uuid.UUID, payload: CustomerApproval, request: Request, db: Session = Depends(get_db)
+):
+    admin = _customer_admin(request, db)
+    return approve_grant(db, admin, grant_id, payload.reason, payload.mfa_code, request, CUSTOMER_ADMIN)
+
+
+@router.post("/admin/support-access/{grant_id}/deny")
+def deny_support_access(
+    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
+):
+    admin = _customer_admin(request, db)
+    return deny_grant(db, admin, grant_id, payload.reason, request, CUSTOMER_ADMIN)
+
+
+@router.post("/admin/support-access/{grant_id}/revoke")
+def revoke_support_access(
+    grant_id: uuid.UUID, payload: CustomerDecision, request: Request, db: Session = Depends(get_db)
+):
+    """End a request or an approved access at once, whatever its window says."""
+    admin = _customer_admin(request, db)
+    return revoke_grant(db, admin, grant_id, payload.reason, request, CUSTOMER_ADMIN)
 
 
 @router.get("/admin/support-access/{grant_id}/activity")

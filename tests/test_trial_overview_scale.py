@@ -49,7 +49,7 @@ def _as_read_one_by_one(session, tenant_id) -> dict:
     per-trial functions (story.progress, imports.uploaded_rows, team.trial_request) and the same owner and seat rule."""
     request = trial_request(session, tenant_id)
     owner = (
-        session.query(AuthUser.username, AuthUser.display_name, AuthUser.status)
+        session.query(AuthUser.id, AuthUser.username, AuthUser.display_name, AuthUser.status)
         .filter(AuthUser.tenant_id == tenant_id, ~AuthUser.username.like("sample-author+%"))
         .order_by(AuthUser.created_at)
         .first()
@@ -63,7 +63,9 @@ def _as_read_one_by_one(session, tenant_id) -> dict:
         "story": story.progress(session, tenant_id, story.remembered(request.profile if request else None)),
         "rows": imports.uploaded_rows(session, tenant_id),
         "users": seats,
-        "owner": {"email": owner.username, "name": owner.display_name, "status": owner.status} if owner else None,
+        "owner": {"id": str(owner.id), "email": owner.username, "name": owner.display_name, "status": owner.status}
+        if owner
+        else None,
         "cited_for": citations.labels((request.profile or {}).get("citations") if request else ()),
         "feedback": story._feedback_by_tenant(session, [tenant_id]).get(tenant_id),
         "demo_request": story._demos_by_tenant(session, [tenant_id]).get(tenant_id),
