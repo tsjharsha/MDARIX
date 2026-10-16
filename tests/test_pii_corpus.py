@@ -6,6 +6,7 @@ Each KEPT case is text that must come back unchanged: investigation facts, stand
 
 import pytest
 
+from backend.app.trial import imports
 from genai.pii import is_personal_key, mask, mask_text
 
 # (text, fragments that must disappear, placeholders that must appear)
@@ -66,6 +67,31 @@ MASKED = [
     ("Contact 6175550100 after 5pm.", ["6175550100"], ["[PHONE]"]),
     ("Mobile +16175550100 is best.", ["16175550100"], ["[PHONE]"]),
     ("Ring 07700900123 to arrange collection.", ["07700900123"], ["[PHONE]"]),
+    # --- Indian mobile numbers: +91, 0091, 0 or nothing, then 5-5 (space, hyphen, dot), or 10 digits after +91
+    ("phone +91 98450 12345: alarm", ["98450", "12345"], ["[PHONE]"]),
+    ("Call +91-98450-12345 today.", ["98450", "12345"], ["[PHONE]"]),
+    ("Call +91.98450.12345 today.", ["98450", "12345"], ["[PHONE]"]),
+    ("Call 98450 12345 today.", ["98450 12345"], ["[PHONE]"]),
+    ("Call 98450-12345 today.", ["98450-12345"], ["[PHONE]"]),
+    ("Call 098450 12345 today.", ["098450 12345"], ["[PHONE]"]),
+    ("Call 0 98450 12345 today.", ["98450 12345"], ["[PHONE]"]),
+    ("Call 0091 98450 12345 today.", ["98450 12345", "0091"], ["[PHONE]"]),
+    ("Call +91 9845012345 today.", ["9845012345"], ["[PHONE]"]),
+    ("Call +91-9845012345 today.", ["9845012345"], ["[PHONE]"]),
+    ("Call +919845012345 today.", ["919845012345"], ["[PHONE]"]),
+    ("Biomed contact Anil Mehta, +91 99000 54321, reported", ["Anil Mehta", "99000", "54321"], ["[PERSON]", "[PHONE]"]),
+    # --- other international and national groupings
+    ("Call +44 7700 900123 tomorrow.", ["7700 900123"], ["[PHONE]"]),
+    ("Call +33 6 12 34 56 78 tomorrow.", ["12 34 56 78"], ["[PHONE]"]),
+    ("Call +49 30 1234567 tomorrow.", ["1234567"], ["[PHONE]"]),
+    ("Call +44 (0)20 7946 0958 tomorrow.", ["7946 0958"], ["[PHONE]"]),
+    ("Call 07700 900123 tomorrow.", ["07700 900123"], ["[PHONE]"]),
+    ("Call 030 12345678 tomorrow.", ["030 12345678"], ["[PHONE]"]),
+    ("Call 011-23456789 tomorrow.", ["011-23456789"], ["[PHONE]"]),
+    # --- a named contact
+    ("Site contact Xiomara Quist confirmed the fault.", ["Xiomara Quist"], ["[PERSON]"]),
+    ("Hospital contact - Thaddeus Wrexham called back.", ["Thaddeus Wrexham"], ["[PERSON]"]),
+    ("The contact person Rao sent photos.", ["Rao"], ["[PERSON]"]),
     # --- postcodes outside labels
     ("The clinic in Leeds LS1 4AP returned the unit.", ["LS1 4AP"], ["[POSTCODE]"]),
     ("Shipped to London SW1A 1AA.", ["SW1A 1AA"], ["[POSTCODE]"]),
@@ -126,6 +152,17 @@ KEPT = [
     "Daisy chain the two monitors and check the Crystal oscillator drift.",
     "Mark II housing; Grace period of 30 days; Li ion cell at 3.7 V.",
     "Order 2026100300 shipped; ticket 1122334455 closed.",
+    # Numbers that look a little like phone numbers but are lots, dates, versions, counts or record identifiers.
+    "Complaints on lot 2607-2608 rose on 2026-10-16.",
+    "OrbitMed OMD-C-2617 on firmware 2.10.3 failed; 32 to 13 units returned.",
+    "Serial 98450 12345 and S/N 98450-12345 were returned; serial 07700 900123 was not.",
+    "Lot 0123 456789 and batch 61234-55678 were quarantined.",
+    "Part 12345-67890 and part numbers 12345 67890 match the drawing.",
+    "Order 98765 43210 shipped on 16.10.2026; version 10.2.3.4 installed.",
+    "Shipped 60000 70000 units in two batches.",
+    "Drift +3.7 V and +12% at temperature +25 C; reading 300 mmHg, 98% of 120.",
+    "Dose 10.5 mg at 07:30; 1,250 units of 98450 sold.",
+    "Contact the hospital about skin contact; the service contact Number is on the label.",
 ]
 
 
@@ -141,6 +178,28 @@ def test_personal_data_is_masked(text, hidden, placeholders):
 @pytest.mark.parametrize("text", KEPT, ids=[case[:40] for case in KEPT])
 def test_investigation_facts_are_kept(text):
     assert mask_text(text) == text
+
+
+@pytest.mark.parametrize("text, hidden, placeholders", MASKED, ids=[case[0][:40] for case in MASKED])
+def test_an_import_set_to_refuse_flags_whatever_masking_would_replace(text, hidden, placeholders):
+    """The import check (backend/app/trial/imports.py) refuses with the same detection masking uses."""
+    report = imports._Report()
+    imports._check_values(
+        "complaints", [(2, {"complaint_id": "C-1", "product_id": "P-1", "description": text})], report
+    )
+    flagged = [issue["message"] for issue in report.issues if "looks like it contains" in issue["message"]]
+    assert flagged and flagged[0].endswith("Remove personal data and retry, or choose to mask it."), report.issues
+
+
+def test_the_refusal_names_what_was_found():
+    found = imports._masking_found
+    text = "Reported by Nurse Kavya Rao, phone +91 98450 12345: alarm"
+    assert found(text, mask_text(text)) == "a person's name and a phone number"
+    text = "Caller Mr. Daniel Brooks (daniel.brooks@citycare.example), 67-year-old male"
+    assert found(text, mask_text(text)) == "a person's name, an email address and a person's age and sex"
+    assert found("Pump alarm", "Pump alarm") is None
+    # A placeholder already in the file (masked before) is not counted again.
+    assert found("Reported by [PERSON] via 98450 12345", "Reported by [PERSON] via [PHONE]") == "a phone number"
 
 
 def test_serials_and_lots_are_masked_only_beside_a_patient(monkeypatch):
