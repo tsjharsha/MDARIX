@@ -33,6 +33,22 @@ operator knows a release migrates the database.
   Other organizations keep the existing rule. The trials overview answer now carries each person's `id` and a
   `people` list.
 
+### Changed
+
+- The free trial request form says, before anything is sent, that every account uses two-factor sign-in (MFA) with
+  an authenticator app on the phone, so people have one ready; the confirmation screen and the trial guide's first
+  step say it too.
+- Website, "What you get": a roadmap from Live now to Next to Planned that draws itself, with a line of explanation
+  for each capability, the free trial's capabilities on their own card, and what each stage means for a customer.
+- Website, Product lifecycle: the design and development phases picture is replaced by the same phases drawn on the
+  page, each with the design-control records it leaves, the risk file beneath them and the feedback loop back from
+  post-market. Both animations run once and not at all for people who ask for reduced motion.
+
+### Fixed
+
+- Platform Admin › Security: audit actions starting with "SOD" read "Segregation of duties" again (a regular
+  expression held a control character instead of a word boundary).
+
 ## [0.10.17] - 2026-10-16
 
 ### Added
