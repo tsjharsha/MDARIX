@@ -90,6 +90,8 @@ DB_MODULES = {
     "test_mfa_mvp",
     "test_decision_governance_hardening",
     "test_free_trial",
+    # Getting started › Automatic insights: headline numbers, trend, records and the questions answered in place.
+    "test_trial_insights",
     "test_demo_workspace",
     "test_public_signup_onboarding",
     "test_simulator_ingestion",

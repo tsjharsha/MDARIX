@@ -333,17 +333,377 @@
   margin: 0 0 8px;
   font-size: 14px;
 }
-.uw-trial-questions {
+/* Automatic insights (sections/TrialInsights.tsx): headline numbers, the monthly trend, breakdown bars that filter the
+   panel and questions that open onto their answers. Bars grow in once; under reduced motion (.is-still or the system
+   setting) everything shows at its end state. */
+.uw-ins {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.uw-ins-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+.uw-ins-stat .ac-stat-value {
+  font-variant-numeric: tabular-nums;
+}
+.uw-ins-stat .ac-stat-detail {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.uw-ins-filterbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  font-size: 14px;
 }
-.uw-trial-questions .ac-secondary {
-  height: auto;
-  min-height: 36px;
-  padding: 6px 12px;
-  white-space: normal;
+.uw-ins-open {
+  margin-left: auto;
+}
+.uw-ins-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--ac-teal);
+  border-radius: 999px;
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  overflow-wrap: anywhere;
+}
+.uw-ins-chip button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ac-ink-2);
+  cursor: pointer;
+}
+.uw-ins-chip button:hover {
+  background: var(--ac-surface);
+}
+.uw-ins-ids {
+  font-size: 13px;
+  color: var(--ac-ink-2);
+}
+.uw-ins-ids p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+.uw-ins button:focus-visible,
+.uw-ins summary:focus-visible {
+  outline: 3px solid #087b7866;
+  outline-offset: 2px;
+}
+
+/* The monthly trend: one column per month, the recent ones in the series colour, the dashed line the earlier average. */
+.uw-ins-trend-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.uw-ins-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--ac-ink-2);
+}
+.uw-ins-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.uw-ins-key {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #9ab8e2;
+}
+.uw-ins-key.is-recent {
+  background: var(--ac-series);
+}
+.uw-ins-key.is-line {
+  width: 16px;
+  height: 0;
+  border-top: 2px dashed var(--ac-ink-2);
+  border-radius: 0;
+  background: none;
+}
+.uw-ins-plot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 170px;
+  margin: 0;
+  padding: 18px 0 22px;
+  border-bottom: 1px solid var(--ac-axis);
+}
+.uw-ins-average {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 1;
+  border-top: 2px dashed var(--ac-ink-2);
+  pointer-events: none;
+}
+.uw-ins-month {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
+}
+.uw-ins-month-fill {
+  display: block;
+  max-width: 44px;
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: #9ab8e2;
+  transform-origin: bottom;
+  animation: uw-ins-grow 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.uw-ins-month.is-recent .uw-ins-month-fill {
+  background: var(--ac-series);
+}
+.uw-ins-month-value {
+  position: absolute;
+  right: 0;
+  left: 0;
+  padding-bottom: 2px;
+  color: var(--ac-ink-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.uw-ins-month.is-recent .uw-ins-month-value {
+  color: var(--ac-ink);
+  font-weight: 700;
+}
+.uw-ins-month-tick {
+  position: absolute;
+  right: 0;
+  bottom: -20px;
+  left: 0;
+  overflow: hidden;
+  color: var(--ac-muted);
+  font-size: 11px;
+  text-align: center;
+  white-space: nowrap;
+}
+@keyframes uw-ins-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Breakdown bars: each row is a button that filters the panel; the pressed one is marked by colour and a border. */
+.uw-ins-bars {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ins-bars button {
+  display: grid;
+  grid-template-columns: minmax(120px, 260px) minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--ac-radius);
+  background: transparent;
+  color: var(--ac-ink);
+  font: inherit;
   text-align: left;
+  cursor: pointer;
+}
+.uw-ins-bars button:hover {
+  background: var(--ac-page);
+}
+.uw-ins-bars button.is-on {
+  border-color: var(--ac-teal);
+  background: var(--ac-teal-wash);
+}
+.uw-ins-bar-label {
+  color: var(--ac-ink-2);
+  overflow-wrap: anywhere;
+}
+.uw-ins-bar-track {
+  height: 10px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ac-track);
+}
+.uw-ins-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+  background: var(--ac-series);
+  transform-origin: left;
+  animation: uw-ins-grow-x 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 50ms);
+}
+.uw-ins-bars button.is-on .uw-ins-bar-fill {
+  background: var(--ac-teal);
+}
+.uw-ins-bar-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes uw-ins-grow-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Questions to ask next: an accordion; each answer says what it used and what the records lack. */
+.uw-ins-questions {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-ins-questions > li {
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-ins-questions > li.is-open {
+  border-color: var(--ac-teal);
+}
+.uw-ins-question {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--ac-radius);
+  background: transparent;
+  color: var(--ac-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.uw-ins-question:hover {
+  background: var(--ac-page);
+}
+.uw-ins-question svg {
+  flex: none;
+  color: var(--ac-teal);
+  transition: transform 160ms ease;
+}
+.uw-ins-question[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+.uw-ins-answer {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px 36px;
+  font-size: 14px;
+}
+.uw-ins-answer[hidden] {
+  display: none;
+}
+.uw-ins-summary {
+  margin: 0;
+  color: var(--ac-ink);
+  line-height: 1.5;
+}
+/* An answer's table keeps readable columns on a phone and scrolls sideways in its wrapper instead. */
+.uw-ins-answer .ac-table {
+  min-width: 560px;
+}
+.uw-ins-facts {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ac-ink-2);
+}
+.uw-ins-used,
+.uw-ins-basis {
+  margin: 0;
+  color: var(--ac-ink-2);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.uw-ins-missing {
+  padding: 8px 12px;
+  border-left: 3px solid var(--ac-warning);
+  border-radius: 4px;
+  background: var(--ac-page);
+  font-size: 13px;
+}
+.uw-ins-missing b {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.uw-ins-missing ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.uw-ins-answer > .ac-link {
+  justify-self: start;
+}
+@media (max-width: 640px) {
+  .uw-ins-bars button {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+  .uw-ins-bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .uw-ins-answer {
+    padding-left: 14px;
+  }
+  .uw-ins-open {
+    margin-left: 0;
+  }
+  .uw-ins-month-tick {
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .uw-ins-month-fill,
+  .uw-ins-bar-fill {
+    animation: none;
+  }
+  .uw-ins-question svg {
+    transition: none;
+  }
+}
+.uw-ins.is-still .uw-ins-month-fill,
+.uw-ins.is-still .uw-ins-bar-fill {
+  animation: none;
 }
 @media (max-width: 720px) {
   .uw-trial-steps li {
