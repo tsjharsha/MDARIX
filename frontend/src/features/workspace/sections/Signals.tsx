@@ -1,17 +1,15 @@
 import { useMemo, useState } from "react";
 import { BarList, ColumnChart, Panel } from "../../admin/console/charts";
 import { chartWindowEnd, dailyCounts, titleCase, type Slice } from "../../admin/console/dashboardModel";
-import { SearchBox, Table, Tabs, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
-import { sortParams, useServerSort } from "../../../app/tableSort";
-import { displayId } from "../../../app/displayId";
-import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import { Tabs, listOf, useResource } from "../../customer-admin/shared";
+import { useCan } from "../workspaceContext";
 import { Stage2Experience } from "../../stage2/Stage2Experience";
-import { Embedded, NeedsProduct, RecordTable, StatusBadge } from "./common";
+import { Embedded, NeedsProduct, RecordTable } from "./common";
 import { SIGNALS_TABS, parseSignalsTab, type SignalsTab } from "../signals";
 import { SignalInbox } from "./SignalInbox";
 import { DetectionRules } from "./DetectionRules";
 import { TrendCheck } from "./TrendCheck";
+import { ComplaintList } from "./ComplaintList";
 
 /**
  * Signals: the signal inbox (triage), the complaints behind signals, and their trends. `tab` may carry the inbox's
@@ -118,149 +116,5 @@ function Trends() {
         <p className="ac-note">Severity is shown only when the source system recorded it.</p>
       </Panel>
     </div>
-  );
-}
-
-// The complaint list's columns the server sorts across every page (GET /api/v1/complaints sort/order).
-const COMPLAINT_SORTS = [
-  "business_id",
-  "complaint_identifier",
-  "product",
-  "description",
-  "received",
-  "severity",
-  "status",
-  "cases",
-] as const;
-
-/** Every complaint in the organization, across products: search, filter by product and status, page through. */
-function ComplaintList() {
-  const { work } = useWorkspace();
-  const openInvestigation = useOpenInvestigation();
-  const [query, setQuery] = useState("");
-  const [product, setProduct] = useState("");
-  const [status, setStatus] = useState("");
-  const [page, setPage] = useState(1);
-  const { sort, onSort } = useServerSort(() => setPage(1));
-  const params = new URLSearchParams({ page: String(page), page_size: "50", ...sortParams(sort) });
-  if (query.trim()) params.set("q", query.trim());
-  if (product) params.set("product_id", product);
-  if (status) params.set("status", status);
-  const list = useResource<any>(`/api/v1/complaints?${params}`);
-  const pages = list.data?.pages ?? 1;
-  const reset = (apply: () => void) => {
-    apply();
-    setPage(1);
-  };
-  return (
-    <Panel
-      eyebrow="Signals"
-      title={`Complaints in your organization${list.data ? ` · ${list.data.total}` : ""}`}
-      source={list}
-    >
-      <div className="cc-toolbar">
-        <SearchBox
-          value={query}
-          onChange={(value) => reset(() => setQuery(value))}
-          label="Search complaint ID or text"
-        />
-        <select aria-label="Product" value={product} onChange={(event) => reset(() => setProduct(event.target.value))}>
-          <option value="">All products</option>
-          {work.products.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <select aria-label="Status" value={status} onChange={(event) => reset(() => setStatus(event.target.value))}>
-          <option value="">All statuses</option>
-          {listOf(list.data?.statuses).map((value: string) => (
-            <option key={value} value={value}>
-              {titleCase(value)}
-            </option>
-          ))}
-        </select>
-      </div>
-      <Table
-        caption="Complaint list"
-        rows={listOf(list.data?.items)}
-        rowKey={(row) => String(row.id)}
-        empty={{ title: "No complaints found", detail: "Complaints arrive through connectors and imports." }}
-        serverSort={{ sort, onSort, keys: COMPLAINT_SORTS }}
-        columns={[
-          idColumn("Complaint ID", "complaint_identifier"),
-          sourceIdColumn("complaint_identifier"),
-          {
-            key: "product",
-            label: "Product",
-            fields: ["product_name", "product_identifier", "version"],
-            render: (row) => `${row.product_name}${row.version ? ` · ${row.version}` : ""}`,
-          },
-          { key: "description", label: "Description", render: (row) => row.description ?? "—" },
-          {
-            key: "received",
-            label: "Received",
-            fields: ["received_date"],
-            render: (row) => formatDay(row.received_date ?? row.event_date),
-          },
-          {
-            key: "severity",
-            label: "Severity",
-            fields: ["severity", "patient_involved", "serious_injury", "death"],
-            render: (row) => (
-              <span className="ca-person">
-                <span>{row.severity ? titleCase(String(row.severity)) : "—"}</span>
-                {(row.death || row.serious_injury) && (
-                  <small className="uw-flag-critical">Serious injury or death</small>
-                )}
-                {!row.death && !row.serious_injury && row.patient_involved && <small>Patient involved</small>}
-              </span>
-            ),
-          },
-          { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
-          {
-            key: "cases",
-            label: "Investigations",
-            numeric: true,
-            fields: ["investigations"],
-            render: (row) => row.investigations,
-          },
-          ...(openInvestigation
-            ? [
-                {
-                  key: "open-investigation",
-                  label: "",
-                  render: (row: any) => {
-                    const request = investigationRequestFor(row);
-                    return request ? (
-                      <button
-                        type="button"
-                        className="ac-link"
-                        aria-label={`Open an investigation for ${displayId(row, "complaint_identifier", "this complaint")}`}
-                        onClick={() => openInvestigation(request)}
-                      >
-                        Open investigation
-                      </button>
-                    ) : null;
-                  },
-                },
-              ]
-            : []),
-        ]}
-      />
-      {pages > 1 && (
-        <div className="ca-action-row">
-          <button type="button" className="ac-secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            Previous
-          </button>
-          <span className="ac-muted">
-            Page {page} of {pages}
-          </span>
-          <button type="button" className="ac-secondary" disabled={page >= pages} onClick={() => setPage(page + 1)}>
-            Next
-          </button>
-        </div>
-      )}
-    </Panel>
   );
 }

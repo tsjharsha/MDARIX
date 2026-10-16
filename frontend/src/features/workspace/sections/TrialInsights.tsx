@@ -21,6 +21,7 @@ import { useAiReady } from "../useAiStatus";
 import { handQuestionToAsk } from "../../ask/pendingQuestion";
 import { countOf } from "./common";
 import { TrendHero } from "./TrendHero";
+import { complaintListTab, insightComplaintFilters } from "../complaintList";
 import {
   FACETS,
   FACET_NAMES,
@@ -93,13 +94,10 @@ export function InsightsPanel({ insights, source }: { insights: Insights | null;
           expanded={expanded}
           onExpand={(key) => setExpanded((current) => (current === key ? null : key))}
           still={still}
-          onOpenComplaints={(text) => {
-            open("Complaints");
-            if (text)
-              notify(
-                `Complaints opened. It has no filter for ${text} yet; the IDs are listed under Automatic insights.`,
-              );
-          }}
+          // The complaint list, with the panel's filters and its data's source (the sample or the imported data).
+          onOpenComplaints={() =>
+            open("Complaints", complaintListTab(insightComplaintFilters(filters, insights.source_system)))
+          }
           onOpenCase={(item) => {
             work.setInvestigationId(item.id, item.product_id);
             open("Investigations");

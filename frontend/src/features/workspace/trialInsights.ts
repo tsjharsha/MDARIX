@@ -55,6 +55,8 @@ export type InsightQuestion = { key: string; question: string; answer: InsightAn
 
 export type Insights = {
   scope: string;
+  /** The complaints' source system (added in 0.10.17), so the complaint list opens on the same complaints. */
+  source_system?: string;
   total_complaints: number;
   by_product: { product_id: string; name: string; complaints: number }[];
   by_version: { product_id: string | null; version: string; complaints: number }[];
