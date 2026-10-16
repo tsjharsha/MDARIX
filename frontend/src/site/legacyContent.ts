@@ -422,39 +422,140 @@ export const capabilityCopy: Record<string, { eyebrow: string; title: string; co
 
 // What every workspace can use today (the free trial included), what is built together during a pilot, and what is
 // planned. Keep this in step with the product: nothing moves to "Available today" until it works for a customer, and
-// AI stays out of it until it is switched on for customers.
-export const capabilityStatus: { label: string; text: string; items: string[] }[] = [
+// AI stays out of it until it is switched on for customers. `icon` names an icon in pages.tsx (ROADMAP_ICONS).
+export type CapabilityIcon =
+  | "product"
+  | "second-look"
+  | "clock"
+  | "signal"
+  | "investigation"
+  | "signature"
+  | "capa"
+  | "import"
+  | "roles"
+  | "connection"
+  | "mapping"
+  | "ai"
+  | "sso"
+  | "connector"
+  | "database";
+
+export const capabilityStatus: {
+  label: string;
+  badge: string;
+  text: string;
+  promise: string;
+  items: { icon: CapabilityIcon; title: string; detail: string }[];
+}[] = [
   {
     label: "Available today",
+    badge: "Live now",
     text: "In every workspace, including the 30-day free trial.",
+    promise: "Start on sample data, then on your own exports. No integration and no credit card.",
     items: [
-      "Product 360: products, versions, lots, components and suppliers",
-      "A second look at complaints closed as inquiries or “no fault found”",
-      "Reporting clocks for the FDA, EU, UK and Canada",
-      "Complaint signals from a count rule and a trend check per product version",
-      "Investigations with evidence, competing hypotheses and open questions side by side",
-      "Human decisions with electronic signatures and an audit trail",
-      "CAPA effectiveness checks, risk-file input and the inspector summary",
-      "CSV import with templates and a personal-data check",
-      "Roles, customer administration and authenticator-app MFA",
+      {
+        icon: "product",
+        title: "Product 360",
+        detail:
+          "Products, versions, lots, components and suppliers in one place, so every complaint sits on the right product record.",
+      },
+      {
+        icon: "second-look",
+        title: "A second look at closed complaints",
+        detail:
+          "Complaints closed as inquiries or “no fault found” are brought back for review, so a reportable event is not lost in the wrong category.",
+      },
+      {
+        icon: "clock",
+        title: "Reporting clocks",
+        detail:
+          "FDA, EU, UK and Canada reporting windows counted from the day you became aware, with each reportability decision and its reason kept.",
+      },
+      {
+        icon: "signal",
+        title: "Complaint signals",
+        detail:
+          "A count rule and a trend check per product version raise a signal when complaints rise, before anyone has to spot it in a spreadsheet.",
+      },
+      {
+        icon: "investigation",
+        title: "Investigations",
+        detail:
+          "Evidence, competing hypotheses and open questions side by side, so a conclusion shows what supports it and what is still unknown.",
+      },
+      {
+        icon: "signature",
+        title: "Signed human decisions",
+        detail:
+          "Decisions signed with your password and authenticator code. Whoever writes a brief never reviews or signs it, and every step is in the audit trail.",
+      },
+      {
+        icon: "capa",
+        title: "CAPA effectiveness and inspection readiness",
+        detail:
+          "Plan and sign the effectiveness check, send input to the risk file, and download the inspector summary as one pack.",
+      },
+      {
+        icon: "import",
+        title: "Import your own exports",
+        detail:
+          "CSV or Excel with your own column names, guided by templates. Personal details are refused or replaced before anything is stored.",
+      },
+      {
+        icon: "roles",
+        title: "Roles, administration and MFA",
+        detail:
+          "Workflow roles with separation of duties, customer administration, and authenticator-app MFA on every account.",
+      },
     ],
   },
   {
     label: "With design partners",
+    badge: "Next",
     text: "Built and validated together during a pilot.",
+    promise: "As a design partner, we connect your systems and validate each step with your team.",
     items: [
-      "Live connections to your QMS, PLM, ERP and supplier systems",
-      "Mapping your fields and reference data to the MDARIX model",
-      "AI assistance that cites its evidence, switched on once it is validated with your team",
+      {
+        icon: "connection",
+        title: "Live connections",
+        detail:
+          "Your QMS, PLM, ERP and supplier systems feed MDARIX on a schedule, by file transfer, REST or database, instead of manual exports.",
+      },
+      {
+        icon: "mapping",
+        title: "Mapping to the MDARIX model",
+        detail:
+          "Your fields and reference data mapped with governed templates, reviewed with your team before anything goes live.",
+      },
+      {
+        icon: "ai",
+        title: "AI assistance that cites its evidence",
+        detail:
+          "Answers that name the records they rely on, switched on only once it is validated with your team. People still make every decision.",
+      },
     ],
   },
   {
     label: "Planned",
+    badge: "Planned",
     text: "Not available yet.",
+    promise: "On our roadmap. Design partners help decide what comes first.",
     items: [
-      "Single sign-on (OpenID Connect and SAML)",
-      "Ready-made connectors for named vendor systems",
-      "A dedicated database for each customer",
+      {
+        icon: "sso",
+        title: "Single sign-on",
+        detail: "Sign in with your company's identity provider over OpenID Connect or SAML.",
+      },
+      {
+        icon: "connector",
+        title: "Ready-made vendor connectors",
+        detail: "Connectors for named QMS, PLM and ERP products, set up without custom integration work.",
+      },
+      {
+        icon: "database",
+        title: "A dedicated database for each customer",
+        detail: "Your records in a database of their own, for organisations that need that separation.",
+      },
     ],
   },
 ];

@@ -30,7 +30,7 @@ describe("website home", () => {
 
   it("keeps AI out of what is available today and says the free trial runs without it", () => {
     const today = capabilityStatus.find((status) => status.label === "Available today")!;
-    expect(today.items.join(" ")).not.toMatch(/AI/);
+    expect(today.items.map((item) => `${item.title} ${item.detail}`).join(" ")).not.toMatch(/\bAI\b/);
     expect(today.text).toContain("free trial");
     expect(trialIncludes).toContain("AI is off during the trial: every step works by hand");
     const html = renderToStaticMarkup(<HomePage />);

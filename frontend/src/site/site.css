@@ -822,6 +822,378 @@
   justify-self: start;
   margin-top: 8px;
 }
+
+/* What you get, as a roadmap (pages.tsx ScopeClarity): a navy stage with a track from "Live now" to "Planned", the
+   free trial's capabilities on a white card, then the next and planned stages. Hidden start states and motion only
+   apply when the visitor has not asked for reduced motion, so without motion everything is simply shown. */
+.ms-roadmap {
+  --rm-live: var(--ms-teal-bright);
+  --rm-next: #f5c26b;
+  --rm-planned: #a9bccb;
+  position: relative;
+  display: grid;
+  gap: 22px;
+  margin-top: 8px;
+  padding: 34px;
+  border-radius: 24px;
+  background:
+    radial-gradient(640px 280px at 12% 0%, rgb(29 106 106 / 75%) 0%, transparent 62%),
+    radial-gradient(520px 260px at 92% 100%, rgb(201 133 0 / 16%) 0%, transparent 60%), var(--ms-navy-deep);
+  box-shadow: 0 30px 60px -30px rgb(15 34 51 / 55%);
+  color: #fff;
+  overflow: hidden;
+}
+.ms-roadmap-head {
+  position: relative;
+  padding: 4px 0 8px;
+}
+.ms-roadmap-track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ms-roadmap-stop {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.ms-roadmap-stop strong {
+  color: #fff;
+  font-size: 17px;
+  line-height: 1.25;
+}
+.ms-roadmap-count {
+  color: rgb(255 255 255 / 68%);
+  font-size: 13px;
+}
+.ms-roadmap-dot {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
+  border: 4px solid var(--ms-navy-deep);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px currentcolor;
+}
+.ms-roadmap-stop.is-live {
+  color: var(--rm-live);
+}
+.ms-roadmap-stop.is-next {
+  color: var(--rm-next);
+}
+.ms-roadmap-stop.is-planned {
+  color: var(--rm-planned);
+}
+.ms-roadmap-stop.is-live .ms-roadmap-dot {
+  background: var(--rm-live);
+}
+.ms-roadmap-stop.is-next .ms-roadmap-dot {
+  background: linear-gradient(90deg, var(--rm-next) 50%, var(--ms-navy-deep) 50%);
+}
+.ms-roadmap-stop.is-planned .ms-roadmap-dot {
+  background: var(--ms-navy-deep);
+}
+/* The rail runs from the first stop's centre to the last one's: solid up to the next stop, dashed after it. */
+.ms-roadmap-rail {
+  position: absolute;
+  top: 14px;
+  left: 16.667%;
+  right: 16.667%;
+  height: 3px;
+}
+.ms-roadmap-rail-done,
+.ms-roadmap-rail-next {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 3px;
+  border-radius: 3px;
+  transform-origin: left center;
+}
+.ms-roadmap-rail-done {
+  left: 0;
+  background: linear-gradient(90deg, var(--rm-live), var(--rm-next));
+}
+.ms-roadmap-rail-next {
+  left: 50%;
+  background: repeating-linear-gradient(90deg, var(--rm-next) 0 10px, transparent 10px 18px);
+  opacity: 0.8;
+}
+.ms-roadmap-spark {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 70px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(255 255 255 / 85%), transparent);
+  opacity: 0;
+}
+.ms-roadmap-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid currentcolor;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* Cards */
+.ms-roadmap-card {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: 28px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 6%);
+}
+.ms-roadmap-card header {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.ms-roadmap-card h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.ms-roadmap-card header p {
+  margin: 0;
+  color: rgb(255 255 255 / 75%);
+}
+.ms-roadmap-card.is-next .ms-roadmap-badge {
+  color: var(--rm-next);
+}
+.ms-roadmap-card.is-planned .ms-roadmap-badge {
+  color: var(--rm-planned);
+}
+.ms-roadmap-card.is-live {
+  position: relative;
+  border: 0;
+  border-top: 4px solid var(--ms-teal);
+  background: #fff;
+  box-shadow: 0 24px 48px -28px rgb(0 0 0 / 60%);
+  color: var(--ms-ink);
+}
+.ms-roadmap-card.is-live header p {
+  color: var(--ms-ink-2);
+}
+.ms-roadmap-card.is-live .ms-roadmap-badge {
+  border-color: transparent;
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+}
+.ms-roadmap-ribbon {
+  position: absolute;
+  top: 26px;
+  right: 26px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--ms-teal);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 18px -8px rgb(8 123 120 / 70%);
+}
+.ms-roadmap-list {
+  display: grid;
+  gap: 18px 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ms-roadmap-card.is-live .ms-roadmap-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ms-roadmap-list li {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.ms-roadmap-list li > span:last-child {
+  display: grid;
+  gap: 3px;
+}
+.ms-roadmap-list strong {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.ms-roadmap-list li > span:last-child > span {
+  color: rgb(255 255 255 / 72%);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ms-roadmap-card.is-live .ms-roadmap-list li > span:last-child > span {
+  color: var(--ms-ink-2);
+}
+.ms-roadmap-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgb(255 255 255 / 10%);
+}
+.ms-roadmap-card.is-live .ms-roadmap-icon {
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+}
+.ms-roadmap-card.is-next .ms-roadmap-icon {
+  color: var(--rm-next);
+}
+.ms-roadmap-card.is-planned .ms-roadmap-icon {
+  color: var(--rm-planned);
+}
+.ms-roadmap-promise {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 8%);
+  color: rgb(255 255 255 / 88%);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ms-roadmap-card.is-live .ms-roadmap-promise {
+  background: var(--ms-mint);
+  color: var(--ms-teal-dark);
+}
+.ms-roadmap-later {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+@media (max-width: 1100px) {
+  .ms-roadmap-card.is-live .ms-roadmap-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .ms-roadmap {
+    padding: 22px 14px;
+    border-radius: 18px;
+  }
+  .ms-roadmap-card {
+    padding: 22px 18px;
+  }
+  .ms-roadmap-card.is-live .ms-roadmap-list,
+  .ms-roadmap-later {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ms-roadmap-ribbon {
+    position: static;
+    margin-top: 6px;
+  }
+  .ms-roadmap-stop strong {
+    font-size: 13px;
+  }
+  .ms-roadmap-count {
+    font-size: 12px;
+  }
+  .ms-roadmap-badge {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ms-roadmap-rail-done,
+  .ms-roadmap-rail-next {
+    transform: scaleX(0);
+  }
+  .ms-roadmap-stop,
+  .ms-roadmap-list li,
+  .ms-roadmap-promise,
+  .ms-roadmap-ribbon {
+    opacity: 0;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-rail-done {
+    animation: ms-rm-grow 0.9s 0.35s cubic-bezier(0.3, 0.7, 0.2, 1) forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-rail-next {
+    animation: ms-rm-grow 0.9s 1.15s cubic-bezier(0.3, 0.7, 0.2, 1) forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-stop {
+    animation: ms-rm-rise 0.6s calc(var(--stage) * 0.8s + 0.1s) ease forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-list li {
+    animation: ms-rm-rise 0.55s calc(0.5s + var(--stage) * 0.6s + var(--n) * 80ms) ease forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-promise {
+    animation: ms-rm-rise 0.6s calc(1.3s + var(--stage) * 0.6s) ease forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-ribbon {
+    animation: ms-rm-stamp 0.6s 1.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-spark {
+    animation: ms-rm-spark 4.5s 2.4s ease-in-out infinite;
+  }
+  .ms-roadmap.is-visible .ms-roadmap-stop.is-live .ms-roadmap-dot::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
+    border: 2px solid var(--rm-live);
+    border-radius: 50%;
+    opacity: 0;
+    animation: ms-rm-ping 2.6s 1s ease-out infinite;
+  }
+}
+@keyframes ms-rm-grow {
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes ms-rm-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ms-rm-stamp {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ms-rm-spark {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  10%,
+  45% {
+    opacity: 1;
+  }
+  60%,
+  100% {
+    left: calc(100% - 70px);
+    opacity: 0;
+  }
+}
+@keyframes ms-rm-ping {
+  0% {
+    opacity: 0.9;
+    transform: scale(0.7);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
 .ms-card-diagram img {
   margin-top: 10px;
   border-radius: 10px;
@@ -2365,8 +2737,431 @@
     transform: scale(2.4);
   }
 }
-.ms-lc-phases {
+/* Design and development phases (designPhases.tsx): a navy stage, seven phases on a track that draws itself, the
+   records each phase leaves, the risk file beneath them all, and a feedback arc from post-market back to the start.
+   Start states and motion only apply when the visitor has not asked for reduced motion. */
+.ms-dp {
+  --dp-glow: var(--ms-teal-bright);
+  --dp-field: #f5c26b;
+  --dp-medal: 64px;
+  --dp-arc: 92px;
+  position: relative;
   margin-top: 28px;
+  padding: 30px 26px 26px;
+  border-radius: 24px;
+  background:
+    radial-gradient(700px 300px at 10% 0%, rgb(29 106 106 / 70%) 0%, transparent 62%),
+    radial-gradient(520px 280px at 95% 100%, rgb(201 133 0 / 18%) 0%, transparent 60%),
+    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 100% 28px,
+    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px) 0 0 / 28px 100%,
+    var(--ms-navy-deep);
+  box-shadow: 0 30px 60px -30px rgb(15 34 51 / 55%);
+  color: #fff;
+  overflow: hidden;
+}
+.ms-dp-body {
+  position: relative;
+  padding-top: var(--dp-arc);
+}
+/* The feedback arc spans from phase 6's medal to phase 0's (column centres at 1/14 and 13/14 of the width). */
+.ms-dp-arc {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 100%;
+  height: calc(var(--dp-arc) - 6px);
+  overflow: visible;
+}
+.ms-dp-arc path {
+  fill: none;
+  stroke-linecap: round;
+}
+.ms-dp-arc-base {
+  stroke: rgb(245 194 107 / 22%);
+  stroke-width: 6;
+}
+.ms-dp-arc-flow {
+  stroke: var(--dp-field);
+  stroke-width: 2.5;
+  stroke-dasharray: 2 12;
+}
+.ms-dp-arc-head {
+  position: absolute;
+  top: calc(var(--dp-arc) - 12px);
+  left: calc(7.143% - 7px);
+  width: 0;
+  height: 0;
+  border-top: 10px solid var(--dp-field);
+  border-right: 7px solid transparent;
+  border-left: 7px solid transparent;
+}
+.ms-dp-arc-label {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  margin: 0;
+  padding: 6px 14px;
+  border: 1px solid rgb(245 194 107 / 45%);
+  border-radius: 999px;
+  background: var(--ms-navy-deep);
+  color: rgb(255 255 255 / 86%);
+  font-size: 13px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.ms-dp-arc-label strong {
+  color: var(--dp-field);
+}
+.ms-dp-track {
+  position: absolute;
+  top: calc(var(--dp-arc) + var(--dp-medal) / 2 - 2px);
+  left: 7.143%;
+  right: 7.143%;
+  height: 4px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 10%);
+  overflow: hidden;
+}
+.ms-dp-track-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--dp-glow), #4fb3d9 55%, var(--dp-field));
+  transform-origin: left center;
+}
+.ms-dp-sheen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 90px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 90%), transparent);
+  opacity: 0;
+}
+.ms-dp-phases {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ms-dp-phases > li {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 7px;
+  padding: 0 6px;
+  text-align: center;
+}
+.ms-dp-medal {
+  display: grid;
+  place-items: center;
+  width: var(--dp-medal);
+  height: var(--dp-medal);
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 35%, #1f4a5c, var(--ms-navy-deep) 70%) padding-box,
+    conic-gradient(from 200deg, var(--dp-glow), #4fb3d9, var(--dp-glow)) border-box;
+  border: 3px solid transparent;
+  box-shadow: 0 0 22px rgb(115 214 203 / 35%);
+  color: var(--dp-glow);
+}
+.ms-dp-phases > li.is-field .ms-dp-medal {
+  background:
+    radial-gradient(circle at 50% 35%, #4a3a17, var(--ms-navy-deep) 70%) padding-box,
+    conic-gradient(from 200deg, var(--dp-field), #ffd98f, var(--dp-field)) border-box;
+  box-shadow: 0 0 26px rgb(245 194 107 / 45%);
+  color: var(--dp-field);
+}
+.ms-dp-num {
+  color: var(--dp-glow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.ms-dp-phases > li.is-field .ms-dp-num {
+  color: var(--dp-field);
+}
+.ms-dp-phases > li > strong {
+  min-height: 3.9em;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.ms-dp-phases ul {
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ms-dp-phases ul li {
+  padding: 3px 9px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 7%);
+  color: rgb(255 255 255 / 82%);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ms-dp-flag {
+  margin-top: 4px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--dp-field);
+  color: var(--ms-navy-deep);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px -8px rgb(245 194 107 / 80%);
+}
+.ms-dp-risk {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+  margin-top: 26px;
+  padding: 12px 18px;
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 5%);
+  overflow: hidden;
+}
+.ms-dp-risk-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(208 59 59 / 30%), rgb(245 194 107 / 22%));
+  transform-origin: left center;
+}
+.ms-dp-risk strong,
+.ms-dp-risk span:not(.ms-dp-risk-fill) {
+  position: relative;
+}
+.ms-dp-risk strong {
+  color: #ffb4a8;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ms-dp-risk span:not(.ms-dp-risk-fill) {
+  color: rgb(255 255 255 / 84%);
+  font-size: 14px;
+}
+/* Narrow screens: the phases run down a vertical track; the arc becomes a note at the end. */
+@media (max-width: 900px) {
+  .ms-dp {
+    --dp-medal: 52px;
+    padding: 22px 16px 18px;
+    border-radius: 18px;
+  }
+  .ms-dp-body {
+    display: grid;
+    padding-top: 0;
+  }
+  .ms-dp-arc,
+  .ms-dp-arc-head {
+    display: none;
+  }
+  .ms-dp-arc-label {
+    position: static;
+    order: 2;
+    margin-top: 18px;
+    border-radius: 12px;
+    white-space: normal;
+    transform: none;
+  }
+  .ms-dp-track {
+    display: none;
+  }
+  /* One segment per phase, from its medal to the next one's, so the line ends at phase 6. */
+  .ms-dp-phases > li {
+    position: relative;
+  }
+  .ms-dp-phases > li:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    top: calc(var(--dp-medal) / 2);
+    left: calc(var(--dp-medal) / 2 - 2px);
+    width: 4px;
+    height: calc(100% + 18px);
+    background: var(--dp-glow);
+    transform-origin: center top;
+  }
+  .ms-dp-phases > li:nth-last-child(2)::before {
+    background: linear-gradient(180deg, var(--dp-glow), var(--dp-field));
+  }
+  .ms-dp-medal {
+    position: relative;
+    z-index: 1;
+  }
+  .ms-dp-phases {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .ms-dp-phases > li {
+    grid-template-columns: var(--dp-medal) minmax(0, 1fr);
+    justify-items: start;
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 0;
+    text-align: left;
+  }
+  .ms-dp-medal {
+    grid-row: 1 / span 4;
+    margin: 0;
+  }
+  .ms-dp-medal svg {
+    width: 22px;
+    height: 22px;
+  }
+  .ms-dp-phases > li > strong {
+    min-height: 0;
+    font-size: 15px;
+  }
+  .ms-dp-phases ul {
+    display: flex;
+    flex-wrap: wrap;
+    justify-items: start;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ms-dp-track-fill,
+  .ms-dp-risk-fill {
+    clip-path: inset(0 100% 0 0);
+  }
+  .ms-dp-phases > li,
+  .ms-dp-phases ul li,
+  .ms-dp-flag,
+  .ms-dp-arc,
+  .ms-dp-arc-head,
+  .ms-dp-arc-label {
+    opacity: 0;
+  }
+  .ms-dp.is-visible .ms-dp-track-fill {
+    animation: ms-dp-wipe 2.16s 0.15s linear forwards;
+  }
+  .ms-dp.is-visible .ms-dp-risk-fill {
+    animation: ms-dp-wipe 2.6s 0.3s ease-out forwards;
+  }
+  .ms-dp.is-visible .ms-dp-phases > li {
+    animation: ms-dp-rise 0.6s calc(0.15s + var(--p) * 0.36s) ease forwards;
+  }
+  .ms-dp.is-visible .ms-dp-medal {
+    animation: ms-dp-light 0.9s calc(0.15s + var(--p) * 0.36s) ease-out;
+  }
+  .ms-dp.is-visible .ms-dp-phases ul li {
+    animation: ms-dp-rise 0.5s calc(0.45s + var(--p) * 0.36s) ease forwards;
+  }
+  .ms-dp.is-visible .ms-dp-flag {
+    animation: ms-dp-stamp 0.6s 2.9s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  }
+  .ms-dp.is-visible .ms-dp-phases > li.is-field .ms-dp-medal {
+    animation:
+      ms-dp-light 0.9s calc(0.15s + var(--p) * 0.36s) ease-out,
+      ms-dp-beacon 2.8s 3.2s ease-in-out infinite;
+  }
+  .ms-dp.is-visible .ms-dp-arc,
+  .ms-dp.is-visible .ms-dp-arc-head,
+  .ms-dp.is-visible .ms-dp-arc-label {
+    animation: ms-dp-fade 0.8s 3.1s ease forwards;
+  }
+  .ms-dp.is-visible .ms-dp-arc-flow {
+    animation: ms-dp-flow 1.4s linear infinite;
+  }
+  .ms-dp.is-visible .ms-dp-sheen {
+    animation: ms-dp-sheen 5s 3.4s ease-in-out infinite;
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (max-width: 900px) {
+  .ms-dp-phases > li:not(:last-child)::before {
+    transform: scaleY(0);
+  }
+  .ms-dp.is-visible .ms-dp-phases > li:not(:last-child)::before {
+    animation: ms-dp-grow-down 0.36s calc(0.15s + var(--p) * 0.36s) linear forwards;
+  }
+}
+@keyframes ms-dp-wipe {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes ms-dp-grow-down {
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes ms-dp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ms-dp-fade {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ms-dp-light {
+  0% {
+    transform: scale(0.6);
+    filter: brightness(0.6);
+  }
+  60% {
+    transform: scale(1.12);
+    filter: brightness(1.5);
+  }
+  100% {
+    transform: none;
+    filter: none;
+  }
+}
+@keyframes ms-dp-beacon {
+  0%,
+  100% {
+    box-shadow: 0 0 26px rgb(245 194 107 / 45%);
+  }
+  50% {
+    box-shadow:
+      0 0 0 10px rgb(245 194 107 / 12%),
+      0 0 40px rgb(245 194 107 / 70%);
+  }
+}
+@keyframes ms-dp-stamp {
+  from {
+    opacity: 0;
+    transform: scale(0.6) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ms-dp-flow {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@keyframes ms-dp-sheen {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  10%,
+  40% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    left: calc(100% - 90px);
+    opacity: 0;
+  }
 }
 @media (max-width: 640px) {
   .ms-lc-hero {
