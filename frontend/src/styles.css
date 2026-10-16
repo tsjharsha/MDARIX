@@ -11216,6 +11216,15 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   text-decoration: none;
   cursor: pointer;
 }
+/* A guide link's name with a short line under it, so the two user guides are told apart at a glance. */
+.help-menu-item {
+  display: grid;
+  gap: 1px;
+}
+.help-menu-item small {
+  color: #5b6b7a;
+  font-size: 12px;
+}
 .help-menu-list a:hover,
 .help-menu-list button:hover,
 .help-menu-list a:focus-visible,

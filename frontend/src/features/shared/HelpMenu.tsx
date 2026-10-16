@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Bug, CircleHelp, LifeBuoy, NotebookText, ShieldCheck } from "lucide-react";
+import { BookOpen, Bug, CircleHelp, LifeBuoy, ListChecks, NotebookText, ShieldCheck } from "lucide-react";
 import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
+import { USER_GUIDE_PATH } from "../help/userGuide";
 
 /**
- * Help in every signed-in screen: getting started (during a trial), the pilot guide, the support address, a
+ * Help in every signed-in screen: getting started (during a trial), the step-by-step user guide (every screen), the
+ * free trial user guide (the trial's seven steps, during a trial), the pilot guide, the support address, a
  * "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and privacy pages.
  * The support address comes from the server configuration (backend/app/site_info.py).
  */
@@ -55,10 +57,23 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
               </button>
             </li>
           )}
+          <li>
+            <a href={USER_GUIDE_PATH} target="_blank" rel="noopener">
+              <ListChecks size={15} aria-hidden="true" />
+              <span className="help-menu-item">
+                Step-by-step user guide
+                <small>Every screen, task by task</small>
+              </span>
+            </a>
+          </li>
           {onGettingStarted && (
             <li>
               <a href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
-                <NotebookText size={15} aria-hidden="true" /> Free trial user guide
+                <NotebookText size={15} aria-hidden="true" />
+                <span className="help-menu-item">
+                  Free trial user guide
+                  <small>The trial in 7 steps</small>
+                </span>
               </a>
             </li>
           )}

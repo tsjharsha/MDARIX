@@ -10,6 +10,24 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.10] - 2026-10-16
+
+### Added
+
+- A step-by-step user guide at `/help/user-guide`: every screen of the workspace, task by task, with the names of its
+  buttons and fields as they appear, who may do each task, and what you see when it worked. Seven parts (the basics,
+  the home screens, complaints and signals, investigations, records, your data and account, feedback and the end of a
+  trial) and a table of who can do what. It opens without signing in and saves as a PDF. A test checks that every
+  button name it quotes still exists on its screen.
+- Help menu and Getting started › Your trial journey offer both guides, told apart: "Step-by-step user guide" (every
+  screen, task by task) and "Free trial user guide" (the trial in 7 steps). The step-by-step guide is in every
+  organization's Help menu.
+
+### Fixed
+
+- My Account › Security said every session ends after 60 minutes; it ends after 12 hours at most (and after 30
+  minutes without activity).
+
 ## [0.10.9] - 2026-10-15
 
 ### Changed
