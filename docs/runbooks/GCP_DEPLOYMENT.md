@@ -120,13 +120,53 @@ login, `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED=true`; STAGING_ORACLE.md section 0) 
 data only. Check: every service healthy, `config_check` clean, a real invitation email arrives, a backup lands in
 the Delhi bucket, the restore drill of BACKUP_AND_RESTORE.md, and one trial walked end to end by a person.
 
-Go-live, once the operator has approved the legal texts and the rehearsal is done: point `mdarix.in` (A record) and
-`www` (CNAME to `mdarix.in`) at the static IP; in `.env.production` set `MDARIX_ENV=production`,
-`MDARIX_DOMAIN=mdarix.in`, `MDARIX_APP_URL` and `MDARIX_ALLOWED_ORIGINS` to `https://mdarix.in`,
-`MDARIX_WWW_REDIRECT=on`, `MDARIX_SITE_ACCESS=public`, `MDARIX_LEGAL_TEXT_APPROVED=true`, and remove
-`MDARIX_PRIVATE_STAGING_ACKNOWLEDGED`; start from an empty database (drop and recreate `mdarix`, STAGING_ORACLE.md
-section 5), run `config_check` (it must print nothing), start, invite the two Platform Administrators again, move the
-uptime check to `mdarix.in`, and change the off-site path from `/rehearsal` to `/prod`.
+Go-live, once the operator has approved the legal texts and the rehearsal is done (done on 2026-10-16, in this order):
+
+1. **DNS** (the owner, at the registrar): `mdarix.in` A record and `www` CNAME to `mdarix.in` at the static IP. Leave
+   the mail records (MX, SPF, DKIM, DMARC, the ZeptoMail bounce CNAME) as they are.
+2. **Keep a way back**: a final backup (`docker compose --profile backup run --rm backup`), copied off-site at once
+   with the cron's `gcloud storage rsync` command and listed in the bucket, its `MANIFEST.sha256` checked; and a disk
+   snapshot (`gcloud compute disks snapshot mdarix-prod --zone=asia-south1-a --snapshot-names=mdarix-pre-golive-<date>`).
+3. **Draft the production settings** beside the live file (`.env.production.next`, mode 600): `MDARIX_ENV=production`,
+   `MDARIX_DOMAIN=mdarix.in`, `MDARIX_APP_URL` and `MDARIX_ALLOWED_ORIGINS` to `https://mdarix.in` (the app URL is the
+   only trusted origin: a wrong value refuses every sign-in), `MDARIX_WWW_REDIRECT=on`, `MDARIX_SITE_ACCESS=public`;
+   remove `MDARIX_SITE_LOGIN_USER`, `MDARIX_SITE_LOGIN_HASH` and `MDARIX_PRIVATE_STAGING_ACKNOWLEDGED`; add
+   `MDARIX_OPERATOR_COUNTRY=IN` and `MDARIX_OPERATOR_REGION=IN` (the operator organization is recorded as US
+   otherwise); keep `MDARIX_TRUSTED_PROXY_HOPS=1` in the file (compose sets it for `api` only, and production needs
+   it in every process) and both heartbeat URLs (`MDARIX_BACKUP_HEARTBEAT_URL` is required in production). Check the
+   draft without touching the live stack:
+   `docker run --rm --env-file <draft without quotes> -e MDARIX_LEGAL_DIR=/var/lib/mdarix/legal -v "$PWD/legal:/var/lib/mdarix/legal:ro" -v "$PWD/certs:/etc/mdarix/certs:ro" mdarix/api:<tag> python -m backend.app.config_check --offline`:
+   the only problem left must be `MDARIX_LEGAL_TEXT_APPROVED`.
+4. **Empty the database and the file stores**: `docker compose stop web api background`; as `postgres`,
+   `DROP DATABASE mdarix WITH (FORCE); CREATE DATABASE mdarix OWNER mdarix_owner;` then both extensions in it
+   (STAGING_ORACLE.md section 5); `docker volume rm mdarix_objects mdarix_reports` (the rehearsal's files would
+   otherwise stay and go into every production backup). Never `docker compose down -v` (it deletes the database
+   volume and the certificates).
+5. **Backups to production**: move the rehearsal's local backups out of `/var/backups/mdarix` (else the next rsync
+   copies them under `/prod`) and change `/rehearsal` to `/prod` in `/etc/cron.d/mdarix-offsite`.
+6. **Install the settings**: keep the rehearsal file (`.env.production.rehearsal-final`), move the draft into place.
+   **The owner** sets `MDARIX_LEGAL_TEXT_APPROVED=true`: production refuses to start without it.
+7. **Start and check**: `config_check --offline` prints only its "Offline check: ..." line and exits 0 (judge by the
+   exit code); `docker compose up -d --no-build --wait`; every service healthy and `migrate` exited 0;
+   `docker compose exec api python -m backend.app.config_check` prints nothing; `docker compose logs web` shows
+   "certificate obtained successfully" for `mdarix.in` and `www.mdarix.in` (`--wait` passes even when a certificate
+   fails).
+8. **Re-grant the backup role** (grants live in the database that was just recreated):
+   `docker compose run --rm migrate python scripts/configure_backup_role.py`.
+9. **Invite the two Platform Administrators** (DEPLOYMENT.md section 2.5), send a test alert
+   (`scripts/send_test_alert.py`), take the first production backup and copy it off-site by hand, and move the
+   uptime check and its alert policy to `mdarix.in` (delete the rehearsal check). Copy the tutorial videos into the
+   host `videos/` folder if the server is new.
+10. **Smoke test from outside**: `/health/status` ok, `/` returns 200 (not the private 401), `www` returns 301 to the
+    apex, `/health/ready` 404, the security headers, `/api/v1/public/site-info` shows the company name and address
+    only, `/api/v1/public/version` the release, every video plays. Do not run `scripts/production_smoke.py` (it
+    sets a fixed password on the account it activates), `scripts/demo_tenant.py` or `scripts/seed_demo_expansion.py`
+    against production.
+
+Known gap: with `MDARIX_BACKUP_S3_URI` empty, the off-site copy is the host cron alone and nothing alerts when it
+fails; check `/var/log/mdarix-offsite.log` and the bucket listing until a check is added. The self-hosted database
+has no point-in-time recovery: a daily dump and a daily disk snapshot give a recovery point of about a day, accepted
+for the free-trial phase (section 5 moves the database to Cloud SQL when design partners pay).
 
 ## 5. When design partners pay
 
