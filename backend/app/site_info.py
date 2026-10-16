@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Response
 
 from backend.app.deployment_role import deployment_role
+from backend.app.version import APP_VERSION
 
 router = APIRouter(prefix="/api/v1/public", tags=["Website"])
 
@@ -39,6 +40,15 @@ def site_info(response: Response) -> dict:
         # MULTI, PLATFORM or CELL (backend/app/deployment_role.py); free trials exist on MULTI only.
         "deployment_role": deployment_role(),
     }
+
+
+@router.get("/version")
+def version(response: Response) -> dict:
+    """The version the server runs (the repository's VERSION file), for an open tab to see that a newer MDARIX was
+    deployed and offer a reload (frontend/src/features/shared/appVersion.ts). Never cached, and it reads no session,
+    so asking does not keep an idle sign-in alive. The built pages carry the same number, so nothing new is disclosed."""
+    response.headers["Cache-Control"] = "no-store"
+    return {"version": APP_VERSION}
 
 
 @router.get("/legal/{document}")

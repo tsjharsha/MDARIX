@@ -27,6 +27,7 @@ from backend.app.db.models.foundation import (
     Product,
     ProductComponent,
     ProductVersion,
+    RealityRelationship,
     Supplier,
 )
 
@@ -273,21 +274,20 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
         **_stamp(now, 120),
     )
     db.add_all([site, supplier_a, supplier_b])
-    db.add(
-        Change(
-            id=uuid.uuid4(),
-            tenant_id=tenant_id,
-            change_identifier="SAMPLE-CHG-014",
-            change_type="Supplier change",
-            description=(
-                "OrbitCare 300 Rev B: pressure sensor sourced from NovaSense Components instead of Precision "
-                "Sensors Ltd. Incoming inspection sampling reduced from 32 to 13 units per lot."
-            ),
-            event_timestamp=now - timedelta(days=80),
-            source_identifier="SAMPLE-CHG-014",
-            **_stamp(now, 80),
-        )
+    change = Change(
+        id=uuid.uuid4(),
+        tenant_id=tenant_id,
+        change_identifier="SAMPLE-CHG-014",
+        change_type="Supplier change",
+        description=(
+            "OrbitCare 300 Rev B: pressure sensor sourced from NovaSense Components instead of Precision "
+            "Sensors Ltd. Incoming inspection sampling reduced from 32 to 13 units per lot."
+        ),
+        event_timestamp=now - timedelta(days=80),
+        source_identifier="SAMPLE-CHG-014",
+        **_stamp(now, 80),
     )
+    db.add(change)
     db.flush()
 
     for index, (identifier, name, family, symptom, complaint_days) in enumerate(_PRODUCTS, 1):
@@ -340,8 +340,27 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
             components.append(component)
         db.flush()
         for c_index, component in enumerate(components, 1):
-            # The OrbitCare pressure sensor is the component whose supplier changed.
-            supplier = supplier_b if (index == 1 and c_index == 1) else supplier_a
+            # The OrbitCare pressure sensor is the component whose supplier changed; the change record names it as the
+            # component it affects, as an imported change links its affected_ids (business_imports.py).
+            changed = index == 1 and c_index == 1
+            supplier = supplier_b if changed else supplier_a
+            if changed:
+                db.add(
+                    RealityRelationship(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        source_entity_type="Change",
+                        source_entity_id=change.id,
+                        target_entity_type="Component",
+                        target_entity_id=component.id,
+                        relationship_type="AFFECTS",
+                        assertion_status="supported",
+                        effective_timestamp=now - timedelta(days=80),
+                        recorded_timestamp=now - timedelta(days=80),
+                        provenance={"origin": "sample", "source_system": SAMPLE_SOURCE},
+                        created_at=now,
+                    )
+                )
             db.add(
                 ComponentSupplier(
                     id=uuid.uuid4(),

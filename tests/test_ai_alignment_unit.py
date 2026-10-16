@@ -97,6 +97,36 @@ def test_the_record_based_answer_keeps_facts_and_source_assertions_only_with_the
     assert answer.ai_used is False and answer.summary_origin == "SYSTEM"
 
 
+def test_a_records_only_answer_that_found_nothing_says_plainly_what_it_searched():
+    from genai.structured_answer import (
+        NOTHING_FOUND_ALL,
+        NOTHING_FOUND_CASE,
+        SEARCH_FOUND_NOTHING,
+        SEARCHED_ALL,
+        SEARCHED_CASE,
+        records_only_wording,
+    )
+
+    empty = compose(CaseRecords(investigation_scoped=False, limitations=[SEARCH_FOUND_NOTHING]))
+    assert "0 records found" in empty.summary  # as composed; the records-only path rewords it
+    answer = records_only_wording(empty, investigation_scoped=False)
+    assert answer.summary == NOTHING_FOUND_ALL
+    assert NOTHING_FOUND_ALL.startswith("No evidence record matches this question. Ask MDARIX searched the evidence")
+    assert answer.limitations == [SEARCHED_ALL]
+    assert "context-valid" not in " ".join(answer.limitations)
+    assert "It does not count complaints" in SEARCHED_ALL and "Getting started › Automatic insights" in SEARCHED_ALL
+
+    in_case = records_only_wording(
+        compose(CaseRecords(investigation_scoped=True, limitations=[SEARCH_FOUND_NOTHING])), investigation_scoped=True
+    )
+    assert in_case.summary == NOTHING_FOUND_CASE == "No evidence record of this case matches this question."
+    assert in_case.limitations[0] == SEARCHED_CASE
+
+    # What was found stays as composed.
+    found = compose(_records())
+    assert records_only_wording(found, investigation_scoped=True) == found
+
+
 def test_the_record_based_answer_sorts_links_unknowns_and_what_is_missing():
     answer = compose(_records())
     assert [item.hypothesis_business_id for item in answer.supporting_evidence] == ["HYP-000001"]

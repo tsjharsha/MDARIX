@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, FileText, Info, Search } from "lucide-react";
 import { Inline, Markdown } from "../shared/Markdown";
 import { useCan } from "../workspace/workspaceContext";
@@ -7,6 +7,7 @@ import { StatementKind } from "../shared/StatementKind";
 import { answerOriginText, hasStructuredContent, structuredOf } from "./structuredModel";
 import { StructuredAnswerView } from "./StructuredAnswer";
 import { TrustBadge } from "../workspace/sections/TrustBadge";
+import { onQuestionHanded, pendingQuestion, takeQuestion } from "./pendingQuestion";
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -45,7 +46,23 @@ export function AskMdarixPage({
   investigationId?: string;
   productVersionId?: string;
 }) {
-  const [question, setQuestion] = useState("");
+  // A question handed over by another screen (pendingQuestion.ts) fills the box once, ready to send; never sent here.
+  const [handed] = useState(pendingQuestion);
+  const [question, setQuestion] = useState(handed ?? "");
+  const box = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const fill = (text: string) => {
+      takeQuestion(text);
+      setQuestion(text);
+      const field = box.current;
+      if (field) {
+        field.focus();
+        field.setSelectionRange(text.length, text.length);
+      }
+    };
+    if (handed) fill(handed);
+    return onQuestionHanded(fill);
+  }, [handed]);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -94,6 +111,7 @@ export function AskMdarixPage({
         <label htmlFor="ask-question">Question</label>
         <textarea
           id="ask-question"
+          ref={box}
           rows={5}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -159,7 +177,7 @@ function AskAnswer({ result }: { result: any }) {
             </span>
           ) : (
             <span className="ask-badge is-warn">
-              <AlertTriangle size={14} aria-hidden="true" /> No matching records found
+              <AlertTriangle size={14} aria-hidden="true" /> No matching evidence found
             </span>
           )}
           <span className="ask-badge">Human review required</span>

@@ -20,6 +20,18 @@ def test_site_info_shows_the_configured_company(monkeypatch):
     assert body["trial"]["data_deleted_after_days"] == 30
 
 
+def test_the_version_the_server_runs_is_answered_fresh_without_a_session(monkeypatch):
+    """An open tab compares it with the version it was built as (frontend/src/features/shared/appVersion.ts)."""
+    from backend.app.version import APP_VERSION
+
+    monkeypatch.setenv("MDARIX_RELEASE", "2026.10.3")  # a deployment's release tag does not change the number
+    response = TestClient(app).get("/api/v1/public/version")  # no cookie: the check never touches a session
+    assert response.status_code == 200
+    assert response.json() == {"version": APP_VERSION}
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers.get("set-cookie") is None
+
+
 def test_a_legal_document_is_served_only_once_it_has_been_supplied(monkeypatch, tmp_path):
     monkeypatch.setenv("MDARIX_LEGAL_DIR", str(tmp_path))
     assert client.get("/api/v1/public/legal/privacy").json() == {

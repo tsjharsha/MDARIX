@@ -980,5 +980,51 @@ def structured_answer(
     if reading is not None and reading.status == "OK":
         answer = merge(answer, reading, refs)
     else:
+        answer = records_only_wording(answer, investigation_scoped=investigation_id is not None)
         answer = answer.model_copy(update={"ai_used": False, "ai_note": ai_note, "reason_code": reason_code})
     return answer.model_dump(mode="json")
+
+
+# What the search says when it found nothing (retrieval/service.py); the records-only answer says it in plain words.
+SEARCH_FOUND_NOTHING = "No relevant tenant-scoped, context-valid evidence was retrieved."
+# What Ask searches without AI (genai/ask.py search_evidence over retrieval/service.py): the organization's evidence
+# records, which hold the evidence of its cases and one record for each uploaded complaint, investigation, CAPA, change,
+# requirement, risk, failure mode, control or evidence file (retrieval/record_evidence.py); with a case chosen, only the
+# evidence recorded on that case or linked to it.
+_NOT_COUNTED = (
+    "It does not count complaints: for complaint counts by version, lot, problem code or country, see Getting started "
+    "› Automatic insights."
+)
+SEARCHED_ALL = (
+    "Without AI, Ask MDARIX searches your organization's evidence records: the evidence of all your cases and the "
+    "records you uploaded (complaints, investigations, CAPAs, changes, risks and evidence files). " + _NOT_COUNTED
+)
+SEARCHED_CASE = (
+    "Without AI, Ask MDARIX searches the evidence of the selected case: the evidence recorded on it or linked to it. "
+    + _NOT_COUNTED
+)
+NOTHING_FOUND_ALL = (
+    "No evidence record matches this question. Ask MDARIX searched the evidence of all your cases and the records you "
+    "uploaded."
+)
+NOTHING_FOUND_CASE = "No evidence record of this case matches this question."
+
+
+def records_only_wording(answer: StructuredAnswer, *, investigation_scoped: bool) -> StructuredAnswer:
+    """A records-only answer (no model) that found nothing says so plainly, with what was searched; the search's own
+    technical line gives way to that. Anything found is left as composed."""
+    nothing = not (
+        answer.sources
+        or answer.known_facts
+        or answer.supporting_evidence
+        or answer.contradicting_evidence
+        or answer.unknowns
+    )
+    limitations = [text for text in answer.limitations if text != SEARCH_FOUND_NOTHING]
+    if not nothing and len(limitations) == len(answer.limitations):
+        return answer
+    searched = SEARCHED_CASE if investigation_scoped else SEARCHED_ALL
+    update: dict = {"limitations": [searched, *limitations]}
+    if nothing:
+        update["summary"] = NOTHING_FOUND_CASE if investigation_scoped else NOTHING_FOUND_ALL
+    return answer.model_copy(update=update)

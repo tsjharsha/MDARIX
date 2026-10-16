@@ -6444,6 +6444,59 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
     margin-top: 12px;
   }
 }
+/* "A new version of MDARIX is available" (features/shared/NewVersionNotice.tsx): small, top right, above the page and
+   clear of the privacy notice at the bottom; it never blocks the page. Its status region stays in the page, empty,
+   so a screen reader announces the notice when it appears. */
+.new-version-notice {
+  position: fixed;
+  z-index: 60;
+  top: 14px;
+  right: 18px;
+  max-width: calc(100vw - 24px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 14px;
+  background: #102b3d;
+  color: #fff;
+  border: 1px solid #477080;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px #0b243855;
+  font-size: 14px;
+}
+.new-version-notice .new-version-reload {
+  background: var(--tenant-accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 13px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.new-version-notice .new-version-dismiss {
+  display: inline-flex;
+  padding: 5px;
+  background: transparent;
+  color: #d8e8ea;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.new-version-notice button:focus-visible {
+  outline: 2px solid #73d6cb;
+  outline-offset: 2px;
+}
+@media (max-width: 700px) {
+  .new-version-notice {
+    left: 12px;
+    right: 12px;
+    top: 10px;
+  }
+  .new-version-notice span {
+    flex: 1;
+  }
+}
 /* Platform Administrator control plane: light-blue / MDARIX-green workspace. */
 .platform-admin-screen {
   gap: 18px;

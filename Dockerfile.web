@@ -6,6 +6,9 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# The release the bundle is built as (frontend/vite.config.ts reads ../VERSION): the app compares it with the version
+# the API reports and offers a reload when a newer one is deployed.
+COPY VERSION /VERSION
 RUN npm run build
 
 # Rebuild the pinned Caddy release with a patched Go toolchain. The upstream Caddy image can lag a Go security
