@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { MASKING_SUMMARY, aiAcknowledgement, aiSettingsPayload, providerLabel } from "../aiSettings";
-import { BadgeCheck, Bot, Gauge, ShieldCheck } from "lucide-react";
+import { BadgeCheck, Bot, Gauge } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
+import { TwoFactorPanel } from "../../shared/TwoFactorSettings";
 import { useConsole } from "../context";
 import { Table, Tabs, formatDate, listOf, send, useResource } from "../shared";
 import { plural, readable } from "../labels";
@@ -56,25 +57,22 @@ export function SecuritySection({ tab }: { tab?: string }) {
 }
 
 function Posture() {
+  const { context } = useConsole();
   const summary = useResource<any>("/api/v1/admin/security-summary");
   const retention = useResource<any>("/api/v1/admin/retention-status");
   return (
     <>
       <div className="ac-grid two">
-        <Panel eyebrow="Your account" title="Multi-factor authentication">
-          <p>
-            Protect your administrator account with a second factor. You are asked for a 6-digit code when you sign in.
-          </p>
-          <div className="ca-action-row">
-            <a className="ac-primary" href="/mfa?setup=1">
-              <ShieldCheck size={16} /> Set up MFA
-            </a>
-          </div>
+        <TwoFactorPanel
+          eyebrow="Your account"
+          account={context?.email}
+          notOnText="Protect your administrator account with a second factor. You are asked for a 6-digit code when you sign in."
+        >
           <p className="ac-muted">
             MFA (multi-factor authentication) is required for administrators and before every electronic signature.
             Other users can turn it on from their account.
           </p>
-        </Panel>
+        </TwoFactorPanel>
         <Panel eyebrow="Sessions" title="How sign-in sessions are protected">
           <ul className="ca-check-list">
             <li>

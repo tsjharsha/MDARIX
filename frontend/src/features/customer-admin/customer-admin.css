@@ -473,3 +473,63 @@
     justify-self: start;
   }
 }
+
+/* Two-factor sign-in on one's own account (features/shared/TwoFactorSettings.tsx): My Account and Security. */
+.ca-mfa-on {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--ac-ink);
+}
+.ca-mfa-on svg {
+  color: var(--ac-teal);
+}
+.ca-mfa-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--ac-radius);
+  font-size: 14px;
+}
+.ca-mfa-message.is-good {
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+}
+.ca-mfa-message.is-bad {
+  background: #fdecec;
+  color: #8b1d1d;
+}
+.ca-mfa-form,
+.ca-mfa-codes {
+  display: grid;
+  gap: 12px;
+  max-width: 460px;
+  margin-top: 8px;
+}
+.ca-mfa-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--ac-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ca-mfa-form input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  font: inherit;
+  font-weight: 400;
+}
+.ca-mfa-form input:focus {
+  outline: 3px solid #087b7833;
+  border-color: var(--ac-teal);
+}
+.ca-mfa-codes .mfa-recovery-codes {
+  padding: 12px 12px 12px 34px;
+  border: 1px dashed var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: #f6f9fb;
+  user-select: all;
+}
