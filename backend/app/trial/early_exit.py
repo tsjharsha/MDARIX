@@ -153,15 +153,25 @@ def withdraw(db: Session, tenant_id: uuid.UUID, user: AuthUser, now: datetime | 
 
 def overview(db: Session) -> list[dict]:
     """Every request, pending first then newest, for the Platform Administrator, with the trial's days left and who
-    asked (their name, unless the trial's data, people included, has been deleted)."""
-    from backend.app.trial.service import trial_subscription
+    asked (their name, unless the trial's data, people included, has been deleted).
 
+    A fixed number of statements however many requests there are (as the trial overview, story.trial_overview): the
+    requests, then their organizations, the people who asked and the trials' subscriptions, each read for every
+    request at once. Before 0.10.17 each request cost four statements of its own."""
     rows = db.query(TrialExitRequest).order_by(TrialExitRequest.created_at.desc()).limit(500).all()
+    tenant_ids = {row.trial_tenant_id for row in rows}
+    person_ids = {row.requested_by for row in rows if row.requested_by}
+    tenants = {tenant.id: tenant for tenant in db.query(Tenant).filter(Tenant.id.in_(tenant_ids))} if tenant_ids else {}
+    people = (
+        {person.id: person for person in db.query(AuthUser).filter(AuthUser.id.in_(person_ids))} if person_ids else {}
+    )
+    trial_ends = _trial_ends(db, tenant_ids)
+    now = datetime.now(timezone.utc)
     items = []
     for row in rows:
-        tenant = db.get(Tenant, row.trial_tenant_id)
-        person = db.get(AuthUser, row.requested_by) if row.requested_by else None
-        on_trial = trial_subscription(db, row.trial_tenant_id) is not None
+        tenant = tenants.get(row.trial_tenant_id)
+        person = people.get(row.requested_by) if row.requested_by else None
+        ends = trial_ends.get(row.trial_tenant_id)
         items.append(
             {
                 **(view(row) or {}),
@@ -172,11 +182,36 @@ def overview(db: Session) -> list[dict]:
                 "requested_by": (person.display_name or person.username)
                 if person is not None and not row.data_deleted
                 else None,
-                "days_left": days_left(db, row.trial_tenant_id) if on_trial else None,
+                "days_left": _days_until(ends, now) if ends is not None else None,
             }
         )
     items.sort(key=lambda item: 0 if item["status"] == PENDING else 1)
     return items
+
+
+def _trial_ends(db: Session, tenant_ids) -> dict:
+    """``{tenant id: end of its Free Trial subscription}`` for the tenants still on the Free Trial plan, in one
+    statement: each tenant's latest Free Trial subscription, as ``service.trial_subscription`` reads it for one."""
+    from backend.app.db.models.foundation import PlanDefinition
+    from backend.app.db.models.stage2 import SubscriptionLifecycle
+    from backend.app.trial import service
+
+    if not tenant_ids:
+        return {}
+    ends: dict = {}
+    for tenant_id, expires_at in (
+        db.query(SubscriptionLifecycle.tenant_id, SubscriptionLifecycle.expires_at)
+        .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+        .filter(SubscriptionLifecycle.tenant_id.in_(tenant_ids), PlanDefinition.code == service.FREE_TRIAL_PLAN)
+        .order_by(SubscriptionLifecycle.created_at)
+    ):
+        ends[tenant_id] = expires_at  # the latest subscription comes last
+    return ends
+
+
+def _days_until(expires_at: datetime, now: datetime) -> int:
+    """Whole days left until ``expires_at``, rounded up; 0 once it has passed (as ``days_left``)."""
+    return max(0, int(-(-(expires_at - now).total_seconds() // 86400)))
 
 
 def _owner_email(db: Session, tenant_id: uuid.UUID) -> str | None:

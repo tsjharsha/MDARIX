@@ -37,7 +37,10 @@ def test_customer_admin_does_not_accept_browser_tenant_as_authority():
 def test_customer_admin_has_auditable_export_and_mfa_entry_points():
     assert "/api/v1/admin/audit-history/export?output_format=CSV" in UI
     assert "/api/v1/admin/audit-history/evidence-package" in UI
-    assert "/mfa?setup=1" in UI
+    # The administrator's own MFA panel is the shared one (features/shared/TwoFactorSettings.tsx), as in My Account.
+    assert "<TwoFactorPanel" in UI
+    shared = (ROOT / "frontend" / "src" / "features" / "shared" / "TwoFactorSettings.tsx").read_text(encoding="utf-8")
+    assert "/mfa?setup=1" in shared and "/api/v1/auth/mfa/recovery-codes" in shared
 
 
 def test_customer_admin_never_offers_platform_roles():

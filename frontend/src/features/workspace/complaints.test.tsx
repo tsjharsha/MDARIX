@@ -60,6 +60,7 @@ describe("the Complaints section", () => {
       "Second look",
       "Backlog",
       "Reportability",
+      "Complaint list",
       "Review settings",
       "Reporting windows",
     ]);

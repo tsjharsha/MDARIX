@@ -843,6 +843,12 @@ def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minut
     assert orbit["basis"] == "UNITS" and orbit["label"] == "Rate significantly higher than the previous version"
     assert "Scaled by the units in the field" in orbit["sentence"]
     assert board.json()["basis"]["units"] >= 1
+    # PulseWatch 410 and VentraLink 250 stay flat, as the sample's own explanation says: the rise is OrbitCare's only,
+    # whichever way the complaints are grouped.
+    for group in ("version", "problem", "type"):
+        items = user.get("/api/v1/triage/trends", params={"group": group}).json()["items"]
+        flagged = {item["name"] for item in items if item["result"] in ("SIGNIFICANT", "ELEVATED")}
+        assert flagged and all(name.startswith("OrbitCare 300") for name in flagged), (group, flagged)
 
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
     trends = chapters["TRENDS_TO_CASES"]["finding"]

@@ -85,6 +85,16 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             result: "You land on your workspace. Five wrong passwords or codes lock sign-in for 15 minutes.",
           },
           {
+            title: "Get new recovery codes, or move to a new phone",
+            steps: [
+              "Open My Account, then Security. Multi-factor authentication shows Two-factor sign-in is on and how many recovery codes you have left.",
+              "For new recovery codes, choose Generate new recovery codes, enter your Current password and the code your authenticator app shows, and choose Generate new codes. Choose Copy all or Download, then I have saved these codes.",
+              "For a new phone, choose Replace authenticator app. Enter your Current password and a code from your current app (or a recovery code if the phone is lost), choose Replace authenticator app, then scan the new QR code and enter its code.",
+            ],
+            result:
+              "Your earlier recovery codes, or your old app, stop working at once, and MDARIX emails you that it happened. Replacing the app also signs you out on your other devices.",
+          },
+          {
             title: "Reset a forgotten password",
             steps: [
               "On the sign-in page choose Forgot password?.",
@@ -103,7 +113,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
           },
         ],
         tips: [
-          "Lost your phone and your recovery codes? Ask your administrator to reset your multi-factor authentication.",
+          "Lost your phone? Sign in with a recovery code, then replace the authenticator app in My Account. Lost your recovery codes too? Ask your administrator to reset your multi-factor authentication.",
         ],
       },
       {
@@ -844,6 +854,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Enter your Current password, a New password and Confirm new password, and choose Change password.",
             ],
             result: "Your other sessions are signed out.",
+          },
+          {
+            title: "Manage two-factor sign-in",
+            steps: [
+              "Open Security. Multi-factor authentication shows whether two-factor sign-in is on and how many recovery codes are left; if it is off, choose Set up MFA.",
+              "Choose Generate new recovery codes for a fresh set, or Replace authenticator app when you change phones. Both ask for your Current password and a code from your app.",
+            ],
+            result:
+              "The old codes or the old app stop working at once, and you get an email about the change. If your role requires two-factor sign-in, it cannot be turned off.",
           },
           {
             title: "See your access and settings",

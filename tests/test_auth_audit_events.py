@@ -160,7 +160,10 @@ def _next_code(secret: str, steps_ahead: int = 1) -> str:
     return totp.code_at(secret, int(time.time() // 30) + steps_ahead)
 
 
-def test_mfa_steps_are_audited_and_changes_need_reauthentication():
+def test_mfa_steps_are_audited_and_changes_need_reauthentication(monkeypatch):
+    # A fixed authenticator clock: every code below belongs to a known 30-second step.
+    clock = {"step": int(time.time() // 30)}
+    monkeypatch.setattr(totp, "_step", lambda at=None: clock["step"])
     user = _user(role="Investigator")
     client, _ = _client_for(user)
     started = client.post("/api/v1/auth/mfa/enroll")
@@ -173,18 +176,28 @@ def test_mfa_steps_are_audited_and_changes_need_reauthentication():
     assert _events(user.id, "MFA_FAILED")[0].details == {"step": "ENROLLMENT"}
     assert _events(user.id, "MFA_ENROLLED")[0].details == {"replaced": False, "recovery_codes": 8}
 
-    # Replacing the authenticator or the recovery codes needs the password or a fresh code, even now.
+    # Replacing the authenticator or the recovery codes needs the password and a fresh code, even now.
+    clock["step"] += 1
+    code = totp.current_code(secret)
     missing = client.post("/api/v1/auth/mfa/recovery-codes")
     assert missing.status_code == 403 and missing.json()["detail"]["code"] == "REAUTHENTICATION_REQUIRED"
-    wrong = client.post("/api/v1/auth/mfa/recovery-codes", json={"password": "not my password"})
+    password_only = client.post("/api/v1/auth/mfa/recovery-codes", json={"password": PASSWORD})
+    assert password_only.status_code == 403 and password_only.json()["detail"]["code"] == "REAUTHENTICATION_REQUIRED"
+    code_only = client.post("/api/v1/auth/mfa/recovery-codes", json={"mfa_code": code})
+    assert code_only.status_code == 403 and code_only.json()["detail"]["code"] == "REAUTHENTICATION_REQUIRED"
+    wrong = client.post("/api/v1/auth/mfa/recovery-codes", json={"password": "not my password", "mfa_code": code})
     assert wrong.status_code == 403 and wrong.json()["detail"]["code"] == "REAUTHENTICATION_FAILED"
     assert _events(user.id, "MFA_FAILED")[-1].details == {"step": "REAUTHENTICATION"}
-    reissued = client.post("/api/v1/auth/mfa/recovery-codes", json={"password": PASSWORD})
+    # The wrong password did not spend the code.
+    reissued = client.post("/api/v1/auth/mfa/recovery-codes", json={"password": PASSWORD, "mfa_code": code})
     assert reissued.status_code == 200, reissued.text
     assert _events(user.id, "MFA_RECOVERY_CODES_REGENERATED")[0].details == {"recovery_codes": 8}
     refused = client.post("/api/v1/auth/mfa/enroll")
     assert refused.status_code == 403 and refused.json()["detail"]["code"] == "REAUTHENTICATION_REQUIRED"
-    replacing = client.post("/api/v1/auth/mfa/enroll", json={"mfa_code": _next_code(secret)})
+    clock["step"] += 1
+    replacing = client.post(
+        "/api/v1/auth/mfa/enroll", json={"password": PASSWORD, "mfa_code": totp.current_code(secret)}
+    )
     assert replacing.status_code == 200, replacing.text
     replaced = client.post(
         "/api/v1/auth/mfa/verify-enrollment", json={"code": totp.current_code(replacing.json()["secret"])}

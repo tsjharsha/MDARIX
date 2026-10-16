@@ -126,6 +126,7 @@ DB_MODULES = {
     "test_auth_limits",
     "test_auth_session_lifecycle",
     "test_auth_audit_events",
+    "test_mfa_self_service",
     "test_auth_signup_acknowledgement",
     "test_customer_admin_erasure_hold",
     # product-reports: seed tagged cases in the golden organization (tests/reports_seed.py).

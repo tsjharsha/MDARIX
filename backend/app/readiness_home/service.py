@@ -272,7 +272,7 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         "CAPAs without a verified effect",
         value,
         CRITICAL if (summary["closed_without_check"] or summary["overdue"]) else ATTENTION if value else CLEAR,
-        f"{summary['closed_without_check']} closed without a check, {summary['overdue']} checks overdue, "
+        f"{summary['closed_without_check']} closed without a check, {_n(summary['overdue'], 'check')} overdue, "
         f"{summary['not_planned']} with no check planned",
         {"section": "Records", "tab": "Effectiveness checks"},
         [

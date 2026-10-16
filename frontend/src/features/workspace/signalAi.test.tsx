@@ -269,6 +269,33 @@ describe("follow-ups from the brief's recommended actions", () => {
     expect(followUpsFromActions([])).toEqual({});
     expect(followUpsFromActions(["CAPA " + "x".repeat(400)]).CAPA_REQUIRED.title.length).toBe(300);
   });
+
+  it("reads a corrective action named in other words as a CAPA", () => {
+    expect(followUpTypesOf("Restore incoming inspection to 32 units per lot for NovaSense pressure sensors")).toEqual([
+      "CAPA_REQUIRED",
+    ]);
+    expect(followUpTypesOf("Retrain the line on the revised work instruction")).toEqual(["CAPA_REQUIRED"]);
+    expect(followUpTypesOf("Tighten the supplier's acceptance sampling")).toEqual(["CAPA_REQUIRED"]);
+    expect(followUpTypesOf("Find the root cause of the leaks")).toEqual(["CAPA_REQUIRED"]);
+    // Containing lots is a field action review; testing returned devices and other words name no follow-up.
+    expect(followUpTypesOf("Contain OrbitCare 300 lots 003 and 004")).toEqual(["FIELD_ACTION_REVIEW_REQUIRED"]);
+    expect(followUpTypesOf("Bench-test returned pumps from lots 003 and 004")).toEqual([]);
+    expect(followUpTypesOf("Increase the font size of the label")).toEqual([]);
+  });
+
+  it("ticks CAPA required for the sample brief, once, with the action as its title", () => {
+    const found = followUpsFromActions([
+      "Contain OrbitCare 300 lots 003 and 004",
+      "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors",
+      "Bench-test returned pumps from lots 003 and 004 at the upper pressure range",
+    ]);
+    expect(Object.keys(found).sort()).toEqual(["CAPA_REQUIRED", "FIELD_ACTION_REVIEW_REQUIRED"]);
+    expect(found.CAPA_REQUIRED.title).toBe(
+      "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors",
+    );
+    expect(followUpTypesOf("Open a corrective action to restore the inspection")).toEqual(["CAPA_REQUIRED"]);
+    expect(followUpsFromActions(["CAPA " + "x".repeat(400)]).CAPA_REQUIRED.title.length).toBe(300);
+  });
 });
 
 describe("tasks", () => {

@@ -233,6 +233,33 @@ def create_interaction(
             as_of=payload.temporal_cutoff,
         )
         grounded = {**grounded, "retrieved_evidence": search["evidence"]}
+        sources = list(search["sources"])
+        if payload.investigation_id:
+            from genai.grounding import source_provenance
+
+            found = {source["evidence_identifier"] for source in sources}
+            sources += [
+                {**source, "found_by": "investigation"}
+                for source in source_provenance(grounded)
+                if source.get("evidence_identifier") not in found
+            ]
+        # What was searched, recorded before the model is called: when no model answers (AI switched off, allowance
+        # used up, ...) the record-based answer still comes from these records, and the screen says so.
+        response["sources_provenance"] = sources
+        response["search"] = {
+            "status": search["status"],
+            "retrieval_query_id": search.get("retrieval_query_id"),
+            "embedding_model": search.get("embedding_model"),
+            "records_found": len(search["sources"]),
+        }
+        response["grounding"] = {
+            "policy_version": grounded.get("policy_version") or grounded.get("context_policy_version"),
+            # The search is always limited to the signed-in tenant; it is narrowed to one case when one is given.
+            "tenant_scope_enforced": True,
+            "investigation_scoped": bool(payload.investigation_id),
+            "searched_tenant_evidence": bool(search["sources"]),
+            "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
+        }
         # The model is asked for the structured sections as JSON; its Markdown answer is rendered from them.
         prompt = structured_ask_prompt(payload.prompt)
         # Fit the provider's input limit: keep the facts, drop internal detail (never fail on a large case).
@@ -249,17 +276,6 @@ def create_interaction(
         from genai.structured_answer import evidence_texts, render_markdown
 
         raw_answer = normalize_answer(result.output.get("answer"))
-        sources = list(search["sources"])
-        if payload.investigation_id:
-            from genai.grounding import source_provenance
-
-            found = {source["evidence_identifier"] for source in sources}
-            sources += [
-                {**source, "found_by": "investigation"}
-                for source in source_provenance(grounded)
-                if source.get("evidence_identifier") not in found
-            ]
-        response["sources_provenance"] = sources
         known = {source["evidence_identifier"] for source in sources}
         reading = read_model_reply(raw_answer, known, evidence_texts(search, grounded))
         if reading.status == "OK":
@@ -275,20 +291,6 @@ def create_interaction(
         answer_check = check_answer(checked_text, known)
         shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check
-        response["search"] = {
-            "status": search["status"],
-            "retrieval_query_id": search.get("retrieval_query_id"),
-            "embedding_model": search.get("embedding_model"),
-            "records_found": len(search["sources"]),
-        }
-        response["grounding"] = {
-            "policy_version": grounded.get("policy_version") or grounded.get("context_policy_version"),
-            # The search is always limited to the signed-in tenant; it is narrowed to one case when one is given.
-            "tenant_scope_enforced": True,
-            "investigation_scoped": bool(payload.investigation_id),
-            "searched_tenant_evidence": bool(search["sources"]),
-            "field_policy": grounded.get("field_policy", "SERVER_ALLOWLIST_FAIL_CLOSED"),
-        }
         response["limitations"] = result.output.get("limitations", []) + answer_check["notes"]
         if reading.status == "INVALID":
             from genai.structured_answer import AI_NOTE_INVALID

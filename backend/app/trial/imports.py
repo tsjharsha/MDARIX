@@ -1334,6 +1334,8 @@ def insights(db: Session, tenant_id) -> dict:
         )
     return {
         "scope": "your data" if own else "sample data",
+        # The complaints' source, so "Open these complaints" lists the same ones (GET /api/v1/complaints?source_system=).
+        "source_system": scope,
         "total_complaints": total,
         "by_product": by_product,
         "by_version": by_version[:6],
