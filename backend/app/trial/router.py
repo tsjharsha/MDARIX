@@ -32,19 +32,19 @@ from backend.app.db.models.foundation import (
     Product,
     Risk,
 )
-from backend.app.db.models.stage2 import OnboardingRequest
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports, retention, team
 from backend.app.trial.sample_data import SAMPLE_SOURCE
 from backend.app.trial.service import (
+    REQUEST_STATUSES,
     TRIAL_FILE_LIMIT_BYTES,
     TRIAL_ROW_LIMIT,
     TRIAL_USER_LIMIT,
     approve_request,
     decline_request,
+    request_queue,
     resend_invitation,
-    serialize_request,
     trial_subscription,
 )
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
@@ -65,17 +65,25 @@ class ColleagueInvite(BaseModel):
 
 
 @router.get("/platform-admin/trial-requests")
-def list_trial_requests(request: Request, db: Session = Depends(get_db)):
+def list_trial_requests(
+    request: Request,
+    status: str = "",
+    q: str = "",
+    page: int = 1,
+    page_size: int = 50,
+    sort: str = "",
+    order: str = "",
+    db: Session = Depends(get_db),
+):
+    """One page (``page_size`` up to 200) of the trial requests, newest first: ``status`` keeps one status, ``q``
+    searches company, requester, email and MDARIX ID, ``sort``/``order`` order every page; ``counts`` per status."""
     _require_platform_admin(request, db)
-    rows = db.query(OnboardingRequest).order_by(OnboardingRequest.created_at.desc()).limit(500).all()
-    items = [serialize_request(db, row) for row in rows]
-    return {
-        "items": items,
-        "counts": {
-            status: sum(1 for item in items if item["status"] == status)
-            for status in ("PENDING_REVIEW", "APPROVED", "DECLINED")
-        },
-    }
+    if status.strip() and status.strip().upper() not in REQUEST_STATUSES:
+        raise HTTPException(
+            422,
+            detail={"code": "INVALID_REQUEST_STATUS", "message": "status is PENDING_REVIEW, APPROVED or DECLINED"},
+        )
+    return request_queue(db, status=status, q=q, page=page, page_size=page_size, sort=sort, order=order)
 
 
 @router.post("/platform-admin/trial-requests/{request_id}/approve")
@@ -770,12 +778,29 @@ def decline_trial_exit(
 
 
 @router.get("/platform-admin/trials")
-def platform_trial_overview(request: Request, db: Session = Depends(get_db)):
-    """Every free trial still holding data: dates, usage, how far into the story it went, and its feedback."""
+def platform_trial_overview(
+    request: Request,
+    page: int = 1,
+    page_size: int = 50,
+    sort: str = "",
+    order: str = "",
+    state: str = "",
+    q: str = "",
+    db: Session = Depends(get_db),
+):
+    """Every free trial still holding data: dates, usage, how far into the story it went, and its feedback. The
+    figures cover every trial; ``items`` is one page (``page_size`` up to 200) of those in ``state`` (ACTIVE,
+    ENDING_SOON or ENDED) matching ``q`` (name, tenant key, MDARIX ID or owner's email), sorted by ``sort``/``order``
+    or, by default, with the trials that need attention first."""
     from backend.app.trial import story
 
     _require_platform_admin(request, db)
-    return story.trial_overview(db)
+    if state.strip() and state.strip().upper() not in story.OVERVIEW_STATES:
+        raise HTTPException(
+            422,
+            detail={"code": "INVALID_TRIAL_STATE", "message": "state is ACTIVE, ENDING_SOON or ENDED"},
+        )
+    return story.trial_overview(db, page=page, page_size=page_size, sort=sort, order=order, state=state, q=q)
 
 
 # ------------------------------------------------------------------------------------------- Trial team

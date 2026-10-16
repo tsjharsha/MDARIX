@@ -762,16 +762,25 @@ def rows_from_records(entity: str, records: list[dict], report: _Report) -> list
     return rows
 
 
-def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
-    total = 0
+def upload_counters(source: str = UPLOAD_SOURCE) -> list[tuple]:
+    """``(model, conditions)`` for every kind of record an upload loads: what ``uploaded_rows`` counts, per tenant here
+    and for many tenants at once in the Platform Admin trial overview (backend/app/trial/story.py)."""
     from retrieval.record_evidence import RECORD_EVIDENCE_TYPE
 
+    counters = []
     for model in (Product, ProductVersion, LotBatch, Complaint, *business_imports.MODELS):
-        query = db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, model.source_system == source)
+        conditions = [model.source_system == source]
         if model is business_imports.Evidence:
             # The searchable copy of each imported record is not a row the customer loaded.
-            query = query.filter(model.evidence_type != RECORD_EVIDENCE_TYPE)
-        total += query.scalar() or 0
+            conditions.append(model.evidence_type != RECORD_EVIDENCE_TYPE)
+        counters.append((model, tuple(conditions)))
+    return counters
+
+
+def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
+    total = 0
+    for model, conditions in upload_counters(source):
+        total += db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions).scalar() or 0
     return int(total)
 
 

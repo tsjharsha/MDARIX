@@ -1,13 +1,18 @@
+import { useState } from "react";
 import { CalendarCheck, CalendarClock, MessageSquare, Rocket, Sparkles, Upload, Users } from "lucide-react";
 import { BarList, Panel, StatTile, ToneBadge } from "../console/charts";
-import { Table, formatDate, useResource } from "../../customer-admin/shared";
+import { SearchBox, Table, formatDate, useResource, type Resource } from "../../customer-admin/shared";
+import { useServerSort, type SortState } from "../../../app/tableSort";
+import { Pager } from "../areas/common";
 import {
-  TRIALS_PATH,
-  attentionOrder,
+  TRIAL_SORT_KEYS,
+  TRIAL_STATE_FILTERS,
+  attentionList,
   chapterFunnel,
   nextChapterTitle,
   storyStage,
   trialStateOf,
+  trialsPath,
   type TrialItem,
   type TrialOverview,
 } from "./trials";
@@ -17,14 +22,66 @@ import { TrialExitRequests } from "./TrialExitRequests";
  * Trials: every free trial still holding data, as MDARIX staff need to see it to help a prospect succeed. How many
  * days are left, how much of the trial's limits is used, how far into the story (the quality loop, chapter by
  * chapter) it went and which chapter it should try next, when someone last did something, and what it told us. A
- * chapter counts only when the trial acted in it (a record it created), never on page views.
+ * chapter counts only when the trial acted in it (a record it created), never on page views. The figures cover every
+ * trial; the table shows one page at a time, searched, filtered and sorted by the server.
  */
 export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: string) => void }) {
-  const overview = useResource<TrialOverview>(TRIALS_PATH);
+  const [page, setPage] = useState(1);
+  const [state, setState] = useState("");
+  const [query, setQuery] = useState("");
+  const { sort, onSort } = useServerSort(() => setPage(1));
+  const overview = useResource<TrialOverview>(trialsPath({ page, sort, state, q: query }));
+  return (
+    <TrialsOverviewView
+      overview={overview}
+      onOpenTenant={onOpenTenant}
+      table={{
+        page,
+        onPage: setPage,
+        state,
+        onState: (value) => {
+          setState(value);
+          setPage(1);
+        },
+        query,
+        onQuery: (value) => {
+          setQuery(value);
+          setPage(1);
+        },
+        sort,
+        onSort,
+      }}
+    />
+  );
+}
+
+export type TrialTableControls = {
+  page: number;
+  onPage: (page: number) => void;
+  state: string;
+  onState: (state: string) => void;
+  query: string;
+  onQuery: (query: string) => void;
+  sort: SortState;
+  onSort: (key: string) => void;
+};
+
+/** The screen for one answer of the overview (separate from the requests, so it renders on its own in tests). */
+export function TrialsOverviewView({
+  overview,
+  onOpenTenant,
+  table,
+}: {
+  overview: Resource<TrialOverview>;
+  onOpenTenant: (tenantId: string) => void;
+  table: TrialTableControls;
+}) {
   const data = overview.data;
   const summary = data?.summary;
   const engagedAt = data?.engaged_chapters ?? 4;
-  const items = attentionOrder(data?.items ?? [], engagedAt);
+  const items = data?.items ?? [];
+  const attention = attentionList(data, engagedAt);
+  const filtered = Boolean(table.state || table.query.trim());
   return (
     <div className="cc-page">
       <div className="cc-title">
@@ -86,31 +143,43 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
         </Panel>
         <Panel eyebrow="Help them succeed" title="Who needs attention first" source={overview}>
           <ul className="cc-trial-attention">
-            {items
-              .filter((item) => item.state !== "ENDED")
-              .slice(0, 5)
-              .map((item) => (
-                <li key={item.tenant_id}>
-                  <button type="button" className="ac-link" onClick={() => onOpenTenant(item.tenant_id)}>
-                    {item.name}
-                  </button>
-                  <span>
-                    {item.days_left} days left · {item.story.acted_count} of {item.story.total} chapters · next:{" "}
-                    {nextChapterTitle(item, data?.chapters ?? [])}
-                  </span>
-                </li>
-              ))}
+            {attention.map((item) => (
+              <li key={item.tenant_id}>
+                <button type="button" className="ac-link" onClick={() => onOpenTenant(item.tenant_id)}>
+                  {item.name}
+                </button>
+                <span>
+                  {item.days_left} days left · {item.story.acted_count} of {item.story.total} chapters · next:{" "}
+                  {nextChapterTitle(item, data?.chapters ?? [])}
+                </span>
+              </li>
+            ))}
           </ul>
-          {!items.some((item) => item.state !== "ENDED") && <p className="ac-muted">No active trial.</p>}
+          {!attention.length && <p className="ac-muted">No active trial.</p>}
         </Panel>
       </div>
       <TrialExitRequests onChanged={overview.reload} />
       <Panel eyebrow="Every trial" title="Trials holding data" source={overview}>
+        <div className="cc-toolbar">
+          <SearchBox value={table.query} onChange={table.onQuery} label="Search organization, tenant or owner email" />
+          <select aria-label="Trial state" value={table.state} onChange={(event) => table.onState(event.target.value)}>
+            {TRIAL_STATE_FILTERS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
         <Table<TrialItem>
           caption="Free trials"
           rows={items}
           rowKey={(row) => row.tenant_id}
-          empty={{ title: "No free trials", detail: "Approved trial requests appear here with their progress." }}
+          serverSort={{ sort: table.sort, onSort: table.onSort, keys: TRIAL_SORT_KEYS }}
+          empty={
+            filtered
+              ? { title: "No matching trials", detail: "Change the search or the trial state." }
+              : { title: "No free trials", detail: "Approved trial requests appear here with their progress." }
+          }
           columns={[
             {
               key: "name",
@@ -237,6 +306,13 @@ export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: stri
               ),
             },
           ]}
+        />
+        <Pager
+          page={data?.page ?? table.page}
+          pages={data?.pages ?? 1}
+          total={data?.total ?? items.length}
+          noun="trial"
+          onPage={table.onPage}
         />
       </Panel>
     </div>

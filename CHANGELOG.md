@@ -10,6 +10,33 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.16] - 2026-10-16
+
+### Fixed
+
+- Platform Admin › Customers & Tenants › Trials no longer slows down as trials grow. It used to read each trial on
+  its own (about 32 database queries per trial), so the page took over 20 seconds for 300 trials and stopped loading
+  at about 90 active trials. It now reads every trial together in the same handful of queries whatever their number
+  (about 0.15 seconds for 300 trials in our measurement).
+- The trial request queue (Platform Admin › Identity & Access › Onboarding) no longer looks up each approved
+  request's workspace one by one, and no longer stops at the newest 500 requests: the tab counts include every
+  request.
+
+### Changed
+
+- Trials: the table shows 50 trials a page with Previous and Next, a search (organization, tenant key, MDARIX ID or
+  the owner's email) and a trial-state filter (active, ending within 7 days, ended). The column headings Organization,
+  Trial, Story, Last activity, Demo and Feedback sort every page. Without a sort the trials that need attention come
+  first, as before. The figures at the top, the chapter funnel and "Who needs attention first" still cover every
+  trial, whatever page or filter the table shows.
+- Trial request queue: each tab (Pending, Approved, Declined) shows 50 requests a page with Previous and Next and a
+  search (company, requester, email or request ID); the Request ID, Company, Requester and Requested headings sort
+  every page.
+- API: `GET /api/v1/platform-admin/trials` and `GET /api/v1/platform-admin/trial-requests` return one page and take
+  `page`, `page_size` (default 50, at most 200), `sort`, `order` and `q`; the trials overview also takes `state` and
+  returns `attention`, the request queue `status`. Both add `page`, `page_size`, `total` and `pages` to their answer.
+  Platform Admin only, as before. No database migration.
+
 ## [0.10.15] - 2026-10-16
 
 ### Changed

@@ -270,7 +270,7 @@ def test_trial_requests_team_insights_and_feedback_carry_business_ids(platform, 
     request_id = _request_id(platform, email)
     queued = next(
         item
-        for item in platform.get("/api/v1/platform-admin/trial-requests").json()["items"]
+        for item in platform.get("/api/v1/platform-admin/trial-requests", params={"q": email}).json()["items"]
         if item["id"] == request_id
     )
     assert _is("TRQ", queued["business_id"]) and queued["tenant_business_id"] is None

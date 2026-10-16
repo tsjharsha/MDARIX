@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
-import { Table, idColumn } from "../customer-admin/shared";
+import { sortParams, useServerSort, type SortState } from "../../app/tableSort";
+import { SearchBox, Table, idColumn } from "../customer-admin/shared";
+import { Pager } from "./areas/common";
 
 type TrialRequest = {
   id: string;
@@ -26,11 +28,40 @@ type TrialRequest = {
 type DueTrial = { tenant_id: string; tenant_key: string; name: string; trial_ended_at: string; delete_after: string };
 type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
 
+/** One page of the queue (backend/app/trial/service.py request_queue): counts per status for the tabs. */
+export type TrialRequestPage = {
+  items: TrialRequest[];
+  counts: Record<string, number>;
+  page?: number;
+  pages?: number;
+  total?: number;
+};
+
 const FILTERS: [string, string][] = [
   ["PENDING_REVIEW", "Pending"],
   ["APPROVED", "Approved"],
   ["DECLINED", "Declined"],
 ];
+
+/** Columns the server orders every page by. */
+export const TRIAL_REQUEST_SORT_KEYS = ["business_id", "organization", "requester", "requested"] as const;
+
+/** The queue request for one tab's page: its status, page, order and search (company, requester, email, ID). */
+export function trialRequestsPath({
+  status,
+  page,
+  sort,
+  q,
+}: {
+  status: string;
+  page: number;
+  sort: SortState;
+  q: string;
+}): string {
+  const params = new URLSearchParams({ status, page: String(page), ...sortParams(sort) });
+  if (q.trim()) params.set("q", q.trim());
+  return `/api/v1/platform-admin/trial-requests?${params}`;
+}
 
 const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -39,7 +70,11 @@ const formatDate = (value: string | null) =>
 export function TrialRequestsWorkspace() {
   const [items, setItems] = useState<TrialRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [listed, setListed] = useState({ page: 1, pages: 1, total: 0 });
   const [filter, setFilter] = useState("PENDING_REVIEW");
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
+  const { sort, onSort } = useServerSort(() => setPage(1));
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<TrialRequest | null>(null);
@@ -48,17 +83,23 @@ export function TrialRequestsWorkspace() {
   const [reason, setReason] = useState("");
   const [result, setResult] = useState<{ tone: "good" | "bad"; text: string; link?: string } | null>(null);
 
-  const load = () => {
+  const path = trialRequestsPath({ status: filter, page, sort, q: query });
+  // Only the answer to the latest request is shown (typing a search sends one request per keystroke).
+  const latest = useRef(path);
+  const load = useCallback(() => {
+    latest.current = path;
     setState("loading");
-    requestJson<{ items: TrialRequest[]; counts: Record<string, number> }>("/api/v1/platform-admin/trial-requests")
+    requestJson<TrialRequestPage>(path)
       .then((data) => {
+        if (latest.current !== path) return;
         setItems(data.items);
         setCounts(data.counts);
+        setListed({ page: data.page ?? 1, pages: data.pages ?? 1, total: data.total ?? data.items.length });
         setState("ready");
       })
-      .catch(() => setState("error"));
-  };
-  useEffect(load, []);
+      .catch(() => latest.current === path && setState("error"));
+  }, [path]);
+  useEffect(load, [load]);
 
   const act = async (row: TrialRequest, path: string, body?: object) => {
     setBusy(row.id);
@@ -128,6 +169,7 @@ export function TrialRequestsWorkspace() {
     }
   };
 
+  // The server sends only the chosen tab's page (older answers may hold every status).
   const rows = items.filter((item) => item.status === filter);
   return (
     <section className="platform-admin-card trial-queue" aria-labelledby="trial-queue-title">
@@ -157,11 +199,24 @@ export function TrialRequestsWorkspace() {
             role="tab"
             aria-selected={filter === value}
             className={filter === value ? "is-active" : ""}
-            onClick={() => setFilter(value)}
+            onClick={() => {
+              setFilter(value);
+              setPage(1);
+            }}
           >
             {label} <span>{counts[value] ?? 0}</span>
           </button>
         ))}
+      </div>
+      <div className="cc-toolbar">
+        <SearchBox
+          value={query}
+          onChange={(value) => {
+            setQuery(value);
+            setPage(1);
+          }}
+          label="Search company, requester, email or ID"
+        />
       </div>
 
       {result && (
@@ -188,13 +243,18 @@ export function TrialRequestsWorkspace() {
         <p className="trial-queue-empty">Loading trial requests…</p>
       ) : rows.length === 0 ? (
         <p className="trial-queue-empty">
-          {filter === "PENDING_REVIEW" ? "No requests are waiting for review." : "Nothing here yet."}
+          {query.trim()
+            ? "No request matches the search."
+            : filter === "PENDING_REVIEW"
+              ? "No requests are waiting for review."
+              : "Nothing here yet."}
         </p>
       ) : (
         <Table
           caption="Trial requests"
           rows={rows}
           rowKey={(row) => row.id}
+          serverSort={{ sort, onSort, keys: TRIAL_REQUEST_SORT_KEYS }}
           empty={{ title: "Nothing here yet", detail: "Requests appear here as companies ask for a trial." }}
           columns={[
             idColumn("Request ID"),
@@ -295,6 +355,9 @@ export function TrialRequestsWorkspace() {
             },
           ]}
         />
+      )}
+      {state !== "error" && listed.total > 0 && (
+        <Pager page={listed.page} pages={listed.pages} total={listed.total} noun="request" onPage={setPage} />
       )}
 
       {confirming && (

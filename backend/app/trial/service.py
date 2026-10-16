@@ -146,21 +146,49 @@ def _trial_tenant_key(organization: str) -> str:
     return f"TRIAL_{stem}_{secrets.token_hex(3).upper()}"
 
 
-def _owner_status(db: Session, row: OnboardingRequest) -> str | None:
-    """The requester's account status once approved: INVITED until they activate, then ACTIVE."""
-    if row.tenant_id is None:
-        return None
-    status = (
-        db.query(AuthUser.status)
-        .filter(AuthUser.tenant_id == row.tenant_id, AuthUser.username == row.email.strip().lower())
-        .scalar()
-    )
-    return status
-
-
 def serialize_request(db: Session, row: OnboardingRequest) -> dict:
-    tenant = db.query(Tenant).filter(Tenant.id == row.tenant_id).first() if row.tenant_id else None
-    subscription = trial_subscription(db, row.tenant_id) if row.tenant_id else None
+    return serialize_requests(db, [row])[0]
+
+
+def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]:
+    """The queue's view of each request, with its trial workspace, the trial's end and whether the requester has
+    activated their account (INVITED until they do, then ACTIVE): three statements for any number of requests."""
+    tenant_ids = list({row.tenant_id for row in rows if row.tenant_id})
+    tenants, subscriptions, owner_status = {}, {}, {}
+    if tenant_ids:
+        tenants = {
+            tenant.id: tenant
+            for tenant in db.query(
+                Tenant.id, Tenant.business_id, Tenant.tenant_key, Tenant.tenant_identifier, Tenant.status
+            ).filter(Tenant.id.in_(tenant_ids))
+        }
+        # Each tenant's latest Free Trial subscription (trial_subscription); a converted tenant has none.
+        for subscription in (
+            db.query(SubscriptionLifecycle.tenant_id, SubscriptionLifecycle.expires_at)
+            .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+            .filter(SubscriptionLifecycle.tenant_id.in_(tenant_ids), PlanDefinition.code == FREE_TRIAL_PLAN)
+            .order_by(SubscriptionLifecycle.created_at.desc(), SubscriptionLifecycle.id)
+        ):
+            subscriptions.setdefault(subscription.tenant_id, subscription)
+        emails = list({row.email.strip().lower() for row in rows if row.tenant_id})
+        owner_status = {
+            (user.tenant_id, user.username): user.status
+            for user in db.query(AuthUser.tenant_id, AuthUser.username, AuthUser.status).filter(
+                AuthUser.tenant_id.in_(tenant_ids), AuthUser.username.in_(emails)
+            )
+        }
+    return [
+        _request_view(
+            row,
+            tenants.get(row.tenant_id),
+            subscriptions.get(row.tenant_id),
+            owner_status.get((row.tenant_id, row.email.strip().lower())) if row.tenant_id else None,
+        )
+        for row in rows
+    ]
+
+
+def _request_view(row: OnboardingRequest, tenant, subscription, owner_status: str | None) -> dict:
     return {
         "id": str(row.id),
         "business_id": row.business_id,
@@ -182,7 +210,81 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
         # Closed trials keep their data for 30 days (trial.retention), then it is deleted and the workspace archived.
         "data_delete_after": (subscription.expires_at + timedelta(days=30)).isoformat() if subscription else None,
         "data_deleted": bool(tenant and tenant.status == "ARCHIVED"),
-        "owner_status": _owner_status(db, row),
+        "owner_status": owner_status,
+    }
+
+
+REQUEST_STATUSES = ("PENDING_REVIEW", "APPROVED", "DECLINED")
+REQUEST_PAGE_SIZE = 50
+REQUEST_PAGE_SIZE_MAX = 200
+
+
+def request_queue(
+    db: Session,
+    *,
+    status: str = "",
+    q: str = "",
+    page: int = 1,
+    page_size: int = REQUEST_PAGE_SIZE,
+    sort: str = "",
+    order: str = "",
+) -> dict:
+    """One page of the Platform Admin trial request queue, newest first unless ``sort``/``order`` says otherwise.
+
+    ``status`` keeps one status (PENDING_REVIEW, APPROVED or DECLINED; all by default); ``q`` keeps the requests whose
+    company, requester, email or MDARIX ID contains it. ``counts`` are per status over every request matching ``q``
+    (the tabs), ``total`` and ``pages`` over the ones listed."""
+    from sqlalchemy import func, or_
+
+    from backend.app.sorting import order_query
+
+    page_size = min(REQUEST_PAGE_SIZE_MAX, max(1, int(page_size)))
+    query = db.query(OnboardingRequest)
+    if q.strip():
+        like = f"%{q.strip().lower()}%"
+        query = query.filter(
+            or_(
+                func.lower(OnboardingRequest.organization).like(like),
+                func.lower(OnboardingRequest.display_name).like(like),
+                func.lower(OnboardingRequest.email).like(like),
+                func.lower(OnboardingRequest.business_id).like(like),
+            )
+        )
+    counts = dict.fromkeys(REQUEST_STATUSES, 0)
+    for value, number in query.with_entities(OnboardingRequest.status, func.count(OnboardingRequest.id)).group_by(
+        OnboardingRequest.status
+    ):
+        counts[value] = int(number)
+    if status.strip():
+        query = query.filter(OnboardingRequest.status == status.strip().upper())
+    total = query.count()
+    pages = max(1, -(-total // page_size))
+    page = min(max(1, int(page)), pages)
+    query = order_query(
+        query,
+        sort,
+        order,
+        columns={
+            "business_id": [OnboardingRequest.business_id],
+            "organization": [OnboardingRequest.organization],
+            "requester": [OnboardingRequest.display_name, OnboardingRequest.email],
+            "email": [OnboardingRequest.email],
+            "requested": [OnboardingRequest.created_at],
+            "created_at": [OnboardingRequest.created_at],
+            "reviewed_at": [OnboardingRequest.reviewed_at],
+            "status": [OnboardingRequest.status],
+        },
+        default=[OnboardingRequest.created_at.desc()],
+        tiebreak=[OnboardingRequest.id],
+    )
+    rows = query.offset((page - 1) * page_size).limit(page_size).all()
+    return {
+        "items": serialize_requests(db, rows),
+        "counts": counts,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "pages": pages,
     }
 
 
