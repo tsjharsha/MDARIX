@@ -3,13 +3,17 @@
 Investigations need product, lot, change, supplier and complaint identifiers, so those are kept. What identifies a
 person is replaced with a typed placeholder (``[EMAIL]``, ``[PHONE]``, ``[PERSON]`` ...):
 
-* email addresses, phone numbers (grouped, or 10-11 digits run together), national/insurance/card-style numbers,
+* email addresses; phone numbers: three or more groups (617 555 0100, (617) 555-0100, +44 20 7946 0958), anything
+  led by "+" and a country code (+44 7700 900123, +33 6 12 34 56 78, +91-9845012345), Indian mobiles written 5-5
+  after +91, 0091, 0 or nothing (+91 98450 12345, 098450-12345, 98450.12345: ten digits starting 6-9), numbers led
+  by a trunk 0 (07700 900123, 030 12345678) and 10-11 digits run together; national/insurance/card-style numbers,
   labelled IP addresses, postcodes (UK, US state + ZIP, country-prefixed European codes);
 * values after labels such as "Patient:", "Reporter:", "DOB:", "Address:"; record numbers with or without a colon
   ("MRN 004512", "Patient ID 88213", "Medical record no. 004512", "Insurance member ID: XJ-5512-339"); dates of
   birth with or without a colon ("Date of birth 1961-04-02", "born 02/04/1961");
 * names after a personal title (Mr, Mrs, Ms, Dr ...), after a role word (Nurse, Patient, Complainant, Reporter,
-  Caller ...), after "reported by" in any case, initials with a surname ("J. Smith"), and bare two-token names
+  Caller ...), after a named contact ("Biomed contact Anil Mehta", "site contact Rao", "contact person ..."),
+  after "reported by" in any case, initials with a surname ("J. Smith"), and bare two-token names
   whose first token is a common given name (a built-in list). An unusual given name in free text without a label,
   title or role word is NOT recognised: the documentation says so, and labelled fields stay the reliable path;
 * age-and-sex phrases ("67-year-old male"), care facilities after "at" ("at Riverside Hospital");
@@ -35,6 +39,23 @@ EMAIL = re.compile(r"(?i)\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b")
 # Grouped phone numbers: optional country code, then at least three groups (617 555 0100, (617) 555-0100, +44 20 7946
 # 0958). Requiring separators keeps lot numbers, dates and serials such as L24-0815 or 2026-10-03 intact.
 PHONE = re.compile(r"(?<![\w-])(?:\+\d{1,3}[\s.-]?)?(?:\(\d{2,5}\)[\s.-]?|\d{2,5}[\s.-])\d{3,4}[\s.-]\d{3,5}(?![\w-])")
+# A number led by "+" and a country code is a phone number whatever its grouping (+44 7700 900123, +33 6 12 34 56 78,
+# +49 30 1234567, +91-9845012345); 8 to 15 digits in all (see _international_phone), so "+3.7 V" or "+12%" stay.
+INTERNATIONAL_PHONE = re.compile(
+    r"(?<![\w+])\+[1-9]\d{0,2}(?:[ \t.-]?\(\d{1,4}\))?[ \t.-]?\d{1,5}(?:[ \t.-]?\d{2,10}){0,5}(?![\w-]|\.\d)"
+)
+# An Indian mobile number: ten digits starting 6-9, written 5-5 with a space, hyphen or dot after +91, 0091, a trunk 0
+# or nothing (+91 98450 12345, 098450-12345, 98450.12345), or run together after +91 or 0091 (+91 9845012345). The
+# first digit 6-9 and the 5-5 split keep counts, lots (2607-2608), dates and part numbers (12345-67890) intact.
+INDIAN_MOBILE = re.compile(
+    r"(?<![\w.+-])(?:(?:(?:\+|00)91[ \t.-]?|0[ \t-]?)?[6-9]\d{4}[ \t.-]\d{5}|(?:\+|00)91[ \t.-]?[6-9]\d{9})"
+    r"(?![\w-]|\.\d)"
+)
+# Two round five-digit figures side by side ("60000 70000 units") are quantities, not a mobile (see _indian_mobile).
+ROUND_PAIR = re.compile(r"[6-9]\d{2}00[ \t.-]\d{3}00")
+# A national number led by a trunk 0, then one more group of 6-8 digits: 07700 900123 (UK mobile), 030 12345678,
+# 011-23456789. Three-group layouts are PHONE; a record label right before it keeps it (see _phone_unless_record).
+TRUNK_PHONE = re.compile(r"(?<![\w.+-])0\d{2,4}[ \t.-]\d{6,8}(?![\w-]|\.\d)")
 # A phone number written without separators: 10 or 11 digits, an optional country code before them. A 10-11 digit
 # run right after a serial, lot or order label is a record identifier and is kept (see _plain_phone).
 PLAIN_PHONE = re.compile(r"(?<![\w.-])(?:\+\d{1,3}\s?)?\d{10,11}(?![\w-])")
@@ -98,6 +119,13 @@ ROLE_WORDS = (
 # A name: optional initials, a token, optional middle initial, optional second token (any case: the caller decides).
 NAME_ANY_CASE = r"(?:[A-Za-z]\.\s*)*[A-Za-z][a-zA-Z'-]+(?:\s+[A-Za-z]\.)?(?:\s+[A-Za-z][a-zA-Z'-]+)?"
 NAME_TITLE_CASE = r"(?:[A-Z]\.\s*)*[A-Z][a-zA-Z'-]+(?:\s+[A-Z]\.)?(?:\s+[A-Z][a-zA-Z'-]+)?"
+# A named contact, the word "contact" in any case after what qualifies it: "Biomed contact Anil Mehta", "hospital
+# contact - Xiomara Quist", "contact person Rao". A bare "contact" is left to ROLE_NAME ("Contact Jane Doe") and
+# LABELLED ("contact: ..."), so "contact the hospital" or "skin contact" stays.
+CONTACT_NAME = re.compile(
+    r"(?i:\b((?:biomed(?:ical)?|clinical|hospital|site|facility|customer|ward|primary|main|named|emergency|"
+    r"sales|service|distributor)\s+contact(?:\s+person)?|contact\s+person))(\s*-?\s+)(" + NAME_TITLE_CASE + r")"
+)
 REPORTED_BY = re.compile(
     r"(?i)\b(reported by|called by|submitted by|contacted by|spoke (?:with|to)|interviewed|signed by|witnessed by|"
     r"notified by|escalated by|complaint from|call from)(\s+)((?:the\s+|a\s+|an\s+)?(?:" + ROLE_WORDS + r")\s+)?"
@@ -274,6 +302,25 @@ def _plain_phone(match: re.Match) -> str:
     return match.group(0) if RECORD_LABEL_BEFORE_NUMBER.search(before) else "[PHONE]"
 
 
+def _phone_unless_record(match: re.Match) -> str:
+    """A number led by "+" is a phone number; another is one unless a serial, lot or order label stands before it."""
+    return "[PHONE]" if match.group(0).startswith("+") else _plain_phone(match)
+
+
+def _indian_mobile(match: re.Match) -> str:
+    """An Indian mobile, unless it is two round figures with no +91, 0091 or 0 before them ("60000 70000") or a
+    record label stands right before it ("Serial 98450 12345")."""
+    text = match.group(0)
+    if ROUND_PAIR.fullmatch(text):
+        return text
+    return _phone_unless_record(match)
+
+
+def _international_phone(match: re.Match) -> str:
+    """A "+" number with 8 to 15 digits (the international maximum); fewer is a signed value such as +12 or +3.7."""
+    return "[PHONE]" if 8 <= sum(char.isdigit() for char in match.group(0)) <= 15 else match.group(0)
+
+
 def _title_case(token: str) -> bool:
     return token[:1].isupper() and (token[1:].islower() or token.endswith("."))
 
@@ -297,6 +344,13 @@ def _role_name(match: re.Match) -> str:
     if first in NOT_A_SURNAME or first in {"id", "no"}:
         return match.group(0)
     return f"{match.group(1)} [PERSON]"
+
+
+def _contact_name(match: re.Match) -> str:
+    first = match.group(3).split()[0].lower().rstrip(".")
+    if first in NOT_A_SURNAME or first in NOT_A_NAME or first in {"id", "no", "details", "number"}:
+        return match.group(0)
+    return f"{match.group(1)}{match.group(2)}[PERSON]"
 
 
 def _given_name(match: re.Match) -> str:
@@ -359,11 +413,16 @@ def mask_text(text: str) -> str:
     masked = REPORTED_BY.sub(_reported_by, masked)
     masked = TITLE.sub("[PERSON]", masked)
     masked = ROLE_NAME.sub(_role_name, masked)
+    masked = CONTACT_NAME.sub(_contact_name, masked)
     masked = FACILITY.sub(_facility, masked)
     masked = GIVEN_NAME.sub(_given_name, masked)
     masked = INITIALS_NAME.sub(_initials, masked)
     masked = AGE_SEX.sub("[AGE_SEX]", masked)
     masked = SSN.sub("[ID_NUMBER]", masked)
+    # Phone layouts before card numbers: "0091 98450 12345" has a card's digit count but is a phone number.
+    masked = INTERNATIONAL_PHONE.sub(_international_phone, masked)
+    masked = INDIAN_MOBILE.sub(_indian_mobile, masked)
+    masked = TRUNK_PHONE.sub(_phone_unless_record, masked)
     masked = CARD.sub(_card, masked)
     masked = PHONE.sub("[PHONE]", masked)
     masked = PLAIN_PHONE.sub(_plain_phone, masked)

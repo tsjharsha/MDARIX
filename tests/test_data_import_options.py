@@ -178,6 +178,62 @@ def test_a_file_where_every_row_has_a_problem_imports_nothing(investigator, prod
     assert _stored(ids) == {}
 
 
+# The rehearsal file: three of 33 complaints name a person with an Indian mobile number or an email address.
+REHEARSAL_ROWS = {
+    5: "Reported by Nurse Kavya Rao, phone +91 98450 12345: Pressure alarm sounded during infusion",
+    18: "Caller Mr. Daniel Brooks (daniel.brooks@citycare.example) said: the display froze after the update",
+    34: "Biomed contact Anil Mehta, +91 99000 54321, reported: occlusion alarm on start-up",
+}
+REHEARSAL_SECRETS = (
+    "Kavya Rao",
+    "98450 12345",
+    "Daniel Brooks",
+    "daniel.brooks@citycare.example",
+    "Anil Mehta",
+    "99000 54321",
+)
+
+
+def _rehearsal_file(product_id: str) -> tuple[str, list[str]]:
+    # Line 1 is the header, so data line N is the file's row N.
+    rows = [
+        (product_id, REHEARSAL_ROWS.get(line, f"Occlusion alarm during infusion, unit {line}")) for line in range(2, 35)
+    ]
+    return _complaints(product_id, *rows)
+
+
+def test_refusing_flags_every_row_that_masking_would_change(investigator, product):
+    body, ids = _rehearsal_file(product)
+    check = investigator.post(CHECK, content=body).json()
+    assert not check["ready"] and check["rows_to_import"] == 0
+    messages = {issue["row"]: issue["message"] for issue in check["issues"]}
+    assert set(messages) == {5, 18, 34}, check["issues"]
+    assert messages[5] == (
+        "This looks like it contains a person's name and a phone number. "
+        "Remove personal data and retry, or choose to mask it."
+    )
+    assert messages[18].startswith("This looks like it contains a person's name and an email address.")
+    assert messages[34].startswith("This looks like it contains a person's name and a phone number.")
+    assert investigator.post(IMPORT, content=body).status_code == 422
+    assert _stored(ids) == {}
+
+
+def test_masking_replaces_every_name_phone_and_email_in_the_rehearsal_file(investigator, product):
+    body, ids = _rehearsal_file(product)
+    check = investigator.post(CHECK, params={"personal_data": "mask"}, content=body).json()
+    assert check["ready"] and check["issues"] == [] and check["masked_values"] == 3 and check["rows_to_import"] == 33
+
+    result = investigator.post(IMPORT, params={"personal_data": "mask"}, content=body).json()
+    assert result["created"] == 33 and result["masked_values"] == 3
+    stored = _stored(ids)
+    assert stored[ids[5 - 2]] == "Reported by Nurse [PERSON], phone [PHONE]: Pressure alarm sounded during infusion"
+    assert stored[ids[18 - 2]] == "Caller [PERSON] ([EMAIL]) said: the display froze after the update"
+    assert stored[ids[34 - 2]] == "Biomed contact [PERSON], [PHONE], reported: occlusion alarm on start-up"
+    for secret in REHEARSAL_SECRETS:
+        assert all(secret not in description for description in stored.values()), secret
+    assert stored[ids[0]] == "Occlusion alarm during infusion, unit 2"
+
+
 @pytest.mark.parametrize("params", [{"on_problems": "ignore"}, {"personal_data": "keep"}])
 def test_unknown_options_are_refused(investigator, product, params):
     body, _ = _complaints(product, (product, "Alarm"))

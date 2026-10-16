@@ -1,9 +1,10 @@
 """Validated import of products, lots and complaints: CSV uploads (trials and workspaces) and mapped connector records.
 
 Every batch is checked in full before anything is written: only template columns are accepted, references must
-resolve inside the tenant, and text that looks like personal data (emails, phone numbers, dates of birth, patient
-or record numbers, named people) is rejected. By default a batch with any problem imports nothing. An uploader may
-choose instead (``on_problems=skip``) to import the rows that pass and get the others back as a rejects file with each
+resolve inside the tenant, and text that holds personal data is rejected: anything masking would replace (names,
+phone numbers, emails, dates of birth, patient or record numbers, addresses ... genai/pii.py), and labels such as
+"MRN" or "date of birth" that masking leaves in place. By default a batch with any problem imports nothing. An
+uploader may choose instead (``on_problems=skip``) to import the rows that pass and get the others back as a rejects file with each
 row's problems (returned, never stored), and (``personal_data=mask``) to have personal data in free text replaced by
 typed placeholders such as [PERSON] or [PHONE] (genai/pii.py) instead of refused; what masking cannot remove is still
 refused. A problem of the file itself (columns, encoding, size, limits) always stops the whole file. An ImportPolicy
@@ -186,7 +187,9 @@ FLAG_VALUES = {"y": True, "yes": True, "true": True, "1": True, "n": False, "no"
 LONG_TEXT = {"description": 4000, "text": 4000, "question": 4000, "content": 20000}
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._/#:-]{0,119}$")
-# (pattern, what it found, whether it matches only a label such as "MRN" or "date of birth" rather than the value).
+# Personal data is found by masking (genai/pii.py), so refusing catches everything masking would replace. These
+# patterns are a second net for what masking leaves in place: labels ("MRN", "date of birth", "Aadhaar") and a few
+# looser layouts. (pattern, what it found, whether it matches only a label rather than the value).
 _PERSONAL_DATA = [
     (re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+"), "an email address", False),
     (re.compile(r"(?<!\w)(\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\w)"), "a phone number", False),
@@ -204,6 +207,23 @@ _PERSONAL_DATA = [
 ]
 # What masking puts in place of personal data (genai/pii.py), e.g. [PERSON], [PHONE], [DATE_OF_BIRTH].
 _MASK_PLACEHOLDER = re.compile(r"\[[A-Z_]+\]")
+# Each placeholder in the words of the check report. A lot or serial is masked only beside a patient's details, so
+# the report names those details, not the lot.
+_MASK_FOUND = {
+    "[PERSON]": "a person's name",
+    "[PHONE]": "a phone number",
+    "[EMAIL]": "an email address",
+    "[DATE_OF_BIRTH]": "a date of birth",
+    "[ID_NUMBER]": "a patient or record identifier",
+    "[ADDRESS]": "an address",
+    "[POSTCODE]": "a postcode",
+    "[CARD_NUMBER]": "a card number",
+    "[IP_ADDRESS]": "an IP address",
+    "[AGE_SEX]": "a person's age and sex",
+    "[FACILITY]": "the name of a hospital or care home",
+    "[LOT]": None,
+    "[SERIAL]": None,
+}
 
 
 def template_csv(entity: str) -> str:
@@ -240,6 +260,27 @@ def _mask(value: str) -> str:
     from genai.pii import mask_text
 
     return mask_text(value)
+
+
+def _masking_found(value: str, masked: str) -> str | None:
+    """What masking replaced, in plain words ("a person's name and a phone number"); None when it changed nothing.
+    Placeholders already in the text (a file masked before) are not counted again."""
+    if masked == value:
+        return None
+    already = {}
+    for placeholder in _MASK_PLACEHOLDER.findall(value):
+        already[placeholder] = already.get(placeholder, 0) + 1
+    found: list[str] = []
+    for placeholder in _MASK_PLACEHOLDER.findall(masked):
+        if already.get(placeholder):
+            already[placeholder] -= 1
+            continue
+        words = _MASK_FOUND.get(placeholder, "personal data")
+        if words and words not in found:
+            found.append(words)
+    if not found:
+        return "personal data"
+    return found[0] if len(found) == 1 else ", ".join(found[:-1]) + " and " + found[-1]
 
 
 # Whole-number columns (a lot's quantity): digits only, separators allowed ("1,250", "1 250").
@@ -516,16 +557,19 @@ def _check_values(
                     expected = "YYYY-MM-DD" + (f" or {DATE_FORMATS[date_format]}" if date_format != "ISO" else "")
                     report.add(line, column, f"'{value}' is not a date in {expected} format.")
             else:
+                # The same detection both ways: refusing flags whatever masking would replace.
+                masked = _mask(value)
                 if mask_personal_data:
-                    masked = _mask(value)
                     if masked != value:
                         report.masked_values += 1
                         report.originals[(line, column)] = value
                         row[column] = value = masked
+                    found = _personal_data(value, labels=False)
+                else:
+                    found = _masking_found(value, masked) or _personal_data(value)
                 limit = LONG_TEXT.get(column, 255)
                 if len(value) > limit:
                     report.add(line, column, f"Keep this under {limit} characters.")
-                found = _personal_data(value, labels=not mask_personal_data)
                 if found:
                     advice = (
                         "Masking could not remove it; remove it from the file."

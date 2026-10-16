@@ -10,6 +10,33 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.14] - 2026-10-16
+
+### Changed
+
+- Getting started › Automatic insights: "Complaints per month" is now a hero card in the Readiness page's navy and
+  teal. The recent rate counts up ("8.3 a month now — up from 3.0 before · 2.8×", or "none before Aug 2026" for a
+  version new in the recent months). A smooth area chart draws its line month by month, highlights the last three
+  months as a band ("Rise since Aug '26"), shows the earlier average as a labelled dashed baseline, and calls out the
+  peak ("Sep '26: 12 complaints · 4× the earlier average"). Hover, tap or the arrow keys show each month against the
+  earlier average. Clicking a breakdown bar redraws the card for that filter. The table view remains, phones get
+  shorter labels and fewer month ticks, and reduced-motion settings show everything at once.
+
+### Fixed
+
+- Personal details in uploaded files are now found in more formats, both when an import refuses them and when it
+  replaces them: Indian mobile numbers written the usual ways (+91 98450 12345, +91-98450-12345, 098450 12345,
+  98450 12345, +91 9845012345), any number that starts with + and a country code (+44 7700 900123,
+  +33 6 12 34 56 78), national numbers that start with 0 (07700 900123, 030 12345678), and a person named after
+  "Biomed contact", "site contact", "hospital contact" or "contact person". Lot numbers, serial numbers, dates,
+  version numbers and record numbers stay as written.
+- Refusing personal data (the default for uploads) now catches everything that replacing it would replace. Before,
+  a complaint such as "Reported by Nurse Kavya Rao, phone +91 98450 12345: ..." passed the check and could be
+  imported; it is now refused with "This looks like it contains a person's name and a phone number. Remove personal
+  data and retry, or choose to mask it." The message names everything found. A hospital or care home named in the
+  text ("at Riverside Hospital") is also refused now, as replacing has always replaced it.
+- The same wider detection applies to what is masked before any text is sent to an AI model.
+
 ## [0.10.13] - 2026-10-16
 
 ### Added
