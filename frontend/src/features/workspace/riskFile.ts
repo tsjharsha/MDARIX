@@ -92,7 +92,8 @@ export const RISK_FILE_STATE: Record<RiskFileState, { label: string; tone: Tone 
 export const riskFileStateOf = (state: string | null | undefined) =>
   RISK_FILE_STATE[(state ?? "") as RiskFileState] ?? { label: "—", tone: "neutral" as Tone };
 
-const plural = (count: number, noun: string) => `${count.toLocaleString()} ${count === 1 ? noun : `${noun}s`}`;
+/** "1 malfunction", "3 malfunctions". */
+export const plural = (count: number, noun: string) => `${count.toLocaleString()} ${count === 1 ? noun : `${noun}s`}`;
 
 /** What reached the product's post-market data in the period, in one line. */
 export function postMarketText(item: Pick<RiskFileProduct, "post_market">): string {
@@ -100,7 +101,7 @@ export function postMarketText(item: Pick<RiskFileProduct, "post_market">): stri
   const parts = [
     plural(data.complaints, "complaint"),
     data.harm ? `${data.harm} with death or serious injury` : "",
-    data.malfunction ? `${data.malfunction} malfunctions` : "",
+    data.malfunction ? plural(data.malfunction, "malfunction") : "",
     data.significant_rises.length ? plural(data.significant_rises.length, "significant rise") : "",
     data.signals_decided ? `${plural(data.signals_decided, "signal")} decided` : "",
   ].filter(Boolean);

@@ -289,6 +289,83 @@ def test_the_request_queue_endpoint_takes_pages_and_filters(seeded):
         assert TestClient(app).get("/api/v1/platform-admin/trial-requests").status_code == 401
 
 
+def _ask_to_end(session, tenant_ids, now) -> None:
+    """One exit request per trial, by its owner: pending, declined or approved (with its data deleted) in turn."""
+    from backend.app.db.models.stage2 import TrialExitRequest
+
+    for number, tenant_id in enumerate(tenant_ids):
+        owner = (
+            session.query(AuthUser.id)
+            .filter(AuthUser.tenant_id == tenant_id, ~AuthUser.username.like("sample-author+%"))
+            .order_by(AuthUser.created_at)
+            .first()
+        )
+        status = ("PENDING", "DECLINED", "APPROVED")[number % 3]
+        session.add(
+            TrialExitRequest(
+                id=uuid.uuid4(),
+                trial_tenant_id=tenant_id,
+                organization=f"Exit {number}",
+                requested_by=owner.id if owner else None,
+                reason_code="FINISHED",
+                delete_data=status == "APPROVED",
+                status=status,
+                data_deleted=status == "APPROVED",
+                created_at=now - timedelta(minutes=number),
+                updated_at=now,
+            )
+        )
+    session.flush()
+
+
+def _exit_request_alone(session, item) -> dict:
+    """What the exit requests panel showed for one request before 0.10.17, each figure read for it alone."""
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.models.stage2 import TrialExitRequest
+    from backend.app.trial import early_exit
+
+    row = session.get(TrialExitRequest, uuid.UUID(item["id"]))
+    tenant = session.get(Tenant, row.trial_tenant_id)
+    person = session.get(AuthUser, row.requested_by) if row.requested_by else None
+    on_trial = service.trial_subscription(session, row.trial_tenant_id) is not None
+    return {
+        "tenant_business_id": tenant.business_id if tenant else None,
+        "tenant_status": tenant.status if tenant else None,
+        "requested_by": (person.display_name or person.username) if person and not row.data_deleted else None,
+        "days_left": early_exit.days_left(session, row.trial_tenant_id) if on_trial else None,
+    }
+
+
+def test_the_exit_requests_panel_reads_every_request_in_the_same_few_statements(seeded):
+    """Platform Admin › Trials › exit requests: 5 or 45 requests, the same statements (before 0.10.17 each request
+    cost four: its organization, the person who asked and its subscription twice), and the same figures as reading
+    each request alone."""
+    from backend.app.trial import early_exit
+
+    session, now = seeded
+    _ask_to_end(session, seed_trials(session, 5, "XFEW", now), now)
+    with QueryCounter() as few:
+        early_exit.overview(session)
+    plan = session.query(PlanDefinition).filter(PlanDefinition.code == SCALE_PLAN).one()
+    _ask_to_end(session, seed_trials(session, 40, "XMANY", now, plan=plan), now)
+    with QueryCounter() as many:
+        items = early_exit.overview(session)
+    # The requests, their organizations, the people who asked and the trials' subscriptions.
+    assert many.count == few.count <= 4, (few.count, many.count)
+
+    seeded_items = [item for item in items if item["organization"].startswith("Exit ")]
+    assert len(seeded_items) >= 45
+    assert [item["status"] for item in items] == sorted(
+        (item["status"] for item in items), key=lambda status: status != "PENDING"
+    )
+    for item in seeded_items:
+        expected = _exit_request_alone(session, item)
+        assert {key: item[key] for key in expected} == expected, item
+    shown = {item["status"]: item for item in seeded_items}
+    assert shown["PENDING"]["requested_by"] and shown["PENDING"]["days_left"] is not None
+    assert shown["APPROVED"]["requested_by"] is None  # the people were deleted with the data
+
+
 @pytest.mark.skipif(not os.getenv("MDARIX_TRIAL_SCALE_BENCH"), reason="set MDARIX_TRIAL_SCALE_BENCH=1 to measure")
 def test_benchmark_the_trial_overview_and_request_queue():
     """Statements and milliseconds per endpoint for 25, 100 and 300 trials (``-s`` shows them)."""

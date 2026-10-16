@@ -40,6 +40,8 @@ ROLE_AREAS = {
     "LEADERSHIP": "Leadership",
     "OTHER": "Other",
 }
+# The parts of MDARIX a person may say they used: the full product's, and the lightweight MVP's screens (Getting
+# started, Readiness, Complaints, Records; the form offers the set the organization sees).
 FEATURES = {
     "PRODUCT_360",
     "SIGNALS",
@@ -49,6 +51,10 @@ FEATURES = {
     "DECISIONS",
     "CSV_IMPORT",
     "AUDIT_TRAIL",
+    "GETTING_STARTED",
+    "READINESS",
+    "COMPLAINTS",
+    "RECORDS",
 }
 ADOPTION = {"YES", "MAYBE", "NO", "NOT_MY_DECISION"}
 ANONYMOUS_ATTRIBUTION = "medical-device company"

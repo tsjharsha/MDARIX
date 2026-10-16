@@ -421,7 +421,19 @@ const FOLLOW_UP_WORDS: ReadonlyArray<[FollowUpAction, RegExp]> = [
     "PRODUCT_CHANGE_REQUIRED",
     /\b(design change|product change|firmware|software update|engineering change|change request|redesign|tool(ing)? change|specification change)\b/i,
   ],
-  ["CAPA_REQUIRED", /\b(capa|corrective|preventive)\b/i],
+  [
+    "CAPA_REQUIRED",
+    // Named outright (CAPA, corrective, preventive, root cause), or a corrective action in other words: restoring or
+    // tightening a quality control (inspection, sampling, a process or procedure, training, the supplier's controls)
+    // removes the cause found, so it is done under a CAPA. Containing lots alone is a field action review.
+    new RegExp(
+      [
+        String.raw`\b(capa|scar|corrective|preventive|prevent (recurrence|reoccurrence)|root cause)\b`,
+        String.raw`\b(restore|reinstate|re-?establish|tighten|increase|strengthen|revise|retrain|re-?validate|re-?qualify)\b.*\b(inspection|sampling|acceptance|process|procedure|controls?|supplier|training|work instruction|sop|validation|qualification)\b`,
+      ].join("|"),
+      "i",
+    ),
+  ],
 ];
 
 export function followUpTypesOf(action: string): FollowUpAction[] {

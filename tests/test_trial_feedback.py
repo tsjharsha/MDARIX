@@ -162,6 +162,16 @@ def test_answers_outside_the_lists_are_refused_and_only_platform_admins_review()
     assert user.get("/api/v1/platform-admin/feedback").status_code == 403
 
 
+def test_the_lightweight_mvp_screens_are_accepted_and_ai_questions_may_be_left_out():
+    """The MVP form names the screens a trial user sees (Product 360 is parked) and, with AI off, asks nothing about
+    AI: the AI rating is simply not sent."""
+    user = _trial_user(f"Kestrel Devices {uuid.uuid4().hex[:6]} fbt")
+    answers = _answers(features_used=["GETTING_STARTED", "READINESS", "COMPLAINTS", "SIGNALS", "RECORDS"])
+    answers.pop("rating_ai_trust", None)
+    sent = user.post("/api/v1/trial/feedback", json=answers)
+    assert sent.status_code == 200, sent.text
+
+
 def test_a_person_cannot_withdraw_someone_elses_feedback():
     owner = _trial_user(f"Talbrook Medical {uuid.uuid4().hex[:6]} fbt")
     other = _trial_user(f"Ostend Surgical {uuid.uuid4().hex[:6]} fbt")

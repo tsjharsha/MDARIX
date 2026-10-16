@@ -4,6 +4,7 @@ import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, formatDate, useResource } from "../../customer-admin/shared";
 import {
   RISK_FILE_PERIODS,
+  plural,
   postMarketText,
   riskFileHeadline,
   riskFilePath,
@@ -143,7 +144,7 @@ export function ProductDetail({ detail }: { detail: RiskFileDetail }) {
             {detail.reviews.map((review, index) => (
               <li key={`${review.review}:${index}`}>
                 {review.review} on {review.case} · {(review.outcome ?? "").toLowerCase().replace(/_/g, " ")} ·{" "}
-                {review.risks_assessed} risks assessed · {formatDate(review.at)}
+                {plural(review.risks_assessed, "risk")} assessed · {formatDate(review.at)}
               </li>
             ))}
           </ul>

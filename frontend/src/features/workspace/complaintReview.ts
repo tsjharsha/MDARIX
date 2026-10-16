@@ -9,6 +9,8 @@ export const COMPLAINTS_TABS = [
   "Second look",
   "Backlog",
   "Reportability",
+  // Every complaint, filtered by product, version, lot, problem code, country or status (complaintList.ts).
+  "Complaint list",
   "Review settings",
   "Reporting windows",
 ] as const;

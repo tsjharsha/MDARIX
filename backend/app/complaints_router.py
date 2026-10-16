@@ -1,15 +1,16 @@
-"""The organization's complaints, across every product: search, filter by product and status, page through."""
+"""The organization's complaints, across every product: search, filter by product, status, product version, lot,
+problem code, country and source, page through."""
 
 from __future__ import annotations
 
 import uuid
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
-from backend.app.db.models.foundation import Complaint, InvestigationComplaint, Product, ProductVersion
+from backend.app.db.models.foundation import Complaint, InvestigationComplaint, LotBatch, Product, ProductVersion
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.sorting import order_query
 
@@ -23,6 +24,56 @@ def _like(text: str) -> str:
 
 
 RECEIVED_AT = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp)
+# The most values each filter's list offers (the problem codes, countries and versions recorded on complaints).
+FACET_MAX = 200
+
+
+def _uuid(text: str) -> uuid.UUID | None:
+    try:
+        return uuid.UUID(text)
+    except ValueError:
+        return None
+
+
+def _facets(db: Session, tenant_id: uuid.UUID) -> dict:
+    """What the list's filters offer: the problem codes, countries and product versions the complaints record."""
+
+    def distinct(column) -> list[str]:
+        return [
+            row[0]
+            for row in db.query(column)
+            .filter(Complaint.tenant_id == tenant_id, column.is_not(None), column != "")
+            .distinct()
+            .order_by(column)
+            .limit(FACET_MAX)
+        ]
+
+    has_complaint = exists().where(
+        Complaint.tenant_id == ProductVersion.tenant_id, Complaint.product_version_id == ProductVersion.id
+    )
+    versions = (
+        db.query(
+            ProductVersion.id, ProductVersion.business_id, ProductVersion.version_identifier, Product.id, Product.name
+        )
+        .join(Product, (Product.id == ProductVersion.product_id) & (Product.tenant_id == ProductVersion.tenant_id))
+        .filter(ProductVersion.tenant_id == tenant_id, has_complaint)
+        .order_by(Product.name, ProductVersion.version_identifier)
+        .limit(FACET_MAX)
+        .all()
+    )
+    return {
+        "problem_codes": distinct(Complaint.problem_code),
+        "countries": distinct(Complaint.country),
+        "versions": [
+            {
+                "id": str(version_id),
+                "business_id": business_id,
+                "product_id": str(product_id),
+                "label": f"{product_name} {identifier}",
+            }
+            for version_id, business_id, identifier, product_id, product_name in versions
+        ],
+    }
 
 
 def _sorts() -> dict:
@@ -52,6 +103,13 @@ def list_complaints(
     q: str = Query("", max_length=120),
     product_id: uuid.UUID | None = None,
     status: str = Query("", max_length=40),
+    # A product version by its MDARIX ID (or its id), a lot by its number (or MDARIX ID), a problem code and a country
+    # as recorded (any case), and the system the complaints came from (Getting started's insights read one source).
+    version: str = Query("", max_length=120),
+    lot: str = Query("", max_length=120),
+    problem_code: str = Query("", max_length=120),
+    country: str = Query("", max_length=80),
+    source_system: str = Query("", max_length=120),
     page: int = Query(1, ge=1, le=10_000),
     page_size: int = Query(50, ge=1, le=200),
     sort: str | None = Query(None, max_length=60),
@@ -75,6 +133,28 @@ def list_complaints(
         query = query.filter(Complaint.product_id == product_id)
     if status.strip():
         query = query.filter(func.lower(Complaint.status) == status.strip().lower())
+    if version.strip():
+        # The joined version is the tenant's own (the join matches on tenant), so another tenant's never matches.
+        value = version.strip()
+        version_id = _uuid(value)
+        query = query.filter(
+            or_(ProductVersion.business_id == value, ProductVersion.id == version_id)
+            if version_id
+            else ProductVersion.business_id == value
+        )
+    if lot.strip():
+        value = lot.strip()
+        lots = select(LotBatch.id).where(
+            LotBatch.tenant_id == tenant_id,
+            or_(func.lower(LotBatch.lot_identifier) == value.lower(), LotBatch.business_id == value),
+        )
+        query = query.filter(Complaint.lot_batch_id.in_(lots))
+    if problem_code.strip():
+        query = query.filter(func.lower(Complaint.problem_code) == problem_code.strip().lower())
+    if country.strip():
+        query = query.filter(func.lower(Complaint.country) == country.strip().lower())
+    if source_system.strip():
+        query = query.filter(Complaint.source_system == source_system.strip())
     if q.strip():
         pattern = _like(q.strip())
         query = query.filter(
@@ -101,6 +181,16 @@ def list_complaints(
         if ids
         else {}
     )
+    lot_ids = {complaint.lot_batch_id for complaint, *_ in rows if complaint.lot_batch_id}
+    lot_numbers = (
+        dict(
+            db.query(LotBatch.id, LotBatch.lot_identifier)
+            .filter(LotBatch.tenant_id == tenant_id, LotBatch.id.in_(lot_ids))
+            .all()
+        )
+        if lot_ids
+        else {}
+    )
     statuses = [
         row[0]
         for row in db.query(func.lower(Complaint.status))
@@ -114,6 +204,7 @@ def list_complaints(
         "page_size": page_size,
         "pages": max(1, -(-total // page_size)),
         "statuses": statuses,
+        **_facets(db, tenant_id),
         "items": [
             {
                 "id": str(complaint.id),
@@ -124,6 +215,7 @@ def list_complaints(
                 "product_identifier": product_identifier,
                 "product_name": product_name,
                 "version": version,
+                "lot": lot_numbers.get(complaint.lot_batch_id),
                 "status": complaint.status,
                 "description": complaint.description,
                 "event_date": complaint.event_timestamp.isoformat() if complaint.event_timestamp else None,

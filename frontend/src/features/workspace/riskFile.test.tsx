@@ -73,6 +73,14 @@ describe("risk file input rules", () => {
       "12 complaints · 2 with death or serious injury · 3 malfunctions · 1 significant rise · 1 signal decided",
     );
     expect(riskFileText(product())).toBe("No risk review · 1 of 4 risks assessed · 1 reassessment open (1 overdue)");
+    // One of a kind is singular (VentraLink 250 showed "1 malfunctions").
+    expect(
+      postMarketText(
+        product({
+          post_market: { ...product().post_market, complaints: 1, harm: 0, malfunction: 1, signals_decided: 0 },
+        }),
+      ),
+    ).toBe("1 complaint · 1 malfunction · 1 significant rise");
     expect(
       riskFileText(
         product({
@@ -143,5 +151,7 @@ describe("risk file input screens", () => {
     expect(markup).toContain("Not assessed in the period");
     expect(markup).toContain("Assessed in INV000147");
     expect(markup).toContain("no change required");
+    expect(markup).toContain("1 risk assessed");
+    expect(markup).not.toContain("1 risks assessed");
   });
 });

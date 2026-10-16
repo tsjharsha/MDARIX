@@ -259,10 +259,10 @@ def lines(data: dict) -> list[tuple[str, str]]:
     for group in complaints["by_product_version"]:
         body(f"- {group['group']}: {group['complaints']}")
     if complaints["more_groups"]:
-        muted(f"  and {complaints['more_groups']} more product versions")
+        muted(f"  and {_n(complaints['more_groups'], 'more product version')}")
     second = data["second_look"]
     body(
-        f"Second look: {second['confirmed']} records confirmed as complaints and {second['dismissed']} dismissed in the "
+        f"Second look: {_n(second['confirmed'], 'record')} confirmed as complaints and {second['dismissed']} dismissed in the "
         "period."
     )
 
@@ -303,7 +303,7 @@ def lines(data: dict) -> list[tuple[str, str]]:
             f"- {product['name']}: {product['label'].lower()}; {_n(product['complaints'], 'complaint')} "
             f"({product['harm']} with harm), {_n(product['risk_reviews'], 'risk review')}, "
             f"{product['risks_assessed']} of {_n(product['risks'], 'risk')} assessed, "
-            f"{product['reassessments_open']} reassessments open."
+            f"{_n(product['reassessments_open'], 'reassessment')} open."
         )
 
     capa = data["capa"]

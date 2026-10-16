@@ -23,6 +23,8 @@ import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
 import { ReportingWindows } from "./ReportingWindows";
 import { Starters } from "./Starters";
+import { ComplaintList } from "./ComplaintList";
+import { COMPLAINT_LIST_TAB, parseComplaintListTab } from "../complaintList";
 import { SECOND_LOOK_STARTERS, STARTER_MIN_EXTRA, starterProblem } from "../starters";
 import {
   BACKLOG_SHOWS,
@@ -67,15 +69,20 @@ import {
  * Complaints: the second look (records cancelled or logged as inquiries that carry signs of a complaint, and recurring
  * No Fault Found codes, for a person to decide on), the backlog board (open complaints in no signal and no case,
  * against the organization's target) and the reportability watch (reporting clocks against the organization's own
- * windows). MDARIX never changes a record in the customer's system and never submits a report.
+ * windows), and the complaint list with its filters (a link may carry them: complaintListTab in ../complaintList.ts).
+ * MDARIX never changes a record in the customer's system and never submits a report.
  */
 export function ComplaintsSection({ tab }: { tab?: string }) {
-  const [active, setActive] = useState<ComplaintsTab>(() => offeredTab(tab, COMPLAINTS_TABS, "Second look"));
+  const [target] = useState(() => parseComplaintListTab(tab));
+  const [active, setActive] = useState<ComplaintsTab>(() =>
+    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Second look"),
+  );
   return (
     <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={setActive} label="Complaint sections">
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}
       {active === "Reportability" && <ReportabilityWatch onOpenTab={setActive} />}
+      {active === COMPLAINT_LIST_TAB && <ComplaintList eyebrow="Complaints" initialFilters={target.filters} />}
       {active === "Review settings" && <ReviewSettingsPanel />}
       {active === "Reporting windows" && <ReportingWindows />}
     </Tabs>
