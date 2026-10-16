@@ -557,7 +557,7 @@ export function AuthPage({ mode }: { mode: string }) {
           {mode === "signin"
             ? "Use your work email to open your workspace."
             : mode === "signup"
-              ? "30 days, up to 3 users and 5,000 uploaded rows, no credit card. You create your password from the invitation email."
+              ? "30 days, up to 3 users and 5,000 uploaded rows, no credit card. You create your password from the invitation email and set up an authenticator app for two-factor sign-in (MFA)."
               : mode === "forgot-password"
                 ? "Enter your work email and we will send you a secure reset link."
                 : "Choose a password of at least 12 characters. A phrase of several words works well."}
