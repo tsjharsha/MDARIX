@@ -6,6 +6,9 @@
   development; backend/app/config_check.py refuses a weaker production setting).
 - Governed decision signatures need a fresh authenticator code (MDARIX_REQUIRE_MFA_FOR_SIGNATURES, default on).
 - Wrong codes are limited: 5 failures lock MFA checks for the account for 15 minutes.
+- People manage their own second factor in My Account (backend/app/auth_router.py): new recovery codes, or a new
+  authenticator app in place of the old one, each after the current password AND a fresh authenticator code. Nobody
+  can switch MFA off for themselves; for the roles above it cannot be off at all.
 """
 
 from __future__ import annotations
@@ -47,11 +50,17 @@ def is_enrolled(user) -> bool:
     return bool(getattr(user, "mfa_enrolled_at", None) and getattr(user, "mfa_secret_encrypted", None))
 
 
+def required_for(user) -> bool:
+    """True when the person's role must use MFA (then nobody can switch it off for them; an administrator's reset only
+    sends them to set up a new authenticator at their next sign-in)."""
+    return _normalize(user.role) in required_roles()
+
+
 def session_state_for(user) -> str | None:
     """The MFA step a new session still owes: VERIFY (enrolled), ENROLL (policy requires it), or None."""
     if is_enrolled(user):
         return "VERIFY"
-    if _normalize(user.role) in required_roles():
+    if required_for(user):
         return "ENROLL"
     return None
 
