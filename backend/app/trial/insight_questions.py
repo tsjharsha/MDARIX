@@ -317,7 +317,7 @@ def _version_question(records: _Records) -> dict | None:
         )
         parts.append(
             f"{sibling.version_identifier} has {_count(len(own), 'complaint')}, {_rate(per_month)} per month since "
-            f"its first in {month_label(first)}"
+            f"its first complaint in {month_label(first)}"
             if own and first
             else f"{sibling.version_identifier} has none"
         )
@@ -391,7 +391,7 @@ def _version_question(records: _Records) -> dict | None:
         when = _day(change.event_timestamp or change.effective_timestamp)
         facts.append(
             f"Change {change.change_identifier} ({change.change_type}{', ' + when if when else ''}): "
-            f"{_shorten(change.description)}"
+            f"{_shorten(change.description, 240)}"
         )
     if not changes:
         any_link = records.db.query(RealityRelationship.source_entity_id).filter(
@@ -462,25 +462,24 @@ def _lots_question(records: _Records) -> dict | None:
         question = f"What do the records say about lot {lot.lot_identifier}?"
         label = records.version_label(lot.product_version_id)
         summary = (
-            f"Lot {lot.lot_identifier} has {together} of {_count(total, 'complaint')}"
-            + (f" and builds {label}" if label else "")
-            + "."
+            f"Lot {lot.lot_identifier}" + (f" ({label})" if label else "") + f" has {together} of "
+            f"{_count(total, 'complaint')}."
         )
     else:
         question = f"What do lots {names[0]} and {names[1]} have in common?"
         first, second = lots
         shared = []
         if first.product_version_id and first.product_version_id == second.product_version_id:
-            shared.append(f"build {records.version_label(first.product_version_id)}")
+            shared.append(f"{records.version_label(first.product_version_id)} lots")
         site = records.sites.get(first.manufacturing_site_id)
         if site and first.manufacturing_site_id == second.manufacturing_site_id:
-            shared.append(f"come from {site.name}")
+            shared.append(f"made at {site.name}")
         if shared:
-            opening = f"Lots {names[0]} and {names[1]} both {_join(shared)}"
+            opening = f"Lots {names[0]} and {names[1]} are both " + " ".join(shared)
         elif first.product_version_id and second.product_version_id:
             opening = (
-                f"Lots {names[0]} and {names[1]} build different versions "
-                f"({records.version_label(first.product_version_id)}, "
+                f"Lots {names[0]} and {names[1]} are of different versions "
+                f"({records.version_label(first.product_version_id)} and "
                 f"{records.version_label(second.product_version_id)})"
             )
         else:
@@ -490,7 +489,7 @@ def _lots_question(records: _Records) -> dict | None:
     parts = {version_id: records.components_of(version_id) for version_id in version_ids}
     if len(lots) == 2 and len(version_ids) == 1 and parts[version_ids[0]]:
         facts.append(
-            f"Both lots build {records.version_label(version_ids[0])}, whose recorded components and suppliers are: "
+            f"Both lots are {records.version_label(version_ids[0])}, whose recorded components and suppliers are: "
             + "; ".join(_component_text(item) for item in parts[version_ids[0]])
             + "."
         )
@@ -509,7 +508,7 @@ def _lots_question(records: _Records) -> dict | None:
             + "."
         )
     else:
-        missing.append("No components are recorded for the versions these lots build.")
+        missing.append("No components are recorded for the versions of these lots.")
     missing.append(
         "The records do not link a lot to the component lots or supplier deliveries that went into it, so which "
         "parts each lot used is not known."
@@ -581,8 +580,11 @@ def _rise_question(records: _Records) -> dict | None:
         summary = f"{rose}, but lot quantities are missing, so complaints per unit cannot be shown."
         missing.append("Lot quantities (the quantity column of the lots file) are needed to count per unit.")
     else:
-        shown = [f"{label} lots {_rate(rate)} ({n} from {units:,} units)" for rate, label, n, units in rates[:3]]
-        summary = f"{rose}; per 1,000 units released, " + "; ".join(shown) + "."
+        shown = [
+            f"{label} {_rate(rate)} ({_count(n, 'complaint')} from {units:,} units)"
+            for rate, label, n, units in rates[:3]
+        ]
+        summary = f"{rose}. Per 1,000 units released: " + "; ".join(shown) + "."
     no_lot = sum(1 for c in records.complaints if c.lot_batch_id not in records.lots)
     if no_lot:
         missing.append(
@@ -676,16 +678,18 @@ def _codes_question(records: _Records) -> dict | None:
         if recent > earlier and recent_count >= RISING_MIN_RECENT:
             rising.append((code, recent, earlier, recent_count, own))
     period = f"{month_label(recent_months[0])} to {month_label(recent_months[-1])}"
+    window = f"the last {RECENT_MONTHS} months ({period})"
     if rising:
         summary = (
-            f"{_count(len(rising), 'problem code')} rose in {period}: "
-            + "; ".join(f"{code} {_rate(e)} to {_rate(r)} per month" for code, r, e, _c, _o in rising[:3])
+            f"{_count(len(rising), 'problem code')} rose in {window}: "
+            + "; ".join(f"{code} from {_rate(e)} to {_rate(r)} per month" for code, r, e, _c, _o in rising[:3])
             + ("; and more" if len(rising) > 3 else "")
             + "."
         )
     else:
         summary = (
-            f"No problem code has at least {RISING_MIN_RECENT} complaints in {period} and more per month than before."
+            f"No problem code rose in {window}: none has at least {RISING_MIN_RECENT} complaints in those months "
+            "and more per month than before."
         )
     missing = []
     uncoded = len(records.complaints) - len(coded)
@@ -724,9 +728,9 @@ def _origin_question(records: _Records) -> dict | None:
         top, n = countries[0]
         with_country = sum(n for _c, n in countries)
         in_all = _count(len(countries), "country", "countries")
-        parts.append(f"Most come from {top} ({n} of {with_country} with a country, {in_all} in all)")
+        parts.append(f"{top} has the most complaints ({n} of {with_country} with a country; {in_all} in all)")
     if reporters:
-        parts.append("reporters: " + ", ".join(f"{kind} {n}" for kind, n in reporters[:4]))
+        parts.append("By reporter type: " + ", ".join(f"{kind} {n}" for kind, n in reporters[:4]))
     missing = []
     no_country = total - sum(n for _c, n in countries)
     no_reporter = total - sum(n for _r, n in reporters)
@@ -741,7 +745,7 @@ def _origin_question(records: _Records) -> dict | None:
         "key": "origin",
         "question": "Where are complaints coming from?",
         "answer": _answer(
-            "; ".join(parts) + ".",
+            ". ".join(parts) + ".",
             bars=[{"label": country, "count": n} for country, n in countries[:ROWS_MAX]] or None,
             table={"columns": ["Reporter type", "Complaints"], "rows": [[kind, n] for kind, n in reporters]}
             if reporters

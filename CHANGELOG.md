@@ -10,6 +10,38 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.13] - 2026-10-16
+
+### Added
+
+- "A new version of MDARIX is available." A tab opened before a deploy keeps running the version it loaded; it now
+  asks the server every 5 minutes, and when the tab is shown again, which version it runs, and when that is newer than
+  its own it shows a small notice at the top right with a Reload button and a way to dismiss it for now. It never
+  reloads by itself (you may be typing), stays silent offline or on an error, and the check does not keep an idle
+  sign-in alive. The server answers at `GET /api/v1/public/version`; the web image now builds with the repository's
+  `VERSION`, so both sides compare the same number.
+
+### Changed
+
+- "Ask MDARIX to look further" under an Automatic insights answer now opens Ask MDARIX with the question already in
+  the question box, ready for you to press Ask MDARIX; it is no longer copied for you to paste. The link shows only
+  while AI answers for your organization: without AI, Ask only finds matching evidence records and does not count
+  complaints, so it could not look further into the counts the answer shows.
+- When Ask MDARIX answers from your records without AI and nothing matches, it now says so plainly ("No evidence
+  record matches this question. Ask MDARIX searched the evidence of all your cases and the records you uploaded.", or
+  "No evidence record of this case matches this question." with a case chosen) and explains what it searched and that
+  it does not count complaints, pointing to Getting started › Automatic insights for complaint counts. The badge reads
+  "No matching evidence found".
+- The sample data's supplier change (SAMPLE-CHG-014) is now linked to the OrbitCare 300 pressure sensor it concerns,
+  so "What changed in OrbitCare 300 Infusion Pump (Sample) Rev B?" shows the change record. This applies to sample
+  data added from now on; existing trials keep theirs as it is.
+- Automatic insights answers read more naturally: "Complaints rose from 3.0 to 8.3 per month. Per 1,000 units
+  released: OrbitCare 300 Infusion Pump (Sample) Rev B 37.8 (17 complaints from 450 units); ...", "since its first
+  complaint in Aug 2026", "Lots A and B are both ... Rev B lots made at ...", "US has the most complaints (7 of 9 with a
+  country; 3 countries in all)" and "No problem code rose in the last 3 months (...)". A change record's description is
+  shown in full up to 240 characters.
+- In the answers' tables every numeric column (counts, quantities, rates), heading and cells alike, is right-aligned.
+
 ## [0.10.12] - 2026-10-16
 
 ### Changed

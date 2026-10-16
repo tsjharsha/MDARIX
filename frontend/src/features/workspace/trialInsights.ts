@@ -21,6 +21,24 @@ export type InsightRecord = {
 
 export type InsightTable = { columns: string[]; rows: (string | number)[][] };
 
+// A number as the server writes one in a table: 17, "1,250", "37.8", "-2.5", "40%".
+const NUMBER_TEXT = /^[-+]?\d[\d,]*(\.\d+)?%?$/;
+// A cell that holds no value ("—"): it does not decide the column's alignment.
+const isBlank = (cell: string | number) => typeof cell === "string" && (cell.trim() === "" || cell.trim() === "—");
+const isNumber = (cell: string | number) => typeof cell === "number" || NUMBER_TEXT.test(cell.trim());
+
+/**
+ * Which columns of an answer's table hold numbers, so their heading and cells are right-aligned together: a column
+ * counts when every cell with a value is a number (sent as a number or as text such as "1,250" or "37.8").
+ */
+export function numericColumns(table: InsightTable): boolean[] {
+  return table.columns.map((_column, index) => {
+    const cells = table.rows.map((row) => row[index]).filter((cell) => cell !== undefined && cell !== null);
+    const values = cells.filter((cell) => !isBlank(cell));
+    return values.length > 0 && values.every(isNumber);
+  });
+}
+
 export type InsightAnswer = {
   summary: string;
   table: InsightTable | null;

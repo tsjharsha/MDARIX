@@ -17,6 +17,8 @@ import type { Slice } from "../../admin/console/dashboardModel";
 import { AnimatedNumber, prefersReducedMotion } from "../../admin/console/motion";
 import { Tabs } from "../../customer-admin/shared";
 import { useWorkspace } from "../workspaceContext";
+import { useAiReady } from "../useAiStatus";
+import { handQuestionToAsk } from "../../ask/pendingQuestion";
 import { countOf } from "./common";
 import {
   FACETS,
@@ -31,6 +33,7 @@ import {
   headlineOf,
   monthLabel,
   monthSeries,
+  numericColumns,
   rateText,
   toggleFilter,
   trendOf,
@@ -65,6 +68,8 @@ export function InsightsPanel({ insights, source }: { insights: Insights | null;
   const [expanded, setExpanded] = useState<string | null>(null);
   // Read once: a person who asked their system for less motion sees every number and bar at its end state.
   const [still] = useState(prefersReducedMotion);
+  // "Ask MDARIX to look further" only while AI answers: without it Ask finds evidence records but counts no complaints.
+  const aiReady = useAiReady() === true;
   // New data (an import, the sample removed) starts unfiltered: a value filtered on may no longer exist.
   const [loaded, setLoaded] = useState(insights);
   if (insights !== loaded) {
@@ -100,11 +105,15 @@ export function InsightsPanel({ insights, source }: { insights: Insights | null;
             work.setInvestigationId(item.id, item.product_id);
             open("Investigations");
           }}
-          onAsk={(question) => {
-            void navigator.clipboard?.writeText(question).catch(() => undefined);
-            open("Intelligence", "Ask MDARIX");
-            notify(`Question copied. Paste it into Ask MDARIX: "${question}"`);
-          }}
+          onAsk={
+            aiReady
+              ? (question) => {
+                  handQuestionToAsk(question);
+                  open("Intelligence", "Ask MDARIX");
+                  notify("Your question is in Ask MDARIX: press Ask MDARIX to run it.");
+                }
+              : null
+          }
         />
       )}
     </Panel>
@@ -137,7 +146,8 @@ export function InsightsBody({
   still: boolean;
   onOpenComplaints: (filterText: string) => void;
   onOpenCase: (item: InsightAnswer["cases"][number]) => void;
-  onAsk: (question: string) => void;
+  /** Null hides "Ask MDARIX to look further" (AI not ready). */
+  onAsk: ((question: string) => void) | null;
 }) {
   const records = insights.records;
   const labels = insights.version_labels ?? {};
@@ -493,9 +503,10 @@ export function QuestionItem({
   open: boolean;
   onToggle: () => void;
   onOpenCase: (item: InsightAnswer["cases"][number]) => void;
-  onAsk: (question: string) => void;
+  onAsk: ((question: string) => void) | null;
 }) {
   const answer = item.answer;
+  const numeric = answer.table ? numericColumns(answer.table) : [];
   const id = `uw-ins-answer-${item.key}`;
   return (
     <li className={open ? "is-open" : ""}>
@@ -511,8 +522,8 @@ export function QuestionItem({
             <table className="ac-table">
               <thead>
                 <tr>
-                  {answer.table.columns.map((column) => (
-                    <th scope="col" key={column}>
+                  {answer.table.columns.map((column, index) => (
+                    <th scope="col" key={column} className={numeric[index] ? "num" : undefined}>
                       {column}
                     </th>
                   ))}
@@ -522,7 +533,7 @@ export function QuestionItem({
                 {answer.table.rows.map((row, index) => (
                   <tr key={index}>
                     {row.map((cell, column) => (
-                      <td key={column} className={typeof cell === "number" ? "num" : undefined}>
+                      <td key={column} className={numeric[column] ? "num" : undefined}>
                         {typeof cell === "number" ? cell.toLocaleString() : cell}
                       </td>
                     ))}
@@ -571,9 +582,11 @@ export function QuestionItem({
             </ul>
           </div>
         )}
-        <button type="button" className="ac-link" onClick={() => onAsk(item.question)}>
-          <Bot size={15} aria-hidden="true" /> Ask MDARIX to look further
-        </button>
+        {onAsk && (
+          <button type="button" className="ac-link" onClick={() => onAsk(item.question)}>
+            <Bot size={15} aria-hidden="true" /> Ask MDARIX to look further
+          </button>
+        )}
       </div>
     </li>
   );

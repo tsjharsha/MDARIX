@@ -7,6 +7,7 @@ import {
   filterText,
   headlineOf,
   monthSeries,
+  numericColumns,
   toggleFilter,
   trendOf,
   trendSummary,
@@ -67,8 +68,14 @@ const INSIGHTS: Insights = {
       key: "version",
       question: "What changed in OrbitCare 300 Rev B?",
       answer: {
-        summary: "OrbitCare 300: Rev B has 6 complaints, 2.0 per month since its first in Aug 2026.",
-        table: { columns: ["Version", "Complaints"], rows: [["Rev B", 6]] },
+        summary: "OrbitCare 300: Rev B has 6 complaints, 2.0 per month since its first complaint in Aug 2026.",
+        table: {
+          columns: ["Version", "Released", "Complaints", "Per month", "Top lots"],
+          rows: [
+            ["Rev B", "2 Aug 2026", 6, "2.0", "L-3 (4), L-4 (2)"],
+            ["Rev A", "—", 4, "—", "L-1 (2)"],
+          ],
+        },
         bars: null,
         facts: ["Rev B lists 1 component: Pressure Sensor: NovaSense since 28 Jul 2026."],
         ids: ["CMP004", "CMP005"],
@@ -82,7 +89,7 @@ const INSIGHTS: Insights = {
       key: "origin",
       question: "Where are complaints coming from?",
       answer: {
-        summary: "Most come from US (2 of 3 with a country, 2 countries in all).",
+        summary: "US has the most complaints (2 of 3 with a country; 2 countries in all).",
         table: null,
         bars: [{ label: "US", count: 2 }],
         facts: [],
@@ -101,6 +108,7 @@ const render = (
   props: Partial<{ insights: Insights; filters: InsightFilters; tab: "version" | "lot" | "code" | "country" }> & {
     expanded?: string | null;
     still?: boolean;
+    onAsk?: ((question: string) => void) | null;
   } = {},
 ) =>
   renderToStaticMarkup(
@@ -116,7 +124,7 @@ const render = (
       still={props.still ?? true}
       onOpenComplaints={noop}
       onOpenCase={noop}
-      onAsk={noop}
+      onAsk={props.onAsk === undefined ? noop : props.onAsk}
     />,
   );
 
@@ -230,7 +238,7 @@ describe("Automatic insights: the panel", () => {
     const open = render({ expanded: "version" });
     expect(open).toContain('aria-expanded="true" aria-controls="uw-ins-answer-version"');
     expect(open).not.toContain('id="uw-ins-answer-version" class="uw-ins-answer" hidden=""');
-    expect(open).toContain("Rev B has 6 complaints, 2.0 per month since its first in Aug 2026.");
+    expect(open).toContain("Rev B has 6 complaints, 2.0 per month since its first complaint in Aug 2026.");
     expect(open).toContain("Complaints used:</b> CMP004, CMP005 and 4 more");
     expect(open).toContain("Based on:</b> Complaints by version.");
     expect(open).toContain("Not in the records");
@@ -239,6 +247,35 @@ describe("Automatic insights: the panel", () => {
     const origin = render({ expanded: "origin" });
     expect(origin).toContain("INV000001");
     expect(origin).toContain("No complaint records a reporter type.");
+  });
+
+  it("right-aligns every numeric column of an answer's table, its heading and its cells alike", () => {
+    const table = INSIGHTS.questions![0].answer.table!;
+    expect(numericColumns(table)).toEqual([false, false, true, true, false]);
+    expect(
+      numericColumns({
+        columns: ["Lot", "Quantity", "Per 1,000 units"],
+        rows: [
+          ["L-1", "1,250", "37.8"],
+          ["L-2", "—", "—"],
+        ],
+      }),
+    ).toEqual([false, true, true]);
+    expect(numericColumns({ columns: ["Quantity"], rows: [["—"]] })).toEqual([false]);
+    const open = render({ expanded: "version" });
+    expect(open).toContain('<th scope="col">Released</th><th scope="col" class="num">Complaints</th>');
+    expect(open).toContain('<th scope="col" class="num">Per month</th><th scope="col">Top lots</th>');
+    expect(open).toContain(
+      '<td>2 Aug 2026</td><td class="num">6</td><td class="num">2.0</td><td>L-3 (4), L-4 (2)</td>',
+    );
+    expect(open).toContain('<td class="num">4</td><td class="num">—</td>');
+  });
+
+  it("offers Ask MDARIX to look further only while AI answers", () => {
+    expect(render({ expanded: "version" })).toContain("Ask MDARIX to look further");
+    const withoutAi = render({ expanded: "version", onAsk: null });
+    expect(withoutAi).not.toContain("Ask MDARIX to look further");
+    expect(withoutAi).toContain("Based on:</b> Complaints by version.");
   });
 
   it("says plainly when a tab has nothing recorded", () => {

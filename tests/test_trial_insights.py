@@ -35,6 +35,11 @@ from backend.app.trial.sample_data import seed_lot_quantities, seed_sample_works
 
 # The sample's complaints are dated back from this day: April to October 2026, the last three months August to October.
 NOW = datetime(2026, 10, 16, 12, 0, tzinfo=timezone.utc)
+# The sample's supplier change, as "What changed" shows it (sample_data.py links it to the OrbitCare pressure sensor).
+CHANGE_FACT = (
+    "Change SAMPLE-CHG-014 (Supplier change, 28 Jul 2026): OrbitCare 300 Rev B: pressure sensor sourced from NovaSense "
+    "Components instead of Precision Sensors Ltd. Incoming inspection sampling reduced from 32 to 13 units per lot."
+)
 NOTE = "Counts and patterns from your records. They point to where to look; people decide what they mean."
 LEGACY_FIELDS = (
     "scope",
@@ -297,28 +302,29 @@ def test_every_sample_question_is_answered_from_the_records(workspaces):
 
     version = _question(result, "version")["answer"]
     assert version["summary"] == (
-        "OrbitCare 300 Infusion Pump (Sample): Rev B has 17 complaints, 5.7 per month since its first in Aug 2026; "
-        "Rev A has 6 complaints, 0.9 per month since its first in Apr 2026."
+        "OrbitCare 300 Infusion Pump (Sample): Rev B has 17 complaints, 5.7 per month since its first complaint in "
+        "Aug 2026; Rev A has 6 complaints, 0.9 per month since its first complaint in Apr 2026."
     )
     assert [row[0] for row in version["table"]["rows"]] == ["Rev B", "Rev A"]
     assert version["table"]["rows"][0][4] == "SAMPLE-ORBIT-300-LOT-003 (9), SAMPLE-ORBIT-300-LOT-004 (6)"
     assert any("Pressure Sensor (Sample): NovaSense Components (Sample)" in fact for fact in version["facts"])
     assert version["ids_total"] == 17
-    # The sample's supplier change is not linked to the product, so it is named as unlinked, not shown as related.
-    assert any("No change record is linked" in line and "SAMPLE-CHG-014" in line for line in version["missing"])
+    # The sample's supplier change names the OrbitCare pressure sensor as the component it affects, so it is shown.
+    assert version["facts"][-1] == CHANGE_FACT
+    assert not any("change record" in line for line in version["missing"])
     assert any("Rev A has no components recorded" in line for line in version["missing"])
 
     lots = _question(result, "lots")["answer"]
     assert lots["summary"] == (
-        "Lots SAMPLE-ORBIT-300-LOT-003 and SAMPLE-ORBIT-300-LOT-004 both build OrbitCare 300 Infusion Pump (Sample) "
-        "Rev B and come from Assembly Site 1 (Sample); together they have 15 of 37 complaints."
+        "Lots SAMPLE-ORBIT-300-LOT-003 and SAMPLE-ORBIT-300-LOT-004 are both OrbitCare 300 Infusion Pump (Sample) "
+        "Rev B lots made at Assembly Site 1 (Sample); together they have 15 of 37 complaints."
     )
     assert [row[5] for row in lots["table"]["rows"]] == ["6.0", "4.0"]  # per 100 units: 9 and 6 of 150
     assert any("do not link a lot to the component lots" in line for line in lots["missing"])
 
     rise = _question(result, "rise")["answer"]
-    assert rise["summary"].startswith("Complaints rose from 3.0 to 8.3 per month; per 1,000 units released, ")
-    assert "OrbitCare 300 Infusion Pump (Sample) Rev B lots 37.8 (17 from 450 units)" in rise["summary"]
+    assert rise["summary"].startswith("Complaints rose from 3.0 to 8.3 per month. Per 1,000 units released: ")
+    assert "OrbitCare 300 Infusion Pump (Sample) Rev B 37.8 (17 complaints from 450 units)" in rise["summary"]
     assert rise["missing"] == []
 
     harm = _question(result, "harm")["answer"]
@@ -329,12 +335,13 @@ def test_every_sample_question_is_answered_from_the_records(workspaces):
 
     codes = _question(result, "codes")["answer"]
     assert codes["summary"] == (
-        "No problem code has at least 2 complaints in Aug 2026 to Oct 2026 and more per month than before."
+        "No problem code rose in the last 3 months (Aug 2026 to Oct 2026): none has at least 2 complaints in those "
+        "months and more per month than before."
     )
     assert codes["missing"] == ["29 complaints have no problem code and are not counted here."]
 
     origin = _question(result, "origin")["answer"]
-    assert origin["summary"] == "Most come from US (7 of 9 with a country, 3 countries in all)."
+    assert origin["summary"] == "US has the most complaints (7 of 9 with a country; 3 countries in all)."
     assert origin["bars"][0] == {"label": "US", "count": 7}
     assert origin["missing"] == ["28 complaints have no country.", "No complaint records a reporter type."]
 
@@ -444,7 +451,8 @@ def test_an_upload_without_the_optional_columns_says_what_is_missing(workspaces)
 
     lots = _question(result, "lots")["answer"]
     assert lots["summary"] == (
-        "Lots L24-0815 and L24-0902 both build AquaFlow 200 Infusion Pump Rev D; together they have 9 of 12 complaints."
+        "Lots L24-0815 and L24-0902 are both AquaFlow 200 Infusion Pump Rev D lots; together they have 9 of 12 "
+        "complaints."
     )
     assert "Lot L24-0815 has no manufacturing site recorded." in lots["missing"]
     assert "Lot L24-0815 has no quantity, so complaints per 100 units cannot be shown." in lots["missing"]

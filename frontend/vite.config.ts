@@ -1,8 +1,21 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// The release this bundle is built as: the repository's VERSION file, one folder up (the web image copies it to
+// /VERSION, next to /build: Dockerfile.web). The app compares it with the version the API reports
+// (src/features/shared/appVersion.ts); without the file it is empty and no comparison is made.
+function builtVersion(): string {
+  try {
+    return readFileSync(new URL("../VERSION", import.meta.url), "utf-8").trim();
+  } catch {
+    return "";
+  }
+}
+
 export default defineConfig({
   plugins: [react()],
+  define: { __MDARIX_VERSION__: JSON.stringify(builtVersion()) },
   server: {
     headers: {
       "X-Content-Type-Options": "nosniff",

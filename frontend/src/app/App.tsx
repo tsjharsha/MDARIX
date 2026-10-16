@@ -19,6 +19,7 @@ import { signOut } from "../features/shared/session";
 import { api } from "./api";
 import { PlatformProductConfiguration } from "../features/stage2/PlatformProductConfiguration";
 import { ConsentBanner } from "../features/shared/ConsentBanner";
+import { NewVersionNotice } from "../features/shared/NewVersionNotice";
 import { CustomerAdminControlPlane } from "../features/customer-admin/CustomerAdminControlPlane";
 import { RegulatoryCopilot } from "../features/regulatory/RegulatoryCopilot";
 import { RiskTraceabilityWorkspace } from "../features/risk/RiskTraceabilityWorkspace";
@@ -36,6 +37,17 @@ import { UserGuidePage } from "../features/help/UserGuidePage";
 import { USER_GUIDE_PATH } from "../features/help/userGuide";
 
 export function App() {
+  // Every page of the one bundle (the website, sign-in and the signed-in app) offers a reload once a newer MDARIX
+  // is deployed than the one this tab loaded (features/shared/appVersion.ts).
+  return (
+    <>
+      <Page />
+      <NewVersionNotice />
+    </>
+  );
+}
+
+function Page() {
   const publicPath = window.location.pathname;
   if (["/signin", "/signup", "/forgot-password", "/activate-account", "/reset-password", "/mfa"].includes(publicPath))
     return <AuthPage mode={publicPath.slice(1)} />;
