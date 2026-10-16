@@ -31,7 +31,8 @@ the time (UTC).
 | **SEV3** | Limited impact or a workaround exists | A few dead-lettered events, one failing connector |
 
 When unsure, pick the higher severity. Any SEV1 that may involve personal data starts the clock in section 4: write
-down when you became aware.
+down when you became aware. Any cyber incident (an attack, unauthorized access, malicious code, a data leak) also
+starts the 6-hour CERT-In clock in section 4.3: write down when it was first noticed.
 
 ## 3. Contain
 
@@ -66,13 +67,15 @@ Do only what limits the damage. Do not change or delete data by hand.
 
 ## 4. Notify
 
+### 4.1 Customers
+
 If personal data may have been accessed, changed, lost or disclosed without authorization, notify each affected
 customer **without undue delay and no later than 72 hours after becoming aware**. Customer contracts and data
 processing agreements may set shorter deadlines; the shortest one applies. Do not wait for the full picture: send what
 is known and follow up.
 
-Whether a regulator or the people concerned must be notified is the customer's decision as controller, or for the
-company's own data the company lawyer's. Do not advise customers on that beyond the facts.
+For customer content, whether a regulator or the people concerned must be notified is the customer's decision as
+controller. Do not advise customers on that beyond the facts. For the data MDARIX controls itself, follow section 4.2.
 
 **Notification to a customer** (one per affected organization, sent to its administrators and contract contact):
 
@@ -89,6 +92,55 @@ company's own data the company lawyer's. Do not advise customers on that beyond 
 
 **Sign-off before sending:** the incident lead and `[PRIVACY CONTACT]` both approve the text. Record in the incident
 record who approved, when, what was sent to whom, and the reasons for any decision not to notify.
+
+### 4.2 Personal data MDARIX controls (DPDP Rules 2025, rule 7)
+
+This covers the data MDARIX decides about itself: website visitors, demo and trial requests, user accounts, sign-in
+and security records (see "Our two roles" in `legal/privacy.md`). The privacy policy promises the steps below. The
+duty under the Digital Personal Data Protection Rules, 2025 applies from 13 May 2027; MDARIX follows it now.
+
+1. **Each affected person, without delay.** Do not wait for the full picture. Write to each person through their
+   MDARIX account or by email to the address they gave us, in short, clear and plain words, with:
+   - a description of the breach: its nature, its extent, and when it happened;
+   - the consequences likely to arise for that person;
+   - what MDARIX has done and is doing to reduce the risk, if anything;
+   - what the person can do to protect their interests (for example change their password, watch for phishing);
+   - the business contact details of a person who can answer their questions for MDARIX (privacy@mdarix.in and the
+     incident lead's name).
+2. **The Data Protection Board of India, without delay:** a description of the breach, with its nature, extent,
+   timing and location, and its likely impact. Use the channel the Board publishes for breach intimations.
+3. **The Board, within 72 hours of becoming aware** (or a longer period the Board allows on a written request), a
+   detailed report with:
+   - updated and detailed information on the description sent in step 2;
+   - the broad facts about the events, circumstances and reasons that led to the breach;
+   - the measures taken or proposed to reduce the risk;
+   - any findings about the person who caused the breach;
+   - the remedial measures taken to prevent it happening again;
+   - a report on the intimations given to the affected people in step 1.
+
+The sign-off in section 4.1 applies to each of these messages. Keep a copy of every message, with the time sent and
+the recipients, in the incident record.
+
+### 4.3 CERT-In (cyber incidents)
+
+**When this applies:** once the company that will operate MDARIX is registered (a body corporate). The CERT-In
+Directions of 28 April 2022 under section 70B(6) of the Information Technology Act, 2000 then require it. Until the
+company is registered, the incident lead and the founder decide whether to report voluntarily, and record the
+decision and the reason in the incident record.
+
+- **Report within 6 hours of noticing** a cyber incident of a type the Directions list (among them unauthorized
+  access to systems or data, data breaches and data leaks, malicious code, and attacks on servers and applications),
+  or of it being brought to our notice. Use the reporting form and the address given on `https://www.cert-in.org.in`
+  (incident@cert-in.org.in at the time of writing). Send what is known; follow up as facts come in.
+- Record in the incident record when the incident was noticed, when the report was sent and to whom, and any
+  follow-up CERT-In asks for.
+- Once the company is registered, name a point of contact for CERT-In and record it in
+  [52_SUPPORT_AND_OWNERSHIP_HANDOVER.md](../handover/52_SUPPORT_AND_OWNERSHIP_HANDOVER.md).
+
+**Log retention (known gap).** The Directions also require logs of all systems to be kept securely for 180 days,
+within India. Today the logs rotate by size, not by time: the JSON log driver keeps about 200 MB per service
+(`docker-compose.prod.yml`, `max-size: 20m`, `max-file: 10`), which may cover far less than 180 days. Until this is
+closed, preserve logs early in every incident (section 3, step 1).
 
 ## 5. Recover
 

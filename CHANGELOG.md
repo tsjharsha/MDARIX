@@ -10,6 +10,25 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.15] - 2026-10-16
+
+### Changed
+
+- Privacy policy (updated 16 October 2026): if a personal-data breach affects the data MDARIX controls, it now says
+  that we tell each affected person without delay, in their account or by email, what happened, what it may mean for
+  them, what we are doing and what they can do, and who to contact; and that we tell the Data Protection Board of
+  India without delay, with a detailed report within 72 hours. It also says how to identify yourself when you make a
+  privacy request (write from the email address on your account), that we respond to a grievance within one month,
+  that the policy is available on request in any language of the Eighth Schedule to the Constitution of India, and
+  that we do not knowingly collect personal data of children.
+- Terms of service and Free trial agreement (updated 16 October 2026): MDARIX is for professionals aged 18 or over,
+  acting for their organization. The trial sign-up form says so above the agreement text.
+- Incident runbook: steps for telling affected people and the Data Protection Board of India about a breach of the
+  data MDARIX controls, the CERT-In 6-hour report that applies once the operating company is registered, and the
+  180-day log retention it requires, recorded as a known gap (logs rotate by size today).
+- Subprocessor list (internal): object storage, Sentry, inbound email (Resend) and AI providers are marked as not
+  used in production today.
+
 ## [0.10.14] - 2026-10-16
 
 ### Changed

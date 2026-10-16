@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
 
-Last updated: 15 October 2026
+Last updated: 16 October 2026
 
 This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a demo or a free trial, or use the MDARIX product investigation platform (the "Service").
 
@@ -89,7 +89,9 @@ Your browser's local storage keeps preferences only, such as dismissed notices, 
 
 More detail is on our [Security page](/security).
 
-If a personal-data breach affects you or a customer's data, we tell the customer, and you where the law requires it, without undue delay, and in any case within 72 hours of becoming aware of it.
+If a personal-data breach affects a customer's content, we tell the customer, and you where the law requires it, without undue delay, and in any case within 72 hours of becoming aware of it.
+
+If a personal-data breach affects the personal data we control for our own records, we tell each affected person, in plain words and without delay, in their MDARIX account or by email. We tell you what happened, including the nature and extent of the breach and when it happened; the consequences it is likely to have for you; what we have done and are doing to reduce the risk; what you can do to protect yourself; and how to reach a person who can answer your questions. We also tell the Data Protection Board of India without delay, and send it a detailed report within 72 hours of becoming aware of the breach.
 
 ## Your rights
 
@@ -104,13 +106,19 @@ Depending on where you live, you may have the right to:
 - nominate another person to exercise your rights if you die or become unable to;
 - have a grievance about our handling of your data addressed.
 
-To use these rights, email privacy@mdarix.in. Our contact for grievances under India's Digital Personal Data Protection Act, 2023 is the founder of MDARIX, at that address. If your data is part of a customer's content, we will pass your request to that customer and help them respond.
+To use these rights, email privacy@mdarix.in. So that we can identify you, write from the email address on your MDARIX account, or the one you gave us when you requested a trial or a demo. If you no longer have access to that address, say so in your email and we will verify your identity another way before we act on your request.
+
+Our contact for grievances under India's Digital Personal Data Protection Act, 2023 is the founder of MDARIX, at that address. We respond to a grievance within one month of receiving it. If your data is part of a customer's content, we will pass your request to that customer and help them respond.
 
 If you are not satisfied with our answer, you can complain to the Data Protection Board of India. If you are in the European Economic Area or the United Kingdom, you can also complain to your local data protection authority.
 
 ## Children
 
-The Service is for businesses and is not directed at children.
+The Service is for businesses and is not directed at children. It is for professionals aged 18 or over, acting for their organization. We do not knowingly collect personal data of children (people under 18).
+
+## Language
+
+This policy is available in English. If you ask us at privacy@mdarix.in, we will provide it in any language listed in the Eighth Schedule to the Constitution of India.
 
 ## Changes to this policy
 
