@@ -2,8 +2,10 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { CheckCircle2, MessageSquareText, Star, X } from "lucide-react";
 import { ApiError, describeError, requestJson } from "../../../app/apiClient";
 import { Panel } from "../../admin/console/charts";
-import { useWorkspace } from "../workspaceContext";
+import { useFeatureSet, useWorkspace } from "../workspaceContext";
+import { useAiReady } from "../useAiStatus";
 import { formatDay } from "../../../app/dates";
+import type { FeatureSet } from "../../../app/featureSet";
 
 type Consent = "NAMED" | "ANONYMOUS" | "PRIVATE";
 type Submission = {
@@ -30,6 +32,11 @@ const RATINGS: [string, string][] = [
   ["rating_speed", "Speed"],
   ["rating_import", "Importing your own data (CSV templates)"],
 ];
+// The ratings and the parts of MDARIX that are about AI: asked only while AI answers for the organization.
+const AI_RATINGS = new Set(["rating_ai_trust"]);
+const AI_FEATURES = new Set(["ASK_MDARIX"]);
+// The screens as each feature set offers them (app/featureSet.ts): the full product, or the lightweight MVP's screens
+// with Getting started (trials) and Import data. Product 360 and the evidence library are parked in the MVP.
 const FEATURES: [string, string][] = [
   ["PRODUCT_360", "Product 360"],
   ["SIGNALS", "Signals and complaints"],
@@ -40,6 +47,37 @@ const FEATURES: [string, string][] = [
   ["CSV_IMPORT", "CSV import"],
   ["AUDIT_TRAIL", "Audit trail"],
 ];
+const MVP_FEATURES: [string, string][] = [
+  ["GETTING_STARTED", "Getting started (sample data and automatic insights)"],
+  ["READINESS", "Readiness"],
+  ["COMPLAINTS", "Complaints (second look, backlog, reportability)"],
+  ["SIGNALS", "Signals and trend check"],
+  ["INVESTIGATIONS", "Investigations"],
+  ["ASK_MDARIX", "Ask MDARIX"],
+  ["DECISIONS", "Decisions and sign-off"],
+  ["RECORDS", "Records (effectiveness checks, risk file input, audit trail, reports)"],
+  ["CSV_IMPORT", "Import data (CSV templates)"],
+];
+
+/**
+ * What the form asks about: the screens this organization sees, and nothing about AI unless AI answers for it (an
+ * organization with AI off is not asked to rate AI answers it never saw). Exported for tests.
+ */
+export function feedbackChoices({
+  featureSet,
+  aiReady,
+  isTrial,
+}: {
+  featureSet: FeatureSet;
+  aiReady: boolean | null;
+  isTrial: boolean;
+}): { ratings: [string, string][]; features: [string, string][] } {
+  const ai = aiReady === true;
+  const features = (featureSet === "mvp" ? MVP_FEATURES : FEATURES).filter(
+    ([value]) => (ai || !AI_FEATURES.has(value)) && (isTrial || value !== "GETTING_STARTED"),
+  );
+  return { ratings: RATINGS.filter(([key]) => ai || !AI_RATINGS.has(key)), features };
+}
 const ADOPTION: [string, string][] = [
   ["YES", "Yes"],
   ["MAYBE", "Maybe"],
@@ -203,6 +241,7 @@ export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
   const [error, setError] = useState("");
   const [writing, setWriting] = useState(false);
   const [loadError, setLoadError] = useState<{ message: string; requestId?: string }>({ message: "" });
+  const choices = feedbackChoices({ featureSet: useFeatureSet(), aiReady: useAiReady(), isTrial });
 
   const load = () =>
     requestJson<FeedbackForm>("/api/v1/trial/feedback")
@@ -239,9 +278,10 @@ export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
         body: JSON.stringify({
           role_area: answers.role_area || null,
           job_title: answers.job_title || null,
-          ...answers.ratings,
+          // Only what the form asked: a rating or a part hidden since (AI switched off) is not sent.
+          ...Object.fromEntries(choices.ratings.map(([key]) => [key, answers.ratings[key]])),
           recommend_score: answers.recommend_score,
-          features_used: answers.features_used,
+          features_used: answers.features_used.filter((value) => choices.features.some(([shown]) => shown === value)),
           liked: answers.liked || null,
           improve: answers.improve || null,
           missing: answers.missing || null,
@@ -366,7 +406,7 @@ export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
 
       <Panel eyebrow="2 of 5" title="Rate your experience">
         <div className="uw-fb-ratings">
-          {RATINGS.map(([key, label]) => (
+          {choices.ratings.map(([key, label]) => (
             <Stars
               key={key}
               name={key}
@@ -399,7 +439,7 @@ export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
       <Panel eyebrow="3 of 5" title="What you tried">
         <fieldset className="uw-fb-checks">
           <legend>Which parts of MDARIX did you use?</legend>
-          {FEATURES.map(([value, label]) => (
+          {choices.features.map(([value, label]) => (
             <label key={value}>
               <input
                 type="checkbox"

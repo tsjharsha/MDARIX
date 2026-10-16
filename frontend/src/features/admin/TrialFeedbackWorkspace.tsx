@@ -68,6 +68,10 @@ const FEATURES: Record<string, string> = {
   DECISIONS: "Decisions and sign-off",
   CSV_IMPORT: "CSV import",
   AUDIT_TRAIL: "Audit trail",
+  GETTING_STARTED: "Getting started",
+  READINESS: "Readiness",
+  COMPLAINTS: "Complaints",
+  RECORDS: "Records",
 };
 const titleCase = (value: string) =>
   value.toLowerCase().replace(/(^|_)(\w)/g, (_, gap, c) => (gap ? " " : "") + c.toUpperCase());
