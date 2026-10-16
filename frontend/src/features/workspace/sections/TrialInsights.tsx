@@ -163,7 +163,7 @@ export function InsightsBody({
       )}
       {records && (
         <>
-          <HeadlineNumbers headline={headline} still={still} />
+          <HeadlineNumbers headline={headline} still={still} ofAll={filters.version ? records.length : null} />
 
           <div className="uw-ins-filterbar" aria-live="polite">
             {active.length ? (
@@ -310,9 +310,25 @@ function Count({ value, still, suffix = "" }: { value: number; still: boolean; s
   );
 }
 
-function HeadlineNumbers({ headline, still }: { headline: ReturnType<typeof headlineOf>; still: boolean }) {
+function HeadlineNumbers({
+  headline,
+  still,
+  ofAll,
+}: {
+  headline: ReturnType<typeof headlineOf>;
+  still: boolean;
+  /** With a version filter on, the version's share of all complaints (its share of itself is always 100%). */
+  ofAll: number | null;
+}) {
   const rate = headline.rate;
-  const Arrow = rate?.direction === "up" ? ArrowUpRight : rate?.direction === "down" ? ArrowDownRight : ArrowRight;
+  const Arrow =
+    rate?.direction === "up" || rate?.direction === "new"
+      ? ArrowUpRight
+      : rate?.direction === "down"
+        ? ArrowDownRight
+        : ArrowRight;
+  const top = headline.topVersion;
+  const share = top && ofAll ? Math.round((100 * top.complaints) / ofAll) : top?.share;
   return (
     <div className="uw-ins-stats">
       <Stat icon={<Inbox size={18} />} label="Complaints" detail="In view">
@@ -326,23 +342,27 @@ function HeadlineNumbers({ headline, still }: { headline: ReturnType<typeof head
       </Stat>
       <Stat
         icon={<Layers size={18} />}
-        label="Top version"
+        label={ofAll ? "Share of all" : "Top version"}
         detail={
-          headline.topVersion
-            ? `${headline.topVersion.label}, ${countOf(headline.topVersion.complaints, "complaint")}`
+          top
+            ? ofAll
+              ? `${top.label}: ${top.complaints.toLocaleString()} of all ${countOf(ofAll, "complaint")}`
+              : `${top.label}, ${countOf(top.complaints, "complaint")}`
             : "No version recorded"
         }
       >
-        {headline.topVersion ? <Count value={headline.topVersion.share} still={still} suffix="%" /> : "—"}
+        {top && share !== undefined ? <Count value={share} still={still} suffix="%" /> : "—"}
       </Stat>
       <Stat
         icon={<Arrow size={18} />}
         label="Recent rate"
         detail={
           rate
-            ? `Per month, the last ${RECENT_MONTHS} months; ${rateText(rate.earlier)} before (${
-                rate.direction === "up" ? "up" : rate.direction === "down" ? "down" : "no change"
-              })`
+            ? rate.direction === "new"
+              ? `Per month, the last ${RECENT_MONTHS} months; none before ${monthLabel(rate.since)}`
+              : `Per month, the last ${RECENT_MONTHS} months; ${rateText(rate.earlier)} before (${
+                  rate.direction === "up" ? "up" : rate.direction === "down" ? "down" : "no change"
+                })`
             : "Needs four months or more to compare"
         }
       >

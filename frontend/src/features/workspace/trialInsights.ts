@@ -151,24 +151,29 @@ export type Headline = {
   harm: number;
   malfunction: number;
   topVersion: { label: string; share: number; complaints: number } | null;
-  rate: { recent: number; earlier: number; direction: "up" | "down" | "flat" } | null;
+  /** "new": complaints only in the recent months (a version released since), so there is no rate before to compare. */
+  rate: { recent: number; earlier: number; direction: "up" | "down" | "flat" | "new"; since: string } | null;
 };
 
 export function headlineOf(records: InsightRecord[], series: string[], labels: Record<string, string> = {}): Headline {
   const total = records.length;
   const [top] = breakdown(records, "version", labels).items;
   const trend = trendOf(records, series);
+  const since = trend.months.find((item) => item.recent)?.month ?? "";
   const rate =
     trend.recentAverage === null || trend.earlierAverage === null
       ? null
       : {
           recent: trend.recentAverage,
           earlier: trend.earlierAverage,
-          direction: (trend.recentAverage > trend.earlierAverage
-            ? "up"
-            : trend.recentAverage < trend.earlierAverage
-              ? "down"
-              : "flat") as "up" | "down" | "flat",
+          direction: (trend.earlierAverage === 0 && trend.recentAverage > 0
+            ? "new"
+            : trend.recentAverage > trend.earlierAverage
+              ? "up"
+              : trend.recentAverage < trend.earlierAverage
+                ? "down"
+                : "flat") as "up" | "down" | "flat" | "new",
+          since,
         };
   return {
     total,

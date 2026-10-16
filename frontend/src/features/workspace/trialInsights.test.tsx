@@ -208,7 +208,7 @@ describe("Automatic insights: the panel", () => {
     const html = render({ filters });
     expect(tile(html, "Complaints")).toBe("6");
     expect(tile(html, "With harm")).toBe("1");
-    expect(tile(html, "Top version")).toBe("100%");
+    expect(tile(html, "Share of all")).toBe("60%");
     expect(html).toContain("Showing 6 complaints of 10:");
     expect(html).toContain("Version: OrbitCare 300 Rev B");
     expect(html).toContain('aria-label="Clear the filter OrbitCare 300 Rev B"');
@@ -264,5 +264,19 @@ describe("Automatic insights: the panel", () => {
     const older = render({ insights: { ...INSIGHTS, records: undefined, questions: undefined } });
     expect(older).toContain(INSIGHTS.findings[0]);
     expect(older).not.toContain("Complaints per month");
+  });
+});
+
+describe("Automatic insights: a version filter", () => {
+  it("shows the version's share of all complaints, and a version new in the recent months as new, not as a rise", () => {
+    const series = monthSeries(RECORDS.map((item) => item.month));
+    const rate = headlineOf(applyFilters(RECORDS, { version: "PV2" }), series, LABELS).rate;
+    expect(rate).toMatchObject({ direction: "new", since: "2026-08", earlier: 0 });
+    const html = render({ filters: { version: "PV2" } });
+    expect(tile(html, "Share of all")).toBe("60%");
+    expect(tile(html, "Top version")).toBeUndefined();
+    expect(html).toContain("OrbitCare 300 Rev B: 6 of all 10 complaints");
+    expect(html).toContain("none before Aug 2026");
+    expect(html).not.toContain("0.0 before");
   });
 });
