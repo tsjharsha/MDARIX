@@ -8,7 +8,7 @@ from backend.app.db.models.foundation import Tenant
 from backend.app.db.session import SessionLocal
 from genai import provider as provider_module
 from genai.ask import check_answer, compact_context, normalize_answer
-from genai.provider import GenAIProvider, GenAIResult
+from genai.provider import GenAIProvider, GenAIResult, GenAIUnavailable
 from retrieval.embedding_provider import DeterministicEmbeddingProvider
 from retrieval.indexing import index_tenant_evidence
 from tests.chunk_cleanup import restore_chunks
@@ -84,6 +84,31 @@ def test_ask_without_an_investigation_searches_the_whole_tenant(model):
     assert response["grounding"]["searched_tenant_evidence"] is True
     tenant_evidence = {item["id"] for item in model.calls[-1]["context"]["retrieved_evidence"]}
     assert all(not identifier.lower().count("ground_truth") for identifier in tenant_evidence)
+
+
+class SwitchedOffModel(GenAIProvider):
+    """A provider is configured but the organization's AI switch is off: no model answers."""
+
+    def complete(self, prompt, context=None, **kwargs):
+        raise GenAIUnavailable("GENAI_DISABLED_FOR_ORGANIZATION")
+
+
+@pytest.mark.parametrize("investigation", [True, False])
+def test_with_ai_switched_off_ask_still_says_which_records_it_searched(monkeypatch, investigation):
+    """The record-based answer is built from what was searched, so the grounding facts are there on both paths."""
+    question = "Did the supplier change its process before Component Rev B?"
+    monkeypatch.setattr(provider_module, "GenAIProvider", RecordingModel)
+    answered = _ask(question, investigation=investigation)
+    monkeypatch.setattr(provider_module, "GenAIProvider", SwitchedOffModel)
+    refused = _ask(question, investigation=investigation)
+    assert refused["refusal"]["code"] == "GENAI_DISABLED_FOR_ORGANIZATION"
+    grounding = refused["grounding"]
+    assert grounding["tenant_scope_enforced"] is True
+    assert grounding["investigation_scoped"] is investigation
+    assert grounding["searched_tenant_evidence"] is True and refused["search"]["records_found"] >= 1
+    assert refused["sources_provenance"]
+    # The same facts as when the model answers: they describe the search, not the model.
+    assert grounding == answered["grounding"]
 
 
 def test_without_a_model_ask_still_returns_the_sources_it_found():
