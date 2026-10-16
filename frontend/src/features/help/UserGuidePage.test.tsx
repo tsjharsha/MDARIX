@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { UserGuidePage } from "./UserGuidePage";
@@ -7,7 +6,16 @@ import { TRIAL_GUIDE_PATH } from "./trialGuide";
 import { HelpMenu } from "../shared/HelpMenu";
 import { TrialJourney } from "../workspace/sections/TrialJourney";
 
-const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
+// The screens' source as text (Vite's ?raw), so a test can check that the guide quotes their labels exactly.
+const SOURCES = import.meta.glob("../**/*.tsx", { query: "?raw", import: "default", eager: true }) as Record<
+  string,
+  string
+>;
+const source = (path: string) => {
+  const text = SOURCES[path];
+  if (text === undefined) throw new Error(`no source file ${path}`);
+  return text;
+};
 
 describe("step-by-step user guide", () => {
   it("covers every screen, each topic with tasks to follow", () => {

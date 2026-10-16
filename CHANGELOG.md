@@ -10,6 +10,14 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.11] - 2026-10-16
+
+### Fixed
+
+- The web image builds again: the step-by-step user guide's test read the screens' source with Node's file API, which
+  the production type check does not include, so the 0.10.10 web build stopped. The test now reads them through Vite
+  (`?raw`), and checks the same 39 labels.
+
 ## [0.10.10] - 2026-10-16
 
 ### Added
