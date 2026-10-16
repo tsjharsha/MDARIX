@@ -10,6 +10,39 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.17] - 2026-10-16
+
+### Added
+
+- The complaint list can be filtered by product version, lot, problem code and country, and is now also a tab of
+  Complaints; Getting started › Automatic insights › "Open these complaints" opens it with the insight's filters
+  applied.
+- Two-factor sign-in you manage yourself. My Account › Security, and the administrator's Security page, show whether
+  two-factor sign-in is on, since when, and how many recovery codes are left. "Generate new recovery codes" asks for
+  your current password and the code your authenticator app shows now, then shows the new codes once to copy or
+  download; the earlier codes stop working immediately. "Replace authenticator app" (for a new phone, or with a
+  recovery code when the phone is lost) asks for your password and a current code, sets up the new app, issues new
+  recovery codes and signs you out on your other devices. Both are audited, emailed to you, rate-limited and locked
+  after repeated wrong attempts. API: `GET /api/v1/auth/mfa/status`; `POST /api/v1/auth/mfa/recovery-codes` and
+  replacing an authenticator through `POST /api/v1/auth/mfa/enroll` now require both `password` and `mfa_code`.
+
+### Fixed
+
+- "Set up MFA" no longer ends in an error for someone who already uses an authenticator app.
+- With AI switched off for the organization, Ask MDARIX says which records its answer was built from instead of
+  "No matching evidence found".
+- Counts of one read correctly in Records › Risk file input ("1 malfunction", "1 risk assessed") and the readiness
+  summary ("1 check overdue", "1 record confirmed", "1 reassessment open").
+- In a case's Decision tab, a brief that recommends restoring or tightening a quality control (for example, restoring
+  incoming inspection) pre-ticks CAPA required, alongside the follow-ups already ticked from the brief.
+- In new trials, the sample's VentraLink 250 stays flat as its explanation says, so the trend check flags only
+  OrbitCare 300 Rev B; existing trials are unchanged.
+- The feedback form names the screens the organization actually sees, and asks about AI only while AI answers.
+
+### Changed
+
+- Platform Admin › Trials › exit requests reads every request in four statements instead of four per request.
+
 ## [0.10.16] - 2026-10-16
 
 ### Fixed
