@@ -28,6 +28,7 @@ Replace every `TBD` before the provider goes live. An entry without a contract r
 | Groq paid tier (`groq`) | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Cerebras paid tier (`cerebras`) | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Mistral paid plan (`mistral`) | TBD | TBD | TBD | TBD | TBD (EU) | TBD | TBD | TBD |
+| Google Cloud Vertex AI, Gemini (`vertex`) | TBD (Google Cloud Terms of Service + Cloud Data Processing Addendum, accepted with the billing account; record the billing account and acceptance date) | None: the Service Specific Terms forbid training on customer content without permission (confirm at review) | Zero data retention once (1) the project's 24-hour in-memory cache is switched off and (2) abuse-monitoring prompt logging does not apply (invoiced billing account) or Google has granted the exception; no grounding with Google Search or Maps | TBD (`MDARIX_GENAI_VERTEX_ZDR=true` only once both are confirmed) | asia-south1 (Mumbai, India) | TBD | TBD | TBD |
 | Google Gemini API paid tier (`gemini`) | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 | Ollama, self-hosted (`ollama`) | Not applicable: runs on MDARIX's own server | None: nothing leaves the server | Not applicable | Not required | Same as the MDARIX server | TBD | TBD | TBD |
 

@@ -31,11 +31,49 @@ OPENAI_COMPATIBLE = {
     # shim, which Anthropic does not offer for production use. For production under a commercial agreement only
     # (genai/policy.py, docs/compliance/AI_PROVIDER_REGISTER.md).
     "anthropic": ("https://api.anthropic.com/v1/messages", "claude-sonnet-5-5"),
+    # Gemini on Google Cloud Vertex AI, through Vertex's OpenAI-compatible endpoint. Its address names the Google
+    # Cloud project and region (vertex_url below), and it signs in without an API key (vertex_token below).
+    "vertex": (None, "google/gemini-2.5-flash"),
     "ollama": (OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL),
     # OmniRoute: a self-hosted gateway that forwards each request to the upstream providers configured in it. The model
     # name is an OmniRoute model or combo; set MDARIX_GENAI_OMNIROUTE_MODEL to the one you configured.
     "omniroute": ("http://127.0.0.1:20128/v1/chat/completions", "auto"),
 }
+# Vertex AI: asia-south1 (Mumbai) keeps the processing in India. The access token comes from the metadata server of
+# the Google Cloud VM, for the service account attached to it: no key is stored, and the token lasts about an hour.
+VERTEX_DEFAULT_LOCATION = "asia-south1"
+VERTEX_TOKEN_URL = "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token"
+# Providers that sign in without an API key: a model on MDARIX's own server, or Vertex AI through the VM's identity.
+KEYLESS_PROVIDERS = frozenset({"ollama", "vertex"})
+_VERTEX_TOKEN: dict[str, object] = {"value": None, "expires": 0.0}
+
+
+def vertex_url(project: str | None, location: str | None) -> str | None:
+    """Vertex AI's chat-completions address for a Google Cloud project and region; None without a project."""
+    if not project or not project.strip():
+        return None
+    location = (location or VERTEX_DEFAULT_LOCATION).strip()
+    return (
+        f"https://{location}-aiplatform.googleapis.com/v1/projects/{project.strip()}"
+        f"/locations/{location}/endpoints/openapi/chat/completions"
+    )
+
+
+def vertex_token(timeout: float) -> str:
+    """An access token for Vertex AI from the VM's metadata server, reused until a minute before it expires."""
+    if _VERTEX_TOKEN["value"] and time.time() < float(_VERTEX_TOKEN["expires"]):
+        return str(_VERTEX_TOKEN["value"])
+    req = request.Request(VERTEX_TOKEN_URL, headers={"Metadata-Flavor": "Google"})
+    with request.urlopen(req, timeout=timeout) as response:
+        raw = json.loads(response.read())
+    token = raw.get("access_token")
+    if not token:
+        raise GenAIUnavailable("GENAI_PROVIDER_UNAVAILABLE: no Vertex AI access token")
+    _VERTEX_TOKEN["value"] = token
+    _VERTEX_TOKEN["expires"] = time.time() + max(0, int(raw.get("expires_in") or 0) - 60)
+    return token
+
+
 # Providers in OPENAI_COMPATIBLE that speak their own Messages API instead of chat completions.
 ANTHROPIC_MESSAGES_API = frozenset({"anthropic"})
 ANTHROPIC_VERSION = "2023-06-01"
@@ -205,6 +243,8 @@ class GenAIProvider:
         self.provider_name = (provider_name or os.getenv("MDARIX_GENAI_PROVIDER", "controlled")).strip().lower()
         known_url, known_model = OPENAI_COMPATIBLE.get(self.provider_name, (None, "mdarix-controlled"))
         self.base_url = base_url or os.getenv(prefix + "BASE_URL") or known_url
+        if self.provider_name == "vertex" and not self.base_url:
+            self.base_url = vertex_url(os.getenv(prefix + "PROJECT"), os.getenv(prefix + "LOCATION"))
         self.api_key = api_key or os.getenv(prefix + "API_KEY")
         self.model = model or os.getenv(prefix + "MODEL", known_model)
         self.model_version = os.getenv(prefix + "MODEL_VERSION", "unconfigured")
@@ -220,7 +260,7 @@ class GenAIProvider:
 
     @property
     def configured(self) -> bool:
-        return bool(self.base_url and (self.api_key or self.provider_name == "ollama"))
+        return bool(self.base_url and (self.api_key or self.provider_name in KEYLESS_PROVIDERS))
 
     def health(self):
         now = time.time()
@@ -425,6 +465,8 @@ class GenAIProvider:
                 if self.provider_name in ANTHROPIC_MESSAGES_API:
                     req.add_header("x-api-key", self.api_key or "")
                     req.add_header("anthropic-version", ANTHROPIC_VERSION)
+                elif self.provider_name == "vertex" and not self.api_key:
+                    req.add_header("Authorization", f"Bearer {vertex_token(self.timeout)}")
                 elif self.api_key:
                     req.add_header("Authorization", f"Bearer {self.api_key}")
                 with request.urlopen(req, timeout=self.timeout) as response:

@@ -163,3 +163,63 @@ def test_empty_numeric_settings_mean_the_defaults(monkeypatch):
         1000,
         0.0,
     )
+
+
+def test_vertex_builds_its_address_and_signs_in_as_the_vm(monkeypatch):
+    captured = []
+
+    class Response:
+        def __init__(self, body):
+            self.body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps(self.body).encode()
+
+    def fake_urlopen(request, timeout):
+        captured.append(request)
+        if request.full_url == provider_module.VERTEX_TOKEN_URL:
+            return Response({"access_token": "vm-token", "expires_in": 3599, "token_type": "Bearer"})
+        return Response({"choices": [{"message": {"content": "From the records."}}], "usage": {}})
+
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "vertex")
+    monkeypatch.setenv("MDARIX_GENAI_PROJECT", "mdarix-test")
+    for name in ("MDARIX_GENAI_API_KEY", "MDARIX_GENAI_BASE_URL", "MDARIX_GENAI_LOCATION", "MDARIX_GENAI_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(provider_module, "_VERTEX_TOKEN", {"value": None, "expires": 0.0})
+    monkeypatch.setattr(provider_module.request, "urlopen", fake_urlopen)
+
+    provider = GenAIProvider(max_retries=0)
+    assert provider.configured
+    assert provider.model == "google/gemini-2.5-flash"
+    assert provider.base_url == (
+        "https://asia-south1-aiplatform.googleapis.com/v1/projects/mdarix-test"
+        "/locations/asia-south1/endpoints/openapi/chat/completions"
+    )
+    for _ in range(2):
+        result = provider.complete("Summarize the evidence", {"status": "open"})
+        assert result.provider == "vertex"
+        assert result.output["answer"] == "From the records."
+    token_calls = [r for r in captured if r.full_url == provider_module.VERTEX_TOKEN_URL]
+    model_calls = [r for r in captured if r.full_url == provider.base_url]
+    # One token for both requests (it is reused until a minute before it expires), sent as a bearer token.
+    assert len(token_calls) == 1
+    assert token_calls[0].get_header("Metadata-flavor") == "Google"
+    assert [r.get_header("Authorization") for r in model_calls] == ["Bearer vm-token", "Bearer vm-token"]
+
+
+def test_vertex_without_a_project_is_not_configured(monkeypatch):
+    monkeypatch.setenv("MDARIX_GENAI_PROVIDER", "vertex")
+    for name in ("MDARIX_GENAI_PROJECT", "MDARIX_GENAI_API_KEY", "MDARIX_GENAI_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    provider = GenAIProvider()
+    assert not provider.configured
+    assert provider.complete("hello", {}).output["status"] == "PROVIDER_NOT_CONFIGURED"
+    assert provider_module.vertex_url("p1", "europe-west4").startswith(
+        "https://europe-west4-aiplatform.googleapis.com/"
+    )

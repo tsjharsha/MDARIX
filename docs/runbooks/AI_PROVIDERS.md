@@ -85,6 +85,7 @@ Supported provider names:
 | Cerebras (paid tier) | `cerebras` | `https://api.cerebras.ai/v1/chat/completions` | `gpt-oss-120b` |
 | Mistral (paid plan, EU) | `mistral` | `https://api.mistral.ai/v1/chat/completions` | `mistral-small-latest` |
 | Google Gemini API (paid tier) | `gemini` | Gemini's OpenAI-compatible endpoint | `gemini-flash-latest` |
+| **Google Cloud Vertex AI** (Gemini) | `vertex` | `https://<region>-aiplatform.googleapis.com/v1/projects/<project>/locations/<region>/endpoints/openapi/chat/completions`, built from `MDARIX_GENAI_PROJECT` and `MDARIX_GENAI_LOCATION` (default `asia-south1`); no API key: an access token from the VM's metadata server | `google/gemini-2.5-flash` |
 | Ollama (self-hosted) | `ollama` | `http://127.0.0.1:11434/v1/chat/completions` | `llama3.2` |
 | OmniRoute (self-hosted gateway) | `omniroute` | `http://127.0.0.1:20128/v1/chat/completions` (override with `MDARIX_GENAI_OMNIROUTE_BASE_URL`) | `auto` (set `MDARIX_GENAI_OMNIROUTE_MODEL` to your OmniRoute model or combo) |
 
@@ -108,6 +109,23 @@ MDARIX_GENAI_MODEL=claude-sonnet-5-5
 MDARIX_GENAI_CONTRACTED_PROVIDERS=anthropic
 MDARIX_GENAI_ANTHROPIC_ZDR=true   # only once zero data retention is confirmed for the account
 ```
+
+Vertex AI example (`.env` on the Google Cloud VM):
+
+```dotenv
+MDARIX_GENAI_PROVIDER=vertex
+MDARIX_GENAI_PROJECT=<google cloud project id>
+MDARIX_GENAI_LOCATION=asia-south1          # Mumbai: processing stays in India
+MDARIX_GENAI_MODEL=google/gemini-2.5-flash # check the region's model list before changing it
+MDARIX_GENAI_CONTRACTED_PROVIDERS=vertex
+MDARIX_GENAI_VERTEX_ZDR=true               # only once the cache is off and abuse logging does not apply
+```
+
+Before it is used, in the Google Cloud project: enable the Vertex AI API; give the VM a service account with the
+`Vertex AI User` role and the `cloud-platform` access scope (changing either needs the VM stopped); switch off the
+project's Gemini input cache; and confirm abuse-monitoring logging does not apply (invoiced billing account) or ask
+Google for the exception. The token is read from the metadata server, so Vertex only works on a Google Cloud VM;
+elsewhere, set `MDARIX_GENAI_BASE_URL` and an `MDARIX_GENAI_API_KEY` access token yourself.
 
 Claude through AWS Bedrock or Google Vertex AI, and Azure OpenAI, need their own request signing and are not
 supported by `genai/provider.py` today.
