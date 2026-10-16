@@ -30,7 +30,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
-from backend.app.trial import business_imports
+from backend.app.trial import business_imports, insight_questions
 from backend.app.trial.columns import examples as column_examples
 from backend.app.trial.columns import match as columns_match
 from backend.app.trial.sample_data import SAMPLE_SOURCE
@@ -1257,8 +1257,11 @@ def insights(db: Session, tenant_id) -> dict:
         top = by_version[0]
         share = round(100 * top["complaints"] / total)
         if share >= 40 and len(by_version) > 1:
+            # The product's name, as people read it, rather than its identifier.
+            named = next((item["name"] for item in by_product if item["product_id"] == top["product_id"]), None)
             findings.append(
-                f"{share}% of complaints ({top['complaints']} of {total}) concern {top['product_id']} {top['version']}."
+                f"{share}% of complaints ({top['complaints']} of {total}) concern "
+                f"{named or top['product_id']} {top['version']}."
             )
     if by_lot and total:
         top_lots = by_lot[:2]
@@ -1267,19 +1270,15 @@ def insights(db: Session, tenant_id) -> dict:
             findings.append(
                 f"{share}% of complaints come from lots {' and '.join(item['lot_id'] for item in top_lots)}."
             )
-    if len(by_month) >= 4:
-        recent = sum(item["complaints"] for item in by_month[-3:]) / 3
-        earlier = sum(item["complaints"] for item in by_month[:-3]) / max(len(by_month) - 3, 1)
-        if earlier and recent >= 1.5 * earlier:
-            findings.append(
-                f"Complaints in the last 3 months average {recent:.1f} per month, up from {earlier:.1f} before."
-            )
-    questions = []
-    if by_version:
-        questions.append(f"What changed in {by_version[0]['product_id']} {by_version[0]['version']}?")
-    if by_lot:
-        questions.append(f"Which components and suppliers do lots {by_lot[0]['lot_id']} share?")
-    questions.append("What evidence is still missing before we can explain this complaint trend?")
+    # The headline numbers, the trend, the complaints for filtering on screen and the questions answered in place.
+    # The rise is measured on the same months the trend shows (months without complaints count as zero).
+    extra = insight_questions.build(db, tenant_id, scope, complaints, products, versions, lots)
+    rate = extra["headline"]["rate"]
+    if rate and rate["earlier"] and rate["recent"] >= 1.5 * rate["earlier"]:
+        findings.append(
+            f"Complaints in the last {insight_questions.RECENT_MONTHS} months average {rate['recent']:.1f} per month, "
+            f"up from {rate['earlier']:.1f} before."
+        )
     return {
         "scope": "your data" if own else "sample data",
         "total_complaints": total,
@@ -1288,6 +1287,7 @@ def insights(db: Session, tenant_id) -> dict:
         "by_lot": by_lot,
         "by_month": by_month,
         "findings": findings,
-        "suggested_questions": questions,
+        "suggested_questions": [item["question"] for item in extra["questions"]],
         "note": "Counts and patterns from your records. They point to where to look; people decide what they mean.",
+        **extra,
     }

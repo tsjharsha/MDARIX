@@ -10,6 +10,31 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.12] - 2026-10-16
+
+### Changed
+
+- Getting started › Your data › Automatic insights is now interactive. At the top, five numbers count up when the
+  panel appears: complaints, complaints reporting harm (death or serious injury), malfunctions, the top version's share
+  and the recent rate (the last 3 months' average per month against the months before, with an up or down arrow).
+  Below them, complaints per month as columns, months without complaints shown as zero, the last 3 months highlighted
+  against a dashed line at the earlier average, with a table view and a text summary for screen readers. Nothing moves
+  for people whose system asks for reduced motion.
+- Breakdowns by version, by lot, by problem code and by country. Clicking a bar shows only its complaints across the
+  whole panel (numbers, trend and the other tabs); filters on different tabs combine, a second bar on the same tab
+  replaces the first, and a chip clears each one. "Open these complaints" opens Complaints and the filtered complaint
+  IDs are listed under the panel (Complaints has no version or lot filter yet).
+- "Questions to ask next" now answer themselves in place, computed by fixed rules from your own records (no AI): what
+  changed in the version with the most complaints (against the product's other versions, its components and
+  suppliers, and change records linked to the product or its components), what the two lots with the most complaints
+  have in common, whether the rise holds per 1,000 units released, which complaints report harm or a malfunction,
+  which problem codes rose, where complaints come from (country and reporter type) and what evidence open
+  investigations still wait for. Each answer names the records it used and says plainly what the records lack to
+  answer more. A question is asked only when your records hold what it needs, and products are named as people read
+  them ("What do lots A and B have in common?", no longer "Which components and suppliers do lots A share?").
+- The finding about a rising trend counts months without complaints as zero, the same months the trend shows, and the
+  finding about the top version names the product rather than its identifier.
+
 ## [0.10.11] - 2026-10-16
 
 ### Fixed

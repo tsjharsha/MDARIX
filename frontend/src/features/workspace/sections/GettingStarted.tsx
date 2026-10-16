@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Bot, CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
+import { CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
-import { BarList, Empty, Panel, StatTile, ToneBadge, type PanelSource } from "../../admin/console/charts";
-import type { Slice } from "../../admin/console/dashboardModel";
+import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
@@ -16,6 +15,8 @@ import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel } from "./RemoveSample";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel } from "./SampleData";
+import { InsightsPanel } from "./TrialInsights";
+import type { Insights } from "../trialInsights";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
 import {
@@ -41,20 +42,6 @@ export type TrialStatus = {
   own_data?: { products: number; lots: number; complaints: number };
   templates?: ImportTemplate[];
 };
-type Insights = {
-  scope: string;
-  total_complaints: number;
-  by_product: { product_id: string; name: string; complaints: number }[];
-  by_version: { product_id: string | null; version: string; complaints: number }[];
-  by_lot: { lot_id: string; complaints: number }[];
-  findings: string[];
-  suggested_questions: string[];
-  note: string;
-};
-
-const slices = (items: { label: string; count: number }[]): Slice[] =>
-  items.map((item) => ({ key: item.label, label: item.label, count: item.count, tone: "neutral" }));
-
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 /** The tabs below the story: everything that is not the story itself, one click away. */
@@ -553,74 +540,6 @@ function TeamPanel({ onChanged }: { onChanged: () => void }) {
             </div>
           )}
         </>
-      )}
-    </Panel>
-  );
-}
-
-function InsightsPanel({ insights, source }: { insights: Insights | null; source: PanelSource }) {
-  const { open, notify } = useWorkspace();
-  return (
-    <Panel
-      title="Automatic insights"
-      eyebrow={insights ? `From ${insights.scope} · ${countOf(insights.total_complaints, "complaint")}` : "Insights"}
-      source={source}
-    >
-      {insights && insights.total_complaints === 0 ? (
-        <Empty title="No complaints yet" detail="Upload complaints to see where they concentrate." />
-      ) : (
-        insights && (
-          <>
-            {insights.findings.length > 0 && (
-              <ul className="uw-trial-findings">
-                {insights.findings.map((finding) => (
-                  <li key={finding}>{finding}</li>
-                ))}
-              </ul>
-            )}
-            <div className="ac-grid two">
-              <div>
-                <h3 className="uw-trial-subhead">Complaints by product version</h3>
-                <BarList
-                  colour="series"
-                  items={slices(
-                    insights.by_version.map((item) => ({
-                      label: `${item.product_id ?? ""} ${item.version}`.trim(),
-                      count: item.complaints,
-                    })),
-                  )}
-                />
-              </div>
-              <div>
-                <h3 className="uw-trial-subhead">Lots with the most complaints</h3>
-                <BarList
-                  colour="series"
-                  items={slices(insights.by_lot.map((item) => ({ label: item.lot_id, count: item.complaints })))}
-                />
-              </div>
-            </div>
-            <div>
-              <h3 className="uw-trial-subhead">Questions to ask next</h3>
-              <div className="uw-trial-questions">
-                {insights.suggested_questions.map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    className="ac-secondary"
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(question).catch(() => undefined);
-                      open("Intelligence", "Ask MDARIX");
-                      notify(`Question copied. Paste it into Ask MDARIX: "${question}"`);
-                    }}
-                  >
-                    <Bot size={15} aria-hidden="true" /> {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="uw-trial-note">{insights.note}</p>
-          </>
-        )
       )}
     </Panel>
   );

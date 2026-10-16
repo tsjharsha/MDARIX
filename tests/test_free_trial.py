@@ -191,6 +191,9 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert counts["products"] == 3 and counts["complaints"] == 37
     insights = user.get("/api/v1/trial/insights").json()
     assert insights["scope"] == "sample data" and insights["findings"]
+    # One request carries the whole panel: headline numbers, the complaints to filter and the questions answered.
+    assert insights["headline"]["total"] == 37 and len(insights["records"]) == 37
+    assert insights["questions"] and all(item["answer"]["summary"] for item in insights["questions"])
 
 
 def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatch):
