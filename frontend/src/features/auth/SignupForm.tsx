@@ -398,10 +398,10 @@ export function SignupForm() {
             </span>
           </label>
           <p className="auth-consent su-wide">
-            By requesting a trial you agree to the <a href="/terms">Terms of Service</a> and the{" "}
-            <a href="/trial-agreement">Free Trial Agreement</a>, and acknowledge the{" "}
-            <a href="/privacy">Privacy Policy</a>. Trial data is deleted 30 days after the trial ends unless you
-            continue.
+            For professionals aged 18 or over, requesting for their organization. By requesting a trial you agree to the{" "}
+            <a href="/terms">Terms of Service</a> and the <a href="/trial-agreement">Free Trial Agreement</a>, and
+            acknowledge the <a href="/privacy">Privacy Policy</a>. Trial data is deleted 30 days after the trial ends
+            unless you continue.
           </p>
           {alert && <div className="su-wide">{alert}</div>}
           <div className="su-actions su-wide">
