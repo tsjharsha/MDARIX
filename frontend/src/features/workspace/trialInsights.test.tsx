@@ -198,9 +198,23 @@ describe("Automatic insights: the panel", () => {
     expect(tile(html, "Recent rate")).toBe("2.3");
     expect(html).toContain("OrbitCare 300 Rev B, 6 complaints");
     expect(html).toContain("0.8 before (up)");
+    // The hero trend: the recent rate, the band over the last three months, the earlier average and the peak.
+    expect(html).toContain('<h3 class="uw-ins-hero-eyebrow"');
+    expect(html).toContain("2.3</span></span></strong> <span>a month now</span>");
+    expect(html).toContain("up from 0.8 before · 3.1×");
     expect(html).toContain('role="img" aria-label="10 complaints from Apr 2026 to Oct 2026');
-    expect(html).toContain("Average before: 0.8 per month");
-    expect(html.match(/class="uw-ins-month is-recent"/g)).toHaveLength(3);
+    expect(html).toContain("Rise since Aug &#x27;26");
+    expect(html).toContain("Average before: 0.8 a month");
+    expect(html).toContain(
+      '<tspan class="uw-ins-hero-peak-value">Sep &#x27;26: 3 complaints</tspan><tspan> · 4× the earlier average</tspan>',
+    );
+    expect(html.match(/class="uw-ins-hero-dot is-recent/g)).toHaveLength(3);
+    expect(html.match(/class="uw-ins-hero-dot"/g)).toHaveLength(4);
+    // One keyboard stop for the months (the latest), each month a column named with its numbers.
+    expect(html.match(/<button type="button" tabindex="0"/g)).toHaveLength(1);
+    expect(html).toContain(
+      'aria-label="Sep 2026: 3 complaints, one of the last 3 months. +2.3 against the earlier average (0.8)."',
+    );
     expect(html).toContain("Show table");
     // Every breakdown bar is a button that says whether it is the filter.
     expect(html.match(/<button type="button" aria-pressed="false"/g)).toHaveLength(2);
@@ -291,8 +305,10 @@ describe("Automatic insights: the panel", () => {
     const still = render({ still: true });
     expect(still).toContain('class="uw-ins is-still"');
     expect(tile(still, "Complaints")).toBe("10");
+    expect(still).toContain('class="uw-ins-hero is-still"');
     const moving = render({ still: false });
     expect(moving).toContain('class="uw-ins"');
+    expect(moving).toContain('class="uw-ins-hero"');
     expect(moving).not.toContain("is-still");
   });
 
@@ -315,5 +331,9 @@ describe("Automatic insights: a version filter", () => {
     expect(html).toContain("OrbitCare 300 Rev B: 6 of all 10 complaints");
     expect(html).toContain("none before Aug 2026");
     expect(html).not.toContain("0.0 before");
+    // The hero redraws for the version: no earlier average to multiply, nothing before the band.
+    expect(html).toContain("None before Aug &#x27;26");
+    expect(html).toContain('<tspan class="uw-ins-hero-peak-value">Sep &#x27;26: 3 complaints</tspan></text>');
+    expect(html).not.toContain("the earlier average</tspan>");
   });
 });

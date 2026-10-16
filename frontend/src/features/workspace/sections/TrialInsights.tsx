@@ -20,6 +20,7 @@ import { useWorkspace } from "../workspaceContext";
 import { useAiReady } from "../useAiStatus";
 import { handQuestionToAsk } from "../../ask/pendingQuestion";
 import { countOf } from "./common";
+import { TrendHero } from "./TrendHero";
 import {
   FACETS,
   FACET_NAMES,
@@ -37,7 +38,6 @@ import {
   rateText,
   toggleFilter,
   trendOf,
-  trendSummary,
   unrecordedText,
   valueLabel,
   type Facet,
@@ -45,7 +45,6 @@ import {
   type InsightFilters,
   type InsightQuestion,
   type Insights,
-  type Trend,
 } from "../trialInsights";
 
 // Bars a breakdown tab shows before it says how many more values there are.
@@ -222,10 +221,7 @@ export function InsightsBody({
             </details>
           )}
 
-          <div>
-            <h3 className="uw-trial-subhead">Complaints per month</h3>
-            <MonthlyTrend trend={trend} still={still} />
-          </div>
+          <TrendHero trend={trend} still={still} replayKey={described || "all"} />
 
           <div>
             <h3 className="uw-trial-subhead">Where complaints concentrate</h3>
@@ -401,92 +397,6 @@ function Stat({
       <span className="ac-stat-label">{label}</span>
       <strong className="ac-stat-value">{children}</strong>
       <span className="ac-stat-detail">{detail}</span>
-    </div>
-  );
-}
-
-/** Columns per month, the last three highlighted against a dashed line at the earlier months' average. */
-export function MonthlyTrend({ trend, still }: { trend: Trend; still: boolean }) {
-  const [asTable, setAsTable] = useState(false);
-  const peak = Math.max(1, ...trend.months.map((item) => item.complaints), trend.earlierAverage ?? 0);
-  const summary = trendSummary(trend);
-  return (
-    <div className="uw-ins-trend">
-      <div className="uw-ins-trend-bar">
-        <span className="uw-ins-legend">
-          {trend.recentAverage !== null && (
-            <>
-              <span>
-                <i className="uw-ins-key is-recent" aria-hidden="true" /> Last {RECENT_MONTHS} months
-              </span>
-              <span>
-                <i className="uw-ins-key" aria-hidden="true" /> Before
-              </span>
-              <span>
-                <i className="uw-ins-key is-line" aria-hidden="true" /> Average before:{" "}
-                {rateText(trend.earlierAverage ?? 0)} per month
-              </span>
-            </>
-          )}
-        </span>
-        <button type="button" className="ac-link" onClick={() => setAsTable((value) => !value)} aria-pressed={asTable}>
-          {asTable ? "Show chart" : "Show table"}
-        </button>
-      </div>
-      {asTable ? (
-        <div className="ac-table-wrap">
-          <table className="ac-table">
-            <caption className="ca-sr-only">{summary}</caption>
-            <thead>
-              <tr>
-                <th scope="col">Month</th>
-                <th scope="col" className="num">
-                  Complaints
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {trend.months.map((item) => (
-                <tr key={item.month}>
-                  <td>
-                    {monthLabel(item.month)}
-                    {item.recent ? ` (last ${RECENT_MONTHS} months)` : ""}
-                  </td>
-                  <td className="num">{item.complaints}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <figure className="uw-ins-plot" role="img" aria-label={summary}>
-          {trend.earlierAverage !== null && (
-            <span
-              className="uw-ins-average"
-              // Above the 22px tick band, at the average's share of the 40px-shorter plot height.
-              style={{ bottom: `calc(22px + (100% - 40px) * ${trend.earlierAverage / peak})` }}
-              aria-hidden="true"
-            />
-          )}
-          {trend.months.map((item, index) => (
-            <span
-              key={item.month}
-              className={`uw-ins-month${item.recent ? " is-recent" : ""}`}
-              title={`${monthLabel(item.month)}: ${countOf(item.complaints, "complaint")}`}
-              aria-hidden="true"
-            >
-              <span className="uw-ins-month-value" style={{ bottom: `${(item.complaints / peak) * 100}%` }}>
-                {item.complaints}
-              </span>
-              <span
-                className="uw-ins-month-fill"
-                style={{ height: `${(item.complaints / peak) * 100}%`, ["--i" as string]: index }}
-              />
-              <span className="uw-ins-month-tick">{monthLabel(item.month).replace(" 20", " '")}</span>
-            </span>
-          ))}
-        </figure>
-      )}
     </div>
   );
 }

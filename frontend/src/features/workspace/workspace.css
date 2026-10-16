@@ -404,117 +404,366 @@
   outline-offset: 2px;
 }
 
-/* The monthly trend: one column per month, the recent ones in the series colour, the dashed line the earlier average. */
-.uw-ins-trend-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-.uw-ins-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  color: var(--ac-ink-2);
-}
-.uw-ins-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.uw-ins-key {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
-  background: #9ab8e2;
-}
-.uw-ins-key.is-recent {
-  background: var(--ac-series);
-}
-.uw-ins-key.is-line {
-  width: 16px;
-  height: 0;
-  border-top: 2px dashed var(--ac-ink-2);
-  border-radius: 0;
-  background: none;
-}
-.uw-ins-plot {
+/* The monthly trend as the panel's hero (sections/TrendHero.tsx), on the navy of the Readiness hero (qualityLoop.css):
+   one teal series, the earlier months a muted step and the last three a brighter step with a band behind them (steps
+   checked with the dataviz palette validator, ordinal, on #0d2238 / #183249 / #0d3b4a). Text uses the text tokens on
+   navy, never the series colour. The line draws itself, the points pop as it reaches them, the callout follows; under
+   reduced motion (.is-still or the system setting) everything is drawn at once. */
+.uw-ins-hero {
+  --uw-hero-recent: #5eead4;
+  --uw-hero-before: #2a9d94;
+  --uw-hero-surface: #10283d;
+  --uw-hero-ink: #ffffff;
+  --uw-hero-ink-2: rgba(230, 240, 247, 0.86);
+  --uw-hero-muted: rgba(230, 240, 247, 0.62);
   position: relative;
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 170px;
-  margin: 0;
-  padding: 18px 0 22px;
-  border-bottom: 1px solid var(--ac-axis);
+  min-width: 0;
+  padding: 24px 24px 16px;
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse 55% 70% at 82% 30%, rgba(8, 123, 120, 0.42), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 8% 0%, rgba(94, 234, 212, 0.08), transparent 70%),
+    linear-gradient(135deg, #0d2238 0%, #183249 60%, #0d3b4a 100%);
+  box-shadow: 0 18px 40px -24px rgba(13, 34, 56, 0.7);
+  color: var(--uw-hero-ink-2);
 }
-.uw-ins-average {
-  position: absolute;
-  right: 0;
-  left: 0;
-  z-index: 1;
-  border-top: 2px dashed var(--ac-ink-2);
+.uw-ins-hero-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 20px;
+}
+.uw-ins-hero-copy {
+  min-width: 0;
+}
+.uw-ins-hero-eyebrow {
+  margin: 0;
+  color: #5eead4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.uw-ins-hero-figure {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 6px 0 4px;
+  color: var(--uw-hero-ink);
+}
+.uw-ins-hero-figure strong {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.uw-ins-hero-figure > span {
+  font-size: 20px;
+  font-weight: 600;
+}
+.uw-ins-hero-count {
+  display: inline-grid;
+}
+.uw-ins-hero-count > span {
+  grid-area: 1 / 1;
+}
+.uw-ins-hero-count > span:first-child {
+  visibility: hidden;
+}
+.uw-ins-hero-delta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--uw-hero-ink-2);
+  font-size: 15px;
+}
+.uw-ins-hero-arrow {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(94, 234, 212, 0.16);
+  color: var(--uw-hero-recent);
+}
+.uw-ins-hero-toggle {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--uw-hero-ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+.uw-ins-hero-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.uw-ins .uw-ins-hero button:focus-visible {
+  outline: 2px solid var(--uw-hero-recent);
+  outline-offset: 2px;
+}
+.uw-ins-hero-body {
+  min-width: 0;
+  margin-top: 4px;
+}
+.uw-ins-hero-plot {
+  position: relative;
+}
+.uw-ins-hero-svg {
+  display: block;
+  overflow: visible;
+  font-family: inherit;
+}
+.uw-ins-hero-stop-recent {
+  stop-color: var(--uw-hero-recent);
+}
+.uw-ins-hero-stop-before {
+  stop-color: var(--uw-hero-before);
+}
+.uw-ins-hero-grid line {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+.uw-ins-hero-axis line {
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+.uw-ins-hero-grid text,
+.uw-ins-hero-axis text,
+.uw-ins-hero-tick {
+  fill: var(--uw-hero-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.uw-ins-hero-band {
+  animation: uw-ins-hero-fade 700ms ease-out both;
+}
+.uw-ins-hero-band line {
+  stroke: var(--uw-hero-recent);
+  stroke-linecap: round;
+  stroke-opacity: 0.55;
+  stroke-width: 2;
+}
+.uw-ins-hero-band text {
+  fill: var(--uw-hero-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.uw-ins-hero-area {
+  animation: uw-ins-hero-reveal 1400ms cubic-bezier(0.22, 0.8, 0.24, 1) 150ms both;
+}
+.uw-ins-hero-average {
+  animation: uw-ins-hero-fade 600ms ease-out 900ms both;
+}
+.uw-ins-hero-average line {
+  stroke: rgba(230, 240, 247, 0.45);
+  stroke-dasharray: 5 5;
+  stroke-width: 1.5;
+}
+.uw-ins-hero-average text {
+  fill: var(--uw-hero-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  /* A halo in the surface colour keeps the label clear of anything it crosses. */
+  paint-order: stroke;
+  stroke: var(--uw-hero-surface);
+  stroke-linejoin: round;
+  stroke-width: 4px;
+}
+.uw-ins-hero-line {
+  fill: none;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 6px rgba(94, 234, 212, 0.35));
+  animation: uw-ins-hero-draw 1400ms cubic-bezier(0.22, 0.8, 0.24, 1) 150ms both;
+}
+.uw-ins-hero-cross {
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1;
   pointer-events: none;
 }
-.uw-ins-month {
-  position: relative;
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: stretch;
-  min-width: 0;
-  height: 100%;
+.uw-ins-hero-dot {
+  fill: var(--uw-hero-before);
+  stroke: var(--uw-hero-surface);
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: uw-ins-hero-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-.uw-ins-month-fill {
-  display: block;
-  max-width: 44px;
-  width: 100%;
-  margin: 0 auto;
-  border-radius: 4px 4px 0 0;
-  background: #9ab8e2;
-  transform-origin: bottom;
-  animation: uw-ins-grow 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: calc(var(--i, 0) * 60ms);
+.uw-ins-hero-dot.is-recent {
+  fill: var(--uw-hero-recent);
 }
-.uw-ins-month.is-recent .uw-ins-month-fill {
-  background: var(--ac-series);
+.uw-ins-hero-dot.is-active {
+  stroke: #ffffff;
 }
-.uw-ins-month-value {
-  position: absolute;
-  right: 0;
-  left: 0;
-  padding-bottom: 2px;
-  color: var(--ac-ink-2);
+.uw-ins-hero-peak {
+  animation: uw-ins-hero-rise 500ms ease-out both;
+}
+.uw-ins-hero-peak line {
+  stroke: rgba(230, 240, 247, 0.5);
+  stroke-width: 1;
+}
+.uw-ins-hero-peak rect {
+  fill: #0b1d2c;
+  stroke: rgba(94, 234, 212, 0.55);
+  stroke-width: 1;
+}
+.uw-ins-hero-peak text {
+  fill: var(--uw-hero-ink-2);
   font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
 }
-.uw-ins-month.is-recent .uw-ins-month-value {
-  color: var(--ac-ink);
+.uw-ins-hero-peak-value {
+  fill: var(--uw-hero-ink);
   font-weight: 700;
 }
-.uw-ins-month-tick {
+/* One transparent column per month: the hover, tap and keyboard target, wider than its point. */
+.uw-ins-hero-hits {
   position: absolute;
-  right: 0;
-  bottom: -20px;
-  left: 0;
-  overflow: hidden;
-  color: var(--ac-muted);
-  font-size: 11px;
-  text-align: center;
-  white-space: nowrap;
+  inset: 0;
 }
-@keyframes uw-ins-grow {
+.uw-ins-hero-hits button {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: crosshair;
+}
+/* The focused month: a quiet column wash; the crosshair, ringed point and tooltip say which month it is. */
+.uw-ins .uw-ins-hero-hits button:focus-visible {
+  outline: none;
+  background: rgba(94, 234, 212, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(94, 234, 212, 0.45);
+}
+.uw-ins-hero-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  min-width: 150px;
+  max-width: 240px;
+  margin-left: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(11, 29, 44, 0.94);
+  box-shadow: 0 10px 24px -12px rgba(0, 0, 0, 0.6);
+  color: var(--uw-hero-ink-2);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+.uw-ins-hero-tip.is-left {
+  margin-left: -12px;
+  transform: translateX(-100%);
+}
+.uw-ins-hero-tip strong {
+  color: var(--uw-hero-ink);
+  font-size: 15px;
+}
+.uw-ins-hero-empty {
+  margin: 8px 0;
+  color: var(--uw-hero-ink-2);
+}
+/* The table view on the card itself: the same numbers, white on navy, the recent months marked. */
+.uw-ins-hero-table {
+  overflow-x: auto;
+}
+.uw-ins-hero-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.uw-ins-hero-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--uw-hero-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+.uw-ins-hero-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--uw-hero-ink-2);
+}
+.uw-ins-hero-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.uw-ins-hero-table tr.is-recent td {
+  background: rgba(94, 234, 212, 0.08);
+  color: var(--uw-hero-ink);
+  font-weight: 600;
+}
+@keyframes uw-ins-hero-draw {
   from {
-    transform: scaleY(0);
+    stroke-dashoffset: 1;
+  }
+}
+@keyframes uw-ins-hero-reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
   }
   to {
-    transform: scaleY(1);
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes uw-ins-hero-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+@keyframes uw-ins-hero-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes uw-ins-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (max-width: 640px) {
+  .uw-ins-hero {
+    padding: 18px 16px 12px;
+    border-radius: 14px;
+  }
+  .uw-ins-hero-figure strong {
+    font-size: 44px;
+  }
+  .uw-ins-hero-figure > span {
+    font-size: 17px;
+  }
+  .uw-ins-hero-delta {
+    font-size: 14px;
+  }
+  /* On a phone the toggle sits on the eyebrow's row, so it costs the chart no height. */
+  .uw-ins-hero-toggle {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+  .uw-ins-hero-tip {
+    min-width: 0;
+    max-width: 180px;
+    padding: 6px 10px;
+    font-size: 11.5px;
   }
 }
 
@@ -688,21 +937,28 @@
   .uw-ins-open {
     margin-left: 0;
   }
-  .uw-ins-month-tick {
-    font-size: 10px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .uw-ins-month-fill,
-  .uw-ins-bar-fill {
+  .uw-ins-bar-fill,
+  .uw-ins-hero-band,
+  .uw-ins-hero-area,
+  .uw-ins-hero-average,
+  .uw-ins-hero-line,
+  .uw-ins-hero-dot,
+  .uw-ins-hero-peak {
     animation: none;
   }
   .uw-ins-question svg {
     transition: none;
   }
 }
-.uw-ins.is-still .uw-ins-month-fill,
-.uw-ins.is-still .uw-ins-bar-fill {
+.uw-ins.is-still .uw-ins-bar-fill,
+.uw-ins-hero.is-still .uw-ins-hero-band,
+.uw-ins-hero.is-still .uw-ins-hero-area,
+.uw-ins-hero.is-still .uw-ins-hero-average,
+.uw-ins-hero.is-still .uw-ins-hero-line,
+.uw-ins-hero.is-still .uw-ins-hero-dot,
+.uw-ins-hero.is-still .uw-ins-hero-peak {
   animation: none;
 }
 @media (max-width: 720px) {
