@@ -34,7 +34,9 @@ from backend.app.db.models.foundation import (
 SAMPLE_SOURCE = "MDARIX_SAMPLE"
 
 # (identifier, name, family, symptom, complaint pattern). The pattern lists days-ago for each complaint:
-# OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat.
+# OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints
+# (_STORY_COMPLAINTS), PulseWatch and VentraLink Rev B each have at most 2 complaints in the trend check's last 30 days,
+# so neither is flagged as a rise (VentraLink's last one was at day 14, which made 3 there: a "significant rise").
 _PRODUCTS = [
     (
         "SAMPLE-ORBIT-300",
@@ -55,7 +57,7 @@ _PRODUCTS = [
         "VentraLink 250 Respiratory Controller (Sample)",
         "Respiratory support",
         "flow reading variance",
-        [140, 99, 52, 14],
+        [140, 99, 52, 33],
     ),
 ]
 
