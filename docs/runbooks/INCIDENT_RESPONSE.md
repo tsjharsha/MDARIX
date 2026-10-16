@@ -88,9 +88,9 @@ controller. Do not advise customers on that beyond the facts. For the data MDARI
 | Likely consequences | For the customer and the people concerned |
 | Measures taken | Containment so far, and what is still in progress |
 | What the customer should do | For example reset passwords, review the audit trail, rotate their system credentials |
-| Contact point | Name and email of the incident lead and `[PRIVACY CONTACT]` |
+| Contact point | Name and email of the incident lead and the privacy contact (privacy@mdarix.in, the founder during the validation phase) |
 
-**Sign-off before sending:** the incident lead and `[PRIVACY CONTACT]` both approve the text. Record in the incident
+**Sign-off before sending:** the incident lead and the privacy contact (privacy@mdarix.in, the founder during the validation phase) both approve the text. Record in the incident
 record who approved, when, what was sent to whom, and the reasons for any decision not to notify.
 
 ### 4.2 Personal data MDARIX controls (DPDP Rules 2025, rule 7)
