@@ -1,6 +1,12 @@
-"""Local MVP MFA recovery-code lifecycle primitives."""
+"""MFA recovery codes: issued once, stored only as SHA-256 hashes, each usable once.
+
+A code is 64 random bits written as two groups of eight hex digits (xxxxxxxx-xxxxxxxx); hashing it without a salt is
+enough, because the code itself is random and cannot be guessed from a dictionary. A code is compared with every
+stored hash in constant time, so how long a check takes does not tell which hashes are near a match.
+"""
 
 import hashlib
+import hmac
 import secrets
 
 
@@ -16,8 +22,13 @@ def hash_recovery_codes(codes: list[str]) -> list[str]:
 
 def consume_recovery_code(code: str, hashes: list[str]) -> tuple[bool, list[str]]:
     digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
-    if digest not in hashes:
+    match = None
+    for index, stored in enumerate(hashes):
+        # Every stored hash is compared, found or not.
+        if hmac.compare_digest(digest, str(stored)) and match is None:
+            match = index
+    if match is None:
         return False, hashes
     remaining = list(hashes)
-    remaining.remove(digest)
+    del remaining[match]
     return True, remaining

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, KeyRound, LogOut, ShieldCheck } from "lucide-react";
+import { CheckCircle2, KeyRound, LogOut } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
+import { TwoFactorPanel } from "../../shared/TwoFactorSettings";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { signOut } from "../../shared/session";
@@ -165,14 +166,7 @@ function Security() {
   };
   return (
     <div className="ac-grid two">
-      <Panel eyebrow="Sign-in" title="Multi-factor authentication">
-        <p>Add a second step to sign-in. You'll also confirm your identity this way when you sign a decision.</p>
-        <div className="ca-action-row">
-          <a className="ac-primary" href="/mfa?setup=1">
-            <ShieldCheck size={16} /> Set up MFA
-          </a>
-        </div>
-      </Panel>
+      <TwoFactorPanel account={session?.email} />
       <Panel eyebrow="Sign-in" title="Change your password">
         <form className="uw-password-form" onSubmit={(event) => void changePassword(event)}>
           <label>

@@ -130,10 +130,11 @@ class MfaVerify(BaseModel):
 
 class Reauthentication(BaseModel):
     """Proof that the person at the keyboard is the account's owner, for changes to how they sign in: the current
-    password or a fresh authenticator code. A stolen, still-open session gives neither."""
+    password AND a fresh authenticator code (a one-time recovery code instead of the authenticator code where the
+    endpoint allows it). A stolen, still-open session gives neither; a stolen password alone is not enough either."""
 
     password: str | None = Field(default=None, max_length=128)
-    mfa_code: str | None = Field(default=None, min_length=6, max_length=6)
+    mfa_code: str | None = Field(default=None, min_length=6, max_length=32)
 
 
 def fail(exc):
@@ -250,8 +251,13 @@ def _platform_tenant_id(db: Session):
 # ------------------------------------------------------------------------------------------- MFA
 
 
-def _mfa_session(request: Request, db: Session):
-    """The signed-in session and its user, for the MFA steps (which a session that still owes MFA may use)."""
+def _mfa_session(request: Request, db: Session, *, lock: bool = False):
+    """The signed-in session and its user, for the MFA steps (which a session that still owes MFA may use).
+
+    ``lock`` holds the user's row until the commit, for the steps that read and rewrite the authenticator or the
+    recovery codes: two such requests at once (a recovery code used while new codes are issued) then run one after the
+    other, so neither writes back a list of codes the other has already replaced.
+    """
     token = read_session_token(request)
     row = (
         db.query(AuthSession)
@@ -267,14 +273,31 @@ def _mfa_session(request: Request, db: Session):
     if not row:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     bind_tenant(db, row.tenant_id)
-    user = (
-        db.query(AuthUser)
-        .filter(AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id, AuthUser.status == "ACTIVE")
-        .first()
+    query = db.query(AuthUser).filter(
+        AuthUser.id == row.user_id, AuthUser.tenant_id == row.tenant_id, AuthUser.status == "ACTIVE"
     )
+    user = (query.with_for_update().populate_existing() if lock else query).first()
     if not user:
         raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
     return row, user
+
+
+def _verified_account(request: Request, db: Session):
+    """A fully signed-in session (second factor given, not idle, organization open: get_request_context) and its
+    user's row, locked until the commit (see ``_mfa_session``). Returns the session's token and the user."""
+    from backend.app.request_context import get_request_context
+
+    ctx = get_request_context(request, db)
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id, AuthUser.status == "ACTIVE")
+        .with_for_update()
+        .populate_existing()
+        .first()
+    )
+    if user is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    return ctx.session_id, user
 
 
 def _limit_mfa(request: Request, user) -> None:
@@ -306,41 +329,86 @@ def _record_mfa_failure(db: Session, user, request: Request, step: str) -> None:
     db.commit()
 
 
-def _reauthenticate(db: Session, request: Request, user, proof: Reauthentication | None) -> None:
-    """Changing how an account signs in needs the current password or a fresh authenticator code, even from a fully
-    verified session: a session left open on a shared screen must not be enough to replace the authenticator."""
+def _reauthenticate(
+    db: Session, request: Request, user, proof: Reauthentication | None, *, allow_recovery_code: bool = False
+) -> str:
+    """Changing how an account signs in needs the current password AND a fresh code from the authenticator app, even
+    from a fully verified session: a session left open on a shared screen, or a password seen over a shoulder, is not
+    enough to replace the authenticator or to read new recovery codes. Where ``allow_recovery_code``, an unused
+    recovery code stands in for the authenticator (the phone is lost), and is used up.
+
+    The code is checked only when the password is right, so a mistyped password never spends a code, and the answer
+    never says which of the two was wrong. Wrong attempts count towards the MFA lockout (5 lock the account's MFA
+    checks for 15 minutes) and are rate limited per address and per account. Returns how the second factor was given:
+    AUTHENTICATOR or RECOVERY_CODE.
+    """
     from backend.app import mfa
 
-    if proof is None or not (proof.password or proof.mfa_code):
+    password = (proof.password if proof else None) or ""
+    code = str((proof.mfa_code if proof else None) or "").strip().lower()
+    if not password or not code:
         raise HTTPException(
             403,
             detail={
                 "code": "REAUTHENTICATION_REQUIRED",
-                "message": "Confirm with your current password or an authenticator code",
+                "message": "Confirm with your current password and a code from your authenticator app",
             },
         )
     _limit_mfa(request, user)
+    enforce("mfa:change", str(user.id))
     mfa.ensure_not_locked(db, user)
-    if proof.mfa_code:
-        ok = mfa.check_code(user, proof.mfa_code, allow_recovery=False)
-    else:
+    if user.password_hash:
         try:
-            ok = bool(user.password_hash) and _verify(proof.password, user.password_hash)
+            password_ok = _verify(password, user.password_hash)
         except ValueError:
-            ok = False
-    if not ok:
+            password_ok = False
+    else:
+        burn_verification_time(password)
+        password_ok = False
+    recovery = allow_recovery_code and "-" in code
+    if not (password_ok and mfa.check_code(user, code, allow_recovery=allow_recovery_code)):
         _record_mfa_failure(db, user, request, "REAUTHENTICATION")
         raise HTTPException(403, detail={"code": "REAUTHENTICATION_FAILED", "message": "The password or code is wrong"})
     mfa.record_success(db, user)
+    if recovery:
+        left = len(user.mfa_recovery_hashes or [])
+        _audit_user(
+            db, user, "MFA_RECOVERY_CODE_USED", request, {"recovery_codes_left": left, "step": "REAUTHENTICATION"}
+        )
+    return "RECOVERY_CODE" if recovery else "AUTHENTICATOR"
+
+
+@router.get("/mfa/status")
+def mfa_status(request: Request, db: Session = Depends(get_db)):
+    """Two-factor sign-in for the signed-in person (My Account): whether it is on and since when, how many recovery
+    codes are left, whether their role requires it (then it cannot be turned off), and whether a new authenticator
+    was started but not yet confirmed. Never the secret or a code."""
+    from backend.app import mfa
+    from backend.app.request_context import get_request_context
+
+    ctx = get_request_context(request, db)
+    user = db.query(AuthUser).filter(AuthUser.id == uuid.UUID(ctx.user_id), AuthUser.tenant_id == ctx.tenant_id).first()
+    if user is None:
+        raise HTTPException(401, detail={"code": "UNAUTHENTICATED", "message": "Authentication required"})
+    enrolled = mfa.is_enrolled(user)
+    return {
+        "enrolled": enrolled,
+        "enrolled_at": user.mfa_enrolled_at if enrolled else None,
+        "recovery_codes_left": len(user.mfa_recovery_hashes or []) if enrolled else 0,
+        "required_for_role": mfa.required_for(user),
+        "replacement_pending": bool(enrolled and user.mfa_pending_secret_encrypted),
+    }
 
 
 @router.post("/mfa/enroll")
 def mfa_enroll(request: Request, proof: Reauthentication | None = None, db: Session = Depends(get_db)):
     """Start setting up an authenticator app: returns the secret (and its otpauth link for a QR code).
 
-    Replacing an existing authenticator needs a fully verified session and, in the body, the current password or
-    a fresh code from the current app (``{"password": ...}`` or ``{"mfa_code": ...}``), so neither a stolen
-    password nor a stolen session alone can do it.
+    A first authenticator needs only the signed-in session (which may still owe the setup, right after sign-in).
+    Replacing an existing one needs a fully verified session and, in the body, the current password and a fresh code
+    from the current app, or one of the recovery codes when the phone is lost (``{"password": ..., "mfa_code": ...}``).
+    The current authenticator keeps working until the new one is confirmed with its first code
+    (/mfa/verify-enrollment): an account never has two active authenticators.
     """
     from backend.app import mfa
 
@@ -348,7 +416,9 @@ def mfa_enroll(request: Request, proof: Reauthentication | None = None, db: Sess
     if mfa.is_enrolled(user):
         if session_row.mfa_state:
             raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your current code first"})
-        _reauthenticate(db, request, user, proof)
+        _token, user = _verified_account(request, db)
+        method = _reauthenticate(db, request, user, proof, allow_recovery_code=True)
+        _audit_user(db, user, "MFA_REPLACEMENT_STARTED", request, {"method": method})
     started = mfa.start_enrollment(user)
     db.commit()
     return started
@@ -356,10 +426,22 @@ def mfa_enroll(request: Request, proof: Reauthentication | None = None, db: Sess
 
 @router.post("/mfa/verify-enrollment")
 def mfa_verify_enrollment(data: MfaCode, request: Request, response: Response, db: Session = Depends(get_db)):
-    """Confirm the new authenticator with its first code; returns one-time recovery codes (shown once)."""
+    """Confirm the new authenticator with its first code; returns one-time recovery codes (shown once).
+
+    When it replaces an earlier authenticator, the old secret and every old recovery code stop working in the same
+    transaction, and every other session of the person is signed out (as after a password change); this one stays.
+    """
     from backend.app import mfa
 
     session_row, user = _mfa_session(request, db)
+    replaced = mfa.is_enrolled(user)
+    if replaced:
+        # Only a session that has already given the current code may swap the authenticator.
+        if session_row.mfa_state:
+            raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your current code first"})
+        _token, user = _verified_account(request, db)
+    else:
+        session_row, user = _mfa_session(request, db, lock=True)
     _limit_mfa(request, user)
     mfa.ensure_not_locked(db, user)
     now = datetime.now(timezone.utc)
@@ -367,14 +449,17 @@ def mfa_verify_enrollment(data: MfaCode, request: Request, response: Response, d
         raise HTTPException(
             400, detail={"code": "MFA_CHALLENGE_INVALID", "message": "Start MFA setup before verifying a code"}
         )
-    replaced = mfa.is_enrolled(user)
     codes = mfa.finish_enrollment(user, data.code, now)
     if codes is None:
         _record_mfa_failure(db, user, request, "ENROLLMENT")
         raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
     mfa.record_success(db, user)
-    _mfa_complete(session_row, response, read_session_token(request))
-    _audit_user(db, user, "MFA_ENROLLED", request, {"replaced": replaced, "recovery_codes": len(codes)}, now)
+    token = read_session_token(request)
+    _mfa_complete(session_row, response, token)
+    details: dict = {"replaced": replaced, "recovery_codes": len(codes)}
+    if replaced:
+        details["other_sessions_signed_out"] = revoke_user_sessions(db, user.id, user.tenant_id, keep_raw=token)
+    _audit_user(db, user, "MFA_ENROLLED", request, details, now)
     queue_security_notice(db, user, "MFA_REPLACED" if replaced else "MFA_ENROLLED", now)
     db.commit()
     return {"status": "MFA_ENROLLED", "user_id": str(user.id), "enrolled_at": now, "recovery_codes": codes}
@@ -386,7 +471,7 @@ def mfa_verify(data: MfaVerify, request: Request, response: Response, db: Sessio
     when one is being set up, for clients that use this endpoint for both."""
     from backend.app import mfa
 
-    session_row, user = _mfa_session(request, db)
+    session_row, user = _mfa_session(request, db, lock=True)
     if user.mfa_pending_secret_encrypted and (not mfa.is_enrolled(user) or not session_row.mfa_state):
         if len(data.code) != 6:
             raise HTTPException(403, detail={"code": "MFA_CODE_INVALID", "message": "MFA code is invalid"})
@@ -411,22 +496,27 @@ def mfa_verify(data: MfaVerify, request: Request, response: Response, db: Sessio
 
 @router.post("/mfa/recovery-codes")
 def mfa_recovery_codes(request: Request, proof: Reauthentication | None = None, db: Session = Depends(get_db)):
-    """Replace the recovery codes (fully verified session, plus the current password or a fresh authenticator code
-    in the body); the old ones stop working."""
+    """Replace the recovery codes: a fully verified session, plus the current password and a fresh authenticator code
+    in the body (a recovery code does not count here: with the phone lost, replace the authenticator instead).
+
+    Every earlier code stops working in the same transaction that stores the new ones; only their hashes are kept,
+    and the codes themselves are in this response alone. Audited, and the person is told by email.
+    """
     from backend.app import mfa
     from security.mfa_recovery import hash_recovery_codes, issue_recovery_codes
 
-    session_row, user = _mfa_session(request, db)
-    if session_row.mfa_state or not mfa.is_enrolled(user):
-        raise HTTPException(403, detail={"code": "MFA_REQUIRED", "message": "Verify your code first"})
+    _token, user = _verified_account(request, db)
+    if not mfa.is_enrolled(user):
+        raise HTTPException(400, detail={"code": "MFA_NOT_ENROLLED", "message": "Set up an authenticator app first"})
     _reauthenticate(db, request, user, proof)
     now = datetime.now(timezone.utc)
     codes = issue_recovery_codes(8)
     user.mfa_recovery_hashes = hash_recovery_codes(codes)
+    user.updated_at = now
     _audit_user(db, user, "MFA_RECOVERY_CODES_REGENERATED", request, {"recovery_codes": len(codes)}, now)
     queue_security_notice(db, user, "MFA_RECOVERY_CODES_REGENERATED", now)
     db.commit()
-    return {"status": "RECOVERY_CODES_ISSUED", "recovery_codes": codes}
+    return {"status": "RECOVERY_CODES_ISSUED", "recovery_codes": codes, "issued_at": now}
 
 
 @router.post("/mfa/challenge")

@@ -45,6 +45,8 @@ LIMITS: dict[str, Limit] = {
     "token:ip": Limit(20, 3600),
     "mfa:ip": Limit(30, 300),
     "mfa:user": Limit(10, 300),
+    # Replacing the authenticator or the recovery codes, per account (on top of the two MFA limits above).
+    "mfa:change": Limit(10, 3600),
     "password-change:user": Limit(10, 3600),
     "demo:ip": Limit(5, 3600),
     "feedback:user": Limit(10, 86400),
@@ -67,6 +69,7 @@ AUTH_SCOPES = frozenset(
         "token:ip",
         "mfa:ip",
         "mfa:user",
+        "mfa:change",
         "password-change:user",
     }
 )

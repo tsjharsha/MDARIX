@@ -3,6 +3,7 @@ import { CalendarCheck, Eye, EyeOff, FileSearch, LockKeyhole, ShieldCheck, UserC
 import { SignupForm } from "./SignupForm";
 import { SignupMotion } from "./SignupMotion";
 import { QrCodeSvg } from "../../app/QrCodeSvg";
+import { MfaAlreadyOn } from "./MfaAlreadyOn";
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
   signin: {
@@ -140,6 +141,9 @@ const MESSAGES: Record<string, string> = {
   INVALID_ACTIVATION:
     'This invitation link has expired or was already used. Request a new link from the sign-in page with "Forgot password?", or ask your administrator to send a new invitation.',
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
+  REAUTHENTICATION_REQUIRED: "Enter your current password and a code from your current app, or a recovery code.",
+  REAUTHENTICATION_FAILED: "The password or the code is wrong. Check both and try again.",
+  MFA_TEMPORARILY_LOCKED: "Too many wrong codes. Wait 15 minutes, then try again.",
 };
 
 function problemMessage(data: { detail?: { code?: string; message?: string } } | null, fallback: string): string {
@@ -170,14 +174,42 @@ export function AuthPage({ mode }: { mode: string }) {
   const [useRecovery, setUseRecovery] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [mfaEnrollment] = useState(query.get("setup") === "1");
+  // The account already has an authenticator: "Set up MFA" offers to replace it instead (MfaAlreadyOn).
+  const [mfaAlreadyOn, setMfaAlreadyOn] = useState(false);
+  const [replacingMfa, setReplacingMfa] = useState(false);
   // Setting up the authenticator: the setup key (and its QR code) is asked for as the screen opens; a new one on request.
-  const generateKey = async () => {
-    const response = await fetch("/api/v1/auth/mfa/enroll", { method: "POST" }).catch(() => null);
+  // Replacing one sends the current password and a current code (or a recovery code) with the request.
+  const generateKey = async (proof?: { password: string; mfa_code: string }) => {
+    const response = await fetch(
+      "/api/v1/auth/mfa/enroll",
+      proof
+        ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(proof) }
+        : { method: "POST" },
+    ).catch(() => null);
     if (!response) {
       setMessage("MDARIX cannot be reached right now. Check your connection and try again.");
       return;
     }
     const data = await response.json().catch(() => ({}));
+    const refusal = response.ok ? undefined : data?.detail?.code;
+    if (refusal === "MFA_REQUIRED") {
+      // Signed in with the password only: the current code comes first.
+      window.location.replace(`/mfa?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    if (refusal === "REAUTHENTICATION_REQUIRED" && !proof) {
+      setMfaAlreadyOn(true);
+      setMessage("");
+      return;
+    }
+    if (proof) {
+      if (!response.ok) {
+        setMessage(problemMessage(data, "The authenticator app could not be replaced."));
+        return;
+      }
+      setMfaAlreadyOn(false);
+      setReplacingMfa(true);
+    }
     setMfaSecret(data.secret ?? "");
     setMfaUri(data.otpauth_uri ?? "");
     setMessage(
@@ -241,7 +273,11 @@ export function AuthPage({ mode }: { mode: string }) {
       const data = await response.json().catch(() => ({}));
       if (response.ok && mfaEnrollment && Array.isArray(data.recovery_codes)) {
         setRecoveryCodes(data.recovery_codes);
-        setMessage("Authenticator set up. Save your recovery codes before you continue.");
+        setMessage(
+          replacingMfa
+            ? "Your new authenticator app is on. The old app and your old recovery codes no longer work, and you were signed out on your other devices."
+            : "Authenticator set up. Save your recovery codes before you continue.",
+        );
       } else if (response.ok) {
         setMessage("Verified. Loading MDARIX...");
         window.location.href = returnTo;
@@ -378,6 +414,7 @@ export function AuthPage({ mode }: { mode: string }) {
         <div className="auth-card">
           <span className="eyebrow">Account security</span>
           <h1>Save your recovery codes</h1>
+          {replacingMfa && message && <p role="status">{message}</p>}
           <p>
             Each code signs you in once if your phone is lost or not at hand. They are shown only now: print them or
             keep them in a password manager.
@@ -395,12 +432,36 @@ export function AuthPage({ mode }: { mode: string }) {
         </div>
       </AuthFrame>
     );
+  if (isMfa && mfaEnrollment && mfaAlreadyOn)
+    return (
+      <AuthFrame mode="security">
+        <MfaAlreadyOn
+          returnTo={returnTo}
+          busy={busy}
+          message={message}
+          onReplace={async (proof) => {
+            setBusy(true);
+            try {
+              await generateKey(proof);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      </AuthFrame>
+    );
   if (isMfa)
     return (
       <AuthFrame mode="security">
         <form className="auth-card" onSubmit={submit}>
           <span className="eyebrow">Account security</span>
-          <h1>{mfaEnrollment ? "Set up your authenticator app" : "Verify your identity"}</h1>
+          <h1>
+            {replacingMfa
+              ? "Set up your new authenticator app"
+              : mfaEnrollment
+                ? "Set up your authenticator app"
+                : "Verify your identity"}
+          </h1>
           <p>
             {mfaEnrollment
               ? "Scan the QR code with an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password and others), then enter the 6-digit code it shows."
@@ -424,9 +485,12 @@ export function AuthPage({ mode }: { mode: string }) {
               ) : (
                 <p className="mfa-key-label">Preparing your setup key…</p>
               )}
-              <button className="secondary-link" type="button" onClick={() => void generateKey()}>
-                {mfaSecret ? "Generate a new key" : "Try again"}
-              </button>
+              {/* A replacement key needs the password and a current code again: start over for a new one. */}
+              {!replacingMfa && (
+                <button className="secondary-link" type="button" onClick={() => void generateKey()}>
+                  {mfaSecret ? "Generate a new key" : "Try again"}
+                </button>
+              )}
             </>
           )}
           <label className="auth-field">
