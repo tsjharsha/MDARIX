@@ -1,6 +1,8 @@
 // The Platform Admin trial overview (GET /api/v1/platform-admin/trials, backend/app/trial/story.py): every free trial
 // still holding data, its dates and usage, how far into the story it went (chapters it acted in, from records it
-// created, never page views) and its feedback. Pure rules for the screen (customers/TrialsOverview.tsx).
+// created, never page views) and its feedback. The figures cover every trial; the table is one page of them, filtered
+// and sorted by the server. Pure rules for the screen (customers/TrialsOverview.tsx).
+import { sortParams, type SortState } from "../../../app/tableSort";
 import type { Slice, Tone } from "../console/dashboardModel";
 
 export type TrialState = "ACTIVE" | "ENDING_SOON" | "ENDED";
@@ -47,10 +49,45 @@ export type TrialOverview = {
   };
   chapters: { code: string; number: number; title: string }[];
   engaged_chapters: number;
+  /** One page of the trials matching the filters, in the requested order (attention order by default). */
   items: TrialItem[];
+  /** The trials that need a person first, from every trial whatever the table shows. */
+  attention?: TrialItem[];
+  page?: number;
+  page_size?: number;
+  total?: number;
+  pages?: number;
 };
 
 export const TRIALS_PATH = "/api/v1/platform-admin/trials";
+
+/** Columns the server orders every page by (OVERVIEW_SORTS in backend/app/trial/story.py). */
+export const TRIAL_SORT_KEYS = ["name", "state", "story", "last_activity", "demo", "feedback"] as const;
+
+export const TRIAL_STATE_FILTERS: [string, string][] = [
+  ["", "All trials"],
+  ["ACTIVE", "Active"],
+  ["ENDING_SOON", "Ending within 7 days"],
+  ["ENDED", "Ended"],
+];
+
+export type TrialQuery = { page: number; sort: SortState; state: string; q: string };
+
+/** The overview request for one page of the table: its page, order, state filter and search. */
+export function trialsPath({ page, sort, state, q }: TrialQuery): string {
+  const params = new URLSearchParams({ page: String(page), ...sortParams(sort) });
+  if (state) params.set("state", state);
+  if (q.trim()) params.set("q", q.trim());
+  return `${TRIALS_PATH}?${params}`;
+}
+
+/** Who needs attention first: the server's list (every trial), else the first open trials it sent. */
+export function attentionList(data: TrialOverview | null | undefined, engagedAt: number): TrialItem[] {
+  if (data?.attention) return data.attention;
+  return attentionOrder(data?.items ?? [], engagedAt)
+    .filter((item) => item.state !== "ENDED")
+    .slice(0, 5);
+}
 
 export const TRIAL_STATE: Record<TrialState, { label: string; tone: Tone }> = {
   ACTIVE: { label: "Active", tone: "good" },

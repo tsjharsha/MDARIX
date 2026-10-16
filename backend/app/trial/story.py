@@ -7,8 +7,8 @@ recorded in MDARIX (a person decided a second-look record, recorded a reporting 
 signal, ran the AI, signed a decision, planned or signed an effectiveness check, completed a risk review, downloaded
 the readiness summary, imported their own complaints). Nothing here is inferred from page views.
 
-``story`` serves the trial's Getting started page (findings and actions); ``progress`` serves the Platform Admin trial
-overview (actions only, cheap enough for every trial at once).
+``story`` serves the trial's Getting started page (findings and actions); ``progress`` gives one trial's actions, and
+``trial_overview`` the same for every trial at once in a fixed number of statements (the Platform Admin overview).
 """
 
 from __future__ import annotations
@@ -144,8 +144,10 @@ def chapter_text(code: str, title: str, promise: str, pain: str, ai_ready: bool)
     return title, promise, pain
 
 
-def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
-    """How often the organization acted in each chapter (records it created in MDARIX), sample data excluded."""
+def chapter_counters() -> tuple:
+    """``(chapter code, model, conditions)`` for each kind of record that counts as acting in a chapter (records the
+    organization created in MDARIX, sample data excluded); a chapter with two kinds counts both. One definition for
+    one organization (``acted_counts``) and for every trial at once (the Platform Admin overview)."""
     from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
     from backend.app.db.models.case_ai import CaseAiRun
     from backend.app.db.models.complaint_review import ComplaintSecondLook
@@ -156,25 +158,37 @@ def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
     from backend.app.db.models.stage3 import AIInteraction
     from backend.app.trial.imports import UPLOAD_SOURCE
 
-    def count(model, *conditions) -> int:
-        return _count(db, db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions))
-
-    return {
-        "HIDDEN_COMPLAINTS": count(ComplaintSecondLook),
-        "REPORTING_CLOCKS": count(ComplaintReportability),
-        "TRENDS_TO_CASES": count(InvestigationSignal),
+    return (
+        ("HIDDEN_COMPLAINTS", ComplaintSecondLook, ()),
+        ("REPORTING_CLOCKS", ComplaintReportability, ()),
+        ("TRENDS_TO_CASES", InvestigationSignal, ()),
         # A question asked of MDARIX, or an analysis a person started (the case page's automatic first run does not
         # count: opening a page is not investigating).
-        "INVESTIGATE_WITH_AI": count(CaseAiRun, CaseAiRun.trigger == "MANUAL") + count(AIInteraction),
-        "DECIDE_AND_SIGN": count(Decision, Decision.decision_kind == "BRIEF"),
-        "CAPA_EFFECTIVE": count(CapaEffectivenessCheck),
-        "RISK_FILE": count(CaseReview, CaseReview.review_type == "RISK", CaseReview.status == "COMPLETED"),
-        "SHOW_THE_INSPECTOR": count(
+        ("INVESTIGATE_WITH_AI", CaseAiRun, (CaseAiRun.trigger == "MANUAL",)),
+        ("INVESTIGATE_WITH_AI", AIInteraction, ()),
+        ("DECIDE_AND_SIGN", Decision, (Decision.decision_kind == "BRIEF",)),
+        ("CAPA_EFFECTIVE", CapaEffectivenessCheck, ()),
+        ("RISK_FILE", CaseReview, (CaseReview.review_type == "RISK", CaseReview.status == "COMPLETED")),
+        (
+            "SHOW_THE_INSPECTOR",
             AuditEvent,
-            AuditEvent.action.in_(("READINESS_SUMMARY_EXPORTED", "READINESS_INSPECTION_PACK_EXPORTED")),
+            (AuditEvent.action.in_(("READINESS_SUMMARY_EXPORTED", "READINESS_INSPECTION_PACK_EXPORTED")),),
         ),
-        "YOUR_DATA": count(Complaint, Complaint.source_system == UPLOAD_SOURCE),
-    }
+        ("YOUR_DATA", Complaint, (Complaint.source_system == UPLOAD_SOURCE,)),
+    )
+
+
+def acted_counts(db: Session, tenant_id: uuid.UUID) -> dict[str, int]:
+    """How often the organization acted in each chapter (records it created in MDARIX), sample data excluded."""
+    counts = dict.fromkeys(CODES, 0)
+    for code, model, conditions in chapter_counters():
+        counts[code] += _count(db, db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions))
+    return counts
+
+
+def _person_activity(model):
+    """Audit events a person caused (system events excluded): what "last activity" reads."""
+    return ~model.actor_ref.like("system:%")
 
 
 def last_activity(db: Session, tenant_id: uuid.UUID) -> datetime | None:
@@ -184,7 +198,7 @@ def last_activity(db: Session, tenant_id: uuid.UUID) -> datetime | None:
     try:
         return (
             db.query(func.max(AuditEvent.created_at))
-            .filter(AuditEvent.tenant_id == tenant_id, ~AuditEvent.actor_ref.like("system:%"))
+            .filter(AuditEvent.tenant_id == tenant_id, _person_activity(AuditEvent))
             .scalar()
         )
     except Exception:
@@ -204,10 +218,13 @@ def remembered(profile: dict | None) -> tuple:
 def progress(db: Session, tenant_id: uuid.UUID, tried_before: tuple = ()) -> dict:
     """The chapters the organization acted in, for the Platform Admin overview; ``tried_before``: chapters tried before
     the sample data was removed (backend/app/trial/sample_removal.py), still counted."""
-    counts = acted_counts(db, tenant_id)
+    return _reached(acted_counts(db, tenant_id), tried_before, last_activity(db, tenant_id))
+
+
+def _reached(counts: dict[str, int], tried_before: tuple, moment: datetime | None) -> dict:
+    """``progress`` from the chapter counts, the chapters tried before the sample was removed and the last activity."""
     acted = [code for code in CODES if counts.get(code) or code in tried_before]
     nxt = next((code for code in CODES if code not in acted), None)
-    moment = last_activity(db, tenant_id)
     return {
         "acted": acted,
         "acted_count": len(acted),
@@ -390,85 +407,293 @@ def story(
 
 
 # ------------------------------------------------------------------------------------------- Platform Admin overview
+#
+# Every trial at once, in a fixed number of statements however many trials there are: one per kind of information
+# (the trials, their requests, feedback, demo requests, chapter counts, last activity), each grouped by tenant, then
+# the people and uploads of the trials on the page shown. The summary and the attention list cover every trial; the
+# table is one page of them, filtered and sorted on the server.
+
+OVERVIEW_PAGE_SIZE = 50
+OVERVIEW_PAGE_SIZE_MAX = 200
+OVERVIEW_STATES = ("ACTIVE", "ENDING_SOON", "ENDED")
+# How many trials "Who needs attention first" names (the most urgent, whatever page or filter the table shows).
+ATTENTION_SHOWN = 5
+# Columns the table can be sorted by across every page; without one it is in attention order.
+OVERVIEW_SORTS = {
+    "name": lambda item: item["name"],
+    "tenant_key": lambda item: item["tenant_key"],
+    "state": lambda item: item["expires_at"],
+    "expires_at": lambda item: item["expires_at"],
+    "days_left": lambda item: item["days_left"],
+    "story": lambda item: item["story"]["acted_count"],
+    "last_activity": lambda item: item["story"]["last_activity"],
+    "demo": lambda item: (item["demo_request"] or {}).get("created_at"),
+    "feedback": lambda item: (item["feedback"] or {}).get("overall"),
+}
 
 
-def trial_overview(db: Session, now: datetime | None = None) -> dict:
-    """Every Free Trial organization still holding data: its dates, usage, story progress and feedback. ``db`` is the
-    control database (the trials' shared data plane); each trial's records are read in a session bound to it."""
-    from backend.app.ai_settings import _models_in_use
+def _attention_rank(item: dict) -> tuple:
+    """Trials that need a person first: ending soon and not engaged, then the least progress, then the fewest days
+    left. Python's sort is stable, so equal trials keep the overview's base order (end date, then subscription)."""
+    acted = item["story"]["acted_count"]
+    state = item["state"]
+    rank = 3 if state == "ENDED" else 0 if state == "ENDING_SOON" and acted < ENGAGED_CHAPTERS else 1
+    return rank, acted, item["days_left"]
 
-    ai_on_server = bool(_models_in_use())
-    from backend.app.trial import citations
-    from backend.app.trial.team import trial_request
+
+def _on_trial(statement):
+    """``statement`` (a select from subscription lifecycles) limited to the Free Trial organizations still holding
+    data on the trials' shared data plane: the overview's trials, as rows or as a subquery of their tenant ids."""
     from backend.app.db.data_plane import TRIAL_SHARED_DATA_PLANE
     from backend.app.db.models.customer_lifecycle import TenantDataPlane
-    from backend.app.db.models.foundation import AuthUser, PlanDefinition, Tenant
+    from backend.app.db.models.foundation import PlanDefinition, Tenant
     from backend.app.db.models.stage2 import SubscriptionLifecycle
-    from backend.app.db.tenant_scope import bind_tenant
-    from backend.app.trial import imports
-    from backend.app.trial.retention import RETENTION_DAYS
-    from backend.app.trial.service import FREE_TRIAL_PLAN, TRIAL_ROW_LIMIT, TRIAL_USER_LIMIT
+    from backend.app.trial import service
 
-    now = now or datetime.now(timezone.utc)
-    rows = (
-        db.query(SubscriptionLifecycle, Tenant)
-        .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+    return (
+        statement.join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
         .join(Tenant, Tenant.id == SubscriptionLifecycle.tenant_id)
         .join(TenantDataPlane, TenantDataPlane.tenant_id == Tenant.id)
-        .filter(
-            PlanDefinition.code == FREE_TRIAL_PLAN,
+        .where(
+            PlanDefinition.code == service.FREE_TRIAL_PLAN,
             TenantDataPlane.connection_secret_ref == TRIAL_SHARED_DATA_PLANE,
             Tenant.status != "ARCHIVED",
         )
-        .order_by(SubscriptionLifecycle.expires_at)
-        .all()
     )
-    feedback = _feedback_by_tenant(db, [tenant.id for _, tenant in rows])
-    demos = _demos_by_tenant(db, [tenant.id for _, tenant in rows])
-    items = []
-    for subscription, tenant in rows:
-        users = (
-            db.query(func.count(AuthUser.id))
-            .filter(AuthUser.tenant_id == tenant.id, AuthUser.status.in_(["ACTIVE", "INVITED"]))
-            .scalar()
+
+
+def grouped_counts(db: Session, counters, tenants) -> dict:
+    """``{index: {tenant id: records}}`` for each ``(model, conditions)`` of ``counters``, among ``tenants`` (a list of
+    ids or a subquery of them), in one statement. Should it fail (an older database without one of the tables), each
+    is counted on its own and one that fails counts nothing, as ``_count`` does for one organization."""
+    from sqlalchemy import literal, select, union_all
+
+    if isinstance(tenants, (list, tuple, set)) and not tenants:
+        return {}
+    statements = [
+        select(literal(index).label("counter"), model.tenant_id, func.count(model.id))
+        .where(model.tenant_id.in_(tenants), *conditions)
+        .group_by(model.tenant_id)
+        for index, (model, conditions) in enumerate(counters)
+    ]
+    try:
+        rows = db.execute(union_all(*statements)).all()
+    except Exception:
+        logger.exception("Trial overview: the counts could not be read together")
+        db.rollback()
+        rows = []
+        for statement in statements:
+            try:
+                rows.extend(db.execute(statement).all())
+            except Exception:
+                logger.exception("Trial overview: a count could not be read")
+                db.rollback()
+    found: dict = {}
+    for counter, tenant_id, records in rows:
+        found.setdefault(counter, {})[tenant_id] = int(records or 0)
+    return found
+
+
+def acted_counts_by_tenant(db: Session, tenants) -> dict:
+    """``{tenant id: acted_counts}`` for many organizations at once; one with no record at all is left out."""
+    counters = chapter_counters()
+    grouped = grouped_counts(db, [(model, conditions) for _code, model, conditions in counters], tenants)
+    found: dict = {}
+    for index, (code, _model, _conditions) in enumerate(counters):
+        for tenant_id, records in grouped.get(index, {}).items():
+            found.setdefault(tenant_id, dict.fromkeys(CODES, 0))[code] += records
+    return found
+
+
+def last_activity_by_tenant(db: Session, tenants) -> dict:
+    """``{tenant id: last_activity}`` for many organizations at once."""
+    from backend.app.db.models.foundation import AuditEvent
+
+    try:
+        return dict(
+            db.query(AuditEvent.tenant_id, func.max(AuditEvent.created_at))
+            .filter(AuditEvent.tenant_id.in_(tenants), _person_activity(AuditEvent))
+            .group_by(AuditEvent.tenant_id)
+            .all()
         )
-        # The first person of the trial (the sample author, an account nobody signs in with, is not one).
-        owner = (
-            db.query(AuthUser.username, AuthUser.display_name, AuthUser.status)
-            .filter(AuthUser.tenant_id == tenant.id, ~AuthUser.username.like("sample-author+%"))
-            .order_by(AuthUser.created_at)
-            .first()
+    except Exception:
+        logger.exception("Trial overview: the last activity could not be read")
+        db.rollback()
+        return {}
+
+
+def uploaded_rows_by_tenant(db: Session, tenant_ids: list) -> dict:
+    """``{tenant id: uploaded_rows}`` (backend/app/trial/imports.py) for many organizations at once."""
+    from backend.app.trial.imports import upload_counters
+
+    totals: dict = {}
+    for per_tenant in grouped_counts(db, upload_counters(), tenant_ids).values():
+        for tenant_id, records in per_tenant.items():
+            totals[tenant_id] = totals.get(tenant_id, 0) + records
+    return totals
+
+
+def _requests_by_tenant(db: Session, tenants) -> dict:
+    """``{tenant id: (email, profile)}``: the trial request that created each trial (backend/app/trial/team.py)."""
+    from backend.app.db.models.stage2 import OnboardingRequest
+
+    found: dict = {}
+    for row in (
+        db.query(
+            OnboardingRequest.tenant_id,
+            OnboardingRequest.email,
+            OnboardingRequest.organization,
+            OnboardingRequest.profile,
         )
-        request = trial_request(db, tenant.id)
-        with Session(bind=db.get_bind(), autoflush=False) as session:
-            bind_tenant(session, tenant.id)
-            reached = progress(session, tenant.id, remembered(request.profile if request else None))
-            rows_uploaded = imports.uploaded_rows(session, tenant.id)
-        ended = subscription.expires_at <= now
-        seconds_left = (subscription.expires_at - now).total_seconds()
-        items.append(
-            {
-                "tenant_id": str(tenant.id),
-                "tenant_business_id": tenant.business_id,
-                "tenant_key": tenant.tenant_key,
-                "name": tenant.name,
-                "owner": {"email": owner.username, "name": owner.display_name, "status": owner.status}
-                if owner
-                else None,
-                "starts_at": subscription.starts_at.isoformat() if subscription.starts_at else None,
-                "expires_at": subscription.expires_at.isoformat(),
-                "data_deleted_at": (subscription.expires_at + timedelta(days=RETENTION_DAYS)).isoformat(),
+        .filter(OnboardingRequest.tenant_id.in_(tenants))
+        .order_by(OnboardingRequest.created_at, OnboardingRequest.id)
+    ):
+        found.setdefault(row.tenant_id, row)
+    return found
+
+
+def _people_by_tenant(db: Session, tenant_ids: list) -> dict:
+    """``{tenant id: (seats used, owner)}``: people holding a seat (active or invited) and the trial's first person
+    (the sample author, an account nobody signs in with, is not one)."""
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.trial.team import SEATED_STATUSES
+
+    if not tenant_ids:
+        return {}
+    seats: dict = {}
+    owners: dict = {}
+    for person in (
+        db.query(AuthUser.tenant_id, AuthUser.username, AuthUser.display_name, AuthUser.status)
+        .filter(AuthUser.tenant_id.in_(tenant_ids))
+        .order_by(AuthUser.tenant_id, AuthUser.created_at, AuthUser.id)
+    ):
+        if person.status in SEATED_STATUSES:
+            seats[person.tenant_id] = seats.get(person.tenant_id, 0) + 1
+        if not person.username.startswith("sample-author+"):
+            owners.setdefault(
+                person.tenant_id, {"email": person.username, "name": person.display_name, "status": person.status}
+            )
+    return {tenant_id: (seats.get(tenant_id, 0), owners.get(tenant_id)) for tenant_id in tenant_ids}
+
+
+def trial_overview(
+    db: Session,
+    now: datetime | None = None,
+    *,
+    page: int = 1,
+    page_size: int = OVERVIEW_PAGE_SIZE,
+    sort: str = "",
+    order: str = "",
+    state: str = "",
+    q: str = "",
+) -> dict:
+    """Every Free Trial organization still holding data: its dates, usage, story progress and feedback.
+
+    ``summary``, ``chapters`` and ``attention`` (who needs a person first) cover every trial; ``items`` is one page
+    (``page``, ``page_size`` up to 200) of the trials in ``state`` (ACTIVE, ENDING_SOON or ENDED) whose name, tenant
+    key, MDARIX ID or owner's email contains ``q``, in attention order or by ``sort``/``order`` (``OVERVIEW_SORTS``).
+    ``db`` is the control database, which is also the trials' shared data plane: their records are read for every
+    trial at once in a session of their own, in system scope (the caller has verified the Platform Admin)."""
+    from sqlalchemy import select
+
+    from backend.app.ai_settings import _models_in_use
+    from backend.app.db.models.foundation import Tenant
+    from backend.app.db.models.stage2 import SubscriptionLifecycle
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.sorting import parse_sort, sort_rows
+    from backend.app.trial import citations
+    from backend.app.trial.retention import RETENTION_DAYS
+    from backend.app.trial.service import TRIAL_ROW_LIMIT, TRIAL_USER_LIMIT
+
+    ai_on_server = bool(_models_in_use())
+    now = now or datetime.now(timezone.utc)
+    page_size = min(OVERVIEW_PAGE_SIZE_MAX, max(1, int(page_size)))
+    rows = db.execute(
+        _on_trial(
+            select(
+                SubscriptionLifecycle.tenant_id,
+                SubscriptionLifecycle.starts_at,
+                SubscriptionLifecycle.expires_at,
+                Tenant.business_id,
+                Tenant.tenant_key,
+                Tenant.name,
+            ).select_from(SubscriptionLifecycle)
+        ).order_by(SubscriptionLifecycle.expires_at, SubscriptionLifecycle.id)
+    ).all()
+    trial_ids = _on_trial(select(SubscriptionLifecycle.tenant_id).select_from(SubscriptionLifecycle))
+    with Session(bind=db.get_bind(), autoflush=False) as data:
+        bind_system(data, "platform administrator: trial overview")
+        requests = _requests_by_tenant(db, trial_ids)
+        feedback = _feedback_by_tenant(db, trial_ids) if rows else {}
+        demos = _demos_by_tenant(db, trial_ids) if rows else {}
+        counts = acted_counts_by_tenant(data, trial_ids) if rows else {}
+        moments = last_activity_by_tenant(data, trial_ids) if rows else {}
+        items, tenant_of, searched = [], {}, []
+        for row in rows:
+            request = requests.get(row.tenant_id)
+            ended = row.expires_at <= now
+            seconds_left = (row.expires_at - now).total_seconds()
+            item = {
+                "tenant_id": str(row.tenant_id),
+                "tenant_business_id": row.business_id,
+                "tenant_key": row.tenant_key,
+                "name": row.name,
+                "owner": None,
+                "starts_at": row.starts_at.isoformat() if row.starts_at else None,
+                "expires_at": row.expires_at.isoformat(),
+                "data_deleted_at": (row.expires_at + timedelta(days=RETENTION_DAYS)).isoformat(),
                 "state": "ENDED" if ended else "ENDING_SOON" if seconds_left <= 7 * 86400 else "ACTIVE",
                 "days_left": 0 if ended else max(0, int(-(-seconds_left // 86400))),
-                "users": {"used": int(users or 0), "limit": TRIAL_USER_LIMIT},
-                "rows": {"used": int(rows_uploaded or 0), "limit": TRIAL_ROW_LIMIT},
-                "story": reached,
-                "feedback": feedback.get(tenant.id),
-                "demo_request": demos.get(tenant.id),
+                "users": {"used": 0, "limit": TRIAL_USER_LIMIT},
+                "rows": {"used": 0, "limit": TRIAL_ROW_LIMIT},
+                "story": _reached(
+                    counts.get(row.tenant_id) or dict.fromkeys(CODES, 0),
+                    remembered(request.profile if request else None),
+                    moments.get(row.tenant_id),
+                ),
+                "feedback": feedback.get(row.tenant_id),
+                "demo_request": demos.get(row.tenant_id),
                 # What the organization said it was cited for (Getting started), to prepare the demo.
                 "cited_for": citations.labels((request.profile or {}).get("citations") if request else ()),
             }
-        )
+            items.append(item)
+            tenant_of[id(item)] = row.tenant_id
+            searched.append(
+                " ".join(
+                    str(value)
+                    for value in (row.name, row.tenant_key, row.business_id, request.email if request else None)
+                    if value
+                ).casefold()
+            )
+
+        wanted = (state or "").strip().upper()
+        needle = (q or "").strip().casefold()
+        shown = [
+            item
+            for item, text in zip(items, searched)
+            if (not wanted or item["state"] == wanted) and (not needle or needle in text)
+        ]
+        if parse_sort(sort, order)[0] in OVERVIEW_SORTS:
+            shown = sort_rows(shown, sort, order, OVERVIEW_SORTS)
+        else:
+            shown = sorted(shown, key=_attention_rank)
+        total = len(shown)
+        pages = max(1, -(-total // page_size))
+        page = min(max(1, int(page)), pages)
+        page_items = shown[(page - 1) * page_size : page * page_size]
+        attention = [item for item in sorted(items, key=_attention_rank) if item["state"] != "ENDED"][:ATTENTION_SHOWN]
+
+        # The people and uploads of the trials shown (the page and the attention list), in two more statements.
+        shown_ids = list(dict.fromkeys(tenant_of[id(item)] for item in [*page_items, *attention]))
+        people = _people_by_tenant(db, shown_ids)
+        uploaded = uploaded_rows_by_tenant(data, shown_ids)
+    for item in {id(item): item for item in [*page_items, *attention]}.values():
+        tenant_id = tenant_of[id(item)]
+        seats, owner = people.get(tenant_id, (0, None))
+        item["owner"] = owner
+        item["users"]["used"] = seats
+        item["rows"]["used"] = uploaded.get(tenant_id, 0)
+
     active = [item for item in items if item["state"] != "ENDED"]
     return {
         "summary": {
@@ -488,15 +713,21 @@ def trial_overview(db: Session, now: datetime | None = None) -> dict:
             for number, (code, title, promise, pain, *_) in enumerate(CHAPTERS, 1)
         ],
         "engaged_chapters": ENGAGED_CHAPTERS,
-        "items": items,
+        "attention": attention,
+        "items": page_items,
+        "page": page,
+        "page_size": page_size,
+        "total": total,
+        "pages": pages,
     }
 
 
-def _demos_by_tenant(db: Session, tenant_ids: list) -> dict:
-    """``{tenant id: {status, created_at, business_id}}``: each trial's latest one-to-one demo request."""
+def _demos_by_tenant(db: Session, tenant_ids) -> dict:
+    """``{tenant id: {status, created_at, business_id}}``: each trial's latest one-to-one demo request; ``tenant_ids``
+    is a list of ids or a subquery of them."""
     from backend.app.db.models.stage2 import DemoRequest
 
-    if not tenant_ids:
+    if isinstance(tenant_ids, list) and not tenant_ids:
         return {}
     found: dict = {}
     for row in (
@@ -515,9 +746,10 @@ def _demos_by_tenant(db: Session, tenant_ids: list) -> dict:
     return found
 
 
-def _feedback_by_tenant(db: Session, tenant_ids: list) -> dict:
-    """``{tenant id: {responses, overall, recommend}}`` from the trial feedback (averages, rounded)."""
-    if not tenant_ids:
+def _feedback_by_tenant(db: Session, tenant_ids) -> dict:
+    """``{tenant id: {responses, overall, recommend}}`` from the trial feedback (averages, rounded); ``tenant_ids`` is a
+    list of ids or a subquery of them."""
+    if isinstance(tenant_ids, list) and not tenant_ids:
         return {}
     from backend.app.db.models.stage2 import TrialFeedback
 

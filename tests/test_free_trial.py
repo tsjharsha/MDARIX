@@ -112,7 +112,7 @@ def _request_trial(organization="Trial Devices Inc") -> str:
 
 
 def _request_id(admin, email) -> str:
-    items = admin.get("/api/v1/platform-admin/trial-requests").json()["items"]
+    items = admin.get("/api/v1/platform-admin/trial-requests", params={"q": email}).json()["items"]
     return next(item["id"] for item in items if item["email"] == email)
 
 
@@ -258,7 +258,7 @@ def test_what_the_organization_was_cited_for_leads_the_story():
     story = user.get("/api/v1/trial/story").json()
     cited = [chapter["code"] for chapter in story["chapters"] if chapter["cited"]]
     assert cited == ["CAPA_EFFECTIVE", "RISK_FILE"] and story["next"] == "CAPA_EFFECTIVE"
-    overview = authenticated_client().get("/api/v1/platform-admin/trials").json()
+    overview = authenticated_client().get("/api/v1/platform-admin/trials", params={"q": approval["tenant_key"]}).json()
     item = next(entry for entry in overview["items"] if entry["tenant_key"] == approval["tenant_key"])
     assert item["cited_for"] == [
         "CAPAs closed without verifying they were effective",
@@ -562,7 +562,7 @@ def test_closed_trial_data_is_deleted_after_30_days():
         db.close()
     assert user.get("/api/v1/trial/status").status_code == 401
     assert TestClient(app).post("/api/v1/auth/signin", json={"email": email, "password": PASSWORD}).status_code != 200
-    queue = admin.get("/api/v1/platform-admin/trial-requests").json()["items"]
+    queue = admin.get("/api/v1/platform-admin/trial-requests", params={"q": approval["business_id"]}).json()["items"]
     request = next(item for item in queue if item["tenant_id"] == approval["tenant_id"])
     assert request["data_deleted"] is True
     # The requester's job title goes with the rest of their personal data; the company facts stay.
@@ -645,7 +645,7 @@ def test_the_review_queue_shows_what_the_requester_told_us():
         json={"email": email, "display_name": "Taylor Quality", "organization": "Profile Devices", **answers},
     )
     assert sent.status_code == 200, sent.text
-    queue = authenticated_client().get("/api/v1/platform-admin/trial-requests").json()["items"]
+    queue = authenticated_client().get("/api/v1/platform-admin/trial-requests", params={"q": email}).json()["items"]
     item = next(row for row in queue if row["email"] == email)
     assert item["profile"]["complaint_system"] == "TRACKWISE" and item["profile"]["markets"] == ["US", "EU"]
     lines = {line["label"]: line["value"] for line in item["profile_lines"]}
@@ -716,7 +716,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
 
     # The Platform Admin sees the trial, its usage and how far into the story it went; the trial user does not.
     assert user.get("/api/v1/platform-admin/trials").status_code in (401, 403)
-    overview = authenticated_client().get("/api/v1/platform-admin/trials")
+    overview = authenticated_client().get("/api/v1/platform-admin/trials", params={"q": tenant_key})
     assert overview.status_code == 200, overview.text
     item = next(entry for entry in overview.json()["items"] if entry["tenant_key"] == tenant_key)
     assert item["story"]["acted"] == ["HIDDEN_COMPLAINTS"] and item["story"]["total"] == 9
@@ -1039,7 +1039,7 @@ def test_a_trial_books_a_one_to_one_demo_and_mdarix_sees_its_progress(monkeypatc
         assert item["source"] == "TRIAL" and item["organization"] == "Trial Devices Inc"
         assert item["trial_tenant_id"] == str(tenant_id) and item["context"]["chapters_total"] == 9
         assert item["note"] == "We have a notified body audit in March."
-        trials = admin.get("/api/v1/platform-admin/trials").json()
+        trials = admin.get("/api/v1/platform-admin/trials", params={"q": approval["tenant_key"]}).json()
         mine = next(entry for entry in trials["items"] if entry["tenant_id"] == str(tenant_id))
         assert mine["demo_request"]["status"] == "NEW" and trials["summary"]["demo_requested"] >= 1
     finally:
