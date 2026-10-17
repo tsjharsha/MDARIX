@@ -183,6 +183,14 @@ const ROADMAP_ICONS: Record<CapabilityIcon, LucideIcon> = {
 };
 // One tone per stage, in the order of capabilityStatus: live today, next with design partners, planned.
 const ROADMAP_TONES = ["live", "next", "planned"] as const;
+// Each stage lists only what it adds, so the track says that and the running total ("+3 more · 12 in total"): a
+// later stage never reads as all there is.
+const ROADMAP_COUNTS = capabilityStatus.map((status, index) => {
+  const added = status.items.length;
+  const total = capabilityStatus.slice(0, index + 1).reduce((sum, stage) => sum + stage.items.length, 0);
+  if (index === 0) return `${added} ${added === 1 ? "capability" : "capabilities"}`;
+  return `+${added} more · ${total} in total`;
+});
 
 // What you get, as a roadmap: a track from "Live now" to "Planned" that draws itself when it scrolls into view, the
 // free trial's capabilities in full, then what design partners get next and what is planned. The motion runs once
@@ -249,9 +257,7 @@ function ScopeClarity() {
                 <span className="ms-roadmap-dot" aria-hidden="true" />
                 <span className="ms-roadmap-badge">{status.badge}</span>
                 <strong>{status.label}</strong>
-                <span className="ms-roadmap-count">
-                  {status.items.length} {status.items.length === 1 ? "capability" : "capabilities"}
-                </span>
+                <span className="ms-roadmap-count">{ROADMAP_COUNTS[index]}</span>
               </li>
             ))}
           </ol>
