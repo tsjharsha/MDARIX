@@ -10,6 +10,16 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.22] - 2026-10-17
+
+### Changed
+
+- The website and the application are drawn smaller on laptops at 125–150% display scaling, where they looked
+  oversized at 100% browser zoom: at 80% on screens that give the browser 1,100–1,439 px of width, and at 90% at
+  1,440–1,799 px, as browser zoom would draw them. Only mouse-driven, high-density screens are scaled; phones, tablets,
+  standard-density laptops and wide desktop screens are unchanged. Full-height panels (the app menu, the sign-in
+  page) still fill the window, and dragging a list's column edge still follows the pointer.
+
 ## [0.10.21] - 2026-10-17
 
 ### Changed
