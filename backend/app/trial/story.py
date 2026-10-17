@@ -553,8 +553,9 @@ def _requests_by_tenant(db: Session, tenants) -> dict:
 
 
 def _people_by_tenant(db: Session, tenant_ids: list) -> dict:
-    """``{tenant id: (seats used, owner)}``: people holding a seat (active or invited) and the trial's first person
-    (the sample author, an account nobody signs in with, is not one)."""
+    """``{tenant id: (seats used, owner, people)}``: people holding a seat (active or invited), the trial's first
+    person, and those holding a seat as Platform Admin reads them (to reset one's MFA). The sample author, an account
+    nobody signs in with, is none of them."""
     from backend.app.db.models.foundation import AuthUser
     from backend.app.trial.team import SEATED_STATUSES
 
@@ -562,18 +563,24 @@ def _people_by_tenant(db: Session, tenant_ids: list) -> dict:
         return {}
     seats: dict = {}
     owners: dict = {}
+    people: dict = {}
     for person in (
-        db.query(AuthUser.tenant_id, AuthUser.username, AuthUser.display_name, AuthUser.status)
+        db.query(AuthUser.id, AuthUser.tenant_id, AuthUser.username, AuthUser.display_name, AuthUser.status)
         .filter(AuthUser.tenant_id.in_(tenant_ids))
         .order_by(AuthUser.tenant_id, AuthUser.created_at, AuthUser.id)
     ):
         if person.status in SEATED_STATUSES:
             seats[person.tenant_id] = seats.get(person.tenant_id, 0) + 1
-        if not person.username.startswith("sample-author+"):
-            owners.setdefault(
-                person.tenant_id, {"email": person.username, "name": person.display_name, "status": person.status}
-            )
-    return {tenant_id: (seats.get(tenant_id, 0), owners.get(tenant_id)) for tenant_id in tenant_ids}
+        if person.username.startswith("sample-author+"):
+            continue
+        view = {"id": str(person.id), "email": person.username, "name": person.display_name, "status": person.status}
+        owners.setdefault(person.tenant_id, view)
+        if person.status in SEATED_STATUSES:
+            people.setdefault(person.tenant_id, []).append(view)
+    return {
+        tenant_id: (seats.get(tenant_id, 0), owners.get(tenant_id), people.get(tenant_id, []))
+        for tenant_id in tenant_ids
+    }
 
 
 def trial_overview(
@@ -639,6 +646,7 @@ def trial_overview(
                 "tenant_key": row.tenant_key,
                 "name": row.name,
                 "owner": None,
+                "people": [],
                 "starts_at": row.starts_at.isoformat() if row.starts_at else None,
                 "expires_at": row.expires_at.isoformat(),
                 "data_deleted_at": (row.expires_at + timedelta(days=RETENTION_DAYS)).isoformat(),
@@ -689,8 +697,9 @@ def trial_overview(
         uploaded = uploaded_rows_by_tenant(data, shown_ids)
     for item in {id(item): item for item in [*page_items, *attention]}.values():
         tenant_id = tenant_of[id(item)]
-        seats, owner = people.get(tenant_id, (0, None))
+        seats, owner, seated = people.get(tenant_id, (0, None, []))
         item["owner"] = owner
+        item["people"] = seated
         item["users"]["used"] = seats
         item["rows"]["used"] = uploaded.get(tenant_id, 0)
 

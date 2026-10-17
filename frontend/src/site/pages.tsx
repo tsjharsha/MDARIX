@@ -1,17 +1,31 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
+  Boxes,
+  Cable,
   Check,
   CircleDashed,
+  Clock3,
+  Database,
+  FileSpreadsheet,
+  KeyRound,
   Lock,
+  Microscope,
   Network,
+  PenLine,
+  PlugZap,
   ScrollText,
+  SearchCheck,
   ShieldCheck,
+  Shuffle,
   Sparkles,
   UserCheck,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
-import { menus, pages, postMarketResources, trialIncludes } from "./legacyContent";
+import { menus, pages, postMarketResources, trialIncludes, type CapabilityIcon } from "./legacyContent";
 import { DEMO_REQUESTS_OFFERED } from "./offer";
 import {
   capabilityStatus,
@@ -23,6 +37,7 @@ import {
   type Capability,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
+import { DesignPhases } from "./designPhases";
 import { CustomerVoices, LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
 import { QualityLoop } from "../features/workspace/sections/QualityLoop";
 import { LOOP_ORDER, type LoopStation } from "../features/workspace/qualityLoop";
@@ -149,34 +164,104 @@ function CtaBand() {
   );
 }
 
+const ROADMAP_ICONS: Record<CapabilityIcon, LucideIcon> = {
+  product: Boxes,
+  "second-look": SearchCheck,
+  clock: Clock3,
+  signal: Activity,
+  investigation: Microscope,
+  signature: PenLine,
+  capa: ShieldCheck,
+  import: FileSpreadsheet,
+  roles: UsersRound,
+  connection: Cable,
+  mapping: Shuffle,
+  ai: Sparkles,
+  sso: KeyRound,
+  connector: PlugZap,
+  database: Database,
+};
+// One tone per stage, in the order of capabilityStatus: live today, next with design partners, planned.
+const ROADMAP_TONES = ["live", "next", "planned"] as const;
+
+// What you get, as a roadmap: a track from "Live now" to "Planned" that draws itself when it scrolls into view, the
+// free trial's capabilities in full, then what design partners get next and what is planned. The motion runs once
+// (the live stop keeps a soft pulse) and none of it runs for people who ask for reduced motion.
 function ScopeClarity() {
+  const [today, ...later] = capabilityStatus;
+  const column = (status: (typeof capabilityStatus)[number], index: number) => {
+    const tone = ROADMAP_TONES[index];
+    return (
+      <article
+        key={status.label}
+        className={`ms-roadmap-card is-${tone}`}
+        aria-labelledby={`roadmap-${tone}`}
+        style={{ "--stage": index } as CSSProperties}
+      >
+        <header>
+          <span className="ms-roadmap-badge">{status.badge}</span>
+          <h3 id={`roadmap-${tone}`}>{status.label}</h3>
+          <p>{status.text}</p>
+          {index === 0 && <span className="ms-roadmap-ribbon">Included in your free trial</span>}
+        </header>
+        <ul className="ms-roadmap-list">
+          {status.items.map((item, n) => {
+            const Icon = ROADMAP_ICONS[item.icon];
+            return (
+              <li key={item.title} style={{ "--n": n } as CSSProperties}>
+                <span className="ms-roadmap-icon">
+                  <Icon size={18} aria-hidden="true" />
+                </span>
+                <span>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="ms-roadmap-promise">{status.promise}</p>
+      </article>
+    );
+  };
   return (
     <section className="ms-section ms-scope" aria-labelledby="scope-title">
       <SectionHead
         eyebrow="What you get"
-        title="Know what is available today."
+        title="Know what is available today, and what comes next."
         id="scope-title"
-        copy="What works in every workspace now, the free trial included, what we build with design partners, and what is still planned."
+        copy="Everything marked Live now works in every workspace, the free trial included. What we build with design partners and what is still planned is labelled as such, so you always know which is which."
       />
-      <div className="ms-grid-3">
-        {capabilityStatus.map((status, index) => (
-          <Reveal key={status.label} delay={index * 80} className="ms-card ms-card-flat">
-            <strong>{status.label}</strong>
-            <p>{status.text}</p>
-            <ul className="ms-check-list">
-              {status.items.map((item) => (
-                <li key={item}>
-                  <Check size={16} aria-hidden="true" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </Reveal>
-        ))}
-      </div>
+      <Reveal className="ms-roadmap">
+        <div className="ms-roadmap-head">
+          <span className="ms-roadmap-rail" aria-hidden="true">
+            <span className="ms-roadmap-rail-done" />
+            <span className="ms-roadmap-rail-next" />
+            <span className="ms-roadmap-spark" />
+          </span>
+          <ol className="ms-roadmap-track" aria-label="From what is live now to what is planned">
+            {capabilityStatus.map((status, index) => (
+              <li
+                key={status.label}
+                className={`ms-roadmap-stop is-${ROADMAP_TONES[index]}`}
+                style={{ "--stage": index } as CSSProperties}
+              >
+                <span className="ms-roadmap-dot" aria-hidden="true" />
+                <span className="ms-roadmap-badge">{status.badge}</span>
+                <strong>{status.label}</strong>
+                <span className="ms-roadmap-count">
+                  {status.items.length} {status.items.length === 1 ? "capability" : "capabilities"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        {column(today, 0)}
+        <div className="ms-roadmap-later">{later.map((status, index) => column(status, index + 1))}</div>
+      </Reveal>
       <Reveal className="ms-card ms-card-flat ms-scope-trial">
         <strong>In your free trial</strong>
-        <p>Everything under “Available today”, on sample data first and then on your own exports.</p>
+        <p>Everything marked Live now, on sample data first and then on your own exports.</p>
         <ul className="ms-check-list">
           {trialIncludes.map((item) => (
             <li key={item}>
@@ -676,13 +761,7 @@ export function LifecyclePage() {
           title="Medical device design and development phases."
           copy="Each phase leaves design-control records: user needs, design inputs and outputs, verification, validation and the risk file. When a field problem appears, investigators trace back through those records, which is where MDARIX starts."
         />
-        <Reveal className="ms-lc-phases">
-          <Photo
-            src={img("medtech-product-lifecycle-hero")}
-            alt="Medical device design and development phases 0 to 6: concept and ideation, user needs and feasibility, design inputs and prototyping, detailed design and design controls, verification and validation, manufacturing transfer and regulatory submission, post-market surveillance and feedback loops"
-            className="ms-photo-contain"
-          />
-        </Reveal>
+        <DesignPhases />
       </section>
       <section className="ms-section">
         <SectionHead eyebrow="Current capabilities" title="Lifecycle intelligence available today." />

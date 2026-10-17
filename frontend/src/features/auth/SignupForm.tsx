@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Smartphone } from "lucide-react";
 
 import {
   COMPANY_SIZES,
@@ -183,6 +183,10 @@ export function SignupForm() {
               : "We review your request and prepare your workspace with sample data."}
           </li>
           <li>You set your own password from the invitation email. MDARIX never sees it.</li>
+          <li>
+            You add MDARIX to an authenticator app on your phone and save your recovery codes: two-factor sign-in (MFA)
+            is required.
+          </li>
           <li>You sign in, explore the sample investigation, then upload your own exports.</li>
         </ol>
         <a className="primary-action" href={TRIAL_GUIDE_PATH} target="_blank" rel="noopener">
@@ -214,6 +218,14 @@ export function SignupForm() {
         30 days, up to 3 users and 5,000 uploaded rows, no credit card. You set your own password from the invitation
         email; MDARIX never sees it.
       </p>
+      <div className="su-mfa-note" role="note">
+        <Smartphone size={20} aria-hidden="true" />
+        <p>
+          <strong>Have your phone ready.</strong> Every MDARIX account uses two-factor sign-in (MFA). When you first
+          sign in, you add MDARIX to an authenticator app on your phone (Microsoft Authenticator, Google Authenticator,
+          1Password or similar) and save your recovery codes. Each colleague you invite needs one too.
+        </p>
+      </div>
       <ol className="su-steps" aria-label="Request steps">
         <li className={step === 1 ? "is-current" : "is-done"} aria-current={step === 1 ? "step" : undefined}>
           <span>1</span> About you

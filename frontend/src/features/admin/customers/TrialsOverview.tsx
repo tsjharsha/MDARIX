@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { CalendarCheck, CalendarClock, MessageSquare, Rocket, Sparkles, Upload, Users } from "lucide-react";
 import { BarList, Panel, StatTile, ToneBadge } from "../console/charts";
-import { SearchBox, Table, formatDate, useResource, type Resource } from "../../customer-admin/shared";
+import {
+  ConfirmDialog,
+  SearchBox,
+  Table,
+  formatDate,
+  send,
+  useResource,
+  type Confirmation,
+  type Resource,
+} from "../../customer-admin/shared";
 import { useServerSort, type SortState } from "../../../app/tableSort";
 import { Pager } from "../areas/common";
 import {
@@ -15,6 +24,7 @@ import {
   trialsPath,
   type TrialItem,
   type TrialOverview,
+  type TrialPerson,
 } from "./trials";
 import { TrialExitRequests } from "./TrialExitRequests";
 
@@ -82,6 +92,8 @@ export function TrialsOverviewView({
   const items = data?.items ?? [];
   const attention = attentionList(data, engagedAt);
   const filtered = Boolean(table.state || table.query.trim());
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [notice, setNotice] = useState("");
   return (
     <div className="cc-page">
       <div className="cc-title">
@@ -196,12 +208,10 @@ export function TrialsOverviewView({
               label: "Trial owner",
               render: (row) =>
                 row.owner ? (
-                  <span className="cc-trial-org">
-                    {row.owner.name || row.owner.email}
-                    <small>
-                      {row.owner.email} · {row.owner.status === "INVITED" ? "invitation not accepted" : "active"}
-                    </small>
-                  </span>
+                  <TrialPeople
+                    row={row}
+                    onReset={(person) => setConfirm(trialMfaReset(person, row, overview.reload))}
+                  />
                 ) : (
                   "—"
                 ),
@@ -314,7 +324,66 @@ export function TrialsOverviewView({
           noun="trial"
           onPage={table.onPage}
         />
+        {notice && (
+          <p className="ac-note" role="status">
+            {notice}
+          </p>
+        )}
       </Panel>
+      <ConfirmDialog
+        request={confirm}
+        onClose={() => setConfirm(null)}
+        onDone={(message) => {
+          setConfirm(null);
+          setNotice(message);
+        }}
+      />
     </div>
+  );
+}
+
+/**
+ * Resetting a trial person's MFA after they lost their authenticator and recovery codes. A trial has no administrator
+ * (and nobody inside it can reset its owner's), so MDARIX does it without a support grant; the reason is audited in the
+ * trial's own trail (backend/app/access/platform_customer_admins.py).
+ */
+export function trialMfaReset(person: TrialPerson, trial: Pick<TrialItem, "name">, onDone: () => void): Confirmation {
+  const name = person.name || person.email;
+  return {
+    title: `Reset multi-factor authentication for ${name}?`,
+    body: `${name} (${trial.name}) lost their authenticator app and recovery codes. Their authenticator is removed, they are signed out, and they set up a new one at their next sign-in. Check who is asking before you do this.`,
+    confirmLabel: "Reset MFA",
+    reason: { label: "Why is the authenticator being reset? (kept in the trial's audit trail)", min: 5 },
+    done: `${name} sets up a new authenticator at their next sign-in.`,
+    run: async (reason) => {
+      await send(`/api/v1/platform-admin/users/${person.id}/mfa-reset`, "POST", { reason });
+      onDone();
+    },
+  };
+}
+
+/** The trial's owner, then its colleagues, each with Reset MFA once they have activated their account. */
+function TrialPeople({ row, onReset }: { row: TrialItem; onReset: (person: TrialPerson) => void }) {
+  const owner = row.owner;
+  const others = (row.people ?? []).filter((person) => person.id !== owner?.id);
+  const reset = (person: TrialPerson) =>
+    person.id && person.status === "ACTIVE" ? (
+      <button type="button" className="ac-link" onClick={() => onReset(person)}>
+        Reset MFA
+      </button>
+    ) : null;
+  return (
+    <span className="cc-trial-org">
+      {owner?.name || owner?.email}
+      <small>
+        {owner?.email} · {owner?.status === "INVITED" ? "invitation not accepted" : "active"}
+      </small>
+      {owner && reset(owner)}
+      {others.map((person) => (
+        <small key={person.id ?? person.email}>
+          {person.name || person.email} · {person.status === "INVITED" ? "invited" : "colleague"} {reset(person)}
+        </small>
+      ))}
+    </span>
   );
 }

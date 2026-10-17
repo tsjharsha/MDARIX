@@ -1,7 +1,10 @@
-"""Free-trial team: the trial owner invites colleagues, up to the trial's user limit.
+"""Free-trial team: the trial owner invites colleagues, up to the trial's user limit, and looks after them.
 
-Only the person whose request created the trial can invite. Colleagues join that one workspace as workspace users
-(never administrators) with a single-use invitation, exactly like the owner.
+Only the person whose request created the trial (the trial owner) can invite. Colleagues join that one workspace as
+workspace users (never administrators) with a single-use invitation, exactly like the owner. A trial has no admin
+console, so the owner also removes a colleague (the account is offboarded, never deleted: their work stays theirs,
+and the seat is free again) and resets a colleague's MFA after they lost their authenticator and recovery codes. The
+owner's own MFA is never reset here: they replace their authenticator in My Account, or MDARIX support resets it.
 """
 
 from __future__ import annotations
@@ -17,10 +20,13 @@ from sqlalchemy.orm import Session
 from auth.service import _hash
 from backend.app.access.authz import platform_account_clause
 from backend.app.db.models.foundation import AuditEvent, AuthUser, TenantMembership
-from backend.app.db.models.stage2 import OnboardingRequest
+from backend.app.db.models.stage2 import OnboardingRequest, UserInvitation
 from backend.app.trial.service import TRIAL_USER_LIMIT, TRIAL_USER_ROLE, _send_invitation
 
 SEATED_STATUSES = ("ACTIVE", "INVITED")
+# A removed colleague: refused at sign-in and by any invitation link (backend/app/auth_router.py); holds no seat.
+REMOVED_STATUS = "OFFBOARDED"
+SOURCE = "TRIAL_OWNER"
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -37,6 +43,11 @@ def is_trial_owner(db: Session, tenant_id, user: AuthUser) -> bool:
     return row is not None and row.email.strip().lower() == (user.username or "").strip().lower()
 
 
+def require_owner(db: Session, tenant_id, user: AuthUser, message: str) -> None:
+    if not is_trial_owner(db, tenant_id, user):
+        raise _error(403, "TRIAL_OWNER_REQUIRED", message)
+
+
 def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
     request = trial_request(db, tenant_id)
     owner_email = (request.email if request else "").strip().lower()
@@ -46,8 +57,11 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
         .order_by(AuthUser.created_at)
         .all()
     )
+    owner = is_trial_owner(db, tenant_id, viewer)
     return {
-        "can_invite": is_trial_owner(db, tenant_id, viewer),
+        "can_invite": owner,
+        # Remove colleagues, reset their MFA, decide on support access: the trial owner only.
+        "can_manage": owner,
         "limit": TRIAL_USER_LIMIT,
         "seats_used": len(users),
         "members": [
@@ -66,8 +80,7 @@ def team(db: Session, tenant_id, viewer: AuthUser) -> dict:
 
 
 def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, display_name: str) -> dict:
-    if not is_trial_owner(db, tenant_id, inviter):
-        raise _error(403, "TRIAL_OWNER_REQUIRED", "Only the person who started this trial can invite colleagues")
+    require_owner(db, tenant_id, inviter, "Only the person who started this trial can invite colleagues")
     email = email.strip().lower()
     name = display_name.strip()
     if not _EMAIL.match(email) or len(email) > 254:
@@ -133,8 +146,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
 
 
 def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_id: uuid.UUID) -> dict:
-    if not is_trial_owner(db, tenant_id, inviter):
-        raise _error(403, "TRIAL_OWNER_REQUIRED", "Only the person who started this trial can resend invitations")
+    require_owner(db, tenant_id, inviter, "Only the person who started this trial can resend invitations")
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id).first()
     if user is None or user.status != "INVITED":
         raise _error(409, "NOT_AN_OPEN_INVITATION", "This person has already activated their account")
@@ -144,3 +156,103 @@ def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_
         "email": user.username,
         **_send_invitation(db, user, inviter.company, inviter.id),
     }
+
+
+def _colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, *, own: str) -> AuthUser:
+    """A person of this trial the owner acts on: never the owner themself (``own`` says what to do instead), an
+    MDARIX staff account or the sample author (an account nobody signs in with)."""
+    if user_id == owner.id:
+        raise _error(409, "SELF_CHANGE_NOT_ALLOWED", own)
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id, ~platform_account_clause())
+        .with_for_update()
+        .first()
+    )
+    if user is None or str(user.username or "").startswith("sample-author+"):
+        raise _error(404, "USER_NOT_FOUND", "This person is not on your trial team")
+    return user
+
+
+def remove_colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, request=None) -> dict:
+    """Take a colleague off the trial, or withdraw an invitation not yet accepted. The account is offboarded (it
+    cannot sign in, and an open invitation link no longer works), every session of theirs ends, and the seat is free
+    for someone else. Nothing they did is deleted: it stays attributed to them. Audited as TRIAL_COLLEAGUE_REMOVED."""
+    from auth.durable import revoke_user_sessions
+    from backend.app.enterprise_audit import make_audit_event
+
+    require_owner(db, tenant_id, owner, "Only the person who started this trial can remove colleagues")
+    user = _colleague(db, tenant_id, owner, user_id, own="You cannot remove yourself from your own trial")
+    previous = user.status
+    if previous not in SEATED_STATUSES:
+        raise _error(409, "NOT_ON_THE_TEAM", "This person is no longer on your trial team")
+    now = datetime.now(timezone.utc)
+    user.status = REMOVED_STATUS
+    user.updated_at = now
+    db.query(TenantMembership).filter(
+        TenantMembership.tenant_id == tenant_id, TenantMembership.user_id == user.id
+    ).update({"status": REMOVED_STATUS, "updated_at": now}, synchronize_session=False)
+    # An invitation not yet accepted is withdrawn: its link stops working at once.
+    db.query(UserInvitation).filter(
+        UserInvitation.tenant_id == tenant_id, UserInvitation.user_id == user.id, UserInvitation.used_at.is_(None)
+    ).update({"used_at": now}, synchronize_session=False)
+    revoked = revoke_user_sessions(db, user.id, tenant_id)
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(owner.id),
+            action="TRIAL_COLLEAGUE_REMOVED",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={
+                "removed_user_id": str(user.id),
+                "invitation_withdrawn": previous == "INVITED",
+                "sessions_revoked": revoked,
+                "source": SOURCE,
+            },
+            old_values={"status": previous},
+            new_values={"status": user.status},
+            request=request,
+            created_at=now,
+        )
+    )
+    db.commit()
+    return {
+        "id": str(user.id),
+        "business_id": user.business_id,
+        "email": user.username,
+        "status": "REMOVED",
+        "invitation_withdrawn": previous == "INVITED",
+        "sessions_revoked": revoked,
+    }
+
+
+def reset_colleague_mfa(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, reason: str, request=None) -> dict:
+    """Remove a colleague's authenticator after they lost it with their recovery codes (backend/app/mfa.py reset):
+    they are signed out and set up a new one at their next sign-in. Audited as USER_MFA_RESET, like an
+    administrator's reset."""
+    from backend.app import mfa
+    from backend.app.enterprise_audit import make_audit_event
+
+    require_owner(db, tenant_id, owner, "Only the person who started this trial can reset a colleague's MFA")
+    user = _colleague(
+        db, tenant_id, owner, user_id, own="Replace your own authenticator app in My Account › Security instead"
+    )
+    if user.status != "ACTIVE":
+        raise _error(409, "USER_NOT_ACTIVE", "Only a colleague who has activated their account has MFA to reset")
+    now = datetime.now(timezone.utc)
+    revoked = mfa.reset(db, user, now)
+    db.add(
+        make_audit_event(
+            tenant_id=tenant_id,
+            actor_ref=str(owner.id),
+            action="USER_MFA_RESET",
+            entity_type="AuthUser",
+            entity_id=user.id,
+            details={"reason": reason.strip(), "sessions_revoked": revoked, "source": SOURCE},
+            request=request,
+            created_at=now,
+        )
+    )
+    db.commit()
+    return {"id": str(user.id), "business_id": user.business_id, "status": "MFA_RESET", "sessions_revoked": revoked}

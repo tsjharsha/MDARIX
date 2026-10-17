@@ -35,6 +35,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     time: "3 minutes",
     why: "Your request tells us your devices and markets, so your workspace starts ready for you.",
     actions: [
+      "Before you start, have an authenticator app on your phone (Microsoft Authenticator, Google Authenticator, 1Password or similar): every account uses two-factor sign-in (MFA), set up at your first sign-in.",
       "Open the MDARIX website and choose Start free trial.",
       "Step 1, About you: your name, job title, work email, company and country (a phone number is optional).",
       "Step 2, Your trial: company size, device class, the devices you make, your markets, where complaints are handled today and what you want to improve. Tick that you will not upload patient-identifiable data.",
@@ -72,7 +73,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     ],
     result:
       "Both colleagues are listed as Invited, then Active once they set their own password from their email (the link is valid for 48 hours).",
-    tip: "Only the person who started the trial can invite. Each colleague chooses their own password; nobody shares one.",
+    tip: "Only the person who started the trial can invite. Each colleague chooses their own password; nobody shares one. If someone leaves, choose Remove from trial to free their seat.",
   },
   {
     key: "sample",

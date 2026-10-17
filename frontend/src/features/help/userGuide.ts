@@ -233,6 +233,28 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             result: "Invitation emailed. The link is valid for 48 hours. A trial includes up to 3 users.",
           },
           {
+            title: "Look after your trial team",
+            who: "The person who started the trial.",
+            steps: [
+              "Open the Team tab.",
+              "When a colleague leaves, choose Remove from trial beside their name and confirm. For an invitation not yet accepted, the same button withdraws it.",
+              "When a colleague lost their authenticator app and their recovery codes, choose Reset MFA, give the reason and confirm.",
+            ],
+            result:
+              "A removed colleague is signed out and can no longer sign in; what they did stays under their name, and their seat is free. After Reset MFA they set up a new authenticator at their next sign-in.",
+            note: "To replace your own authenticator, use My Account › Security. If you lost it and your recovery codes, contact MDARIX support.",
+          },
+          {
+            title: "Decide on support access",
+            who: "The person who started the trial.",
+            steps: [
+              "When MDARIX support asks to see part of your trial's data, the request appears under Support access in the Team tab.",
+              "Choose Approve (with a reason and a code from your authenticator app) or Deny. Choose Revoke to end an access early.",
+            ],
+            result:
+              "Nothing opens until you approve, only the areas named, until the time shown. Every use is in your audit trail.",
+          },
+          {
             title: "See your trial's dates and limits",
             steps: [
               "Open the Your trial tab: Trial ends (and when the data is deleted), Users, and Uploaded rows.",
@@ -884,8 +906,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "The person who started the trial.",
             steps: [
               "Open Getting started › Team, fill in Colleague's name and Work email and choose Invite colleague.",
+              "There, too, choose Remove from trial when someone leaves, Reset MFA when a colleague lost their authenticator, and decide on Support access.",
             ],
-            note: "A trial includes up to 3 users, each a Leader (Quality Manager).",
+            note: "A trial includes up to 3 users, each a Leader (Quality Manager). A removed colleague's seat is free again.",
           },
           {
             title: "Manage people (customer administrators)",

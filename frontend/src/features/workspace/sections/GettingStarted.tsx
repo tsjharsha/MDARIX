@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
-import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
@@ -13,6 +12,7 @@ import { TrialJourney } from "./TrialJourney";
 import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel } from "./RemoveSample";
+import { TeamPanel } from "./TrialTeam";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { SampleDataPanel } from "./SampleData";
 import { InsightsPanel } from "./TrialInsights";
@@ -262,7 +262,7 @@ export function GettingStartedSection() {
                   <StatTile
                     label="Users"
                     value={trial?.usage ? `${trial.usage.users} of ${trial.limits?.users}` : null}
-                    detail={trial?.is_owner ? "Invite colleagues under Team" : "Your trial team"}
+                    detail={trial?.is_owner ? "Invite or remove colleagues under Team" : "Your trial team"}
                     icon={<Users size={18} />}
                   />
                   <StatTile
@@ -406,141 +406,5 @@ export function ChapterRow({
       </button>
       <span className="ca-sr-only">{done ? "Tried" : "Not tried yet"}</span>
     </li>
-  );
-}
-
-type TeamMember = {
-  id: string;
-  display_name: string;
-  email: string;
-  status: string;
-  is_owner: boolean;
-  is_you: boolean;
-};
-type Team = { can_invite: boolean; limit: number; seats_used: number; members: TeamMember[] };
-
-function TeamPanel({ onChanged }: { onChanged: () => void }) {
-  const team = useResource<Team>("/api/v1/trial/team");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: "good" | "bad"; text: string; link?: string } | null>(null);
-  const data = team.data;
-  const full = !!data && data.seats_used >= data.limit;
-
-  const send = async (path: string, body?: object) => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const result = await requestJson<any>(path, {
-        method: "POST",
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-      const sent = result.email_delivery === "SENT";
-      const link = !sent && result.activation_path ? `${window.location.origin}${result.activation_path}` : undefined;
-      setMessage(
-        sent
-          ? { tone: "good", text: `Invitation emailed to ${result.email}. The link is valid for 48 hours.` }
-          : link
-            ? {
-                tone: "good",
-                text: `Email is not set up on this development server. Send ${result.email} this one-time link (valid 48 hours):`,
-                link,
-              }
-            : {
-                tone: "bad",
-                text: `The invitation email to ${result.email} could not be sent. Try Resend in a few minutes, or contact MDARIX support.`,
-              },
-      );
-      setName("");
-      setEmail("");
-      team.reload();
-      onChanged();
-    } catch (error) {
-      setMessage({ tone: "bad", text: error instanceof Error ? error.message : "The invitation could not be sent." });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Panel title="Your team" eyebrow={data ? `${data.seats_used} of ${data.limit} users` : "Team"} source={team}>
-      {data && (
-        <>
-          <ul className="uw-team">
-            {data.members.map((member) => (
-              <li key={member.id}>
-                <div>
-                  <strong>
-                    {member.display_name}
-                    {member.is_you && <span className="uw-team-tag">You</span>}
-                    {member.is_owner && <span className="uw-team-tag">Trial owner</span>}
-                  </strong>
-                  <small>{member.email}</small>
-                </div>
-                <span className={`uw-team-status ${member.status === "ACTIVE" ? "is-active" : ""}`}>
-                  {member.status === "ACTIVE" ? "Active" : "Invited"}
-                </span>
-                {data.can_invite && member.status === "INVITED" && (
-                  <button
-                    type="button"
-                    className="ac-link"
-                    disabled={busy}
-                    onClick={() => send(`/api/v1/trial/team/${member.id}/resend-invitation`)}
-                  >
-                    Resend invitation
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {data.can_invite && !full && (
-            <form
-              className="uw-team-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void send("/api/v1/trial/team", { email: email.trim(), display_name: name.trim() });
-              }}
-            >
-              <label>
-                Colleague's name
-                <input required maxLength={120} value={name} onChange={(event) => setName(event.target.value)} />
-              </label>
-              <label>
-                Work email
-                <input
-                  required
-                  type="email"
-                  maxLength={254}
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </label>
-              <button type="submit" className="ac-primary" disabled={busy}>
-                {busy ? "Sending…" : "Invite colleague"}
-              </button>
-            </form>
-          )}
-          {data.can_invite && full && (
-            <p className="uw-trial-note">
-              All {data.limit} trial seats are in use.{" "}
-              <a href="/contact" target="_blank" rel="noopener">
-                Contact us
-              </a>{" "}
-              to add more people as a design partner.
-            </p>
-          )}
-          {!data.can_invite && (
-            <p className="uw-trial-note">The person who started this trial can invite colleagues.</p>
-          )}
-          {message && (
-            <div className={`uw-trial-message is-${message.tone}`} role="status">
-              <span>{message.text}</span>
-              {message.link && <code className="uw-team-link">{message.link}</code>}
-            </div>
-          )}
-        </>
-      )}
-    </Panel>
   );
 }

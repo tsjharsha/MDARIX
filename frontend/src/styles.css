@@ -10737,6 +10737,30 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: var(--auth-ink-2);
   font-size: 13px;
 }
+/* Two-factor sign-in is required: said before the request, so people have an authenticator app ready. */
+.su-mfa-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--auth-line, #d7e3e1);
+  border-radius: 10px;
+  background: var(--auth-wash, #eef7f5);
+  color: var(--auth-ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.su-mfa-note > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--auth-teal);
+}
+.su-mfa-note p {
+  margin: 0;
+}
+.su-mfa-note strong {
+  color: var(--auth-ink, inherit);
+}
 .auth-page .auth-card.su-done {
   justify-items: start;
 }

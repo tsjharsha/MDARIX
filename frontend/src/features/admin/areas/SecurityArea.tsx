@@ -24,7 +24,7 @@ import { PersonCell } from "./common";
 type Notify = (text: string, tone?: "good" | "critical") => void;
 
 /** An audit action in words ("SOD_DENIED" -> "Segregation of duties denied"). */
-const actionLabel = (action: string) => titleCase(action).replace(/^Sod/, "Segregation of duties");
+const actionLabel = (action: string) => titleCase(action).replace(/^Sod\b/, "Segregation of duties");
 
 type Posture = {
   isolation: {
