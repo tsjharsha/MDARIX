@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PublicMegaSite } from "../PublicMegaSite";
+import { applyPageMeta, applyPrivatePageMeta } from "../site/seo";
 import { AppView, navigateTo, viewFromPath } from "./router";
 import { Stage2AdminControlPlane } from "../features/stage2/Stage2AdminControlPlane";
 import { MappingStudio } from "../features/stage2/MappingStudio";
@@ -47,8 +48,27 @@ export function App() {
   );
 }
 
+// Kept out of search results: sign-in and account screens, and the signed-in application.
+const PRIVATE_PATHS = ["/signin", "/forgot-password", "/activate-account", "/reset-password", "/mfa", "/request-demo"];
+const isPrivatePath = (path: string) =>
+  PRIVATE_PATHS.includes(path) ||
+  ["/app", "/platform-admin"].some((root) => path === root || path.startsWith(`${root}/`));
+
 function Page() {
   const publicPath = window.location.pathname;
+  // The free trial request is a page people search for; the screens behind it are not (site/seo.ts).
+  useEffect(() => {
+    if (publicPath === "/signup") applyPageMeta("/signup");
+    // The application names its own tab (the organization); sign-in and account screens say what they are.
+    else if (isPrivatePath(publicPath))
+      applyPrivatePageMeta(
+        PRIVATE_PATHS.includes(publicPath)
+          ? publicPath === "/signin"
+            ? "Sign in · MDARIX"
+            : "MDARIX account"
+          : undefined,
+      );
+  }, [publicPath]);
   if (["/signin", "/signup", "/forgot-password", "/activate-account", "/reset-password", "/mfa"].includes(publicPath))
     return <AuthPage mode={publicPath.slice(1)} />;
   if (publicPath === "/request-demo") return DEMO_REQUESTS_OFFERED ? <RequestDemoPage /> : <AuthPage mode="signup" />;

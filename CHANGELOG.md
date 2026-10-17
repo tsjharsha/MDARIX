@@ -10,6 +10,18 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.20] - 2026-10-17
+
+### Added
+
+- Search engines and link previews. Each website page has its own title and description in the words medical
+  device teams search with (complaint handling, post-market surveillance, MDR reportability, CAPA), its canonical
+  address and an index rule (`frontend/src/site/seo.ts`); `/robots.txt` opens the website to crawlers and keeps
+  sign-in, account screens, the application and the API out; `/sitemap.xml` lists the 14 public pages; the home page
+  carries Organization and WebSite structured data (no personal name or address) and a 1200×630 share card
+  (`/og-image.png`) for LinkedIn, email and chat previews. Sign-in, account and application screens, and the "not
+  found" page, are marked noindex.
+
 ## [0.10.19] - 2026-10-17
 
 ### Changed
