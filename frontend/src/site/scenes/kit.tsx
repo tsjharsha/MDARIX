@@ -109,6 +109,7 @@ export function Card({
   h,
   title,
   index = 0,
+  delay,
   className = "",
   children,
 }: {
@@ -118,12 +119,14 @@ export function Card({
   h: number;
   title?: string;
   index?: number;
+  /** A fixed start offset added to the stagger, e.g. "1.2s". */
+  delay?: string;
   className?: string;
   children?: ReactNode;
 }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <g className={`sc-card sc-rise ${className}`} style={at(index)}>
+      <g className={`sc-card sc-rise ${className}`} style={at(index, delay)}>
         <rect width={w} height={h} rx={12} />
         {title && (
           <text className="sc-card-title" x={14} y={22}>

@@ -10,6 +10,18 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.21] - 2026-10-17
+
+### Changed
+
+- Website: every page now has the sign-in pages' backdrop (a very light med-tech photo under a white wash, fixed while
+  the page scrolls); cards, the header and the navy panels sit on top of it. The signed-in application is unchanged.
+- Website: the 45 photo illustrations are replaced by animated scenes drawn on the page (`frontend/src/site/scenes/`),
+  each showing the idea of the text beside it with the illustrative OrbitCare 300 story: page heroes on a navy stage,
+  section and card pictures on a light one, and simpler versions for the home page's small step frames. Each scene
+  animates once as it scrolls into view, with at most a gentle loop, and is shown still for people who ask for reduced
+  motion; its accessible name is the former picture's alt text.
+
 ## [0.10.20] - 2026-10-17
 
 ### Added

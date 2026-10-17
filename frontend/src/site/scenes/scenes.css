@@ -47,7 +47,8 @@
 :where(.sc text:not([fill])) {
   fill: var(--sc-ink);
 }
-.sc text {
+/* A default size that any fontSize attribute or style overrides. */
+:where(.sc text) {
   font-size: 13px;
 }
 /* A scene in a picture frame replaces the photo (motion.tsx Photo): the frame keeps its shape and shadow. */
@@ -94,12 +95,12 @@
 .sc-chip-muted text {
   fill: var(--sc-muted);
 }
-.sc-card > rect {
+.sc-card > rect:first-child {
   fill: var(--sc-panel);
   stroke: var(--sc-line);
   filter: drop-shadow(0 6px 14px rgb(16 32 47 / 10%));
 }
-.sc-dark .sc-card > rect {
+.sc-dark .sc-card > rect:first-child {
   filter: none;
 }
 .sc-card-title {

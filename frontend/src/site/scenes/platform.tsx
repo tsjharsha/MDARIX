@@ -98,7 +98,7 @@ function Product360({ label }: { label: string }) {
     { depth: 1, text: "Rev B · 2026", tone: "teal" },
     { depth: 2, text: "Pressure sensor PS-2", tone: "ink" },
     { depth: 3, text: "Supplier · Kestrel Sensors", tone: "amber" },
-    { depth: 2, text: "Lots 003 · 004 · 005", tone: "ink" },
+    { depth: 2, text: "Lots 003 – 006", tone: "ink" },
   ];
   const stats = [
     { title: "Complaints", value: "42", bar: 0.84, tone: "var(--sc-amber)" },

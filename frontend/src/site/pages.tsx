@@ -406,7 +406,7 @@ export function HomePage() {
           {steps.map((step, index) => (
             <Reveal key={step.title} delay={index * 90} className="ms-step">
               <a href={step.href}>
-                <Photo src={step.image} alt={step.alt} />
+                <Photo src={step.image} alt={step.alt} compact />
                 <span className="ms-step-index">0{index + 1}</span>
                 <h3>{step.title}</h3>
                 <p>{step.text}</p>

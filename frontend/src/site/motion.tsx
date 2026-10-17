@@ -48,13 +48,16 @@ export function Photo({
   alt,
   caption,
   className = "",
+  compact = false,
 }: {
   src: string;
   alt: string;
   caption?: string;
   className?: string;
+  /** A small frame: use the scene's simpler version when it has one. */
+  compact?: boolean;
 }) {
-  const Scene = sceneFor(src);
+  const Scene = sceneFor(src, compact);
   return (
     <figure className={`ms-photo ${className}`}>
       <div className="ms-photo-frame">
