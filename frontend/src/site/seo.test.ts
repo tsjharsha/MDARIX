@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import robots from "../../public/robots.txt?raw";
+import robotsFile from "../../public/robots.txt?raw";
 import sitemap from "../../public/sitemap.xml?raw";
 import indexHtml from "../../index.html?raw";
 import { INDEXED_PATHS, PAGE_META, SITE_URL } from "./seo";
 import { SITE_PAGES } from "./pages";
+
+// A Windows checkout may turn the file's line endings into CRLF; the rules are the same.
+const robots = robotsFile.replace(/\r\n/g, "\n");
 
 describe("what search engines read", () => {
   it("gives every website page its own title and a description short enough to show in full", () => {

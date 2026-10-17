@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { sceneFor } from "./scenes";
 
 /** Fade/slide content in as it scrolls into view. Visible immediately when motion is reduced or unsupported. */
 export function Reveal({
@@ -40,22 +41,27 @@ export function Reveal({
   );
 }
 
-/** A photo with a slow "living" zoom. */
+/** A photo with a slow "living" zoom, or, where one has been drawn, the animated scene that replaces it
+ * (scenes/index.ts), in the same frame, with the photo's alt text as its accessible name. */
 export function Photo({
   src,
   alt,
   caption,
   className = "",
+  compact = false,
 }: {
   src: string;
   alt: string;
   caption?: string;
   className?: string;
+  /** A small frame: use the scene's simpler version when it has one. */
+  compact?: boolean;
 }) {
+  const Scene = sceneFor(src, compact);
   return (
     <figure className={`ms-photo ${className}`}>
       <div className="ms-photo-frame">
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+        {Scene ? <Scene label={alt} /> : <img src={src} alt={alt} loading="lazy" decoding="async" />}
       </div>
       {caption && <figcaption>{caption}</figcaption>}
     </figure>
