@@ -1,0 +1,13 @@
+# The MDARIX website is open to search engines; sign-in, account screens, the signed-in application and the API are not.
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /platform-admin
+Disallow: /api/
+Disallow: /signin
+Disallow: /forgot-password
+Disallow: /activate-account
+Disallow: /reset-password
+Disallow: /mfa
+
+Sitemap: https://mdarix.in/sitemap.xml

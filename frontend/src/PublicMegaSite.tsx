@@ -3,6 +3,7 @@ import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
+import { applyPageMeta } from "./site/seo";
 import { lifecycleStages, platformGroups, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
 import {
   CompanyPage,
@@ -193,7 +194,7 @@ export function PublicMegaSite({ path }: { path: string }) {
     const target = `${page}${hash ? `#${hash}` : ""}`;
     if (page !== "not-found" && `${window.location.pathname}${window.location.hash}` !== target)
       window.history.replaceState(null, "", target);
-    document.title = page === "/" ? "MDARIX · Product investigation intelligence" : `MDARIX · ${pageTitle(page)}`;
+    applyPageMeta(page === "not-found" ? null : page);
     if (hash) window.setTimeout(() => document.getElementById(hash)?.scrollIntoView({ block: "start" }), 60);
     else window.scrollTo({ top: 0 });
   }, [page, hash]);
@@ -361,23 +362,4 @@ export function PublicMegaSite({ path }: { path: string }) {
       </footer>
     </div>
   );
-}
-
-function pageTitle(page: Page) {
-  return {
-    "/": "Home",
-    "/platform": "Platform",
-    "/solutions": "Solutions",
-    "/product-lifecycle": "Product lifecycle",
-    "/trust": "Trust",
-    "/resources": "Resources",
-    "/company": "Company",
-    "/videos": "Free trial videos",
-    "/privacy": LEGAL_PAGES["/privacy"].title,
-    "/terms": LEGAL_PAGES["/terms"].title,
-    "/trial-agreement": LEGAL_PAGES["/trial-agreement"].title,
-    "/security": "Security",
-    "/contact": "Contact",
-    "not-found": "Page not found",
-  }[page];
 }
