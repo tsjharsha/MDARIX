@@ -18,8 +18,10 @@
   --ms-radius: 14px;
   --ms-max: 1200px;
 
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  background: var(--ms-surface);
+  background: var(--ms-ground);
   color: var(--ms-ink);
   font-family:
     Inter,
@@ -30,6 +32,28 @@
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+/* The sign-in pages' backdrop (styles.css .auth-page) behind every website page: a very light med-tech photo under a
+   white wash, fixed while the page scrolls. Website only: the signed-in application never uses .mdx-site. Cards,
+   the header and the navy panels keep their own solid backgrounds on top of it. */
+.mdx-site::before,
+.mdx-site::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+.mdx-site::before {
+  z-index: -2;
+  background: url("/site/medtech-product-360-device.webp") center / cover no-repeat;
+  opacity: 0.18;
+  filter: saturate(0.6);
+}
+.mdx-site::after {
+  z-index: -1;
+  background:
+    radial-gradient(60% 70% at 85% 40%, #ffffffcc, transparent 70%),
+    linear-gradient(115deg, #f3f6faf2 0%, #f3f6fab3 45%, #eef5f5cc 100%);
 }
 .mdx-site *,
 .mdx-site *::before,
@@ -735,7 +759,7 @@
   max-width: none;
   padding-left: max(24px, calc((100vw - var(--ms-max)) / 2));
   padding-right: max(24px, calc((100vw - var(--ms-max)) / 2));
-  background: var(--ms-ground);
+  background: rgb(255 255 255 / 45%);
 }
 .ms-section-head {
   max-width: 760px;
@@ -804,7 +828,7 @@
   font-size: 15px;
 }
 .ms-card-flat {
-  background: var(--ms-ground);
+  background: var(--ms-surface);
 }
 .ms-band .ms-card-flat {
   background: #fff;
