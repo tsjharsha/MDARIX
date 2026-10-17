@@ -11,6 +11,24 @@
   color: var(--text-primary);
   background: var(--canvas);
   font-family: Inter, "Segoe UI", Arial, sans-serif;
+  --page-zoom: 1;
+}
+
+/* Page scale. A laptop at 125–150% display scaling gives the browser only 1,100–1,800 px of width, and the pages,
+   laid out for a desktop, look oversized at 100%. On such a screen (mouse-driven, high pixel density) the website
+   and the app are drawn at 80% or 90%, as browser zoom would; phones, tablets, standard-density and wide screens
+   stay at 100%. --page-zoom carries the same number for viewport lengths (postcss.config.js). */
+@media (hover: hover) and (pointer: fine) and (min-resolution: 1.25dppx) and (min-width: 1100px) and (max-width: 1439.98px) {
+  :root {
+    --page-zoom: 0.8;
+    zoom: 0.8;
+  }
+}
+@media (hover: hover) and (pointer: fine) and (min-resolution: 1.25dppx) and (min-width: 1440px) and (max-width: 1799.98px) {
+  :root {
+    --page-zoom: 0.9;
+    zoom: 0.9;
+  }
 }
 
 body {

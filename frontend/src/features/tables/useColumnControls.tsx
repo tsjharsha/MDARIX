@@ -54,6 +54,11 @@ export type HeaderControls = {
 
 type DragState = { key: string; over?: string; side?: "before" | "after" };
 
+/** The scale the page is drawn at (styles.css, "Page scale"): screen distances divide by it to become CSS widths. */
+function pageZoom(): number {
+  return Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+}
+
 /**
  * Lets people arrange a list's columns: drag a heading onto another to move it (or Alt+Left / Alt+Right on the
  * heading), and drag the right edge of a heading to change its width (or arrow keys on that edge; a double-click
@@ -100,7 +105,7 @@ export function useColumnControls({
     const result: Record<string, number> = {};
     headRow.current?.querySelectorAll<HTMLElement>("th[data-col]").forEach((cell) => {
       const key = cell.dataset.col;
-      if (key) result[key] = clampWidth(cell.getBoundingClientRect().width);
+      if (key) result[key] = clampWidth(cell.getBoundingClientRect().width / pageZoom());
     });
     return result;
   };
@@ -122,7 +127,7 @@ export function useColumnControls({
     let latest = base;
     grip.setPointerCapture(event.pointerId);
     const move = (moveEvent: PointerEvent) => {
-      latest = { ...base, [key]: clampWidth(startWidth + moveEvent.clientX - startX) };
+      latest = { ...base, [key]: clampWidth(startWidth + (moveEvent.clientX - startX) / pageZoom()) };
       preview({ ...layout, widths: latest });
     };
     const end = () => {
