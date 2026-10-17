@@ -3,11 +3,14 @@
 Organized by the management review inputs of ISO 13485:2016 clause 5.6.2 that MDARIX holds records for (feedback and
 complaint handling, reporting to regulatory authorities, corrective and preventive action), with the trend check and
 today's readiness checks; under the QMSR, FDA can now read management review records. Counts come from the
-organization's records as imported into MDARIX for the period chosen; nothing here is a conclusion or advice.
+organization's records as imported into MDARIX for the period chosen; nothing here is a conclusion or advice. The
+summary ends with the standards it references (the sections' clauses, each check's basis and the reporting windows'
+basis), from the one catalog in backend/app/standards.py.
 """
 
 from __future__ import annotations
 
+import textwrap
 import uuid
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
@@ -23,10 +26,16 @@ from backend.app.db.models.reportability import ComplaintReportability
 from backend.app.db.models.signals import Signal
 from backend.app.readiness_home import service
 from backend.app.reportability import rules as report_rules
+from backend.app.standards import DISCLAIMER, entries, known
 
 PERIOD_DEFAULT, PERIOD_MIN, PERIOD_MAX = 365, 30, 1095
 TOP_GROUPS = 15
 WATERMARK = "MANAGEMENT REVIEW INPUT - VERIFY AGAINST SOURCE RECORDS"
+# The clauses the sections' headings cite, as catalog ids: management review inputs (sections 2, 3 and 6) and
+# post-production information in the risk file (section 5).
+SECTION_BASIS = ("ISO13485_5_6_2", "ISO14971_10")
+# The standards table's column widths in characters (the PDF is set in Courier, so the columns line up).
+SHORT_WIDTH, TITLE_WIDTH = 25, 52
 STATE_WORDS = {
     service.CLEAR: "clear",
     service.ATTENTION: "needs attention",
@@ -114,13 +123,15 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
     ]
     from backend.app.reportability.service import settings_of
 
+    windows = settings_of(db, tenant_id)["windows"]
     reporting = {
         "decisions": len(decisions),
         "reported": sum(1 for row in decisions if row.decision == report_rules.REPORTED),
         "not_reportable": sum(1 for row in decisions if row.decision == report_rules.NOT_REPORTABLE),
         "inside_window": sum(1 for value in timeliness if value is True),
         "after_window": sum(1 for value in timeliness if value is False),
-        "windows": [window["name"] for window in settings_of(db, tenant_id)["windows"]],
+        "windows": [window["name"] for window in windows],
+        "basis": known(code for window in windows for code in window.get("basis") or []),
     }
     signals = Counter(
         status
@@ -181,7 +192,7 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "checks_signed_not_effective": signed.get("NOT_EFFECTIVE", 0),
         "now": capa_check.get("detail"),
     }
-    return {
+    data = {
         "period": {"from": start.isoformat(), "to": today.isoformat(), "days": period_days},
         "readiness": checks,
         "complaints": complaints,
@@ -199,6 +210,21 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
             "Reporting windows are the organization's own; MDARIX keeps the clock and decides nothing.",
         ],
     }
+    data["standards"] = {"entries": entries(referenced(data)), "note": DISCLAIMER}
+    return data
+
+
+def _ids(chips) -> list[str]:
+    return [chip["id"] for chip in chips or [] if isinstance(chip, dict) and chip.get("id")]
+
+
+def referenced(data: dict) -> list[str]:
+    """The catalog ids the summary cites: its sections' clauses, each check's basis and the reporting windows' basis."""
+    cited = [*SECTION_BASIS]
+    for check in (data.get("readiness") or {}).get("checks") or []:
+        cited += _ids(check.get("basis"))
+    cited += (data.get("reporting") or {}).get("basis") or []
+    return known(cited)
 
 
 def _trend_basis_limitation(basis: dict) -> str:
@@ -247,6 +273,8 @@ def lines(data: dict) -> list[tuple[str, str]]:
         value = "-" if check["value"] is None else check["value"]
         body(f"- {check['title']}: {value} ({STATE_WORDS.get(check['state'], check['state'])}). {check['detail']}")
         muted(f"    Why: {check['why']}")
+        if check.get("basis"):
+            muted("    Basis: " + "; ".join(chip["short"] for chip in check["basis"]))
 
     complaints = data["complaints"]
     heading("2. Feedback and complaint handling (management review inputs, ISO 13485:2016 clause 5.6.2)")
@@ -276,6 +304,9 @@ def lines(data: dict) -> list[tuple[str, str]]:
     body(
         "Reporting windows: " + ("; ".join(reporting["windows"]) if reporting["windows"] else "none entered yet") + "."
     )
+    window_basis = entries(reporting.get("basis") or [])
+    if window_basis:
+        muted("    Basis of the windows: " + "; ".join(entry["short"] for entry in window_basis))
 
     trends = data["trends"]
     heading("4. Trends (inputs to risk management and CAPA)")
@@ -318,6 +349,15 @@ def lines(data: dict) -> list[tuple[str, str]]:
     heading("7. Limitations")
     for item in data["limitations"]:
         muted(f"- {item}")
+
+    heading("8. Standards referenced")
+    body(f"{'Standard':<{SHORT_WIDTH}}{'Title':<{TITLE_WIDTH}}Jurisdiction")
+    for entry in entries(referenced(data)):
+        title = textwrap.wrap(entry["title"], TITLE_WIDTH - 2) or [""]
+        body(f"{entry['short']:<{SHORT_WIDTH}}{title[0]:<{TITLE_WIDTH}}{entry['jurisdiction']}")
+        for more in title[1:]:
+            body(" " * SHORT_WIDTH + more)
+    muted(DISCLAIMER)
     return out
 
 

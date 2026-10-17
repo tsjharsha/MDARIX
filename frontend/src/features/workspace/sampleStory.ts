@@ -1,7 +1,9 @@
 // The free trial's sample dataset, explained (Getting started › sections/SampleData.tsx): what it holds, how it was
 // made and the pain point each part re-creates, with the requirement behind it and the screen that shows it. The
 // records are those backend/app/trial/sample_data.py writes when a trial is approved; the counts come from the
-// trial's status (GET /api/v1/trial/status, `sample`).
+// trial's status (GET /api/v1/trial/status, `sample`). References come from the one catalog of standards
+// (features/shared/standards.ts) where it has the exact entry, and are kept as written where it has none.
+import { cite } from "../shared/standards";
 
 export type SampleCounts = {
   products?: number;
@@ -19,7 +21,7 @@ export type SamplePain = {
   inSample: readonly string[];
   /** Why it matters: what an inspector or notified body checks, in one sentence. */
   requirement: string;
-  /** The requirement it comes from. */
+  /** The requirement it comes from (built with cite from the catalog). */
   reference: string;
   opens: { section: string; tab?: string };
   action: string;
@@ -35,7 +37,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "SAMPLE-RV-03 to 05: three No Fault Found returns on OrbitCare 300 within a year.",
     ],
     requirement: "Every complaint is evaluated, and investigated where the device may have failed.",
-    reference: "ISO 13485 clause 8.2.2, part of FDA's QMSR since 2 February 2026",
+    reference: cite("ISO13485_8_2_2", "QMSR"),
     opens: { section: "Complaints", tab: "Second look" },
     action: "Open the second look",
   },
@@ -50,7 +52,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     ],
     requirement:
       "FDA reports within 30 calendar days (5 work days when remedial action is needed); EU serious incidents within 15 days, sooner for a death.",
-    reference: "21 CFR 803; EU MDR Article 87",
+    reference: cite("21 CFR 803", "MDR_87"),
     opens: { section: "Complaints", tab: "Reportability" },
     action: "Open the reportability watch",
   },
@@ -62,7 +64,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "The patient needed oxygen; the record was closed after a training call.",
     ],
     requirement: "A complaint that involves injury is investigated, or the reason it is not is recorded.",
-    reference: "ISO 13485 clause 8.2.2",
+    reference: cite("ISO13485_8_2_2"),
     opens: { section: "Readiness" },
     action: "See the inspection check",
   },
@@ -76,7 +78,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "PulseWatch 410 and VentraLink 250 stay flat, as a background.",
     ],
     requirement: "Complaint data is analysed for trends, and a significant increase is reported.",
-    reference: "ISO 13485 clause 8.4; EU MDR Article 88",
+    reference: cite("ISO13485_8_4", "MDR_88"),
     opens: { section: "Signals", tab: "Trend check" },
     action: "Open the trend check",
   },
@@ -89,7 +91,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "Its Decision Brief, written by a sample author, is waiting for your quality review and your signature.",
     ],
     requirement: "The cause is found before action is taken, and every conclusion traces back to its evidence.",
-    reference: "ISO 13485 clauses 8.2.2 and 8.5.2",
+    reference: cite("ISO13485_8_2_2", "ISO13485_8_5_2"),
     opens: { section: "Investigations" },
     action: "Open the investigation",
   },
@@ -101,7 +103,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "SAMPLE-CAPA-02: its effectiveness check is due in 12 days.",
     ],
     requirement: "Corrective action is verified to be effective and to have no adverse effect.",
-    reference: "ISO 13485 clause 8.5.2",
+    reference: cite("ISO13485_8_5_2"),
     opens: { section: "Records", tab: "Effectiveness checks" },
     action: "Open the effectiveness checks",
   },
@@ -113,7 +115,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "PulseWatch 410: no risk recorded in MDARIX at all.",
     ],
     requirement: "Production and post-production information is fed back into the risk file.",
-    reference: "ISO 14971:2019 clause 10",
+    reference: cite("ISO14971_10"),
     opens: { section: "Records", tab: "Risk file input" },
     action: "Open the risk file input",
   },

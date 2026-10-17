@@ -275,6 +275,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             steps: [
               "The ring shows how many inspection checks are clear.",
               "Each check shows its state (Clear, Needs attention, Critical or Not set up), the records behind it and Why it matters.",
+              "Under Why it matters, small chips name the check's regulatory basis, for example ISO 13485 8.2.2 or 21 CFR 803.50; point at a chip for its title. MDARIX organizes the evidence these ask for; it does not certify compliance.",
               "Choose Open on a check to go to the screen where you act on it.",
             ],
             note: "The eight checks: Complaints to recheck, Complaints past target, Reporting clocks, Trends without CAPA or risk review, Post-market data not in the risk file, Harm complaints closed without an investigation, CAPAs without a verified effect, Signals waiting past their triage date.",
@@ -287,6 +288,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose Download PDF for the readiness summary, or Inspection pack (ZIP) for the summary, every check and every record behind it as CSV, with SHA-256 fingerprints.",
             ],
             result: "Downloaded, with the file's name.",
+            note: "The summary ends with Standards referenced: each standard it cites, with its title and jurisdiction. The pack's 00-README.txt lists the basis each file supports.",
           },
         ],
       },
@@ -394,6 +396,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Open Complaints › Reporting windows and choose Add a window.",
               "Start from a template (FDA MDR, EU MDR, MHRA or Health Canada) or A blank window.",
               "Check each window's Name, Days, Counted in (Calendar days or Work days), what starts the clock (Death, Serious injury, Malfunction) and its Markets.",
+              "A window started from a template keeps its basis (21 CFR 803.50 and 803.53, EU MDR Art. 87, UK MDR 2002 or SOR/98-282), shown under Basis and beside the window's name on each Reportability card.",
               "Give a Reason for the change (for example your procedure's revision) and choose Save reporting windows.",
             ],
           },
@@ -468,6 +471,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Each row's Result is Significant rise (chance under 1% if nothing changed), Higher than usual (under 5%), In line with history, Too few to assess or History too short.",
               "On a rising row with no open signal, choose Raise a signal (PMS / Signal Triage Lead and Leader).",
             ],
+            note: "The line under the table names the basis: ISO 13485 8.4 (analysis of data) and EU MDR Art. 88 (trend reporting).",
           },
           {
             title: "Change a detection rule",
@@ -703,7 +707,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "In Sign the decision, enter Your password and the Authenticator code, and choose Sign decision.",
             ],
             result:
-              "The signed record opens: who signed, when, the meaning of the signature and a fingerprint of the brief version reviewed, so any later change is detected.",
+              "The signed record opens: who signed, when, the meaning of the signature and a fingerprint of the brief version reviewed, so any later change is detected. A line names what it records of 21 CFR 11.50 and 11.70.",
           },
           {
             title: "Open the CAPA and carry out the follow-ups",
@@ -772,6 +776,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose Effective: the criteria are met, or Not effective: plan a further action.",
               "Write What you found, enter Your password and the Authenticator code, and choose Sign the result.",
             ],
+            note: "The board's basis is ISO 13485 8.5.2 (corrective action). A signed round keeps the date and time, the meaning of the signature and a link to the exact check signed (21 CFR 11.50 and 11.70).",
           },
         ],
       },

@@ -1,0 +1,161 @@
+{
+  "disclaimer": "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its validation stay yours.",
+  "standards": [
+    {
+      "id": "ISO13485_4_2_5",
+      "short": "ISO 13485 4.2.5",
+      "title": "Control of records",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_5_6_2",
+      "short": "ISO 13485 5.6.2",
+      "title": "Management review input",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_7_3_9",
+      "short": "ISO 13485 7.3.9",
+      "title": "Control of design and development changes",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_7_4",
+      "short": "ISO 13485 7.4",
+      "title": "Purchasing (suppliers)",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_8_2_1",
+      "short": "ISO 13485 8.2.1",
+      "title": "Feedback",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_8_2_2",
+      "short": "ISO 13485 8.2.2",
+      "title": "Complaint handling",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_8_2_3",
+      "short": "ISO 13485 8.2.3",
+      "title": "Reporting to regulatory authorities",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_8_4",
+      "short": "ISO 13485 8.4",
+      "title": "Analysis of data",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "ISO13485_8_5_2",
+      "short": "ISO 13485 8.5.2",
+      "title": "Corrective action",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "QMSR",
+      "short": "21 CFR 820 (QMSR)",
+      "title": "Quality Management System Regulation, incorporating ISO 13485:2016 since 2 February 2026",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR820_35",
+      "short": "21 CFR 820.35",
+      "title": "Control of records (QMSR)",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR803_17",
+      "short": "21 CFR 803.17",
+      "title": "Written MDR procedures",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR803_50",
+      "short": "21 CFR 803.50",
+      "title": "30-day reports by manufacturers",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR803_53",
+      "short": "21 CFR 803.53",
+      "title": "5-day reports",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR11_10E",
+      "short": "21 CFR 11.10(e)",
+      "title": "Audit trails",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR11_50",
+      "short": "21 CFR 11.50",
+      "title": "Signature manifestations",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR11_70",
+      "short": "21 CFR 11.70",
+      "title": "Signature/record linking",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "CFR11_200",
+      "short": "21 CFR 11.200",
+      "title": "Electronic signature components and controls",
+      "jurisdiction": "United States"
+    },
+    {
+      "id": "MDR_83",
+      "short": "EU MDR Art. 83",
+      "title": "Post-market surveillance system",
+      "jurisdiction": "European Union"
+    },
+    {
+      "id": "MDR_87",
+      "short": "EU MDR Art. 87",
+      "title": "Reporting of serious incidents and field safety corrective actions",
+      "jurisdiction": "European Union"
+    },
+    {
+      "id": "MDR_88",
+      "short": "EU MDR Art. 88",
+      "title": "Trend reporting",
+      "jurisdiction": "European Union"
+    },
+    {
+      "id": "ISO14971_10",
+      "short": "ISO 14971 clause 10",
+      "title": "Production and post-production activities",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "IEC62304_9",
+      "short": "IEC 62304 clause 9",
+      "title": "Software problem resolution process",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "IMDRF_AET",
+      "short": "IMDRF AET",
+      "title": "Adverse event terminology",
+      "jurisdiction": "International"
+    },
+    {
+      "id": "UK_MDR",
+      "short": "UK MDR 2002 (as amended)",
+      "title": "Post-market surveillance and vigilance (Great Britain)",
+      "jurisdiction": "United Kingdom"
+    },
+    {
+      "id": "CA_MDR",
+      "short": "SOR/98-282 ss. 59–61",
+      "title": "Mandatory problem reporting (Canada)",
+      "jurisdiction": "Canada"
+    }
+  ]
+}

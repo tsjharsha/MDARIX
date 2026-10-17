@@ -22,6 +22,7 @@ import {
   type FollowUp,
 } from "../afterDecision";
 import { CaseStoryLink } from "./CaseStoryLink";
+import { SignatureBasis } from "../../shared/Basis";
 
 const record = (value: unknown): Record<string, any> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
@@ -191,6 +192,7 @@ export function DecisionRecordDrawer({
                 {signature.signature_meaning}
               </p>
             )}
+            <SignatureBasis />
           </section>
           <section className="ca-drawer-section" aria-label="Follow-up actions">
             <h3>Follow-up actions</h3>

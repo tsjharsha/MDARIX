@@ -10,6 +10,7 @@ import { VIEW_TO_SECTION } from "./UserWorkspace";
 import { viewFromPath } from "../../app/router";
 import type { ReportabilitySettings, WatchItem } from "./reportability";
 import type { CapaDetail, CapaItem } from "./effectiveness";
+import { BASIS_DISCLAIMER, SIGNATURE_BASIS } from "../shared/standards";
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {
@@ -51,6 +52,7 @@ const watchItem = (overrides: Partial<WatchItem> = {}): WatchItem => ({
       state: "DUE_SOON",
       days_left: 2,
       triggers: ["DEATH", "MALFUNCTION"],
+      basis: ["CFR803_50", "CFR803_53"],
     },
   ],
   binding: {
@@ -61,6 +63,7 @@ const watchItem = (overrides: Partial<WatchItem> = {}): WatchItem => ({
     state: "DUE_SOON",
     days_left: 2,
     triggers: ["DEATH", "MALFUNCTION"],
+    basis: ["CFR803_50", "CFR803_53"],
   },
   follow_ups: [
     {
@@ -89,6 +92,16 @@ describe("a complaint on the reportability watch", () => {
     expect(markup).toContain("uw-cr-rail tone-warning");
     expect(markup).toContain("Record decision");
     expect(markup).toContain("Open investigation");
+  });
+
+  it("names the basis of its window beside the window's name", () => {
+    const markup = render(<WatchCard item={watchItem()} onDecide={vi.fn()} />, []);
+    expect(markup).toContain('aria-label="Basis of the window"');
+    expect(markup).toContain('title="30-day reports by manufacturers">21 CFR 803.50<');
+    expect(markup).toContain(">21 CFR 803.53<");
+    const without = watchItem();
+    const binding = without.binding ? { ...without.binding, basis: [] } : null;
+    expect(render(<WatchCard item={{ ...without, binding }} onDecide={vi.fn()} />, [])).not.toContain("uw-basis");
   });
 
   it("offers no decision to a role without regulatory review or approval", () => {
@@ -130,6 +143,7 @@ describe("the reporting windows", () => {
         days: 30,
         day_basis: "CALENDAR",
         note: "A 5-work-day report rests on a judgment",
+        basis: ["CFR803_50", "CFR803_53"],
       },
     ],
     lookback_days: 365,
@@ -142,6 +156,7 @@ describe("the reporting windows", () => {
         days: 15,
         day_basis: "CALENDAR",
         note: null,
+        basis: ["MDR_87"],
       },
     ],
     version: 3,
@@ -155,12 +170,20 @@ describe("the reporting windows", () => {
     expect(markup).toContain("EU MDR: serious incident (15 days)");
     expect(markup).toContain("Templates are a starting point");
     expect(markup).toContain("Rita Regulatory");
+    // Each window and template names its basis; the disclaimer is said once.
+    expect(markup).toContain(">21 CFR 803.50<");
+    expect(markup).toContain(">EU MDR Art. 87<");
+    expect(markup.split(BASIS_DISCLAIMER).length).toBe(2);
   });
 
   it("shows them read-only to everyone else", () => {
     const markup = render(<WindowsBody settings={settings} onSaved={vi.fn()} />, ["regulatory.review"]);
     expect(markup).not.toContain("Save reporting windows");
     expect(markup).toContain("30 calendar days · starts on death, serious injury, malfunction · 2 markets");
+    expect(markup).toContain(">21 CFR 803.53<");
+    expect(markup).toContain(BASIS_DISCLAIMER);
+    const handMade = { ...settings, windows: [{ ...settings.windows[0], basis: [] }] };
+    expect(render(<WindowsBody settings={handMade} onSaved={vi.fn()} />, [])).not.toContain(BASIS_DISCLAIMER);
   });
 });
 
@@ -281,6 +304,30 @@ describe("CAPA effectiveness", () => {
     expect(markup).toContain("Effective: the criteria are met");
     expect(markup).toContain("Authenticator code");
     expect(markup).toContain("Change the plan");
+  });
+
+  it("says what a signed round records, and only once a round is signed", () => {
+    const signed: CapaDetail["rounds"][number] = {
+      id: "k-0",
+      round: 1,
+      status: "EFFECTIVE",
+      criteria: "At most one OCC complaint in 90 days",
+      planned_on: "2026-09-20",
+      measured_from: "2026-08-01",
+      plan_version: 1,
+      planned_by: "Ivy Investigator",
+      planned_at: "2026-08-01T10:00:00Z",
+      result_summary: "No recurrence",
+      evidence: {},
+      signed_by: "Quinn Quality",
+      signer_role: "QUALITY_REVIEWER",
+      signed_at: "2026-09-21T10:00:00Z",
+      content_fingerprint: "a".repeat(64),
+    };
+    const markup = render(<CheckBody detail={detail({ rounds: [signed] })} onChanged={vi.fn()} />, []);
+    expect(markup).toContain(SIGNATURE_BASIS);
+    expect(markup).toContain(BASIS_DISCLAIMER);
+    expect(render(<CheckBody detail={detail()} onChanged={vi.fn()} />, [])).not.toContain(SIGNATURE_BASIS);
   });
 
   it("offers no signature to a role that may only plan", () => {

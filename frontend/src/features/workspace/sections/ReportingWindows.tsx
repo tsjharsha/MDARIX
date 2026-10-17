@@ -18,11 +18,12 @@ import {
 } from "../reportability";
 import { countOf } from "./common";
 import { InlineError } from "./boardParts";
+import { BasisChips, BasisNote } from "../../shared/Basis";
 
 /**
  * Complaints › Reporting windows: the windows the reportability watch counts against, entered from the organization's
  * own procedure (FDA, EU or any other authority). Changed by a person with regulatory approval, with a reason;
- * versioned and audited.
+ * versioned and audited. A window started from a template keeps the template's regulatory basis, shown as chips.
  */
 export function ReportingWindows() {
   const settings = useResource<ReportabilitySettings>("/api/v1/complaints/reportability-settings");
@@ -101,6 +102,7 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
                   {window.markets.length ? countOf(window.markets.length, "market") : "every market"}
                 </span>
                 {window.note && <small>{window.note}</small>}
+                <BasisChips ids={window.basis} />
               </li>
             ))}
           </ul>
@@ -115,6 +117,11 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
           {forms.map((form, index) => (
             <fieldset className="ca-drawer-section uw-rw-window" key={form.key}>
               <legend>Window {index + 1}</legend>
+              {form.basis.length > 0 && (
+                <p className="ac-muted">
+                  Basis: <BasisChips ids={form.basis} />
+                </p>
+              )}
               <div className="ca-form-grid">
                 <label className="ca-field">
                   Name
@@ -208,7 +215,7 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
                     className="ac-secondary"
                     onClick={() => setForms((current) => [...current, windowForm(template)])}
                   >
-                    <Plus size={14} aria-hidden="true" /> {template.name}
+                    <Plus size={14} aria-hidden="true" /> {template.name} <BasisChips ids={template.basis} />
                   </button>
                 ))}
               <button
@@ -263,6 +270,9 @@ export function WindowsBody({ settings, onSaved }: { settings: ReportabilitySett
             </button>
           </div>
         </form>
+      )}
+      {(canEdit ? [...forms, ...settings.templates] : settings.windows).some((window) => window.basis.length > 0) && (
+        <BasisNote />
       )}
     </>
   );

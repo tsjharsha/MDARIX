@@ -7,6 +7,9 @@ import { collapsed } from "./complaintReview";
 export const RECORDS_TABS = ["Effectiveness checks", "Risk file input"] as const;
 export type RecordsTab = (typeof RECORDS_TABS)[number];
 
+/** The effectiveness board's regulatory basis (catalog ids): corrective action, verified to be effective. */
+export const EFFECTIVENESS_BASIS: readonly string[] = ["ISO13485_8_5_2"];
+
 export const EFFECTIVENESS_LIMITS = {
   criteriaMin: 10,
   criteriaMax: 2000,

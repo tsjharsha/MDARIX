@@ -10,6 +10,44 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.23] - 2026-10-18
+
+### Added
+
+- The regulatory basis of every report and finding, from one catalog (`backend/app/standards.py`, mirrored for the
+  web app in `frontend/src/features/shared/standards.json`; a test keeps the two identical): 26 clauses, sections and
+  articles of ISO 13485, 21 CFR 820 (QMSR), 803 and 11, the EU MDR, ISO 14971, IEC 62304, IMDRF, the UK MDR 2002 and
+  SOR/98-282, each with its short form, title and jurisdiction. Wherever a basis is shown, the page or report says
+  once: "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its
+  validation stay yours."
+- Readiness: each inspection check returns its `basis` and shows it as small chips under "Why it matters" (hidden
+  complaints: ISO 13485 8.2.2 and 21 CFR 820.35; late reports: ISO 13485 8.2.3, 21 CFR 803.50 and 803.53, EU MDR
+  Art. 87; trends without action: ISO 13485 8.4 and EU MDR Art. 88; CAPAs without a verified effect: ISO 13485
+  8.5.2; risk file input: ISO 14971 clause 10; backlog and harm closed without an investigation: ISO 13485 8.2.2;
+  signals past their triage date: ISO 13485 8.4).
+- The management review summary (PDF and `GET /api/v1/readiness/summary`) names each check's basis and the reporting
+  windows' basis, and ends with "8. Standards referenced": the standards the report uses, with title and jurisdiction.
+  The PDF writer now prints en and em dashes and typographic quotes instead of a question mark.
+- The inspection pack's `00-README.txt` lists the basis each file supports and the standards referenced;
+  `02-inspection-checks.csv` has a Basis column.
+- Reporting windows: each template carries its basis (FDA: 21 CFR 803.50 and 803.53; EU: EU MDR Art. 87; Great
+  Britain: UK MDR 2002; Canada: SOR/98-282 ss. 59–61), kept by a window started from it and shown in Complaints ›
+  Reporting windows and beside the window's name on each Reportability card. Windows saved before this release take
+  their template's basis while they keep its name; a window entered by hand has none. No schema change: the basis is
+  stored with the windows.
+- Signals › Trend check and Records › Effectiveness checks name their basis (ISO 13485 8.4 and EU MDR Art. 88; ISO
+  13485 8.5.2).
+- The signed record of a decision, a signed CAPA effectiveness round and the signature verification screens say:
+  "Records, as 21 CFR 11.50 and 11.70 call for, the date and time of signing, its meaning, and a link to the exact
+  record signed." The signer is recorded by their account and their name is read from the user directory when the
+  record is shown, so the sentence does not claim the name.
+
+### Changed
+
+- The trial's "What were you cited for?" themes and the sample data story take their references from the catalog
+  where it has the exact entry (for example "ISO 13485 8.2.2; 21 CFR 820 (QMSR)"), and keep their wording where it
+  has none (21 CFR 803 as a whole, ISO 13485 8.3 and 5.6).
+
 ## [0.10.22] - 2026-10-17
 
 ### Changed

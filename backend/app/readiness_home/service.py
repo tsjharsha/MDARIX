@@ -13,6 +13,8 @@ Further inspection checks drawn from 2025-2026 findings:
 - CAPA_EFFECTIVENESS: CAPAs closed without an effectiveness check, and checks overdue;
 - TRIAGE_OVERDUE: signals still awaiting triage past their due date.
 
+Each check names its regulatory basis (``BASIS``, ids of the one catalog in backend/app/standards.py).
+
 Nothing here changes a record. Every count is of the organization's records as imported into MDARIX.
 """
 
@@ -30,6 +32,7 @@ from backend.app.db.models.foundation import Capa, Complaint, InvestigationCompl
 from backend.app.db.models.reviews import CaseReview
 from backend.app.db.models.signals import InvestigationSignal, Signal
 from backend.app.signals.labels import AWAITING_TRIAGE
+from backend.app.standards import DISCLAIMER, chips
 
 LOOKBACK_DAYS = 365
 ITEMS_MAX = 8
@@ -57,6 +60,30 @@ WHY = {
     "clause 10 asks for post-production information to reach risk management.",
 }
 
+# The regulatory basis of each check, from the one catalog (backend/app/standards.py), shown as chips under "why it
+# matters" and listed in the management review summary and the inspection pack.
+BASIS = {
+    # Hidden complaints: records that meet the complaint definition must be handled as complaints, and their records
+    # kept as complaint records.
+    "COMPLAINTS_TO_RECHECK": ("ISO13485_8_2_2", "CFR820_35"),
+    # The backlog: complaint handling asks for complaints to be handled in a timely manner.
+    "COMPLAINTS_PAST_TARGET": ("ISO13485_8_2_2",),
+    # Late or at-risk reports: reporting to regulatory authorities, the FDA 30-day and 5-day reports and EU vigilance.
+    "REPORTING_CLOCKS": ("ISO13485_8_2_3", "CFR803_50", "CFR803_53", "MDR_87"),
+    # Trends never acted on: analysis of data, and EU trend reporting of statistically significant increases.
+    "TRENDS_WITHOUT_ACTION": ("ISO13485_8_4", "MDR_88"),
+    # Harm complaints closed without an investigation: complaint handling asks for each complaint to be investigated,
+    # or the reason it is not to be recorded.
+    "HARM_CLOSED_WITHOUT_CASE": ("ISO13485_8_2_2",),
+    # CAPAs closed without an effectiveness check: corrective action includes verifying that it was effective.
+    "CAPA_EFFECTIVENESS": ("ISO13485_8_5_2",),
+    # Signals waiting past their triage date: signals come from the analysis of complaint data, and one left waiting
+    # is data nobody has analysed.
+    "TRIAGE_OVERDUE": ("ISO13485_8_4",),
+    # Post-market data not in the risk file: production and post-production information feeds risk management.
+    "RISK_FILE_INPUT": ("ISO14971_10",),
+}
+
 
 def today_utc() -> date:
     return datetime.now(timezone.utc).date()
@@ -79,6 +106,7 @@ def _check(code, title, value, state, detail, opens, items=None, extra=None) -> 
         "state": state,
         "detail": detail,
         "why": WHY[code],
+        "basis": chips(BASIS[code]),
         "opens": opens,
         "items": (items or [])[:ITEMS_MAX],
         **(extra or {}),
@@ -369,6 +397,7 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
                 "state": NOT_SET,
                 "detail": "This check could not be read; try again shortly",
                 "why": WHY.get(code, ""),
+                "basis": chips(BASIS.get(code, ())),
                 "opens": None,
                 "items": [],
             }
@@ -387,4 +416,5 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
         },
         "note": "Read from your records as imported into MDARIX; rules only, no AI. A person decides what each finding "
         "means.",
+        "basis_note": DISCLAIMER,
     }

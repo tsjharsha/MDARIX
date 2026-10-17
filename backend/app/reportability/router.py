@@ -77,6 +77,8 @@ class WindowRequest(BaseModel):
     days: int
     day_basis: str = Field(default=rules.CALENDAR, max_length=20)
     note: str | None = Field(default=None, max_length=rules.NOTE_MAX * 2)
+    # Catalog ids (backend/app/standards.py), kept from the template; unknown ids are dropped. Absent: the template's.
+    basis: list[str] | None = Field(default=None, max_length=50)
 
 
 class SettingsRequest(BaseModel):

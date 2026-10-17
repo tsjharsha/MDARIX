@@ -2,9 +2,10 @@
 
 ``build_pack`` writes, for one organization and period:
 
-- ``00-README.txt``: what the pack holds, for whom, how to check it is complete, and its limits;
+- ``00-README.txt``: what the pack holds, for whom, the regulatory basis each file supports (from the one catalog in
+  backend/app/standards.py), how to check it is complete, and its limits;
 - ``01-readiness-summary.pdf``: the management review summary (summary.py), as Readiness downloads it;
-- ``02-inspection-checks.csv``: every inspection check with its state, number, detail and why it matters;
+- ``02-inspection-checks.csv``: every inspection check with its state, number, detail, why it matters and its basis;
 - one CSV per check with every record behind it (not the first few the home screen names): hidden complaints, the
   backlog past target, reporting clocks, harm complaints closed without a case, signals past their triage date, trends
   without CAPA or risk review, CAPAs without a verified effect, products whose post-market data has not reached the
@@ -27,6 +28,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from backend.app.readiness_home import service, summary
+from backend.app.standards import BY_ID, DISCLAIMER, entries, known
 
 PACK_VERSION = "MDARIX_INSPECTION_PACK_V1"
 EVERYTHING = 10**6
@@ -243,10 +245,33 @@ CHECK_FILES = (
 )
 
 
+# The basis of the files that are not one check's records, as catalog ids: the summary is organized by the
+# management review inputs; the manifest keeps any change to a file identifiable, as the control of records asks.
+FILE_BASIS = {
+    "01-readiness-summary.pdf": ("ISO13485_5_6_2",),
+    "manifest.json": ("ISO13485_4_2_5",),
+}
+
+
+def _shorts(ids) -> str:
+    return "; ".join(BY_ID[code].short for code in ids)
+
+
+def file_basis(name: str) -> list[str]:
+    """The catalog ids a file of the pack supports: a check's records carry the check's basis, the list of checks
+    every check's."""
+    checks = {file: code for file, code, _ in CHECK_FILES}
+    if name in checks:
+        return list(service.BASIS.get(checks[name], ()))
+    if name == "02-inspection-checks.csv":
+        return known(code for _, check, _ in CHECK_FILES for code in service.BASIS.get(check, ()))
+    return list(FILE_BASIS.get(name, ()))
+
+
 def _checks_csv(readiness: dict) -> bytes:
     files = {code: name for name, code, _ in CHECK_FILES}
     return _csv(
-        ["Check", "Title", "State", "Number", "Detail", "Why it matters", "Records in"],
+        ["Check", "Title", "State", "Number", "Detail", "Why it matters", "Basis", "Records in"],
         [
             [
                 check.get("code"),
@@ -255,6 +280,7 @@ def _checks_csv(readiness: dict) -> bytes:
                 check.get("value"),
                 check.get("detail"),
                 check.get("why"),
+                [chip.get("short") for chip in check.get("basis") or []],
                 files.get(check.get("code")),
             ]
             for check in readiness.get("checks", [])
@@ -264,6 +290,12 @@ def _checks_csv(readiness: dict) -> bytes:
 
 def _readme(organization: str, generated_at: str, period: dict, readiness: dict, names: list[str]) -> bytes:
     counts = readiness.get("summary") or {}
+    inside = []
+    for name in [*names, "manifest.json"]:
+        basis = file_basis(name)
+        label = "manifest.json (the SHA-256 of every file above)" if name == "manifest.json" else name
+        inside.append(f"  {label}" + (f"; basis: {_shorts(basis)}" if basis else ""))
+    cited = known(code for name in [*names, "manifest.json"] for code in file_basis(name))
     lines = [
         "MDARIX inspection pack",
         "",
@@ -274,13 +306,17 @@ def _readme(organization: str, generated_at: str, period: dict, readiness: dict,
         f"{counts.get('critical', 0)} critical, {counts.get('attention', 0)} needing attention, "
         f"{counts.get('not_set', 0)} not set up",
         "",
-        "What is inside",
-        *[f"  {name}" for name in names],
-        "  manifest.json (the SHA-256 of every file above)",
+        "What is inside, with the basis each file supports",
+        *inside,
+        "",
+        "Standards referenced",
+        *[f"  {entry['short']}: {entry['title']} ({entry['jurisdiction']})" for entry in entries(cited)],
+        f"  {DISCLAIMER}",
         "",
         "How to use it",
         "  Start with 01-readiness-summary.pdf, organized by the management review inputs of ISO 13485 clause 5.6.2.",
-        "  02-inspection-checks.csv lists every check; each check names the file with every record behind it.",
+        "  02-inspection-checks.csv lists every check with its basis; each check names the file with every record "
+        "behind it.",
         "  To confirm nothing changed since export, compare each file's SHA-256 with manifest.json.",
         "",
         "Limits",

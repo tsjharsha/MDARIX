@@ -11,6 +11,8 @@ export type ReadinessCheck = {
   state: CheckState;
   detail: string;
   why: string;
+  /** The regulatory basis of the check, from the catalog (backend/app/standards.py). */
+  basis?: Array<{ id: string; short: string; title: string }>;
   opens: { section: string; tab?: string } | null;
   items: Array<{ id: string; ref: string | null; label?: string | null }>;
 };
@@ -21,7 +23,12 @@ export type Readiness = {
   checks: ReadinessCheck[];
   summary: { checks: number; clear: number; attention: number; critical: number; not_set: number };
   note: string;
+  /** The disclaimer the screen carries once under the checks' basis. */
+  basis_note?: string;
 };
+
+/** The catalog ids of a check's basis, for the chips. */
+export const basisIds = (check: Pick<ReadinessCheck, "basis">) => (check.basis ?? []).map((item) => item.id);
 
 export const READINESS_PATH = "/api/v1/readiness";
 export const SUMMARY_PERIODS = [

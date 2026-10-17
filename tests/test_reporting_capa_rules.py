@@ -57,6 +57,7 @@ def test_window_lists_are_cleaned_and_checked():
         "days": 5,
         "day_basis": rules.CALENDAR,
         "note": None,
+        "basis": [],
     }
     assert rules.windows_problem([{**cleaned, "triggers": []}]).endswith("(a death, a serious injury or a malfunction)")
     assert "whole number of days" in rules.windows_problem([{**cleaned, "days": 0}])

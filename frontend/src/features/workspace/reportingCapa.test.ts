@@ -45,6 +45,7 @@ const FDA: ReportingWindow = {
   days: 30,
   day_basis: "CALENDAR",
   note: null,
+  basis: ["CFR803_50", "CFR803_53"],
 };
 
 const summary = (overrides: Partial<WatchSummary> = {}): WatchSummary => ({
@@ -174,6 +175,14 @@ describe("the reporting windows", () => {
   it("round-trips a window through its form", () => {
     expect(windowOf(windowForm(FDA))).toEqual(FDA);
     expect(windowForm(FDA).key).not.toBe(windowForm(FDA).key);
+  });
+
+  it("keeps a template's basis through the form, in the order the server returns a window", () => {
+    expect(Object.keys(windowOf(windowForm(FDA)))).toEqual(Object.keys(FDA));
+    expect(windowOf(windowForm(FDA)).basis).toEqual(["CFR803_50", "CFR803_53"]);
+    expect(windowOf(windowForm(BLANK_WINDOW)).basis).toEqual([]);
+    const { basis: _dropped, ...older } = FDA;
+    expect(windowForm(older as ReportingWindow).basis).toEqual([]);
   });
 
   it("sees changes in the windows and the look-back only", () => {

@@ -54,6 +54,9 @@ export type TrendBoard = {
   items: TrendItem[];
 };
 
+/** The trend check's regulatory basis (catalog ids): analysis of data, and EU trend reporting of significant rises. */
+export const TREND_BASIS: readonly string[] = ["ISO13485_8_4", "MDR_88"];
+
 export const TREND_GROUPS: ReadonlyArray<{ value: TrendGroup; label: string }> = [
   { value: "version", label: "By version" },
   { value: "problem", label: "By problem code" },

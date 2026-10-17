@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { SAMPLE_MADE, SAMPLE_PAINS, sampleFacts, type SampleCounts, type SamplePain } from "../sampleStory";
+import { BasisNote } from "../../shared/Basis";
 
 /** The panel's anchor, for the links that scroll to it (Getting started). */
 export const SAMPLE_DATA_ID = "trial-sample-data";
@@ -102,6 +103,7 @@ export function SampleDataPanel({
             );
           })}
         </ol>
+        <BasisNote />
         <details className="uw-sample-made">
           <summary>How the sample data was made</summary>
           <ul>

@@ -5,6 +5,7 @@ import { Table, formatDate, idColumn, listOf, useResource } from "../../customer
 import { useWorkspace } from "../workspaceContext";
 import { StatusBadge } from "./common";
 import { roleLabel } from "../../../app/roles";
+import { SignatureBasis } from "../../shared/Basis";
 
 /**
  * The record a user may see: decisions in the selected investigation and the signatures on them.
@@ -110,6 +111,7 @@ function Signatures({ decisionId }: { decisionId: string }) {
           { key: "when", label: "Signed", render: (row) => formatDate(row.signed_at) },
         ]}
       />
+      {listOf(verification.data?.signatures).length > 0 && <SignatureBasis />}
     </Panel>
   );
 }
