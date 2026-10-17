@@ -10,6 +10,14 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.19] - 2026-10-17
+
+### Changed
+
+- Website, "What you get": the roadmap track says what each later stage adds and the running total ("+3 more · 12 in
+  total", "+3 more · 15 in total"), so "With design partners" and "Planned" no longer read as if they held only three
+  capabilities each.
+
 ## [0.10.18] - 2026-10-17
 
 ### Added

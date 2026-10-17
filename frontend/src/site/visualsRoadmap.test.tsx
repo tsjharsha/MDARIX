@@ -14,6 +14,11 @@ describe("what you get, as a roadmap", () => {
     }
     expect(html).toContain("Included in your free trial");
     expect(capabilityStatus.map((status) => status.badge)).toEqual(["Live now", "Next", "Planned"]);
+    // Later stages say what they add and the running total.
+    const [today, next, planned] = capabilityStatus.map((status) => status.items.length);
+    expect(html).toContain(`${today} capabilities`);
+    expect(html).toContain(`+${next} more · ${today + next} in total`);
+    expect(html).toContain(`+${planned} more · ${today + next + planned} in total`);
   });
 });
 
