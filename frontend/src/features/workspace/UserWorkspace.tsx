@@ -464,7 +464,7 @@ export function UserWorkspace({
               </button>
             )}
             <SwitchOrganization />
-            <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started") : undefined} />
+            <HelpMenu onGettingStarted={trial?.is_trial ? () => open("Getting started", "Your data") : undefined} />
             <button
               type="button"
               className="ac-secondary"
@@ -541,7 +541,7 @@ export function UserWorkspace({
                 <ColumnScopeProvider key={location.key} scope={`workspace:${section}`}>
                   <SectionErrorBoundary name={section} resetKey={location.key}>
                     <div className="ca-section">
-                      {section === "Getting started" && <GettingStartedSection />}
+                      {section === "Getting started" && <GettingStartedSection focus={tab} />}
                       {section === "Readiness" && <ReadinessSection />}
                       {section === "Dashboard" && <DashboardSection />}
                       {section === "My Work" && <MyWorkSection tab={tab} />}

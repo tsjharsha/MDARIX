@@ -10,6 +10,15 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.25] - 2026-10-18
+
+### Fixed
+
+- Help, "Report a problem" opened with no background: the form showed through the page behind it and could hardly
+  be read. It now opens as a normal dialog, white, above the page.
+- Help, "Getting started and import templates" did nothing when Getting started was already open. It now opens the
+  "Your data" tab, where the import templates are, and scrolls to it.
+
 ## [0.10.24] - 2026-10-18
 
 ### Changed
