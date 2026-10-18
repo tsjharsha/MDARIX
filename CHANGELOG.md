@@ -10,6 +10,23 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.27] - 2026-10-18
+
+### Fixed
+
+- Website: labels in the animated pictures no longer run into each other or past the edge of their cards. Since
+  0.10.24 the pictures raised their smallest labels so far that, on laptops the site draws at 80% (1,100 to 1,439 px
+  wide at 125% display scaling or more), some no longer fit: on the Trust page "Re-authenticated · 15:20" and "Design
+  partners: after validation" ran past their cards, a citation sat on top of "Most come from lots 003–004", "Human
+  review required" ran into "Always", and the "Advises only" label crowded its heading. Labels are now at least 13 px
+  on screen at 100% (from 14.5 px) and at least 12 px on those laptops (the smaller pictures two to a row on Solutions
+  about 10.5 px there, from 11), and every picture is laid out to hold them: the AI assurance picture puts each
+  citation before its statement, the Trust picture shows "Signed · 15:20" above "Re-authenticated", the signature
+  stamp on Decisions has its own space, and the tenants, audit trail, investigation context, failure chain, reporting
+  windows, scenario comparison and AI lifecycle pictures were rearranged or given shorter labels with the same
+  meaning. Headings and large figures in the pictures show at their intended size again, and lines drawn to a label
+  stop at its edge instead of crossing the text.
+
 ## [0.10.26] - 2026-10-18
 
 ### Added

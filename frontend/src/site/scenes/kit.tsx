@@ -13,7 +13,9 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
      technology.
    - Text inside the SVG is short (labels, not sentences). It scales with the frame, so the stage sets a floor
      (--sc-floor, see textFloor) that keeps every label at least MIN_TEXT_PX on screen: give an inline size with
-     fs(), or leave the size to scenes.css; never a bare number in a style.
+     fs(), or leave the size to scenes.css; never a bare number in a style. Lay labels out for MAX_FLOOR: a label
+     never shares a row with a pill or a value it could run into at that size. After changing a scene, run
+     npm run check:scenes against a preview (scripts/check-scenes.mjs) and look at the scene on a laptop view.
    - Text keeps 4.5:1 contrast: coloured text takes the ink tokens (--sc-teal-ink…), which scenes.css applies.
    - Colours come from the tokens in scenes.css (--sc-*), so light and dark stages stay consistent.
    Motion classes (scenes.css): sc-rise, sc-pop, sc-fade (entrances), sc-draw (a stroke that draws itself: give the
@@ -25,13 +27,16 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 export const W = 640;
 export const H = 400;
 
-/** The smallest a scene label may render on screen, in CSS px: comfortably above 13 px, so it stays at 13 px or more
- * on a laptop the page scale (0.10.22) draws at 90%. */
-export const MIN_TEXT_PX = 14.5;
-/** On screen at any page scale (80% on some laptops), never below this. */
-const MIN_SCALED_PX = 13;
-/** The largest floor, in canvas units: what the scenes' layouts hold. */
-const MAX_FLOOR = 17;
+/** The smallest a scene label renders on screen at 100%, in CSS px. */
+export const MIN_TEXT_PX = 13;
+/** The smallest it renders on screen under the page scale (styles.css: 80% or 90% on laptops at 125–150% display
+ * scaling), in CSS px. At 80%, 12 px is 15 canvas units in a frame drawn at its usual 640 px: what the layouts hold
+ * beside their headings and pills (13 px would take 16.3, and the labels would outgrow their cards). */
+export const MIN_SCALED_PX = 12;
+/** The largest floor, in canvas units: what every scene's layout holds (npm run check:scenes checks it in a narrow
+ * window). Smaller frames reach it before their labels reach the sizes above: the scenes two to a row on Solutions
+ * (527 px) render 13 px at 100% but about 10.5 px at 80%. */
+export const MAX_FLOOR = 16;
 /** A phone-sized frame (under 480 px) keeps the scenes' own sizes: raising them that far would break the layouts.
  * The complex scenes open full-screen there (Enlarge). */
 const SMALL_FRAME = 480;
@@ -43,7 +48,8 @@ export function textFloor(width: number, height: number, zoom = 1): number {
   const scale = Math.min(width / W, height / H);
   if (!(scale > 0)) return 0;
   const floor = Math.max(MIN_TEXT_PX / scale, MIN_SCALED_PX / (scale * zoom));
-  return Math.round(Math.min(width < SMALL_FRAME ? SMALL_FRAME_FLOOR : MAX_FLOOR, floor) * 10) / 10;
+  // Rounded up to a tenth, so rounding never takes a label below the minimum.
+  return Math.ceil(Math.min(width < SMALL_FRAME ? SMALL_FRAME_FLOOR : MAX_FLOOR, floor) * 10 - 1e-9) / 10;
 }
 
 const FloorContext = createContext(0);
@@ -121,13 +127,23 @@ export function Scene({
 export const at = (index: number, offset?: string) =>
   ({ "--i": index, ...(offset ? { "--d": offset } : {}) }) as CSSProperties;
 
-/** A rounded label chip: a pill with centred text. */
+type ChipTone = "base" | "teal" | "amber" | "red" | "muted";
+
+/** A chip's width in canvas units: wide enough for its label at the text floor `floor` (12px text before the frame is
+ * measured), and never narrower than `width`. Scenes that set chips side by side lay them out with it. */
+export function chipWidth(text: string, floor: number, width = 0): number {
+  return Math.max(width, 56, text.length * Math.max(12, floor) * 0.54 + 24);
+}
+
+/** A rounded label chip: a pill with centred text. `align` says which point of the chip x is: its centre, or its left
+ * or right end (so a chip at the end of a header row keeps inside the card however wide its label renders). */
 export function Chip({
   x,
   y,
   text,
   width,
   tone = "base",
+  align = "middle",
   index = 0,
   className = "",
 }: {
@@ -135,23 +151,50 @@ export function Chip({
   y: number;
   text: string;
   width?: number;
-  tone?: "base" | "teal" | "amber" | "red" | "muted";
+  tone?: ChipTone;
+  align?: "start" | "middle" | "end";
   index?: number;
   className?: string;
 }) {
-  // Wide enough for the label at the stage's text floor (12px text before the frame is measured).
-  const size = Math.max(12, useTextFloor());
-  const w = Math.max(width ?? 0, 56, text.length * size * 0.6 + 22);
+  const w = chipWidth(text, useTextFloor(), width);
+  const cx = align === "start" ? x + w / 2 : align === "end" ? x - w / 2 : x;
   return (
     // The position is on the outer group; the motion on the inner one (a CSS transform replaces an SVG transform).
-    <g transform={`translate(${x} ${y})`}>
+    <g transform={`translate(${cx} ${y})`}>
       <g className={`sc-chip sc-chip-${tone} sc-pop ${className}`} style={at(index)}>
+        {/* An opaque backing, so a line drawn to the chip stops at its edge instead of running through the label. */}
+        <rect className="sc-chip-back" x={-w / 2} y={-13} width={w} height={26} rx={13} />
         <rect x={-w / 2} y={-13} width={w} height={26} rx={13} />
         <text textAnchor="middle" dy="4.5">
           {text}
         </text>
       </g>
     </g>
+  );
+}
+
+/** Chips side by side from x, each starting `gap` after the one before it ends, however wide their labels render. */
+export function ChipRow({
+  x,
+  y,
+  gap = 12,
+  chips,
+}: {
+  x: number;
+  y: number;
+  gap?: number;
+  chips: { text: string; tone?: ChipTone; index?: number }[];
+}) {
+  const floor = useTextFloor();
+  const starts = chips.map((_, i) =>
+    chips.slice(0, i).reduce((left, chip) => left + chipWidth(chip.text, floor) + gap, x),
+  );
+  return (
+    <>
+      {chips.map((chip, i) => (
+        <Chip key={chip.text} x={starts[i]} y={y} align="start" {...chip} />
+      ))}
+    </>
   );
 }
 

@@ -11,7 +11,8 @@
     "test:e2e:install": "playwright install chromium",
     "lint": "tsc --noEmit --noUnusedLocals -p .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "check:scenes": "node scripts/check-scenes.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "6.1.1",

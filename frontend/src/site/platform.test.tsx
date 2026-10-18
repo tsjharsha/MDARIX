@@ -70,12 +70,12 @@ describe("diagram text", () => {
   it("is drawn large enough to read at the size each frame gets", () => {
     // A 760 px frame on a 1,440 px screen needs no more than the scenes' 13 px base size.
     expect(textFloor(760, 475)).toBeLessThanOrEqual(13);
-    // A page-hero frame (588 px wide) raises small labels so they render at 14.5 px.
-    expect(textFloor(588, 367.5) * (588 / 640)).toBeGreaterThanOrEqual(14.49);
-    // At the 80% page scale, never below 13 px on screen.
-    expect(textFloor(760, 475, 0.8) * (760 / 640) * 0.8).toBeGreaterThanOrEqual(12.99);
+    // A page-hero frame (588 px wide) raises small labels so they render at 13 px.
+    expect(textFloor(588, 367.5) * (588 / 640)).toBeGreaterThanOrEqual(13);
+    // At the 80% page scale, never below 12 px on screen.
+    expect(textFloor(760, 475, 0.8) * (760 / 640) * 0.8).toBeGreaterThanOrEqual(12);
     // The cap keeps a scene's layout; a phone-sized frame keeps the scenes' own sizes.
-    expect(textFloor(500, 312.5)).toBe(17);
+    expect(textFloor(500, 312.5)).toBe(16);
     expect(textFloor(340, 212.5)).toBe(13);
     expect(textFloor(0, 0)).toBe(0);
   });

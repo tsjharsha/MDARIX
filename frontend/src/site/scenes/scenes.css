@@ -8,6 +8,8 @@
   --sc-muted: #566878;
   --sc-line: #d5e0e8;
   --sc-panel: #ffffff;
+  /* An opaque fill close to the stage, behind see-through parts (a chip's tint). */
+  --sc-solid: #ffffff;
   --sc-teal: #087b78;
   --sc-teal-2: #0aa39d;
   --sc-glow: #73d6cb;
@@ -36,6 +38,7 @@
   --sc-muted: rgb(255 255 255 / 72%);
   --sc-line: rgb(255 255 255 / 16%);
   --sc-panel: rgb(255 255 255 / 7%);
+  --sc-solid: #12283b;
   --sc-teal: #73d6cb;
   --sc-teal-2: #4fb3d9;
   --sc-amber: #f5c26b;
@@ -92,6 +95,10 @@
 }
 
 /* Shared parts */
+.sc-chip .sc-chip-back {
+  fill: var(--sc-solid);
+  stroke: none;
+}
 .sc-chip rect {
   fill: var(--sc-panel);
   stroke: var(--sc-line);
