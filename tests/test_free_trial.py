@@ -912,6 +912,9 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert len(checks) == 9 and any("03-hidden-complaints.csv" in line for line in checks)
     readme = archive.read("00-README.txt").decode("utf-8")
     assert "SHA-256" in readme and "verify against the source records" in readme
+    assert "03-hidden-complaints.csv; basis: ISO 13485 8.2.2; 21 CFR 820.35" in readme
+    assert readme.count("it does not certify compliance") == 1
+    assert checks[0].split(",")[6] == "Basis"
 
     # The export is audited, and handing the inspector a pack is chapter 8 of the trial's story.
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}

@@ -204,6 +204,8 @@ def test_the_organization_enters_its_own_windows(org, windows):
         watch_rules.TEMPLATES[1]["name"],
     ]
     assert windows["configured"] is True and windows["version"] == 1
+    # Each window keeps its template's regulatory basis (backend/app/standards.py).
+    assert [window["basis"] for window in windows["windows"]] == [["CFR803_50", "CFR803_53"], ["MDR_87"]]
     assert windows["updated_by_name"] == "Rita Regulatory"
     body = {"windows": windows["windows"], "lookback_days": 365, "reason": REASON}
     assert org["investigator"].put(SETTINGS, json=body).status_code == 403
@@ -237,6 +239,7 @@ def test_the_watch_runs_clocks_against_the_windows_most_urgent_first(org, window
     assert items[overdue]["state"] == "OVERDUE" and items[overdue]["binding"]["days_left"] == -10
     assert items[due_soon]["state"] == "DUE_SOON" and items[due_soon]["binding"]["days_left"] == 2
     assert items[due_soon]["binding"]["window"] == watch_rules.TEMPLATES[0]["name"]
+    assert items[due_soon]["binding"]["basis"] == ["CFR803_50", "CFR803_53"]
     assert items[running]["state"] == "RUNNING" and items[running]["binding"]["days"] == 15
     assert items[no_window]["state"] == "NO_WINDOW" and items[no_window]["clocks"] == []
     assert items[follow_up]["state"] == "FOLLOW_UP"

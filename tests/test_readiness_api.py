@@ -237,6 +237,18 @@ def test_every_check_reads_the_records_behind_it(org, seeded):
     triage = checks["TRIAGE_OVERDUE"]
     assert (triage["value"], triage["state"]) == (1, "ATTENTION")
     assert all(check["why"] for check in body["checks"])
+    # Every check names its regulatory basis from the one catalog, and the screen carries the disclaimer.
+    from backend.app import standards
+
+    assert all(check["basis"] for check in body["checks"])
+    assert all(chip == standards.BY_ID[chip["id"]].chip() for check in body["checks"] for chip in check["basis"])
+    assert [chip["id"] for chip in checks["REPORTING_CLOCKS"]["basis"]] == [
+        "ISO13485_8_2_3",
+        "CFR803_50",
+        "CFR803_53",
+        "MDR_87",
+    ]
+    assert body["basis_note"] == standards.DISCLAIMER
     # A number never contradicts its state: zero is clear (or not set up), never a finding.
     assert all(check["value"] or check["state"] in ("CLEAR", "NOT_SET") for check in body["checks"])
     # Harm complaints of a product with no risk review: post-market data not in the risk file.
@@ -275,6 +287,9 @@ def test_the_summary_for_management_review(org, seeded):
     assert complaints["received"] == 6 and complaints["closed"] == 1
     assert (complaints["death"], complaints["serious_injury"]) == (2, 1)
     assert summary["reporting"]["windows"] == ["FDA MDR: death, serious injury or malfunction (30 calendar days)"]
+    assert summary["reporting"]["basis"] == ["CFR803_50", "CFR803_53"]
+    cited = [entry["id"] for entry in summary["standards"]["entries"]]
+    assert {"ISO13485_5_6_2", "ISO14971_10", "CFR803_50", "MDR_88"} <= set(cited) and len(cited) == len(set(cited))
     assert summary["trends"]["signals_raised"] == 2
     assert org["viewer"].get("/api/v1/readiness/summary", params={"period_days": 5}).status_code == 422
 
@@ -288,6 +303,7 @@ def test_the_summary_for_management_review(org, seeded):
 
     assert page_count(pdf.content) >= 1
     assert b"Readiness today" in pdf.content and b"Reporting to regulatory authorities" in pdf.content
+    assert b"8. Standards referenced" in pdf.content and b"it does not certify compliance" in pdf.content
     with SessionLocal() as db:
         bind_system(db, "test: read the audit trail")
         assert (

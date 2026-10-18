@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Check, ClipboardList, X } from "lucide-react";
 import { errorText, send, useResource } from "../../customer-admin/shared";
+import { BasisNote } from "../../shared/Basis";
 
-export type CitationOption = { code: string; label: string; reference: string; chapter: string };
+export type CitationOption = { code: string; label: string; reference: string; basis?: string[]; chapter: string };
 type Focus = { citations: string[]; options: CitationOption[] };
 
 export const FOCUS_PATH = "/api/v1/trial/focus";
@@ -93,6 +94,7 @@ export function CitedFor({ onSaved }: { onSaved: () => void }) {
           </li>
         ))}
       </ul>
+      <BasisNote />
       {error && (
         <p className="uw-flag-critical" role="alert">
           {error}

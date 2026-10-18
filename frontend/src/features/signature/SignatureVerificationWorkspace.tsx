@@ -6,6 +6,7 @@ import { WorkspaceContext } from "../workspace/workspaceContext";
 import { displayId, safeText } from "../../app/displayId";
 import { isCaseDecision } from "../workspace/humanDecision";
 import { DecisionRecordDrawer } from "../workspace/sections/DecisionRecord";
+import { SignatureBasis } from "../shared/Basis";
 
 type Decision = {
   id: string;
@@ -247,6 +248,7 @@ export function SignatureVerificationWorkspace() {
           later change is detected. Certificate-based digital signatures and signing through your own identity provider
           are not available yet.
         </span>
+        <SignatureBasis />
       </section>
     </div>
   );

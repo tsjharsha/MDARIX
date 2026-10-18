@@ -19,8 +19,10 @@ import {
   trendResultLabel,
   type TrendGroup,
   type TrendItem,
+  TREND_BASIS,
 } from "../signalAi";
 import { ChipFilter, Hero, InlineError, ProductFilter } from "./boardParts";
+import { BasisLine } from "../../shared/Basis";
 
 /**
  * Signals › Trend check: every product version (or version and problem, or complaint type) against its own history,
@@ -167,6 +169,7 @@ export function TrendCheck({ onOpenSignal }: { onOpenSignal: (reference: string)
           ]}
         />
         <p className="ac-note">{board.data?.note}</p>
+        <BasisLine ids={TREND_BASIS} />
       </Panel>
     </div>
   );

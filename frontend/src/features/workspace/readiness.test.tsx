@@ -1,6 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { checkStateOf, checkValue, itemsText, readinessHeadline, summaryPdfPath, type Readiness } from "./readiness";
+import {
+  basisIds,
+  checkStateOf,
+  checkValue,
+  itemsText,
+  readinessHeadline,
+  summaryPdfPath,
+  type Readiness,
+} from "./readiness";
 import { CheckRow, HomeTile } from "./sections/Readiness";
 import { PARKED_SECTIONS, routeFor } from "../../app/featureSet";
 import { addressFor, locationFromAddress } from "./workspaceAddress";
@@ -15,6 +23,10 @@ const check = (overrides = {}) => ({
   state: "CRITICAL" as const,
   detail: "1 report a death or serious injury",
   why: "2026 FDA warning letters cite complaints cancelled or logged as inquiries.",
+  basis: [
+    { id: "ISO13485_8_2_2", short: "ISO 13485 8.2.2", title: "Complaint handling" },
+    { id: "CFR820_35", short: "21 CFR 820.35", title: "Control of records (QMSR)" },
+  ],
   opens: { section: "Complaints", tab: "Second look" },
   items: [
     { id: "a", ref: "CMP000001" },
@@ -91,6 +103,24 @@ describe("readiness screens", () => {
     expect(markup).toContain("Harm complaints closed without an investigation");
     expect(markup).toContain("0 · Clear");
     expect(markup).toContain("Why it matters:");
+  });
+
+  it("shows each check's basis as chips under why it matters", () => {
+    for (const markup of [
+      renderToStaticMarkup(<HomeTile check={check()} onOpen={vi.fn()} />),
+      renderToStaticMarkup(
+        <ul>
+          <CheckRow check={check()} onOpen={vi.fn()} />
+        </ul>,
+      ),
+    ]) {
+      expect(markup).toContain('title="Complaint handling">ISO 13485 8.2.2<');
+      expect(markup).toContain(">21 CFR 820.35<");
+      expect(markup.indexOf("2026 FDA warning letters")).toBeLessThan(markup.indexOf("ISO 13485 8.2.2"));
+    }
+    expect(basisIds(check())).toEqual(["ISO13485_8_2_2", "CFR820_35"]);
+    // A check without a basis shows none.
+    expect(renderToStaticMarkup(<HomeTile check={check({ basis: [] })} onOpen={vi.fn()} />)).not.toContain("uw-basis");
   });
 });
 

@@ -15,6 +15,9 @@ left to the reviewer.
 A clock starts at the day the organization became aware of the complaint (the earliest of its awareness, received
 and recorded days, as the case's regulatory review reads it) and ends at that day plus the window's days: calendar days, or work days (Monday to Friday;
 public holidays are not known to MDARIX and are counted as work days, which only makes a due date earlier).
+
+Each template names its regulatory basis (``basis``: ids of the one catalog, backend/app/standards.py); a window made
+from a template keeps it, and the watch shows it beside the window's name. A window entered by hand has none.
 """
 
 from __future__ import annotations
@@ -22,6 +25,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
+
+from backend.app.standards import known
 
 DEATH, SERIOUS_INJURY, MALFUNCTION = "DEATH", "SERIOUS_INJURY", "MALFUNCTION"
 TRIGGERS = (DEATH, SERIOUS_INJURY, MALFUNCTION)
@@ -140,6 +145,8 @@ TEMPLATES = (
         "day_basis": CALENDAR,
         "note": "A 5-work-day report (remedial action to prevent an unreasonable risk of substantial harm, or an FDA "
         "request) rests on a judgment; your reviewer applies it.",
+        # 803.50 sets the 30 days; 803.53 is the 5-work-day report the note names.
+        "basis": ["CFR803_50", "CFR803_53"],
     },
     {
         "name": "EU MDR: serious incident (15 days)",
@@ -149,6 +156,7 @@ TEMPLATES = (
         "day_basis": CALENDAR,
         "note": "A malfunction can also be a serious incident when it might have led to death or serious "
         "deterioration; a serious public health threat is 2 days. Your reviewer applies both.",
+        "basis": ["MDR_87"],
     },
     {
         "name": "EU MDR: death (10 days)",
@@ -157,6 +165,7 @@ TEMPLATES = (
         "days": 10,
         "day_basis": CALENDAR,
         "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+        "basis": ["MDR_87"],
     },
     {
         "name": "MHRA (Great Britain): serious incident (15 days)",
@@ -166,6 +175,7 @@ TEMPLATES = (
         "day_basis": CALENDAR,
         "note": "A serious public health threat is 2 days, and a malfunction can be a serious incident; your reviewer "
         "applies both. Northern Ireland follows the EU MDR but reports to the MHRA.",
+        "basis": ["UK_MDR"],
     },
     {
         "name": "MHRA (Great Britain): death (10 days)",
@@ -174,6 +184,7 @@ TEMPLATES = (
         "days": 10,
         "day_basis": CALENDAR,
         "note": "An unanticipated serious deterioration in health is also 10 days; your reviewer applies it.",
+        "basis": ["UK_MDR"],
     },
     {
         "name": "Health Canada: death or serious deterioration (10 days)",
@@ -182,6 +193,7 @@ TEMPLATES = (
         "days": 10,
         "day_basis": CALENDAR,
         "note": "For an incident in Canada; a foreign incident is reported as soon as possible after the decision.",
+        "basis": ["CA_MDR"],
     },
     {
         "name": "Health Canada: could cause death or serious deterioration if it recurred (30 days)",
@@ -191,8 +203,10 @@ TEMPLATES = (
         "day_basis": CALENDAR,
         "note": "Whether a recurrence could cause death or serious deterioration rests on a judgment; your reviewer "
         "applies it.",
+        "basis": ["CA_MDR"],
     },
 )
+TEMPLATE_BASIS = {template["name"]: template["basis"] for template in TEMPLATES}
 
 
 def normalize(value: object) -> str:
@@ -207,7 +221,9 @@ def _clean_text(value: object) -> str:
 
 
 def clean_window(raw: dict) -> dict:
-    """One window as stored: name and note tidied, markets tidied without repeats, triggers in their order."""
+    """One window as stored: name and note tidied, markets tidied without repeats, triggers in their order, and its
+    basis as catalog ids. A window saved before windows carried a basis (``basis`` absent) takes its template's when it
+    still has the template's name."""
     markets: list[str] = []
     seen: set[str] = set()
     for market in raw.get("markets") or []:
@@ -217,13 +233,16 @@ def clean_window(raw: dict) -> dict:
             markets.append(text)
     triggers = [code for code in TRIGGERS if code in {str(item).strip().upper() for item in raw.get("triggers") or []}]
     note = _clean_text(raw.get("note")) or None
+    name = _clean_text(raw.get("name"))
+    basis = raw.get("basis")
     return {
-        "name": _clean_text(raw.get("name")),
+        "name": name,
         "markets": markets,
         "triggers": triggers,
         "days": raw.get("days"),
         "day_basis": str(raw.get("day_basis") or CALENDAR).strip().upper(),
         "note": note,
+        "basis": known(TEMPLATE_BASIS.get(name, []) if basis is None else basis),
     }
 
 
@@ -313,6 +332,7 @@ class Clock:
     state: str
     days_left: int
     triggers: tuple[str, ...]
+    basis: tuple[str, ...] = ()
 
     def as_dict(self) -> dict:
         return {
@@ -323,6 +343,7 @@ class Clock:
             "state": self.state,
             "days_left": self.days_left,
             "triggers": list(self.triggers),
+            "basis": list(self.basis),
         }
 
 
@@ -345,6 +366,7 @@ def clocks(record: dict, windows: list[dict], aware: date | None, today: date) -
                 state=clock_state(due, today, window["days"]),
                 days_left=(due - today).days,
                 triggers=tuple(code for code in window["triggers"] if code in reported),
+                basis=tuple(window.get("basis") or ()),
             )
         )
     return sorted(found, key=lambda clock: (clock.due, clock.name))

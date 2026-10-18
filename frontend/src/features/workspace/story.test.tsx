@@ -14,6 +14,7 @@ import {
   type TrialStory,
 } from "./trialStory";
 import type { Readiness, ReadinessCheck } from "./readiness";
+import { BASIS_DISCLAIMER } from "../shared/standards";
 import {
   attentionOrder,
   chapterFunnel,
@@ -399,7 +400,10 @@ describe("booking a one-to-one demo from the trial", () => {
     expect(html).toContain("What your sample data is, and why it looks like this");
     expect(html).toContain("37 complaints");
     for (const pain of SAMPLE_PAINS) expect(html).toContain(pain.title);
-    expect(html).toContain("ISO 13485 clause 8.2.2");
+    // References come from the one catalog where it has the entry, kept as written where it has none.
+    expect(html).toContain("ISO 13485 8.2.2; 21 CFR 820 (QMSR)");
+    expect(html).toContain("21 CFR 803; EU MDR Art. 87");
+    expect(html.split(BASIS_DISCLAIMER).length).toBe(2);
     expect(html).toContain("How the sample data was made");
     expect(html).toContain("No real company, device, patient or person");
     // A screen the role does not hold is not offered.

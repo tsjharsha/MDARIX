@@ -22,14 +22,19 @@ FOOTER_TOP = MARGIN + 14
 BODY_LINES_PER_PAGE = int((HEADER_BOTTOM - FOOTER_TOP) / BODY_LEADING)
 
 Line = tuple[str, str]  # (text, style) where style is "body", "heading" or "muted"
+# Characters outside Latin-1 that WinAnsiEncoding (the fonts' encoding) still has, as octal escapes: dashes and quotes.
+WIN_ANSI = {"–": "\\226", "—": "\\227", "‘": "\\221", "’": "\\222", "“": "\\223", "”": "\\224"}
 
 
 def escape(value: str) -> str:
-    """A PDF string literal body: backslash and parentheses escaped, anything outside Latin-1 made printable."""
+    """A PDF string literal body: backslash and parentheses escaped, typographic dashes and quotes in the fonts'
+    encoding, anything else outside Latin-1 made printable."""
     out = []
     for ch in value:
         if ch in "\\()":
             out.append("\\" + ch)
+        elif ch in WIN_ANSI:
+            out.append(WIN_ANSI[ch])
         elif ch in "\r\n\t":
             out.append(" ")
         elif ord(ch) < 32 or ord(ch) > 255:

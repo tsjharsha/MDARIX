@@ -20,6 +20,7 @@ import { SignatureVerificationWorkspace } from "../../signature/SignatureVerific
 import {
   BOARD_SHOWS,
   DIRECTION,
+  EFFECTIVENESS_BASIS,
   EFFECTIVENESS_LIMITS,
   EMPTY_SIGN,
   RECORDS_TABS,
@@ -48,6 +49,7 @@ import {
 } from "../effectiveness";
 import { Embedded, StatusBadge } from "./common";
 import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
+import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
 import { TrustSection } from "./Trust";
 
@@ -173,6 +175,7 @@ function EffectivenessBoard({ initialCapa }: { initialCapa: string | null }) {
           and its case&apos;s problem codes; it is not a statistical test. The person signing judges against the
           criteria.
         </p>
+        <BasisLine ids={EFFECTIVENESS_BASIS} />
       </Panel>
       {open && <CheckDrawer capaId={open} onClose={() => setOpen(null)} onChanged={board.reload} />}
     </div>
@@ -381,6 +384,7 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
               );
             })}
           </ol>
+          {detail.rounds.some((round) => round.signed_at) && <SignatureBasis />}
         </section>
       )}
       {canPlan && !planning && (

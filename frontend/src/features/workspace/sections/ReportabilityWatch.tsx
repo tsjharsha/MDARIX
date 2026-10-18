@@ -37,6 +37,7 @@ import { StatusBadge, countOf } from "./common";
 import { ChipFilter, Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { Starters } from "./Starters";
 import { REPORTABILITY_STARTERS, starterProblem } from "../starters";
+import { BasisChips, BasisNote } from "../../shared/Basis";
 
 /** Whether the signed-in role may record a reportability decision (the server's rule). */
 function useCanDecide() {
@@ -186,6 +187,7 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: ComplaintsT
           report. Windows that rest on a judgment (an FDA 5-work-day report, an EU serious public health threat) are
           applied by your reviewer.
         </p>
+        <BasisNote />
       </Panel>
       {deciding && <DecisionDrawer item={deciding} onClose={() => setDeciding(null)} onDecided={list.reload} />}
     </div>
@@ -218,7 +220,8 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
             <strong>{item.binding ? clockText(item.binding) : state.label}</strong>
             {item.binding && (
               <span>
-                Due by {formatDay(item.binding.due_date)} · {item.binding.window}
+                Due by {formatDay(item.binding.due_date)} · {item.binding.window}{" "}
+                <BasisChips ids={item.binding.basis} label="Basis of the window" />
               </span>
             )}
             {item.aware_date && (

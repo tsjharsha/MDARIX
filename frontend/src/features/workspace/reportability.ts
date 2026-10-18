@@ -35,6 +35,8 @@ export type ReportingWindow = {
   days: number;
   day_basis: DayBasis;
   note: string | null;
+  /** The window's regulatory basis as catalog ids (features/shared/standards.ts), kept from its template. */
+  basis: string[];
 };
 
 export type ReportabilitySettings = {
@@ -55,6 +57,8 @@ export type Clock = {
   state: "OVERDUE" | "DUE_SOON" | "RUNNING";
   days_left: number;
   triggers: Trigger[];
+  /** The basis of the window the clock counts against (catalog ids). */
+  basis?: string[];
 };
 
 export type WatchState = "OVERDUE" | "DUE_SOON" | "IN_REVIEW" | "RUNNING" | "NO_WINDOW" | "FOLLOW_UP" | "DECIDED";
@@ -274,6 +278,8 @@ export type WindowForm = {
   days: string;
   dayBasis: DayBasis;
   note: string;
+  /** Kept from the template the window started from; not edited on the form. */
+  basis: string[];
 };
 
 let nextKey = 1;
@@ -287,6 +293,7 @@ export function windowForm(window: ReportingWindow): WindowForm {
     days: String(window.days),
     dayBasis: window.day_basis,
     note: window.note ?? "",
+    basis: [...(window.basis ?? [])],
   };
 }
 
@@ -297,6 +304,7 @@ export const BLANK_WINDOW: ReportingWindow = {
   days: 30,
   day_basis: "CALENDAR",
   note: null,
+  basis: [],
 };
 
 /** The markets typed in (comma or line separated), tidied, without repeats (any case or dots). */
@@ -322,6 +330,7 @@ export function windowOf(form: WindowForm): ReportingWindow {
     days: Number(form.days),
     day_basis: form.dayBasis,
     note: collapsed(form.note) || null,
+    basis: form.basis,
   };
 }
 

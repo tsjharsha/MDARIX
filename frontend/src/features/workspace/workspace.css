@@ -3038,6 +3038,28 @@ div.uw-task-count:hover {
   font-size: 12px;
   line-height: 1.4;
 }
+/* The regulatory basis of a finding or a window (features/shared/Basis.tsx): small chips from the one catalog. */
+.uw-basis {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: middle;
+}
+.uw-basis-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  background: var(--ac-surface);
+  color: var(--ac-ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.uw-basis-line .uw-basis {
+  margin-right: 4px;
+}
 .uw-rd-open {
   display: inline-flex;
   align-items: center;

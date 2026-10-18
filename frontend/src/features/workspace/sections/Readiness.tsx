@@ -18,6 +18,7 @@ import {
   READINESS_PATH,
   SUMMARY_PERIODS,
   inspectionPackPath,
+  basisIds,
   checkStateOf,
   checkValue,
   itemsText,
@@ -27,6 +28,7 @@ import {
   type ReadinessCheck,
 } from "../readiness";
 import { InlineError } from "./boardParts";
+import { BasisChips, BasisNote } from "../../shared/Basis";
 import { QualityLoop } from "./QualityLoop";
 import { loopFromReadiness } from "../qualityLoop";
 
@@ -39,8 +41,8 @@ const HOME_ICONS: Record<string, typeof ScanSearch> = {
 
 /**
  * Readiness: what an investigator or a notified-body auditor would find in your records today, read from them (rules
- * only), the four home numbers first; every check opens the records behind it. The summary for management review
- * downloads as a PDF.
+ * only), the four home numbers first; every check opens the records behind it and shows its regulatory basis under
+ * why it matters, with the disclaimer once at the foot. The summary for management review downloads as a PDF.
  */
 export function ReadinessSection() {
   const { open } = useWorkspace();
@@ -78,6 +80,7 @@ export function ReadinessSection() {
           ))}
         </ul>
         {data.data && <p className="ac-note">{data.data.note}</p>}
+        {data.data && <BasisNote />}
       </Panel>
     </div>
   );
@@ -99,6 +102,7 @@ export function HomeTile({ check, onOpen }: { check: ReadinessCheck; onOpen: () 
       <span className="uw-rd-detail">{check.detail}</span>
       {refs && <span className="uw-rd-refs">{refs}</span>}
       <span className="uw-rd-why">{check.why}</span>
+      <BasisChips ids={basisIds(check)} />
       {check.opens && (
         <span className="uw-rd-open">
           Open <ChevronRight size={14} aria-hidden="true" />
@@ -124,6 +128,7 @@ export function CheckRow({ check, onOpen }: { check: ReadinessCheck; onOpen: () 
         <p className="uw-cr-text">{check.detail}</p>
         {refs && <p className="uw-cr-meta">{refs}</p>}
         <p className="uw-cr-meta">Why it matters: {check.why}</p>
+        <BasisChips ids={basisIds(check)} />
       </div>
       <div className="uw-cr-actions">
         {check.opens && (
