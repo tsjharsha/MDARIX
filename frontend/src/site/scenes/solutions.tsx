@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { Card, Illustrative, Scene, at } from "./kit";
+import { Card, Illustrative, Scene, at, fs } from "./kit";
 import type { SceneComponent } from "./index";
 
 // Scenes for the Solutions page pictures, by picture name (see kit.tsx for the rules every scene follows).
@@ -57,7 +57,7 @@ function Txt({
   spacing?: string;
   children: ReactNode;
 }) {
-  const style: CSSProperties = { ...(className ? at(index, offset) : {}), fontSize: size, letterSpacing: spacing };
+  const style: CSSProperties = { ...(className ? at(index, offset) : {}), fontSize: fs(size), letterSpacing: spacing };
   return (
     <text
       x={x}
@@ -116,7 +116,7 @@ function Pill({
           y={size * 0.36}
           fontWeight={700}
           fill={tone === "base" ? "var(--sc-ink)" : stroke}
-          style={{ fontSize: size }}
+          style={{ fontSize: fs(size) }}
         >
           {text}
         </text>
@@ -250,7 +250,7 @@ function Head({
           <circle r={18} fill={tint(tone, 16)} stroke={ink(tone)} strokeWidth={2} />
         )}
         {family === "challenge" ? (
-          <text textAnchor="middle" y={7.5} fontWeight={800} fill={ink(tone)} style={{ fontSize: 21 }}>
+          <text textAnchor="middle" y={7.5} fontWeight={800} fill={ink(tone)} style={{ fontSize: fs(21) }}>
             ?
           </text>
         ) : (
@@ -509,7 +509,7 @@ function SolutionAffected({ label }: { label: string }) {
           y={6}
           fontWeight={800}
           fill={kind === "scope" ? "var(--sc-amber)" : kind === "check" ? "var(--sc-muted)" : "var(--sc-ink-2)"}
-          style={{ fontSize: 17 }}
+          style={{ fontSize: fs(17) }}
         >
           {lot}
         </text>
@@ -1182,7 +1182,7 @@ function RoleManufacturing({ label }: { label: string }) {
                 y={6}
                 fontWeight={800}
                 fill={lot.sensor ? "var(--sc-amber)" : "var(--sc-ink-2)"}
-                style={{ fontSize: 18 }}
+                style={{ fontSize: fs(18) }}
               >
                 {lot.lot}
               </text>
@@ -1345,7 +1345,7 @@ function InvestigationVersion({ label }: { label: string }) {
       <Head family="investigation" text="Version investigation" />
       {versions.map((version, index) => (
         <Panel key={version.name} x={version.x} y={100} w={236} h={196} index={index + 1}>
-          <g opacity={version.focus ? 1 : 0.7}>
+          <g>
             <Txt x={22} y={52} size={30} weight={800}>
               {version.name}
             </Txt>

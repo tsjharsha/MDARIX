@@ -30,6 +30,39 @@ function loadSiteInfo(): Promise<SiteInfo | null> {
   return siteInfoRequest;
 }
 
+/** The site details as a page waits for them: still loading, answered, or not reachable. */
+export type SiteInfoState = { status: "loading" } | { status: "ready"; info: SiteInfo } | { status: "failed" };
+
+export function useSiteInfoState(): SiteInfoState {
+  const [state, setState] = useState<SiteInfoState>({ status: "loading" });
+  useEffect(() => {
+    let active = true;
+    loadSiteInfo().then((info) => active && setState(info ? { status: "ready", info } : { status: "failed" }));
+    return () => {
+      active = false;
+    };
+  }, []);
+  return state;
+}
+
+/** The addresses the approved legal texts publish (legal/privacy.md, terms.md, trial-agreement.md), shown when the
+ * server cannot be reached. */
+export const PUBLISHED_CONTACT = { support: "support@mdarix.in", privacy: "privacy@mdarix.in" } as const;
+
+/** What the contact page shows: nothing while loading; the server's addresses once it answers, with the "being
+ * configured" notice only when it has neither; the published addresses when it cannot be reached. */
+export function contactAddresses(state: SiteInfoState): {
+  support: string | null;
+  privacy: string | null;
+  notice: boolean;
+} {
+  if (state.status === "loading") return { support: null, privacy: null, notice: false };
+  if (state.status === "failed") return { ...PUBLISHED_CONTACT, notice: false };
+  const support = state.info.support_email?.trim() || null;
+  const privacy = state.info.privacy_email?.trim() || null;
+  return { support, privacy, notice: !support && !privacy };
+}
+
 export function useSiteInfo(): SiteInfo | null {
   const [info, setInfo] = useState<SiteInfo | null>(null);
   useEffect(() => {
@@ -282,7 +315,12 @@ export function SecurityPage() {
 }
 
 export function ContactPage() {
-  const info = useSiteInfo();
+  return <ContactView state={useSiteInfoState()} />;
+}
+
+export function ContactView({ state }: { state: SiteInfoState }) {
+  const info = state.status === "ready" ? state.info : null;
+  const addresses = contactAddresses(state);
   return (
     <article className="ms-section ms-legal" aria-labelledby="contact-page-title">
       <span className="ms-eyebrow">Company</span>
@@ -292,18 +330,18 @@ export function ContactPage() {
         that best matches your request and our team will direct it to the right owner.
       </p>
       <div className="ms-contact-grid">
-        {info?.support_email && (
+        {addresses.support && (
           <div className="ms-card">
             <Mail size={20} aria-hidden="true" />
             <strong>Support and sales</strong>
-            <EmailLink address={info.support_email} />
+            <EmailLink address={addresses.support} />
           </div>
         )}
-        {info?.privacy_email && (
+        {addresses.privacy && (
           <div className="ms-card">
             <Mail size={20} aria-hidden="true" />
             <strong>Privacy and data requests</strong>
-            <EmailLink address={info.privacy_email} />
+            <EmailLink address={addresses.privacy} />
           </div>
         )}
         {(info?.company_name || info?.company_address) && (
@@ -314,7 +352,7 @@ export function ContactPage() {
           </div>
         )}
       </div>
-      {!info?.support_email && !info?.privacy_email && (
+      {addresses.notice && (
         <div className="ms-legal-notice" role="status">
           <strong>Contact details are being configured</strong>
           <span>

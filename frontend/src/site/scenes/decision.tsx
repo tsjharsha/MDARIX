@@ -595,7 +595,7 @@ function AiProvenance({ label }: { label: string }) {
           </text>
         </Card>
       ))}
-      <g opacity={0.6}>
+      <g>
         <Card x={24} y={298} w={214} h={50} index={4}>
           <text x={14} y={22} fontSize={13} fontWeight={800} fill="var(--sc-muted)">
             Service log S-22

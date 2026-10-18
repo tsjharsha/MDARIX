@@ -10,6 +10,45 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.24] - 2026-10-18
+
+### Changed
+
+- Website: the Platform menu is four pages and an overview instead of 19 links: Product 360, Investigations,
+  Decisions and Trust (`/platform/product-360`, `/platform/investigations`, `/platform/decisions`, `/platform/trust`).
+  Each page holds its capabilities as sections, and every capability carries one of the roadmap's three labels,
+  Available today, With design partners or Planned, with a line on what that means in the product today. The Product
+  360 screen, the product reality graph, counterfactual analysis and the three AI capabilities (AI Challenger, AI
+  Assurance, AI Provenance) are With design partners: the free trial reads products through Readiness, Complaints and
+  Signals, and AI is off during the trial. The 19 former `/platform/<capability>` addresses, and the former
+  `/platform#<section>` links, open the matching section of the page that now holds it.
+- Website: the roadmap ("Know what is available today, and what comes next") has its own page, `/roadmap`, in the
+  Product Lifecycle menu and the footer. Its first live item is now "Products, versions and lots"; the Product 360
+  screen is listed under With design partners.
+- Website: the standards ("Built around the evidence regulators ask for") have their own Regulations page,
+  `/trust/regulations`, in the Trust menu and the footer, with the FDA, EU MDR, UK and Canada reporting windows and
+  their basis from the standards catalog.
+- Website: the home page is shorter (about 830 words and 5,500 px at 1,440 px wide, from 2,137 words and 11,335 px):
+  the hero, the inspection checks, one worked example (the OrbitCare 300 Rev B pressure-alarm investigation, which
+  replaces three overlapping story sections), "Your systems stay the record", a short trust strip with one line
+  linking to the Regulations page ("Covers FDA, EU MDR, UK and Canada reporting"), and the closing call to action with
+  what the free trial includes.
+- Website diagrams are legible: no diagram or SVG label renders below 14 px on a 1,440 px screen (some were 6 to 10
+  px), and every label has at least 4.5:1 contrast with what is behind it. A drawn scene raises its smallest labels to
+  suit the size of its frame, scene pictures are drawn wider (two to a row on Solutions, one at a time on Resources),
+  and coloured and muted labels use darker shades. The product reality graph, the cross-functional investigation and
+  "Your systems stay the record" have an Enlarge button that opens them full-screen (Escape or Close returns to the
+  button).
+
+### Fixed
+
+- The Contact page no longer says "Contact details are being configured" while it is loading, or when the server
+  cannot be reached: it shows nothing while loading, falls back to the published support@mdarix.in and
+  privacy@mdarix.in when the server is unreachable, and shows the notice only when the server answers with neither
+  address.
+- Website on a phone: an open menu (Platform, Solutions, Product Lifecycle, Trust) showed only its title; it now
+  shows its links, and closing the menu closes it too.
+
 ## [0.10.23] - 2026-10-18
 
 ### Added

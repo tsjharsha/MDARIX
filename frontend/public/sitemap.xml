@@ -2,72 +2,102 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://mdarix.in/</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://mdarix.in/platform</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://mdarix.in/platform/product-360</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/platform/investigations</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/platform/decisions</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/platform/trust</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/roadmap</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://mdarix.in/solutions</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://mdarix.in/product-lifecycle</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://mdarix.in/trust</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://mdarix.in/trust/regulations</loc>
+    <lastmod>2026-10-18</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://mdarix.in/resources</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/company</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/videos</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://mdarix.in/privacy</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/terms</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/trial-agreement</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/security</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/contact</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://mdarix.in/signup</loc>
-    <lastmod>2026-10-17</lastmod>
+    <lastmod>2026-10-18</lastmod>
     <priority>0.9</priority>
   </url>
 </urlset>

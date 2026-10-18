@@ -455,9 +455,9 @@ export const capabilityStatus: {
     items: [
       {
         icon: "product",
-        title: "Product 360",
+        title: "Products, versions and lots",
         detail:
-          "Products, versions, lots, components and suppliers in one place, so every complaint sits on the right product record.",
+          "Your products, versions and lots from your own exports, so every complaint, signal and case sits on the right product version and lot.",
       },
       {
         icon: "second-look",
@@ -515,6 +515,12 @@ export const capabilityStatus: {
     text: "Built and validated together during a pilot.",
     promise: "As a design partner, we connect your systems and validate each step with your team.",
     items: [
+      {
+        icon: "product",
+        title: "The Product 360 screen",
+        detail:
+          "One screen for a product's versions, components, suppliers, lots and field signals, with the graph that connects them.",
+      },
       {
         icon: "connection",
         title: "Live connections",

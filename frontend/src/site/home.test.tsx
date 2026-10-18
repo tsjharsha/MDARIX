@@ -39,6 +39,20 @@ describe("website home", () => {
     expect(html).not.toContain("AI answers show their evidence");
   });
 
+  it("keeps one worked example and moves the roadmap and the regulations to their own pages", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    expect(html).toContain("Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?");
+    expect(html).toContain("Your systems stay the record.");
+    // One line, linked to the Regulations page, instead of the standards section.
+    expect(html).toMatch(/href="\/trust\/regulations"[^>]*>Covers FDA, EU MDR, UK and Canada reporting/);
+    expect(html).not.toContain("Built around the evidence regulators ask for.");
+    expect(html).not.toContain("Know what is available today, and what comes next.");
+    // The three overlapping story sections are one.
+    expect(html).not.toContain("From field signal to a decision you can defend.");
+    expect(html).not.toContain("From a rising signal to the lot, the component and the supplier.");
+    expect(html).not.toContain("Bring quality, regulatory, product, supplier, and manufacturing context");
+  });
+
   it("shows signals and CAPA as current lifecycle capability", () => {
     const items = lifecycleStages.flatMap((stage) => stage.items);
     for (const slug of ["signal", "capa"]) {

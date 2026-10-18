@@ -13,7 +13,6 @@ import {
   KeyRound,
   Lock,
   Microscope,
-  Network,
   PenLine,
   PlugZap,
   ScrollText,
@@ -28,17 +27,28 @@ import {
 import { menus, pages, postMarketResources, trialIncludes, type CapabilityIcon } from "./legacyContent";
 import { DEMO_REQUESTS_OFFERED } from "./offer";
 import {
+  AVAILABILITY,
   capabilityStatus,
   img,
   lifecycleStages,
   platformGroups,
   productStructureTitles,
   solutionGroups,
-  type Capability,
+  type Availability,
+  type PlatformGroup,
+  type PlatformPath,
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
 import { DesignPhases } from "./designPhases";
-import { CustomerVoices, LifecycleHero, SignalStory, SourceFlow, StandardsSection } from "./visuals";
+import {
+  CustomerVoices,
+  LifecycleHero,
+  LotChart,
+  ReportingWindows,
+  SourceFlow,
+  StandardsSection,
+  WeeklyChart,
+} from "./visuals";
 import { QualityLoop } from "../features/workspace/sections/QualityLoop";
 import { LOOP_ORDER, type LoopStation } from "../features/workspace/qualityLoop";
 
@@ -69,13 +79,19 @@ export const SITE_LOOP: LoopStation[] = LOOP_ORDER.map((step, index) => ({
 export const SITE_PAGES = [
   "/",
   "/platform",
+  "/platform/product-360",
+  "/platform/investigations",
+  "/platform/decisions",
+  "/platform/trust",
+  "/roadmap",
   "/solutions",
   "/product-lifecycle",
   "/trust",
+  "/trust/regulations",
   "/resources",
   "/company",
   "/videos",
-] as const;
+] as const satisfies readonly string[];
 export type SitePage = (typeof SITE_PAGES)[number];
 
 const QUESTION_FLOW = [
@@ -99,6 +115,7 @@ function PageHero({
   copy,
   image,
   visual,
+  center = false,
   children,
 }: {
   eyebrow: string;
@@ -106,10 +123,12 @@ function PageHero({
   copy: string;
   image?: { src: string; alt: string; contain?: boolean };
   visual?: ReactNode;
+  /** A text-only hero, centred. */
+  center?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <section className="ms-page-hero">
+    <section className={center ? "ms-page-hero ms-page-hero-center" : "ms-page-hero"}>
       <div className="ms-page-hero-copy">
         <span className="ms-eyebrow">{eyebrow}</span>
         <h1>{title}</h1>
@@ -138,7 +157,7 @@ function SectionHead({ eyebrow, title, copy, id }: { eyebrow: string; title: str
   );
 }
 
-function CtaBand() {
+function CtaBand({ trial = false }: { trial?: boolean }) {
   return (
     <section className="ms-cta-band">
       <Reveal>
@@ -148,6 +167,19 @@ function CtaBand() {
           Start with exports from your quality, product and supplier systems. Your systems of record stay where they
           are.
         </p>
+        {trial && (
+          <div className="ms-cta-trial">
+            <strong>In your free trial</strong>
+            <ul>
+              {trialIncludes.map((item) => (
+                <li key={item}>
+                  <Check size={15} aria-hidden="true" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="ms-cta-row">
           {DEMO_REQUESTS_OFFERED && (
             <a className="ms-btn ms-btn-light" href="/request-demo">
@@ -192,9 +224,9 @@ const ROADMAP_COUNTS = capabilityStatus.map((status, index) => {
   return `+${added} more · ${total} in total`;
 });
 
-// What you get, as a roadmap: a track from "Live now" to "Planned" that draws itself when it scrolls into view, the
-// free trial's capabilities in full, then what design partners get next and what is planned. The motion runs once
-// (the live stop keeps a soft pulse) and none of it runs for people who ask for reduced motion.
+// What you get, as a roadmap (the /roadmap page): a track from "Live now" to "Planned" that draws itself when it
+// scrolls into view, the free trial's capabilities in full, then what design partners get next and what is planned.
+// The motion runs once (the live stop keeps a soft pulse) and none of it runs for people who ask for reduced motion.
 function ScopeClarity() {
   const [today, ...later] = capabilityStatus;
   const column = (status: (typeof capabilityStatus)[number], index: number) => {
@@ -233,13 +265,7 @@ function ScopeClarity() {
     );
   };
   return (
-    <section className="ms-section ms-scope" aria-labelledby="scope-title">
-      <SectionHead
-        eyebrow="What you get"
-        title="Know what is available today, and what comes next."
-        id="scope-title"
-        copy="Everything marked Live now works in every workspace, the free trial included. What we build with design partners and what is still planned is labelled as such, so you always know which is which."
-      />
+    <section className="ms-section ms-scope" aria-label="Roadmap">
       <Reveal className="ms-roadmap">
         <div className="ms-roadmap-head">
           <span className="ms-roadmap-rail" aria-hidden="true">
@@ -286,38 +312,33 @@ function ScopeClarity() {
 
 /* ------------------------------------------------------------------------------------------------ Home */
 
+// The worked example on the home page: the free trial's sample story (OrbitCare 300 Rev B, site/visuals.tsx), from
+// the rising signal to the signed decision, each step linking to the Platform section that does it.
+const EXAMPLE_STEPS = [
+  {
+    title: "A signal rises",
+    text: "Pressure-alarm complaints roughly triple after Rev B is released. A change is a lead, not a cause.",
+    href: "/platform/product-360#product-version",
+  },
+  {
+    title: "Scope to the lot and the supplier",
+    text: "Lots 003 and 004, built with the new supplier's pressure sensors, hold 30 of the 42 complaints.",
+    href: "/platform/investigations#evidence",
+  },
+  {
+    title: "Weigh the explanations together",
+    text: "Quality, regulatory, product, supplier quality and manufacturing review the same evidence, competing hypotheses and open questions.",
+    href: "/platform/investigations#hypotheses",
+  },
+  {
+    title: "Decide and sign",
+    text: "An authorized person decides and signs, and the audit trail keeps every step. AI is off in the free trial: every step works by hand.",
+    href: "/platform/decisions#decision-center",
+  },
+];
+
 export function HomePage() {
   const home = pages["/"];
-  const steps = [
-    {
-      title: "Reconstruct product reality",
-      text: "Relate products, versions, components, suppliers, lots, changes, complaints, risks, and evidence.",
-      image: img("medtech-product-360-device"),
-      alt: "Medical device shown with its product structure and versions",
-      href: "/platform#product-intelligence",
-    },
-    {
-      title: "Investigate with evidence",
-      text: "Separate observations, interpretations, hypotheses, contradictions, unknowns, and decisions.",
-      image: img("medtech-evidence-intelligence-hero"),
-      alt: "Evidence records connected with provenance",
-      href: "/platform#investigation-intelligence",
-    },
-    {
-      title: "Challenge before concluding",
-      text: "Compare competing explanations and keep missing evidence visible before anyone decides.",
-      image: img("medtech-hero-challenger"),
-      alt: "Competing explanations compared against evidence",
-      href: "/platform#challenger",
-    },
-    {
-      title: "Decide, sign and trace",
-      text: "AI supports investigation. Authorized humans make controlled decisions, with a full audit trail.",
-      image: img("medtech-decision-center-hero"),
-      alt: "Reviewer preparing a decision with the evidence package",
-      href: "/platform#decision-intelligence",
-    },
-  ];
   return (
     <>
       <section className="ms-hero">
@@ -363,14 +384,14 @@ export function HomePage() {
         <SectionHead
           eyebrow="Inspection readiness"
           title="See your quality loop the way an inspector will."
-          copy="From the complaint that comes in to the risk file it must reach: eight checks drawn from 2026 FDA warning letters, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
+          copy="Eight checks drawn from 2026 FDA warning letters, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
         />
         <Reveal>
           <QualityLoop
             stations={SITE_LOOP}
             eyebrow="Illustrative · synthetic data"
             title="2 of 8 inspection checks clear"
-            detail="Hidden complaints, a harm complaint closed without an investigation, a CAPA closed without an effectiveness check, and post-market data that never reached the risk file: what an inspector would find first. Your free trial starts with sample data that tells this story, then reads your own export."
+            detail="Hidden complaints, a harm complaint closed without an investigation, a CAPA without an effectiveness check, and field data that never reached the risk file: what an inspector would find first. Your free trial starts with sample data that tells this story."
             doneLabel="clear"
           >
             <a className="ms-btn ms-btn-light" href="/signup">
@@ -385,67 +406,70 @@ export function HomePage() {
         </Reveal>
       </section>
 
-      <section className="ms-section ms-question">
+      <section className="ms-section ms-band ms-example" aria-labelledby="example-title">
         <SectionHead
-          eyebrow="A product investigation question"
+          eyebrow="One investigation, start to finish"
+          id="example-title"
           title="Why did pressure-alarm complaints rise after OrbitCare 300 Rev B?"
-          copy="MDARIX helps teams follow the question across product reality, evidence, uncertainty, assurance, and controlled human decision-making."
+          copy="From a rising signal to the lot, the component and the supplier, reviewed by every function in one place and decided by a person."
         />
-        <Reveal>
-          <FlowChain steps={QUESTION_FLOW} label="Investigation flow from complaint signal to human decision" />
-        </Reveal>
-      </section>
-
-      <section className="ms-section">
-        <SectionHead
-          eyebrow="How MDARIX works"
-          title="From field signal to a decision you can defend."
-          copy="One connected path, from the first signal to an authorized decision, with every step traceable."
-        />
-        <div className="ms-steps">
-          {steps.map((step, index) => (
-            <Reveal key={step.title} delay={index * 90} className="ms-step">
-              <a href={step.href}>
-                <Photo src={step.image} alt={step.alt} compact />
-                <span className="ms-step-index">0{index + 1}</span>
-                <h3>{step.title}</h3>
-                <p>{step.text}</p>
-                <span className="ms-link">
-                  Learn more <ArrowRight size={14} aria-hidden="true" />
-                </span>
-              </a>
-            </Reveal>
-          ))}
+        <div className="ms-viz-grid-2">
+          <Reveal className="ms-card ms-viz-card">
+            <span className="ms-eyebrow">Signal</span>
+            <h3>Pressure-alarm complaints per week</h3>
+            <WeeklyChart />
+          </Reveal>
+          <Reveal className="ms-card ms-viz-card" delay={120}>
+            <span className="ms-eyebrow">Where it concentrates</span>
+            <h3>Complaints per lot</h3>
+            <LotChart />
+            <p className="ms-viz-read">
+              <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with the new supplier's sensors.
+            </p>
+          </Reveal>
         </div>
+        <div className="ms-example-team">
+          <Reveal className="ms-example-visual">
+            <Photo
+              src={img("medtech-investigation-team")}
+              alt="Cross-functional MedTech team reviewing an investigation together"
+            />
+          </Reveal>
+          <Reveal delay={120}>
+            <ol className="ms-example-steps">
+              {EXAMPLE_STEPS.map((step, index) => (
+                <li key={step.title}>
+                  <span className="ms-step-index" aria-hidden="true">
+                    0{index + 1}
+                  </span>
+                  <div>
+                    <a href={step.href}>
+                      <strong>{step.title}</strong>
+                    </a>
+                    <p>{step.text}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
+        </div>
+        <p className="ms-viz-caption">Illustrative example with synthetic data. No customer data is shown.</p>
       </section>
 
-      <section className="ms-section ms-band">
-        <SectionHead
-          eyebrow="A different intelligence layer"
-          title="Keep your systems of record. Connect the investigation."
-        />
+      <SourceFlow />
+
+      <section className="ms-section ms-band ms-trust-short" aria-labelledby="trust-strip-title">
+        <SectionHead eyebrow="Trust by design" title="Built for regulated teams." id="trust-strip-title" />
         <div className="ms-grid-4">
           {[
-            [
-              Network,
-              "Product reality",
-              "Relate products, versions, components, suppliers, lots, changes, complaints, risks, and evidence.",
-            ],
-            [
-              ScrollText,
-              "Evidence before inference",
-              "Separate observations, interpretations, hypotheses, contradictions, unknowns, and decisions.",
-            ],
-            [
-              Sparkles,
-              "AI you can inspect",
-              "When AI is switched on, each answer shows its evidence, time view, product version, provenance and limits. It is off in the free trial.",
-            ],
-            [UserCheck, "Humans decide", "AI supports investigation. Authorized humans make controlled decisions."],
+            [Lock, "Isolated data per customer", "The database itself enforces each organization's boundary."],
+            [ShieldCheck, "AI off in the trial", "Every step works by hand. AI stays advisory and cites its evidence."],
+            [BadgeCheck, "Signed decisions", "Approval authority by role, re-authentication and no self-approval."],
+            [ScrollText, "Complete audit trail", "Who did what, when and why, ready to export."],
           ].map(([Icon, title, text], index) => {
-            const I = Icon as typeof Network;
+            const I = Icon as typeof Lock;
             return (
-              <Reveal key={String(title)} delay={index * 80} className="ms-card">
+              <Reveal key={String(title)} delay={index * 80} className="ms-card ms-card-flat">
                 <span className="ms-icon">
                   <I size={20} aria-hidden="true" />
                 </span>
@@ -455,109 +479,10 @@ export function HomePage() {
             );
           })}
         </div>
-      </section>
-
-      <SourceFlow />
-      <SignalStory />
-
-      <section className="ms-section ms-split">
-        <Reveal className="ms-split-copy">
-          <span className="ms-eyebrow">Built for MedTech investigation teams</span>
-          <h2>Bring quality, regulatory, product, supplier, and manufacturing context into one review.</h2>
-          <p>
-            MDARIX helps cross-functional teams inspect the same product reality while preserving source ownership,
-            evidence provenance, uncertainty, and accountable human decisions.
-          </p>
-          <div className="ms-chip-row">
-            {menus.Solutions[1].items.map((role) => (
-              <a key={role.label} href={role.href.replace("/solutions#", "/solutions#")} className="ms-chip">
-                {role.label}
-              </a>
-            ))}
-          </div>
-        </Reveal>
-        <Reveal delay={120}>
-          <Photo
-            src={img("medtech-investigation-team")}
-            alt="Cross-functional MedTech team reviewing an investigation together"
-            caption="Product reality → signals → evidence → governed decision"
-          />
-        </Reveal>
-      </section>
-
-      <section className="ms-section">
-        <div className="ms-grid-3">
-          {[
-            [
-              "Quality signal loop",
-              "From field signal to controlled action.",
-              "Follow complaints and service observations through product version, affected lots, evidence review, and an accountable human decision.",
-              "/medtech-quality-loop.svg",
-              "Workflow from field signal through triage, evidence review, action, and effectiveness check",
-            ],
-            [
-              "Evidence chain",
-              "Make every conclusion traceable.",
-              "Keep source records, observations, competing hypotheses, unknowns, and approvals visible in the same investigation story.",
-              "/medtech-evidence-chain.svg",
-              "Evidence chain linking source records to observations, hypotheses, and decisions",
-            ],
-            [
-              "Connected systems",
-              "Work above the systems you already use.",
-              "Connect QMS, PLM, ERP, supplier, and manufacturing context through governed mappings while each source remains authoritative.",
-              "/medtech-source-network.svg",
-              "Connected medical device systems feeding a governed MDARIX investigation workspace",
-            ],
-          ].map(([eyebrow, title, text, src, alt], index) => (
-            <Reveal key={eyebrow} delay={index * 90} className="ms-card ms-card-diagram">
-              <span className="ms-eyebrow">{eyebrow}</span>
-              <h3>{title}</h3>
-              <p>{text}</p>
-              <img src={src} alt={alt} loading="lazy" />
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      <StandardsSection id="standards" />
-
-      <section className="ms-section ms-trust-strip">
-        <SectionHead
-          eyebrow="Trust by design"
-          title="Built for regulated teams from the first line of code."
-          copy="Your data stays in your organization's space, AI stays advisory and cited, and every decision is signed and recorded."
-        />
-        <div className="ms-grid-4">
-          {[
-            [
-              Lock,
-              "Isolated data per customer",
-              "Every record belongs to one organization; the database itself enforces the boundary on every query.",
-            ],
-            [
-              ShieldCheck,
-              "Grounded, bounded AI",
-              "When switched on, answers cite authorized evidence and hold back when it is thin. AI is off in the free trial.",
-            ],
-            [
-              BadgeCheck,
-              "Controlled signatures",
-              "Approval authority by role, re-authentication and no self-approval.",
-            ],
-            [ScrollText, "Complete audit trail", "Who did what, when and why, ready to export for review."],
-          ].map(([Icon, title, text], index) => {
-            const I = Icon as typeof Lock;
-            return (
-              <Reveal key={String(title)} delay={index * 80} className="ms-card ms-card-dark">
-                <I size={20} aria-hidden="true" />
-                <strong>{String(title)}</strong>
-                <p>{String(text)}</p>
-              </Reveal>
-            );
-          })}
-        </div>
-        <Reveal className="ms-center">
+        <Reveal className="ms-trust-links">
+          <a className="ms-link" href="/trust/regulations">
+            Covers FDA, EU MDR, UK and Canada reporting <ArrowRight size={14} aria-hidden="true" />
+          </a>
           <a className="ms-link" href="/trust">
             How MDARIX earns trust <ArrowRight size={14} aria-hidden="true" />
           </a>
@@ -565,21 +490,84 @@ export function HomePage() {
       </section>
 
       <CustomerVoices />
-      <ScopeClarity />
-      <CtaBand />
+      <CtaBand trial />
     </>
   );
 }
 
 /* ------------------------------------------------------------------------------------------------ Platform */
 
-function CapabilitySection({ capability, index }: { capability: Capability; index: number }) {
+const AVAILABILITY_TONE: Record<Availability, { tone: "live" | "next" | "planned"; icon: LucideIcon }> = {
+  "Available today": { tone: "live", icon: BadgeCheck },
+  "With design partners": { tone: "next", icon: UsersRound },
+  Planned: { tone: "planned", icon: CircleDashed },
+};
+
+/** A capability's availability, in the roadmap's three labels. */
+export function AvailabilityTag({ status }: { status: Availability }) {
+  const { tone, icon: Icon } = AVAILABILITY_TONE[status];
   return (
-    <article id={capability.slug} className={`ms-capability ${index % 2 ? "ms-capability-flip" : ""}`}>
-      <Reveal className="ms-capability-copy">
-        <span className="ms-eyebrow">{capability.label}</span>
-        <h3>{productStructureTitles[capability.slug] ?? capability.title}</h3>
-        <p>{capability.summary}</p>
+    <span className={`ms-avail is-${tone}`}>
+      <Icon size={14} aria-hidden="true" />
+      {status}
+    </span>
+  );
+}
+
+/** What the three labels mean, in the roadmap's words, with the way to the roadmap. */
+function AvailabilityLegend() {
+  return (
+    <section className="ms-section ms-band" aria-labelledby="availability-title">
+      <SectionHead
+        eyebrow="Availability"
+        id="availability-title"
+        title="Every capability says where it stands."
+        copy="The labels are the roadmap's: nothing is marked Available today until it works in a free trial workspace."
+      />
+      <div className="ms-grid-3">
+        {capabilityStatus.map((status, index) => (
+          <Reveal key={status.label} delay={index * 80} className="ms-card ms-card-flat">
+            <AvailabilityTag status={AVAILABILITY[index]} />
+            <p>{status.text}</p>
+          </Reveal>
+        ))}
+      </div>
+      <Reveal className="ms-center">
+        <a className="ms-link" href="/roadmap">
+          See the roadmap <ArrowRight size={14} aria-hidden="true" />
+        </a>
+      </Reveal>
+    </section>
+  );
+}
+
+function PlatformBoundary() {
+  return (
+    <section className="ms-section">
+      <Reveal className="ms-boundary">
+        <strong>MDARIX is a context and investigation layer.</strong>
+        <span>
+          It complements QMS, PLM, ERP/MES, and supplier systems; it does not replace their authoritative records.
+        </span>
+      </Reveal>
+    </section>
+  );
+}
+
+function CapabilitySection({ capability }: { capability: PlatformGroup["capabilities"][number] }) {
+  const title = productStructureTitles[capability.slug] ?? capability.title;
+  return (
+    <article id={capability.slug} className="ms-capability" aria-labelledby={`${capability.slug}-title`}>
+      <Reveal className="ms-capability-head">
+        <div className="ms-capability-copy">
+          <div className="ms-capability-label">
+            <span className="ms-eyebrow">{capability.label}</span>
+            <AvailabilityTag status={capability.availability.status} />
+          </div>
+          <h2 id={`${capability.slug}-title`}>{title}</h2>
+          <p>{capability.summary}</p>
+          <p className="ms-capability-note">{capability.availability.note}</p>
+        </div>
         <ul className="ms-check-list">
           {capability.cards.map((card) => (
             <li key={card.title}>
@@ -590,14 +578,31 @@ function CapabilitySection({ capability, index }: { capability: Capability; inde
             </li>
           ))}
         </ul>
-        <FlowChain steps={capability.steps} label={`${capability.label} workflow`} />
       </Reveal>
       {capability.image && (
-        <Reveal delay={120}>
+        <Reveal className="ms-capability-visual">
           <Photo src={capability.image.src} alt={capability.image.alt} />
         </Reveal>
       )}
+      <FlowChain steps={capability.steps} label={`${capability.label} workflow`} />
     </article>
+  );
+}
+
+/** The other Platform pages, at the foot of each one. */
+function PlatformPager({ current }: { current?: PlatformPath }) {
+  return (
+    <nav className="ms-platform-pager" aria-label="Platform pages">
+      {platformGroups
+        .filter((group) => group.path !== current)
+        .map((group) => (
+          <a key={group.path} className="ms-card" href={group.path}>
+            <span className="ms-eyebrow">Platform</span>
+            <strong>{group.name}</strong>
+            <span>{group.blurb}</span>
+          </a>
+        ))}
+    </nav>
   );
 }
 
@@ -606,40 +611,174 @@ export function PlatformPage() {
   return (
     <>
       <PageHero
-        eyebrow={platform.eyebrow}
+        eyebrow="Platform"
         title={platform.title}
         copy={platform.copy}
         image={{ src: img("medtech-product-reality-graph-hero"), alt: "Connected product reality graph" }}
       />
-      <nav className="ms-subnav" aria-label="Platform sections">
-        {platformGroups.map((group) => (
-          <a key={group.id} href={`#${group.id}`}>
-            {group.title}
+      <section className="ms-section" aria-labelledby="platform-pages">
+        <SectionHead
+          eyebrow="Four pages"
+          id="platform-pages"
+          title="Every capability, and where it stands today."
+          copy="Each page holds its capabilities as sections, and each capability carries its label: Available today, With design partners or Planned."
+        />
+        <div className="ms-platform-pages">
+          {platformGroups.map((group, index) => (
+            <Reveal key={group.path} delay={(index % 2) * 80} className="ms-card ms-platform-card">
+              <span className="ms-eyebrow">{group.blurb}</span>
+              <h3>
+                <a href={group.path}>{group.name}</a>
+              </h3>
+              <p>{group.copy}</p>
+              <ul>
+                {group.capabilities.map((capability) => (
+                  <li key={capability.slug}>
+                    <a href={`${group.path}#${capability.slug}`}>{capability.label}</a>
+                    <AvailabilityTag status={capability.availability.status} />
+                  </li>
+                ))}
+              </ul>
+              <a className="ms-link" href={group.path}>
+                Open {group.name} <ArrowRight size={14} aria-hidden="true" />
+              </a>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+      <AvailabilityLegend />
+      <PlatformBoundary />
+      <CtaBand />
+    </>
+  );
+}
+
+/** One Platform page: its capabilities as sections, each with its availability. */
+export function PlatformGroupPage({ path }: { path: PlatformPath }) {
+  const group = platformGroups.find((item) => item.path === path) ?? platformGroups[0];
+  const counts = AVAILABILITY.map((status) => ({
+    status,
+    count: group.capabilities.filter((capability) => capability.availability.status === status).length,
+  })).filter((item) => item.count > 0);
+  return (
+    <>
+      <PageHero eyebrow={`Platform · ${group.name}`} title={group.headline} copy={group.copy} center>
+        <ul className="ms-avail-summary" aria-label="Where this page's capabilities stand">
+          {counts.map((item) => (
+            <li key={item.status}>
+              <AvailabilityTag status={item.status} />
+              <span>
+                {item.count} {item.count === 1 ? "capability" : "capabilities"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </PageHero>
+      <nav className="ms-subnav" aria-label={`${group.name} sections`}>
+        {group.capabilities.map((capability) => (
+          <a key={capability.slug} href={`#${capability.slug}`}>
+            {capability.label}
           </a>
         ))}
       </nav>
-      {platformGroups.map((group) => (
-        <section key={group.id} className="ms-section ms-platform-group" aria-labelledby={group.id}>
-          <SectionHead
-            eyebrow="Platform"
-            title={group.title}
-            id={group.id}
-            copy={group.capabilities.map((capability) => capability.label).join(" · ")}
-          />
-          {group.capabilities.map((capability, index) => (
-            <CapabilitySection key={capability.slug} capability={capability} index={index} />
-          ))}
-        </section>
-      ))}
-      <section className="ms-section ms-band">
-        <Reveal className="ms-boundary">
-          <strong>MDARIX Product 360 is a context and investigation layer.</strong>
-          <span>
-            It complements QMS, PLM, ERP/MES, and supplier systems; it does not replace their authoritative records.
-          </span>
-        </Reveal>
+      <section className="ms-section ms-platform-group" aria-label={group.name}>
+        {group.capabilities.map((capability) => (
+          <CapabilitySection key={capability.slug} capability={capability} />
+        ))}
       </section>
+      {path === "/platform/trust" && (
+        <section className="ms-section ms-band">
+          <div className="ms-grid-2">
+            <Reveal className="ms-card ms-card-flat">
+              <strong>Regulations</strong>
+              <p>FDA, EU MDR, UK and Canada reporting, and the standards whose evidence MDARIX organizes.</p>
+              <a className="ms-link" href="/trust/regulations">
+                See the regulations <ArrowRight size={14} aria-hidden="true" />
+              </a>
+            </Reveal>
+            <Reveal className="ms-card ms-card-flat" delay={80}>
+              <strong>Security and access</strong>
+              <p>Organization isolation, sessions and MFA, and what MDARIX does and does not claim today.</p>
+              <a className="ms-link" href="/trust#security">
+                How MDARIX earns trust <ArrowRight size={14} aria-hidden="true" />
+              </a>
+            </Reveal>
+          </div>
+        </section>
+      )}
+      <AvailabilityLegend />
+      <section className="ms-section">
+        <PlatformPager current={path} />
+      </section>
+      <CtaBand />
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------ Roadmap */
+
+export function RoadmapPage() {
+  return (
+    <>
+      <PageHero
+        eyebrow="Roadmap"
+        title="Know what is available today, and what comes next."
+        copy="Everything marked Live now works in every workspace, the free trial included. What we build with design partners and what is still planned is labelled as such, so you always know which is which."
+        center
+      />
       <ScopeClarity />
+      <section className="ms-section ms-band" aria-labelledby="roadmap-pages">
+        <SectionHead
+          eyebrow="Page by page"
+          id="roadmap-pages"
+          title="Each capability, with its label."
+          copy="The Platform pages show every capability with the same three labels."
+        />
+        <PlatformPager />
+      </section>
+      <CtaBand />
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------ Regulations */
+
+export function RegulationsPage() {
+  return (
+    <>
+      <PageHero
+        eyebrow="Trust · Regulations"
+        title="Built around the evidence regulators ask for."
+        copy="Post-market quality work is defined by a few standards and regulations. MDARIX organizes the evidence they call for. It does not certify compliance: your quality system and its validation stay yours."
+        center
+      />
+      <ReportingWindows />
+      <StandardsSection
+        id="standards"
+        title="The standards behind post-market quality work."
+        copy="What each one asks for, and how MDARIX helps you show it."
+      />
+      <section className="ms-section ms-band">
+        <div className="ms-grid-2">
+          <Reveal className="ms-card ms-card-flat">
+            <strong>What MDARIX claims</strong>
+            <p>
+              MDARIX is not yet a validated (GxP) system and does not hold ISO 27001 or SOC 2 certification. It never
+              submits anything to a regulator.
+            </p>
+            <a className="ms-link" href="/security">
+              Security at MDARIX <ArrowRight size={14} aria-hidden="true" />
+            </a>
+          </Reveal>
+          <Reveal className="ms-card ms-card-flat" delay={80}>
+            <strong>Human decisions, recorded</strong>
+            <p>Reportability decisions and investigation decisions are made and signed by people, with their reason.</p>
+            <a className="ms-link" href="/platform/trust">
+              Trust on the Platform <ArrowRight size={14} aria-hidden="true" />
+            </a>
+          </Reveal>
+        </div>
+      </section>
       <CtaBand />
     </>
   );
@@ -793,10 +932,13 @@ export function LifecyclePage() {
             <span className="ms-badge ms-badge-current">Available</span>
             <h3>Current capabilities</h3>
             <p>
-              Product 360, temporal context, the second look at closed complaints, reporting clocks, signals and trend
-              checks, investigations with evidence, hypotheses and open questions, signed decisions, CAPA effectiveness
-              checks, risk-file input, the inspector summary, and the audit trail.
+              Products, versions and lots, temporal context, the second look at closed complaints, reporting clocks,
+              signals and trend checks, investigations with evidence, hypotheses and open questions, signed decisions,
+              CAPA effectiveness checks, risk-file input, the inspector summary, and the audit trail.
             </p>
+            <a className="ms-link" href="/roadmap">
+              See the roadmap <ArrowRight size={14} aria-hidden="true" />
+            </a>
           </Reveal>
           <Reveal className="ms-card" delay={100}>
             <span className="ms-badge ms-badge-future">Future</span>
@@ -857,6 +999,7 @@ export function TrustPage() {
       <nav className="ms-subnav" aria-label="Trust sections">
         <a href="#principles">Principles</a>
         <a href="#ai">AI trust</a>
+        <a href="/trust/regulations">Regulations</a>
         <a href="#security">Security &amp; access</a>
         <a href="#integrations">Integrations</a>
       </nav>
@@ -923,7 +1066,19 @@ export function TrustPage() {
         </Reveal>
       </section>
 
-      <StandardsSection id="trust-standards" />
+      <section className="ms-section" aria-labelledby="regulations-link">
+        <Reveal className="ms-card ms-card-flat ms-regulations-link">
+          <span className="ms-eyebrow">Regulations</span>
+          <strong id="regulations-link">Built around the evidence regulators ask for.</strong>
+          <p>
+            FDA, EU MDR, UK and Canada reporting windows, and the standards whose evidence MDARIX organizes. MDARIX does
+            not certify compliance: your quality system and its validation stay yours.
+          </p>
+          <a className="ms-link" href="/trust/regulations">
+            See the regulations <ArrowRight size={14} aria-hidden="true" />
+          </a>
+        </Reveal>
+      </section>
 
       <section className="ms-section" aria-labelledby="security">
         <SectionHead eyebrow={security.eyebrow} title={security.title} copy={security.copy} id="security" />
@@ -1103,7 +1258,7 @@ export function ResourcesPage() {
           title="AI, safety signals, and post-market surveillance."
           copy="Explore how medical-device teams monitor real-world performance, investigate emerging signals, and keep AI-enabled devices under human oversight across the product lifecycle."
         />
-        <div className="ms-grid-3">
+        <div className="ms-resource-pictures">
           {[
             [
               "medtech-resource-pms-signals",
@@ -1120,9 +1275,13 @@ export function ResourcesPage() {
               "Regulatory intelligence and source provenance for AI medical devices",
               "Regulatory intelligence",
             ],
-          ].map(([name, alt, caption], index) => (
-            <Reveal key={name} delay={index * 80}>
-              <Photo src={img(name)} alt={alt} caption={caption} />
+          ].map(([name, alt, caption]) => (
+            <Reveal key={name}>
+              <Photo src={img(name)} alt={alt} />
+              <div>
+                <h3>{caption}</h3>
+                <p>{alt}.</p>
+              </div>
             </Reveal>
           ))}
         </div>
