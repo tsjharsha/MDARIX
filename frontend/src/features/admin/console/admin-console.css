@@ -33,6 +33,11 @@
     sans-serif;
   font-size: 14px;
 }
+/* A dialog rendered at the end of the page (Report a problem) keeps the console's colours and type, and takes no room. */
+.admin-console.ac-portal {
+  min-height: 0;
+  background: none;
+}
 .admin-console button,
 .admin-console input,
 .admin-console select {

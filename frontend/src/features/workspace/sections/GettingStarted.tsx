@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
@@ -47,6 +47,8 @@ const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ b
 /** The tabs below the story: everything that is not the story itself, one click away. */
 export const TRIAL_TABS = ["Your data", "Team", "About the sample data", "Your trial"] as const;
 export type TrialTab = (typeof TRIAL_TABS)[number];
+/** The tab below the story that a link names, if it names one. */
+export const trialTabFor = (name?: string): TrialTab | undefined => TRIAL_TABS.find((tab) => tab === name);
 
 /**
  * Getting started: the free trial as a story. The quality loop MDARIX closes, chapter by chapter, each with what the
@@ -54,7 +56,7 @@ export type TrialTab = (typeof TRIAL_TABS)[number];
  * to try it. A chapter is done when the organization acted in it (a record it created in MDARIX), so the progress here
  * is the progress MDARIX sees (/api/v1/trial/story).
  */
-export function GettingStartedSection() {
+export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const { open, work, session, notify } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
@@ -63,12 +65,22 @@ export function GettingStartedSection() {
   const allowed = (section: string) =>
     section === "Getting started" ||
     sectionAllowed(section as WorkspaceSection, session?.allowed_menu, session?.business_permissions);
-  const [tab, setTab] = useState<TrialTab>("Your data");
+  const focusTab = trialTabFor(focus);
+  const [tab, setTab] = useState<TrialTab>(focusTab ?? "Your data");
   // A tab below the story, opened and brought into view.
   const showTab = (name: TrialTab) => {
     setTab(name);
     window.setTimeout(() => scrollTo("trial-tabs"), 0);
   };
+  // Opened on one of those tabs (Help, "Getting started and import templates"): brought into view once the story
+  // above it has loaded, so the scroll lands on the tab and not where it was while the page was still filling in.
+  const focused = useRef(false);
+  const loaded = status.state !== "loading" && story.state !== "loading";
+  useEffect(() => {
+    if (!focusTab || !loaded || focused.current) return;
+    focused.current = true;
+    scrollTo("trial-tabs");
+  }, [focusTab, loaded]);
   const go = (chapter: Pick<StoryChapter, "code" | "opens"> & Partial<Pick<StoryChapter, "case">>) => {
     if (chapter.code === "YOUR_DATA" || chapter.opens.section === "Getting started") return showTab("Your data");
     if (!allowed(chapter.opens.section)) return;

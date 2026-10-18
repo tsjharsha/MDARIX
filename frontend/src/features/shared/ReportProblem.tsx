@@ -72,90 +72,93 @@ export function ReportProblemDialog({ supportEmail, onClose }: { supportEmail?: 
   };
 
   // Rendered at the end of the page, not inside the header that opened it: the sticky header is its own stacking
-  // context, and the dialog must sit above the privacy notice and everything else.
+  // context, and the dialog must sit above the privacy notice and everything else. The "admin-console" wrapper
+  // carries the workspace's colours and type there; without it the dialog had no background and its text no colour.
   return createPortal(
-    <div className="ac-modal-backdrop" role="presentation">
-      <DialogBehaviour onClose={onClose} />
-      <section
-        className="ac-modal report-problem"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="report-problem-title"
-      >
-        <p className="ac-eyebrow">
-          <Bug size={14} aria-hidden="true" /> Help
-        </p>
-        <h2 id="report-problem-title">Report a problem</h2>
-        {sent !== null ? (
-          <>
-            <p role="status">
-              Thank you. Your report has reached the MDARIX team{sent ? ` (report ${sent})` : ""}. We reply by email.
-            </p>
-            <div className="ac-modal-actions">
-              <button type="button" className="ac-primary" onClick={onClose}>
-                Close
-              </button>
-            </div>
-          </>
-        ) : (
-          <form className="ca-form" onSubmit={submit}>
-            <p className="ac-muted">
-              Tell us what happened and what you expected.{" "}
-              {requestId
-                ? "The page you are on and the reference of the last failed request are sent with it."
-                : "The page you are on is sent with it."}{" "}
-              Do not include patient or personal data.
-            </p>
-            <label className="ca-field">
-              What went wrong, in a few words
-              <input
-                required
-                maxLength={SUMMARY_LIMIT}
-                value={summary}
-                onChange={(event) => setSummary(event.target.value)}
-              />
-            </label>
-            <label className="ca-field">
-              Details: what you did, what happened, what you expected
-              <textarea
-                required
-                rows={6}
-                maxLength={DETAILS_LIMIT}
-                value={details}
-                onChange={(event) => setDetails(event.target.value)}
-              />
-              <small className="ac-muted">
-                {details.length.toLocaleString()} of {DETAILS_LIMIT.toLocaleString()} characters
-              </small>
-            </label>
-            {requestId && (
-              <p className="ac-request-id">
-                Reference sent with the report: <code>{requestId}</code>
+    <div className="admin-console ac-portal">
+      <div className="ac-modal-backdrop" role="presentation">
+        <DialogBehaviour onClose={onClose} />
+        <section
+          className="ac-modal report-problem"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-problem-title"
+        >
+          <p className="ac-eyebrow">
+            <Bug size={14} aria-hidden="true" /> Help
+          </p>
+          <h2 id="report-problem-title">Report a problem</h2>
+          {sent !== null ? (
+            <>
+              <p role="status">
+                Thank you. Your report has reached the MDARIX team{sent ? ` (report ${sent})` : ""}. We reply by email.
               </p>
-            )}
-            {failure && (
-              <p className="ca-inline-error" role="alert">
-                {failure.message}{" "}
-                {failure.mailto ? (
-                  <a href={failure.mailto}>Send it by email instead</a>
-                ) : (
-                  <a href="/contact" target="_blank" rel="noopener">
-                    Contact us instead
-                  </a>
-                )}
+              <div className="ac-modal-actions">
+                <button type="button" className="ac-primary" onClick={onClose}>
+                  Close
+                </button>
+              </div>
+            </>
+          ) : (
+            <form className="ca-form" onSubmit={submit}>
+              <p className="ac-muted">
+                Tell us what happened and what you expected.{" "}
+                {requestId
+                  ? "The page you are on and the reference of the last failed request are sent with it."
+                  : "The page you are on is sent with it."}{" "}
+                Do not include patient or personal data.
               </p>
-            )}
-            <div className="ac-modal-actions">
-              <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
-                Cancel
-              </button>
-              <button type="submit" className="ac-primary" disabled={busy || !summary.trim() || !details.trim()}>
-                {busy ? "Sending…" : "Send report"}
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
+              <label className="ca-field">
+                What went wrong, in a few words
+                <input
+                  required
+                  maxLength={SUMMARY_LIMIT}
+                  value={summary}
+                  onChange={(event) => setSummary(event.target.value)}
+                />
+              </label>
+              <label className="ca-field">
+                Details: what you did, what happened, what you expected
+                <textarea
+                  required
+                  rows={6}
+                  maxLength={DETAILS_LIMIT}
+                  value={details}
+                  onChange={(event) => setDetails(event.target.value)}
+                />
+                <small className="ac-muted">
+                  {details.length.toLocaleString()} of {DETAILS_LIMIT.toLocaleString()} characters
+                </small>
+              </label>
+              {requestId && (
+                <p className="ac-request-id">
+                  Reference sent with the report: <code>{requestId}</code>
+                </p>
+              )}
+              {failure && (
+                <p className="ca-inline-error" role="alert">
+                  {failure.message}{" "}
+                  {failure.mailto ? (
+                    <a href={failure.mailto}>Send it by email instead</a>
+                  ) : (
+                    <a href="/contact" target="_blank" rel="noopener">
+                      Contact us instead
+                    </a>
+                  )}
+                </p>
+              )}
+              <div className="ac-modal-actions">
+                <button type="button" className="ac-secondary" onClick={onClose} disabled={busy}>
+                  Cancel
+                </button>
+                <button type="submit" className="ac-primary" disabled={busy || !summary.trim() || !details.trim()}>
+                  {busy ? "Sending…" : "Send report"}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </div>
     </div>,
     document.body,
   );
