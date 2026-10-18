@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -266,6 +267,47 @@ class TrialExitRequest(Base):
         CheckConstraint(
             "status IN ('PENDING', 'APPROVED', 'DECLINED', 'WITHDRAWN')", name="ck_trial_exit_requests_status"
         ),
+    )
+
+
+class TrialMvpRequest(Base):
+    """A free trial's request for an MVP conversation (md46; backend/app/trial/mvp_request.py): what the organization
+    expects from the MVP, the products, sites and systems it has in mind, how to reach the person who asked, and whether
+    to move its trial data into the MVP. A tenant table under row-level security, like ``trial_feedback``: the
+    organization sees only its own request, Platform Administrators read every one through the system scope, and it is
+    deleted with the trial's data. One open request (NEW or CONTACTED) per organization."""
+
+    __tablename__ = "trial_mvp_requests"
+    id = _id()
+    tenant_id = _tenant()
+    requested_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    organization: Mapped[str] = mapped_column(String(160), nullable=False)
+    expectations: Mapped[str] = mapped_column(String(2000), nullable=False)
+    scope: Mapped[str | None] = mapped_column(String(2000))
+    phone: Mapped[str | None] = mapped_column(String(30))
+    contact_preference: Mapped[str | None] = mapped_column(String(200))
+    # Asked for only when the organization had removed the sample data and imported its own (the server checks).
+    move_trial_data: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NEW")
+    # The trial when it asked: days left, and its sample and own records (backend/app/trial/mvp_request.py).
+    context = mapped_column(JSONB)
+    handled_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    handled_at = _ts()
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at = _ts(False)
+    updated_at = _ts(False)
+    __table_args__ = (
+        Index("ix_trial_mvp_requests_tenant", "tenant_id", "created_at"),
+        Index("ix_trial_mvp_requests_status", "status", "created_at"),
+        Index(
+            "ux_trial_mvp_requests_open",
+            "tenant_id",
+            unique=True,
+            postgresql_where=text("status IN ('NEW', 'CONTACTED')"),
+        ),
+        CheckConstraint("status IN ('NEW', 'CONTACTED', 'CLOSED')", name="ck_trial_mvp_requests_status"),
     )
 
 

@@ -10,6 +10,42 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.26] - 2026-10-18
+
+### Added
+
+- Free trial: **Next steps** (From trial to MVP), a page in the workspace menu of every free-trial organization, for
+  everyone in it (`/app/next-steps`). It explains how the trial becomes an MVP: the MVP works only with your real data,
+  in a dedicated MDARIX transactional database set up only for your organization and run by MDARIX; what changes from
+  the trial (data, where it lives, how it gets in, people, start, length, cost, support); how the MVP starts, in five
+  steps over at least 2 to 3 weeks of setup and validation; how your systems are connected through an approved mapping
+  file; the Customer Administrator; what MDARIX needs from you; the price (a paid engagement of 3 months to 1 year,
+  priced in a written proposal, with a discount for design partners; no figures are shown); and common questions.
+  "Download this page as PDF" prints the page without the menu and buttons, with every answer open. Next steps is
+  linked from Getting started (under the story's chapters), from End your trial early, and from the Help menu during
+  a trial.
+- Request an MVP conversation, from Next steps: what you expect from the MVP, the products, sites and systems you have
+  in mind, and, if you like, a phone number and how and when to reach you. "Move our trial data into the MVP" is
+  offered only when the organization has removed the sample data and imported its own; otherwise the form says why,
+  and that the trial data is deleted 30 days after the trial ends. The server refuses the move in any other case. One
+  open request per organization: asking again updates it. The answer is shown on screen, and Next steps then shows
+  where the request stands. The MDARIX team is emailed each request and update (`MDARIX_DEMO_ALERT_EMAIL`, else
+  `MDARIX_TRIAL_ALERT_EMAIL`; no new setting) and sees every request in Platform Admin > Identity & Access >
+  Onboarding (Demo and trial requests), where it marks them contacted or closed. Audited as `TRIAL_MVP_REQUESTED`,
+  `TRIAL_MVP_REQUEST_UPDATED` and `TRIAL_MVP_REQUEST_STATUS_CHANGED`. Migration `md46` adds `trial_mvp_requests`, a
+  tenant table under row-level security like `trial_feedback`; it holds the requester's name and email and is deleted
+  with the trial's data.
+- The free trial user guide (`/help/trial-guide`) has a chapter "After your trial", in the same words as Next steps,
+  and its "When the 30 days are over" now points to Next steps. The pilot guide (`/help/pilot-guide`) describes the
+  five steps and the dedicated database run by MDARIX.
+- Website: the Company page has an "After the trial" section below the free trial's steps: an MVP on your real data,
+  a dedicated database run by MDARIX, 2 to 3 weeks of setup and validation, paid, with a design-partner discount. No
+  prices are shown.
+
+### Changed
+
+- The trial reminder emails sent 7 days and 1 day before the trial ends link to Next steps.
+
 ## [0.10.25] - 2026-10-18
 
 ### Fixed

@@ -56,6 +56,7 @@ CONTROL_ONLY = (
     "demo_requests",
     "trial_exit_requests",
     "trial_feedback",
+    "trial_mvp_requests",
     "subscription_lifecycles",
     "subscription_versions",
     "plan_definitions",

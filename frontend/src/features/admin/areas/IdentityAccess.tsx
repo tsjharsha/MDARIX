@@ -18,6 +18,7 @@ import { titleCase } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { CustomerAdmins } from "../customers/CustomerAdmins";
 import { DemoRequestsWorkspace } from "../DemoRequestsWorkspace";
+import { MvpRequestsWorkspace } from "../MvpRequestsWorkspace";
 import { TrialRequestsWorkspace } from "../TrialRequestsWorkspace";
 import "../../customer-admin/customer-admin.css";
 import "../customers/customers.css";
@@ -193,8 +194,9 @@ function CustomerAdministrators() {
 }
 
 /**
- * People asking to use MDARIX: demo requests from the website, and free-trial requests. Approving a trial creates its
- * customer and tenant (under Customers & Tenants) and the requester's account.
+ * People asking to use MDARIX: demo requests from the website, free-trial requests, and requests from free trials for an
+ * MVP conversation. Approving a trial creates its customer and tenant (under Customers & Tenants) and the requester's
+ * account.
  */
 function Onboarding() {
   return (
@@ -203,12 +205,14 @@ function Onboarding() {
         <div>
           <h2>Demo and trial requests</h2>
           <p className="ac-muted">
-            The people who asked for a demo or a free trial. Approving a trial creates the requester&apos;s account, and
-            the customer and tenant it belongs to, which are then managed under Customers &amp; Tenants.
+            The people who asked for a demo, a free trial or, from a trial, an MVP conversation. Approving a trial
+            creates the requester&apos;s account, and the customer and tenant it belongs to, which are then managed
+            under Customers &amp; Tenants.
           </p>
         </div>
       </div>
       <DemoRequestsWorkspace />
+      <MvpRequestsWorkspace />
       <TrialRequestsWorkspace />
     </div>
   );

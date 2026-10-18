@@ -615,3 +615,32 @@ export const lifecycleStages = menus["Product Lifecycle"].map((group) => ({
 }));
 
 export { capabilityStatus };
+
+/**
+ * After the trial (Company page, below the free trial's steps): what follows a free trial, in the terms the trial
+ * workspace's Next steps page uses (features/help/trialNextSteps.ts). Prices are never shown: they come in a written
+ * proposal. It links to nothing inside the application.
+ */
+export const afterTheTrial = {
+  eyebrow: "After the trial",
+  title: "Then an MVP on your real data.",
+  copy: "When the trial has shown how MDARIX works, the next step is an MVP: MDARIX working on your real complaints, connected to your own systems, run by your own team.",
+  points: [
+    [
+      "Your real data only",
+      "The MVP works on your own records from your complaint, QMS, PLM and ERP systems. There is no sample data in it.",
+    ],
+    [
+      "A dedicated database, run by MDARIX",
+      "Your MVP has a dedicated MDARIX transactional database, set up only for your organization and run by MDARIX. Your systems stay the systems of record.",
+    ],
+    [
+      "2 to 3 weeks of setup and validation",
+      "Setup, configuration and validation testing take at least 2 to 3 weeks. The MVP starts once you have signed off the setup.",
+    ],
+    [
+      "Paid, with a design-partner discount",
+      "The MVP runs from 3 months to 1 year, priced for your scope and usage in a written proposal. Design partners receive a discount.",
+    ],
+  ] as const,
+} as const;

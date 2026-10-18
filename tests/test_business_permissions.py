@@ -67,6 +67,11 @@ EXEMPT = {
     ): "the trial user's own demo request; trial workspaces only, checked in the route",
     (
         "POST",
+        "/api/v1/trial/mvp-request",
+    ): "a request for an MVP conversation, open to everyone in a trial (as the demo request); trial workspaces only, "
+    "and the trial data move only once the sample is removed and own data is in, checked in the route",
+    (
+        "POST",
         "/api/v1/trial/exit-request",
     ): "the owner's own request to end the trial; owner only, checked in the route",
     ("POST", "/api/v1/trial/exit-request/withdraw"): "the owner's own request; owner only, checked in the route",

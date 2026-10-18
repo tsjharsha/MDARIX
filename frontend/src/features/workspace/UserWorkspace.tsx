@@ -20,6 +20,7 @@ import {
   Settings2,
   ShieldCheck,
   ShieldAlert,
+  Signpost,
   Upload,
   UserRound,
   X,
@@ -61,6 +62,8 @@ import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
 import { ImportDataSection } from "./sections/ImportData";
+import { TrialNextStepsSection } from "./sections/TrialNextSteps";
+import { NEXT_STEPS_SUBTITLE, NEXT_STEPS_SUMMARY } from "../help/trialNextSteps";
 import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
 import { caseFromSearch, caseLinkStart, searchWithoutCase } from "./savedContext";
@@ -184,6 +187,12 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     guide: "Tell us what works and what to improve.",
     context: false,
   },
+  "Next steps": {
+    icon: Signpost,
+    description: NEXT_STEPS_SUBTITLE,
+    guide: NEXT_STEPS_SUMMARY,
+    context: false,
+  },
 };
 
 /** Under the MVP feature set Records and My Work also hold what the parked sections did (app/featureSet.ts). */
@@ -223,6 +232,7 @@ export const VIEW_TO_SECTION: Record<string, [WorkspaceSection, string?]> = {
   "regulatory-copilot": ["Intelligence", "Regulatory copilot"],
   "risk-traceability": ["Intelligence", "Risk & traceability"],
   "signature-verification": ["Decisions", "Verify a signature"],
+  "next-steps": ["Next steps"],
 };
 
 export function UserWorkspace({
@@ -402,13 +412,15 @@ export function UserWorkspace({
     return () => window.removeEventListener("popstate", onPopState);
   }, [featureSet]);
 
-  // A section the server's menu does not grant is never rendered, even from an old link.
+  // A section the server's menu does not grant is never rendered, even from an old link. A trial-only section (a link
+  // to Next steps in a reminder email) waits for the trial status before it is judged.
   useEffect(() => {
+    if (!trialChecked && TRIAL_ONLY_SECTIONS.includes(location.section)) return;
     if (!visibleSections.includes(location.section)) open(visibleSections[0] ?? "My Account");
-  }, [visibleSections, location.section]);
+  }, [visibleSections, location.section, trialChecked]);
 
   const tenantName = session?.current_tenant?.tenant_name ?? "Your organization";
-  const api: WorkspaceApi = { session, work, open, notify, reportStep };
+  const api: WorkspaceApi = { session, work, open, notify, reportStep, isTrial: !!trial?.is_trial };
   const { section, tab } = location;
 
   return (
@@ -557,6 +569,7 @@ export function UserWorkspace({
                       {section === "My Account" && <AccountSection tab={tab} />}
                       {section === "Import data" && <ImportDataSection />}
                       {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+                      {section === "Next steps" && trial?.is_trial && <TrialNextStepsSection />}
                     </div>
                   </SectionErrorBoundary>
                 </ColumnScopeProvider>

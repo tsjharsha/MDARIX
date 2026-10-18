@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, ChevronRight, Circle, MessageSquare, ShieldCheck, Star, Upload, Users } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  MessageSquare,
+  ShieldCheck,
+  Signpost,
+  Star,
+  Upload,
+  Users,
+} from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
@@ -14,6 +24,7 @@ import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
+import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { SampleDataPanel } from "./SampleData";
 import { InsightsPanel } from "./TrialInsights";
 import type { Insights } from "../trialInsights";
@@ -205,6 +216,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
             </button>
           </div>
         </div>
+        <div id="trial-next-steps" className="uw-story-partner uw-anchor">
+          <div>
+            <strong>{NEXT_STEPS_LINK}</strong>
+            <p>{NEXT_STEPS_SUMMARY}</p>
+          </div>
+          <div className="uw-story-partner-actions">
+            <button type="button" className="ac-secondary" onClick={() => open("Next steps")}>
+              <Signpost size={15} aria-hidden="true" /> Open {NEXT_STEPS_SECTION}
+            </button>
+          </div>
+        </div>
       </Panel>
 
       <div id="trial-tabs" className="uw-anchor uw-trial-tabs">
@@ -289,7 +311,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                   />
                 </div>
               </Panel>
-              <EndTrialPanel />
+              <EndTrialPanel onNextSteps={() => open("Next steps")} />
             </>
           )}
         </Tabs>

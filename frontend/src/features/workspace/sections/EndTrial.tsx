@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { DoorOpen, Undo2 } from "lucide-react";
+import { DoorOpen, Signpost, Undo2 } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { Drawer, errorText, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
+import { NEXT_STEPS_LINK } from "../../help/trialNextSteps";
 
 export type TrialExitRequest = {
   id: string;
@@ -33,9 +34,10 @@ export function exitRequestText(request: TrialExitRequest | null | undefined): s
 
 /**
  * Ending the trial early (backend/app/trial/early_exit.py), for the person who started it: a request with an optional
- * reason and whether to delete the data. The MDARIX team confirms it; until then it can be withdrawn.
+ * reason and whether to delete the data. The MDARIX team confirms it; until then it can be withdrawn. `onNextSteps`
+ * opens Next steps, for an owner who would rather continue with an MVP.
  */
-export function EndTrialPanel() {
+export function EndTrialPanel({ onNextSteps }: { onNextSteps?: () => void } = {}) {
   const state = useResource<ExitState>(EXIT_REQUEST_PATH);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -64,6 +66,14 @@ export function EndTrialPanel() {
         team; once they confirm it, the trial ends and, if you ask, everything your organization stored in it is
         deleted. You will get an email either way.
       </p>
+      {onNextSteps && (
+        <p className="uw-trial-note">
+          Would you rather continue on your real data?{" "}
+          <button type="button" className="ac-link" onClick={onNextSteps}>
+            <Signpost size={14} aria-hidden="true" /> {NEXT_STEPS_LINK}
+          </button>
+        </p>
+      )}
       {status && (
         <p className={`uw-exit-status${pending ? " is-pending" : ""}`} role="status">
           {status}
