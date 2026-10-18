@@ -4,7 +4,8 @@
 .sc {
   --sc-ink: #10202f;
   --sc-ink-2: #4a5d6e;
-  --sc-muted: #8193a3;
+  /* Muted text keeps 4.5:1 on the stage's darkest tint (#e6f0f5). */
+  --sc-muted: #566878;
   --sc-line: #d5e0e8;
   --sc-panel: #ffffff;
   --sc-teal: #087b78;
@@ -16,6 +17,12 @@
   --sc-red: #d03b3b;
   --sc-green: #12a150;
   --sc-stage: linear-gradient(160deg, #ffffff 0%, #eef6f6 55%, #e6f0f5 100%);
+  /* Text in a colour: darker than the fill and stroke tokens, so it keeps 4.5:1 on the stage and on its own tints. */
+  --sc-teal-ink: #066663;
+  --sc-amber-ink: #8a5a00;
+  --sc-red-ink: #a92a2a;
+  --sc-blue-ink: #1d5f9e;
+  --sc-green-ink: #0b6b35;
   position: absolute;
   inset: 0;
   display: grid;
@@ -26,12 +33,17 @@
 .sc-dark {
   --sc-ink: #ffffff;
   --sc-ink-2: rgb(255 255 255 / 78%);
-  --sc-muted: rgb(255 255 255 / 55%);
+  --sc-muted: rgb(255 255 255 / 72%);
   --sc-line: rgb(255 255 255 / 16%);
   --sc-panel: rgb(255 255 255 / 7%);
   --sc-teal: #73d6cb;
   --sc-teal-2: #4fb3d9;
   --sc-amber: #f5c26b;
+  --sc-teal-ink: #9be6dd;
+  --sc-amber-ink: #ffd58f;
+  --sc-red-ink: #ff9a9a;
+  --sc-blue-ink: #8cc2f0;
+  --sc-green-ink: #5fd896;
   --sc-stage:
     radial-gradient(520px 260px at 12% 0%, rgb(29 106 106 / 75%) 0%, transparent 62%),
     radial-gradient(420px 240px at 95% 100%, rgb(201 133 0 / 16%) 0%, transparent 60%),
@@ -47,9 +59,31 @@
 :where(.sc text:not([fill])) {
   fill: var(--sc-ink);
 }
-/* A default size that any fontSize attribute or style overrides. */
+/* The size of text without an inline style (a fontSize attribute does not outrank it), never below the stage's
+   floor (--sc-floor, set by kit.tsx Scene from the frame's size). */
 :where(.sc text) {
-  font-size: 13px;
+  font-size: max(13px, var(--sc-floor, 0px));
+}
+/* Coloured text takes the colour's ink, which keeps 4.5:1 where the fill colour would not. */
+.sc text[fill="var(--sc-teal)"],
+.sc tspan[fill="var(--sc-teal)"] {
+  fill: var(--sc-teal-ink);
+}
+.sc text[fill="var(--sc-amber)"],
+.sc tspan[fill="var(--sc-amber)"] {
+  fill: var(--sc-amber-ink);
+}
+.sc text[fill="var(--sc-red)"],
+.sc tspan[fill="var(--sc-red)"] {
+  fill: var(--sc-red-ink);
+}
+.sc text[fill="var(--sc-blue)"],
+.sc tspan[fill="var(--sc-blue)"] {
+  fill: var(--sc-blue-ink);
+}
+.sc text[fill="var(--sc-green)"],
+.sc tspan[fill="var(--sc-green)"] {
+  fill: var(--sc-green-ink);
 }
 /* A scene in a picture frame replaces the photo (motion.tsx Photo): the frame keeps its shape and shadow. */
 .ms-photo-frame:has(> .sc) {
@@ -63,7 +97,7 @@
   stroke: var(--sc-line);
 }
 .sc-chip text {
-  font-size: 12px;
+  font-size: max(12px, var(--sc-floor, 0px));
   font-weight: 600;
 }
 .sc-chip-teal rect {
@@ -71,21 +105,21 @@
   stroke: var(--sc-teal);
 }
 .sc-chip-teal text {
-  fill: var(--sc-teal);
+  fill: var(--sc-teal-ink);
 }
 .sc-chip-amber rect {
   fill: color-mix(in srgb, var(--sc-amber) 16%, transparent);
   stroke: var(--sc-amber);
 }
 .sc-chip-amber text {
-  fill: var(--sc-amber);
+  fill: var(--sc-amber-ink);
 }
 .sc-chip-red rect {
   fill: color-mix(in srgb, var(--sc-red) 12%, transparent);
   stroke: var(--sc-red);
 }
 .sc-chip-red text {
-  fill: var(--sc-red);
+  fill: var(--sc-red-ink);
 }
 .sc-chip-muted rect {
   fill: transparent;
@@ -104,14 +138,14 @@
   filter: none;
 }
 .sc-card-title {
-  font-size: 11px;
+  font-size: max(11px, var(--sc-floor, 0px));
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   fill: var(--sc-ink-2) !important;
 }
 .sc-note {
-  font-size: 11px !important;
+  font-size: max(11px, var(--sc-floor, 0px)) !important;
   fill: var(--sc-muted) !important;
 }
 .sc-line {

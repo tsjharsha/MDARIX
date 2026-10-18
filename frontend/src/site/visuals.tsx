@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Reveal } from "./motion";
+import { Enlargeable } from "./enlarge";
+import { BASIS_DISCLAIMER, basisOf } from "../features/shared/standards";
 
 /* Website visuals drawn from data (SVG): an example investigation in numbers, the customer systems MDARIX reads,
-   and the MedTech standards whose evidence it organizes. Every number here is synthetic and labelled as such. */
+   the reporting windows and the MedTech standards whose evidence it organizes. Every number here is synthetic and
+   labelled as such. SVG text scales with its viewBox: sizes here are chosen so every label renders at 14.5 px or more
+   at the width the page gives the picture on a 1,440 px screen (site.css sets them). */
 
 /* ------------------------------------------------------------------------- An investigation in numbers */
 
@@ -19,16 +23,10 @@ const LOTS = [
   { lot: "Lot 005", count: 4, sensor: false, rev: "Rev B" },
   { lot: "Lot 006", count: 3, sensor: false, rev: "Rev B" },
 ];
-const LINKS = [
-  { label: "Linked to a lot", value: 94 },
-  { label: "Linked to a component", value: 88 },
-  { label: "Linked to a supplier", value: 81 },
-];
-
-function WeeklyChart() {
+export function WeeklyChart() {
   const width = 520;
-  const height = 230;
-  const pad = { left: 34, right: 16, top: 26, bottom: 30 };
+  const height = 240;
+  const pad = { left: 34, right: 16, top: 30, bottom: 34 };
   const max = 14;
   const x = (index: number) => pad.left + (index / (WEEKLY.length - 1)) * (width - pad.left - pad.right);
   const y = (value: number) => pad.top + (1 - value / max) * (height - pad.top - pad.bottom);
@@ -62,8 +60,14 @@ function WeeklyChart() {
         </circle>
       ))}
       <circle className="ms-viz-end" cx={x(WEEKLY.length - 1)} cy={y(WEEKLY[WEEKLY.length - 1])} r={4} />
-      {[1, 13, 26].map((week) => (
-        <text key={week} className="ms-viz-axis" x={x(week - 1)} y={height - 8} textAnchor="middle">
+      {[1, 13, 26].map((week, index) => (
+        <text
+          key={week}
+          className="ms-viz-axis"
+          x={x(week - 1)}
+          y={height - 8}
+          textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"}
+        >
           Week {week}
         </text>
       ))}
@@ -71,10 +75,10 @@ function WeeklyChart() {
   );
 }
 
-function LotChart() {
+export function LotChart() {
   const width = 520;
-  const rowHeight = 30;
-  const pad = { left: 118, right: 42, top: 8 };
+  const rowHeight = 34;
+  const pad = { left: 146, right: 42, top: 8 };
   const height = pad.top + LOTS.length * rowHeight + 8;
   const max = 20;
   const scale = (value: number) => (value / max) * (width - pad.left - pad.right);
@@ -87,99 +91,27 @@ function LotChart() {
         const top = pad.top + index * rowHeight;
         return (
           <g key={item.lot} className="ms-viz-row" style={{ animationDelay: `${index * 90}ms` }}>
-            <text className="ms-viz-label" x={pad.left - 10} y={top + 18} textAnchor="end">
+            <text className="ms-viz-label" x={pad.left - 10} y={top + 22} textAnchor="end">
               {item.lot} · {item.rev}
             </text>
-            <rect className="ms-viz-track" x={pad.left} y={top + 6} width={scale(max)} height={16} rx={4} />
+            <rect className="ms-viz-track" x={pad.left} y={top + 8} width={scale(max)} height={18} rx={4} />
             <rect
               className={item.sensor ? "ms-viz-bar ms-viz-bar-hot" : "ms-viz-bar"}
               x={pad.left}
-              y={top + 6}
+              y={top + 8}
               width={scale(item.count)}
-              height={16}
+              height={18}
               rx={4}
             >
               <title>{`${item.lot} (${item.rev}): ${item.count} complaints${item.sensor ? ", new supplier's sensors" : ""}`}</title>
             </rect>
-            <text className="ms-viz-value" x={pad.left + scale(item.count) + 8} y={top + 18}>
+            <text className="ms-viz-value" x={pad.left + scale(item.count) + 8} y={top + 22}>
               {item.count}
             </text>
           </g>
         );
       })}
     </svg>
-  );
-}
-
-function CoverageRings() {
-  const radius = 34;
-  const circumference = 2 * Math.PI * radius;
-  return (
-    <div className="ms-viz-rings">
-      {LINKS.map((item, index) => (
-        <figure key={item.label} className="ms-viz-ring">
-          <svg viewBox="0 0 90 90" role="img" aria-label={`${item.label}: ${item.value} percent of complaints`}>
-            <circle className="ms-viz-ring-track" cx="45" cy="45" r={radius} />
-            <circle
-              className="ms-viz-ring-fill"
-              cx="45"
-              cy="45"
-              r={radius}
-              strokeDasharray={`${(item.value / 100) * circumference} ${circumference}`}
-              style={{ animationDelay: `${200 + index * 160}ms` }}
-              transform="rotate(-90 45 45)"
-            />
-            <text x="45" y="50" textAnchor="middle" className="ms-viz-ring-value">
-              {item.value}%
-            </text>
-          </svg>
-          <figcaption>{item.label}</figcaption>
-        </figure>
-      ))}
-    </div>
-  );
-}
-
-export function SignalStory() {
-  return (
-    <section className="ms-section ms-band" aria-labelledby="signal-story-title">
-      <Reveal className="ms-section-head">
-        <span className="ms-eyebrow">See an investigation take shape</span>
-        <h2 id="signal-story-title">From a rising signal to the lot, the component and the supplier.</h2>
-        <p>
-          The same question an investigation team asks, answered from connected records: when did complaints change,
-          which lots carry them, and how much of the evidence is already linked.
-        </p>
-      </Reveal>
-      <div className="ms-viz-grid-2">
-        <Reveal className="ms-card ms-viz-card">
-          <span className="ms-eyebrow">Signal</span>
-          <h3>Pressure-alarm complaints per week, OrbitCare 300</h3>
-          <WeeklyChart />
-          <p className="ms-viz-read">Complaints roughly triple after Rev B. A change is a lead, not a cause.</p>
-        </Reveal>
-        <Reveal className="ms-card ms-viz-card" delay={120}>
-          <span className="ms-eyebrow">Where it concentrates</span>
-          <h3>Complaints per lot</h3>
-          <LotChart />
-          <p className="ms-viz-read">
-            <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with the new supplier's sensors: 30
-            of 42 complaints.
-          </p>
-        </Reveal>
-      </div>
-      <Reveal className="ms-card ms-viz-card ms-viz-wide" delay={200}>
-        <div>
-          <span className="ms-eyebrow">Evidence coverage</span>
-          <h3>How much of the story is already connected</h3>
-          <p className="ms-viz-read">
-            MDARIX shows what is linked and what is still missing, so a decision never rests on a gap nobody saw.
-          </p>
-        </div>
-        <CoverageRings />
-      </Reveal>
-      <p className="ms-viz-caption">Illustrative example with synthetic data. No customer data is shown.</p>
-    </section>
   );
 }
 
@@ -197,13 +129,14 @@ const SOURCES = [
   ["Supplier portal", "Suppliers · certificates"],
 ] as const;
 const OUTCOMES = [
-  ["Product 360", "Versions, lots, components, suppliers"],
+  ["Product records", "Versions, lots, components, suppliers"],
   ["Investigations", "Question, evidence, hypotheses"],
   ["Ask MDARIX", "Answers with their evidence"],
   ["Decisions", "Signed, traceable, audited"],
 ] as const;
 
-export function SourceFlow() {
+/** The systems-to-MDARIX picture. Drawn twice when enlarged, so its ids are its own (`uid`). */
+function SourceFlowDiagram({ uid }: { uid: string }) {
   const width = 1000;
   const rowGap = 50;
   const top = 30;
@@ -211,6 +144,71 @@ export function SourceFlow() {
   const height = top * 2 + (SOURCES.length - 1) * rowGap;
   const outGap = 78;
   const outTop = center.y - ((OUTCOMES.length - 1) * outGap) / 2;
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${uid}-title`}>
+      <title id={`${uid}-title`}>
+        Eight customer systems flow into MDARIX, which serves product records, investigations, Ask MDARIX and decisions
+      </title>
+      {SOURCES.map(([name, detail], index) => {
+        const y = top + index * rowGap;
+        const path = `M232,${y} C360,${y} 360,${center.y} 430,${center.y}`;
+        return (
+          <g key={name}>
+            <path id={`${uid}-in-${index}`} className="ms-flow-path" d={path} />
+            <circle className="ms-flow-dot" r="3.5">
+              <animateMotion dur={`${2.6 + (index % 3) * 0.5}s`} begin={`${index * 0.35}s`} repeatCount="indefinite">
+                <mpath href={`#${uid}-in-${index}`} />
+              </animateMotion>
+            </circle>
+            <rect className="ms-flow-node" x="16" y={y - 21} width="216" height="42" rx="9" />
+            <text className="ms-flow-name" x="28" y={y - 3}>
+              {name}
+            </text>
+            <text className="ms-flow-detail" x="28" y={y + 14}>
+              {detail}
+            </text>
+          </g>
+        );
+      })}
+      {OUTCOMES.map(([name, detail], index) => {
+        const y = outTop + index * outGap;
+        const path = `M570,${center.y} C640,${center.y} 640,${y} 744,${y}`;
+        return (
+          <g key={name}>
+            <path id={`${uid}-out-${index}`} className="ms-flow-path ms-flow-path-out" d={path} />
+            <circle className="ms-flow-dot ms-flow-dot-out" r="3.5">
+              <animateMotion dur="2.4s" begin={`${0.6 + index * 0.4}s`} repeatCount="indefinite">
+                <mpath href={`#${uid}-out-${index}`} />
+              </animateMotion>
+            </circle>
+            <rect className="ms-flow-node ms-flow-node-out" x="744" y={y - 26} width="244" height="52" rx="10" />
+            <text className="ms-flow-name" x="758" y={y - 4}>
+              {name}
+            </text>
+            <text className="ms-flow-detail" x="758" y={y + 15}>
+              {detail}
+            </text>
+          </g>
+        );
+      })}
+      <circle className="ms-flow-pulse" cx="500" cy={center.y} r="78" />
+      <circle className="ms-flow-core" cx="500" cy={center.y} r="70" />
+      <text className="ms-flow-core-title" x="500" y={center.y - 10} textAnchor="middle">
+        MDARIX
+      </text>
+      <text className="ms-flow-core-detail" x="500" y={center.y + 12} textAnchor="middle">
+        checked import
+      </text>
+      <text className="ms-flow-core-detail" x="500" y={center.y + 30} textAnchor="middle">
+        your data only
+      </text>
+    </svg>
+  );
+}
+
+export function SourceFlow() {
+  const uid = `flow-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const label = "Your systems stay the record: eight customer systems flowing into MDARIX";
   return (
     <section className="ms-section" aria-labelledby="source-flow-title">
       <Reveal className="ms-section-head">
@@ -222,68 +220,16 @@ export function SourceFlow() {
         </p>
       </Reveal>
       <Reveal className="ms-sysflow">
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="source-flow-svg-title">
-          <title id="source-flow-svg-title">
-            Eight customer systems flow into MDARIX, which serves Product 360, investigations, Ask MDARIX and decisions
-          </title>
-          {SOURCES.map(([name, detail], index) => {
-            const y = top + index * rowGap;
-            const path = `M232,${y} C360,${y} 360,${center.y} 430,${center.y}`;
-            return (
-              <g key={name}>
-                <path id={`flow-in-${index}`} className="ms-flow-path" d={path} />
-                <circle className="ms-flow-dot" r="3.5">
-                  <animateMotion
-                    dur={`${2.6 + (index % 3) * 0.5}s`}
-                    begin={`${index * 0.35}s`}
-                    repeatCount="indefinite"
-                  >
-                    <mpath href={`#flow-in-${index}`} />
-                  </animateMotion>
-                </circle>
-                <rect className="ms-flow-node" x="16" y={y - 19} width="216" height="38" rx="9" />
-                <text className="ms-flow-name" x="30" y={y - 2}>
-                  {name}
-                </text>
-                <text className="ms-flow-detail" x="30" y={y + 12}>
-                  {detail}
-                </text>
-              </g>
-            );
-          })}
-          {OUTCOMES.map(([name, detail], index) => {
-            const y = outTop + index * outGap;
-            const path = `M570,${center.y} C640,${center.y} 640,${y} 768,${y}`;
-            return (
-              <g key={name}>
-                <path id={`flow-out-${index}`} className="ms-flow-path ms-flow-path-out" d={path} />
-                <circle className="ms-flow-dot ms-flow-dot-out" r="3.5">
-                  <animateMotion dur="2.4s" begin={`${0.6 + index * 0.4}s`} repeatCount="indefinite">
-                    <mpath href={`#flow-out-${index}`} />
-                  </animateMotion>
-                </circle>
-                <rect className="ms-flow-node ms-flow-node-out" x="768" y={y - 24} width="216" height="48" rx="10" />
-                <text className="ms-flow-name" x="784" y={y - 3}>
-                  {name}
-                </text>
-                <text className="ms-flow-detail" x="784" y={y + 13}>
-                  {detail}
-                </text>
-              </g>
-            );
-          })}
-          <circle className="ms-flow-pulse" cx="500" cy={center.y} r="78" />
-          <circle className="ms-flow-core" cx="500" cy={center.y} r="70" />
-          <text className="ms-flow-core-title" x="500" y={center.y - 8} textAnchor="middle">
-            MDARIX
-          </text>
-          <text className="ms-flow-core-detail" x="500" y={center.y + 12} textAnchor="middle">
-            checked import
-          </text>
-          <text className="ms-flow-core-detail" x="500" y={center.y + 28} textAnchor="middle">
-            your data only
-          </text>
-        </svg>
+        <Enlargeable
+          label={label}
+          enlarged={() => (
+            <div className="ms-enlarged-flow">
+              <SourceFlowDiagram uid={`${uid}-big`} />
+            </div>
+          )}
+        >
+          <SourceFlowDiagram uid={uid} />
+        </Enlargeable>
         <ul className="ms-flow-list">
           {SOURCES.map(([name, detail]) => (
             <li key={name}>
@@ -292,6 +238,48 @@ export function SourceFlow() {
           ))}
         </ul>
       </Reveal>
+    </section>
+  );
+}
+
+/* ---------------------------------------------------------------------------------- Reporting windows */
+
+// The four reporting templates of Complaints › Reporting windows, each with its basis from the standards catalog
+// (features/shared/standards.json, mirrored from backend/app/standards.py).
+const REPORTING = [
+  { region: "United States", name: "FDA medical device reporting", basis: ["CFR803_50", "CFR803_53"] },
+  { region: "European Union", name: "EU MDR vigilance", basis: ["MDR_87"] },
+  { region: "Great Britain", name: "UK medical devices vigilance", basis: ["UK_MDR"] },
+  { region: "Canada", name: "Mandatory problem reporting", basis: ["CA_MDR"] },
+];
+
+export function ReportingWindows() {
+  return (
+    <section className="ms-section" aria-labelledby="reporting-title">
+      <Reveal className="ms-section-head">
+        <span className="ms-eyebrow">Reporting windows</span>
+        <h2 id="reporting-title">FDA, EU MDR, UK and Canada reporting.</h2>
+        <p>
+          Each window is counted from the day you became aware, and each reportability decision keeps its reason. People
+          decide what is reportable; MDARIX never submits anything to a regulator.
+        </p>
+      </Reveal>
+      <div className="ms-grid-4">
+        {REPORTING.map((item, index) => (
+          <Reveal key={item.region} delay={index * 70} className="ms-card ms-reporting">
+            <span className="ms-standard-region">{item.region}</span>
+            <strong>{item.name}</strong>
+            <ul>
+              {basisOf(item.basis).map((standard) => (
+                <li key={standard.id}>
+                  <b>{standard.short}</b> {standard.title}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        ))}
+      </div>
+      <p className="ms-viz-caption">{BASIS_DISCLAIMER}</p>
     </section>
   );
 }
@@ -385,16 +373,21 @@ function Emblem({ mark }: { mark: string }) {
   );
 }
 
-export function StandardsSection({ id }: { id?: string }) {
+export function StandardsSection({
+  id,
+  title = "Built around the evidence regulators ask for.",
+  copy = "Post-market quality work is defined by a few standards and regulations. MDARIX organizes the evidence they call for. It does not certify compliance: your quality system and its validation stay yours.",
+}: {
+  id?: string;
+  title?: string;
+  copy?: string;
+}) {
   return (
     <section className="ms-section" id={id} aria-labelledby={`${id ?? "standards"}-title`}>
       <Reveal className="ms-section-head">
         <span className="ms-eyebrow">MedTech standards</span>
-        <h2 id={`${id ?? "standards"}-title`}>Built around the evidence regulators ask for.</h2>
-        <p>
-          Post-market quality work is defined by a few standards and regulations. MDARIX organizes the evidence they
-          call for. It does not certify compliance: your quality system and its validation stay yours.
-        </p>
+        <h2 id={`${id ?? "standards"}-title`}>{title}</h2>
+        <p>{copy}</p>
       </Reveal>
       <div className="ms-standards">
         {STANDARDS.map((standard, index) => (

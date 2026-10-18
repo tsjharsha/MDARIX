@@ -4,13 +4,16 @@ import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
 import { applyPageMeta } from "./site/seo";
-import { lifecycleStages, platformGroups, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
+import { lifecycleStages, platformGroups, platformPageOf, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
 import {
   CompanyPage,
   HomePage,
   LifecyclePage,
+  PlatformGroupPage,
   PlatformPage,
+  RegulationsPage,
   ResourcesPage,
+  RoadmapPage,
   SITE_PAGES,
   SolutionsPage,
   TrustPage,
@@ -30,7 +33,7 @@ import {
 const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/contact"] as const;
 type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
-// The website was consolidated from ~65 URLs into 8 pages. Every old URL lands on the section that now holds its
+// The website was consolidated from ~65 URLs into a few pages. Every old URL lands on the section that now holds its
 // content, so existing links and bookmarks keep working.
 const LEGACY_PAGES: Record<string, string> = {
   "/why-mdarix": "/trust#principles",
@@ -40,7 +43,15 @@ const LEGACY_PAGES: Record<string, string> = {
   "/pricing": "/contact",
   "/plans": "/contact",
   "/capabilities": "/platform",
-  "/roadmap": "/product-lifecycle#roadmap",
+  "/regulations": "/trust/regulations",
+};
+// Former anchors whose section moved to a page of its own: the standards (home page and Trust) to Regulations, the
+// roadmap (home page and Platform) to the roadmap page.
+const MOVED_ANCHORS: Record<string, string> = {
+  "/#standards": "/trust/regulations",
+  "/trust#trust-standards": "/trust/regulations",
+  "/#scope-title": "/roadmap",
+  "/platform#scope-title": "/roadmap",
 };
 const LIFECYCLE_SLUGS = new Set(lifecycleStages.flatMap((stage) => stage.items.map((item) => item.slug)));
 const PLATFORM_SLUGS = new Set(
@@ -49,11 +60,24 @@ const PLATFORM_SLUGS = new Set(
 
 export function resolveSitePath(path: string, hash: string): { page: Page; hash: string } {
   const clean = path.replace(/\/+$/, "") || "/";
+  const moved = MOVED_ANCHORS[`${clean}#${hash}`];
+  if (moved) return { page: moved as Page, hash: "" };
+  // The former single Platform page's anchors (/platform#challenger, /platform#decision-intelligence) open the page
+  // that now holds the capability, at its section; a former group anchor opens its page at the top.
+  if (clean === "/platform" && hash) {
+    const target = platformPageOf(hash);
+    if (target) return { page: target.path, hash: target.id === hash ? "" : hash };
+  }
+  // The roadmap was a section of the lifecycle page; its lifecycle anchors (/roadmap#capa) still open there.
+  if (clean === "/roadmap" && (LIFECYCLE_SLUGS.has(hash) || FUTURE_LIFECYCLE.has(hash)))
+    return { page: "/product-lifecycle", hash };
   if ((SITE_PAGES as readonly string[]).includes(clean)) return { page: clean as SitePage, hash };
   if ((INFO_PAGES as readonly string[]).includes(clean)) return { page: clean as Page, hash };
   if (clean.startsWith("/platform/")) {
+    // A former capability page (/platform/challenger) opens its section on the Platform page that holds it.
     const slug = clean.slice("/platform/".length);
-    if (PLATFORM_SLUGS.has(slug)) return { page: "/platform", hash: slug };
+    const target = PLATFORM_SLUGS.has(slug) ? platformPageOf(slug) : undefined;
+    if (target) return { page: target.path, hash: slug };
     if (LIFECYCLE_SLUGS.has(slug) || FUTURE_LIFECYCLE.has(slug)) return { page: "/product-lifecycle", hash: slug };
     return { page: "/platform", hash: "" };
   }
@@ -70,20 +94,19 @@ type NavMenu = {
   name: string;
   title: string;
   href: string;
-  groups: { title: string; links: { label: string; href: string; note?: string }[] }[];
+  /** Further pages, listed under Overview. */
+  more?: { label: string; href: string }[];
+  groups: { title?: string; links: { label: string; href: string; note?: string; description?: string }[] }[];
 };
 
 const NAV_MENUS: NavMenu[] = [
   {
     name: "Platform",
-    title: "Platform & AI",
+    title: "Platform",
     href: "/platform",
+    // Four pages, each holding its capabilities as sections.
     groups: platformGroups.map((group) => ({
-      title: group.title,
-      links: group.capabilities.map((capability) => ({
-        label: capability.label,
-        href: `/platform#${capability.slug}`,
-      })),
+      links: [{ label: group.name, href: group.path, description: group.blurb }],
     })),
   },
   {
@@ -99,6 +122,7 @@ const NAV_MENUS: NavMenu[] = [
     name: "Product Lifecycle",
     title: "Product Lifecycle",
     href: "/product-lifecycle",
+    more: [{ label: "Roadmap", href: "/roadmap" }],
     groups: lifecycleStages.map((stage) => ({
       title: stage.title,
       links: stage.items.map((item) => ({
@@ -125,6 +149,7 @@ const NAV_MENUS: NavMenu[] = [
         title: "Trust foundations",
         links: [
           { label: "AI trust & assurance", href: "/trust#ai" },
+          { label: "Regulations", href: "/trust/regulations" },
           { label: "Security & access", href: "/trust#security" },
           { label: "Integration approach", href: "/trust#integrations" },
         ],
@@ -137,10 +162,9 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
   {
     title: "Platform",
     links: [
-      ["Product 360", "/platform#product-360"],
-      ["Investigation intelligence", "/platform#investigation-intelligence"],
-      ["Decision intelligence", "/platform#decision-intelligence"],
-      ["Trust & governance", "/platform#trust-governance"],
+      ["Overview", "/platform"],
+      ...platformGroups.map((group): [string, string] => [group.name, group.path]),
+      ["Roadmap", "/roadmap"],
     ],
   },
   {
@@ -156,6 +180,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     title: "Trust",
     links: [
       ["Why MDARIX", "/trust#principles"],
+      ["Regulations", "/trust/regulations"],
       ["AI trust", "/trust#ai"],
       ["Security & access", "/trust#security"],
       ["Integrations", "/trust#integrations"],
@@ -181,6 +206,14 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     ],
   },
 ];
+
+/** The menu a page belongs to, so the header marks it: a Platform page under Platform, Regulations under Trust. */
+function isCurrentMenu(name: string, page: Page): boolean {
+  const menu = NAV_MENUS.find((item) => item.name === name);
+  if (!menu) return false;
+  if (menu.href === page || menu.more?.some((link) => link.href === page)) return true;
+  return page.startsWith(`${menu.href}/`);
+}
 
 export function PublicMegaSite({ path }: { path: string }) {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
@@ -243,7 +276,10 @@ export function PublicMegaSite({ path }: { path: string }) {
           aria-expanded={mobileOpen}
           aria-controls="public-navigation"
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMobileOpen(!mobileOpen)}
+          onClick={() => {
+            setMobileOpen(!mobileOpen);
+            setOpenMenu(null);
+          }}
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -253,7 +289,7 @@ export function PublicMegaSite({ path }: { path: string }) {
               key={name}
               type="button"
               aria-expanded={openMenu === name}
-              className={NAV_MENUS.find((menu) => menu.name === name)?.href === page ? "is-current" : ""}
+              className={isCurrentMenu(name, page) ? "is-current" : ""}
               onClick={() => setOpenMenu(openMenu === name ? null : name)}
             >
               {name} <ChevronDown size={14} aria-hidden="true" />
@@ -285,16 +321,28 @@ export function PublicMegaSite({ path }: { path: string }) {
               <a className="ms-link" href={activeMenu.href} onClick={closeMenus}>
                 Overview <ArrowRight size={14} aria-hidden="true" />
               </a>
+              {activeMenu.more?.map((link) => (
+                <a key={link.href} className="ms-link" href={link.href} onClick={closeMenus}>
+                  {link.label} <ArrowRight size={14} aria-hidden="true" />
+                </a>
+              ))}
             </div>
-            {activeMenu.groups.map((group) => (
-              <section key={group.title}>
-                <h2>{group.title}</h2>
-                {group.links.map((link) => (
-                  <a key={link.label} href={link.href} onClick={closeMenus}>
-                    {link.label}
-                    {link.note && <small>{link.note}</small>}
-                  </a>
-                ))}
+            {activeMenu.groups.map((group, index) => (
+              <section key={group.title ?? index}>
+                {group.title && <h2>{group.title}</h2>}
+                {group.links.map((link) =>
+                  link.description ? (
+                    <a key={link.label} className="ms-mega-page" href={link.href} onClick={closeMenus}>
+                      <strong>{link.label}</strong>
+                      <span>{link.description}</span>
+                    </a>
+                  ) : (
+                    <a key={link.label} href={link.href} onClick={closeMenus}>
+                      {link.label}
+                      {link.note && <small>{link.note}</small>}
+                    </a>
+                  ),
+                )}
               </section>
             ))}
           </div>
@@ -304,6 +352,9 @@ export function PublicMegaSite({ path }: { path: string }) {
       <main id="main" className="ms-main">
         {page === "/" && <HomePage />}
         {page === "/platform" && <PlatformPage />}
+        {platformGroups.map((group) => page === group.path && <PlatformGroupPage key={group.path} path={group.path} />)}
+        {page === "/roadmap" && <RoadmapPage />}
+        {page === "/trust/regulations" && <RegulationsPage />}
         {page === "/solutions" && <SolutionsPage />}
         {page === "/product-lifecycle" && <LifecyclePage />}
         {page === "/trust" && <TrustPage />}

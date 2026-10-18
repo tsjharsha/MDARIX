@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { sceneFor } from "./scenes";
+import { Enlargeable } from "./enlarge";
 
 /** Fade/slide content in as it scrolls into view. Visible immediately when motion is reduced or unsupported. */
 export function Reveal({
@@ -48,25 +49,42 @@ export function Photo({
   alt,
   caption,
   className = "",
-  compact = false,
 }: {
   src: string;
   alt: string;
   caption?: string;
   className?: string;
-  /** A small frame: use the scene's simpler version when it has one. */
-  compact?: boolean;
 }) {
-  const Scene = sceneFor(src, compact);
+  const Scene = sceneFor(src);
+  const frame = (
+    <div className="ms-photo-frame">
+      {Scene ? <Scene label={alt} /> : <img src={src} alt={alt} loading="lazy" decoding="async" />}
+    </div>
+  );
   return (
     <figure className={`ms-photo ${className}`}>
-      <div className="ms-photo-frame">
-        {Scene ? <Scene label={alt} /> : <img src={src} alt={alt} loading="lazy" decoding="async" />}
-      </div>
+      {Scene && ENLARGEABLE.some((name) => src.endsWith(`/${name}.webp`)) ? (
+        <Enlargeable
+          label={alt}
+          enlarged={() => (
+            <div className="ms-enlarged-scene">
+              <Scene label={alt} />
+            </div>
+          )}
+        >
+          {frame}
+        </Enlargeable>
+      ) : (
+        frame
+      )}
       {caption && <figcaption>{caption}</figcaption>}
     </figure>
   );
 }
+
+// The complex scenes, which also open full-screen (Enlarge): the product reality graph and the cross-functional
+// investigation. "Your systems stay the record" (visuals.tsx SourceFlow) has the same button.
+const ENLARGEABLE = ["medtech-product-reality-graph-hero", "medtech-investigation-team"];
 
 /** Steps joined by animated connectors; a light pulse travels along the chain. */
 export function FlowChain({ steps, label }: { steps: string[]; label: string }) {
@@ -114,10 +132,9 @@ export function InvestigationAnimation() {
               className="ms-line"
               d="M0 98 L30 96 L60 99 L90 95 L120 97 L150 94 L170 92 L190 80 L210 62 L230 48 L250 40 L270 36 L290 30 L320 26"
             />
-            <text x="176" y="18" className="ms-marker-label">
-              Rev B released
-            </text>
           </svg>
+          {/* In HTML, not in the stretched chart, so it keeps its size and shape. */}
+          <span className="ms-marker-label">Rev B released</span>
         </section>
         <section className="ms-demo-evidence" aria-hidden="true">
           <small>Evidence gathered</small>

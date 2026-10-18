@@ -19,6 +19,31 @@ export const PAGE_META = {
     description:
       "Link every complaint to its product, version, lot, component and supplier, weigh evidence and hypotheses, and sign decisions with a full audit trail.",
   },
+  "/platform/product-360": {
+    title: "Product 360: the product, version and lot behind every complaint · MDARIX",
+    description:
+      "How MDARIX ties each medical device complaint to its product, version, lot, component and supplier, and what the free trial offers today.",
+  },
+  "/platform/investigations": {
+    title: "Complaint investigations with evidence and hypotheses · MDARIX",
+    description:
+      "Investigate medical device complaints in one case: evidence, competing hypotheses and open questions side by side, and Ask MDARIX on your records.",
+  },
+  "/platform/decisions": {
+    title: "Investigation decisions, briefs and failure chains · MDARIX",
+    description:
+      "Failure chains, a versioned decision brief and a decision signed with password and authenticator code, with open questions carried into it.",
+  },
+  "/platform/trust": {
+    title: "Human review, audit trail and AI safeguards · MDARIX",
+    description:
+      "Signed human review, an append-only audit trail and customer administration today. AI assurance comes with design partners; AI is off in the trial.",
+  },
+  "/roadmap": {
+    title: "Roadmap: available today, with design partners, planned · MDARIX",
+    description:
+      "What every MDARIX workspace and the free trial can use today, what is built with design partners, and what is planned, such as single sign-on.",
+  },
   "/solutions": {
     title: "Solutions for medical device quality and regulatory teams · MDARIX",
     description:
@@ -33,6 +58,11 @@ export const PAGE_META = {
     title: "Trust: human decisions, audit trails and validated AI · MDARIX",
     description:
       "Decisions signed by people with an audit trail, authenticator-app MFA, isolated customer data, and AI that cites its evidence and stays off until validated.",
+  },
+  "/trust/regulations": {
+    title: "FDA, EU MDR, UK and Canada reporting and MedTech standards · MDARIX",
+    description:
+      "MDR reporting windows, ISO 13485, QMSR, ISO 14971, IEC 62304 and Part 11: the evidence MDARIX organizes. MDARIX does not certify compliance.",
   },
   "/resources": {
     title: "Resources on complaint handling and post-market surveillance · MDARIX",

@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HomePage, LifecyclePage } from "./pages";
+import { LifecyclePage, RoadmapPage } from "./pages";
 import { capabilityStatus } from "./content";
 
-describe("what you get, as a roadmap", () => {
+describe("what you get, as a roadmap (the /roadmap page)", () => {
   it("shows every stage with its badge, each capability with its explanation, and the free trial", () => {
-    const html = renderToStaticMarkup(<HomePage />);
+    const html = renderToStaticMarkup(<RoadmapPage />);
     for (const status of capabilityStatus) {
       expect(html).toContain(status.label);
       expect(html).toContain(status.badge);

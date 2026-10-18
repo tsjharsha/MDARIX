@@ -359,12 +359,157 @@ function capabilityFor(slug: string, label: string): Capability {
   return { slug, label, ...written, image };
 }
 
-/** Platform page: the four capability groups, in the order of the original Platform menu. */
+/** The website's three availability labels, the stages of the roadmap (capabilityStatus), in its order. */
+export type Availability = "Available today" | "With design partners" | "Planned";
+export const AVAILABILITY: readonly Availability[] = ["Available today", "With design partners", "Planned"];
+
+/**
+ * Where each Platform capability stands, from the roadmap (capabilityStatus) and the product as it runs: a free trial
+ * always gets the MVP's screens (backend/app/feature_set.py, app/featureSet.ts), and what the MVP parks (the Products
+ * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product built with design partners. AI
+ * is off during the trial, so every AI capability is "With design partners". `note` says what the label means in the
+ * product today. Nothing moves to "Available today" until it works in a trial workspace.
+ */
+export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; note: string }> = {
+  "product-360": {
+    status: "With design partners",
+    note: "The Product 360 screen is not in the free trial: there, products, versions and lots are read through Readiness, Complaints and Signals. The screen itself is opened with design partners.",
+  },
+  "reality-graph": {
+    status: "With design partners",
+    note: "The connected graph is part of the Product 360 screen, opened with design partners. In the free trial each complaint and case is linked to its product version and lot.",
+  },
+  "product-version": {
+    status: "Available today",
+    note: "Complaints, signals and trend checks are counted per product version, and every screen of a case works on the version you choose.",
+  },
+  timeline: {
+    status: "Available today",
+    note: "A case can be read as it is now, as it happened, or as it was known on a date you choose.",
+  },
+  "ask-mdarix": {
+    status: "Available today",
+    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI come with design partners.",
+  },
+  investigation: {
+    status: "Available today",
+    note: "Every case has one page: scope, evidence, analysis, reviews, the decision brief and the decision.",
+  },
+  evidence: {
+    status: "Available today",
+    note: "Evidence comes from the exports you import. Live connections to your systems are built with design partners.",
+  },
+  hypotheses: {
+    status: "Available today",
+    note: "Hypotheses, contradictions and open questions are written and judged by hand in a case's Intelligence tab.",
+  },
+  challenger: {
+    status: "With design partners",
+    note: "AI is off during the trial. The AI challenge of a hypothesis is switched on with design partners once it is validated.",
+  },
+  unknowns: {
+    status: "Available today",
+    note: "A case's open questions and missing evidence, written by hand, stay visible up to the decision.",
+  },
+  "failure-chain": {
+    status: "Available today",
+    note: "Written by hand in a case's Intelligence tab. Ready-made chain templates are not in the free trial.",
+  },
+  counterfactual: {
+    status: "With design partners",
+    note: "Not in the free trial. Scenario comparison is built and validated with design partners.",
+  },
+  "decision-center": {
+    status: "Available today",
+    note: "In the free trial this is a case's Decision step: readiness, the brief and the signed decision on one page.",
+  },
+  "investigation-brief": {
+    status: "Available today",
+    note: "A case's Decision Brief, versioned and reviewed before the decision is signed.",
+  },
+  "ai-assurance": {
+    status: "With design partners",
+    note: "AI is off during the trial. Its assurance checks are validated with design partners before AI is switched on.",
+  },
+  "ai-provenance": {
+    status: "With design partners",
+    note: "AI is off during the trial. Each AI output records its sources and model once AI is switched on with design partners.",
+  },
+  "human-review": {
+    status: "Available today",
+    note: "Decisions are signed with your password and authenticator code, and whoever writes a brief never reviews or signs it.",
+  },
+  "audit-trail": {
+    status: "Available today",
+    note: "Records › Audit trail holds every action, decision and signature, ready to export.",
+  },
+  "enterprise-administration": {
+    status: "Available today",
+    note: "Users, roles, MFA and your own audit trail today. Connections and field mappings come with design partners; single sign-on is planned.",
+  },
+};
+
+export const PLATFORM_PATHS = [
+  "/platform/product-360",
+  "/platform/investigations",
+  "/platform/decisions",
+  "/platform/trust",
+] as const;
+export type PlatformPath = (typeof PLATFORM_PATHS)[number];
+
+/** The four Platform pages, one per group of the original Platform menu, each holding its capabilities as sections. */
+const PLATFORM_PAGE_DEFS: Record<
+  string,
+  { path: PlatformPath; name: string; headline: string; copy: string; blurb: string }
+> = {
+  "Product Intelligence": {
+    path: "/platform/product-360",
+    name: "Product 360",
+    headline: "Know the product, the version and the lot behind every complaint.",
+    copy: "The device as it exists across versions, components, suppliers, lots and time, so an investigation starts from the right product record.",
+    blurb: "Products, versions, lots and time",
+  },
+  "Investigation Intelligence": {
+    path: "/platform/investigations",
+    name: "Investigations",
+    headline: "Investigate with the evidence, the explanations and the gaps side by side.",
+    copy: "One governed case for each question: the evidence, competing hypotheses and what is still unknown stay visible, so a plausible story is never mistaken for proof.",
+    blurb: "Evidence, hypotheses and open questions",
+  },
+  "Decision Intelligence": {
+    path: "/platform/decisions",
+    name: "Decisions",
+    headline: "Decide where all the evidence is, and sign it.",
+    copy: "Failure chains, the decision brief and the decision itself in one place, with what is still uncertain carried into the decision.",
+    blurb: "Failure chains, briefs and signed decisions",
+  },
+  "Trust & Governance": {
+    path: "/platform/trust",
+    name: "Trust",
+    headline: "People decide, every step is recorded, and AI stays off until it is validated.",
+    copy: "Signed human review, a complete audit trail and customer administration today; the AI safeguards that come with design partners.",
+    blurb: "Human review, audit trail and AI safeguards",
+  },
+};
+
+/** The Platform pages: the four groups of the original Platform menu, in its order. */
 export const platformGroups = menus.Platform.map((group) => ({
+  ...PLATFORM_PAGE_DEFS[group.title],
   title: group.title,
   id: group.title.toLowerCase().replace(/[^a-z]+/g, "-"),
-  capabilities: group.items.map((item) => capabilityFor(slugOf(item.href), item.label)),
+  capabilities: group.items.map((item) => ({
+    ...capabilityFor(slugOf(item.href), item.label),
+    availability: CAPABILITY_AVAILABILITY[slugOf(item.href)],
+  })),
 }));
+export type PlatformGroup = (typeof platformGroups)[number];
+
+/** The Platform page that holds a capability (by its slug), or that a former group anchor named. */
+export function platformPageOf(slugOrGroup: string): PlatformGroup | undefined {
+  return platformGroups.find(
+    (group) => group.id === slugOrGroup || group.capabilities.some((capability) => capability.slug === slugOrGroup),
+  );
+}
 
 export const productStructureTitles: Record<string, string> = {
   "product-360": "See the whole device in one place.",
@@ -464,7 +609,7 @@ export const lifecycleStages = menus["Product Lifecycle"].map((group) => ({
         ? item.href
         : content
           ? `/product-lifecycle#${slug}`
-          : `/platform#${slug}`;
+          : `${platformPageOf(slug)?.path ?? "/platform"}#${slug}`;
     return { slug, label: item.label, future, title: content?.title, copy: content?.copy, href };
   }),
 }));

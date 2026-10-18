@@ -1,14 +1,14 @@
 import type { CSSProperties } from "react";
-import { Card, Chip, Illustrative, Scene, at } from "./kit";
+import { Card, Chip, Illustrative, Scene, at, fs } from "./kit";
 import type { SceneComponent } from "./index";
 
 // Scenes for the investigation pictures, by picture name (see kit.tsx for the rules every scene follows).
 // Font sizes are set with style (not the fontSize attribute): the stage's ".sc text" rule outranks the attribute.
 
 /** A font size as an inline style. */
-const px = (size: number, extra?: CSSProperties): CSSProperties => ({ fontSize: size, ...extra });
+const px = (size: number, extra?: CSSProperties): CSSProperties => ({ fontSize: fs(size), ...extra });
 /** The small upper-case label used for card and column titles. */
-const CAPS: CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: "0.08em" };
+const CAPS: CSSProperties = { fontSize: fs(11), fontWeight: 800, letterSpacing: "0.08em" };
 /** A light tint of a colour token, for chip and band fills. */
 const tint = (color: string, amount = 14) => `color-mix(in srgb, ${color} ${amount}%, transparent)`;
 /** A rounded rectangle as a path, so its outline can draw itself (sc-draw needs a path with pathLength). */
@@ -364,7 +364,7 @@ function AskCited({ label }: { label: string }) {
           </text>
         </g>
         <circle cx={37} cy={287} r={9} fill="var(--sc-amber)" className="sc-pulse" />
-        <text x={37} y={291} textAnchor="middle" style={px(12)} fontWeight={800} fill="#ffffff">
+        <text x={37} y={291} textAnchor="middle" style={px(12)} fontWeight={800} fill="#10202f">
           !
         </text>
         <g className="sc-fade" style={at(0, "2.5s")}>
