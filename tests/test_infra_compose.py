@@ -165,6 +165,47 @@ def test_caddy_keeps_readiness_internal_and_publishes_the_status():
     assert "request>headers>Referer delete" in CADDYFILE
 
 
+def _fastapi_reads_as_json(content_type: str | None) -> bool:
+    """FastAPI's own rule (fastapi/routing.py): no Content-Type, or application/json or application/*+json."""
+    import email.message
+
+    if not content_type:
+        return True
+    message = email.message.Message()
+    message["content-type"] = content_type
+    subtype = message.get_content_subtype()
+    return message.get_content_maintype() == "application" and (subtype == "json" or subtype.endswith("+json"))
+
+
+def test_caddy_caps_every_body_the_api_reads_as_json_at_1_mib_and_leaves_uploads_at_25_mb():
+    """An anonymous oversized JSON body is refused at the front door, before it can tie up an API worker; files
+    (multipart, CSV, Excel) keep the upload limit."""
+    assert re.search(r"request_body \{\s*max_size 25MB\s*\}", CADDYFILE)
+    matcher = re.search(r"@json_body header_regexp Content-Type (\S+)\n", CADDYFILE)
+    assert matcher and re.search(r"request_body @json_body \{\s*max_size 1MiB\s*\}", CADDYFILE)
+    assert "@no_content_type header !Content-Type" in CADDYFILE
+    assert re.search(r"request_body @no_content_type \{\s*max_size 1MiB\s*\}", CADDYFILE)
+    # The pattern (RE2 in Caddy; the same meaning in Python for this pattern) catches exactly what FastAPI parses.
+    pattern = re.compile(matcher.group(1))
+    for content_type in (
+        "application/json",
+        "application/json; charset=utf-8",
+        "Application/JSON",
+        " application/json",
+        "application/problem+json",
+        "application/vnd.api+json",
+        "",
+        "multipart/form-data; boundary=x",
+        "text/csv",
+        "text/csv; charset=utf-8",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/octet-stream",
+        "text/plain",
+        "application/x-www-form-urlencoded",
+    ):
+        assert bool(pattern.search(content_type)) == _fastapi_reads_as_json(content_type), content_type
+
+
 def test_caddy_is_public_without_www_unless_told_otherwise():
     environment = SERVICES["web"]["environment"]
     # ":-" also replaces an empty value, which Caddy would read as a snippet name that does not exist.

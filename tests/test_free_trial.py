@@ -207,11 +207,31 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 
+def _platform_organization() -> None:
+    """The platform's own organization, where the automatic-approval account lives (scripts/create_platform_admin.py
+    creates it on a real deployment; a fresh test database may not have it yet)."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "create_platform_admin", Path(__file__).resolve().parents[1] / "scripts" / "create_platform_admin.py"
+    )
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    db = SessionLocal()
+    try:
+        script._operator_tenant(db, datetime.now(timezone.utc))
+        db.commit()
+    finally:
+        db.close()
+
+
 def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monkeypatch):
     """A company domain is approved right after sign-up by the automatic-approval account; a second colleague of the
     same company, a free-mail address and anything over the day's cap wait for a Platform Administrator."""
     from backend.app.trial import auto_approval
 
+    _platform_organization()
     monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE", "company-domains")
     monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "100000")
     company = f"acme-{uuid.uuid4().hex[:8]}.com"
@@ -240,6 +260,33 @@ def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monke
     assert sign_up(f"trial.{uuid.uuid4().hex[:8]}@gmail.com") == "ONBOARDING_REQUEST_ACCEPTED"
     monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "0")
     assert sign_up(f"lead@other-{uuid.uuid4().hex[:8]}.com") == "ONBOARDING_REQUEST_ACCEPTED"
+
+
+def test_an_automatically_approved_trial_has_its_sample_signal_from_the_first_minute(monkeypatch):
+    """A company email is approved right after sign-up, and the approval detects the sample's signals as a Platform
+    Administrator's approval does: the signal inbox (story chapter 3) has work before the person first signs in."""
+    from backend.app.db.models.signals import Signal
+    from backend.app.db.tenant_scope import bind_tenant
+
+    _platform_organization()
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE", "company-domains")
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "100000")
+    email = f"quality.lead@devices-{uuid.uuid4().hex[:8]}.com"
+    response = TestClient(app).post(
+        "/api/v1/auth/signup",
+        json={"email": email, "display_name": "Taylor Quality", "organization": "Signal Devices", **PROFILE},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "TRIAL_APPROVING"
+    db = SessionLocal()
+    try:
+        row = db.query(OnboardingRequest).filter(OnboardingRequest.email == email).one()
+        assert row.status == "APPROVED" and row.tenant_id is not None
+        bind_tenant(db, row.tenant_id)
+        signals = db.query(Signal).filter(Signal.tenant_id == row.tenant_id).all()
+    finally:
+        db.close()
+    assert len(signals) >= 1
 
 
 def test_what_the_organization_was_cited_for_leads_the_story():
@@ -522,6 +569,35 @@ def test_trial_owner_invites_colleagues_up_to_the_user_limit():
     refused = colleague.post("/api/v1/trial/team", json={"email": "x@example.invalid", "display_name": "X"})
     assert refused.status_code == 403
     assert colleague.get("/api/v1/platform-admin/trial-requests").status_code == 403
+
+
+def test_a_colleague_hears_who_invited_them_and_of_the_sample_only_while_it_exists(monkeypatch):
+    """The owner's colleague gets the colleague invitation naming the owner; once the owner removed the sample data,
+    a resent invitation no longer mentions it."""
+    from auth import emailer
+
+    sent = []
+    monkeypatch.setattr(
+        emailer,
+        "_send_email",
+        lambda to, subject, text, html=None, reply_to=None: sent.append({"to": to, "text": text}) or "SENT",
+    )
+    owner, approval, _email = _approved_trial_client()
+    colleague = f"colleague-{uuid.uuid4().hex[:8]}@example.invalid"
+    invited = owner.post("/api/v1/trial/team", json={"email": colleague, "display_name": "Casey Review"})
+    assert invited.status_code == 200, invited.text
+    text = sent[-1]["text"]
+    assert sent[-1]["to"] == colleague
+    assert "Taylor Quality invited you to the MDARIX free trial of Trial Devices Inc" in text
+    assert "because Taylor Quality, who runs your organization's trial, invited you" in text
+    assert "ready-made sample investigation" in text and "you requested" not in text
+
+    removed = owner.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
+    assert removed.status_code == 200, removed.text
+    resent = owner.post(f"/api/v1/trial/team/{invited.json()['id']}/resend-invitation")
+    assert resent.status_code == 200, resent.text
+    assert sent[-1]["to"] == colleague
+    assert "Taylor Quality invited you" in sent[-1]["text"] and "sample" not in sent[-1]["text"].lower()
 
 
 def test_closed_trial_data_is_deleted_after_30_days():

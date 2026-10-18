@@ -11,13 +11,14 @@ import { NextStepsPanel } from "./NextSteps";
 import { ApprovalsPanel } from "./DecisionApprovals";
 import { CaseDecisionPanel } from "./CaseDecision";
 import { parseDecisionTab, tabName } from "../decisionTabs";
+import { BRIEF_TAB } from "../decisionBrief";
 import type { QueueRow } from "../humanDecision";
 
 const TABS = ["Approvals", "Decision", "Decision center", "Verify a signature"] as const;
 type Tab = (typeof TABS)[number];
 
 export function DecisionsSection({ tab }: { tab?: string }) {
-  const { work } = useWorkspace();
+  const { work, open } = useWorkspace();
   // Approvals (the queue of briefs awaiting a signature) is for people who may sign; it is their first tab.
   const canSign = useCan("decision.sign");
   // Under the MVP feature set the legacy Decision center is parked (featureSet.ts).
@@ -76,6 +77,10 @@ export function DecisionsSection({ tab }: { tab?: string }) {
                 investigationId={decisionCase}
                 caseLabel={caseLabel}
                 onCaseChanged={() => work.refreshInvestigations()}
+                // The brief's review is on the case page: offered for the case the context bar holds.
+                onReviewBrief={
+                  decisionCase === work.investigationId ? () => open("Investigations", BRIEF_TAB) : undefined
+                }
               />
             </>
           ) : (

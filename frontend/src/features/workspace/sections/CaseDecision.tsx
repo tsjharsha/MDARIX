@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { FileSignature, Gavel, Undo2 } from "lucide-react";
+import { ClipboardCheck, FileSignature, Gavel, Undo2 } from "lucide-react";
 import { requestJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from "../../customer-admin/shared";
@@ -23,6 +23,7 @@ import {
   RETURN_COMMENT_MAX,
   SUPERSEDE_REASON_MAX,
   acknowledgementRequired,
+  awaitsBriefReview,
   caseDecisionPath,
   decisionFormProblems,
   decisionHistory,
@@ -80,6 +81,7 @@ export function CaseDecisionPanel({
   initialFollowUp = null,
   initialAssessment = null,
   onCaseChanged,
+  onReviewBrief,
 }: {
   investigationId: string;
   caseLabel: string;
@@ -87,6 +89,8 @@ export function CaseDecisionPanel({
   initialAssessment?: string | null;
   /** Called when the case's state changed here (a decision signed, a return, a material impact). */
   onCaseChanged?: () => void;
+  /** Opens the quality review of the brief (the Decision Brief tab), offered while no version is accepted. */
+  onReviewBrief?: () => void;
 }) {
   const { notify } = useWorkspace();
   const context = useResource<CaseDecisionContext>(caseDecisionPath(investigationId));
@@ -198,6 +202,19 @@ export function CaseDecisionPanel({
             {safeText(actions.reason) ??
               "Only an authorized decision maker who did not write or submit this brief can sign. Administrators never sign."}
           </p>
+          {awaitsBriefReview(brief) && onReviewBrief && (
+            <>
+              <p className="ac-muted">
+                A quality reviewer first reviews the Decision Brief and accepts it for decision. The decision is then
+                signed here.
+              </p>
+              <div className="ca-action-row">
+                <button type="button" className="ac-primary" onClick={onReviewBrief}>
+                  <ClipboardCheck size={15} aria-hidden="true" /> Review the brief first
+                </button>
+              </div>
+            </>
+          )}
         </Panel>
       )}
       {data && brief && actions.can_return === true && (

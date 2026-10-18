@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialGuidePage } from "./TrialGuidePage";
-import { shortTitle } from "./TrialGuideVisuals";
+import { GuideScene, shortTitle } from "./TrialGuideVisuals";
 import { GUIDE_STEPS, SAMPLE_CHAPTERS_GOAL, TRIAL_GUIDE_PATH, journeyProgress } from "./trialGuide";
 import { TrialJourney } from "../workspace/sections/TrialJourney";
 
@@ -80,5 +80,13 @@ describe("free trial user guide", () => {
     expect(html).toContain("Continue the story");
     expect(html).toContain(`href="${TRIAL_GUIDE_PATH}"`);
     expect(html).toContain("Free trial user guide");
+  });
+});
+
+describe("free trial user guide illustrations", () => {
+  it("show the address people type, mdarix.in", () => {
+    const html = GUIDE_STEPS.map((step) => renderToStaticMarkup(<GuideScene step={step.key} />)).join("");
+    expect(html).toContain("mdarix.in/activate-account");
+    expect(html).not.toContain("mdarix.com");
   });
 });

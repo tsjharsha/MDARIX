@@ -7,7 +7,8 @@
 # and type plain "docker compose ...".) The --env-file matters: the ${...:?} values in this file are read from it,
 # never from the env_file entries below, so without it a fresh VM stops with "required variable ... is missing".
 #
-# Postgres is a managed service with point-in-time recovery (not in this file). Only Caddy is reachable from the
+# Postgres is not in this file: a managed service, or during the validation phase the server's own (layer
+# docker-compose.staging-oracle.yml; docs/runbooks/GCP_DEPLOYMENT.md). Only Caddy is reachable from the
 # internet (80/443); the API, the background service (outbox worker and scheduler) and the virus scanner talk on a
 # private network. No simulators, no mail
 # catcher, no published database ports, and no default passwords. Settings live in two files:

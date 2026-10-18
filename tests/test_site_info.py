@@ -20,6 +20,15 @@ def test_site_info_shows_the_configured_company(monkeypatch):
     assert body["trial"]["data_deleted_after_days"] == 30
 
 
+def test_sign_up_reads_the_free_mail_domains_that_automatic_approval_uses():
+    """The website's note for a personal address uses the server's own list, so the two never disagree."""
+    from backend.app.trial.auto_approval import FREE_MAIL_DOMAINS, is_company_domain
+
+    domains = client.get("/api/v1/public/site-info").json()["trial"]["free_mail_domains"]
+    assert domains == sorted(FREE_MAIL_DOMAINS) and "gmail.com" in domains
+    assert not any(is_company_domain(domain) for domain in domains)
+
+
 def test_the_version_the_server_runs_is_answered_fresh_without_a_session(monkeypatch):
     """An open tab compares it with the version it was built as (frontend/src/features/shared/appVersion.ts)."""
     from backend.app.version import APP_VERSION

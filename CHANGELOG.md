@@ -10,6 +10,67 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.28] - 2026-10-19
+
+### Fixed
+
+- Website, Security page: it said the database runs on a managed service with point-in-time recovery. It now says
+  what is true during the validation phase: the database runs on MDARIX's own server in Mumbai, is backed up every
+  day with an encrypted copy in Delhi and a daily snapshot of the server's disk kept in Mumbai, and restoring follows a
+  written, rehearsed procedure. The subprocessor list, the retention schedule and the legal notes say the same. The
+  Google Cloud runbook pins the daily disk snapshots to Mumbai (`--storage-location=asia-south1`), so they stay in
+  India as the privacy policy promises.
+- Website, Regulations page: it said reportability decisions are "signed". Reportability decisions are recorded by a
+  named person with their reason; investigation decisions are signed electronically, with re-authentication. The
+  Company page and the Trust page's search description say the same.
+- Free trial: a trial approved at once for a company email now has its sample signal straight away, as a trial
+  approved by the MDARIX team already had; the Signal inbox (chapter 3 of Getting started) was empty for up to an
+  hour.
+- Signing a decision no longer ends in a dead end. While no version of the Decision Brief is accepted for decision,
+  the case's Decision tab says so and offers **Review the brief first**, which opens the Decision Brief tab at its
+  quality review. The Decision Brief tab now offers **Start review** (and then **Record your review**) at the top, not
+  only below the whole brief, and once you accept the brief for decision it offers **Next: sign the decision**.
+- Sign-up: the Terms of Service, Free Trial Agreement and Privacy Policy links open in a new tab, so reading them no
+  longer erases the form.
+- A colleague invited to a free trial gets an invitation of their own: "Priya Raman invited you to the MDARIX free
+  trial of Lumenvia Health Devices", one line on what MDARIX is, a note to have their phone ready for the
+  authenticator app, and why they receive it (the trial's owner invited them). It mentions the sample investigation
+  only while the trial still has it. The trial owner's own invitation is unchanged.
+- Website homepage: the worked example's numbers now add up, and the Platform pages tell the same case: 42
+  pressure-alarm complaints, from about 2 to 12 a month after Rev B, 30 of them in lots 003 and 004 and 2 without a
+  lot; the case is INV-031 everywhere.
+- Signals: "Recurring words" no longer counts words from what a complaint says did not happen ("no patient injury
+  reported" was shown as "injury (5)"), clinical outcomes (they have their own line), "returned for evaluation" or lot
+  numbers.
+- Free trial sample data: OrbitCare 300's sample complaints carry the problem code PRESSURE_ALARM, so the sample signal
+  reads "5 complaints: pressure alarm on OrbitCare 300 Infusion Pump (Sample) Rev B in 30 days" instead of "unspecified
+  problem", and Automatic insights shows PRESSURE_ALARM as the problem code that rose. Applies to new trials; existing
+  trials keep their data. A case opened from a threshold signal now starts from a question such as "Why did
+  pressure-alarm complaints rise on OrbitCare 300 Infusion Pump (Sample) Rev B?".
+- The free trial user guide's pictures show the address mdarix.in (they showed mdarix.com).
+
+### Changed
+
+- Website homepage: the hero says what MDARIX is: post-market surveillance and complaint handling for medical devices,
+  with complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place.
+- Sign-up says before you send the request what happens next: with a company email the activation link arrives within
+  minutes; a personal address (Gmail and similar) is reviewed by the MDARIX team, usually within one business day, and
+  the form says so as soon as such an address is typed. It also says the trial comes with sample data and that AI is
+  off. The list of personal mail domains is the one automatic approval uses, published in
+  `/api/v1/public/site-info` (`trial.free_mail_domains`).
+
+### Security
+
+- The web server refuses a request body above 1 MiB (1,048,576 bytes, HTTP 413) when the API would read it as JSON
+  (Content-Type `application/json` or `application/*+json` in any case, or no Content-Type at all), before it reaches
+  the API: an anonymous oversized JSON body could tie up an API worker for about 40 seconds. Uploads (multipart, CSV,
+  Excel) keep the 25 MB limit. The cap leaves a wide margin: the largest JSON the application sends is a case scope,
+  at most about 650 KB with every field at its limit and usually under 150 KB; inbound webhooks are already capped at 1
+  MiB by the API. Scripts that post CSV to the import endpoints must send `Content-Type: text/csv`, as the application
+  does. Signed packages uploaded to a platform deployment (not used yet) must stay under 1 MiB.
+- A request the API cannot read (HTTP 422) is answered field by field as before, but no longer echoes the submitted
+  values back.
+
 ## [0.10.27] - 2026-10-18
 
 ### Fixed

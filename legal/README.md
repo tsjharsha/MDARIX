@@ -64,7 +64,8 @@ in the footer, on `/contact` and in every email.
   no longer identifies them) and the network address and browser recorded at the time; free text that colleagues
   typed into quality records or reasons (for example a name in a complaint description) is not searched out.
 - Backups: encrypted; 14 days on the server (`MDARIX_BACKUP_KEEP_DAYS`), up to 90 days in the off-site copy, plus
-  the managed database's point-in-time recovery window and snapshots. Erased data stays in backups for that period;
+  the server disk's daily snapshots (14 days, kept in Mumbai). During the validation phase the database runs on the
+  server itself, with no point-in-time recovery. Erased data stays in backups for that period;
   after any restore the erasures are repeated from the erasure log before the system is used.
 - A legal hold (a court, regulator or the customer requires preservation) suspends deletion for that organization
   until it is lifted; setting and lifting it are recorded with the reason.

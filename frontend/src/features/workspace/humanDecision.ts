@@ -278,6 +278,11 @@ export const recommendedActions = (brief: Pick<DecisionBrief, "narrative"> | nul
   actionsOf(brief?.narrative?.recommended_actions);
 
 /** One reviewer line: who did what (as people read it), when and with which comment. */
+/** Signing waits for the brief's quality review: the case has a brief, but no version is accepted for decision yet. */
+export function awaitsBriefReview(brief: Pick<DecisionBrief, "status"> | null | undefined): boolean {
+  return !!brief && code(brief.status) !== "APPROVED_FOR_DECISION";
+}
+
 export function reviewerLine(reviewer: DecisionReviewer | null | undefined) {
   const row = reviewer ?? {};
   const action = safeText(row.outcome_label) ?? safeText(row.outcome) ?? safeText(row.action);

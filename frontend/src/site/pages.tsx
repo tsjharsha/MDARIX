@@ -318,7 +318,7 @@ function ScopeClarity() {
 const EXAMPLE_STEPS = [
   {
     title: "A signal rises",
-    text: "Pressure-alarm complaints roughly triple after Rev B is released. A change is a lead, not a cause.",
+    text: "Pressure-alarm complaints rise from about 2 to 12 a month after Rev B is released. A change is a lead, not a cause.",
     href: "/platform/product-360#product-version",
   },
   {
@@ -425,7 +425,8 @@ export function HomePage() {
             <h3>Complaints per lot</h3>
             <LotChart />
             <p className="ms-viz-read">
-              <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with the new supplier's sensors.
+              <span className="ms-viz-key ms-viz-key-hot" aria-hidden="true" /> Built with the new supplier's sensors. 2
+              of the 42 complaints name no lot.
             </p>
           </Reveal>
         </div>
@@ -773,7 +774,10 @@ export function RegulationsPage() {
           </Reveal>
           <Reveal className="ms-card ms-card-flat" delay={80}>
             <strong>Human decisions, recorded</strong>
-            <p>Reportability decisions and investigation decisions are made and signed by people, with their reason.</p>
+            <p>
+              Reportability decisions are recorded by a named person with their reason. Investigation decisions are
+              signed electronically, with re-authentication.
+            </p>
             <a className="ms-link" href="/platform/trust">
               Trust on the Platform <ArrowRight size={14} aria-hidden="true" />
             </a>
@@ -1354,7 +1358,7 @@ export function CompanyPage() {
             ],
             [
               "Design-partner outcome",
-              "During a pilot, MDARIX records when each investigation is opened and closed, every data import with its result, and every decision with its review and signature, so the pilot can be reviewed from the audit trail.",
+              "During a pilot, MDARIX records when each investigation is opened and closed, every data import with its result, every reportability decision with its reason, and every investigation decision with its review and signature, so the pilot can be reviewed from the audit trail.",
             ],
           ].map(([title, text], index) => (
             <Reveal key={title} delay={index * 80} className="ms-card">

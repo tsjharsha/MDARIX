@@ -862,11 +862,31 @@ export function addComplaintsProblem(complaints: string[], reason: string) {
   return textProblem(reason, REASON_MIN, DISPOSITION_REASON_MAX);
 }
 
-/** The investigation question a new case starts from: the signal's title, as a question. */
+// A threshold rule's title (backend/app/signals/logic.py rule_title): "5 complaints: pressure alarm on OrbitCare 300
+// Rev B in 30 days".
+const RULE_TITLE = /^\d+ complaints?: (.+) on (.+) in \d+ days?$/;
+
+/**
+ * The investigation question a new case starts from. A threshold rule's signal asks why its problem's complaints
+ * rose on the product ("Why did pressure-alarm complaints rise on OrbitCare 300 Rev B?"); any other title is asked
+ * as a question.
+ */
 export function defaultInvestigationQuestion(signal: Pick<SignalSummary, "title" | "business_id">): string {
   const title = safeText(signal.title);
   if (!title) return "";
   const subject = title.replace(/[.?!\s]+$/, "");
+  const rule = RULE_TITLE.exec(subject);
+  if (rule) {
+    const [, problem, product] = rule;
+    const words = problem.trim().split(/\s+/);
+    const complaints =
+      problem === "unspecified problem"
+        ? "complaints without a problem code"
+        : words.length <= 2
+          ? `${words.join("-")} complaints`
+          : `complaints about ${problem}`;
+    return `Why did ${complaints} rise on ${product}?`;
+  }
   // "Battery drains early" reads "battery drains early"; an acronym or code ("USB port", "BATTERY_DRAIN") is kept.
   const lower = /^[A-Z][a-z]/.test(subject) ? `${subject.charAt(0).toLowerCase()}${subject.slice(1)}` : subject;
   return `What is the root cause of ${lower}?`;

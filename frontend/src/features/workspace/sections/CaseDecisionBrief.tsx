@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { FilePlus2, GitCompare, Play, RefreshCw, Save, Send } from "lucide-react";
+import { ClipboardCheck, FilePlus2, FileSignature, GitCompare, Play, RefreshCw, Save, Send } from "lucide-react";
 import { AI_TIMEOUT_MS, ApiError, postJson } from "../../../app/apiClient";
 import { Empty, Panel, ToneBadge } from "../../admin/console/charts";
 import { Drawer, Table, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -19,6 +19,7 @@ import {
   briefChecks,
   briefControls,
   briefLines,
+  briefNextStep,
   briefPath,
   briefReview,
   briefReviewActionLabel,
@@ -39,6 +40,7 @@ import {
   submitBody,
   versionsNewestFirst,
   type BriefLine,
+  type BriefNextStep,
   type BriefState,
   type BriefVersion,
   type BriefVersionRow,
@@ -47,6 +49,11 @@ import {
 
 const record = (value: unknown): Record<string, any> =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+
+/** The quality review panel, which the top of the tab and the Decision tab scroll to. */
+const BRIEF_REVIEW_ID = "brief-quality-review";
+const scrollToReview = () =>
+  document.getElementById(BRIEF_REVIEW_ID)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 /** A hash shown short, with the whole value on hover and for screen readers. */
 function Hash({ value }: { value: unknown }) {
@@ -76,10 +83,16 @@ export function CaseDecisionBriefPanel({
   investigationId,
   caseLabel,
   readOnly = false,
+  focusReview = false,
+  onOpenDecision,
 }: {
   investigationId: string;
   caseLabel: string;
   readOnly?: boolean;
+  /** Opened from the Decision tab's "Review the brief first": scroll to the quality review once the brief is read. */
+  focusReview?: boolean;
+  /** Opens the case's Decision tab, offered once the brief has been accepted for decision here. */
+  onOpenDecision?: () => void;
 }) {
   const { notify } = useWorkspace();
   const canRunAi = useCan("ai.run");
@@ -103,6 +116,14 @@ export function CaseDecisionBriefPanel({
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState<{ text: string; tone: "critical" | "warning" } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The brief accepted for decision on this screen: the next step, signing, is offered at the top and in the review.
+  const [accepted, setAccepted] = useState(false);
+  const reviewControls = { startReview: controls.startReview && !readOnly, review: controls.review && !readOnly };
+  const nextStep = briefNextStep(reviewControls, current, accepted);
+  const hasBrief = !!current;
+  useEffect(() => {
+    if (focusReview && hasBrief) scrollToReview();
+  }, [focusReview, hasBrief]);
   const run = async (key: string, work: () => Promise<unknown>, done: string, failed: string) => {
     if (busy) return;
     setBusy(key);
@@ -152,6 +173,15 @@ export function CaseDecisionBriefPanel({
         The Decision Brief gathers what the records establish, what is still unknown and what reviewers found. It
         informs the decision maker; it never makes the decision. AI text is labelled and must be edited by the author.
       </p>
+      {current && nextStep && (
+        <BriefNextStepBar
+          step={nextStep}
+          investigationId={investigationId}
+          version={current}
+          onDone={() => brief.reload()}
+          onOpenDecision={onOpenDecision}
+        />
+      )}
       <Panel
         eyebrow={caseLabel}
         title={current ? `Decision Brief · version ${current.version}` : "Decision Brief"}
@@ -317,9 +347,11 @@ export function CaseDecisionBriefPanel({
         <QualityReviewPanel
           investigationId={investigationId}
           version={current}
-          canStart={controls.startReview && !readOnly}
-          canReview={controls.review && !readOnly}
+          canStart={reviewControls.startReview}
+          canReview={reviewControls.review}
           onDone={() => brief.reload()}
+          onAccepted={() => setAccepted(true)}
+          onOpenDecision={accepted ? onOpenDecision : undefined}
         />
       )}
       {state && (state.versions?.length ?? 0) > 0 && (
@@ -739,6 +771,96 @@ function SubmitDrawer({
   );
 }
 
+/** Why a review action was refused, in words for the reviewer. */
+const reviewFailure = (failure: unknown, fallback: string) =>
+  failure instanceof ApiError && failure.code === "SOD_DENIED"
+    ? "You wrote or submitted this brief, so another quality reviewer must review it."
+    : errorText(failure, fallback);
+
+/** Starting the quality review of one version, from the top of the tab or from the review panel. */
+function useStartReview(investigationId: string, version: BriefVersion, onDone: () => void) {
+  const { notify } = useWorkspace();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const start = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      await send(briefVersionPath(investigationId, version.version, "start-review"), "POST");
+      notify(`${safeText(version.business_id) ?? "The brief"}: review started.`);
+      onDone();
+    } catch (failure) {
+      setError(reviewFailure(failure, "The review could not be started."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { start, busy, error };
+}
+
+/**
+ * The review's next step at the top of the tab, so a reviewer never has to find it below the whole brief: start the
+ * review, go to the review form, or, once the brief is accepted for decision, go and sign the decision.
+ */
+export function BriefNextStepBar({
+  step,
+  investigationId,
+  version,
+  onDone,
+  onOpenDecision,
+}: {
+  step: BriefNextStep;
+  investigationId: string;
+  version: BriefVersion;
+  onDone: () => void;
+  onOpenDecision?: () => void;
+}) {
+  const starting = useStartReview(investigationId, version, onDone);
+  if (step === "SIGN")
+    return onOpenDecision ? (
+      <Panel eyebrow="Quality review" title="Accepted for decision">
+        <p className="ac-muted">
+          This version of the brief is accepted for decision. An authorized decision maker signs the decision on the
+          Decision tab.
+        </p>
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary" onClick={onOpenDecision}>
+            <FileSignature size={15} aria-hidden="true" /> Next: sign the decision
+          </button>
+        </div>
+      </Panel>
+    ) : null;
+  return (
+    <Panel
+      eyebrow="Quality review"
+      title={step === "START_REVIEW" ? "This brief is ready for your review" : "Your review is open"}
+    >
+      <p className="ac-muted">
+        {step === "START_REVIEW"
+          ? "Start the review, read the brief below, then record whether it is fit to decide on."
+          : "Read the brief below, then record your review: accept it for decision, or return it with a comment."}
+      </p>
+      <div className="ca-action-row">
+        {step === "START_REVIEW" ? (
+          <button type="button" className="ac-primary" disabled={starting.busy} onClick={() => void starting.start()}>
+            <Play size={15} aria-hidden="true" /> {starting.busy ? "Starting…" : "Start review"}
+          </button>
+        ) : (
+          <button type="button" className="ac-primary" onClick={scrollToReview}>
+            <ClipboardCheck size={15} aria-hidden="true" /> Record your review
+          </button>
+        )}
+      </div>
+      {starting.error && (
+        <p className="ac-message tone-critical" role="alert">
+          {starting.error}
+        </p>
+      )}
+    </Panel>
+  );
+}
+
 /** The quality review: its history for everyone; Start review and the review form only for a reviewer who may. */
 function QualityReviewPanel({
   investigationId,
@@ -746,39 +868,28 @@ function QualityReviewPanel({
   canStart,
   canReview,
   onDone,
+  onAccepted,
+  onOpenDecision,
 }: {
   investigationId: string;
   version: BriefVersion;
   canStart: boolean;
   canReview: boolean;
   onDone: () => void;
+  /** Called once this person has accepted the brief for decision. */
+  onAccepted: () => void;
+  /** Offered after the acceptance: the case's Decision tab, where the decision is signed. */
+  onOpenDecision?: () => void;
 }) {
   const { notify } = useWorkspace();
   const [action, setAction] = useState("");
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const starting = useStartReview(investigationId, version, onDone);
   const history = version.review_actions ?? [];
   const problem = briefReviewProblem(action, comment);
   const name = safeText(version.business_id) ?? "The brief";
-  const failed = (failure: unknown, fallback: string) =>
-    failure instanceof ApiError && failure.code === "SOD_DENIED"
-      ? "You wrote or submitted this brief, so another quality reviewer must review it."
-      : errorText(failure, fallback);
-  const start = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      await send(briefVersionPath(investigationId, version.version, "start-review"), "POST");
-      notify(`${name}: review started.`);
-      onDone();
-    } catch (failure) {
-      setError(failed(failure, "The review could not be started."));
-    } finally {
-      setBusy(false);
-    }
-  };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (problem || busy) return;
@@ -790,12 +901,18 @@ function QualityReviewPanel({
         "POST",
         briefReviewBody(action, comment),
       );
-      notify(`${name}: ${briefReviewActionLabel({ action }).toLowerCase()} recorded.`);
+      const acceptedNow = action === "ACCEPT_FOR_DECISION";
+      notify(
+        acceptedNow
+          ? `${name}: accepted for decision. Next: sign the decision on the Decision tab.`
+          : `${name}: ${briefReviewActionLabel({ action }).toLowerCase()} recorded.`,
+      );
       setAction("");
       setComment("");
+      if (acceptedNow) onAccepted();
       onDone();
     } catch (failure) {
-      setError(failed(failure, "The review was not recorded."));
+      setError(reviewFailure(failure, "The review was not recorded."));
     } finally {
       setBusy(false);
     }
@@ -803,7 +920,7 @@ function QualityReviewPanel({
   if (!history.length && !canStart && !canReview) return null;
   const chosen = BRIEF_REVIEW_ACTIONS.find((item) => item.value === action);
   return (
-    <Panel eyebrow="Quality review" title="Review of this brief">
+    <Panel eyebrow="Quality review" title="Review of this brief" id={BRIEF_REVIEW_ID}>
       {history.length ? (
         <ol className="ca-timeline" aria-label="Review history">
           {history.map((item, index) => (
@@ -822,10 +939,17 @@ function QualityReviewPanel({
       ) : (
         <p className="ac-muted">No review actions yet.</p>
       )}
+      {onOpenDecision && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-primary" onClick={onOpenDecision}>
+            <FileSignature size={15} aria-hidden="true" /> Next: sign the decision
+          </button>
+        </div>
+      )}
       {canStart && (
         <div className="ca-action-row">
-          <button type="button" className="ac-primary" disabled={busy} onClick={() => void start()}>
-            <Play size={15} aria-hidden="true" /> {busy ? "Starting…" : "Start review"}
+          <button type="button" className="ac-primary" disabled={starting.busy} onClick={() => void starting.start()}>
+            <Play size={15} aria-hidden="true" /> {starting.busy ? "Starting…" : "Start review"}
           </button>
         </div>
       )}
@@ -864,9 +988,9 @@ function QualityReviewPanel({
           </div>
         </form>
       )}
-      {error && (
+      {(error || starting.error) && (
         <p className="ac-message tone-critical" role="alert">
-          {error}
+          {error || starting.error}
         </p>
       )}
     </Panel>

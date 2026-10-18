@@ -27,6 +27,7 @@ from backend.app.db.models.foundation import (
     AuditEvent,
     AuthUser,
     FeatureEntitlement,
+    Investigation,
     PlanDefinition,
     Tenant,
     TenantMembership,
@@ -34,7 +35,12 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.stage2 import OnboardingRequest, SubscriptionLifecycle
 from backend.app.trial.request_profile import describe as describe_profile
-from backend.app.trial.sample_data import seed_lot_quantities, seed_sample_workspace, seed_story_examples
+from backend.app.trial.sample_data import (
+    SAMPLE_SOURCE,
+    seed_lot_quantities,
+    seed_sample_workspace,
+    seed_story_examples,
+)
 from backend.app.runtime_env import is_development
 
 FREE_TRIAL_PLAN = "FREE_TRIAL"
@@ -293,14 +299,38 @@ def long_date(value: datetime) -> str:
     return f"{value.day} {value:%B %Y}"
 
 
-def _send_invitation(db: Session, user: AuthUser, organization: str, admin_id) -> dict:
+def has_sample_investigation(db: Session, tenant_id) -> bool:
+    """Whether the trial still has its sample investigation (the owner may have removed the sample data). A trial's
+    records are on the shared control plane, as seed_sample_workspace wrote them in approve_request."""
+    return (
+        db.query(Investigation.id)
+        .filter(Investigation.tenant_id == tenant_id, Investigation.source_system == SAMPLE_SOURCE)
+        .first()
+        is not None
+    )
+
+
+def _send_invitation(
+    db: Session, user: AuthUser, organization: str, admin_id, *, invited_by: str | None = None
+) -> dict:
+    """Invite ``user`` to the trial: the requester's own invitation, or with ``invited_by`` (the trial owner's name)
+    a colleague's."""
     token = issue_invitation(db, user.id, user.tenant_id, admin_id, ttl=TRIAL_INVITATION_TTL_SECONDS)
     subscription = trial_subscription(db, user.tenant_id)
     ends_on = long_date(subscription.expires_at) if subscription else f"{TRIAL_DAYS} days after activation"
+    colleague = (
+        {"invited_by": invited_by, "sample_data": has_sample_investigation(db, user.tenant_id)} if invited_by else {}
+    )
     result: dict = {}
     try:
         delivery = send_trial_invitation(
-            user.username, token, organization, ends_on=ends_on, users=TRIAL_USER_LIMIT, rows=TRIAL_ROW_LIMIT
+            user.username,
+            token,
+            organization,
+            ends_on=ends_on,
+            users=TRIAL_USER_LIMIT,
+            rows=TRIAL_ROW_LIMIT,
+            **colleague,
         )
     except EmailDeliveryError as exc:
         delivery = "FAILED"
@@ -454,6 +484,12 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
             500, "TRIAL_APPROVAL_FAILED", "The trial workspace could not be created; nothing was saved"
         ) from exc
 
+    # The sample's signals now, for both approvals (a Platform Administrator's and the automatic one), rather than at
+    # the scheduler's next run, and before the invitation, so the signal inbox has work when the person first signs
+    # in. In a session of its own: a failure is logged and never fails the approval, which is committed above.
+    from backend.app.signals.hooks import seed_demo_signals
+
+    seed_demo_signals(db, user.tenant_id)
     invitation = _send_invitation(db, user, row.organization, admin.id)
     return {**serialize_request(db, row), **invitation}
 

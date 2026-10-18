@@ -57,6 +57,40 @@ def test_the_trial_invitation_says_what_the_trial_includes_and_when_data_is_dele
     assert "deleted 30 days after the trial ends" in text
 
 
+def test_the_requester_and_an_invited_colleague_each_get_their_own_trial_invitation(company, outbox):
+    """The requester's invitation is theirs; a colleague learns who invited them, what MDARIX is and that their phone
+    is needed, and hears of the sample investigation only while it exists; text and HTML say the same."""
+    kwargs = {"ends_on": "3 November 2026", "users": 3, "rows": 5000}
+    emailer.send_trial_invitation("owner@acme.example", "tok1", "Acme Devices", **kwargs)
+    emailer.send_trial_invitation("arjun@acme.example", "tok2", "Acme Devices", invited_by="Priya Raman", **kwargs)
+    emailer.send_trial_invitation(
+        "lee@acme.example", "tok3", "Acme Devices", invited_by="Priya Raman", sample_data=False, **kwargs
+    )
+    own, colleague, after_removal = outbox
+    assert own["subject"] == "Activate your MDARIX account"
+    assert "Your MDARIX free trial is ready" in own["text"]
+    assert "because you requested a free MDARIX trial" in own["text"]
+    assert colleague["subject"] == "Priya Raman invited you to the MDARIX free trial"
+    for body in (colleague["text"], colleague["html"]):
+        assert "Priya Raman invited you to the MDARIX free trial of Acme Devices" in body
+        assert "complaints and post-market surveillance" in body
+        assert "Have your phone ready" in body and "authenticator app" in body
+        assert "ready-made sample investigation" in body
+        assert "because Priya Raman, who runs your organization" in body and "trial, invited you." in body
+        assert "you requested" not in body and "Your MDARIX free trial is ready" not in body
+        assert "https://app.example.com/activate-account?token=tok2" in body
+    for body in (after_removal["text"], after_removal["html"]):
+        assert "sample" not in body.lower()
+        assert "Open Getting started to see what you can try." in body
+
+
+def test_an_inviting_owner_name_is_escaped_in_html(company, outbox):
+    emailer.send_trial_invitation(
+        "a@example.com", "tok", "Acme", ends_on="3 November 2026", users=3, rows=5000, invited_by="<b>Eve</b>"
+    )
+    assert "<b>Eve</b>" not in outbox[0]["html"] and "&lt;b&gt;Eve&lt;/b&gt;" in outbox[0]["html"]
+
+
 def test_supplier_requests_reply_to_the_requester(company, outbox):
     emailer.send_supplier_evidence_request(
         "qa@supplier.example",

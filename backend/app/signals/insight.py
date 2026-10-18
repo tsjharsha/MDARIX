@@ -38,6 +38,18 @@ STOPWORDS = frozenset(
     customer patient user reported reports report device unit pump product""".split()
 )
 WORD = re.compile(r"[a-z][a-z\-]{3,}")
+# Recurring words leave out what a complaint says did NOT happen ("no patient injury reported", "without harm"): from a
+# negation to the end of its clause. They also leave out clinical outcomes (the sentence on deaths, serious injuries and
+# malfunctions above counts them from the complaint's own fields), complaint-handling boilerplate ("returned for
+# evaluation") and identifiers (a lot or model number such as SAMPLE-ORBIT-300-LOT-003).
+NEGATIONS = frozenset("no not without never none nor neither".split())
+CLAUSE = re.compile(r"[.;:!?,()]|\bbut\b")
+IDENTIFIER = re.compile(r"\S*\d\S*")
+OUTCOME_WORDS = frozenset(
+    """death deaths died dead fatal fatality injury injuries injured harm harmed serious malfunction malfunctions
+    malfunctioned""".split()
+)
+FILLER_WORDS = frozenset("evaluation returned".split())
 
 
 def today_utc() -> date:
@@ -441,7 +453,17 @@ def _cite(rows) -> list[str]:
 
 
 def _words(text: str | None) -> set[str]:
-    return {word.strip("-") for word in WORD.findall(str(text or "").lower()) if word not in STOPWORDS}
+    """The words a complaint description stands for in "Recurring words" (see NEGATIONS)."""
+    found: set[str] = set()
+    for clause in CLAUSE.split(IDENTIFIER.sub(" ", str(text or "").lower())):
+        for token in clause.split():
+            if token in NEGATIONS or token.endswith("n't"):
+                break
+            for word in WORD.findall(token):
+                word = word.strip("-")
+                if word not in STOPWORDS and word not in OUTCOME_WORDS and word not in FILLER_WORDS:
+                    found.add(word)
+    return found
 
 
 def records_summary(db: Session, signal: Signal) -> dict:

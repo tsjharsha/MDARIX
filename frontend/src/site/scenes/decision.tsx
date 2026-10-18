@@ -353,7 +353,7 @@ function InvestigationBrief({ label }: { label: string }) {
           Investigation brief · v3
         </text>
         <text x={18} y={43} className="sc-note">
-          INV-0042 · OrbitCare 300
+          INV-031 · OrbitCare 300
         </text>
         <Chip x={360 - 14} y={26} align="end" text="In review" tone="amber" index={3} />
         {sections.map((section, index) => (
@@ -825,7 +825,7 @@ function AuditTrail({ label }: { label: string }) {
     <Scene label={label}>
       <Card x={24} y={24} w={592} h={346} index={0}>
         <text x={18} y={32} style={{ fontSize: fs(15) }} fontWeight={800}>
-          Audit trail · INV-0042 · 12 Oct
+          Audit trail · INV-031 · 12 Oct
         </text>
         <Chip x={592 - 14} y={27} align="end" text="Append-only · chained" tone="teal" index={3} />
         {columns.map(([x, text]) => (

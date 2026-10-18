@@ -1713,7 +1713,7 @@ function InvestigationCrossSystem({ label }: { label: string }) {
       ))}
       <Panel x={card.x} y={card.y} w={226} h={200} index={2}>
         <Txt x={20} y={40} size={20} weight={800}>
-          INV-001
+          INV-031
         </Txt>
         <Txt x={20} y={64} size={16} tone="muted">
           Pressure alarms

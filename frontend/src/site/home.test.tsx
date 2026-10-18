@@ -5,6 +5,9 @@ import { DEMO_REQUESTS_OFFERED } from "./offer";
 import { capabilityStatus, lifecycleStages } from "./content";
 import { trialIncludes } from "./legacyContent";
 import { LOOP_ORDER } from "../features/workspace/qualityLoop";
+import { EXAMPLE_NUMBERS } from "./visuals";
+import { InvestigationAnimation } from "./motion";
+import { SCENES } from "./scenes";
 
 describe("website home", () => {
   it("draws the quality loop in story order with illustrative values", () => {
@@ -62,5 +65,39 @@ describe("website home", () => {
       });
     }
     expect(items.find((item) => item.slug === "recall")?.future).toBe(true);
+  });
+});
+
+describe("the worked example", () => {
+  it("says in the hero what MDARIX is for", () => {
+    const html = renderToStaticMarkup(<HomePage />);
+    expect(html).toContain("Post-market surveillance and complaint handling for medical devices");
+    expect(html).toContain(
+      "Complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place",
+    );
+  });
+
+  it("tells one story whose numbers add up", () => {
+    const { weekly, releaseWeek, lots, withoutLot } = EXAMPLE_NUMBERS;
+    const sum = (values: readonly number[]) => values.reduce((total, value) => total + value, 0);
+    const before = sum(weekly.slice(0, releaseWeek));
+    const after = sum(weekly.slice(releaseWeek));
+    const byLot = sum(lots.map((lot) => lot.count));
+    // 42 complaints: 6 before Rev B and 36 after over 13 weeks each (2 and 12 a month), 40 with a lot and 2 without.
+    expect([before, after, before + after]).toEqual([6, 36, 42]);
+    expect(byLot + withoutLot).toBe(42);
+    expect(sum(lots.filter((lot) => lot.sensor).map((lot) => lot.count))).toBe(30);
+    const html = renderToStaticMarkup(<HomePage />);
+    expect(html).toContain("hold 30 of the 42 complaints");
+    expect(html).toContain("from about 2 to 12 a month");
+    expect(html).toContain("2 of the 42 complaints name no lot.");
+    expect(renderToStaticMarkup(<InvestigationAnimation />)).toContain("2 complaints without lot reference");
+    // The Platform scenes tell the same case: one case ID and the same monthly rates.
+    const scenes = Object.values(SCENES)
+      .map((Scene) => renderToStaticMarkup(<Scene label="Scene" />))
+      .join("");
+    expect(scenes).toContain("INV-031");
+    expect(scenes.match(/INV-\d+/g)?.every((id) => id === "INV-031")).toBe(true);
+    expect(scenes).toContain("Complaints rose from 2 to 12 a month");
   });
 });

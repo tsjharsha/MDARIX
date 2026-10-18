@@ -141,7 +141,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
         "business_id": user.business_id,
         "email": email,
         "display_name": name,
-        **_send_invitation(db, user, inviter.company, inviter.id),
+        **_send_invitation(db, user, inviter.company, inviter.id, invited_by=_owner_name(inviter)),
     }
 
 
@@ -154,8 +154,13 @@ def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_
         "id": str(user.id),
         "business_id": user.business_id,
         "email": user.username,
-        **_send_invitation(db, user, inviter.company, inviter.id),
+        **_send_invitation(db, user, inviter.company, inviter.id, invited_by=_owner_name(inviter)),
     }
+
+
+def _owner_name(owner: AuthUser) -> str:
+    """How a colleague's invitation names the trial's owner: their name, else their email."""
+    return (owner.display_name or "").strip() or owner.username
 
 
 def _colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, *, own: str) -> AuthUser:

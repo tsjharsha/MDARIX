@@ -190,6 +190,26 @@ export function briefControls(state: BriefState | null | undefined): BriefContro
   };
 }
 
+/**
+ * The step the top of the Decision Brief tab offers this person, so reviewing never starts at the end of a long page:
+ * start the quality review, record it, or, right after they accepted the brief for decision here (``acceptedHere``),
+ * go and sign the decision. An accepted version stays accepted after the decision is signed, so "sign" is offered only
+ * then.
+ */
+export type BriefNextStep = "START_REVIEW" | "RECORD_REVIEW" | "SIGN";
+
+export function briefNextStep(
+  controls: Pick<BriefControls, "startReview" | "review">,
+  current: Pick<BriefVersion, "status"> | null | undefined,
+  acceptedHere = false,
+): BriefNextStep | null {
+  if (!current) return null;
+  if (briefStatus(current) === "APPROVED_FOR_DECISION") return acceptedHere ? "SIGN" : null;
+  if (controls.startReview) return "START_REVIEW";
+  if (controls.review) return "RECORD_REVIEW";
+  return null;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // The author's narrative
 

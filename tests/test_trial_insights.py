@@ -333,12 +333,12 @@ def test_every_sample_question_is_answered_from_the_records(workspaces):
         "32 complaints leave death, serious injury and malfunction empty."
     ]
 
+    # OrbitCare's sample complaints carry PRESSURE_ALARM, the story's rising problem.
     codes = _question(result, "codes")["answer"]
     assert codes["summary"] == (
-        "No problem code rose in the last 3 months (Aug 2026 to Oct 2026): none has at least 2 complaints in those "
-        "months and more per month than before."
+        "1 problem code rose in the last 3 months (Aug 2026 to Oct 2026): PRESSURE_ALARM from 1.0 to 4.7 per month."
     )
-    assert codes["missing"] == ["29 complaints have no problem code and are not counted here."]
+    assert codes["missing"] == ["11 complaints have no problem code and are not counted here."]
 
     origin = _question(result, "origin")["answer"]
     assert origin["summary"] == "US has the most complaints (7 of 9 with a country; 3 countries in all)."

@@ -434,6 +434,21 @@ describe("triage actions", () => {
       "What is the root cause of USB port overheating?",
     );
     expect(defaultInvestigationQuestion({ title: null })).toBe("");
+    // A threshold rule's title reads as the question a quality lead asks.
+    expect(
+      defaultInvestigationQuestion({
+        title: "5 complaints: pressure alarm on OrbitCare 300 Infusion Pump (Sample) Rev B in 30 days",
+      }),
+    ).toBe("Why did pressure-alarm complaints rise on OrbitCare 300 Infusion Pump (Sample) Rev B?");
+    expect(defaultInvestigationQuestion({ title: "4 complaints: leak on Aster Pump Rev C in 7 days" })).toBe(
+      "Why did leak complaints rise on Aster Pump Rev C?",
+    );
+    expect(
+      defaultInvestigationQuestion({ title: "3 complaints: under infusion no alarm on Aster Pump Rev C in 30 days" }),
+    ).toBe("Why did complaints about under infusion no alarm rise on Aster Pump Rev C?");
+    expect(defaultInvestigationQuestion({ title: "3 complaints: unspecified problem on Aster Pump in 30 days" })).toBe(
+      "Why did complaints without a problem code rise on Aster Pump?",
+    );
     const form = {
       question: "Why do batteries drain early?",
       complaintIds: [UUID],

@@ -37,7 +37,7 @@ function RevisionCompare({ label }: { label: string }) {
     { label: "Pressure sensor", a: "PS-1", b: "PS-2 · Kestrel", changed: true },
     { label: "Inspection sample", a: "32 per lot", b: "13 per lot", changed: true },
     { label: "Lots built", a: "001–002", b: "003–006" },
-    { label: "Alarm complaints / mo", a: "0.8", b: "5.6", changed: true },
+    { label: "Alarm complaints / mo", a: "2", b: "12", changed: true },
   ];
   const rowY = (index: number) => 128 + index * 36;
   return (
@@ -248,7 +248,7 @@ function TimelineViews({ label }: { label: string }) {
  * question and get a cited, bounded answer." */
 function AskCited({ label }: { label: string }) {
   const answer = [
-    { text: "Complaints rose from 0.8 to 5.6 a month", source: "Complaint trend" },
+    { text: "Complaints rose from 2 to 12 a month", source: "Complaint trend" },
     { text: "Most are from lots 003 and 004", source: "Lot build record" },
     { text: "Both lots carry PS-2 from Kestrel", source: "CHG-014 record" },
   ];
