@@ -94,6 +94,7 @@ PLATFORM_TABLES = frozenset(
         "platform_incidents",
         "onboarding_requests",
         "trial_feedback",
+        "trial_mvp_requests",
     }
 )
 SKIPPED = SESSION_TABLES | PLATFORM_TABLES

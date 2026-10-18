@@ -28,6 +28,7 @@ import { menus, pages, postMarketResources, trialIncludes, type CapabilityIcon }
 import { DEMO_REQUESTS_OFFERED } from "./offer";
 import {
   AVAILABILITY,
+  afterTheTrial,
   capabilityStatus,
   img,
   lifecycleStages,
@@ -1411,6 +1412,22 @@ export function CompanyPage() {
             alt="Medical-device investigators connecting complaints, versions, suppliers and lots"
           />
         </Reveal>
+      </section>
+      <section className="ms-section" id="after-the-trial" aria-labelledby="after-the-trial-title">
+        <SectionHead
+          eyebrow={afterTheTrial.eyebrow}
+          title={afterTheTrial.title}
+          id="after-the-trial-title"
+          copy={afterTheTrial.copy}
+        />
+        <div className="ms-grid-4">
+          {afterTheTrial.points.map(([title, text], index) => (
+            <Reveal key={title} delay={index * 80} className="ms-card">
+              <strong>{title}</strong>
+              <p>{text}</p>
+            </Reveal>
+          ))}
+        </div>
       </section>
     </>
   );

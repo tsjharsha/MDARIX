@@ -269,6 +269,136 @@
   font-size: 13px;
 }
 
+/* After your trial (TrialGuidePage.tsx AfterYourTrial): the MVP, in the words of Next steps (trialNextSteps.ts). */
+.tg-chapter {
+  display: grid;
+  gap: 12px;
+  width: min(1120px, calc(100% - 32px));
+  box-sizing: border-box;
+  margin: 28px auto 0;
+  padding: clamp(16px, 2.4vw, 28px);
+  border: 1px solid #dbe4ec;
+  border-radius: 18px;
+  background: #ffffff;
+  scroll-margin-top: 16px;
+}
+.tg-chapter h2 {
+  margin: 0;
+  font-size: clamp(21px, 2.4vw, 26px);
+}
+.tg-chapter h3 {
+  margin: 10px 0 0;
+  font-size: 18px;
+}
+.tg-chapter p,
+.tg-chapter .tg-why {
+  margin: 0;
+}
+.tg-chapter ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+  line-height: 1.6;
+}
+.tg-changes {
+  width: 100%;
+  border: 1px solid #dbe4ec;
+  border-radius: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tg-changes th,
+.tg-changes td {
+  padding: 10px 14px;
+  font-size: 14px;
+  letter-spacing: normal;
+  text-transform: none;
+  border-top: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+.tg-changes thead th,
+.tg-changes thead td {
+  border-top: 0;
+  background: #f1f5f9;
+}
+.tg-changes tbody th {
+  width: 22%;
+}
+.tg-changes tbody td:nth-of-type(1) {
+  color: #475569;
+}
+.tg-mvp-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tg-mvp-steps li {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #dbe4ec;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.tg-mvp-steps li:last-child {
+  border-color: #99d6cf;
+  background: #f0fdfa;
+}
+.tg-mvp-steps span {
+  color: #0f766e;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tg-mvp-steps p {
+  color: #475569;
+}
+.tg-mvp-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 12px 28px;
+}
+.tg-mvp-pair > div {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .tg-changes thead {
+    display: none;
+  }
+  .tg-changes,
+  .tg-changes tbody,
+  .tg-changes tr,
+  .tg-changes th,
+  .tg-changes td {
+    display: block;
+    width: auto;
+  }
+  .tg-changes tbody th {
+    width: auto;
+    padding-bottom: 2px;
+  }
+  .tg-changes td {
+    padding-top: 2px;
+    border-top: 0;
+  }
+  .tg-changes td::before {
+    content: attr(data-label) ": ";
+    color: #183249;
+    font-weight: 600;
+  }
+}
+
 /* The pictures' motion: a pointer moves to the highlighted control, which pulses; parts appear in turn. */
 .tg-ring {
   transform-box: fill-box;
@@ -474,8 +604,16 @@
     print-color-adjust: exact;
   }
   .tg-step,
-  .tg-after {
+  .tg-after,
+  .tg-changes tr,
+  .tg-mvp-steps li,
+  .tg-mvp-pair > div {
     break-inside: avoid;
+  }
+  .tg-chapter {
+    break-before: page;
+    border-color: #cbd5e1;
+    font-size: 13px;
   }
   .tg-step {
     gap: 12px;

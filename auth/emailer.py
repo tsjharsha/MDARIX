@@ -319,6 +319,8 @@ def send_trial_reminder(recipient: str, organization: str, *, days_left: int, en
                 "To keep your workspace and its data, reply to this email and we will set up a design-partner or "
                 "paid plan with you.",
                 "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later.",
+                f"What an MVP on your real data involves is in Next steps, in your workspace: "
+                f"{company().app_url}/app/next-steps",
             ),
             button=("Open MDARIX", f"{company().app_url}/app"),
             reason="You are receiving this email because you started a free MDARIX trial.",
@@ -565,6 +567,49 @@ def send_trial_demo_request_alert(
             heading="Someone in a free trial booked a one-to-one demo. Please contact them.",
             details=tuple(details),
             paragraphs=(f"Their note: {note}",) if note else (),
+            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
+            closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
+            reason="You are receiving this email because you handle MDARIX demo requests.",
+        ),
+    )
+
+
+def send_trial_mvp_request_alert(
+    recipient: str,
+    *,
+    display_name: str,
+    email: str,
+    organization: str,
+    expectations: str,
+    scope: str = "",
+    phone: str = "",
+    contact_preference: str = "",
+    move_trial_data: bool = False,
+    days_left: int = 0,
+    updated: bool = False,
+) -> str:
+    """Tell the MDARIX team that someone in a free trial asked for an MVP conversation (or updated their request)."""
+    details = [("Name", display_name), ("Email", email), ("Organization", organization)]
+    if phone:
+        details.append(("Phone", phone))
+    if contact_preference:
+        details.append(("How and when to reach them", contact_preference))
+    details.append(("Trial data", "Move it into the MVP" if move_trial_data else "Start the MVP without it"))
+    details.append(("Days left in the trial", str(days_left)))
+    paragraphs = [f"What they expect from the MVP: {expectations}"]
+    if scope:
+        paragraphs.append(f"Products, sites and systems in mind: {scope}")
+    return _send(
+        recipient,
+        Message(
+            subject=f"MVP conversation {'request updated' if updated else 'requested'}: {organization}",
+            heading=(
+                "A free trial updated its request for an MVP conversation."
+                if updated
+                else "Someone in a free trial asked for an MVP conversation. Please reply to arrange a scoping call."
+            ),
+            details=tuple(details),
+            paragraphs=tuple(paragraphs),
             button=("Open Platform Admin", f"{company().app_url}/app/admin"),
             closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
             reason="You are receiving this email because you handle MDARIX demo requests.",

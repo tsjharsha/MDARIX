@@ -20,6 +20,7 @@ const SECTION_VIEW: Readonly<Record<string, AppView>> = {
   Records: "records",
   Intelligence: "ask",
   "Trust & Audit": "audit",
+  "Next steps": "next-steps",
 };
 
 /** A tab's name without what it carries after "?" (a request, a view): the address names the tab only. */

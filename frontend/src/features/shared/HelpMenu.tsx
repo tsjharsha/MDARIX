@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { BookOpen, Bug, CircleHelp, LifeBuoy, ListChecks, NotebookText, ShieldCheck } from "lucide-react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { BookOpen, Bug, CircleHelp, LifeBuoy, ListChecks, NotebookText, ShieldCheck, Signpost } from "lucide-react";
 import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
+import { NEXT_STEPS_SECTION, NEXT_STEPS_SUBTITLE } from "../help/trialNextSteps";
+import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
 
 /**
  * Help in every signed-in screen: getting started (during a trial), the step-by-step user guide (every screen), the
- * free trial user guide (the trial's seven steps, during a trial), the pilot guide, the support address, a
+ * free trial user guide (the trial's seven steps, during a trial), Next steps from trial to MVP (during a trial), the
+ * pilot guide, the support address, a
  * "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and privacy pages.
  * The support address comes from the server configuration (backend/app/site_info.py).
  */
@@ -15,6 +18,9 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
   const info = useSiteInfo();
+  // In a trial workspace: Next steps, from trial to MVP (UserWorkspace says whether it is a trial).
+  const workspace = useContext(WorkspaceContext);
+  const onNextSteps = workspace?.isTrial ? () => workspace.open("Next steps") : undefined;
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -75,6 +81,23 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
                   <small>The trial in 7 steps</small>
                 </span>
               </a>
+            </li>
+          )}
+          {onNextSteps && (
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onNextSteps();
+                }}
+              >
+                <Signpost size={15} aria-hidden="true" />
+                <span className="help-menu-item">
+                  {NEXT_STEPS_SECTION}
+                  <small>{NEXT_STEPS_SUBTITLE}</small>
+                </span>
+              </button>
             </li>
           )}
           <li>

@@ -17,6 +17,7 @@ export type AppView =
   | "regulatory-copilot"
   | "risk-traceability"
   | "signature-verification"
+  | "next-steps"
   | "customer-admin"
   | "admin"
   | "admin-stage2"
@@ -78,6 +79,7 @@ export const APP_ROUTES: Record<AppView, string> = {
   "regulatory-copilot": "/app/regulatory-copilot",
   "risk-traceability": "/app/risk-traceability",
   "signature-verification": "/app/signature-verification",
+  "next-steps": "/app/next-steps",
   "customer-admin": "/app/customer-admin",
   admin: "/app/admin",
   "admin-stage2": "/app/admin/stage2",

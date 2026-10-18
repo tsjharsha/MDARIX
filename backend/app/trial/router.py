@@ -610,6 +610,127 @@ def _alert_trial_demo(recipient: str, details: dict) -> None:
         logging.getLogger(__name__).warning("Trial demo request alert failed: %s", type(exc).__name__)
 
 
+# ------------------------------------------------------------------------------------------- The MVP conversation
+
+
+class TrialMvpAsk(BaseModel):
+    """A request for an MVP conversation (Next steps): what the MVP should do, what is in scope, how to reach the
+    person, and whether to move the trial data into the MVP (allowed only once the sample is removed and own data is
+    in; backend/app/trial/mvp_request.py)."""
+
+    expectations: str = Field(default="", max_length=2000)
+    scope: str | None = Field(default=None, max_length=2000)
+    phone: str | None = Field(default=None, max_length=30)
+    contact_preference: str | None = Field(default=None, max_length=200)
+    move_trial_data: bool = False
+
+
+class TrialMvpStatusChange(BaseModel):
+    status: str = Field(min_length=3, max_length=40)
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.get("/trial/mvp-request")
+def trial_mvp_request_status(
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The organization's latest MVP request, or null, and whether it may ask to move its trial data into the MVP."""
+    from backend.app.trial import mvp_request
+
+    _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {
+        "request": mvp_request.view(mvp_request.latest(db, tenant_id)),
+        "data_move": mvp_request.data_move(data, tenant_id),
+    }
+
+
+@router.post("/trial/mvp-request")
+def ask_for_an_mvp(
+    payload: TrialMvpAsk,
+    background: BackgroundTasks,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Ask for an MVP conversation from inside the trial, or update the organization's open request. The MDARIX team
+    gets it in Platform Admin (Identity & Access > Onboarding) and by email."""
+    import os
+
+    from backend.app.trial import mvp_request
+
+    subscription = _require_trial(db, ctx)
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    user = _current_user(db, ctx)
+    seconds_left = (subscription.expires_at - datetime.now(timezone.utc)).total_seconds()
+    days_left = max(0, int(-(-seconds_left // 86400)))
+    row, outcome = mvp_request.submit(
+        db,
+        data,
+        tenant_id,
+        user,
+        expectations=payload.expectations,
+        scope=payload.scope,
+        phone=payload.phone,
+        contact_preference=payload.contact_preference,
+        move_trial_data=payload.move_trial_data,
+        days_left=days_left,
+    )
+    recipient = (os.getenv("MDARIX_DEMO_ALERT_EMAIL") or os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
+    if recipient:
+        background.add_task(
+            _alert_mvp_request,
+            recipient,
+            {
+                "display_name": row.display_name,
+                "email": row.email,
+                "organization": row.organization,
+                "expectations": row.expectations,
+                "scope": row.scope or "",
+                "phone": row.phone or "",
+                "contact_preference": row.contact_preference or "",
+                "move_trial_data": row.move_trial_data,
+                "days_left": days_left,
+                "updated": outcome == "UPDATED",
+            },
+        )
+    return {"status": outcome, "request": mvp_request.view(row)}
+
+
+def _alert_mvp_request(recipient: str, details: dict) -> None:
+    """Email the MDARIX team after the response; a failure is only logged (the request is saved)."""
+    import logging
+
+    from auth.emailer import send_trial_mvp_request_alert
+
+    try:
+        send_trial_mvp_request_alert(recipient, **details)
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Trial MVP request alert failed: %s", type(exc).__name__)
+
+
+@router.get("/platform-admin/mvp-requests")
+def list_mvp_requests(request: Request, db: Session = Depends(get_db)):
+    from backend.app.trial import mvp_request
+
+    _require_platform_admin(request, db)
+    return mvp_request.overview(db)
+
+
+@router.post("/platform-admin/mvp-requests/{request_id}/status")
+def change_mvp_request_status(
+    request_id: uuid.UUID, payload: TrialMvpStatusChange, request: Request, db: Session = Depends(get_db)
+):
+    """Mark an MVP request contacted or closed (or new again), with an optional internal note."""
+    from backend.app.trial import mvp_request
+
+    admin = _require_platform_admin(request, db)
+    row = mvp_request.change_status(db, request_id, admin, payload.status, payload.note)
+    return {**(mvp_request.view(row) or {}), "note": row.note}
+
+
 # ------------------------------------------------------------------------------------------- Ending a trial early
 
 

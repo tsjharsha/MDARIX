@@ -24,10 +24,12 @@ export const WORKSPACE_SECTIONS = [
   "Import data",
   "My Account",
   "Share feedback",
+  // From trial to MVP: shown only in free-trial workspaces, to everyone in one (sections/TrialNextSteps.tsx).
+  "Next steps",
 ] as const;
 
 /** Sections that exist only in a free-trial workspace. */
-export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started"];
+export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Next steps"];
 
 export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
@@ -49,6 +51,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Import data": ["products"],
   "My Account": [],
   "Share feedback": [],
+  "Next steps": [],
 };
 
 export type SessionContext = {
@@ -128,6 +131,8 @@ export type WorkspaceApi = {
   notify: (text: string, tone?: "good" | "critical") => void;
   /** The case page reports the step it shows, for the screen's address (workspaceAddress.ts). */
   reportStep?: (tab: string) => void;
+  /** A free-trial workspace (its trial-only sections are shown; the Help menu offers Next steps). */
+  isTrial?: boolean;
 };
 
 export const WorkspaceContext = createContext<WorkspaceApi | null>(null);
