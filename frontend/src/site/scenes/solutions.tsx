@@ -524,7 +524,7 @@ function SolutionAffected({ label }: { label: string }) {
       <path d="M 197 215 C 222 215 206 140 226 140" className="sc-line sc-draw" pathLength={1} style={at(2)} />
       <path d="M 197 215 C 222 215 206 290 226 290" className="sc-link sc-draw" pathLength={1} style={at(3)} />
       <path d="M 318 140 H 457" className="sc-line sc-draw" pathLength={1} style={at(4)} />
-      <path d="M 318 290 H 581" className="sc-link sc-draw" pathLength={1} style={at(5)} opacity={0.6} />
+      <path d="M 318 290 H 591" className="sc-link sc-draw" pathLength={1} style={at(5)} opacity={0.6} />
       <Pill x={112} y={215} text="OrbitCare 300" size={17} width={170} index={1} />
       <Pill x={272} y={140} text="Rev A" size={17} width={92} index={2} />
       <Pill x={272} y={290} text="Rev B" tone="teal" size={17} width={92} index={3} />
@@ -532,8 +532,8 @@ function SolutionAffected({ label }: { label: string }) {
       {tile(457, 140, "002", "base", 1)}
       {tile(395, 290, "003", "scope", 2)}
       {tile(457, 290, "004", "scope", 3)}
-      {tile(519, 290, "005", "check", 4)}
-      {tile(581, 290, "006", "check", 5)}
+      {tile(531, 290, "005", "check", 4)}
+      {tile(591, 290, "006", "check", 5)}
       <path
         d={scope}
         pathLength={1}
@@ -546,7 +546,7 @@ function SolutionAffected({ label }: { label: string }) {
       <Txt x={426} y={350} size={16} weight={800} anchor="middle" tone="amber" className="sc-fade" offset="1.9s">
         Potential scope
       </Txt>
-      <Txt x={550} y={350} size={16} anchor="middle" tone="muted" className="sc-fade" offset="2s">
+      <Txt x={561} y={350} size={16} anchor="middle" tone="muted" className="sc-fade" offset="2s">
         To check
       </Txt>
       <Illustrative />

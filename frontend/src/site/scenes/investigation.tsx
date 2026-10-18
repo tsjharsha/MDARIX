@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { Card, Chip, Illustrative, Scene, at, fs } from "./kit";
+import { Card, Chip, Illustrative, Scene, at, fs, useTextFloor } from "./kit";
 import type { SceneComponent } from "./index";
 
 // Scenes for the investigation pictures, by picture name (see kit.tsx for the rules every scene follows).
@@ -48,7 +48,7 @@ function RevisionCompare({ label }: { label: string }) {
         <text x={18} y={29} style={px(15)} fontWeight={800}>
           OrbitCare 300 · Revisions
         </text>
-        <Chip x={498} y={23} text="Investigating Rev B" tone="teal" index={2} />
+        <Chip x={578} y={23} align="end" text="Investigating Rev B" tone="teal" index={2} />
         {/* Column heads, and the change that separates them */}
         <Chip x={colA} y={84} text="Rev A" tone="muted" width={76} index={3} />
         <Chip x={colB} y={84} text="Rev B" tone="teal" width={76} index={4} />
@@ -58,7 +58,7 @@ function RevisionCompare({ label }: { label: string }) {
         <g className="sc-fade" style={at(0, "0.8s")}>
           <path d={`M ${colB - 56} 79 L ${colB - 48} 84 L ${colB - 56} 89`} className="sc-link sc-link-amber" />
           <text
-            x={(colA + colB) / 2 - 2}
+            x={(colA + colB) / 2 - 12}
             y={72}
             textAnchor="middle"
             style={px(11)}
@@ -170,7 +170,7 @@ function TimelineViews({ label }: { label: string }) {
         <g className="sc-fade" style={at(0, "2.3s")}>
           <rect x={cursor} y={78} width={572 - cursor} height={204} fill={tint("var(--sc-blue)", 7)} />
           <path d={`M ${cursor} 80 V 292`} stroke="var(--sc-blue)" strokeWidth={2} strokeDasharray="5 5" />
-          <rect x={cursor - 70} y={53} width={140} height={26} rx={13} fill="var(--sc-panel)" stroke="var(--sc-blue)" />
+          <rect x={cursor - 80} y={53} width={160} height={26} rx={13} fill="var(--sc-panel)" stroke="var(--sc-blue)" />
           <text x={cursor} y={70} textAnchor="middle" style={px(12)} fontWeight={700} fill="var(--sc-blue)">
             Known as of wk 19
           </text>
@@ -248,11 +248,13 @@ function TimelineViews({ label }: { label: string }) {
  * question and get a cited, bounded answer." */
 function AskCited({ label }: { label: string }) {
   const answer = [
-    { text: "Complaints rose from 0.8 to 5.6 a month", end: 260, source: "Complaint trend" },
-    { text: "Most are from lots 003 and 004", end: 208, source: "Lot build records" },
-    { text: "Both lots carry PS-2 from Kestrel", end: 214, source: "CHG-014 record" },
+    { text: "Complaints rose from 0.8 to 5.6 a month", source: "Complaint trend" },
+    { text: "Most are from lots 003 and 004", source: "Lot build record" },
+    { text: "Both lots carry PS-2 from Kestrel", source: "CHG-014 record" },
   ];
   const lineY = (index: number) => 182 + index * 32;
+  // Each sentence's citation sits in one column at the end of the answer, clear of the longest sentence.
+  const cite = 348;
   return (
     <Scene label={label}>
       <Card x={24} y={24} w={592} h={338} index={0}>
@@ -260,19 +262,19 @@ function AskCited({ label }: { label: string }) {
         <text x={18} y={29} style={px(15)} fontWeight={800}>
           Ask MDARIX
         </text>
-        <Chip x={474} y={23} text="Advisory · design partners" tone="amber" index={1} />
+        <Chip x={578} y={23} align="end" text="Advisory · design partners" tone="amber" index={1} />
         {/* The question and its scope */}
         <g className="sc-rise" style={at(0, "0.3s")}>
           <rect
-            x={236}
+            x={210}
             y={62}
-            width={338}
+            width={364}
             height={38}
             rx={12}
             fill={tint("var(--sc-teal)", 10)}
             stroke="var(--sc-teal)"
           />
-          <text x={252} y={86} style={px(13)} fontWeight={600}>
+          <text x={226} y={86} style={px(13)} fontWeight={600}>
             Why did pressure alarms rise after Rev B?
           </text>
         </g>
@@ -286,7 +288,7 @@ function AskCited({ label }: { label: string }) {
           <text x={18} y={152} style={CAPS} fill="var(--sc-ink-2)">
             ANSWER
           </text>
-          <text x={404} y={152} style={CAPS} fill="var(--sc-ink-2)">
+          <text x={396} y={152} style={CAPS} fill="var(--sc-ink-2)">
             SOURCES
           </text>
         </g>
@@ -297,7 +299,7 @@ function AskCited({ label }: { label: string }) {
                 {line.text}
               </text>
               <rect
-                x={line.end}
+                x={cite}
                 y={lineY(index) - 14}
                 width={22}
                 height={18}
@@ -306,7 +308,7 @@ function AskCited({ label }: { label: string }) {
                 stroke="var(--sc-teal)"
               />
               <text
-                x={line.end + 11}
+                x={cite + 11}
                 y={lineY(index) - 1}
                 textAnchor="middle"
                 style={px(11)}
@@ -317,7 +319,7 @@ function AskCited({ label }: { label: string }) {
               </text>
             </g>
             <path
-              d={`M ${line.end + 22} ${lineY(index) - 5} C ${line.end + 70} ${lineY(index) - 5}, 360 ${lineY(index) - 5}, 404 ${lineY(index) - 5}`}
+              d={`M ${cite + 22} ${lineY(index) - 5} H 396`}
               className="sc-link sc-draw"
               pathLength={1}
               strokeWidth={1.5}
@@ -326,19 +328,19 @@ function AskCited({ label }: { label: string }) {
             />
             <g className="sc-rise" style={at(index, "1.4s")}>
               <rect
-                x={404}
+                x={396}
                 y={lineY(index) - 19}
-                width={170}
+                width={182}
                 height={28}
                 rx={8}
                 fill="var(--sc-panel)"
                 stroke="var(--sc-line)"
               />
-              <rect x={410} y={lineY(index) - 14} width={22} height={18} rx={5} fill="var(--sc-teal)" />
-              <text x={421} y={lineY(index) - 1} textAnchor="middle" style={px(11)} fontWeight={800} fill="#ffffff">
+              <rect x={402} y={lineY(index) - 14} width={22} height={18} rx={5} fill="var(--sc-teal)" />
+              <text x={413} y={lineY(index) - 1} textAnchor="middle" style={px(11)} fontWeight={800} fill="#ffffff">
                 {index + 1}
               </text>
-              <text x={442} y={lineY(index) - 1} style={px(12)} fontWeight={600}>
+              <text x={434} y={lineY(index) - 1} style={px(12)} fontWeight={600}>
                 {line.source}
               </text>
             </g>
@@ -383,19 +385,19 @@ function AskCited({ label }: { label: string }) {
  * Home, "Bring quality, regulatory, product, supplier, and manufacturing context into one review." */
 function TeamWorkspace({ label }: { label: string }) {
   const roles = [
-    { id: "QA", name: "Quality", record: "Complaint trend", color: "var(--sc-teal)", x: 100, y: 150 },
-    { id: "RA", name: "Regulatory", record: "Reportability check", color: "var(--sc-blue)", x: 100, y: 290 },
+    { id: "QA", name: "Quality", record: "Complaint trend", color: "var(--sc-teal)", x: 92, y: 150 },
+    { id: "RA", name: "Regulatory", record: "Reportability check", color: "var(--sc-blue)", x: 92, y: 290 },
     { id: "PD", name: "Product", record: "Rev B design change", color: "var(--sc-green)", x: 320, y: 58 },
-    { id: "SQ", name: "Supplier quality", record: "Kestrel PS-2 data", color: "var(--sc-amber)", x: 540, y: 150 },
-    { id: "MF", name: "Manufacturing", record: "Lots 003–004 builds", color: "var(--sc-ink-2)", x: 540, y: 290 },
+    { id: "SQ", name: "Supplier quality", record: "Kestrel PS-2 data", color: "var(--sc-amber)", x: 548, y: 150 },
+    { id: "MF", name: "Manufacturing", record: "Lots 003–004 builds", color: "var(--sc-ink-2)", x: 548, y: 290 },
   ];
-  // Where each role's link meets the workspace card (x 190–450, y 112–348).
+  // Where each role's link meets the workspace card (x 175–465, y 112–348).
   const join = (role: (typeof roles)[number]) =>
     role.x === 320
       ? `M 320 ${role.y + 22} V 112`
       : role.x < 320
-        ? `M ${role.x + 22} ${role.y} C 160 ${role.y}, 160 ${role.y < 200 ? 170 : 280}, 190 ${role.y < 200 ? 170 : 280}`
-        : `M ${role.x - 22} ${role.y} C 480 ${role.y}, 480 ${role.y < 200 ? 170 : 280}, 450 ${role.y < 200 ? 170 : 280}`;
+        ? `M ${role.x + 22} ${role.y} C 150 ${role.y}, 150 ${role.y < 200 ? 170 : 280}, 175 ${role.y < 200 ? 170 : 280}`
+        : `M ${role.x - 22} ${role.y} C 490 ${role.y}, 490 ${role.y < 200 ? 170 : 280}, 465 ${role.y < 200 ? 170 : 280}`;
   return (
     <Scene label={label}>
       {/* Links from each role into the workspace, flowing once they appear */}
@@ -405,12 +407,12 @@ function TeamWorkspace({ label }: { label: string }) {
         </g>
       ))}
       {/* The one investigation */}
-      <Card x={190} y={112} w={260} h={236} index={0}>
+      <Card x={175} y={112} w={290} h={236} index={0}>
         <text x={14} y={24} style={CAPS} fill="var(--sc-ink-2)">
-          INV-031 · PRESSURE ALARMS
+          PRESSURE ALARMS
         </text>
-        <text x={14} y={42} style={px(11)} fill="var(--sc-muted)">
-          OrbitCare 300 · Rev B
+        <text x={14} y={43} style={px(11)} fill="var(--sc-muted)">
+          INV-031 · OrbitCare 300 Rev B
         </text>
         {roles.map((role, index) => (
           <g key={`row-${role.id}`} className="sc-rise" style={at(index, "1.1s")}>
@@ -431,7 +433,7 @@ function TeamWorkspace({ label }: { label: string }) {
           </g>
         ))}
         <g className="sc-fade" style={at(0, "2s")}>
-          <path d="M 14 210 H 246" className="sc-line" strokeWidth={1} />
+          <path d="M 14 210 H 276" className="sc-line" strokeWidth={1} />
           <text x={14} y={228} style={px(11)} fill="var(--sc-muted)">
             Decision · authorized reviewer
           </text>
@@ -458,7 +460,7 @@ function TeamWorkspace({ label }: { label: string }) {
           </g>
         </g>
       ))}
-      <Chip x={546} y={52} text="Role-based access" tone="teal" index={6} />
+      <Chip x={616} y={52} align="end" text="Role-based access" tone="teal" index={6} />
       <Illustrative />
     </Scene>
   );
@@ -482,7 +484,7 @@ function EvidenceContext({ label }: { label: string }) {
       {sources.map((source, index) => (
         <path
           key={`link-${source.name}`}
-          d={`M ${source.x + 64} ${source.y} C ${source.x + 124} ${source.y}, 244 ${44 + rowY(index)}, 304 ${44 + rowY(index)}`}
+          d={`M ${source.x + 64} ${source.y} C ${source.x + 124} ${source.y}, 244 ${24 + rowY(index)}, 304 ${24 + rowY(index)}`}
           className="sc-link sc-draw"
           pathLength={1}
           strokeWidth={2.5}
@@ -503,21 +505,22 @@ function EvidenceContext({ label }: { label: string }) {
         </g>
       ))}
       {/* One authorized investigation context */}
-      <Card x={290} y={44} w={326} h={306} index={3}>
+      <Card x={290} y={24} w={326} h={340} index={3}>
         <text x={18} y={33} style={px(13, { letterSpacing: "0.06em" })} fontWeight={800} fill="var(--sc-ink-2)">
           INVESTIGATION CONTEXT
         </text>
+        {/* Who may see it: below the records, where the label has the card's width */}
         <g>
-          <rect x={212} y={14} width={102} height={28} rx={14} fill={tint("var(--sc-teal)")} stroke="var(--sc-teal)" />
+          <rect x={14} y={302} width={140} height={28} rx={14} fill={tint("var(--sc-teal)")} stroke="var(--sc-teal)" />
         </g>
         <path
-          d="M 225 33 v -7 h 12 v 7 z M 228 26 v -3 a 3 3 0 0 1 6 0 v 3"
+          d="M 29 321 v -7 h 12 v 7 z M 32 314 v -3 a 3 3 0 0 1 6 0 v 3"
           fill="none"
           stroke="var(--sc-teal)"
           strokeWidth={1.8}
           strokeLinejoin="round"
         />
-        <text x={244} y={33} style={px(12)} fontWeight={700} fill="var(--sc-teal)">
+        <text x={50} y={321} style={px(12)} fontWeight={700} fill="var(--sc-teal)">
           Authorized
         </text>
         {rows.map((row, index) => (
@@ -531,9 +534,9 @@ function EvidenceContext({ label }: { label: string }) {
               fill={tint("var(--sc-teal)", 6)}
               stroke="var(--sc-line)"
             />
-            <rect x={22} y={rowY(index) - 12} width={76} height={24} rx={12} fill={tint("var(--sc-teal)", 16)} />
+            <rect x={22} y={rowY(index) - 12} width={86} height={24} rx={12} fill={tint("var(--sc-teal)", 16)} />
             <text
-              x={60}
+              x={65}
               y={rowY(index) + 4.5}
               textAnchor="middle"
               style={px(13)}
@@ -542,7 +545,7 @@ function EvidenceContext({ label }: { label: string }) {
             >
               {sources[index].name}
             </text>
-            <text x={108} y={rowY(index) + 5} style={px(15)} fontWeight={600}>
+            <text x={118} y={rowY(index) + 5} style={px(15)} fontWeight={600}>
               {row}
             </text>
           </g>
@@ -559,10 +562,10 @@ function EvidenceContext({ label }: { label: string }) {
             stroke="var(--sc-amber)"
             strokeDasharray="5 4"
           />
-          <text x={108} y={rowY(4) + 5} style={px(15)} fontWeight={600} fill="var(--sc-ink-2)">
+          <text x={118} y={rowY(4) + 5} style={px(15)} fontWeight={600} fill="var(--sc-ink-2)">
             Lot ref missing · 2
           </text>
-          <text x={60} y={rowY(4) + 4.5} textAnchor="middle" style={px(13)} fontWeight={800} fill="var(--sc-amber)">
+          <text x={65} y={rowY(4) + 4.5} textAnchor="middle" style={px(13)} fontWeight={800} fill="var(--sc-amber)">
             Gap
           </text>
         </g>
@@ -570,7 +573,7 @@ function EvidenceContext({ label }: { label: string }) {
           <rect
             x={22}
             y={rowY(4) - 12}
-            width={76}
+            width={86}
             height={24}
             rx={12}
             fill="none"
@@ -605,7 +608,7 @@ function HypothesesCompare({ label }: { label: string }) {
         <text x={18} y={29} style={px(15)} fontWeight={800}>
           Competing hypotheses
         </text>
-        <Chip x={498} y={23} text="Status, not verdict" tone="teal" index={2} />
+        <Chip x={578} y={23} align="end" text="Status, not verdict" tone="teal" index={2} />
         {/* Column heads and the centre line */}
         <g className="sc-fade" style={at(0, "0.4s")}>
           <text x={axis - 10} y={78} textAnchor="end" style={CAPS} fill="var(--sc-red)">
@@ -734,7 +737,7 @@ function ChallengeGate({ label }: { label: string }) {
         </text>
       </Card>
       <path
-        d={`M 274 ${gate.y} H ${gate.x - 54}`}
+        d={`M 274 ${gate.y} H ${gate.x - 64}`}
         className="sc-link sc-draw"
         pathLength={1}
         strokeWidth={3}
@@ -742,7 +745,7 @@ function ChallengeGate({ label }: { label: string }) {
       />
       {/* Not yet a conclusion */}
       <g className="sc-fade" style={at(0, "2.2s")}>
-        <path d={`M ${gate.x + 54} ${gate.y} H 428`} stroke="var(--sc-muted)" strokeWidth={2.5} strokeDasharray="4 6" />
+        <path d={`M ${gate.x + 64} ${gate.y} H 428`} stroke="var(--sc-muted)" strokeWidth={2.5} strokeDasharray="4 6" />
         <path
           d={`M 421 ${gate.y - 7} L 429 ${gate.y} L 421 ${gate.y + 7}`}
           fill="none"
@@ -813,16 +816,16 @@ function ChallengeGate({ label }: { label: string }) {
       <g transform={`translate(${gate.x} ${gate.y})`}>
         <g className="sc-pop" style={at(0, "1.9s")}>
           <rect
-            x={-54}
+            x={-64}
             y={-16}
-            width={108}
+            width={128}
             height={32}
             rx={16}
             fill="var(--sc-panel)"
             stroke="var(--sc-amber)"
             strokeWidth={2}
           />
-          <rect x={-54} y={-16} width={108} height={32} rx={16} fill={tint("var(--sc-amber)", 16)} />
+          <rect x={-64} y={-16} width={128} height={32} rx={16} fill={tint("var(--sc-amber)", 16)} />
           <text textAnchor="middle" y={5} style={px(14)} fontWeight={800} fill="var(--sc-amber)">
             Challenged
           </text>
@@ -833,17 +836,45 @@ function ChallengeGate({ label }: { label: string }) {
   );
 }
 
+/** An unknown on the radar: a dashed amber pill with a "?" mark, wide enough for its label at the stage's text floor
+ * (a child of the Scene, so it can read the floor). */
+function UnknownTag({ text, index }: { text: string; index: number }) {
+  const w = text.length * Math.max(12, useTextFloor()) * 0.54 + 52;
+  return (
+    <g className="sc-pop" style={at(index, "1.4s")}>
+      <rect
+        x={-w / 2}
+        y={-13}
+        width={w}
+        height={26}
+        rx={13}
+        fill="var(--sc-panel)"
+        stroke="var(--sc-amber)"
+        strokeWidth={1.5}
+        strokeDasharray="4 4"
+      />
+      <circle cx={-w / 2 + 15} r={8} fill={tint("var(--sc-amber)", 22)} />
+      <text x={-w / 2 + 15} y={4} textAnchor="middle" style={px(11)} fontWeight={800} fill="var(--sc-amber)">
+        ?
+      </text>
+      <text x={13} y={4.5} textAnchor="middle" style={px(12)} fontWeight={600} fill="var(--sc-ink-2)">
+        {text}
+      </text>
+    </g>
+  );
+}
+
 /** Unknowns radar: around the investigation, what is established (solid) and what is not (dashed), each unknown
  * paired with the request that would close it; a faint sweep turns slowly. Platform, "See what the investigation
  * still cannot establish." */
 function UnknownsRadar({ label }: { label: string }) {
   const cx = 320;
   const cy = 200;
+  // Each link runs to its chip's centre: the chip, drawn over it, hides the rest (kit.tsx Chip is opaque).
   const known = [
-    // Each link stops at its chip's edge (end), so no line runs through a label.
-    { text: "Complaints · 42", x: 320, y: 132, end: [320, 145] },
-    { text: "CHG-014", x: 210, y: 226, end: [246, 226] },
-    { text: "Lots 003–004", x: 430, y: 226, end: [377, 226] },
+    { text: "Complaints · 42", x: 320, y: 130 },
+    { text: "CHG-014", x: 196, y: 228 },
+    { text: "Lots 003–004", x: 456, y: 228 },
   ];
   const unknowns = [
     { text: "Lot ref missing · 2", close: "Ask: complaint follow-up", x: 150, y: 100 },
@@ -878,12 +909,12 @@ function UnknownsRadar({ label }: { label: string }) {
       <text x={24} y={44} style={px(15)} fontWeight={800}>
         Unknowns radar
       </text>
-      <Chip x={546} y={40} text="4 unknowns open" tone="amber" index={8} />
+      <Chip x={616} y={40} align="end" text="4 unknowns open" tone="amber" index={8} />
       {/* What is established: solid links */}
       {known.map((item, index) => (
         <path
           key={`link-${item.text}`}
-          d={`M ${cx} ${cy} L ${item.end[0]} ${item.end[1]}`}
+          d={`M ${cx} ${cy} L ${item.x} ${item.y}`}
           className="sc-link sc-draw"
           pathLength={1}
           style={at(index, "0.4s")}
@@ -902,7 +933,7 @@ function UnknownsRadar({ label }: { label: string }) {
       ))}
       <g transform={`translate(${cx} ${cy})`}>
         <g className="sc-pop">
-          <circle r={30} fill="var(--sc-panel)" stroke="var(--sc-teal)" strokeWidth={2.5} />
+          <circle r={38} fill="var(--sc-panel)" stroke="var(--sc-teal)" strokeWidth={2.5} />
           <text textAnchor="middle" y={4} style={px(11)} fontWeight={800} fill="var(--sc-teal)">
             INV-031
           </text>
@@ -911,52 +942,24 @@ function UnknownsRadar({ label }: { label: string }) {
       {known.map((item, index) => (
         <Chip key={item.text} x={item.x} y={item.y} text={item.text} tone="teal" index={index + 3} />
       ))}
-      {unknowns.map((item, index) => {
-        const w = item.text.length * 7 + 44;
-        return (
-          <g key={item.text} transform={`translate(${item.x} ${item.y})`}>
-            <g className="sc-pop" style={at(index, "1.4s")}>
-              <rect
-                x={-w / 2}
-                y={-13}
-                width={w}
-                height={26}
-                rx={13}
-                fill="var(--sc-panel)"
-                stroke="var(--sc-amber)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-              />
-              <circle cx={-w / 2 + 15} r={8} fill={tint("var(--sc-amber)", 22)} />
-              <text x={-w / 2 + 15} y={4} textAnchor="middle" style={px(11)} fontWeight={800} fill="var(--sc-amber)">
-                ?
-              </text>
-              <text x={12} y={4.5} textAnchor="middle" style={px(12)} fontWeight={600} fill="var(--sc-ink-2)">
-                {item.text}
-              </text>
-            </g>
-            <g className="sc-fade" style={at(index, "2s")}>
-              <text
-                y={item.y < cy ? -21 : 30}
-                textAnchor="middle"
-                style={px(11)}
-                fontWeight={700}
-                fill="var(--sc-teal)"
-              >
-                {item.close}
-              </text>
-            </g>
+      {unknowns.map((item, index) => (
+        <g key={item.text} transform={`translate(${item.x} ${item.y})`}>
+          <UnknownTag text={item.text} index={index} />
+          <g className="sc-fade" style={at(index, "2s")}>
+            <text y={item.y < cy ? -21 : 30} textAnchor="middle" style={px(11)} fontWeight={700} fill="var(--sc-teal)">
+              {item.close}
+            </text>
           </g>
-        );
-      })}
+        </g>
+      ))}
       {/* Legend */}
       <g className="sc-fade" style={at(0, "2.4s")}>
         <circle cx={30} cy={380} r={5} fill="var(--sc-teal)" />
         <text x={41} y={384} style={px(11)} fill="var(--sc-ink-2)">
           Established
         </text>
-        <circle cx={128} cy={380} r={5} fill="none" stroke="var(--sc-amber)" strokeWidth={1.5} strokeDasharray="2 2" />
-        <text x={139} y={384} style={px(11)} fill="var(--sc-ink-2)">
+        <circle cx={150} cy={380} r={5} fill="none" stroke="var(--sc-amber)" strokeWidth={1.5} strokeDasharray="2 2" />
+        <text x={161} y={384} style={px(11)} fill="var(--sc-ink-2)">
           Not established
         </text>
       </g>
@@ -982,7 +985,8 @@ function FailureChain({ label }: { label: string }) {
     { status: "Partly supported", source: "Inspection · 2 of 13 high", strength: 2, color: "var(--sc-amber)" },
     { status: "Not yet supported", source: "Need: returned-device analysis", strength: 0, color: "var(--sc-red)" },
   ];
-  const top = (index: number) => 40 + index * 70;
+  // Each step is a two-line card (its kind above its value), so a long kind never runs into the value.
+  const top = (index: number) => 26 + index * 72;
   const step = 0.45;
   return (
     <Scene label={label}>
@@ -993,7 +997,7 @@ function FailureChain({ label }: { label: string }) {
       </g>
       {/* The links: connector, leader and evidence strength */}
       {links.map((link, index) => {
-        const y = top(index) + 55;
+        const y = top(index) + 61;
         const open = link.strength === 0;
         return (
           <g key={link.source}>
@@ -1038,7 +1042,7 @@ function FailureChain({ label }: { label: string }) {
         );
       })}
       {/* The unsupported link's open question */}
-      <g transform={`translate(52 ${top(3) + 55})`}>
+      <g transform={`translate(52 ${top(3) + 61})`}>
         <g className="sc-pop" style={at(0, `${0.6 + 3 * step}s`)}>
           <circle r={10} fill="var(--sc-panel)" stroke="var(--sc-red)" strokeWidth={2} />
           <text textAnchor="middle" y={4} style={px(12)} fontWeight={800} fill="var(--sc-red)">
@@ -1048,7 +1052,7 @@ function FailureChain({ label }: { label: string }) {
       </g>
       <circle
         cx={52}
-        cy={top(3) + 55}
+        cy={top(3) + 61}
         r={10}
         fill="none"
         stroke="var(--sc-red)"
@@ -1057,21 +1061,21 @@ function FailureChain({ label }: { label: string }) {
       />
       {/* The chain's steps, top to bottom */}
       {nodes.map((node, index) => (
-        <Card key={node.kind} x={24} y={top(index)} w={270} h={40} index={index * 3}>
+        <Card key={node.kind} x={24} y={top(index)} w={270} h={50} index={index * 3}>
           <g>
             <rect
               x={0}
               y={10}
               width={5}
-              height={20}
+              height={30}
               rx={2.5}
               fill={index === 4 ? "var(--sc-amber)" : index === 3 ? "var(--sc-ink-2)" : "var(--sc-teal)"}
             />
           </g>
-          <text x={18} y={25} style={CAPS} fill="var(--sc-muted)">
+          <text x={18} y={21} style={CAPS} fill="var(--sc-muted)">
             {node.kind}
           </text>
-          <text x={134} y={25} style={px(14)} fontWeight={800}>
+          <text x={18} y={40} style={px(14)} fontWeight={800}>
             {node.value}
           </text>
         </Card>

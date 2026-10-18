@@ -1,4 +1,4 @@
-import { Card, Chip, Illustrative, Scene, at } from "./kit";
+import { Card, Chip, ChipRow, Illustrative, Scene, at, fs } from "./kit";
 import type { SceneComponent } from "./index";
 
 // Scenes for the home, trust, resources and company pictures, by picture name (see kit.tsx for the rules every scene follows).
@@ -78,7 +78,7 @@ function DeviceAssembly({ label }: { label: string }) {
         </g>
       ))}
       <g className="sc-fade" style={at(0, "0.5s")}>
-        <text x={320} y={296} textAnchor="middle" fontSize={14} fontWeight={800}>
+        <text x={320} y={296} textAnchor="middle" style={{ fontSize: fs(14) }} fontWeight={800}>
           OrbitCare 300
         </text>
       </g>
@@ -86,11 +86,11 @@ function DeviceAssembly({ label }: { label: string }) {
       <Card x={24} y={36} w={196} h={104} title="Versions" index={6}>
         <path d="M 22 46 V 70" className="sc-line" strokeWidth={1.5} />
         <circle cx={22} cy={46} r={5} fill="var(--sc-line)" />
-        <text x={36} y={50} fontSize={13} fill="var(--sc-muted)">
+        <text x={36} y={50} style={{ fontSize: fs(13) }} fill="var(--sc-muted)">
           Rev A · 2025
         </text>
         <circle cx={22} cy={72} r={5} fill="var(--sc-teal)" />
-        <text x={36} y={76} fontSize={13} fontWeight={800} fill="var(--sc-teal)">
+        <text x={36} y={76} style={{ fontSize: fs(13) }} fontWeight={800} fill="var(--sc-teal)">
           Rev B · 2026
         </text>
         <text x={14} y={94} className="sc-note">
@@ -100,13 +100,13 @@ function DeviceAssembly({ label }: { label: string }) {
       {/* Components */}
       <Card x={420} y={36} w={196} h={104} title="Components" index={7}>
         {[
-          ["Pressure sensor PS-2", "var(--sc-amber)"],
+          ["Sensor PS-2", "var(--sc-amber)"],
           ["Main board", "var(--sc-ink-2)"],
           ["Housing", "var(--sc-ink-2)"],
         ].map(([text, tone], index) => (
           <g key={text}>
             <circle cx={20} cy={46 + index * 20} r={3.5} fill={tone} />
-            <text x={30} y={50 + index * 20} fontSize={12} fontWeight={index === 0 ? 800 : 500}>
+            <text x={30} y={50 + index * 20} style={{ fontSize: fs(12) }} fontWeight={index === 0 ? 800 : 500}>
               {text}
             </text>
           </g>
@@ -114,7 +114,7 @@ function DeviceAssembly({ label }: { label: string }) {
       </Card>
       {/* Supplier */}
       <Card x={24} y={256} w={196} h={104} title="Supplier" index={8}>
-        <text x={14} y={52} fontSize={13} fontWeight={800}>
+        <text x={14} y={52} style={{ fontSize: fs(13) }} fontWeight={800}>
           Kestrel Sensors
         </text>
         <text x={14} y={70} className="sc-note">
@@ -142,13 +142,13 @@ function DeviceAssembly({ label }: { label: string }) {
                   strokeWidth={1.5}
                 />
               </g>
-              <text x={27 + index * 28} y={72} fontSize={11} textAnchor="middle" fill="var(--sc-ink-2)">
+              <text x={27 + index * 28} y={72} style={{ fontSize: fs(11) }} textAnchor="middle" fill="var(--sc-ink-2)">
                 {lot}
               </text>
             </g>
           );
         })}
-        <text x={14} y={92} fontSize={11} fontWeight={700} fill="var(--sc-amber)">
+        <text x={14} y={92} style={{ fontSize: fs(11) }} fontWeight={700} fill="var(--sc-amber)">
           003–004 · new sensor
         </text>
       </Card>
@@ -185,7 +185,7 @@ function SignalFromNoise({ label }: { label: string }) {
   };
   return (
     <Scene label={label} tone="dark">
-      <text x={50} y={50} fontSize={14} fontWeight={800}>
+      <text x={50} y={50} style={{ fontSize: fs(14) }} fontWeight={800}>
         Pressure-alarm complaints
       </text>
       <text x={50} y={68} className="sc-note">
@@ -224,7 +224,7 @@ function SignalFromNoise({ label }: { label: string }) {
           strokeDasharray="6 5"
           opacity={0.8}
         />
-        <text x={58} y={py(threshold) - 8} fontSize={11} fontWeight={700} fill="var(--sc-amber)">
+        <text x={58} y={py(threshold) - 8} style={{ fontSize: fs(11) }} fontWeight={700} fill="var(--sc-amber)">
           Review threshold
         </text>
       </g>
@@ -254,7 +254,7 @@ function SignalFromNoise({ label }: { label: string }) {
       </g>
       <Chip x={px(cross)} y={104} width={126} text="Signal raised" tone="amber" index={16} />
       <g className="sc-fade" style={at(0, "2.6s")}>
-        <text x={50} y={370} fontSize={12} fontWeight={700} fill="var(--sc-teal)">
+        <text x={50} y={370} style={{ fontSize: fs(12) }} fontWeight={700} fill="var(--sc-teal)">
           ● Reviewed by people → investigation opened
         </text>
       </g>
@@ -267,21 +267,21 @@ function SignalFromNoise({ label }: { label: string }) {
  * device, with human oversight at the centre. A topic picture for "AI lifecycle monitoring", not a product claim. */
 function AiLifecycleGoverned({ label }: { label: string }) {
   const stages = [
-    { title: "Validate", note: "Pre-set acceptance criteria", x: 320, y: 70 },
-    { title: "Monitor", note: "Real-world performance", x: 500, y: 265 },
-    { title: "Change control", note: "Planned change · re-test", x: 140, y: 265 },
+    { title: "Validate", note: "Pre-set acceptance criteria", x: 320, y: 72, w: 236 },
+    { title: "Monitor", note: "Real-world performance", x: 502, y: 265, w: 210 },
+    { title: "Change control", note: "Planned change · re-test", x: 138, y: 265, w: 210 },
   ];
-  // Arcs between the stages (Q curves), each with an arrowhead turned to the curve's end direction.
+  // Arcs between the stages' edges (Q curves), each with an arrowhead turned to the curve's end direction.
   const arcs = [
-    { d: "M 410 82 Q 480 120 486 228", end: [486, 228], angle: 87 },
-    { d: "M 440 302 Q 320 362 200 302", end: [200, 302], angle: 207 },
-    { d: "M 150 228 Q 150 120 228 82", end: [228, 82], angle: -26 },
+    { d: "M 442 84 Q 502 100 502 224", end: [502, 224], angle: 90 },
+    { d: "M 440 304 Q 320 362 200 304", end: [200, 304], angle: 206 },
+    { d: "M 138 226 Q 138 84 196 84", end: [196, 84], angle: 0 },
   ];
   return (
     <Scene label={label}>
       {/* A slow dashed ring of oversight round the device */}
       <g className="sc-orbit">
-        <circle cx={320} cy={200} r={66} className="sc-line" strokeDasharray="3 7" />
+        <circle cx={320} cy={200} r={60} className="sc-line" strokeDasharray="3 7" />
       </g>
       {arcs.map((arc, index) => (
         <path
@@ -310,28 +310,33 @@ function AiLifecycleGoverned({ label }: { label: string }) {
       {/* The device at the centre */}
       <g transform="translate(320 200)">
         <g className="sc-pop">
-          <circle r={46} fill="var(--sc-panel)" stroke="var(--sc-teal)" strokeWidth={2.5} />
-          <text y={-2} fontSize={12} fontWeight={800} textAnchor="middle">
+          <circle r={48} fill="var(--sc-panel)" stroke="var(--sc-teal)" strokeWidth={2.5} />
+          <text y={-2} style={{ fontSize: fs(12) }} fontWeight={800} textAnchor="middle">
             AI-enabled
           </text>
-          <text y={14} fontSize={12} fontWeight={800} textAnchor="middle">
+          <text y={16} style={{ fontSize: fs(12) }} fontWeight={800} textAnchor="middle">
             device
           </text>
         </g>
       </g>
-      <Chip x={320} y={290} width={136} text="Human oversight" tone="teal" index={14} />
+      {/* The oversight, named under the ring (between the two lower stages, where a chip would not fit) */}
+      <g className="sc-fade" style={at(0, "2s")}>
+        <text x={320} y={284} textAnchor="middle" style={{ fontSize: fs(13) }} fontWeight={800} fill="var(--sc-teal)">
+          Human oversight
+        </text>
+      </g>
       {/* The three stages */}
       {stages.map((stage, index) => (
-        <Card key={stage.title} x={stage.x - 88} y={stage.y - 35} w={176} h={70} index={index * 3 + 1}>
-          <text x={14} y={28} fontSize={14} fontWeight={800}>
+        <Card key={stage.title} x={stage.x - stage.w / 2} y={stage.y - 35} w={stage.w} h={70} index={index * 3 + 1}>
+          <text x={14} y={28} style={{ fontSize: fs(14) }} fontWeight={800}>
             {stage.title}
           </text>
-          <text x={14} y={48} className="sc-note">
+          <text x={14} y={50} className="sc-note">
             {stage.note}
           </text>
           {stage.title === "Monitor" && (
             <path
-              d="M 112 26 L 122 20 L 132 24 L 142 16 L 152 22 L 162 14"
+              d="M 130 26 L 140 20 L 150 24 L 160 16 L 170 22 L 180 14"
               fill="none"
               stroke="var(--sc-teal)"
               strokeWidth={2}
@@ -354,7 +359,7 @@ function AiLifecycleGoverned({ label }: { label: string }) {
  * crossing them and the days left on each (illustrative counts), each tied to its source text. "Regulatory
  * intelligence". */
 function ReportingClocks({ label }: { label: string }) {
-  const day = 12; // pixels per day on the track
+  const day = 11; // pixels per day on the track
   const x0 = 110;
   const today = 11;
   const clocks = [
@@ -366,36 +371,36 @@ function ReportingClocks({ label }: { label: string }) {
   return (
     <Scene label={label}>
       <Card x={24} y={32} w={592} h={336} index={0}>
-        <text x={18} y={30} fontSize={15} fontWeight={800}>
+        <text x={18} y={28} style={{ fontSize: fs(15) }} fontWeight={800}>
           Reporting windows
         </text>
-        <text x={172} y={30} className="sc-note">
-          counted from the awareness date
+        <text x={18} y={48} className="sc-note">
+          Counted from the awareness date
         </text>
         {/* The day axis */}
-        <text x={x0} y={64} className="sc-note">
+        <text x={x0} y={76} className="sc-note">
           Day 0 · aware
         </text>
-        <text x={x0 + 15 * day} y={64} className="sc-note" textAnchor="middle">
+        <text x={x0 + 15 * day} y={76} className="sc-note" textAnchor="middle">
           Day 15
         </text>
-        <text x={x0 + 30 * day} y={64} className="sc-note" textAnchor="end">
+        <text x={x0 + 30 * day} y={76} className="sc-note" textAnchor="end">
           Day 30
         </text>
-        <g transform={`translate(${x0} 76)`}>
+        <g transform={`translate(${x0} 88)`}>
           <g className="sc-pop" style={at(0, "0.3s")}>
             <path d="M 0 -6 L 6 0 L 0 6 L -6 0 Z" fill="var(--sc-amber)" />
           </g>
         </g>
         {clocks.map((clock, index) => {
-          const y = 100 + index * 50;
+          const y = 112 + index * 46;
           const left = clock.days - today;
           const urgent = left <= 5;
           const tone = urgent ? "var(--sc-amber)" : "var(--sc-teal)";
           return (
             <g key={clock.name}>
               <g className="sc-rise" style={at(index, "0.3s")}>
-                <text x={18} y={y + 5} fontSize={13} fontWeight={800}>
+                <text x={18} y={y + 5} style={{ fontSize: fs(13) }} fontWeight={800}>
                   {clock.name}
                 </text>
                 <rect x={x0} y={y - 7} width={30 * day} height={14} rx={7} fill="var(--sc-line)" opacity={0.5} />
@@ -413,9 +418,10 @@ function ReportingClocks({ label }: { label: string }) {
               />
               <g className="sc-fade" style={at(index, "1.6s")}>
                 <text
-                  x={490}
+                  x={576}
                   y={y + 4.5}
-                  fontSize={12}
+                  textAnchor="end"
+                  style={{ fontSize: fs(12) }}
                   fontWeight={700}
                   fill={urgent ? "var(--sc-amber)" : "var(--sc-ink-2)"}
                 >
@@ -424,7 +430,7 @@ function ReportingClocks({ label }: { label: string }) {
               </g>
               {urgent && (
                 <g className="sc-fade" style={at(index, "1.6s")}>
-                  <circle cx={576} cy={y} r={4} fill="var(--sc-amber)" className="sc-pulse" />
+                  <circle cx={x0 + 30 * day + 12} cy={y} r={4} fill="var(--sc-amber)" className="sc-pulse" />
                 </g>
               )}
             </g>
@@ -432,20 +438,33 @@ function ReportingClocks({ label }: { label: string }) {
         })}
         {/* Today */}
         <path
-          d={`M ${x0 + today * day} 82 V 268`}
+          d={`M ${x0 + today * day} 94 V 264`}
           className="sc-link sc-draw"
           pathLength={1}
           strokeWidth={2}
           style={at(0, "1.4s")}
         />
         <g className="sc-fade" style={at(0, "1.8s")}>
-          <text x={x0 + today * day} y={284} fontSize={11} fontWeight={700} textAnchor="middle" fill="var(--sc-teal)">
+          <text
+            x={x0 + today * day}
+            y={282}
+            style={{ fontSize: fs(11) }}
+            fontWeight={700}
+            textAnchor="middle"
+            fill="var(--sc-teal)"
+          >
             Today · day {today}
           </text>
         </g>
         <path d="M 14 298 H 578" className="sc-line" strokeWidth={1} />
-        <Chip x={14 + 112} y={320} width={224} text="Source linked: regulator text" tone="teal" index={16} />
-        <Chip x={252 + 80} y={320} width={160} text="Check current text" tone="muted" index={18} />
+        <ChipRow
+          x={14}
+          y={320}
+          chips={[
+            { text: "Source linked: regulator text", tone: "teal", index: 16 },
+            { text: "Check current text", tone: "muted", index: 18 },
+          ]}
+        />
       </Card>
       <Illustrative x={616} y={388} />
     </Scene>

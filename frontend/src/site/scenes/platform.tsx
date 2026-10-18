@@ -1,4 +1,4 @@
-import { Card, Chip, Illustrative, Scene, at } from "./kit";
+import { Card, Chip, Illustrative, Scene, at, fs } from "./kit";
 import type { SceneComponent } from "./index";
 
 // Scenes for the Platform page pictures, by picture name (see kit.tsx for the rules every scene follows).
@@ -58,12 +58,22 @@ function ProductRealityGraph({ label }: { label: string }) {
           <circle r={46} fill="#13344a" stroke="var(--sc-teal)" strokeWidth={3} />
           <rect x={-17} y={-24} width={34} height={30} rx={6} fill="none" stroke="var(--sc-teal)" strokeWidth={2.5} />
           <path d="M -11 -10 l 5 0 l 3 -6 l 4 12 l 3 -6 l 7 0" fill="none" stroke="var(--sc-teal)" strokeWidth={2} />
-          <text textAnchor="middle" y={24} fontSize={10} fontWeight={800} fill="var(--sc-teal)">
+          <text textAnchor="middle" y={24} style={{ fontSize: fs(10) }} fontWeight={800} fill="var(--sc-teal)">
             REV B
           </text>
         </g>
         <g className="sc-fade" style={at(0, "0.4s")}>
-          <text textAnchor="middle" y={68} fontSize={12} fontWeight={800}>
+          {/* A halo in the stage colour keeps the name readable where the traced line crosses it */}
+          <text
+            textAnchor="middle"
+            y={68}
+            style={{ fontSize: fs(12) }}
+            fontWeight={800}
+            stroke="var(--sc-solid)"
+            strokeWidth={5}
+            strokeLinejoin="round"
+            paintOrder="stroke"
+          >
             OrbitCare 300
           </text>
         </g>
@@ -80,7 +90,7 @@ function ProductRealityGraph({ label }: { label: string }) {
         />
       ))}
       <g className="sc-fade" style={at(0, "2.6s")}>
-        <text x={20} y={384} fontSize={12} fill="var(--sc-amber)" fontWeight={700}>
+        <text x={20} y={384} style={{ fontSize: fs(12) }} fill="var(--sc-amber)" fontWeight={700}>
           ● Traced: complaints → supplier change → lots 003–004
         </text>
       </g>
@@ -110,10 +120,10 @@ function Product360({ label }: { label: string }) {
       <Card x={24} y={22} w={592} h={356} index={0}>
         {/* Record header */}
         <rect x={0} y={0} width={592} height={46} rx={12} fill="color-mix(in srgb, var(--sc-teal) 9%, transparent)" />
-        <text x={18} y={29} fontSize={15} fontWeight={800}>
+        <text x={18} y={29} style={{ fontSize: fs(15) }} fontWeight={800}>
           Product 360 · OrbitCare 300
         </text>
-        <Chip x={520} y={23} text="Rev B in focus" tone="teal" width={120} index={2} />
+        <Chip x={578} y={23} align="end" text="Rev B in focus" tone="teal" index={2} />
         {/* Tree */}
         {tree.map((row, index) => (
           <g key={row.text} className="sc-rise" style={at(index, "0.4s")}>
@@ -141,7 +151,7 @@ function Product360({ label }: { label: string }) {
             <text
               x={52 + row.depth * 22}
               y={82 + index * 40}
-              fontSize={13}
+              style={{ fontSize: fs(13) }}
               fontWeight={row.depth === 0 ? 800 : 500}
               fill={row.tone === "muted" ? "var(--sc-muted)" : "var(--sc-ink)"}
             >
@@ -157,7 +167,7 @@ function Product360({ label }: { label: string }) {
               <text x={14} y={24} className="sc-card-title">
                 {stat.title}
               </text>
-              <text x={14} y={56} fontSize={26} fontWeight={800}>
+              <text x={14} y={56} style={{ fontSize: fs(26) }} fontWeight={800}>
                 {stat.value}
               </text>
               <rect x={80} y={46} width={136} height={8} rx={4} fill="var(--sc-line)" opacity={0.6} />
