@@ -10,6 +10,16 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.30] - 2026-10-19
+
+### Fixed
+
+- The red confirm button in confirmation dialogs was invisible in the user workspace (white text on no background):
+  for example **Remove from trial** when a trial owner removes a colleague, and every other confirmation that removes,
+  withdraws or cancels something. The button was there and worked, but could not be seen. Its colour is now defined for
+  every console (user workspace, platform administration and customer administration), not only the customer
+  console, and a test keeps it that way.
+
 ## [0.10.29] - 2026-10-19
 
 ### Fixed
