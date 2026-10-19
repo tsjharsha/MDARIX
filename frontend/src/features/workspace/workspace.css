@@ -2139,6 +2139,32 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+/* Where an AI step's button would be while AI cannot run: the reason and the step done by hand. */
+.ai-off-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--ac-muted);
+  font-size: 0.92rem;
+}
+.ai-off-chip {
+  align-self: center;
+  padding: 4px 10px;
+  border: 1px solid var(--ac-line);
+  border-radius: 999px;
+  color: var(--ac-muted);
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+.assurance-details summary {
+  cursor: pointer;
+  list-style: revert;
+}
+.assurance-details ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
 
 /* The structured Ask answer. */
 .ask-structured .ask-section h4 {

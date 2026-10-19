@@ -62,6 +62,15 @@ UNKNOWN_CLOSED_STATUSES = frozenset({"resolved", "accepted_limitation", "not_app
 NAMED_MAX = 5
 # A signed decision (approved or rejected by signature).
 SIGNED_DECISION_STATUSES = frozenset({"APPROVED", "REJECTED"})
+# Where a case's latest Decision Brief stands (backend/app/decision_brief/rules.py STATUS_LABELS), as the step says it.
+DECISION_BRIEF_STATES = {
+    "DRAFT": "being written",
+    "READY_FOR_REVIEW": "waits for its quality review",
+    "UNDER_REVIEW": "under quality review",
+    "RETURNED": "returned to the author",
+    "APPROVED_FOR_DECISION": "approved for decision",
+    "SUPERSEDED": "replaced by a newer version",
+}
 
 
 # ------------------------------------------------------------------------------------------------- pure rules
@@ -290,6 +299,23 @@ def evaluate(facts: dict) -> dict:
     if brief is None:
         steps["brief"] = _step("brief", labels["brief"], "NOT_STARTED", UNREADABLE)
         checks["brief_ready"] = _check("brief_ready", check_labels["brief_ready"], "PENDING", UNREADABLE)
+    elif brief.get("decision_brief"):
+        # A Decision Brief (written, reviewed and approved in the case) is the case's brief.
+        version, status = brief["decision_brief"]["version"], str(brief["decision_brief"]["status"] or "")
+        steps["brief"] = _step(
+            "brief",
+            labels["brief"],
+            "DONE" if status != "DRAFT" else "IN_PROGRESS",
+            f"Decision Brief version {version}: {DECISION_BRIEF_STATES.get(status, status.replace('_', ' ').lower())}",
+        )
+        checks["brief_ready"] = _check(
+            "brief_ready",
+            check_labels["brief_ready"],
+            "PASS" if status == "APPROVED_FOR_DECISION" else "PENDING",
+            f"Decision Brief version {version} is approved for decision"
+            if status == "APPROVED_FOR_DECISION"
+            else f"Decision Brief version {version}: {DECISION_BRIEF_STATES.get(status, 'in progress')}",
+        )
     else:
         latest = brief.get("latest_version")
         steps["brief"] = _step(
@@ -554,16 +580,27 @@ def _contradictions_fact(db: Session, case) -> dict:
 
 
 def _brief_fact(db: Session, case) -> dict:
+    """The case's latest generated brief version and its latest Decision Brief version with its status (None)."""
     from sqlalchemy import func
 
     from backend.app.db.models.foundation import InvestigationBrief
+    from backend.app.db.models.reviews import DecisionBriefVersion
 
     latest = (
         db.query(func.max(InvestigationBrief.brief_version))
         .filter(InvestigationBrief.tenant_id == case.tenant_id, InvestigationBrief.investigation_id == case.id)
         .scalar()
     )
-    return {"latest_version": int(latest) if latest else None}
+    written = (
+        db.query(DecisionBriefVersion.version, DecisionBriefVersion.status)
+        .filter(DecisionBriefVersion.tenant_id == case.tenant_id, DecisionBriefVersion.investigation_id == case.id)
+        .order_by(DecisionBriefVersion.version.desc())
+        .first()
+    )
+    return {
+        "latest_version": int(latest) if latest else None,
+        "decision_brief": {"version": written.version, "status": written.status} if written else None,
+    }
 
 
 def _decision_fact(db: Session, case) -> dict:

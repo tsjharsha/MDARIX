@@ -82,9 +82,16 @@ export function loopFromStory(story: TrialStory | null | undefined): LoopStation
   }));
 }
 
-/** The story's headline: the next chapter to try, or the loop closed. */
-export function storyHeadline(story: TrialStory | null | undefined): { title: string; detail: string } {
-  if (!story) return { title: "Reading your trial's records…", detail: "" };
+/** What the headline says when the story could not be read (a failed or timed-out request). */
+export const STORY_FAILED = {
+  title: "Your trial's story could not be loaded",
+  detail:
+    "Your records are safe; the connection or the server did not answer in time. Try again, or carry on in Investigations, where the sample case is.",
+};
+
+/** The story's headline: the next chapter to try, or the loop closed; ``failed`` when the story could not be read. */
+export function storyHeadline(story: TrialStory | null | undefined, failed = false): { title: string; detail: string } {
+  if (!story) return failed ? STORY_FAILED : { title: "Reading your trial's records…", detail: "" };
   const next = story.chapters.find((chapter) => chapter.code === story.next);
   if (!next)
     return {

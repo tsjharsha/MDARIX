@@ -171,3 +171,87 @@ def test_a_workbook_with_macros_or_too_large_is_not_read(monkeypatch):
 def test_custom_date_formats_are_recognized_and_times_alone_are_not():
     assert xlsx._date_format("dd/mm/yyyy") and xlsx._date_format('d "of" mmm yy') and xlsx._date_format("mmm-yy")
     assert not xlsx._date_format("h:mm:ss") and not xlsx._date_format("#,##0.00") and not xlsx._date_format("General")
+
+
+# ------------------------------------------------------------------------------------- oversized workbooks (SEC-02)
+
+
+def _bomb(megabytes: int, unit: bytes = b"<c/>", *, rows_wrapped: bool = False) -> bytes:
+    """A workbook of a few kilobytes whose sheet unpacks to ``megabytes`` of tiny elements (a "zip bomb")."""
+    main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    head = f'<?xml version="1.0"?><worksheet xmlns="{main}"><sheetData>'.encode()
+    tail = b"</sheetData></worksheet>"
+    if rows_wrapped:
+        unit = b"<row>" + unit + b"</row>"
+    count = (megabytes * 1024 * 1024 - len(head) - len(tail)) // len(unit)
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        archive.writestr(
+            "xl/workbook.xml",
+            f'<workbook xmlns="{main}" xmlns:r="{rel}"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>',
+        )
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Target="worksheets/sheet1.xml" Type="x"/></Relationships>',
+        )
+        with archive.open("xl/worksheets/sheet1.xml", "w") as part:
+            part.write(head)
+            chunk = unit * 100_000
+            for _ in range(count // 100_000):
+                part.write(chunk)
+            part.write(unit * (count % 100_000))
+            part.write(tail)
+    return out.getvalue()
+
+
+def _peak_megabytes(action) -> float:
+    import tracemalloc
+
+    tracemalloc.start()
+    try:
+        action()
+    finally:
+        _current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+    return peak / (1024 * 1024)
+
+
+def test_a_small_workbook_that_unpacks_to_60_mb_is_refused_before_it_is_unpacked():
+    raw = _bomb(59)
+    assert len(raw) < 200_000  # the review's bomb was 60 KB
+    report = imports._Report()
+    peak = _peak_megabytes(lambda: imports._parse("complaints", raw, report, imports.TRIAL_POLICY))
+    assert "too large" in report.issues[0]["message"] and "CSV UTF-8" in report.issues[0]["message"]
+    assert peak < 20, peak
+
+
+def test_a_bomb_past_the_size_checks_is_read_as_a_stream_and_stopped(monkeypatch):
+    # With the size and ratio checks relaxed, the sheet is still read as a stream and refused at the element cap, so
+    # memory stays small (the whole tree of this sheet would take several hundred megabytes).
+    monkeypatch.setattr(xlsx, "MAX_COMPRESSION_RATIO", 10**9)
+    monkeypatch.setattr(xlsx, "MAX_UNCOMPRESSED_BYTES", 10**9)
+    raw = _bomb(2)
+
+    def read():
+        with pytest.raises(xlsx.XlsxError, match="too large"):
+            xlsx.read_rows(raw, max_rows=50)
+
+    assert _peak_megabytes(read) < 20
+    # One cell holding thousands of elements is refused too.
+    one_cell = _bomb(1, b'<c t="inlineStr"><is>' + b"<r/>" * 2000 + b"</is></c>", rows_wrapped=True)
+    with pytest.raises(xlsx.XlsxError, match="too large"):
+        xlsx.read_rows(one_cell, max_rows=5000)
+
+
+def test_reading_stops_soon_after_the_row_limit_with_a_clear_message():
+    header = [["Complaint Number", "Product Code", "Complaint Description"]]
+    just_over = _workbook(header + [[f"C-{n}", "P-9", "Alarm"] for n in range(5050)])
+    assert len(xlsx.read_rows(just_over, max_rows=5000)) == 5051  # within the margin: read, and counted later
+    far_over = _workbook(header + [[f"C-{n}", "P-9", "Alarm"] for n in range(5200)])
+    with pytest.raises(xlsx.XlsxError, match="more than 5,000 rows"):
+        xlsx.read_rows(far_over, max_rows=5000)
+    report = imports._Report()
+    assert imports._parse("complaints", far_over, report, imports.TRIAL_POLICY) == []
+    assert "Split it into smaller files" in report.issues[0]["message"]

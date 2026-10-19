@@ -52,7 +52,20 @@ LIMITS: dict[str, Limit] = {
     "feedback:user": Limit(10, 86400),
     # Browser error reports are unauthenticated: a page in an error loop must not fill the table.
     "client-errors:ip": Limit(30, 300),
+    # Invitation emails a free trial sends to addresses its owner types (backend/app/trial/team.py): they protect
+    # MDARIX's sender reputation, on which every customer's activation and password emails depend.
+    "invite:user": Limit(10, 86400),
+    "invite:org": Limit(10, 86400),
+    "invite-resend:address": Limit(3, 3600),
+    "invite-resend:org": Limit(10, 86400),
+    "team-remove:org": Limit(10, 86400),
 }
+
+# What a person is told when an invitation limit stops them (the generic sentence fits sign-in, not invitations).
+INVITATION_LIMIT_MESSAGE = (
+    "You have sent as many invitations as MDARIX allows for now ({limit} per {window}). This protects the emails "
+    "every customer relies on. Please try again later, or write to support if you need more."
+)
 
 
 # Scopes that protect authentication. When the counter store is down, these refuse (503) in staging and production
@@ -101,16 +114,35 @@ def _key_hash(scope: str, key: str) -> str:
     return hashlib.sha256(f"{salt}:{scope}:{key.strip().lower()}".encode()).hexdigest()
 
 
-def _too_many(retry_after: int) -> HTTPException:
+def _too_many(retry_after: int, message: str | None = None) -> HTTPException:
     return HTTPException(
         429,
-        detail={"code": "RATE_LIMITED", "message": "Too many attempts. Please wait a few minutes and try again."},
+        detail={
+            "code": "RATE_LIMITED",
+            "message": message or "Too many attempts. Please wait a few minutes and try again.",
+            "retry_after_seconds": max(1, retry_after),
+        },
         headers={"Retry-After": str(max(1, retry_after))},
     )
 
 
-def enforce(scope: str, key: str | None) -> None:
-    """Count one attempt for ``key`` under ``scope`` (a name in LIMITS); raise 429 when over the limit."""
+def window_words(seconds: int) -> str:
+    """A limit's window as people say it: "hour", "day", "5 minutes"."""
+    if seconds % 86400 == 0:
+        return "day" if seconds == 86400 else f"{seconds // 86400} days"
+    if seconds % 3600 == 0:
+        return "hour" if seconds == 3600 else f"{seconds // 3600} hours"
+    return f"{max(1, seconds // 60)} minutes"
+
+
+def invitation_message(scope: str) -> str:
+    rule = LIMITS[scope]
+    return INVITATION_LIMIT_MESSAGE.format(limit=rule.limit, window=window_words(rule.window_seconds))
+
+
+def enforce(scope: str, key: str | None, message: str | None = None) -> None:
+    """Count one attempt for ``key`` under ``scope`` (a name in LIMITS); raise 429 when over the limit, with
+    ``message`` for the person when given."""
     if not key or not enabled():
         return
     rule = LIMITS[scope]
@@ -143,4 +175,4 @@ def enforce(scope: str, key: str | None) -> None:
         logger.exception("Rate limit counter unavailable for scope %s", scope)
         return
     if count > rule.limit:
-        raise _too_many(window_start + rule.window_seconds - now)
+        raise _too_many(window_start + rule.window_seconds - now, message)

@@ -24,7 +24,9 @@ class ErasureLog(Base):
     __tablename__ = "erasure_log"
     id = _pk()
     tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    kind: Mapped[str] = mapped_column(String(40), nullable=False)  # PERSON_ERASED | TENANT_PURGED
+    kind: Mapped[str] = mapped_column(
+        String(40), nullable=False
+    )  # PERSON_ERASED | TENANT_PURGED | TRIAL_REQUEST_ERASED
     subject_ref: Mapped[str] = mapped_column(String(255), nullable=False)
     performed_by: Mapped[str] = mapped_column(String(255), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)

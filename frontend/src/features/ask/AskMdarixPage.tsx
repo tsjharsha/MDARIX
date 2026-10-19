@@ -8,6 +8,30 @@ import { answerOriginText, hasStructuredContent, structuredOf } from "./structur
 import { StructuredAnswerView } from "./StructuredAnswer";
 import { TrustBadge } from "../workspace/sections/TrustBadge";
 import { onQuestionHanded, pendingQuestion, takeQuestion } from "./pendingQuestion";
+import { useAiBanner } from "../workspace/useAiStatus";
+
+// Questions Ask answers well with or without AI: the counting ones get the fixed-rule answers of Getting started
+// (backend/app/trial/insight_questions.py ASK_TOPICS), the last searches the case's evidence.
+export const EXAMPLE_QUESTIONS = [
+  "Which lots have the most complaints?",
+  "What changed in the latest version?",
+  "Is the rise real, or just more devices in use?",
+  "Which complaints report harm or a malfunction?",
+  "What does the evidence on this case show?",
+];
+
+/** A fixed-rule answer to the counting part of a question (Ask without AI; the same as Getting started's). */
+export type RuleAnswer = {
+  key: string;
+  question: string;
+  answer: {
+    summary: string;
+    table?: { columns: string[]; rows: Array<Array<string | number>> } | null;
+    facts?: string[];
+    missing?: string[];
+    basis?: string;
+  };
+};
 
 // Structured sections the service may return. Only sections with content are shown.
 const SECTIONS: [string, string][] = [
@@ -67,6 +91,11 @@ export function AskMdarixPage({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const canAsk = useCan("ai.run");
+  const aiOff = useAiBanner();
+  const choose = (text: string) => {
+    setQuestion(text);
+    box.current?.focus();
+  };
   const ask = async () => {
     if (!question.trim() || loading) return;
     setError("");
@@ -100,10 +129,7 @@ export function AskMdarixPage({
         <div>
           <p className="eyebrow">Ask MDARIX</p>
           <h2>Ask about the active case</h2>
-          <p>
-            Your question inherits the authenticated tenant, role, ProductVersion, investigation, and temporal Case
-            Context.
-          </p>
+          <p>Ask about this case in your own words. Answers come from your records and name the records they use.</p>
         </div>
         <div className="version-pill">Human review required</div>
       </section>
@@ -126,6 +152,21 @@ export function AskMdarixPage({
             <Info size={14} aria-hidden="true" /> View only: your role cannot ask MDARIX questions.
           </p>
         )}
+        {aiOff && (
+          <p className="ask-hint" role="note">
+            <Info size={14} aria-hidden="true" /> {aiOff.title}. Ask MDARIX answers from your records: it finds the
+            evidence that matches your words, and answers questions about lots, versions, rises, harm, problem codes and
+            countries with fixed rules.
+          </p>
+        )}
+        <div className="ask-examples" aria-label="Questions to try">
+          <span>Try:</span>
+          {EXAMPLE_QUESTIONS.map((text) => (
+            <button key={text} type="button" className="ask-example" onClick={() => choose(text)}>
+              {text}
+            </button>
+          ))}
+        </div>
         {!investigationId && (
           <p className="ask-hint">
             <Info size={14} aria-hidden="true" /> No investigation is selected, so MDARIX searches all of your records.
@@ -162,6 +203,7 @@ function AskAnswer({ result }: { result: any }) {
   const structured = structuredOf(result);
   const showStructured = hasStructuredContent(structured);
   const madeBy = answerOriginText(structured);
+  const ruleAnswers = (Array.isArray(result?.rule_answers) ? result.rule_answers : []) as RuleAnswer[];
   return (
     <section className="panel ask-answer" aria-labelledby="ask-answer-title">
       <header className="ask-answer-head">
@@ -192,6 +234,8 @@ function AskAnswer({ result }: { result: any }) {
           {response.trust?.author === "AI" && <TrustBadge trust={response.trust} />}
         </div>
       </header>
+
+      {ruleAnswers.length > 0 && <RuleAnswers answers={ruleAnswers} />}
 
       {showStructured ? (
         <>
@@ -292,5 +336,55 @@ function AskAnswer({ result }: { result: any }) {
         </dl>
       </details>
     </section>
+  );
+}
+
+/** The fixed-rule answers to the counting part of the question: what Getting started's Automatic insights say. */
+export function RuleAnswers({ answers }: { answers: RuleAnswer[] }) {
+  return (
+    <div className="ask-section ask-rule-answers">
+      <h4>Counted from your complaint records</h4>
+      <p className="ask-note">
+        <Info size={14} aria-hidden="true" /> Fixed rules, no AI: the same answers as Getting started › Automatic
+        insights. They say where to look; people decide what they mean.
+      </p>
+      {answers.map((item) => (
+        <section key={item.key} className="ask-rule-answer">
+          <h5>{item.question}</h5>
+          <p>{item.answer.summary}</p>
+          {item.answer.table && item.answer.table.rows.length > 0 && (
+            <div className="ask-rule-table">
+              <table>
+                <thead>
+                  <tr>
+                    {item.answer.table.columns.map((column) => (
+                      <th key={column} scope="col">
+                        {column}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {item.answer.table.rows.map((row, index) => (
+                    <tr key={index}>
+                      {row.map((cell, column) => (
+                        <td key={column}>{String(cell)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {(item.answer.facts ?? []).length > 0 && (
+            <ul>
+              {(item.answer.facts ?? []).map((fact) => (
+                <li key={fact}>{fact}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+    </div>
   );
 }

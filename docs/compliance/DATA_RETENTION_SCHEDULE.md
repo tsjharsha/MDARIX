@@ -24,6 +24,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 | Data | Kept | Deleted by | Enforced in |
 |---|---|---|---|
 | Account (name, email, role, authenticator secret) | While the account is in use | Personal-data erasure on request (pseudonymized: name, email and credentials replaced) or the organization purge | `erase_person` in `tenant_purge.py` |
+| Free-trial requests that did not lead to a trial: declined, or approved with an invitation that expired unused (name, email, job title, phone, free-text goal) | **90 days** after the decline, or after the last invitation expired unused (`REQUEST_RETENTION_DAYS`). Requests still waiting for review are not erased automatically (open item) | Scheduler job `trial-retention` (`erase_trial_request`: pseudonymized like a purge; the organization's name and its answers about the organization stay; the never-activated account is erased with `erase_person`; logged in `erasure_log` as TRIAL_REQUEST_ERASED) | `backend/app/trial/retention.py`, `tenant_purge.py` |
 | Sessions, sign-in history, invitations, password-reset requests | While the account exists (no time-based deletion yet) | Erasure of the person or the organization purge | as above |
 | Pseudonymized account and trial-request rows | For the life of the platform, as the record of the contract and of consent; they identify nobody | Not deleted | `tenant_purge.py` (`KEEP_TABLES`) |
 | Published trial feedback | While the person's consent stands | Unpublishing (withdrawal of consent), then erasure or purge | Platform Admin > Trial feedback |
@@ -35,6 +36,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 | Data | Kept | Deleted by |
 |---|---|---|
 | Support problem reports | No automatic deletion yet | Organization purge (they belong to the organization) |
+| Website demo requests (the form is parked; requests made before it was) | No automatic deletion yet (open item) | Deleted with the trial when booked from inside one |
 | Browser error reports | No automatic deletion yet; reports sent before sign-in carry no organization and are not removed by a purge | Not yet defined (open item) |
 | Application logs | As set by the host's log rotation (infrastructure) | Log rotation |
 

@@ -51,6 +51,9 @@ class ImportPolicy:
     file_limit_bytes: int = 10 * 1024 * 1024
     file_too_large: str = "Files can be up to 10 MB"
     limit_label: str = "your workspace"
+    # An Excel workbook's total unpacked size (backend/app/trial/xlsx.py): a 2 MB trial file that unpacks to more is a
+    # "zip bomb", not an export.
+    xlsx_max_bytes: int = 60 * 1024 * 1024
     # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
     # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
     create_references: bool = False
@@ -62,6 +65,7 @@ TRIAL_POLICY = ImportPolicy(
     file_limit_bytes=TRIAL_FILE_LIMIT_BYTES,
     file_too_large="Files can be up to 2 MB during the free trial",
     limit_label="your trial",
+    xlsx_max_bytes=20 * 1024 * 1024,
     create_references=True,
 )
 WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
@@ -374,14 +378,19 @@ def _decode(raw: bytes, report: "_Report") -> str | None:
         return text
 
 
-def _table(raw: bytes, report: "_Report") -> list[list[str]] | None:
+def _table(raw: bytes, report: "_Report", policy: ImportPolicy = TRIAL_POLICY) -> list[list[str]] | None:
     """The upload as rows of cells: an Excel workbook's first sheet (backend/app/trial/xlsx.py), else delimited text
-    (comma, semicolon or tab). None when it cannot be read (the reason is in the report)."""
+    (comma, semicolon or tab). None when it cannot be read (the reason is in the report). A workbook is read no
+    further than the rows the policy takes (plus a margin), within the policy's unpacked size."""
     from backend.app.trial import xlsx
 
     if xlsx.is_xlsx(raw):
         try:
-            rows = xlsx.read_rows(raw)
+            rows = xlsx.read_rows(
+                raw,
+                max_rows=min(policy.row_limit or MAX_ROWS_PER_FILE, MAX_ROWS_PER_FILE),
+                max_bytes=policy.xlsx_max_bytes,
+            )
         except xlsx.XlsxError as exc:
             report.add(None, None, str(exc))
             return None
@@ -474,7 +483,7 @@ def _parse(
         raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
     if len(raw) > policy.file_limit_bytes:
         raise HTTPException(413, detail={"code": "FILE_TOO_LARGE", "message": policy.file_too_large})
-    table = _table(raw, report)
+    table = _table(raw, report, policy)
     if table is None:
         return []
     reader = iter(table)

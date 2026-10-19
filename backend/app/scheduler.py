@@ -81,7 +81,12 @@ def trial_retention(db: Session, _state: dict) -> dict:
             "Nothing was changed for them; see the scheduler log.",
         )
         raise RuntimeError(f"{len(result['failed'])} trial purge(s) failed")
-    return {"purged": result["purged"], "tenants": [item.get("tenant_key") for item in result["trials"]]}
+    return {
+        "purged": result["purged"],
+        "tenants": [item.get("tenant_key") for item in result["trials"]],
+        # Trial requests that never became a trial, erased after their 90 days (backend/app/trial/retention.py).
+        "requests_erased": result["requests"]["erased"],
+    }
 
 
 def trial_reminders(db: Session, _state: dict) -> dict:

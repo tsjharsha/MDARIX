@@ -290,7 +290,7 @@ class GenAIProvider:
                 {
                     "status": "PROVIDER_NOT_CONFIGURED",
                     "answer": None,
-                    "limitations": ["Live GenAI provider is not configured."],
+                    "limitations": ["No AI service is set up here, so no AI was used."],
                     "human_review_required": True,
                     "causality_state": "NOT_ESTABLISHED",
                 },

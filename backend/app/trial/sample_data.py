@@ -13,6 +13,9 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from backend.app.db.models.evidence_intelligence import EvidenceEntityLink
+from evidence.extractors.chunker import EvidenceChunker
+
 from backend.app.db.models.foundation import (
     Change,
     Complaint,
@@ -509,6 +512,26 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
             )
             db.add(evidence)
             db.flush()
+            # Searchable from the first minute (Ask MDARIX, the investigator), like evidence a person adds, and linked
+            # to the product and Rev B, so a search narrowed to OrbitCare 300 Rev B finds it.
+            EvidenceChunker().create_chunks_for_evidence(
+                db, tenant_id, evidence.id, content, {"record": evidence.evidence_identifier}
+            )
+            for entity_type, entity_id, reference in (
+                ("Product", product.id, identifier),
+                ("ProductVersion", versions[1].id, f"{identifier} Rev B"),
+            ):
+                db.add(
+                    EvidenceEntityLink(
+                        id=uuid.uuid4(),
+                        tenant_id=tenant_id,
+                        evidence_id=evidence.id,
+                        entity_type=entity_type,
+                        entity_id=entity_id,
+                        raw_reference=reference,
+                        resolution_status="RESOLVED",
+                    )
+                )
             db.add(
                 InvestigationEvidence(
                     id=uuid.uuid4(),

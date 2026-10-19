@@ -290,9 +290,17 @@ def owner_names(control_db, tenant_id, refs) -> dict[str, str]:
     return {str(username).lower(): (str(name or "").strip() or str(username)) for username, name in rows}
 
 
+# The free trial's sample records name people by addresses on this reserved domain (sample_data.py): they are shown
+# by a name, never as the address.
+SAMPLE_PEOPLE_DOMAIN = "@sample.invalid"
+SAMPLE_OWNER_NAME = "MDARIX sample author"
+
+
 def owner_name(names: dict[str, str], owner_ref: str | None) -> str | None:
     key = str(owner_ref or "").strip().lower()
-    return names.get(key) if key else None
+    if not key:
+        return None
+    return names.get(key) or (SAMPLE_OWNER_NAME if key.endswith(SAMPLE_PEOPLE_DOMAIN) else None)
 
 
 def with_owner_names(control_db, tenant_id, rows: list[dict]) -> list[dict]:

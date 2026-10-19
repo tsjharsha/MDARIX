@@ -11044,6 +11044,57 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   color: #8a5b00;
   font-size: 14px;
 }
+/* Questions to try, under the question box: a click fills the box. */
+.ask-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 0;
+  color: #4a5d6e;
+  font-size: 14px;
+}
+.ask-example {
+  width: auto;
+  padding: 4px 10px;
+  border: 1px solid #c9d6e0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #183249;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ask-example:hover,
+.ask-example:focus-visible {
+  border-color: #087b78;
+  color: #087b78;
+}
+/* Fixed-rule answers to the counting part of a question (Ask without AI). */
+.ask-rule-answer {
+  margin-top: 12px;
+}
+.ask-rule-answer h5 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.ask-rule-answer p {
+  margin: 0 0 8px;
+}
+.ask-rule-table {
+  overflow-x: auto;
+}
+.ask-rule-table table {
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.ask-rule-table th,
+.ask-rule-table td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #dde5ec;
+  text-align: left;
+  white-space: nowrap;
+}
 .ask-answer {
   display: grid;
   gap: 16px;
@@ -11484,4 +11535,11 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
   margin: 4px 0 2px;
   color: #5b6b7b;
   font-size: 13px;
+}
+
+/* An approved trial whose invitation email did not go out (Platform Admin › Trial requests). */
+.trial-queue-pill.is-problem {
+  align-self: flex-start;
+  background: #fde8e8;
+  color: #9b1c1c;
 }

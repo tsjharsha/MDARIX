@@ -1294,3 +1294,332 @@ def test_a_declined_request_keeps_the_trial_and_an_approved_one_can_keep_the_dat
                 ),
                 {"started": started, "pattern": "TRIAL\\_%"},
             )
+
+
+def test_an_invitation_that_fails_after_automatic_approval_is_shown_alerted_and_retried(monkeypatch):
+    """FUN-02: the approval stands, the request records the failed invitation (the queue shows it next to "Resend
+    invitation"), the operators are alerted without the address, and the outbox sends it again until it goes out."""
+    from auth.emailer import EmailDeliveryError
+    from backend.app import alerts, notifications
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.trial import service
+
+    _platform_organization()
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE", "company-domains")
+    monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "100000")
+    alerted = []
+    monkeypatch.setattr(alerts, "send_alert", lambda subject, body: alerted.append((subject, body)) or {})
+    sent = []
+
+    def refused(recipient, *_args, **_kwargs):
+        sent.append(recipient)
+        raise EmailDeliveryError("The email provider refused the message or could not be reached.")
+
+    monkeypatch.setattr(service, "send_trial_invitation", refused)
+    email = f"quality.lead@failing-{uuid.uuid4().hex[:8]}.com"
+    response = TestClient(app).post(
+        "/api/v1/auth/signup",
+        json={"email": email, "display_name": "Taylor Quality", "organization": "Silent Devices", **PROFILE},
+    )
+    assert response.status_code == 200 and response.json()["status"] == "TRIAL_APPROVING"
+    assert sent == [email]
+
+    admin = authenticated_client()
+    item = next(row for row in admin.get("/api/v1/platform-admin/trial-requests", params={"q": email}).json()["items"])
+    assert item["status"] == "APPROVED" and item["owner_status"] == "INVITED"
+    assert item["invitation_delivery"] == "FAILED" and item["invitation_attempted_at"]
+    assert len(alerted) == 1 and alerted[0][0] == "Trial invitation not delivered"
+    assert item["business_id"] in alerted[0][1] and email not in alerted[0][1]
+
+    db = SessionLocal()
+    try:
+        request_id = uuid.UUID(item["id"])
+        failure = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == request_id, AuditEvent.action == "TRIAL_INVITATION_NOT_DELIVERED")
+            .one()
+        )
+        assert failure.details["retry_queued"] is True and email not in str(failure.details)
+        retries = (
+            db.query(OutboxEvent)
+            .filter(OutboxEvent.aggregate_id == request_id, OutboxEvent.event_name == "TRIAL_INVITATION_RETRY")
+            .all()
+        )
+        assert len(retries) == 1 and email not in str(retries[0].payload)
+        # The outbox's attempt fails while the provider still refuses (the outbox tries again later) ...
+        with pytest.raises(notifications.NotificationFailed):
+            notifications.handle_event(db, "TRIAL_INVITATION_RETRY", retries[0].payload)
+        # ... and once it accepts, the invitation goes out and the queue says so; later attempts send nothing.
+        monkeypatch.setattr(
+            service, "send_trial_invitation", lambda recipient, *a, **k: sent.append(recipient) or "SENT"
+        )
+        assert notifications.handle_event(db, "TRIAL_INVITATION_RETRY", retries[0].payload) is True
+        assert notifications.handle_event(db, "TRIAL_INVITATION_RETRY", retries[0].payload) is True
+        assert sent == [email, email, email]
+        delivered = (
+            db.query(AuditEvent)
+            .filter(AuditEvent.entity_id == request_id, AuditEvent.action == "TRIAL_INVITATION_SENT")
+            .one()
+        )
+        assert delivered.details["source"] == "RETRY"
+    finally:
+        db.close()
+    item = next(row for row in admin.get("/api/v1/platform-admin/trial-requests", params={"q": email}).json()["items"])
+    assert item["status"] == "APPROVED" and item["invitation_delivery"] == "SENT"
+    # The Platform Administrator's resend is recorded the same way.
+    resent = admin.post(f"/api/v1/platform-admin/trial-requests/{item['id']}/resend-invitation")
+    assert resent.status_code == 200 and resent.json()["invitation_delivery"] == "SENT"
+
+
+def test_invitation_emails_are_limited_per_address_and_per_organization(monkeypatch):
+    """SEC-03: a trial owner cannot make MDARIX send unlimited invitations: resending is limited per address and per
+    organization, inviting per person and organization, and removing (which frees a seat) per organization. The
+    limit answers 429 with a sentence the screen shows; nothing is sent."""
+    import secrets
+
+    from auth import emailer
+    from backend.app import rate_limit
+
+    monkeypatch.setenv("MDARIX_RATE_LIMITS_ENABLED", "true")
+    monkeypatch.setenv("MDARIX_RATE_LIMIT_SALT", secrets.token_hex(16))
+    sent = []
+    monkeypatch.setattr(emailer, "_send_email", lambda to, *a, **k: sent.append(to) or "SENT")
+    owner, _approval, _email = _approved_trial_client()
+    colleague = f"colleague-{uuid.uuid4().hex[:8]}@example.invalid"
+    invited = owner.post("/api/v1/trial/team", json={"email": colleague, "display_name": "Casey Review"})
+    assert invited.status_code == 200, invited.text
+    resend = f"/api/v1/trial/team/{invited.json()['id']}/resend-invitation"
+    for _ in range(3):
+        assert owner.post(resend).status_code == 200
+    before = len(sent)
+    limited = owner.post(resend)
+    assert limited.status_code == 429 and int(limited.headers["Retry-After"]) > 0
+    detail = limited.json()["detail"]
+    assert detail["code"] == "RATE_LIMITED" and "3 per hour" in detail["message"] and len(sent) == before
+
+    # New invitations and removals have their own daily limits (here lowered to one so the test stays short).
+    monkeypatch.setitem(rate_limit.LIMITS, "invite:org", rate_limit.Limit(1, 86400))
+    monkeypatch.setitem(rate_limit.LIMITS, "team-remove:org", rate_limit.Limit(1, 86400))
+    monkeypatch.setenv("MDARIX_RATE_LIMIT_SALT", secrets.token_hex(16))
+    removed = owner.post(f"/api/v1/trial/team/{invited.json()['id']}/remove")
+    assert removed.status_code == 200, removed.text
+    first = owner.post(
+        "/api/v1/trial/team", json={"email": f"a-{uuid.uuid4().hex[:8]}@example.invalid", "display_name": "A"}
+    )
+    assert first.status_code == 200, first.text
+    second = owner.post(
+        "/api/v1/trial/team", json={"email": f"b-{uuid.uuid4().hex[:8]}@example.invalid", "display_name": "B"}
+    )
+    assert second.status_code == 429 and "1 per day" in second.json()["detail"]["message"]
+    again = owner.post(f"/api/v1/trial/team/{first.json()['id']}/remove")
+    assert again.status_code == 429 and "removed as many colleagues" in again.json()["detail"]["message"]
+
+
+def test_requests_that_never_became_a_trial_lose_their_personal_data_after_90_days():
+    """CMP-05: 90 days after a request was declined, or after the invitation of an approved one expired unused, the
+    retention job erases the requester's name, email, job title, phone and goal (the organization's name and answers
+    stay), erases the never-activated account with it, logs the erasure for a restore, and leaves a younger request
+    alone. The audit record holds no personal data."""
+    from backend.app.db.models.foundation import AuditEvent
+    from backend.app.db.models.pilot_support import ErasureLog
+    from backend.app.db.models.stage2 import UserInvitation
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.tenant_purge import REMOVED_DOMAIN, reapply_erasures
+    from backend.app.trial import retention
+
+    admin = authenticated_client()
+    old_decline, young_decline = _request_trial("Declined Devices"), _request_trial("Recent Devices")
+    for email in (old_decline, young_decline):
+        declined = admin.post(
+            f"/api/v1/platform-admin/trial-requests/{_request_id(admin, email)}/decline",
+            json={"reason": "Not a device company"},
+        )
+        assert declined.status_code == 200, declined.text
+    unused = _request_trial("Unused Devices")
+    approved = admin.post(f"/api/v1/platform-admin/trial-requests/{_request_id(admin, unused)}/approve")
+    assert approved.status_code == 200, approved.text
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        rows = {
+            row.email: row
+            for row in db.query(OnboardingRequest).filter(
+                OnboardingRequest.email.in_([old_decline, young_decline, unused])
+            )
+        }
+        rows[old_decline].reviewed_at = now - timedelta(days=91)
+        rows[young_decline].reviewed_at = now - timedelta(days=89)
+        rows[unused].reviewed_at = now - timedelta(days=95)
+        owner = db.query(AuthUser).filter(AuthUser.username == unused).one()
+        db.query(UserInvitation).filter(UserInvitation.user_id == owner.id).update(
+            {"expires_at": now - timedelta(days=92)}, synchronize_session=False
+        )
+        ids = {email: row.id for email, row in rows.items()}
+        owner_id = owner.id
+        db.commit()
+
+        result = retention.erase_stale_requests(db, "system:test-retention", now)
+        assert result["erased"] >= 2
+        db.expire_all()
+        bind_system(db, "test: read erased requests")
+        for email in (old_decline, unused):
+            row = db.get(OnboardingRequest, ids[email])
+            assert row.email.endswith(REMOVED_DOMAIN) and row.display_name == "Removed"
+            assert not {"job_title", "phone", "evaluation_goal"} & set(row.profile)
+            assert row.organization in ("Declined Devices", "Unused Devices") and row.profile.get("country")
+            audit = (
+                db.query(AuditEvent)
+                .filter(AuditEvent.entity_id == row.id, AuditEvent.action == "TRIAL_REQUEST_DATA_ERASED")
+                .one()
+            )
+            assert email not in str(audit.details) and "Taylor" not in str(audit.details)
+        young = db.get(OnboardingRequest, ids[young_decline])
+        assert young.email == young_decline and young.display_name == "Taylor Quality"
+        account = db.get(AuthUser, owner_id)
+        assert account.username.endswith(REMOVED_DOMAIN) and account.status == "REMOVED"
+        # A second run finds nothing more to do for them.
+        again = retention.erase_stale_requests(db, "system:test-retention", now)
+        assert not {rows[old_decline].business_id, rows[unused].business_id} & set(again["requests"])
+
+        # After a restore from a backup taken before the erasure, the erasure log repeats it.
+        log = db.query(ErasureLog).filter(ErasureLog.subject_ref == str(ids[old_decline])).one()
+        assert log.kind == "TRIAL_REQUEST_ERASED"
+        restored = db.get(OnboardingRequest, ids[old_decline])
+        restored.email, restored.display_name = old_decline, "Taylor Quality"
+        db.commit()
+        bind_system(db, "test: re-apply erasures")
+        summary = reapply_erasures(db, "test", tenant_ids=[log.tenant_id], storage=object())
+        assert str(ids[old_decline]) in [item["subject_ref"] for item in summary["reapplied"]]
+        db.expire_all()
+        bind_system(db, "test: read erased requests")
+        assert db.get(OnboardingRequest, ids[old_decline]).email.endswith(REMOVED_DOMAIN)
+    finally:
+        db.close()
+
+
+def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure_chain():
+    """UX-17 and UX-18: the sample case arrives with the sample author's hand-recorded hypotheses (one supported by
+    the supplier change, an alternative the evidence speaks against), two open questions and a failure chain with one
+    link still unknown; its brief carries them, its progress counts the brief, its owner reads as a name, and the
+    trial user still reviews, accepts and signs the decision (acknowledging the open questions)."""
+    from backend.app.db.models.foundation import FailureChain, Hypothesis, Investigation, Unknown
+
+    user, approval, _email = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        case_id = (
+            db.query(Investigation.id)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .scalar()
+        )
+    finally:
+        db.close()
+    base = f"/api/v1/investigations/{case_id}/intelligence"
+    hypotheses = user.get(f"{base}/hypotheses").json()
+    items = hypotheses["items"] if isinstance(hypotheses, dict) else hypotheses
+    statuses = sorted(item["human_status"] for item in items)
+    assert statuses == ["PARTIALLY_SUPPORTED", "WEAKLY_SUPPORTED"], items
+    assert all("(Sample)" in item["statement"] for item in items)
+    unknowns = user.get(f"{base}/unknowns").json()
+    open_items = [item for item in (unknowns["items"] if isinstance(unknowns, dict) else unknowns)]
+    assert len(open_items) == 2 and {item["status"] for item in open_items} == {"open"}
+    chains = user.get(f"{base}/failure-chains").json()
+    stored = chains["stored"]
+    assert len(stored) == 1 and "(Sample)" in stored[0]["name"]
+
+    readiness = user.get(f"/api/v1/investigations/{case_id}/readiness").json()
+    steps = {step["key"]: step for step in readiness["steps"]}
+    assert steps["hypotheses"]["status"] == "DONE" and steps["gaps"]["status"] == "IN_PROGRESS"
+    assert steps["brief"]["status"] == "DONE" and "Decision Brief version 1" in steps["brief"]["detail"]
+    cases = user.get("/api/v1/data-plane/investigations").json()["records"]
+    owners = {str(row["id"]): row.get("owner_name") for row in cases}
+    assert owners.get(str(case_id)) == "MDARIX sample author"
+
+    brief = f"/api/v1/investigations/{case_id}/decision-brief/versions/1"
+    assert user.post(f"{brief}/start-review", json={}).status_code == 200
+    accepted = user.post(
+        f"{brief}/review", json={"action": "ACCEPT_FOR_DECISION", "comment": "Evidence and scope hold."}
+    )
+    assert accepted.status_code == 200, accepted.text
+    screen = user.get(f"/api/v1/investigations/{case_id}/decision").json()
+    view = screen["brief"]
+    assert view["leading_hypothesis"] and len(view["alternative_hypotheses"]) == 1
+    body = {
+        "brief_version_id": view["id"],
+        "brief_content_hash": view["content_hash"],
+        "outcome": "ACCEPT_CONCLUSION",
+        "rationale": "The supplier change and the inspection results support the proposed conclusion.",
+        "password": PASSWORD,
+    }
+    unacknowledged = user.post(f"/api/v1/investigations/{case_id}/decision/sign", json=body)
+    assert unacknowledged.status_code == 422 and "acknowledge" in unacknowledged.text
+    signed = user.post(
+        f"/api/v1/investigations/{case_id}/decision/sign", json={**body, "residual_unknowns_acknowledged": True}
+    )
+    assert signed.status_code == 200, signed.text
+
+    # Removing the sample data removes what the sample author recorded too.
+    assert user.post("/api/v1/trial/sample-data/removal", json={"confirm": True}).status_code == 200
+    db = SessionLocal()
+    try:
+        for model in (Hypothesis, Unknown, FailureChain):
+            assert db.query(model).filter(model.tenant_id == tenant_id).count() == 0, model.__name__
+    finally:
+        db.close()
+
+
+def test_ask_mdarix_without_ai_answers_the_natural_trial_question_in_plain_words():
+    """UX-23: with AI off in a trial, the natural question about lots and Rev B finds the sample case's evidence,
+    gets the fixed-rule answers about lots and the version, and says AI is off for free trials (never the operator's
+    "provider is not configured")."""
+    from backend.app.db.models.foundation import Investigation, ProductVersion
+
+    user, approval, _ = _approved_trial_client()
+    tenant_id = uuid.UUID(approval["tenant_id"])
+    db = SessionLocal()
+    try:
+        case = (
+            db.query(Investigation)
+            .filter(Investigation.tenant_id == tenant_id, Investigation.investigation_identifier == "SAMPLE-INV-001")
+            .one()
+        )
+        investigation_id = str(case.id)
+        rev_b = str(
+            db.query(ProductVersion.id)
+            .filter(
+                ProductVersion.tenant_id == tenant_id,
+                ProductVersion.product_id == case.product_id,
+                ProductVersion.version_identifier == "Rev B",
+            )
+            .scalar()
+        )
+    finally:
+        db.close()
+    # As the screen asks it: on the case, with OrbitCare 300 Rev B chosen in the context bar.
+    answer = user.post(
+        "/api/v1/stage3/interactions",
+        json={
+            "prompt": "Which lots have the most pressure alarm complaints and what changed in Rev B?",
+            "investigation_id": investigation_id,
+            "product_version_id": rev_b,
+            "page_context": "ASK_MDARIX",
+            "temporal_mode": "CURRENT",
+        },
+    )
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    response = body["response"]
+    assert response["search"]["records_found"] >= 1
+    assert [item["key"] for item in body["rule_answers"]] == ["lots", "version"]
+    assert "003" in body["rule_answers"][0]["answer"]["summary"] or body["rule_answers"][0]["answer"]["table"]
+    shown = " ".join(
+        [*map(str, response["limitations"]), str(body["structured"].get("ai_note")), *body["structured"]["limitations"]]
+    )
+    assert "not configured" not in shown.lower() and "Live GenAI" not in shown
+    assert "AI is off for free trials" in shown
+    assert not any("It does not count complaints" in text for text in body["structured"]["limitations"])
+    # The AI status every screen reads says why the AI buttons are off (UX-02).
+    status = user.get("/api/v1/ai/status").json()
+    assert status["trial"] is True and status["message"].startswith("AI is off for free trials")

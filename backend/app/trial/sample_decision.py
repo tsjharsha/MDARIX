@@ -1,7 +1,9 @@
 """The sample decision of a free trial: the guided investigation arrives ready for its decision.
 
 On the sample case (SAMPLE-INV-001) a sample author, not the trial's people, has saved the scope, reviewed the three
-pieces of evidence and written and submitted the Decision Brief for quality review. The trial user then does what a
+pieces of evidence, recorded by hand (no AI) two competing hypotheses with the evidence for and against them, two open
+questions and a failure chain with one link still unknown, and written and submitted the Decision Brief for quality
+review. The trial user then does what a
 quality lead does: reviews the brief, accepts it for decision and signs the decision with password and authenticator
 code. Segregation of duties is kept as on every case: the person who wrote a brief never reviews or signs it, and the
 sample author is that other person. On the organization's own cases a colleague writes or reviews.
@@ -53,6 +55,76 @@ NARRATIVE = {
     ],
     "author_notes": (
         "Sample Decision Brief, written for the free trial: review it as the quality reviewer, then sign the decision."
+    ),
+}
+
+
+# What the sample author recorded by hand on the case before writing the brief (INTELLIGENCE in the module docstring):
+# the hypothesis the brief proposes, an alternative the evidence speaks against, what is still unknown about each, and
+# the failure chain with the bench test still open. Evidence is named by its sample identifier (sample_data.py).
+SAMPLE_HYPOTHESES = (
+    {
+        "key": "supplier",
+        "statement": "The NovaSense pressure sensors fitted from Rev B (supplier change SAMPLE-CHG-014) read high at "
+        "the upper pressure range and set off pressure alarms during infusion. (Sample)",
+        "human_status": "PARTIALLY_SUPPORTED",
+        "reason": "The change record and the incoming inspection of lots 003 and 004 support it; the bench test of "
+        "returned pumps that would confirm it is still to be done.",
+        "evidence": (
+            (
+                "SAMPLE-EV-001",
+                "SUPPORTING",
+                "The sensor supplier changed for Rev B and inspection was cut to 13 units.",
+            ),
+            ("SAMPLE-EV-002", "SUPPORTING", "Sampled sensors in lots 003 and 004 read 4-6% high; lots 001-002 none."),
+        ),
+    },
+    {
+        "key": "settings",
+        "statement": "Ward pressure-limit settings or use of the pump, not the pump itself, set off the alarms "
+        "(for example occlusion limits set too low). (Sample)",
+        "human_status": "WEAKLY_SUPPORTED",
+        "reason": "The rise sits in lots 003 and 004 and not in lots 001 and 002 used on the same wards, which speaks "
+        "against a ward setting; the alarm settings of the returned pumps have not been checked yet.",
+        "evidence": (
+            ("SAMPLE-EV-002", "CONTRADICTING", "Lots 001-002 on the same wards show no high readings."),
+            (
+                "SAMPLE-EV-003",
+                "CONTRADICTING",
+                "The complaints concentrate in lots 003 and 004, not in particular wards.",
+            ),
+        ),
+    },
+)
+SAMPLE_UNKNOWNS = (
+    {
+        "hypothesis": "supplier",
+        "category": "Test result",
+        "description": "Do returned pumps from lots 003 and 004 read high at the upper pressure range on the bench?",
+        "evidence_needed": "Bench test of returned pumps from lots 003 and 004 against a reference pressure gauge.",
+    },
+    {
+        "hypothesis": "settings",
+        "category": "Field information",
+        "description": "Were the occlusion pressure limits on the reporting wards changed when Rev B arrived?",
+        "evidence_needed": "The alarm-limit settings and alarm logs of the returned pumps.",
+    },
+)
+SAMPLE_CHAIN = {
+    "name": "Pressure alarms on OrbitCare 300 Rev B (Sample)",
+    "nodes": (
+        "Supplier change SAMPLE-CHG-014: NovaSense pressure sensors from Rev B",
+        "Incoming inspection cut from 32 to 13 sensors per lot",
+        "Sensors reading 4-6% high reach lots 003 and 004",
+        "The pump reads pressure above its limit during infusion",
+        "Pressure alarms interrupt infusion",
+    ),
+    # (from, to, state, evidence, why)
+    "links": (
+        (0, 1, "SUPPORTED", "SAMPLE-EV-001", "The change record states both."),
+        (1, 2, "PARTIALLY_SUPPORTED", "SAMPLE-EV-002", "Inspection found high readings in lots 003 and 004."),
+        (2, 3, "UNKNOWN", None, "Not shown until returned pumps are bench-tested."),
+        (3, 4, "PARTIALLY_SUPPORTED", "SAMPLE-EV-003", "Alarm complaints rose in lots 003 and 004 after Rev B."),
     ),
 }
 
@@ -166,6 +238,193 @@ def _review_evidence(db: Session, case, person, now: datetime) -> int:
     return reviewed
 
 
+def _record_intelligence(db: Session, case, person, now: datetime) -> dict:
+    """The sample author's hypotheses, evidence links, judgements, open questions and failure chain, written as the
+    case's intelligence endpoints write them (backend/app/case_intelligence/router.py): origin "human", each change in
+    the intelligence history and the audit trail. Steps a minute apart, links before the judgement that reads them."""
+    from backend.app.access.permissions import EVIDENCE_REVIEW, INVESTIGATION_WORK
+    from backend.app.case_intelligence import router as intelligence
+    from backend.app.case_intelligence import rules
+    from backend.app.db.models.foundation import Evidence, Hypothesis, HypothesisEvidence, Unknown
+
+    ctx = SimpleNamespace(correlation_id=None)
+    evidence = {
+        row.evidence_identifier: row
+        for row in db.query(Evidence).filter(Evidence.tenant_id == case.tenant_id, Evidence.investigation_id == case.id)
+    }
+    clock = iter(now + timedelta(seconds=10 * step) for step in range(100))
+
+    def record(**kwargs):
+        intelligence._record(db, ctx=ctx, person=person, case=case, now=next(clock), **kwargs)
+
+    hypotheses: dict[str, Hypothesis] = {}
+    links = 0
+    for item in SAMPLE_HYPOTHESES:
+        created = next(clock)
+        row = Hypothesis(
+            id=uuid.uuid4(),
+            tenant_id=case.tenant_id,
+            investigation_id=case.id,
+            statement=item["statement"],
+            status=rules.PROPOSED.lower(),
+            origin=rules.ORIGIN_HUMAN,
+            human_status=rules.PROPOSED,
+            status_changed_by=person.user_id,
+            status_changed_at=created,
+            created_by=person.user_id,
+            created_at=created,
+            updated_at=created,
+        )
+        db.add(row)
+        db.flush()
+        hypotheses[item["key"]] = row
+        record(
+            permission=INVESTIGATION_WORK,
+            object_type=rules.OBJECT_HYPOTHESIS,
+            object_id=row.id,
+            entity_type="Hypothesis",
+            event_type=rules.EVENT_CREATED,
+            to_value=rules.PROPOSED,
+            details={"business_id": row.business_id, "statement": row.statement, "origin": "HUMAN", "sample": True},
+            new_values={"statement": row.statement, "human_status": rules.PROPOSED},
+        )
+        for identifier, relation, why in item["evidence"]:
+            source = evidence.get(identifier)
+            if source is None:
+                continue
+            linked = next(clock)
+            link = HypothesisEvidence(
+                id=uuid.uuid4(),
+                tenant_id=case.tenant_id,
+                hypothesis_id=row.id,
+                evidence_id=source.id,
+                relation_type=rules.relation_type(relation),
+                rationale=why,
+                created_by_type=rules.CREATED_BY_HUMAN,
+                created_by=person.user_id,
+                created_at=linked,
+            )
+            db.add(link)
+            db.flush()
+            links += 1
+            record(
+                permission=INVESTIGATION_WORK if person.holds(INVESTIGATION_WORK) else EVIDENCE_REVIEW,
+                object_type=rules.OBJECT_HYPOTHESIS_EVIDENCE,
+                object_id=link.id,
+                entity_type="HypothesisEvidence",
+                event_type=rules.EVENT_EVIDENCE_LINKED,
+                to_value=relation,
+                reason=why,
+                details={
+                    "business_id": row.business_id,
+                    "hypothesis_id": str(row.id),
+                    "evidence_id": str(source.id),
+                    "evidence_business_id": source.business_id,
+                    "relation": relation,
+                    "sample": True,
+                },
+                new_values={"relation_type": link.relation_type, "rationale": why},
+            )
+        # The judgement comes after the links it weighs (readiness reads a link newer than it as not yet judged).
+        judged = next(clock)
+        row.human_status = item["human_status"]
+        row.status_reason = item["reason"]
+        row.status_changed_at = judged
+        row.reviewer_disposition = rules.HUMAN_JUDGED
+        row.updated_at = judged
+        record(
+            permission=INVESTIGATION_WORK,
+            object_type=rules.OBJECT_HYPOTHESIS,
+            object_id=row.id,
+            entity_type="Hypothesis",
+            event_type=rules.EVENT_STATUS_CHANGED,
+            from_value=rules.PROPOSED,
+            to_value=item["human_status"],
+            reason=item["reason"],
+            details={"business_id": row.business_id, "origin": "HUMAN", "sample": True},
+            old_values={"human_status": rules.PROPOSED},
+            new_values={"human_status": item["human_status"], "status_reason": item["reason"]},
+        )
+    for item in SAMPLE_UNKNOWNS:
+        about = hypotheses.get(item["hypothesis"])
+        created = next(clock)
+        row = Unknown(
+            id=uuid.uuid4(),
+            tenant_id=case.tenant_id,
+            investigation_id=case.id,
+            hypothesis_id=about.id if about is not None else None,
+            category=item["category"],
+            description=item["description"],
+            evidence_needed=item["evidence_needed"],
+            status=rules.UNKNOWN_OPEN,
+            origin=rules.ORIGIN_HUMAN,
+            created_by=person.user_id,
+            created_at=created,
+            updated_at=created,
+        )
+        db.add(row)
+        db.flush()
+        record(
+            permission=INVESTIGATION_WORK,
+            object_type=rules.OBJECT_UNKNOWN,
+            object_id=row.id,
+            entity_type="Unknown",
+            event_type=rules.EVENT_CREATED,
+            to_value=rules.UNKNOWN_OPEN,
+            details={
+                "business_id": row.business_id,
+                "description": row.description,
+                "hypothesis_business_id": about.business_id if about is not None else None,
+                "sample": True,
+            },
+            new_values={"description": row.description, "category": row.category},
+        )
+    chain = intelligence._store_chain(
+        db,
+        tenant_id=case.tenant_id,
+        case=case,
+        person=person,
+        name=SAMPLE_CHAIN["name"],
+        origin=rules.CHAIN_ORIGIN_HUMAN,
+        labels=list(SAMPLE_CHAIN["nodes"]),
+        links=[
+            {
+                "from_index": start,
+                "to_index": end,
+                "state": state,
+                "evidence_id": evidence[identifier].id if identifier in evidence else None,
+                "rationale": why,
+            }
+            for start, end, state, identifier, why in SAMPLE_CHAIN["links"]
+        ],
+        now=next(clock),
+    )
+    record(
+        permission=INVESTIGATION_WORK,
+        object_type=rules.OBJECT_FAILURE_CHAIN,
+        object_id=chain.id,
+        entity_type="FailureChain",
+        event_type=rules.EVENT_CREATED,
+        to_value=rules.CHAIN_STATUS_DRAFT,
+        details={
+            "business_id": chain.business_id,
+            "name": chain.name,
+            "origin": "HUMAN",
+            "nodes": len(SAMPLE_CHAIN["nodes"]),
+            "links": len(SAMPLE_CHAIN["links"]),
+            "sample": True,
+        },
+        new_values={"name": chain.name, "nodes": list(SAMPLE_CHAIN["nodes"])},
+    )
+    db.flush()
+    return {
+        "hypotheses": len(hypotheses),
+        "evidence_links": links,
+        "unknowns": len(SAMPLE_UNKNOWNS),
+        "failure_chains": 1,
+    }
+
+
 def _submit_brief(db: Session, case, person, now: datetime):
     """Version 1 of the brief, composed from the case and submitted for quality review, as ``POST
     .../decision-brief`` and ``.../submit`` write it. Returns (row, gate)."""
@@ -273,7 +532,7 @@ def stage_sample_decision(db: Session, tenant_id: uuid.UUID, now: datetime | Non
         author = sample_author(db, tenant_id, now)
         person = _person(db, author)
         # The steps a few minutes apart, in the order an investigator takes them.
-        steps = [now - timedelta(minutes=minutes) for minutes in (30, 20, 10)]
+        steps = [now - timedelta(minutes=minutes) for minutes in (40, 30, 25, 10)]
         if scope.latest_version(db, tenant_id, case.id) is None:
             complaint_ids = [
                 row.complaint_id
@@ -291,7 +550,8 @@ def stage_sample_decision(db: Session, tenant_id: uuid.UUID, now: datetime | Non
                 with_lots=True,
             )
         reviewed = _review_evidence(db, case, person, steps[1])
-        row, gate = _submit_brief(db, case, person, steps[2])
+        intelligence = _record_intelligence(db, case, person, steps[2])
+        row, gate = _submit_brief(db, case, person, steps[3])
         if not gate["can_submit"]:
             savepoint.rollback()
             blocking = [item.get("key") for item in gate["blocking"]]
@@ -302,4 +562,10 @@ def stage_sample_decision(db: Session, tenant_id: uuid.UUID, now: datetime | Non
         savepoint.rollback()
         logger.exception("Trial sample decision could not be staged")
         return {"created": False, "why": "ERROR"}
-    return {"created": True, "brief_version": row.version, "evidence_reviewed": reviewed, "author": str(author.id)}
+    return {
+        "created": True,
+        "brief_version": row.version,
+        "evidence_reviewed": reviewed,
+        "intelligence": intelligence,
+        "author": str(author.id),
+    }

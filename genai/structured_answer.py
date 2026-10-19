@@ -81,6 +81,8 @@ AI_NOTE_NOT_SECTIONED = (
 AI_NOTE_INVALID = "The AI's answer was not in the expected form, so this answer comes from your records only."
 AI_NOTE_EMPTY = "The AI service returned no answer, so this answer comes from your records only."
 AI_NOTE_NOT_CONFIGURED = "No AI service is configured here, so this answer comes from your records only."
+# A free trial runs without AI (no customer data goes to an AI service during a trial).
+AI_NOTE_TRIAL = "AI is off for free trials, so this answer comes from your records only."
 AI_NOTE_UNAVAILABLE = "AI could not be used for this question, so this answer comes from your records only."
 
 

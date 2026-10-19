@@ -108,7 +108,7 @@ const LEGAL_SUMMARIES: Record<LegalPath, { intro: string; sections: { title: str
       },
       {
         title: "Retention and rights",
-        body: "Retention, deletion, export, legal holds, and data requests follow the applicable customer agreement and approved retention schedule. Contact MDARIX for privacy questions.",
+        body: "Retention, deletion, export, legal holds, and data requests follow the applicable customer agreement and approved retention schedule. Trial requests that do not lead to a trial lose the requester's name, email address, job title and phone number 90 days after we decline them or after the invitation expires unused. Contact MDARIX for privacy questions.",
       },
     ],
   },

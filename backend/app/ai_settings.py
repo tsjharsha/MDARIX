@@ -269,7 +269,18 @@ def ai_ready(db: Session, tenant_id) -> bool:
         return False
 
 
+# A free trial runs without AI: its screens say so plainly instead of naming an administrator setting.
+TRIAL_AI_OFF_MESSAGE = "AI is off for free trials. Every step works by hand, and Ask MDARIX answers from your records."
+
+
 @router.get("/ai/status")
 def ai_status(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = Depends(get_request_context)):
-    """Whether AI may be used for the signed-in user's organization now, and why not (any signed-in user)."""
-    return ai_status_for(governance.usage(db, ctx.tenant_id), _models_in_use())
+    """Whether AI may be used for the signed-in user's organization now, and why not (any signed-in user). ``trial``
+    is true for a free trial, whose AI is off."""
+    from backend.app.trial.service import trial_subscription
+
+    status = ai_status_for(governance.usage(db, ctx.tenant_id), _models_in_use())
+    status["trial"] = trial_subscription(db, ctx.tenant_id) is not None
+    if status["trial"] and status["reason_code"] in ("PROVIDER_UNAVAILABLE", "AI_DISABLED"):
+        status["message"] = TRIAL_AI_OFF_MESSAGE
+    return status

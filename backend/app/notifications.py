@@ -51,6 +51,8 @@ CONNECTOR_SYNC_FAILED = "CONNECTOR_SYNC_FAILED"
 AI_BUDGET_THRESHOLD = "AI_BUDGET_THRESHOLD"
 FEEDBACK_SUBMITTED = "FEEDBACK_SUBMITTED"
 TRIAL_REQUEST_DECLINED = "TRIAL_REQUEST_DECLINED"
+# A trial invitation the mail provider refused, sent again (backend/app/trial/service.py retry_invitation).
+TRIAL_INVITATION_RETRY = "TRIAL_INVITATION_RETRY"
 AI_BUDGET_THRESHOLDS = (80, 100)
 # Roles whose holders approve decisions and review risks (backend/app/access/permissions.py).
 APPROVER_ROLES = frozenset({"APPROVER", "LEADER"})
@@ -733,6 +735,12 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name == TRIAL_REQUEST_DECLINED:
         _trial_declined(db, payload, emailer)
+        return True
+    if event_name == TRIAL_INVITATION_RETRY:
+        from backend.app.trial.service import retry_invitation
+
+        if retry_invitation(db, payload["request_id"]) not in ("SENT", "SKIPPED", "NOT_CONFIGURED"):
+            raise NotificationFailed("the trial invitation could not be delivered")
         return True
     if event_name in WORK_EVENTS:
         _work_notice(db, event_name, payload, emailer)

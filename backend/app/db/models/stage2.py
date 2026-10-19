@@ -205,6 +205,9 @@ class OnboardingRequest(Base):
     reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     reviewed_at = _ts()
     decision_reason: Mapped[str | None] = mapped_column(Text)
+    # The latest invitation email of an approved request (md47): SENT, FAILED or NOT_CONFIGURED, and when it was tried.
+    invitation_delivery: Mapped[str | None] = mapped_column(String(20))
+    invitation_attempted_at = _ts()
 
 
 class DemoRequest(Base):
