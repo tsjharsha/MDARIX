@@ -77,6 +77,16 @@ describe("country and phone", () => {
     expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, "en")));
   });
 
+  it("leaves out the countries under comprehensive sanctions", async () => {
+    const { countries } = await import("./trialProfile");
+    const list = countries();
+    for (const code of ["CU", "IR", "KP", "SY"]) expect(list.some((country) => country.code === code)).toBe(false);
+    for (const name of ["Cuba", "Iran", "North Korea", "Syria", "Crimea"])
+      expect(list.some((country) => country.name.includes(name))).toBe(false);
+    // Neighbours and similarly named countries stay.
+    for (const code of ["UA", "KR", "IQ", "RU"]) expect(list.some((country) => country.code === code)).toBe(true);
+  });
+
   it("accepts phones in international format only, and an empty phone", async () => {
     const { isInternationalPhone } = await import("./trialProfile");
     expect(isInternationalPhone("")).toBe(true);

@@ -27,7 +27,36 @@ type TrialRequest = {
   // What the requester told MDARIX about their company and trial, as readable lines (trial/request_profile.py).
   profile?: { job_title?: string; country?: string; [key: string]: unknown };
   profile_lines?: { label: string; value: string }[];
+  /** Which legal texts sending the request accepted, and when (md48); null for requests sent before 0.10.33. */
+  legal_acceptance?: LegalAcceptance | null;
 };
+
+type LegalVersion = { available: boolean; last_updated: string | null; sha256: string | null };
+type LegalAcceptance = { accepted_at: string; documents: Record<string, LegalVersion> };
+
+const LEGAL_TEXT_NAMES: [string, string][] = [
+  ["terms", "Terms of Service"],
+  ["trial-agreement", "Free Trial Agreement"],
+  ["privacy", "Privacy Policy"],
+];
+
+/** The legal texts a request accepted, as review lines: each text's version ("Last updated" date and the start of its
+ * fingerprint), then when it was accepted. Empty for a request sent before the versions were recorded. */
+export function legalAcceptanceLines(
+  acceptance: LegalAcceptance | null | undefined,
+): { label: string; value: string }[] {
+  if (!acceptance?.documents) return [];
+  const lines = LEGAL_TEXT_NAMES.map(([key, name]) => {
+    const version = acceptance.documents[key];
+    const value = !version?.available
+      ? "not published when the request was sent"
+      : `${version.last_updated ? `last updated ${version.last_updated}` : "no date in the text"}${
+          version.sha256 ? ` (fingerprint ${version.sha256.slice(0, 12)})` : ""
+        }`;
+    return { label: name, value };
+  });
+  return [...lines, { label: "Accepted", value: formatDate(acceptance.accepted_at) }];
+}
 /** A closed trial past its 30 days (backend/app/trial/retention.py trials_due); a held one is kept by the run. */
 type DueTrial = {
   tenant_id: string;
@@ -314,7 +343,7 @@ export function TrialRequestsWorkspace() {
                   <details className="trial-queue-answers">
                     <summary>{row.profile_lines.length} answers</summary>
                     <dl>
-                      {row.profile_lines.map((line) => (
+                      {[...row.profile_lines, ...legalAcceptanceLines(row.legal_acceptance)].map((line) => (
                         <div key={line.label}>
                           <dt>{line.label}</dt>
                           <dd>{line.value}</dd>

@@ -8,6 +8,7 @@ import {
   DEVICE_CLASSES,
   EMPTY_PROFILE,
   MARKETS,
+  PASSWORD_PROMISE,
   TRIAL_DATA,
   countries,
   isInternationalPhone,
@@ -25,6 +26,7 @@ import { useSiteInfo } from "../../site/legal";
 const STEP_ONE_CODES = new Set([
   "JOB_TITLE_REQUIRED",
   "COUNTRY_REQUIRED",
+  "COUNTRY_NOT_SERVED",
   "VALID_EMAIL_REQUIRED",
   "VALID_PHONE_REQUIRED",
   "EMAIL_ALREADY_REGISTERED",
@@ -38,8 +40,9 @@ const MESSAGES: Record<string, string> = {
 
 const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
 const EMAIL_HINT =
-  "With a company email, the activation link arrives within minutes. Requests from personal addresses such as Gmail " +
-  "are reviewed by the MDARIX team, usually within one business day.";
+  "With a company email, the trial is approved automatically and the activation link arrives within minutes (up to a " +
+  "daily limit of new trials). Requests from personal addresses such as Gmail are reviewed by the MDARIX team, " +
+  "usually within one business day.";
 
 /** The asterisk of a required field (the input itself carries `required`, which screen readers announce). */
 function Req() {
@@ -83,7 +86,7 @@ export function WhatHappensNext({ personal }: { personal: boolean }) {
       <strong>What happens next:</strong>{" "}
       {personal
         ? "the MDARIX team reviews your request, usually within one business day, and then emails you the invitation."
-        : "with a company email, we email you the activation link within minutes."}{" "}
+        : "with a company email, the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first)."}{" "}
       Your workspace comes with sample data, and AI is off during the trial.
     </p>
   );
@@ -105,14 +108,15 @@ export function TrialConsent() {
       <a href="/privacy" target="_blank" rel="noopener">
         Privacy Policy
       </a>{" "}
-      (each opens in a new tab). Trial data is deleted 30 days after the trial ends unless you continue.
+      (each opens in a new tab). MDARIX records which version of each text you accepted, and when. Trial data is deleted
+      30 days after the trial ends unless you continue.
     </p>
   );
 }
 
 /**
  * The free-trial request, in two short steps: who you are, then your trial. Required fields carry an asterisk. No
- * password is asked for: the requester sets it from the invitation email and MDARIX staff never see it. An email that
+ * password is asked for: the requester sets it from the invitation email; MDARIX keeps only a salted hash. An email that
  * already has an account is told so, with Sign in and Reset password at hand.
  */
 export function SignupForm() {
@@ -213,17 +217,17 @@ export function SignupForm() {
           </p>
         ) : (
           <p className="auth-lead">
-            Thank you. We review every request, usually within one business day, and email <strong>{email}</strong> an
-            invitation once it is approved.
+            Thank you. The MDARIX team reviews your request, usually within one business day, and emails{" "}
+            <strong>{email}</strong> an invitation once it is approved.
           </p>
         )}
         <ol className="su-next">
           <li>
             {approving
               ? "Your workspace is prepared with sample data that tells the whole story."
-              : "We review your request and prepare your workspace with sample data."}
+              : "The MDARIX team reviews your request and prepares your workspace with sample data."}
           </li>
-          <li>You set your own password from the invitation email. MDARIX never sees it.</li>
+          <li>You set your own password from the invitation email. {PASSWORD_PROMISE}</li>
           <li>
             You add MDARIX to an authenticator app on your phone and save your recovery codes: two-factor sign-in (MFA)
             is required.
@@ -257,7 +261,7 @@ export function SignupForm() {
       <h1>Start your free trial</h1>
       <p className="auth-lead">
         30 days, up to 3 users and 5,000 uploaded rows, with sample data from day one and no credit card. AI is off
-        during the trial. You set your own password from the invitation email; MDARIX never sees it.
+        during the trial. You set your own password from the invitation email; {PASSWORD_PROMISE}
       </p>
       <div className="su-mfa-note" role="note">
         <Smartphone size={20} aria-hidden="true" />

@@ -97,6 +97,11 @@ export const PAGE_META = {
     title: "Security · MDARIX",
     description: "How MDARIX protects customer data and accounts, and how to report a security issue.",
   },
+  "/accessibility": {
+    title: "Accessibility statement · MDARIX",
+    description:
+      "What MDARIX has done to make its website and application accessible, the gaps we know of, and how to report a problem.",
+  },
   "/contact": {
     title: "Contact MDARIX",
     description: "Contact the MDARIX team about the free trial, a design-partner pilot or security.",

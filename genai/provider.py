@@ -79,6 +79,9 @@ REFUSAL_MESSAGES = {
         "AI processing is switched off for your organization; an administrator can enable it under "
         "Security › AI processing."
     ),
+    "GENAI_OFF_FOR_FREE_TRIAL": (
+        "AI is off for free trials during the product validation phase, so MDARIX answered from its rules."
+    ),
     "GENAI_PROVIDER_NOT_ALLOWED": (
         "No AI service approved for customer data is configured here, so MDARIX answered from its rules; "
         "please contact MDARIX support."

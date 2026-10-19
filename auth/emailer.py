@@ -208,6 +208,11 @@ def _send_email(
 # ------------------------------------------------------------------------------------------- accounts
 
 
+def _privacy_line() -> str:
+    """Where an invited person reads how their account data is used, before they activate it."""
+    return f"How MDARIX uses your personal data is explained in our privacy policy: {company().app_url}/privacy"
+
+
 def send_activation_email(recipient: str, token: str, organization: str, valid_for: str = INVITATION_VALID_FOR) -> str:
     url = f"{company().app_url}/activate-account?token={token}"
     return _send(
@@ -224,6 +229,7 @@ def send_activation_email(recipient: str, token: str, organization: str, valid_f
             closing=(
                 f"This link works once and expires in {valid_for}. If it has expired, ask your administrator to send "
                 "a new invitation.",
+                _privacy_line(),
             ),
             reason=f"You are receiving this email because an administrator of {organization} invited you to MDARIX.",
         ),
@@ -281,7 +287,7 @@ def send_trial_invitation(
                     else "Open Getting started to see what you can try.",
                 ),
                 button=("Activate my account", url),
-                closing=(f"This link works once and expires in {valid_for}.",),
+                closing=(f"This link works once and expires in {valid_for}.", _privacy_line()),
                 reason=(
                     f"You are receiving this email because {invited_by}, who runs your organization's trial, "
                     "invited you."
@@ -308,7 +314,7 @@ def send_trial_invitation(
                 "Try your own data with the CSV templates (no patient-identifiable data, please).",
             ),
             button=("Activate my account", url),
-            closing=(f"This link works once and expires in {valid_for}.",),
+            closing=(f"This link works once and expires in {valid_for}.", _privacy_line()),
             reason="You are receiving this email because you requested a free MDARIX trial.",
         ),
     )
@@ -353,6 +359,11 @@ def send_password_reset_email(recipient: str, token: str, organization: str | No
 # ------------------------------------------------------------------------------------------- trial lifecycle
 
 
+# The deletion date in trial emails is the earliest one (backend/app/trial/retention.py deletion_date): a grace
+# extension, a request to move the data into the MVP or a legal hold can only make it later.
+DELETED_ON = "Data deleted, at the earliest, on"
+
+
 def send_trial_reminder(recipient: str, organization: str, *, days_left: int, ends_on: str, delete_on: str) -> str:
     left = "today" if days_left <= 0 else ("tomorrow" if days_left == 1 else f"in {days_left} days")
     return _send(
@@ -360,11 +371,12 @@ def send_trial_reminder(recipient: str, organization: str, *, days_left: int, en
         Message(
             subject=f"Your MDARIX trial ends {left}",
             heading=f"Your MDARIX trial for {organization} ends {left}",
-            details=(("Trial ends", ends_on), ("Data deleted on", delete_on)),
+            details=(("Trial ends", ends_on), (DELETED_ON, delete_on)),
             paragraphs=(
                 "To keep your workspace and its data, reply to this email and we will set up a design-partner or "
                 "paid plan with you.",
-                "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later.",
+                "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later, "
+                "on the date above at the earliest.",
                 f"What an MVP on your real data involves is in Next steps, in your workspace: "
                 f"{company().app_url}/app/next-steps",
             ),
@@ -381,10 +393,10 @@ def send_trial_ended(recipient: str, organization: str, *, delete_on: str) -> st
             subject="Your MDARIX trial has ended",
             heading=f"The MDARIX trial for {organization} has ended",
             paragraphs=(
-                "Your workspace is closed. Your data is kept until the date below, then deleted for good.",
+                "Your workspace is closed. Your data is kept at least until the date below, then deleted for good.",
                 "To continue with your data intact, reply to this email before then.",
             ),
-            details=(("Data deleted on", delete_on),),
+            details=((DELETED_ON, delete_on),),
             reason="You are receiving this email because you started a free MDARIX trial.",
         ),
     )
@@ -397,12 +409,12 @@ def send_trial_ended_early(recipient: str, organization: str, *, data_deleted: b
         data = (
             "Everything your organization stored in the trial has been deleted: its records, uploads and files, and "
             "your team's accounts. Only a minimal record that the trial existed is kept, without names or email "
-            "addresses, as the trial terms describe.",
+            "addresses, as the free trial agreement and the privacy policy describe.",
         )
         details: tuple[tuple[str, str], ...] = ()
     else:
-        data = ("Your workspace is closed. Your data is kept until the date below, then deleted for good.",)
-        details = (("Data deleted on", delete_on),) if delete_on else ()
+        data = ("Your workspace is closed. Your data is kept at least until the date below, then deleted for good.",)
+        details = ((DELETED_ON, delete_on),) if delete_on else ()
     return _send(
         recipient,
         Message(
@@ -897,7 +909,7 @@ def send_trial_request_acknowledgement(recipient: str, *, display_name: str, org
             subject="We received your MDARIX free trial request",
             heading=f"Thank you, {display_name}",
             paragraphs=(
-                f"We received your request for a free MDARIX trial for {organization}. We review every request, "
+                f"We received your request for a free MDARIX trial for {organization}. The MDARIX team reviews it, "
                 "usually within one business day.",
                 "Once it is approved you will receive a second email with a link to activate your account. The link "
                 "works once, so keep that email.",

@@ -9,7 +9,9 @@ updated without rebuilding the site. Staging and production refuse to start unti
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Response
@@ -26,6 +28,39 @@ MAX_DOCUMENT_BYTES = 200_000
 
 def _get(name: str) -> str:
     return os.getenv(name, "").strip()
+
+
+_LAST_UPDATED = re.compile(r"^\s*Last updated:\s*(.+?)\s*$", re.MULTILINE)
+
+
+def _document_path(document: str) -> Path | None:
+    filename = LEGAL_DOCUMENTS.get(document)
+    folder = _get("MDARIX_LEGAL_DIR")
+    path = Path(folder) / filename if folder and filename else None
+    if path is None or not path.is_file() or path.stat().st_size > MAX_DOCUMENT_BYTES:
+        return None
+    return path
+
+
+def legal_versions() -> dict:
+    """The version of each legal document the website serves now: its "Last updated" date (None when the text has
+    none) and the SHA-256 of its exact text, or ``available: false`` when it is not provided. A trial request stores
+    this with the time it was sent (``OnboardingRequest.legal_acceptance``), as the record of which texts were
+    accepted."""
+    versions = {}
+    for document in LEGAL_DOCUMENTS:
+        path = _document_path(document)
+        if path is None:
+            versions[document] = {"available": False, "last_updated": None, "sha256": None}
+            continue
+        content = path.read_bytes()
+        found = _LAST_UPDATED.search(content.decode("utf-8", errors="replace"))
+        versions[document] = {
+            "available": True,
+            "last_updated": found.group(1).strip("*_ ") if found else None,
+            "sha256": hashlib.sha256(content).hexdigest(),
+        }
+    return versions
 
 
 @router.get("/site-info")
@@ -63,12 +98,10 @@ def version(response: Response) -> dict:
 @router.get("/legal/{document}")
 def legal_document(document: str, response: Response) -> dict:
     """One lawyer-supplied legal document as Markdown, or ``available: false`` while it has not been provided."""
-    filename = LEGAL_DOCUMENTS.get(document)
-    if filename is None:
+    if document not in LEGAL_DOCUMENTS:
         raise HTTPException(404, detail={"code": "DOCUMENT_NOT_FOUND", "message": "No such document"})
     response.headers["Cache-Control"] = "public, max-age=300"
-    folder = _get("MDARIX_LEGAL_DIR")
-    path = Path(folder) / filename if folder else None
-    if path is None or not path.is_file() or path.stat().st_size > MAX_DOCUMENT_BYTES:
+    path = _document_path(document)
+    if path is None:
         return {"document": document, "available": False, "markdown": None}
     return {"document": document, "available": True, "markdown": path.read_text(encoding="utf-8")}

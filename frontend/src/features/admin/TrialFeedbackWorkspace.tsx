@@ -132,7 +132,8 @@ export function TrialFeedbackWorkspace() {
         <div>
           <p>
             Answers to the questionnaire in the trial workspace. A quote can be published on the website only when the
-            person agreed, and is credited exactly as they chose: with their company's name or anonymously.
+            person agreed, and is credited exactly as they chose: with their job title and company's name, or
+            anonymously by their area of work.
           </p>
         </div>
         <div className="trial-queue-head-actions">

@@ -4,7 +4,7 @@
 
 Last updated: 19 October 2026
 
-This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a demo or a free trial, or use the MDARIX product investigation platform (the "Service").
+This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a free trial or a demo, or use the MDARIX product investigation platform (the "Service").
 
 ## Who we are
 
@@ -14,14 +14,16 @@ Questions about this policy or your personal data: privacy@mdarix.in.
 
 ## Our two roles
 
-- **For our own records** (website visitors, demo and trial requests, user accounts, sign-in and security records) we decide how the data is used. We are the data fiduciary (the controller) of that data.
+- **For our own records** (website visitors, trial and demo requests, user accounts, sign-in and security records, error and problem reports) we decide how the data is used. We are the data fiduciary (the controller) of that data.
 - **For our customers' content** (quality, complaint, supplier, product and investigation records that a customer uploads or connects) we act only on the customer's instructions. The customer decides how that data is used and we process it for the customer. If your personal data is in a customer's records, please contact that customer first; we will help them answer you.
 
 ## What we collect
 
-**When you request a free trial:** your name, job title, work email address, organization name and country, and optionally a phone number. We also ask about your organization so the trial fits it: its size, the devices it makes and their highest class, the markets it sells in, where complaints are handled today, how many complaints it receives, what data it plans to use in the trial and what it would like to evaluate.
+**When you visit our website or use the Service:** our server records each request it receives, with your network (IP) address, your browser's description of itself, the page asked for (without the part of the address after a question mark, such as search terms or the codes in links) and the time, to keep the Service secure and working. If a page fails in your browser, the browser sends us an error report: the page, the error and your browser, and, if you are signed in, your account and organization.
 
-**When you request a demo:** your name, work email address and phone number, and any times or topics you give us. To limit repeated requests we keep a one-way, salted hash of your network (IP) address, not the address itself.
+**When you request a free trial:** your name, job title, work email address, organization name and country, and optionally a phone number. We also ask about your organization so the trial fits it: its size, the devices it makes and their highest class, the markets it sells in, where complaints are handled today, how many complaints it receives, what data it plans to use in the trial and what it would like to evaluate. We also record when you sent the request and which version of our Terms of service, Free trial agreement and this policy you accepted by sending it.
+
+**When you ask for a demo from your trial workspace:** your name and work email address, and any phone number, times and topics you give us. During the product validation phase our website does not take demo requests; if it does again, it also keeps a one-way, salted hash of your network (IP) address to limit repeated requests, not the address itself.
 
 **When you use the Service:**
 
@@ -30,6 +32,7 @@ Questions about this policy or your personal data: privacy@mdarix.in.
 - An audit trail of actions taken in the Service: who did what, and when. Regulated quality work requires this record.
 - Electronic signatures: the signer, the meaning of the signature and the time it was applied.
 - Trial feedback, if you choose to answer our questionnaire or rating: your answers, linked to your account and organization.
+- Problem reports you send from the Service's help menu: what you write, the page you were on and your browser, linked to your account and organization. They are also emailed to our support mailbox.
 - A request to end a trial early: the reason you give, if any, and whether you asked for your data to be deleted.
 
 **Customer content** may contain personal data, for example a name in a complaint description. We process it only to provide the Service to the customer. During the trial, customers are asked not to enter patient-identifiable data.
@@ -37,9 +40,10 @@ Questions about this policy or your personal data: privacy@mdarix.in.
 ## Why we use it
 
 - To provide the Service, run free trials and answer demo requests, which you asked for.
+- To find and fix faults, from error and problem reports.
 - To keep the Service secure, prevent misuse and keep an audit trail.
 - To send account, security, trial and service emails: activation, password reset, trial reminders and notifications you have set up.
-- To improve the Service from trial feedback. We publish a quote from your feedback only if you chose named or anonymous publication; you can withdraw that choice at any time and the quote is removed.
+- To improve the Service from trial feedback. We publish a quote from your feedback only if you chose to have it published, and only after we review it: either with your job title and your company's name, or anonymously, credited only by your area of work (for example "Quality lead, medical-device company"). We never publish your own name with it. You can withdraw that choice at any time and the quote is removed.
 - To meet legal obligations and to establish or defend legal claims.
 
 We do not sell personal data and do not use it for advertising.
@@ -63,10 +67,13 @@ The Service and its data are hosted in India, by Google Cloud in its Mumbai regi
 
 ## How long we keep it
 
-- Free trial workspaces: deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and no longer than 90 days after the trial ends. The person who requested the trial is emailed 7 days and 1 day before the trial ends, and when it ends. A trial that is ended early at your request, with deletion asked for, is deleted when we confirm the request.
+- Free trial workspaces: deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and no longer than 90 days after the trial ends. The person who requested the trial is emailed 7 days and 1 day before the trial ends, and when it ends. A trial that is ended early at your request, with deletion asked for, is deleted when we confirm the request. The trial's audit trail is deleted with it, unless you ask us for an export before then.
+- What we keep after a free trial is deleted: a minimal record that the trial existed, as the record of the agreement. It holds the organization's name, its trial dates, its answers about the organization (such as its country, size and markets), the versions of our legal texts that were accepted, the accounts with their names and email addresses removed, and a record of the deletion. A feedback quote you agreed to have published is kept, with the job title it is credited to, until you withdraw that choice.
 - Free trial requests that do not lead to a trial: 90 days after we decline a request, or 90 days after the invitation to activate the trial expires unused, we delete the requester's name, email address, job title, phone number and what they wrote about their goals. We keep only the organization's name and its answers about the organization, as the record that the request was made.
 - Customer accounts and content: kept for the subscription term. At the end, the customer's data is returned as a full export (unless the customer waives this in writing) and then deleted.
-- Audit trail and electronic signatures: kept unchanged for at least 7 years from each event, or for as long as the customer's account exists if that is longer. When a customer's data is deleted at the end of its contract, its audit trail is given to the customer in the export and then deleted.
+- Audit trail and electronic signatures of a customer's account: kept unchanged, and never deleted, while the account exists. When a customer's data is deleted at the end of its contract, its audit trail is given to the customer in the export, for the customer to keep for its own regulatory period, and then deleted. Free trials are different: their audit trail is deleted with the trial workspace, as described above.
+- Server request logs: kept only until the server's log rotation overwrites them. The server keeps a fixed amount of log data and replaces the oldest first, so how long a record lasts depends on how busy the Service is.
+- Error reports and problem reports: deleted with the organization's data when its account or trial is deleted. Error reports sent before anyone signed in belong to no organization; no automatic deletion period is set for them yet, and you can ask us to delete them.
 - Backups: encrypted and kept for up to 90 days, after which deleted data no longer exists in them.
 - A legal hold (where a court, regulator or the customer requires data to be preserved) pauses deletion for that organization until it is lifted.
 
@@ -76,7 +83,7 @@ When personal data is erased, some traces can remain. Audit records keep an acco
 
 We use one cookie: a strictly necessary session cookie that keeps you signed in. It is secure and cannot be read by scripts. It ends after 30 minutes without activity, and at the latest 12 hours after sign-in.
 
-Your browser's local storage keeps preferences only, such as dismissed notices, table column choices and onboarding progress. We use no analytics, advertising or third-party tracking cookies.
+Your browser's local storage keeps preferences only, such as dismissed notices, table column choices and onboarding progress, and the time of your last activity, for automatic sign-out. We use no analytics, advertising or third-party tracking cookies.
 
 ## How we protect it
 
@@ -85,7 +92,7 @@ Your browser's local storage keeps preferences only, such as dismissed notices, 
 - Encrypted authenticator secrets, connector credentials, uploaded files and backups.
 - Passwords stored only as salted hashes and checked against known breached passwords.
 - Sign-in rate limits and lockout, and two-factor sign-in.
-- Virus scanning of uploads.
+- Virus scanning of every file we store, such as evidence attachments. Imported CSV and Excel files are read as data only and are not stored.
 - A tamper-evident audit trail that is verified daily.
 
 More detail is on our [Security page](/security).
@@ -120,6 +127,10 @@ The Service is for businesses and is not directed at children. It is for profess
 ## Language
 
 This policy is available in English. If you ask us at privacy@mdarix.in, we will provide it in any language listed in the Eighth Schedule to the Constitution of India.
+
+## Trademarks
+
+Product names mentioned in the Service or on our website, such as the names of quality and enterprise systems, are trademarks of their owners. MDARIX is not affiliated with or endorsed by them.
 
 ## Changes to this policy
 

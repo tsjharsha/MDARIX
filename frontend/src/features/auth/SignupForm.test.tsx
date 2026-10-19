@@ -17,7 +17,8 @@ describe("free trial request form", () => {
     const html = renderToStaticMarkup(<SignupForm />);
     expect(html).toContain("sample data from day one");
     expect(html).toContain("AI is off");
-    expect(html).toContain("With a company email, the activation link arrives within minutes.");
+    expect(html).toContain("With a company email, the trial is approved automatically and the activation link arrives");
+    expect(html).toContain("daily limit of new trials");
     expect(html).toContain("reviewed by the MDARIX team, usually within one business day");
     expect(renderToStaticMarkup(<WhatHappensNext personal={false} />)).toContain(
       "we email you the activation link within minutes",
@@ -32,5 +33,13 @@ describe("free trial request form", () => {
     for (const path of ["/terms", "/trial-agreement", "/privacy"])
       expect(html).toContain(`href="${path}" target="_blank" rel="noopener"`);
     expect(html.match(/<a /g)).toHaveLength(3);
+    // The request records which version of each text was accepted (backend/app/auth_router.py signup).
+    expect(html).toContain("records which version of each text you accepted, and when");
+  });
+
+  it("says precisely how the password is kept, never that MDARIX cannot see it", () => {
+    const html = renderToStaticMarkup(<SignupForm />);
+    expect(html).toContain("stores only a salted hash of it, so no one at MDARIX can read it");
+    expect(html).not.toContain("never sees it");
   });
 });

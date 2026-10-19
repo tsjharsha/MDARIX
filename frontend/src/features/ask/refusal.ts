@@ -7,6 +7,7 @@
 export type RefusalCode =
   | "GENAI_MONTHLY_BUDGET_REACHED"
   | "GENAI_DISABLED_FOR_ORGANIZATION"
+  | "GENAI_OFF_FOR_FREE_TRIAL"
   | "GENAI_PROVIDER_NOT_ALLOWED"
   | "GENAI_UNAVAILABLE";
 
@@ -14,6 +15,8 @@ export const REFUSAL_MESSAGES: Record<RefusalCode, string> = {
   GENAI_MONTHLY_BUDGET_REACHED: "Your organization's monthly AI allowance is used up; an administrator can raise it.",
   GENAI_DISABLED_FOR_ORGANIZATION:
     "AI processing is switched off for your organization; an administrator can enable it under Security › AI processing.",
+  GENAI_OFF_FOR_FREE_TRIAL:
+    "AI is off for free trials during the product validation phase, so MDARIX answered from its rules.",
   GENAI_PROVIDER_NOT_ALLOWED:
     "No AI service approved for customer data is configured here, so MDARIX answered from its rules; please contact MDARIX support.",
   GENAI_UNAVAILABLE:

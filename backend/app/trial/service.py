@@ -231,6 +231,8 @@ def _request_view(row: OnboardingRequest, tenant, subscription, owner_status: st
         # The latest invitation email (SENT, FAILED or NOT_CONFIGURED; None before md47) and when it was tried.
         "invitation_delivery": row.invitation_delivery,
         "invitation_attempted_at": row.invitation_attempted_at.isoformat() if row.invitation_attempted_at else None,
+        # Which versions of the Terms, the Free Trial Agreement and the Privacy Policy were accepted, and when (md48).
+        "legal_acceptance": row.legal_acceptance,
     }
 
 

@@ -590,7 +590,8 @@ def _trial_already_requested(status: str | None) -> dict:
 SIGNUP_ACCEPTED = {
     "status": "ONBOARDING_REQUEST_ACCEPTED",
     "tenant_created": False,
-    "next_step": "We review every request, usually within one business day, and email an invitation once approved.",
+    "next_step": "The MDARIX team reviews your request, usually within one business day, and emails an invitation once "
+    "it is approved.",
 }
 # A company email is approved at once (backend/app/trial/auto_approval.py): the workspace is prepared after this answer.
 SIGNUP_APPROVING = {
@@ -627,6 +628,8 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
         raise HTTPException(422, detail={"code": problem.code, "message": problem.message}) from None
     try:
         now = datetime.now(timezone.utc)
+        from backend.app.site_info import legal_versions
+
         row = OnboardingRequest(
             id=uuid.uuid4(),
             email=email,
@@ -634,6 +637,9 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
             organization=" ".join(data.organization.split()),
             status="PENDING_REVIEW",
             profile=profile,
+            # Sending the request accepts the Terms and the Free Trial Agreement and acknowledges the Privacy Policy
+            # (the sign-up page says so above the button): which versions, and when (md48).
+            legal_acceptance={"accepted_at": now.isoformat(), "documents": legal_versions()},
             created_at=now,
             updated_at=now,
         )

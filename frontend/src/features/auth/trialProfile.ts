@@ -1,12 +1,22 @@
 /**
  * What a trial requester tells MDARIX about their company and trial. The codes are the ones
  * backend/app/trial/request_profile.py accepts. No password is asked for: the requester creates it from the
- * invitation email after approval, and MDARIX staff never see it.
+ * invitation email after approval, and MDARIX keeps only a salted hash of it.
  */
 
 import { DIALING_CODES } from "./dialingCodes";
 
 export type Option = { value: string; label: string };
+
+/** How MDARIX keeps passwords, in the words every page uses (auth/service.py stores a salted scrypt hash). */
+export const PASSWORD_PROMISE = "MDARIX stores only a salted hash of it, so no one at MDARIX can read it.";
+
+/**
+ * Countries under comprehensive sanctions, left out of the sign-up list: MDARIX does not offer trials there. The
+ * server refuses them too, with the Crimea and the so-called Donetsk and Luhansk People's Republics typed by name
+ * (backend/app/trial/request_profile.py is_sanctioned_region).
+ */
+export const SANCTIONED_REGIONS: ReadonlySet<string> = new Set(["CU", "IR", "KP", "SY"]);
 
 export const COMPANY_SIZES: Option[] = [
   { value: "1-50", label: "1-50 employees" },
@@ -135,17 +145,19 @@ export function signupBody(email: string, name: string, company: string, profile
 export type Country = { code: string; name: string; dial: string; label: string };
 
 /**
- * Every country and territory for the sign-up dropdown, sorted and shown by name ("India"), with its dialing code
+ * Every country and territory for the sign-up dropdown (except SANCTIONED_REGIONS), sorted and shown by name ("India"), with its dialing code
  * from libphonenumber's metadata (dialingCodes.ts) to start the phone number; the name is the browser's standard English
  * region name.
  */
 export function countries(locale = "en"): Country[] {
   const names =
     typeof Intl !== "undefined" && "DisplayNames" in Intl ? new Intl.DisplayNames([locale], { type: "region" }) : null;
-  return DIALING_CODES.map(([code, dial]) => {
-    const name = names?.of(code) ?? code;
-    return { code, name, dial, label: name };
-  }).sort((a, b) => a.name.localeCompare(b.name, locale));
+  return DIALING_CODES.filter(([code]) => !SANCTIONED_REGIONS.has(code))
+    .map(([code, dial]) => {
+      const name = names?.of(code) ?? code;
+      return { code, name, dial, label: name };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
 }
 
 /** The same check the server makes (backend/app/trial/request_profile.py): +, the country code, then 8 to 15 digits in

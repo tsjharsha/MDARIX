@@ -62,16 +62,19 @@ PER_USER_PER_DAY = 5
 
 
 def consent_wording(choice: str, organization: str) -> str:
-    """The exact sentence the person agrees to; the page shows the same words and the server stores them."""
+    """The exact sentence the person agrees to; the page shows the same words and the server stores them. It names
+    what ``attribution`` credits a published quote with: the job title and the company for NAMED, the area of work
+    only for ANONYMOUS; never the person's name."""
     if choice == "NAMED":
         return (
-            f"MDARIX may show my quote on its website and in its materials with my company's name, {organization}, "
-            "after review. I can withdraw this consent at any time."
+            "MDARIX may show my quote on its website and in its materials with my job title and my company's name, "
+            f"{organization} (not my own name), after review. I can withdraw this consent at any time."
         )
     if choice == "ANONYMOUS":
         return (
-            "MDARIX may show my quote on its website and in its materials without my name or my company's name "
-            f'(as "a {ANONYMOUS_ATTRIBUTION}"), after review. I can withdraw this consent at any time.'
+            "MDARIX may show my quote on its website and in its materials without my name or my company's name, "
+            f'credited only by my area of work (for example "Quality lead, {ANONYMOUS_ATTRIBUTION}"), after review. '
+            "I can withdraw this consent at any time."
         )
     return "My feedback is for the MDARIX team only and is never shown publicly."
 

@@ -59,7 +59,7 @@ def _ensure_trial_open(db: Session, tenant_id) -> None:
                 "code": "TRIAL_ENDED",
                 "message": (
                     "Your MDARIX free trial has ended. Contact us to continue with your data intact"
-                    + (f"; otherwise it is deleted on {deleted_on}." if deleted_on else ".")
+                    + (f"; otherwise it is deleted on {deleted_on} at the earliest." if deleted_on else ".")
                 ),
                 "ended_on": ended_on,
                 "data_deleted_on": deleted_on,

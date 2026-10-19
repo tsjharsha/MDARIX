@@ -26,7 +26,7 @@ const FORMER_PLATFORM_PAGES: Record<string, [string, string]> = {
 
 describe("website addresses", () => {
   it("opens the legal, security and contact pages", () => {
-    for (const path of ["/privacy", "/terms", "/trial-agreement", "/security", "/contact"])
+    for (const path of ["/privacy", "/terms", "/trial-agreement", "/security", "/accessibility", "/contact"])
       expect(resolveSitePath(path, "")).toEqual({ page: path, hash: "" });
   });
 

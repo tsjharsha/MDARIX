@@ -466,6 +466,8 @@ type AiSettings = {
   models: { provider: string; model: string }[];
   provider_name: string | null;
   masking: boolean;
+  /** On the Free Trial plan: AI stays off during the product validation phase and the API refuses to switch it on. */
+  free_trial?: boolean;
   /** The four bars AI must pass before a pilot; production refuses switching AI on until they are met. */
   release_gate?: ReleaseGate;
 };
@@ -493,6 +495,8 @@ function TenantAiSettings({
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const data = settings.data;
   const on = data?.ai_processing_allowed ?? false;
+  // A free trial's AI cannot be switched on (backend/app/ai_settings.py); switching it off stays possible.
+  const trialLocked = Boolean(data?.free_trial) && !on;
   const ask = (body: Record<string, unknown>, title: string, effect: string, done: string) =>
     setConfirm({
       title,
@@ -522,7 +526,10 @@ function TenantAiSettings({
           <dl className="cc-details">
             <div>
               <dt>AI processing</dt>
-              <dd>{on ? "On" : "Off: rule-based answers only"}</dd>
+              <dd>
+                {on ? "On" : "Off: rule-based answers only"}
+                {data.free_trial ? " · Free trial: AI stays off during the product validation phase" : ""}
+              </dd>
             </div>
             <div>
               <dt>AI usage this month (tokens)</dt>
@@ -544,9 +551,20 @@ function TenantAiSettings({
           </dl>
         )}
         <div className="ca-action-row">
-          <button type="button" className={on ? "ca-danger" : "ac-primary"} disabled={!data} onClick={switchAi}>
+          <button
+            type="button"
+            className={on ? "ca-danger" : "ac-primary"}
+            disabled={!data || trialLocked}
+            onClick={switchAi}
+          >
             {on ? "Turn AI off" : "Turn AI on"}
           </button>
+          {trialLocked && (
+            <small className="ac-muted">
+              AI cannot be switched on for a free trial: the free trial agreement keeps it off during the product
+              validation phase.
+            </small>
+          )}
         </div>
         <form
           className="ca-form"

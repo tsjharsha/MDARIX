@@ -73,8 +73,9 @@ export function AuditSection() {
       }
     >
       <p className="ac-muted">
-        Events cannot be changed or deleted and are kept for at least 7 years. Any tampering is detected; use the check
-        below to confirm. Downloads contain only your organization&apos;s events.
+        Events cannot be changed or deleted while your organization&apos;s account exists. When the account closes, the
+        trail is handed to you in the full export, for you to keep for your own regulatory period. Any tampering is
+        detected; use the check below to confirm. Downloads contain only your organization&apos;s events.
       </p>
       <div className="ca-action-row">
         <button type="button" className="ac-secondary" onClick={verify} disabled={integrity.state === "checking"}>

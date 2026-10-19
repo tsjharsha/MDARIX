@@ -42,17 +42,17 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
       "Open the MDARIX website and choose Start free trial.",
       "Step 1, About you: your name, job title, work email, company and country (a phone number is optional).",
       "Step 2, Your trial: company size, device class, the devices you make, your markets, where complaints are handled today and what you want to improve. Tick that you will not upload patient-identifiable data.",
-      "Choose Request free trial. Sending the request accepts the Terms of Service and the Free Trial Agreement.",
+      "Choose Request free trial. Sending the request accepts the Terms of Service and the Free Trial Agreement and acknowledges the Privacy Policy; MDARIX records which version of each you accepted.",
     ],
     result:
-      "With a company email your workspace is prepared at once and the activation email arrives within minutes. Other requests are reviewed, usually within one business day.",
-    tip: "Use your work email: a company email gets its trial at once, and every trial message goes there.",
+      "With a company email the trial is approved automatically and the activation email arrives within minutes, up to a daily limit of new trials. Requests from personal email addresses, and any beyond that limit, are reviewed by the MDARIX team, usually within one business day.",
+    tip: "Use your work email: a company email gets its trial within minutes, and every trial message goes there.",
   },
   {
     key: "sign-in",
     title: "Activate your account and sign in",
     time: "5 minutes",
-    why: "Your password is yours alone: MDARIX never sees it and never sends one.",
+    why: "Your password is yours alone: MDARIX stores only a salted hash of it, so no one at MDARIX can read it, and it never sends one.",
     actions: [
       "Open the invitation email and choose the activation link (valid for 48 hours).",
       "Choose a password of at least 12 characters. A phrase of several words works well.",
