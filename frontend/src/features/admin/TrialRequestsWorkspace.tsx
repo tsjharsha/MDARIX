@@ -28,7 +28,24 @@ type TrialRequest = {
   profile?: { job_title?: string; country?: string; [key: string]: unknown };
   profile_lines?: { label: string; value: string }[];
 };
-type DueTrial = { tenant_id: string; tenant_key: string; name: string; trial_ended_at: string; delete_after: string };
+/** A closed trial past its 30 days (backend/app/trial/retention.py trials_due); a held one is kept by the run. */
+type DueTrial = {
+  tenant_id: string;
+  tenant_key: string;
+  name: string;
+  trial_ended_at: string;
+  delete_after: string;
+  legal_hold?: boolean;
+  held_for_mvp_request?: boolean;
+  hold_until?: string;
+};
+/** Why a due trial is kept by the run, or null when it is deleted. */
+export const keptBecause = (trial: Pick<DueTrial, "legal_hold" | "held_for_mvp_request" | "hold_until">) =>
+  trial.legal_hold
+    ? "under a legal hold"
+    : trial.held_for_mvp_request
+      ? `held for its MVP request${trial.hold_until ? ` until ${new Date(trial.hold_until).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} at the latest` : ""}`
+      : null;
 type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
 
 /** One page of the queue (backend/app/trial/service.py request_queue): counts per status for the tabs. */
@@ -185,6 +202,9 @@ export function TrialRequestsWorkspace() {
 
   // The server sends only the chosen tab's page (older answers may hold every status).
   const rows = items.filter((item) => item.status === filter);
+  // Due trials a legal hold or an open MVP request keeps are listed apart: the run skips them.
+  const deleting = (retention ?? []).filter((trial) => !keptBecause(trial));
+  const kept = (retention ?? []).filter((trial) => keptBecause(trial));
   return (
     <section className="platform-admin-card trial-queue" aria-labelledby="trial-queue-title">
       <div className="platform-admin-card-title">
@@ -413,8 +433,8 @@ export function TrialRequestsWorkspace() {
           <DialogBehaviour onClose={() => setRetention(null)} />
           <div>
             <h4 id="trial-retention-title">Delete expired trial data</h4>
-            {retention.length === 0 ? (
-              <p>No closed trial has passed its 30-day retention period. Nothing will be deleted.</p>
+            {deleting.length === 0 ? (
+              <p>No closed trial is due for deletion. Nothing will be deleted.</p>
             ) : (
               <>
                 <p>
@@ -422,7 +442,7 @@ export function TrialRequestsWorkspace() {
                   longer sign in, and the workspace is archived. The audit trail is kept. This cannot be undone.
                 </p>
                 <ul>
-                  {retention.map((trial) => (
+                  {deleting.map((trial) => (
                     <li key={trial.tenant_id}>
                       {trial.name} ({trial.tenant_key}), trial ended {formatDate(trial.trial_ended_at)}
                     </li>
@@ -430,13 +450,25 @@ export function TrialRequestsWorkspace() {
                 </ul>
               </>
             )}
+            {kept.length > 0 && (
+              <>
+                <p>Kept for now:</p>
+                <ul>
+                  {kept.map((trial) => (
+                    <li key={trial.tenant_id}>
+                      {trial.name} ({trial.tenant_key}), {keptBecause(trial)}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <div className="trial-queue-dialog-actions">
               <button className="platform-admin-secondary" onClick={() => setRetention(null)}>
-                {retention.length ? "Cancel" : "Close"}
+                {deleting.length ? "Cancel" : "Close"}
               </button>
-              {retention.length > 0 && (
+              {deleting.length > 0 && (
                 <button className="platform-admin-primary" disabled={busy !== null} onClick={runRetention}>
-                  {busy ? "Deleting…" : `Delete data of ${retention.length} trial${retention.length === 1 ? "" : "s"}`}
+                  {busy ? "Deleting…" : `Delete data of ${deleting.length} trial${deleting.length === 1 ? "" : "s"}`}
                 </button>
               )}
             </div>

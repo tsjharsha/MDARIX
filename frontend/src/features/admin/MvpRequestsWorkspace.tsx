@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Archive, PhoneCall, RefreshCw, RotateCcw } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { Table } from "../customer-admin/shared";
+import { retentionText, type TrialRetention } from "./customers/trials";
 
 export type MvpRequestItem = {
   id: string;
@@ -20,6 +21,8 @@ export type MvpRequestItem = {
   updated_at: string | null;
   handled_at: string | null;
   note: string | null;
+  /** When the trial's data is deleted; held while this request asks to move it (null once the trial is converted). */
+  retention?: TrialRetention | null;
 };
 
 export const MVP_REQUESTS_PATH = "/api/v1/platform-admin/mvp-requests";
@@ -43,6 +46,9 @@ const FILTERS: [string, string][] = [
   ["CONTACTED", "Contacted"],
   ["CLOSED", "Closed"],
 ];
+
+const formatDay = (value: string) =>
+  new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 
 const formatDate = (value: string | null) =>
   value
@@ -83,7 +89,12 @@ export function MvpRequestsWorkspace() {
     setResult(null);
     try {
       await requestJson(`${MVP_REQUESTS_PATH}/${row.id}/status`, { method: "POST", body: JSON.stringify({ status }) });
-      setResult({ tone: "good", text: `${row.organization}: marked ${status.toLowerCase()}.` });
+      // Closing a request that held the trial data lets its deletion resume, after a grace period (retention.py).
+      const released = status === "CLOSED" && row.retention?.held_for_mvp_request;
+      setResult({
+        tone: "good",
+        text: `${row.organization}: marked ${status.toLowerCase()}.${released ? " Its trial data is no longer held; the new deletion date is shown below." : ""}`,
+      });
       load();
     } catch (error) {
       setResult({ tone: "bad", text: error instanceof Error ? error.message : "The request could not be updated." });
@@ -101,7 +112,9 @@ export function MvpRequestsWorkspace() {
           <h3 id="mvp-queue-title">Free trials that asked for an MVP conversation</h3>
           <p>
             Reply to each requester to arrange a scoping call, then mark the request contacted. Close it when the
-            conversation is over; the organization can then ask again. Prices go only in the written proposal.
+            conversation is over; the organization can then ask again. Prices go only in the written proposal. While a
+            request that asks to move the trial data is open, that data is not deleted; closing it lets the deletion
+            resume.
           </p>
         </div>
         <div className="trial-queue-head-actions">
@@ -166,7 +179,16 @@ export function MvpRequestsWorkspace() {
                 </span>
               ),
             },
-            { key: "data", label: "Trial data", render: (row) => mvpDataText(row) },
+            {
+              key: "data",
+              label: "Trial data",
+              render: (row) => (
+                <span className="cc-stack">
+                  <span>{mvpDataText(row)}</span>
+                  {row.retention && <small>{retentionText(row.retention, formatDay)}</small>}
+                </span>
+              ),
+            },
             {
               key: "contact",
               label: "Contact",

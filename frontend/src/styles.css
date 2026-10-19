@@ -3030,6 +3030,12 @@ th {
   border-radius: 8px;
   padding: 10px 12px;
 }
+/* A checkbox or radio in a toolbar keeps its own size, on one line beside its label (not a 360px search box). */
+.ca-toolbar input[type="checkbox"],
+.ca-toolbar input[type="radio"] {
+  width: auto;
+  padding: 0;
+}
 .ca-toolbar span {
   color: #607887;
   font-size: 13px;

@@ -1064,7 +1064,16 @@ def revoke_trial_support_access(
 @router.get("/platform-admin/trial-retention")
 def trial_retention_preview(request: Request, db: Session = Depends(get_db)):
     _require_platform_admin(request, db)
-    return {"retention_days": retention.RETENTION_DAYS, "due": retention.trials_due(db)}
+    return {
+        "retention_days": retention.RETENTION_DAYS,
+        # A request to move the trial data into the MVP holds it (backend/app/trial/retention.py).
+        "mvp_hold": {
+            "max_days": retention.MVP_HOLD_MAX_DAYS,
+            "grace_days": retention.MVP_HOLD_GRACE_DAYS,
+            "alert_days": retention.MVP_HOLD_ALERT_DAYS,
+        },
+        "due": retention.trials_due(db),
+    }
 
 
 @router.post("/platform-admin/trial-retention/run")

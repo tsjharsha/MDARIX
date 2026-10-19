@@ -62,9 +62,10 @@ export function chapterTone(chapter: StoryChapter): Tone {
   return chapter.finding.state === "NOT_SET" ? "neutral" : checkStateOf(chapter.finding.state).tone;
 }
 
+/** A chapter not tried yet is simply still to do: said neutrally, never as a failure. */
 export function chapterStatus(chapter: StoryChapter): string {
   if (chapter.acted.done) return chapter.acted.count === 1 ? "Done once" : `Done ${chapter.acted.count} times`;
-  return "Your turn";
+  return "To do";
 }
 
 /** The chapters as stations on the loop picture. */

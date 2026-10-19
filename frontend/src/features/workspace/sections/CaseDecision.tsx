@@ -101,6 +101,8 @@ export function CaseDecisionPanel({
   const [recordId, setRecordId] = useState<string | null>(null);
   const [signedKey, setSignedKey] = useState(0);
   const [returning, setReturning] = useState(false);
+  // Once a decision is signed, its summary above is what the case shows; a new decision is a deliberate second step.
+  const [recordingNew, setRecordingNew] = useState(false);
   const current = data?.current_decision ?? null;
   const history = decisionHistory(data?.decisions, current);
   const reload = (text?: string) => {
@@ -179,16 +181,31 @@ export function CaseDecisionPanel({
         </div>
       </Panel>
       {data && brief && <BriefForDecision brief={brief} reviewers={listOf(data.reviewers) as DecisionReviewer[]} />}
-      {data && brief && actions.can_sign === true && (
+      {data && brief && actions.can_sign === true && current && !recordingNew && (
+        <Panel eyebrow="Your decision" title="This case is decided">
+          <p className="ac-muted">
+            The signed decision above stands. Record a new decision only if it must change: the new one supersedes{" "}
+            {safeText(current.business_id) ?? "the current decision"}, and both stay on record.
+          </p>
+          <div className="ca-action-row">
+            <button type="button" className="ac-secondary" onClick={() => setRecordingNew(true)}>
+              <Gavel size={15} aria-hidden="true" /> {newDecisionLabel(current)}
+            </button>
+          </div>
+        </Panel>
+      )}
+      {data && brief && actions.can_sign === true && (!current || recordingNew) && (
         <DecisionFormPanel
           key={`${brief.id ?? ""}:${brief.content_hash ?? ""}:${current?.id ?? ""}`}
           investigationId={investigationId}
           caseLabel={caseLabel}
           context={data}
           brief={brief}
+          onCancel={current ? () => setRecordingNew(false) : undefined}
           onSigned={(decision) => {
             setMessage(null);
             setSignedKey((value) => value + 1);
+            setRecordingNew(false);
             context.reload();
             onCaseChanged?.();
             if (decision) setRecordId(decision);
@@ -543,6 +560,12 @@ function BriefForDecision({ brief, reviewers }: { brief: DecisionBrief; reviewer
   );
 }
 
+/** "Record a new decision (supersedes DEC000001)": the secondary action offered once a case is decided. */
+export function newDecisionLabel(current: { business_id?: unknown } | null | undefined): string {
+  const id = safeText(current?.business_id);
+  return id ? `Record a new decision (supersedes ${id})` : "Record a new decision";
+}
+
 /** The decision form; once complete it shows what the signature means and opens the separate Sign step. */
 function DecisionFormPanel({
   investigationId,
@@ -551,6 +574,7 @@ function DecisionFormPanel({
   brief,
   onSigned,
   onRefused,
+  onCancel,
 }: {
   investigationId: string;
   caseLabel: string;
@@ -558,6 +582,8 @@ function DecisionFormPanel({
   brief: DecisionBrief;
   onSigned: (decisionId: string | null) => void;
   onRefused: (text: string) => void;
+  /** Closes the form without signing (offered when it would supersede a signed decision). */
+  onCancel?: () => void;
 }) {
   const { session, notify } = useWorkspace();
   // The brief writes the follow-ups first: those its recommended actions name are ticked, for the decision maker to
@@ -607,7 +633,7 @@ function DecisionFormPanel({
   };
   const blocked = hash.key === "mismatch" || missingBrief;
   return (
-    <Panel eyebrow="Your decision" title="Decide">
+    <Panel eyebrow="Your decision" title={current ? newDecisionLabel(current) : "Decide"}>
       <form
         className="ca-form"
         onSubmit={(event) => {
@@ -800,6 +826,11 @@ function DecisionFormPanel({
           <button type="submit" className="ac-primary" disabled={blocked || (touched && problems.length > 0)}>
             <Gavel size={15} aria-hidden="true" /> Continue to sign
           </button>
+          {onCancel && (
+            <button type="button" className="ac-secondary" onClick={onCancel}>
+              Keep the signed decision
+            </button>
+          )}
           <span className="ac-muted">You confirm your identity in the next step.</span>
         </div>
       </form>

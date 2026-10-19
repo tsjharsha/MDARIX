@@ -131,7 +131,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `tenant-lifecycle` | 15 min | Apply scheduled tenant status changes |
 | `subscription-lifecycle` | 1 h | Expiry, grace and renewal reminders |
 | `trial-reminders` | 6 h | Email trial owners before and when the trial ends |
-| `trial-retention` | 24 h | Delete trial data 30 days after the trial ends |
+| `trial-retention` | 24 h | Delete trial data 30 days after the trial ends (held while its move into the MVP is requested) |
 | `embedding-catch-up` | 15 min | Embed evidence that has no embedding yet |
 | `operations-alerts` | 5 min | Alert on dead letters and a stopped worker; ping `MDARIX_SCHEDULER_HEARTBEAT_URL` |
 | `export-expiry` | 1 h | Delete data exports after their download period |
@@ -155,6 +155,7 @@ directly to the database, not through a transaction-mode pooler.
 | `Scheduled job missed: <job>` | The job has not started or finished within 2 x its interval (another instance holding the lock, or a slow job starving the loop). Once per occurrence |
 | `Scheduled job running again: <job>` | The missed job ran within its interval again |
 | `Trial data could not be deleted` | `trial-retention` could not purge an ended trial; nothing was changed for it |
+| `Trial data held for an MVP request` | `trial-retention`: a trial kept because its MVP request asks to move its data is 7 days from the date it would otherwise have been deleted, or from the end of its 90-day hold. Once each; close the request (Identity & Access › Onboarding) or convert the trial |
 | `Audit trail integrity check failed` | `audit-chain-verification` found a broken chain; follow [INCIDENT_RESPONSE.md](INCIDENT_RESPONSE.md) |
 
 ### Is the scheduler alive?

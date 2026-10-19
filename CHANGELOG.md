@@ -10,6 +10,50 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.32] - 2026-10-19
+
+### Fixed
+
+- Free trial: trial data the organization asked to move into the MVP is no longer deleted while that is being
+  arranged. While a request from Next steps that asks to move the trial data is open (new or contacted), and the data
+  may still move (sample data removed, own data imported), the nightly `trial-retention` job keeps the trial and
+  records `TRIAL_RETENTION_SKIPPED_MVP_REQUEST` in its audit trail. Closing the request lets the deletion resume 14
+  days later at the earliest (`MVP_HOLD_GRACE_DAYS`), never the same night. The hold never lasts longer than 90 days
+  after the trial ends (`MVP_HOLD_MAX_DAYS`). The MDARIX team gets an operations alert 7 days before the date the data
+  would otherwise have been deleted and 7 days before the hold ends, once each (`TRIAL_RETENTION_MVP_HOLD_ALERTED`).
+  Platform Admin shows the hold in Customers & Tenants › Trials, next to the request in Identity & Access ›
+  Onboarding › MVP requests, and in **Delete expired trial data**, which lists held trials under "Kept for now". A
+  request that does not ask to move the data, or data that cannot move, holds nothing; a legal hold works as before.
+  The privacy policy (How long we keep it) and the trial agreement (5.3) say so; the retention schedule
+  (`docs/compliance/DATA_RETENTION_SCHEDULE.md`) has the periods.
+- Free trial: the 5,000-row allowance counts the rows of your files, as you count them. A 5,000-row complaints export
+  now fits, although it also names products, versions and lots, which are added with it but are not rows. A 6-row
+  file uses 6 rows, not 12. The file check says "6 rows ready to import (6 new rows of your 5,000)" and names what the
+  complaints add besides. A file that does not fit says "This file adds 5,001 rows; your trial has 5,000 of 5,000 rows
+  left.", with thousands separators. Getting started › Your trial › Uploaded rows and the Platform Admin trial
+  overview count the same way, also for rows already uploaded. A row that only updates a record already there is not
+  counted again.
+- Getting started: chapter 4, **Open the guided investigation**, opens the sample case on its Workspace tab instead of
+  the list of investigations (the list when the sample case is gone).
+- Getting started: the first chapter's finding reads "1 of 5 records to recheck reports a death or serious injury"
+  (also on Readiness), not "1 report a death or serious injury". A chapter not tried yet shows a neutral "To do" chip
+  with an empty circle instead of a red cross and "Your turn".
+- Signals: a signal's chart counts the signal's own complaints by product version, so it agrees with the signal (the
+  sample signal showed 7 complaints for a signal of 5). Related records now include changes recorded against a
+  component of the product, so the sample signal shows the supplier change SAMPLE-CHG-014.
+- Decision tab: after a decision is signed, the case shows the signed decision. **Record a new decision (supersedes
+  DEC000001)** is a secondary button that opens the form with the supersede explanation, and **Keep the signed
+  decision** closes it again.
+- Free trial sample data: the sample CAPA SAMPLE-CAPA-02 (restore incoming inspection for the NovaSense sensors) is
+  opened when the trial starts, after the sample brief, and is due in 45 days with its effectiveness check 30 days
+  later, instead of predating the case and being overdue. Applies to new trials.
+- The **Include retired hypotheses** checkbox on a case's Intelligence › Hypotheses tab sits on one line beside its
+  label instead of wrapping over three lines in a wide empty column (every checkbox in a toolbar).
+
+### Added
+
+- Help menu: **Watch the videos** opens the website's videos page in a new tab.
+
 ## [0.10.31] - 2026-10-19
 
 ### Added

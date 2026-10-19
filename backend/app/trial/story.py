@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -59,7 +59,8 @@ CHAPTERS = (
         "One AI run drafts the analysis, competing explanations and challenges; every statement cites the evidence "
         "and passes the automatic trust check, and the investigator judges each one.",
         "Small teams with large backlogs; AI that cannot show its sources is not trusted.",
-        {"section": "Investigations", "tab": None},
+        # Inside the guided investigation, on its case page (Getting started opens the chapter's case).
+        {"section": "Investigations", "tab": "Workspace"},
         None,
     ),
     (
@@ -660,7 +661,8 @@ def trial_overview(
     from backend.app.db.tenant_scope import bind_system
     from backend.app.sorting import parse_sort, sort_rows
     from backend.app.trial import citations
-    from backend.app.trial.retention import RETENTION_DAYS
+    from backend.app.trial import retention
+    from backend.app.trial.mvp_request import data_move
     from backend.app.trial.service import TRIAL_ROW_LIMIT, TRIAL_USER_LIMIT
 
     ai_on_server = bool(_models_in_use())
@@ -672,6 +674,7 @@ def trial_overview(
                 SubscriptionLifecycle.tenant_id,
                 SubscriptionLifecycle.starts_at,
                 SubscriptionLifecycle.expires_at,
+                SubscriptionLifecycle.grace_ends_at,
                 Tenant.business_id,
                 Tenant.tenant_key,
                 Tenant.name,
@@ -686,9 +689,20 @@ def trial_overview(
         demos = _demos_by_tenant(db, trial_ids) if rows else {}
         counts = acted_counts_by_tenant(data, trial_ids) if rows else {}
         moments = last_activity_by_tenant(data, trial_ids) if rows else {}
+        # When each trial's data is deleted: 30 days after it ends, or later while it asks to move it into the MVP.
+        moves = retention.move_requests(db, trial_ids) if rows else {}
+        movable = {
+            tenant_id: bool(data_move(data, tenant_id)["allowed"])
+            for tenant_id, asked in moves.items()
+            if asked["open"] is not None
+        }
         items, tenant_of, searched = [], {}, []
         for row in rows:
             request = requests.get(row.tenant_id)
+            trial_end = max(row.expires_at, row.grace_ends_at or row.expires_at)
+            kept = retention.plan_view(
+                retention.retention_plan(trial_end, moves.get(row.tenant_id), movable.get(row.tenant_id, False), now)
+            )
             ended = row.expires_at <= now
             seconds_left = (row.expires_at - now).total_seconds()
             item = {
@@ -700,7 +714,9 @@ def trial_overview(
                 "people": [],
                 "starts_at": row.starts_at.isoformat() if row.starts_at else None,
                 "expires_at": row.expires_at.isoformat(),
-                "data_deleted_at": (row.expires_at + timedelta(days=RETENTION_DAYS)).isoformat(),
+                "data_deleted_at": kept["delete_after"],
+                # Held while an open request asks to move the data into the MVP (backend/app/trial/retention.py).
+                "retention": kept,
                 "state": "ENDED" if ended else "ENDING_SOON" if seconds_left <= 7 * 86400 else "ACTIVE",
                 "days_left": 0 if ended else max(0, int(-(-seconds_left // 86400))),
                 "users": {"used": 0, "limit": TRIAL_USER_LIMIT},

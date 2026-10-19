@@ -12,7 +12,7 @@ vi.mock("../customer-admin/shared", async (importOriginal) => ({
   useResource: (path: string | null) => ({ state: "ready", data: answers.get(path ?? "") ?? null, reload: () => {} }),
 }));
 
-const { CaseDecisionPanel } = await import("./sections/CaseDecision");
+const { CaseDecisionPanel, newDecisionLabel } = await import("./sections/CaseDecision");
 const { BriefNextStepBar, CaseDecisionBriefPanel } = await import("./sections/CaseDecisionBrief");
 
 const CASE = "11111111-1111-4111-8111-111111111111";
@@ -71,6 +71,31 @@ describe("from the Decision tab to the brief's review", () => {
     const html = render(<CaseDecisionPanel investigationId={CASE} caseLabel="INV000001" onReviewBrief={() => {}} />);
     expect(html).toContain("another person must sign");
     expect(html).not.toContain("Review the brief first");
+  });
+});
+
+describe("after the decision is signed", () => {
+  it("shows the signed decision and offers a new one only as a collapsed, secondary action", () => {
+    decisionContext("APPROVED_FOR_DECISION", null);
+    const open = render(<CaseDecisionPanel investigationId={CASE} caseLabel="INV000001" />);
+    // Not decided yet: the form itself.
+    expect(open).toContain("Continue to sign");
+    answers.set(DECISION, {
+      ...(answers.get(DECISION) as object),
+      current_decision: {
+        id: "d1",
+        business_id: "DEC000001",
+        outcome: "ACCEPT_CONCLUSION",
+        signer_name: "Priya Raman",
+      },
+    });
+    const decided = render(<CaseDecisionPanel investigationId={CASE} caseLabel="INV000001" />);
+    expect(decided).toContain("DEC000001");
+    expect(decided).toContain("View the signed record");
+    expect(decided).toContain("Record a new decision (supersedes DEC000001)");
+    expect(decided).not.toContain("Continue to sign");
+    expect(decided).not.toContain("Why this decision supersedes the current one");
+    expect(newDecisionLabel(null)).toBe("Record a new decision");
   });
 });
 

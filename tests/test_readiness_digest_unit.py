@@ -15,7 +15,13 @@ def _check(code: str, state: str, value, detail: str = "", why: str = "") -> dic
 READINESS = {
     "as_of": "2026-10-19",
     "checks": [
-        _check("COMPLAINTS_TO_RECHECK", "CRITICAL", 5, "1 report a death or serious injury", "Hidden complaints."),
+        _check(
+            "COMPLAINTS_TO_RECHECK",
+            "CRITICAL",
+            5,
+            "1 of 5 records to recheck reports a death or serious injury",
+            "Hidden complaints.",
+        ),
         _check("COMPLAINTS_PAST_TARGET", "CLEAR", 0),
         _check("REPORTING_CLOCKS", "ATTENTION", 2),
         _check("TRENDS_WITHOUT_ACTION", "CLEAR", 0),

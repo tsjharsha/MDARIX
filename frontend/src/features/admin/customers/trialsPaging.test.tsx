@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialsOverviewView, type TrialTableControls } from "./TrialsOverview";
-import { attentionList, trialsPath, type TrialItem, type TrialOverview } from "./trials";
-import { invitationProblem, trialRequestsPath } from "../TrialRequestsWorkspace";
+import { attentionList, retentionText, trialBadgeOf, trialsPath, type TrialItem, type TrialOverview } from "./trials";
+import { invitationProblem, keptBecause, trialRequestsPath } from "../TrialRequestsWorkspace";
 
 const trial = (number: number, overrides: Partial<TrialItem> = {}): TrialItem => ({
   tenant_id: `t-${number}`,
@@ -132,5 +132,38 @@ describe("an invitation that did not go out", () => {
     expect(invitationProblem({ status: "APPROVED", owner_status: "INVITED", invitation_delivery: "SENT" })).toBeNull();
     expect(invitationProblem({ status: "APPROVED", owner_status: "ACTIVE", invitation_delivery: "FAILED" })).toBeNull();
     expect(invitationProblem({ status: "APPROVED", owner_status: "INVITED", invitation_delivery: null })).toBeNull();
+  });
+});
+
+describe("trial data held for an MVP request", () => {
+  const day = (value: string) => value.slice(0, 10);
+  const plan = {
+    delete_after: "2027-01-18T00:00:00+00:00",
+    original_delete_after: "2026-11-19T00:00:00+00:00",
+    held_for_mvp_request: true,
+    hold_until: "2027-01-18T00:00:00+00:00",
+    mvp_request: { id: "r1", status: "CONTACTED" },
+  };
+
+  it("says when the data goes, or that the MVP request holds it", () => {
+    expect(retentionText(plan, day)).toBe(
+      "Data held for its MVP request (would have been deleted 2026-11-19); deleted 2027-01-18 at the latest",
+    );
+    expect(
+      retentionText({ ...plan, held_for_mvp_request: false, delete_after: "2026-12-03T00:00:00+00:00" }, day),
+    ).toBe("Data deleted 2026-12-03");
+    expect(retentionText(null, day, "2026-11-19T00:00:00+00:00")).toBe("Data deleted 2026-11-19");
+    expect(retentionText(null, day)).toBeNull();
+    expect(trialBadgeOf({ state: "ENDED", retention: plan }).label).toBe("Ended, data held for its MVP request");
+    expect(trialBadgeOf({ state: "ENDED", retention: null }).label).toBe("Ended, data kept 30 days");
+  });
+
+  it("keeps a held trial out of the deletion run's list", () => {
+    expect(keptBecause({ legal_hold: true })).toBe("under a legal hold");
+    expect(keptBecause({ held_for_mvp_request: true })).toBe("held for its MVP request");
+    expect(keptBecause({ held_for_mvp_request: true, hold_until: "2027-01-18T12:00:00+00:00" })).toMatch(
+      /^held for its MVP request until .+ at the latest$/,
+    );
+    expect(keptBecause({})).toBeNull();
   });
 });

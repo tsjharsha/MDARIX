@@ -1,5 +1,15 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { BookOpen, Bug, CircleHelp, LifeBuoy, ListChecks, NotebookText, ShieldCheck, Signpost } from "lucide-react";
+import {
+  BookOpen,
+  Bug,
+  CircleHelp,
+  LifeBuoy,
+  ListChecks,
+  NotebookText,
+  PlayCircle,
+  ShieldCheck,
+  Signpost,
+} from "lucide-react";
 import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
@@ -7,10 +17,13 @@ import { NEXT_STEPS_SECTION, NEXT_STEPS_SUBTITLE } from "../help/trialNextSteps"
 import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
 
+/** The website's video series (frontend/src/site/videos.tsx), opened beside the product. */
+export const VIDEOS_PATH = "/videos";
+
 /**
  * Help in every signed-in screen: getting started (during a trial), the step-by-step user guide (every screen), the
- * free trial user guide (the trial's seven steps, during a trial), Next steps from trial to MVP (during a trial), the
- * pilot guide, the support address, a
+ * free trial user guide (the trial's seven steps, during a trial), the website's short videos, Next steps from trial to
+ * MVP (during a trial), the pilot guide, the support address, a
  * "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and privacy pages.
  * The support address comes from the server configuration (backend/app/site_info.py).
  */
@@ -83,6 +96,15 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
               </a>
             </li>
           )}
+          <li>
+            <a href={VIDEOS_PATH} target="_blank" rel="noopener">
+              <PlayCircle size={15} aria-hidden="true" />
+              <span className="help-menu-item">
+                Watch the videos
+                <small>The free trial in short videos, step by step</small>
+              </span>
+            </a>
+          </li>
           {onNextSteps && (
             <li>
               <button
