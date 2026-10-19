@@ -1,4 +1,7 @@
 /* Customer Administrator console. Builds on the shared console tokens in ../admin/console/admin-console.css. */
+/* Defined on every console, not only this one: the user workspace and platform administration render the same
+   confirmation dialogs, and without the token their red confirm button had no background (white text on white). */
+.admin-console,
 .customer-admin-console {
   --ca-danger: #b42318;
 }
