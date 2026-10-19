@@ -193,8 +193,11 @@ _STORY_COMPLAINTS = [
         },
     ),
 ]
-# CAPAs from the quality system (Records › Effectiveness checks): one closed without an effectiveness check, one
-# whose check is due soon. Fields: identifier, product, title, status, opened days ago, due days ago, check in days.
+# CAPAs from the quality system (Records › Effectiveness checks): one closed without an effectiveness check, and the
+# OrbitCare action the sample brief recommends. That one follows the case: opened when the trial starts (after the
+# sample brief was written and submitted, sample_decision.py), due after the trial's 30 days so it is never overdue in
+# them, its effectiveness check planned 30 days after that. Fields: identifier, product, title, status, opened days
+# ago, due days ago (negative: in the future), check in days.
 _STORY_CAPAS = [
     (
         "SAMPLE-CAPA-01",
@@ -209,10 +212,10 @@ _STORY_CAPAS = [
         "SAMPLE-CAPA-02",
         "SAMPLE-ORBIT-300",
         "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors (Sample)",
-        "Effectiveness check",
-        40,
-        10,
-        12,
+        "Open",
+        0,
+        -45,
+        75,
     ),
 ]
 # The risk register (Records › Risk file input): OrbitCare and VentraLink have risks no review has assessed since their

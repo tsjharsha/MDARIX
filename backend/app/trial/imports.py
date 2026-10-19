@@ -465,6 +465,8 @@ class _Report:
         self.mapping: list[dict] = []
         self.ignored: list[str] = []
         self.creates: dict[str, int] = {}
+        # Rows of the file that would add a record (not update one): what a free trial's row allowance counts.
+        self.new_rows = 0
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -652,23 +654,40 @@ class _Lookup:
 
 
 def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, create: bool = False) -> int:
-    """Validate references and count the rows that would be new records. With ``create`` (a free trial) a complaints
-    file may name products, versions and lots not loaded yet: they are counted as records it adds
-    (``report.creates``) instead of refused."""
+    """Validate references and count the records that would be new; ``report.new_rows`` counts the rows that add one
+    (a row that only updates a record is not counted, nor are the products, versions and lots a complaints file names).
+    With ``create`` (a free trial) a complaints file may name products, versions and lots not loaded yet: they are
+    counted as records it adds (``report.creates``) instead of refused."""
     if entity in business_imports.TEMPLATES:
-        return business_imports.check(entity, rows, lookup, report)
+        new = business_imports.check(entity, rows, lookup, report)
+        report.new_rows = new  # one record per row
+        return new
     if create and entity == "complaints":
         return _check_complaints_creating(rows, lookup, report)
     new = 0
     new_products: set[str] = set()
+    new_versions: set[tuple[str, str]] = set()
+    new_lots: set[str] = set()
+    new_complaints: set[str] = set()
+    report.new_rows = 0
     for line, row in rows:
         if entity == "products":
             product = lookup.product(row["product_id"])
+            adds = False
             if product is None and row["product_id"] not in new_products:
                 new_products.add(row["product_id"])
                 new += 1
-            if row.get("version") and (product is None or lookup.version(product, row["version"]) is None):
+                adds = True
+            version_key = (row["product_id"], row.get("version") or "")
+            if (
+                row.get("version")
+                and version_key not in new_versions
+                and (product is None or lookup.version(product, row["version"]) is None)
+            ):
+                new_versions.add(version_key)
                 new += 1
+                adds = True
+            report.new_rows += adds
             continue
         product = lookup.product(row["product_id"])
         if product is None:
@@ -684,7 +703,10 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
                 report.add(line, "site_id", f"Site '{row['site_id']}' is not in your workspace. Load it first.")
             existing = lookup.lot(row["lot_id"])
             if existing is None:
-                new += 1
+                if row["lot_id"] not in new_lots:
+                    new_lots.add(row["lot_id"])
+                    new += 1
+                    report.new_rows += 1
             elif version is not None and existing.product_version_id not in (None, version.id):
                 report.add(line, "lot_id", f"Lot '{row['lot_id']}' already belongs to another version.")
             continue
@@ -703,15 +725,19 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
             .filter(Complaint.tenant_id == lookup.tenant_id, Complaint.complaint_identifier == row["complaint_id"])
             .first()
         )
-        if exists is None:
+        if exists is None and row["complaint_id"] not in new_complaints:
+            new_complaints.add(row["complaint_id"])
             new += 1
+            report.new_rows += 1
     return new
 
 
 def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
     """A complaints file that also adds the products, versions and lots it names (``_check_references`` with create):
-    each is counted once; a lot the workspace already holds must still belong to the complaint's product."""
+    each is counted once; a lot the workspace already holds must still belong to the complaint's product. The rows
+    that add a complaint are ``report.new_rows``; the products, versions and lots they name are not rows."""
     new = 0
+    complaints: set[str] = set()
     products: set[str] = set()
     versions: set[tuple[str, str]] = set()
     lots: dict[str, str] = {}
@@ -743,8 +769,10 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
             .filter(Complaint.tenant_id == lookup.tenant_id, Complaint.complaint_identifier == row["complaint_id"])
             .first()
         )
-        if exists is None:
+        if exists is None and row["complaint_id"] not in complaints:
+            complaints.add(row["complaint_id"])
             new += 1
+    report.new_rows = new
     report.creates = {
         key: value
         for key, value in (("products", len(products)), ("versions", len(versions)), ("lots", len(lots)))
@@ -771,22 +799,61 @@ def rows_from_records(entity: str, records: list[dict], report: _Report) -> list
     return rows
 
 
+def _named_by_a_complaint(model, column, source: str):
+    """True for a product, version or lot a complaints file added because a complaint named it: written in the same
+    import as that complaint (one import stamps every record it adds with the same ``created_at``)."""
+    from sqlalchemy import and_, exists
+
+    return exists().where(
+        and_(
+            Complaint.tenant_id == model.tenant_id,
+            column == model.id,
+            Complaint.source_system == source,
+            Complaint.created_at == model.created_at,
+        )
+    )
+
+
 def upload_counters(source: str = UPLOAD_SOURCE) -> list[tuple]:
-    """``(model, conditions)`` for every kind of record an upload loads: what ``uploaded_rows`` counts, per tenant here
-    and for many tenants at once in the Platform Admin trial overview (backend/app/trial/story.py)."""
+    """``(model, conditions)`` for every kind of record an upload's rows load: what ``uploaded_rows`` counts, per tenant
+    here and for many tenants at once in the Platform Admin trial overview (backend/app/trial/story.py). One row is one
+    row, as the customer counts the rows of a file: a products row with a version counts its version (the product it
+    adds with it does not count again), and the products, versions and lots a complaints file names do not count."""
+    from sqlalchemy import and_, exists
+    from sqlalchemy.orm import aliased
+
     from retrieval.record_evidence import RECORD_EVIDENCE_TYPE
 
+    version = aliased(ProductVersion)
     counters = []
     for model in (Product, ProductVersion, LotBatch, Complaint, *business_imports.MODELS):
         conditions = [model.source_system == source]
         if model is business_imports.Evidence:
             # The searchable copy of each imported record is not a row the customer loaded.
             conditions.append(model.evidence_type != RECORD_EVIDENCE_TYPE)
+        if model is Product:
+            conditions.append(~_named_by_a_complaint(Product, Complaint.product_id, source))
+            # Added in the same import as one of its versions: that row counts as the version.
+            conditions.append(
+                ~exists().where(
+                    and_(
+                        version.tenant_id == Product.tenant_id,
+                        version.product_id == Product.id,
+                        version.source_system == source,
+                        version.created_at == Product.created_at,
+                    )
+                )
+            )
+        elif model is ProductVersion:
+            conditions.append(~_named_by_a_complaint(ProductVersion, Complaint.product_version_id, source))
+        elif model is LotBatch:
+            conditions.append(~_named_by_a_complaint(LotBatch, Complaint.lot_batch_id, source))
         counters.append((model, tuple(conditions)))
     return counters
 
 
 def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
+    """The rows the organization uploaded that are in its workspace (``upload_counters``): a free trial's allowance."""
     total = 0
     for model, conditions in upload_counters(source):
         total += db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions).scalar() or 0
@@ -904,15 +971,19 @@ def _check_rows(
                             _check_references(entity, kept, _Lookup(db, tenant_id), recount, create) if kept else 0
                         )
                         report.creates = recount.creates
+                        report.new_rows = recount.new_rows
         elif not report.error_count:
             new_rows = _check_references(entity, rows, _Lookup(db, tenant_id), report, create)
+    # The allowance counts the file's own rows that add a record: one row in the file is one row, whatever products,
+    # versions or lots a complaints file names besides (uploaded_rows counts the same way).
     used = uploaded_rows(db, tenant_id, policy.source)
-    if policy.row_limit is not None and new_rows and used + new_rows > policy.row_limit:
+    adds = report.new_rows if new_rows else 0
+    if policy.row_limit is not None and adds and used + adds > policy.row_limit:
         report.add(
             None,
             None,
-            f"This file adds {new_rows} records; {policy.limit_label} has {max(policy.row_limit - used, 0)} of "
-            f"{policy.row_limit} left.",
+            f"This file adds {adds:,} {'row' if adds == 1 else 'rows'}; {policy.limit_label} has "
+            f"{max(policy.row_limit - used, 0):,} of {policy.row_limit:,} rows left.",
         )
     if skip_problem_rows:
         ready = bool(kept) and not report.file_problems and not oversized
@@ -923,10 +994,10 @@ def _check_rows(
         "entity": entity,
         "rows": len(rows),
         "new_records": new_rows,
+        # The rows that add a record, as the row allowance counts them (uploaded_rows).
+        "new_rows": adds,
         # Rows that update a record already there (the products, versions and lots a file adds are not rows).
-        "updated_records": max(len(kept) - (new_rows - sum(report.creates.values())), 0)
-        if entity != "products"
-        else None,
+        "updated_records": max(len(kept) - adds, 0) if entity != "products" else None,
         "error_count": report.error_count,
         "issues": report.issues,
         "ready": ready,

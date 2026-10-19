@@ -6,6 +6,9 @@ uses its real data only, so the trial's data is moved into it only on request, a
 removed the sample data and imported its own (``data_move``, checked here as well as on the screen). Otherwise nothing
 is moved and the trial's data is deleted 30 days after the trial ends, as for every trial.
 
+While a request that asks to move the data is open, the trial's data is not deleted (held, for at most 90 days after
+the trial ends); once it is closed, the data is deleted 14 days later at the earliest (backend/app/trial/retention.py).
+
 One open request (NEW or CONTACTED) per organization: asking again updates it. The MDARIX team sees every request in
 Platform Admin (Demo and trial requests) and by email (``MDARIX_DEMO_ALERT_EMAIL``, else ``MDARIX_TRIAL_ALERT_EMAIL``,
 as for the trial's demo request), marks it contacted when it has replied and closes it when the conversation is over;
@@ -222,7 +225,9 @@ def submit(
 
 def overview(db: Session) -> dict:
     """Every request, newest first, for the Platform Administrator: the organization, who asked and how to reach them,
-    what they expect, the trial's days left, and the counts per status."""
+    what they expect, the trial's days left, when its data is deleted (``retention``: held while a request to move it
+    is open), and the counts per status."""
+    from backend.app.trial import retention
     from backend.app.trial.early_exit import _days_until, _trial_ends
 
     rows = db.query(TrialMvpRequest).order_by(TrialMvpRequest.created_at.desc()).limit(500).all()
@@ -230,6 +235,8 @@ def overview(db: Session) -> dict:
     tenants = {tenant.id: tenant for tenant in db.query(Tenant).filter(Tenant.id.in_(tenant_ids))} if tenant_ids else {}
     ends = _trial_ends(db, tenant_ids)
     now = datetime.now(timezone.utc)
+    # Only trials still holding data in the trial store have a deletion date (a converted one keeps its data).
+    kept = {plan["tenant"].id: retention.plan_view(plan) for plan in retention.plans(db, now, tenant_ids)}
     items = []
     for row in rows:
         tenant = tenants.get(row.tenant_id)
@@ -245,6 +252,7 @@ def overview(db: Session) -> dict:
                 "days_left": _days_until(end, now) if end is not None else None,
                 "handled_at": row.handled_at.isoformat() if row.handled_at else None,
                 "note": row.note,
+                "retention": kept.get(row.tenant_id),
             }
         )
     return {

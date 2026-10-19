@@ -61,7 +61,10 @@ What erasure leaves, and why (say so in the reply):
 
 * **Free trials** are deleted automatically 30 days after they end (scheduler job `trial-retention`), and the
   requester is told in the invitation, the reminders and the trial-ended email. A trial under a legal hold is
-  skipped and the skipped run is recorded in its audit trail.
+  skipped and the skipped run is recorded in its audit trail. So is a trial whose open MVP request (Next steps) asks
+  to move its data into the MVP: it is kept while the request is open, at most 90 days after the trial ends, and
+  deleted 14 days after the request is closed at the earliest (`backend/app/trial/retention.py`). Close the request
+  in Platform Admin › Identity & Access › Onboarding once the data has moved, or will not.
 * **On request or at the end of a contract**:
   1. Suspend or terminate the organization.
   2. Hand the data back: **Prepare export** (section 1) after the suspension, and send it. The deletion is refused

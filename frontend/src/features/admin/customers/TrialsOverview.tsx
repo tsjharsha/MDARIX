@@ -19,9 +19,10 @@ import {
   attentionList,
   chapterFunnel,
   nextChapterTitle,
+  retentionText,
   storyStage,
   teamChangeText,
-  trialStateOf,
+  trialBadgeOf,
   trialsPath,
   type TrialItem,
   type TrialOverview,
@@ -221,15 +222,18 @@ export function TrialsOverviewView({
               key: "state",
               label: "Trial",
               render: (row) => {
-                const state = trialStateOf(row.state);
+                const state = trialBadgeOf(row);
                 return (
                   <span className="cc-trial-org">
                     <ToneBadge tone={state.tone} label={state.label} />
                     <small>
                       {row.state === "ENDED"
-                        ? `Data deleted ${formatDate(row.data_deleted_at)}`
+                        ? retentionText(row.retention, formatDate, row.data_deleted_at)
                         : `${row.days_left} days left`}
                     </small>
+                    {row.state !== "ENDED" && row.retention?.held_for_mvp_request && (
+                      <small>{retentionText(row.retention, formatDate)}</small>
+                    )}
                   </span>
                 );
               },

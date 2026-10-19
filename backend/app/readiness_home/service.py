@@ -122,12 +122,20 @@ def complaints_to_recheck(db: Session, tenant_id: uuid.UUID, today: date) -> dic
     found = second_look(db, None, tenant_id, state="open", page=1, page_size=ITEMS_MAX, today=today)
     summary = found["summary"]
     count, harm = summary["to_review"], summary["with_harm"]
+    # "1 of 5 records to recheck reports a death or serious injury": the share, never a bare number before the verb.
+    if not count:
+        detail = "No cancelled record or inquiry shows complaint signs"
+    elif harm:
+        verb = "reports" if harm == 1 else "report"
+        detail = f"{harm} of {_n(count, 'record')} to recheck {verb} a death or serious injury"
+    else:
+        detail = f"{_n(count, 'record')} to recheck, none reporting a death or serious injury"
     return _check(
         "COMPLAINTS_TO_RECHECK",
         "Complaints to recheck",
         count,
         CRITICAL if harm else ATTENTION if count else CLEAR,
-        f"{harm} report a death or serious injury" if count else "No cancelled record or inquiry shows complaint signs",
+        detail,
         {"section": "Complaints", "tab": "Second look"},
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
         {"harm": harm},

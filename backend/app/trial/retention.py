@@ -10,6 +10,14 @@ a request was declined, or after the invitation of an approved one expired unuse
 title, phone and free-text goal are erased (``tenant_purge.erase_trial_request``; the organization's name and its
 answers about the organization stay as the record of the request), and the account made for them, never activated,
 is erased with it. The same scheduled job does it. A request whose trial is under a legal hold is left alone.
+
+A trial whose organization asked for its data to be moved into the MVP (an open request, NEW or CONTACTED, with
+``move_trial_data``, from Next steps; backend/app/trial/mvp_request.py) is held: while the request is open and the
+data may still be moved (sample removed, own data in), the purge skips it with an audit record, for at most
+``MVP_HOLD_MAX_DAYS`` after the trial ends. Once the request is closed, the data is deleted ``MVP_HOLD_GRACE_DAYS``
+later at the earliest (never the same night), and never after the hold's end. The MDARIX team is alerted
+``MVP_HOLD_ALERT_DAYS`` before the date the data would otherwise have been deleted and before the hold ends, once
+each. A legal hold works as before, whatever the request.
 """
 
 from __future__ import annotations
@@ -30,6 +38,11 @@ from backend.app.trial.service import FREE_TRIAL_PLAN
 RETENTION_DAYS = 30
 # Days a declined request, or an approved one whose invitation expired unused, keeps the requester's personal data.
 REQUEST_RETENTION_DAYS = 90
+# A request to move the trial data into the MVP holds it (see the module docstring): for at most this many days after
+# the trial ends; this many days after the request is closed at the earliest; alerts this many days before each date.
+MVP_HOLD_MAX_DAYS = 90
+MVP_HOLD_GRACE_DAYS = 14
+MVP_HOLD_ALERT_DAYS = 7
 
 # Records the trial created or uploaded. Identity, plan, subscription and audit tables are deliberately absent.
 TRIAL_DATA_TABLES = (
@@ -147,11 +160,61 @@ def _existing_tables(db: Session) -> list[str]:
     return [table for table in TRIAL_DATA_TABLES if table in present]
 
 
-def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
-    """Closed Free Trial workspaces whose 30-day retention period has passed and whose data is still present.
-    ``legal_hold`` marks the ones retention must leave alone."""
+def move_requests(db: Session, tenant_ids) -> dict:
+    """``{tenant id: {"open": its open request asking to move the trial data, or None, "closed_at": when its last such
+    request was closed, or None}}`` for the tenants (ids, or a subquery of them) that ever asked to move their data."""
+    from backend.app.db.models.stage2 import TrialMvpRequest
+    from backend.app.trial.mvp_request import OPEN
+
+    found: dict = {}
+    if isinstance(tenant_ids, (list, set, tuple)):
+        if not tenant_ids:
+            return found
+        tenant_ids = list(tenant_ids)
+    rows = db.query(TrialMvpRequest).filter(
+        TrialMvpRequest.tenant_id.in_(tenant_ids), TrialMvpRequest.move_trial_data.is_(True)
+    )
+    for row in rows:
+        entry = found.setdefault(row.tenant_id, {"open": None, "closed_at": None})
+        if row.status in OPEN:
+            entry["open"] = row
+            continue
+        closed = row.handled_at or row.updated_at
+        if closed is not None and (entry["closed_at"] is None or closed > entry["closed_at"]):
+            entry["closed_at"] = closed
+    return found
+
+
+def retention_plan(ended: datetime, requests: dict | None, movable: bool, now: datetime) -> dict:
+    """When one closed trial's data is deleted: 30 days after it ended; while an open request asks to move the data and
+    the data may still be moved, not before the hold ends (``MVP_HOLD_MAX_DAYS`` after the trial); after such a request
+    was closed, ``MVP_HOLD_GRACE_DAYS`` after it closed at the earliest, and never after the hold's end."""
+    original = ended + timedelta(days=RETENTION_DAYS)
+    hold_until = ended + timedelta(days=MVP_HOLD_MAX_DAYS)
+    request = (requests or {}).get("open")
+    held = request is not None and movable and now < hold_until
+    delete_after = original
+    if held:
+        delete_after = max(original, hold_until)
+    elif (requests or {}).get("closed_at") is not None:
+        resumed = min(requests["closed_at"] + timedelta(days=MVP_HOLD_GRACE_DAYS), hold_until)
+        delete_after = max(original, resumed)
+    return {
+        "trial_ended_at": ended,
+        "original_delete_after": original,
+        "delete_after": delete_after,
+        "hold_until": hold_until,
+        "mvp_request": request if held else None,
+    }
+
+
+def plans(db: Session, now: datetime | None = None, tenant_ids=None) -> list[dict]:
+    """The deletion plan (``retention_plan``) of every Free Trial workspace still holding data in the shared trial
+    store (or of those among ``tenant_ids``), with its tenant. ``db`` reads every tenant (system scope)."""
+    from backend.app.trial.mvp_request import data_move
+
     now = now or datetime.now(timezone.utc)
-    rows = (
+    query = (
         db.query(SubscriptionLifecycle, Tenant)
         .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
         .join(Tenant, Tenant.id == SubscriptionLifecycle.tenant_id)
@@ -161,24 +224,60 @@ def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
             TenantDataPlane.connection_secret_ref == TRIAL_SHARED_DATA_PLANE,
             Tenant.status != "ARCHIVED",
         )
-        .all()
     )
-    due = []
+    if tenant_ids is not None:
+        query = query.filter(Tenant.id.in_(list(tenant_ids)))
+    # Oldest subscription first, so a workspace's latest one has the last word where they are read per workspace.
+    rows = query.order_by(SubscriptionLifecycle.created_at).all()
+    requests = move_requests(db, {tenant.id for _subscription, tenant in rows})
+    movable: dict = {}
+    found = []
     for subscription, tenant in rows:
+        asked = requests.get(tenant.id)
+        if asked and asked["open"] is not None and tenant.id not in movable:
+            # The data may still be moved only while the sample stays removed and the own data is there.
+            movable[tenant.id] = bool(data_move(db, tenant.id)["allowed"])
         ended = max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
-        delete_after = ended + timedelta(days=RETENTION_DAYS)
-        if delete_after <= now:
-            due.append(
-                {
-                    "tenant_id": str(tenant.id),
-                    "tenant_business_id": tenant.business_id,
-                    "tenant_key": tenant.tenant_key,
-                    "name": tenant.name,
-                    "trial_ended_at": ended.isoformat(),
-                    "delete_after": delete_after.isoformat(),
-                    "legal_hold": bool(tenant.legal_hold),
-                }
-            )
+        found.append({"tenant": tenant, **retention_plan(ended, asked, movable.get(tenant.id, False), now)})
+    return found
+
+
+def plan_view(plan: dict) -> dict:
+    """A plan as the Platform Administrator sees it (trials overview, MVP requests, the retention preview)."""
+    request = plan["mvp_request"]
+    return {
+        "delete_after": plan["delete_after"].isoformat(),
+        "original_delete_after": plan["original_delete_after"].isoformat(),
+        "held_for_mvp_request": request is not None,
+        "hold_until": plan["hold_until"].isoformat(),
+        "mvp_request": {"id": str(request.id), "status": request.status} if request is not None else None,
+    }
+
+
+def trials_due(db: Session, now: datetime | None = None) -> list[dict]:
+    """Closed Free Trial workspaces whose 30-day retention period has passed and whose data is still present.
+    ``legal_hold`` marks the ones retention must leave alone, ``held_for_mvp_request`` those an open request to move
+    the data into the MVP holds (``delete_after`` is then the end of the hold); a trial whose request was closed lately
+    is listed once its grace period has passed."""
+    now = now or datetime.now(timezone.utc)
+    due = []
+    for plan in plans(db, now):
+        if plan["original_delete_after"] > now:
+            continue
+        if plan["mvp_request"] is None and plan["delete_after"] > now:
+            continue
+        tenant = plan["tenant"]
+        due.append(
+            {
+                "tenant_id": str(tenant.id),
+                "tenant_business_id": tenant.business_id,
+                "tenant_key": tenant.tenant_key,
+                "name": tenant.name,
+                "trial_ended_at": plan["trial_ended_at"].isoformat(),
+                **plan_view(plan),
+                "legal_hold": bool(tenant.legal_hold),
+            }
+        )
     return due
 
 
@@ -245,6 +344,123 @@ def _note_legal_hold(db: Session, trial: dict, actor_ref: str, now: datetime) ->
         )
     )
     db.commit()
+
+
+def _note_mvp_hold(db: Session, trial: dict, actor_ref: str, now: datetime) -> None:
+    """The run skipped a trial an open MVP request holds: recorded in the trial's own trail, like a legal hold."""
+    from backend.app.db.tenant_scope import bind_system
+
+    bind_system(db, "trial retention: record an MVP request hold")
+    tenant_id = uuid.UUID(trial["tenant_id"])
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=actor_ref,
+            action="TRIAL_RETENTION_SKIPPED_MVP_REQUEST",
+            entity_type="Tenant",
+            entity_id=tenant_id,
+            reason="The organization asked for its trial data to be moved into the MVP; the request is open.",
+            details={
+                "original_delete_after": trial["original_delete_after"],
+                "hold_until": trial["hold_until"],
+                "mvp_request": trial["mvp_request"],
+            },
+            created_at=now,
+        )
+    )
+    db.commit()
+
+
+HOLD_ALERTED = "TRIAL_RETENTION_MVP_HOLD_ALERTED"
+# The two moments the MDARIX team is told about a held trial: before the 30-day date, and before the hold ends.
+ALERT_BEFORE_DELETION, ALERT_BEFORE_HOLD_ENDS = "BEFORE_ORIGINAL_DATE", "BEFORE_HOLD_ENDS"
+
+
+def holds_to_alert(db: Session, now: datetime | None = None) -> list[dict]:
+    """Held trials whose 30-day date, or whose hold's end, is ``MVP_HOLD_ALERT_DAYS`` away or less and whose alert for
+    it (per request) has not been sent yet: ``{"plan", "stage"}``."""
+    now = now or datetime.now(timezone.utc)
+    lead = timedelta(days=MVP_HOLD_ALERT_DAYS)
+    wanted = []
+    for plan in plans(db, now):
+        request = plan["mvp_request"]
+        if request is None:
+            continue
+        for stage, day in (
+            (ALERT_BEFORE_DELETION, plan["original_delete_after"]),
+            (ALERT_BEFORE_HOLD_ENDS, plan["hold_until"]),
+        ):
+            if now < day - lead:
+                continue
+            sent = (
+                db.query(AuditEvent.id)
+                .filter(
+                    AuditEvent.tenant_id == plan["tenant"].id,
+                    AuditEvent.action == HOLD_ALERTED,
+                    AuditEvent.details["stage"].astext == stage,
+                    AuditEvent.details["request_id"].astext == str(request.id),
+                )
+                .first()
+            )
+            if sent is None:
+                wanted.append({"plan": plan, "stage": stage})
+    return wanted
+
+
+def alert_holds(db: Session, actor_ref: str, now: datetime | None = None) -> int:
+    """Tell the MDARIX team (backend/app/alerts.py) about every held trial ``holds_to_alert`` lists, in one alert, and
+    record each in the trial's trail so it is told once. Names the workspaces by MDARIX ID and key only. Returns how
+    many were alerted."""
+    from backend.app import alerts
+    from backend.app.db.tenant_scope import bind_system
+
+    now = now or datetime.now(timezone.utc)
+    bind_system(db, "trial retention: alert on trials held for an MVP request")
+    wanted = holds_to_alert(db, now)
+    if not wanted:
+        return 0
+    lines = []
+    for item in wanted:
+        plan, tenant = item["plan"], item["plan"]["tenant"]
+        name = f"{tenant.business_id or tenant.id} ({tenant.tenant_key})"
+        if item["stage"] == ALERT_BEFORE_DELETION:
+            lines.append(
+                f"- {name}: its trial data would be deleted on {plan['original_delete_after']:%d %b %Y}. It is kept "
+                f"because its MVP request asks to move the data. Close the request (Platform Admin, MVP requests) once "
+                f"the data is moved or will not be; deletion then follows {MVP_HOLD_GRACE_DAYS} days later. The hold "
+                f"ends on {plan['hold_until']:%d %b %Y} at the latest."
+            )
+        else:
+            lines.append(
+                f"- {name}: the hold for its MVP request ends on {plan['hold_until']:%d %b %Y}, {MVP_HOLD_MAX_DAYS} "
+                "days after the trial ended, and the trial data is deleted then, unless the organization has moved to "
+                "a paid plan by that day."
+            )
+        db.add(
+            AuditEvent(
+                id=uuid.uuid4(),
+                tenant_id=tenant.id,
+                actor_ref=actor_ref,
+                action=HOLD_ALERTED,
+                entity_type="Tenant",
+                entity_id=tenant.id,
+                details={
+                    "stage": item["stage"],
+                    "request_id": str(plan["mvp_request"].id),
+                    "original_delete_after": plan["original_delete_after"].isoformat(),
+                    "hold_until": plan["hold_until"].isoformat(),
+                },
+                created_at=now,
+            )
+        )
+    db.commit()
+    alerts.send_alert(
+        "Trial data held for an MVP request",
+        f"{len(wanted)} trial(s) keep their data because the organization asked to move it into the MVP:\n"
+        + "\n".join(lines),
+    )
+    return len(wanted)
 
 
 def _unused_invitation_expired(db: Session, request, owner, now: datetime) -> datetime | None:
@@ -344,10 +560,11 @@ def erase_stale_requests(db: Session, actor_ref: str, now: datetime | None = Non
 
 
 def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
-    """Purge every trial that is due. A trial under a legal hold is skipped with an audit note. A trial that cannot
-    be purged completely is left untouched and reported, and one whose files or plane could not be removed stays
-    PURGING and is reported too (the next run resumes it); the scheduled job then fails (and alerts) so an operator
-    looks at it."""
+    """Purge every trial that is due. A trial under a legal hold, or held by an open request to move its data into the
+    MVP, is skipped with an audit note; the MDARIX team is alerted before a held trial's dates (``alert_holds``). A
+    trial that cannot be purged completely is left untouched and reported, and one whose files or plane could not be
+    removed stays PURGING and is reported too (the next run resumes it); the scheduled job then fails (and alerts) so
+    an operator looks at it."""
     from backend.app.tenant_purge import PurgeFailed
 
     now = now or datetime.now(timezone.utc)
@@ -357,6 +574,10 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
         if trial["legal_hold"]:
             _note_legal_hold(db, trial, actor_ref, now)
             skipped.append({**trial, "why": "LEGAL_HOLD"})
+            continue
+        if trial.get("held_for_mvp_request"):
+            _note_mvp_hold(db, trial, actor_ref, now)
+            skipped.append({**trial, "why": "MVP_REQUEST"})
             continue
         try:
             outcome = purge_trial(db, uuid.UUID(trial["tenant_id"]), actor_ref, now)
@@ -368,4 +589,12 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
             continue
         results.append({**trial, **outcome})
     requests = erase_stale_requests(db, actor_ref, now)
-    return {"purged": len(results), "trials": results, "failed": failed, "skipped": skipped, "requests": requests}
+    alerted = alert_holds(db, actor_ref, now)
+    return {
+        "purged": len(results),
+        "trials": results,
+        "failed": failed,
+        "skipped": skipped,
+        "requests": requests,
+        "hold_alerts": alerted,
+    }

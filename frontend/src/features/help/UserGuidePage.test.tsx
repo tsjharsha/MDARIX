@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { UserGuidePage } from "./UserGuidePage";
 import { GUIDE_PARTS, GUIDE_SECTIONS, USER_GUIDE_PATH } from "./userGuide";
 import { TRIAL_GUIDE_PATH } from "./trialGuide";
-import { HelpMenu } from "../shared/HelpMenu";
+import { HelpMenu, VIDEOS_PATH } from "../shared/HelpMenu";
 import { TrialJourney } from "../workspace/sections/TrialJourney";
 
 // The screens' source as text (Vite's ?raw), so a test can check that the guide quotes their labels exactly.
@@ -117,5 +117,9 @@ describe("step-by-step user guide", () => {
     expect(menu).toContain("Every screen, task by task");
     expect(menu).toContain("The trial in 7 steps");
     expect(renderToStaticMarkup(<HelpMenu />)).toContain("Open help menu");
+    // The website's videos, in a new tab.
+    expect(menu).toContain("Watch the videos");
+    expect(menu).toContain('href={VIDEOS_PATH} target="_blank"');
+    expect(VIDEOS_PATH).toBe("/videos");
   });
 });

@@ -147,7 +147,7 @@ describe("the trial's story", () => {
 
   it("reads a chapter as done when the trial acted in it, else by its finding", () => {
     expect(chapterTone(chapter("HIDDEN_COMPLAINTS"))).toBe("critical");
-    expect(chapterStatus(chapter("HIDDEN_COMPLAINTS"))).toBe("Your turn");
+    expect(chapterStatus(chapter("HIDDEN_COMPLAINTS"))).toBe("To do");
     const done = chapter("HIDDEN_COMPLAINTS", { acted: { done: true, count: 3 } });
     expect(chapterTone(done)).toBe("good");
     expect(chapterStatus(done)).toBe("Done 3 times");
@@ -182,6 +182,10 @@ describe("the trial's story", () => {
     );
     expect(markup).toContain("is-next");
     expect(markup).toContain("5 records may be hidden complaints.");
+    // Not tried yet reads as still to do, in a neutral chip with an empty circle, never as a failure.
+    expect(markup).toContain("To do");
+    expect(markup).toContain("ac-badge tone-neutral");
+    expect(markup).not.toContain("tone-critical");
     expect(markup).toContain("Why it matters:");
     expect(markup).toContain("Review hidden complaints");
     const done = renderToStaticMarkup(

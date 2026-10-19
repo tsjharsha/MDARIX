@@ -474,7 +474,7 @@ function SignalBody({
 
       <div className="ac-grid two">
         <section className="ca-drawer-section" aria-label="Complaints by version">
-          <h3>By product version</h3>
+          <h3>Its complaints by product version</h3>
           {split.length ? (
             <ul className="ac-barlist uw-split">
               {split.map((item) => (

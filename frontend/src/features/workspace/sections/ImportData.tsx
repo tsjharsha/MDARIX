@@ -29,6 +29,10 @@ type CheckReport = {
   entity: string;
   rows: number;
   new_records: number;
+  /** The rows that add a record: what a free trial's row allowance counts (one row in the file is one row). */
+  new_rows?: number;
+  /** The free trial's row allowance, or null for a workspace without one. */
+  row_limit?: number | null;
   error_count: number;
   issues: { row: number | null; column: string | null; message: string }[];
   ready: boolean;
@@ -59,6 +63,31 @@ export function alsoCreatesText(creates: Record<string, number> | null | undefin
   );
   if (!parts.length) return "";
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * What a ready check says: the rows to import and, in a free trial, how many of them count toward its row allowance
+ * (the products, versions and lots a complaints file names are added with it but are not rows); elsewhere, the new
+ * records (exported for its test).
+ */
+export function readyText(
+  report: Pick<
+    CheckReport,
+    "rows" | "rows_to_import" | "new_records" | "new_rows" | "row_limit" | "masked_values" | "also_creates"
+  >,
+): string {
+  const rows = countOf(report.rows_to_import ?? report.rows, "row");
+  const masked = report.masked_values
+    ? `; personal data will be replaced in ${countOf(report.masked_values, "value")}`
+    : "";
+  const also = alsoCreatesText(report.also_creates);
+  if (report.row_limit)
+    return `${rows} ready to import (${countOf(report.new_rows ?? 0, "new row")} of your ${report.row_limit.toLocaleString()})${masked}${
+      also ? `; the complaints also add ${also} they name, which do not count as rows` : ""
+    }.`;
+  return `${rows} ready to import (${countOf(report.new_records, "new record")})${masked}${
+    also ? `, including ${also} the complaints name` : ""
+  }.`;
 }
 
 export type ImportResult = {
@@ -381,15 +410,7 @@ export function ImportPanel({
           {report.ready ? (
             <>
               <p className="uw-trial-message is-good">
-                <CheckCircle2 size={16} aria-hidden="true" /> {countOf(report.rows_to_import ?? report.rows, "row")}{" "}
-                ready to import ({countOf(report.new_records, "new record")})
-                {report.masked_values
-                  ? `; personal data will be replaced in ${countOf(report.masked_values, "value")}`
-                  : ""}
-                {alsoCreatesText(report.also_creates)
-                  ? `, including ${alsoCreatesText(report.also_creates)} the complaints name`
-                  : ""}
-                .
+                <CheckCircle2 size={16} aria-hidden="true" /> {readyText(report)}
               </p>
               {!!report.rejected_rows && (
                 <>

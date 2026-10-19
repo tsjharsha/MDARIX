@@ -21,7 +21,7 @@ const check = (overrides = {}) => ({
   title: "Complaints to recheck",
   value: 3,
   state: "CRITICAL" as const,
-  detail: "1 report a death or serious injury",
+  detail: "1 of 5 records to recheck reports a death or serious injury",
   why: "2026 FDA warning letters cite complaints cancelled or logged as inquiries.",
   basis: [
     { id: "ISO13485_8_2_2", short: "ISO 13485 8.2.2", title: "Complaint handling" },

@@ -52,7 +52,8 @@ in the footer, on `/contact` and in every email.
 **How long it is kept** (the full schedule, with what enforces each period, is
 `docs/compliance/DATA_RETENTION_SCHEDULE.md`)
 - A free trial lasts 30 days for up to 3 users and 5,000 uploaded rows. Trial data is deleted 30 days after the trial
-  ends; the person who requested the trial is emailed 7 days and 1 day before the end and when it ends.
+  ends; while the organization's request to move it into an MVP is open, it is kept, at most 90 days after the end.
+  The person who requested the trial is emailed 7 days and 1 day before the end and when it ends.
 - Paid customers: kept for the subscription term. At the end, the customer's data is handed back as a full export
   (or the customer's written waiver is recorded) and then deleted; one person's data can be exported or erased on
   request (`docs/runbooks/DATA_REQUESTS.md`).

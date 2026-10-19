@@ -100,7 +100,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     title: "CAPAs closed without proof they worked",
     inSample: [
       "SAMPLE-CAPA-01: closed without an effectiveness check.",
-      "SAMPLE-CAPA-02: its effectiveness check is due in 12 days.",
+      "SAMPLE-CAPA-02: opened after the sample case's brief, due in 45 days; its effectiveness check is planned 30 days later.",
     ],
     requirement: "Corrective action is verified to be effective and to have no adverse effect.",
     reference: cite("ISO13485_8_5_2"),

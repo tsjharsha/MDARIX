@@ -108,7 +108,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     // A chapter about the guided investigation opens that case, whatever the context bar holds.
     const known = chapter.case ?? chapters.find((item) => item.code === chapter.code)?.case;
     if (known) work.setInvestigationId(known.id, known.product_id);
-    open(chapter.opens.section as WorkspaceSection, chapter.opens.tab ?? undefined);
+    // Without its case (closed, or the sample data removed), a case chapter opens the list of investigations.
+    const inCase = known || chapter.opens.section !== "Investigations";
+    open(chapter.opens.section as WorkspaceSection, inCase ? (chapter.opens.tab ?? undefined) : undefined);
   };
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;
@@ -328,7 +330,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                         ? `${trial.usage.rows.toLocaleString()} of ${trial.limits?.rows.toLocaleString()}`
                         : null
                     }
-                    detail="Sample data does not count"
+                    detail="One row in your file is one row; the sample data does not count"
                     icon={<Upload size={18} />}
                   />
                 </div>
@@ -437,7 +439,16 @@ export function ChapterRow({
         </strong>
         {finding && (
           <p className="uw-story-finding">
-            <ToneBadge tone={chapterTone(chapter)} label={chapterStatus(chapter)} /> {finding}
+            {done ? (
+              <ToneBadge tone={chapterTone(chapter)} label={chapterStatus(chapter)} />
+            ) : (
+              // Not tried yet is no failure: an empty circle and "To do", whatever the finding's tone.
+              <span className="ac-badge tone-neutral">
+                <Circle size={14} aria-hidden="true" />
+                {chapterStatus(chapter)}
+              </span>
+            )}{" "}
+            {finding}
           </p>
         )}
         <details className="uw-story-more">

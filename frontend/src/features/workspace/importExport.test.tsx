@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HowItWasRead, alsoCreatesText, importedText } from "./sections/ImportData";
+import { HowItWasRead, alsoCreatesText, importedText, readyText } from "./sections/ImportData";
 
 describe("uploading a quality system's export as it comes", () => {
   it("says what a complaints file adds besides its complaints", () => {
@@ -29,6 +29,20 @@ describe("uploading a quality system's export as it comes", () => {
       "Imported products and versions: 2 new, 0 updated; 1 row set aside to fix.",
     );
     expect(importedText("Lots and batches", {})).toBe("Imported lots and batches: 0 new, 0 updated.");
+  });
+
+  it("says a free trial's rows as its allowance counts them: one row in the file is one row", () => {
+    const report = { rows: 6, rows_to_import: 6, new_records: 12, new_rows: 6, also_creates: { products: 1, lots: 4 } };
+    expect(readyText({ ...report, row_limit: 5000 })).toBe(
+      "6 rows ready to import (6 new rows of your 5,000); the complaints also add 1 product and 4 lots they name, which do not count as rows.",
+    );
+    expect(readyText({ ...report, row_limit: 5000, also_creates: {}, masked_values: 1 })).toBe(
+      "6 rows ready to import (6 new rows of your 5,000); personal data will be replaced in 1 value.",
+    );
+    // A workspace without an allowance still counts the new records.
+    expect(readyText({ ...report, row_limit: null })).toBe(
+      "6 rows ready to import (12 new records), including 1 product and 4 lots the complaints name.",
+    );
   });
 
   it("shows how the columns were read and which were left out, unstored", () => {

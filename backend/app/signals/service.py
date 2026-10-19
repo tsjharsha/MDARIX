@@ -683,10 +683,8 @@ def _complaints(db: Session, signal: Signal) -> list[dict]:
 
 
 def _version_split(db: Session, signal: Signal, now: datetime) -> list[dict]:
-    """Every complaint of the signal's product in its window, counted by version (``unknown`` when none recorded)."""
-    if signal.product_id is None:
-        return []
-    start, end = _window(signal, now)
+    """The signal's own complaints (those its complaint count counts), by version (``unknown`` when none recorded), so
+    the chart and the signal never disagree. ``now`` is unused and kept for the callers."""
     rows = (
         db.query(
             ProductVersion.id,
@@ -695,16 +693,15 @@ def _version_split(db: Session, signal: Signal, now: datetime) -> list[dict]:
             func.count(Complaint.id),
         )
         .select_from(Complaint)
+        .join(
+            SignalComplaint,
+            and_(SignalComplaint.tenant_id == Complaint.tenant_id, SignalComplaint.complaint_id == Complaint.id),
+        )
         .outerjoin(
             ProductVersion,
             and_(ProductVersion.tenant_id == Complaint.tenant_id, ProductVersion.id == Complaint.product_version_id),
         )
-        .filter(
-            Complaint.tenant_id == signal.tenant_id,
-            Complaint.product_id == signal.product_id,
-            COMPLAINT_EVENT_AT >= start,
-            COMPLAINT_EVENT_AT <= end,
-        )
+        .filter(SignalComplaint.tenant_id == signal.tenant_id, SignalComplaint.signal_id == signal.id)
         .group_by(ProductVersion.id, ProductVersion.business_id, ProductVersion.version_identifier)
         .all()
     )
@@ -724,20 +721,42 @@ CLOSED_RECORD_STATUSES = ("closed", "cancelled", "canceled", "completed", "done"
 
 
 def _related(db: Session, signal: Signal, now: datetime) -> dict:
-    """Context for triage: the product's changes from 90 days before the first complaint to the last, its open CAPAs
-    and its open investigations."""
-    from backend.app.db.models.foundation import Capa, Change, RealityRelationship
+    """Context for triage: the changes to the product, or to a component of one of its versions, from 90 days before
+    the first complaint to the last (a supplier change is usually recorded against the component it affects), its open
+    CAPAs and its open investigations."""
+    from sqlalchemy import or_
+
+    from backend.app.db.models.foundation import Capa, Change, ProductComponent, RealityRelationship
 
     if signal.product_id is None:
         return {"changes": [], "open_capas": [], "open_investigations": []}
     start, end = _window(signal, now)
     start = start - timedelta(days=90)
     tenant = signal.tenant_id
+    components = (
+        db.query(ProductComponent.component_id)
+        .join(
+            ProductVersion,
+            and_(
+                ProductVersion.tenant_id == ProductComponent.tenant_id,
+                ProductVersion.id == ProductComponent.product_version_id,
+            ),
+        )
+        .filter(ProductComponent.tenant_id == tenant, ProductVersion.product_id == signal.product_id)
+    )
     linked_changes = db.query(RealityRelationship.source_entity_id).filter(
         RealityRelationship.tenant_id == tenant,
         RealityRelationship.source_entity_type == "Change",
-        RealityRelationship.target_entity_type == "Product",
-        RealityRelationship.target_entity_id == signal.product_id,
+        or_(
+            and_(
+                RealityRelationship.target_entity_type == "Product",
+                RealityRelationship.target_entity_id == signal.product_id,
+            ),
+            and_(
+                RealityRelationship.target_entity_type == "Component",
+                RealityRelationship.target_entity_id.in_(components),
+            ),
+        ),
     )
     changed_at = func.coalesce(Change.event_timestamp, Change.effective_timestamp)
     changes = [

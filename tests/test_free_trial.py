@@ -397,7 +397,7 @@ def test_csv_import_checks_everything_before_saving():
 
     products = "product_id,product_name,version,version_release_date\nPUMP-1,Pump One,Rev A,2026-01-10\nPUMP-1,Pump One,Rev B,2026-06-01\n"
     check = user.post("/api/v1/trial/imports/products/check", content=products).json()
-    assert check["ready"] and check["new_records"] == 3
+    assert check["ready"] and check["new_records"] == 3 and check["new_rows"] == 2
     assert user.post("/api/v1/trial/imports/products", content=products).status_code == 200
 
     lots = "lot_id,product_id,version\nL-100,PUMP-1,Rev B\n"
@@ -432,7 +432,8 @@ def test_csv_import_checks_everything_before_saving():
     assert user.post("/api/v1/trial/imports/complaints", content=good).json()["updated"] == 2
     status = user.get("/api/v1/trial/status").json()
     assert status["own_data"] == {"products": 1, "lots": 1, "complaints": 2}
-    assert status["usage"]["rows"] == 6
+    # One row in a file is one row: 2 product rows, 1 lot row and 2 complaint rows (re-uploading added none).
+    assert status["usage"]["rows"] == 5
 
 
 def test_a_quality_system_export_uploads_as_it_comes_and_the_second_look_reads_it():
@@ -775,6 +776,8 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert chapters["RISK_FILE"]["finding"]["state"] == "CRITICAL"
     # The decision chapter opens the guided investigation's waiting brief.
     assert chapters["DECIDE_AND_SIGN"]["opens"] == {"section": "Investigations", "tab": "Decision Brief"}
+    # The investigation chapter opens inside the guided investigation, on its case page, not on the list of cases.
+    assert chapters["INVESTIGATE_WITH_AI"]["opens"] == {"section": "Investigations", "tab": "Workspace"}
     assert chapters["DECIDE_AND_SIGN"]["case"]["id"] and chapters["INVESTIGATE_WITH_AI"]["case"]
     assert chapters["HIDDEN_COMPLAINTS"]["case"] is None
     assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])

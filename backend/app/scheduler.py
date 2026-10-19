@@ -86,6 +86,9 @@ def trial_retention(db: Session, _state: dict) -> dict:
         "tenants": [item.get("tenant_key") for item in result["trials"]],
         # Trial requests that never became a trial, erased after their 90 days (backend/app/trial/retention.py).
         "requests_erased": result["requests"]["erased"],
+        # Trials kept because the organization asked to move their data into the MVP, and alerts sent about them.
+        "held_for_mvp_request": sum(1 for item in result["skipped"] if item.get("why") == "MVP_REQUEST"),
+        "hold_alerts": result.get("hold_alerts", 0),
     }
 
 
@@ -295,7 +298,7 @@ JOBS: tuple[Job, ...] = (
         "trial-retention",
         timedelta(hours=24),
         trial_retention,
-        "Delete trial data 30 days after the trial ends",
+        "Delete trial data 30 days after the trial ends (held while its move into the MVP is requested)",
         PLATFORM_JOBS,
     ),
     Job(

@@ -63,7 +63,7 @@ The Service and its data are hosted in India, by Google Cloud in its Mumbai regi
 
 ## How long we keep it
 
-- Free trial workspaces: deleted 30 days after the trial ends. The person who requested the trial is emailed 7 days and 1 day before the trial ends, and when it ends. A trial that is ended early at your request, with deletion asked for, is deleted when we confirm the request.
+- Free trial workspaces: deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and no longer than 90 days after the trial ends. The person who requested the trial is emailed 7 days and 1 day before the trial ends, and when it ends. A trial that is ended early at your request, with deletion asked for, is deleted when we confirm the request.
 - Free trial requests that do not lead to a trial: 90 days after we decline a request, or 90 days after the invitation to activate the trial expires unused, we delete the requester's name, email address, job title, phone number and what they wrote about their goals. We keep only the organization's name and its answers about the organization, as the record that the request was made.
 - Customer accounts and content: kept for the subscription term. At the end, the customer's data is returned as a full export (unless the customer waives this in writing) and then deleted.
 - Audit trail and electronic signatures: kept unchanged for at least 7 years from each event, or for as long as the customer's account exists if that is longer. When a customer's data is deleted at the end of its contract, its audit trail is given to the customer in the export and then deleted.
