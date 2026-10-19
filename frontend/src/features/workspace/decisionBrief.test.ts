@@ -3,6 +3,7 @@ import {
   actionLines,
   aiDisclosure,
   aiDraftUnedited,
+  briefChecks,
   briefContext,
   briefControls,
   briefLine,
@@ -314,5 +315,21 @@ describe("the quality reviewer's dashboard", () => {
       ["blocked_cases", null],
       ["overdue_cases", null],
     ]);
+  });
+});
+
+describe("the brief's own scorecard", () => {
+  it("leaves out the checks about the brief itself and the decision after it", () => {
+    const checks = briefChecks({
+      readiness: {
+        checks: [
+          { key: "evidence_reviewed", label: "Evidence is reviewed", result: "PASS" },
+          { key: "brief_ready", label: "Investigation brief", result: "PENDING", rationale: "No brief generated yet" },
+          { key: "decision", label: "Decision", result: "PENDING" },
+        ],
+      },
+      content: null,
+    } as never);
+    expect(checks.map((check) => check.key)).toEqual(["evidence_reviewed"]);
   });
 });

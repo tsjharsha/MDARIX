@@ -96,6 +96,7 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
         raise _error(
             409, "TRIAL_USER_LIMIT_REACHED", f"Your free trial includes up to {TRIAL_USER_LIMIT} users, all in use"
         )
+    _limit_invitations(tenant_id, inviter, "invite")
     now = datetime.now(timezone.utc)
     user = AuthUser(
         id=uuid.uuid4(),
@@ -150,12 +151,27 @@ def resend_colleague_invitation(db: Session, tenant_id, inviter: AuthUser, user_
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == tenant_id).first()
     if user is None or user.status != "INVITED":
         raise _error(409, "NOT_AN_OPEN_INVITATION", "This person has already activated their account")
+    _limit_invitations(tenant_id, inviter, "invite-resend", address=user.username)
     return {
         "id": str(user.id),
         "business_id": user.business_id,
         "email": user.username,
         **_send_invitation(db, user, inviter.company, inviter.id, invited_by=_owner_name(inviter)),
     }
+
+
+def _limit_invitations(tenant_id, actor: AuthUser, kind: str, *, address: str | None = None) -> None:
+    """Count one invitation email (``kind`` "invite" or "invite-resend") against the limits in rate_limit.LIMITS:
+    per person and per organization for new invitations, per address and per organization for resent ones. Raises
+    429 with a plain message once a limit is reached; the email is not sent."""
+    from backend.app.rate_limit import enforce, invitation_message
+
+    if kind == "invite":
+        enforce("invite:user", str(actor.id), invitation_message("invite:user"))
+        enforce("invite:org", str(tenant_id), invitation_message("invite:org"))
+    else:
+        enforce("invite-resend:address", address, invitation_message("invite-resend:address"))
+        enforce("invite-resend:org", str(tenant_id), invitation_message("invite-resend:org"))
 
 
 def _owner_name(owner: AuthUser) -> str:
@@ -191,6 +207,15 @@ def remove_colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID
     previous = user.status
     if previous not in SEATED_STATUSES:
         raise _error(409, "NOT_ON_THE_TEAM", "This person is no longer on your trial team")
+    # Removing frees a seat for another invitation: limited too, so remove-and-invite cannot loop without end.
+    from backend.app.rate_limit import enforce
+
+    enforce(
+        "team-remove:org",
+        str(tenant_id),
+        "You have removed as many colleagues as MDARIX allows in one day. Please try again tomorrow, or write to "
+        "support if you need to.",
+    )
     now = datetime.now(timezone.utc)
     user.status = REMOVED_STATUS
     user.updated_at = now

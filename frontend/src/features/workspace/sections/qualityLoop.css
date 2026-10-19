@@ -50,6 +50,20 @@
 .ql-actions .uw-rd-download {
   margin: 0;
 }
+/* The second action on the navy hero (e.g. "Go to Investigations" next to "Try again"). */
+.ql-actions .ac-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
 .ql-focus {
   display: flex;
   align-items: baseline;

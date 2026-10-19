@@ -21,7 +21,8 @@ import { displayId } from "../../app/displayId";
 import { hasSavedResults, loadSavedResults } from "./savedResults";
 import { AiInterpretationNote } from "../shared/StatementKind";
 import { useAiBanner } from "../workspace/useAiStatus";
-import { aiNoticeOf, epistemicOf, type IntelligenceView } from "../workspace/intelligence";
+import { aiNoticeOf, epistemicOf, type AiBanner, type IntelligenceView } from "../workspace/intelligence";
+import { pointInTimeText, searchStatusText, stateText, workspaceNotes } from "./workspaceLabels";
 
 type AiBlock = "analysis" | "hypotheses" | "challenges" | "unknowns" | "failureChains" | "counterfactual" | "brief";
 type AiBlockLabel = { note: string | null; notice: { message: string; manual: string | null } | null };
@@ -41,6 +42,32 @@ function AiBlockNote({ label, onJudge }: { label?: AiBlockLabel; onJudge?: () =>
         </p>
       )}
     </>
+  );
+}
+
+/**
+ * Where an AI step's button would be while AI cannot run: why, in a few words, and the step that does the same job by
+ * hand (none for a step without one).
+ */
+export function AiOffNote({
+  banner,
+  manual = [],
+}: {
+  banner: AiBanner;
+  manual?: Array<{ label: string; onClick: () => void }>;
+}) {
+  return (
+    <div className="ai-off-note" role="note">
+      <span>
+        {banner.shortReason}
+        {manual.length ? "; do this step by hand:" : "."}
+      </span>
+      {manual.map((action) => (
+        <button key={action.label} type="button" className="primary-action secondary" onClick={action.onClick}>
+          {action.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -69,27 +96,27 @@ export function InvestigationTabSummary({
   const summaries: Record<string, { title: string; description: string; count: string; state: string }> = {
     overview: {
       title: "Investigation overview",
-      description: "Server-authorized product, temporal, evidence, and guardrail context for this case.",
-      count: `${workspace?.evidence_context.length ?? 0} evidence records`,
-      state: workspace ? "Context loaded" : "Loading context",
+      description: "This case's product, evidence and linked records, and what still needs a person's decision.",
+      count: `${workspace?.evidence_context.length ?? 0} pieces of evidence`,
+      state: workspace ? "Ready" : "Loading…",
     },
     evidence: {
       title: "Evidence review",
-      description: "Inspect source anchors, reliability, and gaps before interpreting the case.",
+      description: "Check where each piece of evidence comes from, how reliable it is, and what is missing.",
       count: `${workspace?.evidence_context.length ?? 0} linked records`,
-      state: workspace?.retrieval_context?.status ?? "Not requested",
+      state: searchStatusText(workspace?.retrieval_context?.status, workspace?.evidence_context.length ?? 0),
     },
     analysis: {
       title: "Observations and analysis",
       description: "Review grounded observations, contradictions, possible explanations, and missing information.",
       count: `${analysis?.observations.length ?? 0} observations`,
-      state: analysis?.status ?? "Not run",
+      state: stateText(analysis?.status, "Not run"),
     },
     hypotheses: {
       title: "Competing hypotheses",
       description: "Compare support and contradiction without selecting an unverified winner.",
       count: `${hypothesisSet?.hypotheses.length ?? 0} hypotheses`,
-      state: hypothesisSet?.status ?? "Not run",
+      state: stateText(hypothesisSet?.status, "Not run"),
     },
     challenger: {
       title: "Challenger review",
@@ -101,13 +128,13 @@ export function InvestigationTabSummary({
       title: "Unknowns and gaps",
       description: "Make missing tests, unresolved questions, and materiality visible.",
       count: `${unknownSet?.unknowns.length ?? 0} unknowns`,
-      state: "Evidence gap posture",
+      state: "Open questions",
     },
     "failure-chain": {
       title: "Failure chain",
-      description: "Show supportable relationships while preserving unresolved links and epistemic status.",
+      description: "Show which links of the chain the evidence supports and which are still open.",
       count: `${failureChains?.chains.length ?? 0} chains`,
-      state: "Causality not established",
+      state: "Cause not proven",
     },
     counterfactual: {
       title: "Constrained scenario",
@@ -119,12 +146,12 @@ export function InvestigationTabSummary({
       title: "Investigation brief",
       description: "Assemble a versioned, provenance-aware package for human review.",
       count: brief ? `Version ${brief.brief_version}` : "Not generated",
-      state: brief?.human_review_state ?? "Human review required",
+      state: stateText(brief?.human_review_state, "Human review required"),
     },
     assurance: {
-      title: "AI assurance",
-      description: "Inspect grounding, provenance, temporal scope, and safety limitations.",
-      count: "No hidden reasoning stored",
+      title: "How MDARIX checks AI output",
+      description: "What MDARIX checks in every AI result before you see it.",
+      count: "Every AI result is checked",
       state: "Advisory only",
     },
     decision: {
@@ -161,6 +188,7 @@ export function InvestigationWorkspacePanel({
   asOf,
   onOpenDecision,
   onOpenIntelligence,
+  onOpenBrief,
 }: {
   investigationId: string;
   temporalMode: TemporalMode;
@@ -168,6 +196,8 @@ export function InvestigationWorkspacePanel({
   onOpenDecision: () => void;
   /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
   onOpenIntelligence?: (view: IntelligenceView) => void;
+  /** Opens the case's Decision Brief tab, where a person writes the brief (the manual way to the AI brief). */
+  onOpenBrief?: () => void;
 }) {
   // Under the MVP feature set the counterfactual and the template failure chains are parked and the decision is taken
   // on the case's own Decision tab (app/featureSet.ts).
@@ -218,6 +248,13 @@ export function InvestigationWorkspacePanel({
       [block]: { note: epistemicOf(payload)?.note ?? null, notice: aiNoticeOf(payload) },
     }));
   const judge = (view: IntelligenceView) => (onOpenIntelligence ? () => onOpenIntelligence(view) : undefined);
+  // While AI cannot run, each AI step's button gives way to the reason and the step that does the same job by hand.
+  const byHand = (...views: IntelligenceView[]) =>
+    onOpenIntelligence && aiBanner
+      ? aiBanner.manual
+          .filter((path) => views.includes(path.view))
+          .map((path) => ({ label: path.label, onClick: () => onOpenIntelligence(path.view) }))
+      : [];
 
   useEffect(() => {
     const sequence = ++requestSequence.current;
@@ -467,7 +504,11 @@ export function InvestigationWorkspacePanel({
               </button>
             ))}
           </div>
-          {canRun ? (
+          {canRun && aiBanner ? (
+            <span className="ai-off-chip" role="note">
+              {aiBanner.shortReason}
+            </span>
+          ) : canRun ? (
             <>
               <button
                 className="primary-action"
@@ -527,8 +568,8 @@ export function InvestigationWorkspacePanel({
       {aiBanner && (
         <div id="ai-status-banner" className="ac-message tone-warning ai-status-banner" role="status">
           <div>
-            <strong>{aiBanner.title}.</strong> {aiBanner.message} The AI run buttons are off; you can do the same work
-            by hand.
+            <strong>{aiBanner.title}.</strong> {aiBanner.message}
+            {onOpenIntelligence ? " Do the same work by hand:" : ""}
           </div>
           {onOpenIntelligence && (
             <div className="ai-status-manual">
@@ -597,30 +638,22 @@ export function InvestigationWorkspacePanel({
       {error && <div className="error inline">{error}</div>}
       {workspace && (
         <div id="workflow-overview" className="workspace-grid">
-          <Panel title="Context Health" icon={<ShieldCheck />}>
+          <Panel title="Case at a glance" icon={<ShieldCheck />}>
             <div className="context-health">
               <Metric icon={<FileText />} label="Evidence" value={workspace.evidence_context.length} />
               <Metric
                 icon={<Network />}
-                label="Graph Nodes"
+                label="Linked records"
                 value={
                   workspace.relationship_context.metadata.node_count ?? workspace.relationship_context.nodes.length
                 }
               />
-              <Metric
-                icon={<GitBranch />}
-                label="Relationships"
-                value={
-                  workspace.relationship_context.metadata.relationship_count ??
-                  workspace.relationship_context.relationships.length
-                }
-              />
             </div>
             <ul className="limitations">
-              {workspace.limitations.slice(0, 5).map((item) => (
-                <li key={item.code}>
-                  <strong>{item.code}</strong>
-                  <span>{item.description}</span>
+              {workspaceNotes(workspace.limitations.slice(0, 5), workspace.evidence_context.length).map((note) => (
+                <li key={note.title}>
+                  <strong>{note.title}</strong>
+                  <span>{note.text}</span>
                 </li>
               ))}
             </ul>
@@ -632,29 +665,35 @@ export function InvestigationWorkspacePanel({
                   <strong>{displayId(item, "evidence_identifier")}</strong>
                   <span>{item.title}</span>
                   <small>
-                    {item.evidence_type} | {item.reliability_status} | anchors{" "}
-                    {item.chunks.filter((chunk) => chunk.source_anchor).length}
+                    {stateText(item.evidence_type, "Evidence")} · {stateText(item.reliability_status, "Not rated")}
                   </small>
                 </article>
               ))}
             </div>
           </Panel>
-          <Panel title="Retrieval & Guardrails" icon={<CircleDot />}>
+          <Panel title="What MDARIX checked" icon={<CircleDot />}>
             <div className="guardrail-list">
               <p>
-                <strong>Retrieval:</strong> {workspace.retrieval_context?.status ?? "Not requested"} (
-                {workspace.retrieval_context?.results_count ?? 0} results)
+                <strong>Evidence search:</strong>{" "}
+                {searchStatusText(workspace.retrieval_context?.status, workspace.evidence_context.length)} (
+                {workspace.retrieval_context?.results_count ?? 0} found)
               </p>
               <p>
-                <strong>Temporal mode:</strong> {String(workspace.temporal_context.mode)}{" "}
-                {workspace.temporal_context.as_of ? `as of ${workspace.temporal_context.as_of}` : ""}
+                <strong>Records shown:</strong>{" "}
+                {pointInTimeText(
+                  String(workspace.temporal_context.mode),
+                  workspace.temporal_context.as_of ? String(workspace.temporal_context.as_of) : null,
+                )}
               </p>
               <p>
-                <strong>Human authority:</strong>{" "}
-                {workspace.guardrails.human_authority_required ? "Required" : "Not recorded"}
+                <strong>Sign-off:</strong>{" "}
+                {workspace.guardrails.human_authority_required ? "A person signs the decision" : "Not recorded"}
               </p>
               <p>
-                <strong>Causality:</strong> {workspace.guardrails.generates_causality ? "Generated" : "Not generated"}
+                <strong>Root cause:</strong>{" "}
+                {workspace.guardrails.generates_causality
+                  ? "Suggested for review"
+                  : "Decided by your team, never by MDARIX"}
               </p>
             </div>
           </Panel>
@@ -663,7 +702,8 @@ export function InvestigationWorkspacePanel({
       <section id="workflow-analysis" className="workflow-action">
         <h3>Analysis</h3>
         <p>Grounded observations and possible explanations for the selected context.</p>
-        {canRun && (
+        {canRun && aiBanner && <AiOffNote banner={aiBanner} manual={byHand("Observations")} />}
+        {canRun && !aiBanner && (
           <button
             className="primary-action"
             onClick={runAnalysis}
@@ -684,7 +724,8 @@ export function InvestigationWorkspacePanel({
       <section id="workflow-hypotheses" className="workflow-action">
         <h3>Competing hypotheses</h3>
         <p>Preserves support, contradiction, gaps, and falsification conditions without choosing a winner.</p>
-        {canRun && (
+        {canRun && aiBanner && <AiOffNote banner={aiBanner} manual={byHand("Hypotheses")} />}
+        {canRun && !aiBanner && (
           <button
             className="primary-action secondary"
             onClick={runHypotheses}
@@ -707,8 +748,11 @@ export function InvestigationWorkspacePanel({
       )}
       <section id="workflow-challenger" className="workflow-action">
         <h3>Challenger, unknowns, and failure chain</h3>
-        <p>Surfaces challenges and material unknowns. An unresolved failure chain is a valid controlled result.</p>
-        {canRun && (
+        <p>Surfaces challenges and open questions. A failure chain with open links is a valid result.</p>
+        {canRun && aiBanner && (
+          <AiOffNote banner={aiBanner} manual={mvp ? byHand("Unknowns") : byHand("Unknowns", "Failure chain")} />
+        )}
+        {canRun && !aiBanner && (
           <button
             className="primary-action secondary"
             onClick={runDay14}
@@ -800,7 +844,8 @@ export function InvestigationWorkspacePanel({
               aria-label="Counterfactual target"
               placeholder="What to take away, e.g. a component revision or supplier change"
             />
-            {canRun && (
+            {canRun && aiBanner && <AiOffNote banner={aiBanner} />}
+            {canRun && !aiBanner && (
               <button
                 className="primary-action"
                 onClick={runCounterfactual}
@@ -857,7 +902,13 @@ export function InvestigationWorkspacePanel({
         {!brief ? (
           <>
             <p>Assemble a versioned, evidence-grounded package for human review.</p>
-            {canRun && (
+            {canRun && aiBanner && (
+              <AiOffNote
+                banner={aiBanner}
+                manual={onOpenBrief ? [{ label: "Write the Decision Brief", onClick: onOpenBrief }] : []}
+              />
+            )}
+            {canRun && !aiBanner && (
               <button
                 className="primary-action"
                 onClick={generateBrief}
@@ -880,31 +931,23 @@ export function InvestigationWorkspacePanel({
         )}
       </section>
       <section id="workflow-assurance" className="panel">
-        <div className="section-title">
-          <ShieldCheck size={18} /> AI Assurance
-        </div>
-        <h2>Deterministic Trust Engine</h2>
-        <p>
-          Assurance validates evidence grounding, citation integrity, tenant and ProductVersion context, temporal
-          context, unsupported claims, causality restraint, provenance, and human authority.
-        </p>
-        <div className="guardrail-list">
-          <p>
-            <strong>Status:</strong> Assurance results are persisted per AI execution.
-          </p>
-          <p>
-            <strong>Policy:</strong> Controlled AI Trust Policy
-          </p>
-          <p>
-            <strong>Causality:</strong> NOT ESTABLISHED by assurance.
-          </p>
-          <p>
-            <strong>Human review:</strong> REQUIRED. Assurance does not approve decisions.
-          </p>
-          <p>
-            <strong>Confidence:</strong> No fabricated numeric confidence score is used.
-          </p>
-        </div>
+        <details className="assurance-details">
+          <summary className="section-title">
+            <ShieldCheck size={18} /> How MDARIX checks AI output
+          </summary>
+          {aiBanner && (
+            <p className="ac-muted">
+              {aiBanner.shortReason}, so there is no AI output on this case to check. When AI is on, every result goes
+              through these checks before you see it.
+            </p>
+          )}
+          <ul className="guardrail-list">
+            <li>Every statement must point to a record of this case; a statement without a source is flagged.</li>
+            <li>It stays within this case's product, version and point in time, and within your organization.</li>
+            <li>AI never states a root cause or a regulatory conclusion: your team decides, and a person signs.</li>
+            <li>No made-up confidence scores; the checks of each AI run are saved with it for the audit trail.</li>
+          </ul>
+        </details>
       </section>
       <section id="workflow-decision" className="panel empty-state">
         <h3>Decision readiness</h3>

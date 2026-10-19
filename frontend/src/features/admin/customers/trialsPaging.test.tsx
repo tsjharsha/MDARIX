@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TrialsOverviewView, type TrialTableControls } from "./TrialsOverview";
 import { attentionList, trialsPath, type TrialItem, type TrialOverview } from "./trials";
-import { trialRequestsPath } from "../TrialRequestsWorkspace";
+import { invitationProblem, trialRequestsPath } from "../TrialRequestsWorkspace";
 
 const trial = (number: number, overrides: Partial<TrialItem> = {}): TrialItem => ({
   tenant_id: `t-${number}`,
@@ -121,5 +121,16 @@ describe("the trial request queue, one page at a time", () => {
     expect(
       trialRequestsPath({ status: "APPROVED", page: 2, sort: { key: "organization", direction: "ascending" }, q: "x" }),
     ).toBe("/api/v1/platform-admin/trial-requests?status=APPROVED&page=2&sort=organization&order=asc&q=x");
+  });
+});
+
+describe("an invitation that did not go out", () => {
+  it("is named on the approved request until its owner activates", () => {
+    expect(invitationProblem({ status: "APPROVED", owner_status: "INVITED", invitation_delivery: "FAILED" })).toBe(
+      "Invitation not delivered",
+    );
+    expect(invitationProblem({ status: "APPROVED", owner_status: "INVITED", invitation_delivery: "SENT" })).toBeNull();
+    expect(invitationProblem({ status: "APPROVED", owner_status: "ACTIVE", invitation_delivery: "FAILED" })).toBeNull();
+    expect(invitationProblem({ status: "APPROVED", owner_status: "INVITED", invitation_delivery: null })).toBeNull();
   });
 });

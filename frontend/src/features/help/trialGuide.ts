@@ -92,7 +92,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
     ],
     result:
       "The chapters tick off one by one, the loop fills in, and Readiness shows what an inspector would find first: the weakest link.",
-    tip: "The sample case's Decision Brief is already written by a sample author, so you can review it and sign alone: whoever writes a brief never reviews or signs it. Signing asks for your password and authenticator code, exactly as on your live data.",
+    tip: "The sample case's Decision Brief is already written by a sample author, who also recorded by hand two competing hypotheses, two open questions and a failure chain (Intelligence tab), so you can review it and sign alone: whoever writes a brief never reviews or signs it. Before you sign you confirm that you have read its open questions; signing asks for your password and authenticator code, exactly as on your live data.",
   },
   {
     key: "own-data",

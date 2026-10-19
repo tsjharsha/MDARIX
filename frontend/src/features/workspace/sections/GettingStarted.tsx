@@ -71,7 +71,17 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const { open, work, session, notify } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
-  const story = useResource<TrialStory>(TRIAL_STORY_PATH);
+  const loadedStory = useResource<TrialStory>(TRIAL_STORY_PATH);
+  // The last story read stays on screen while a reload is under way or has failed; with none at all, the headline
+  // says the story could not be loaded and offers to try again (never "Reading..." for ever).
+  const lastStory = useRef<TrialStory | null>(null);
+  if (loadedStory.data) lastStory.current = loadedStory.data;
+  const storyData = loadedStory.data ?? lastStory.current;
+  const storyFailed = !storyData && (loadedStory.state === "error" || loadedStory.state === "forbidden");
+  const story =
+    storyData && loadedStory.state !== "ready"
+      ? { ...loadedStory, state: "ready" as const, data: storyData }
+      : loadedStory;
   const trial = status.data;
   const allowed = (section: string) =>
     section === "Getting started" ||
@@ -103,7 +113,7 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const chapters = story.data?.chapters ?? [];
   const acted = story.data?.acted ?? 0;
   const total = story.data?.total ?? 9;
-  const headline = storyHeadline(story.data);
+  const headline = storyHeadline(story.data, storyFailed);
   const next = chapters.find((chapter) => chapter.code === story.data?.next) ?? null;
   const talk = () => window.open("/contact", "_blank", "noopener");
   const hasSample = (trial?.sample?.products ?? 0) > 0;
@@ -155,6 +165,18 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
           <button type="button" className="ac-primary" onClick={() => go(next)} disabled={!allowed(next.opens.section)}>
             {CHAPTER_ACTION[next.code] ?? "Open"} <ChevronRight size={15} aria-hidden="true" />
           </button>
+        )}
+        {storyFailed && (
+          <>
+            <button type="button" className="ac-primary" onClick={story.reload}>
+              Try again
+            </button>
+            {allowed("Investigations") && (
+              <button type="button" className="ac-secondary" onClick={() => open("Investigations")}>
+                Go to Investigations <ChevronRight size={15} aria-hidden="true" />
+              </button>
+            )}
+          </>
         )}
       </QualityLoop>
 

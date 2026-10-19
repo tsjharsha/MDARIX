@@ -9,7 +9,9 @@ still end any trial (Customers & Tenants > Trials).
 
 The approval is the usual one (``service.approve_request``), made by the platform's "automatic approval" account, an
 account that cannot sign in; it runs after sign-up's response in its own session, and a failure leaves the request
-waiting for review, with the reason logged.
+waiting for review, with the reason logged. An invitation email that fails afterwards never undoes the approval: it
+is recorded on the request (the Platform Admin queue shows it next to "Resend invitation"), retried through the
+outbox, and the operators are alerted (backend/app/alerts.py), since nobody else would notice.
 """
 
 from __future__ import annotations
@@ -204,14 +206,32 @@ def approve_if_eligible(request_id: uuid.UUID) -> dict:
         if approver is None:
             return {"approved": False, "why": "NO_PLATFORM_ORGANIZATION"}
         db.commit()
-        approve_request(db, request_id, approver)
-        return {"approved": True, "why": why}
+        result = approve_request(db, request_id, approver)
+        if result.get("email_delivery") == "FAILED":
+            _alert_invitation_failed(result)
+        return {"approved": True, "why": why, "email_delivery": result.get("email_delivery")}
     except Exception as exc:  # the request stays waiting for review; nothing is lost
         db.rollback()
         logger.warning("Automatic trial approval failed, the request waits for review: %s", type(exc).__name__)
         return {"approved": False, "why": "FAILED"}
     finally:
         db.close()
+
+
+def _alert_invitation_failed(result: dict) -> None:
+    """Tell the operators that an automatically approved trial's invitation did not go out (no address or name:
+    the request's MDARIX ID and the provider's error). Never raises."""
+    from backend.app.alerts import send_alert
+
+    try:
+        send_alert(
+            "Trial invitation not delivered",
+            f"Trial request {result.get('business_id') or result.get('id')} was approved automatically, but its "
+            f"invitation email failed: {result.get('email_error') or 'unknown error'}. MDARIX retries it for about "
+            "five hours. Platform Admin > Trial requests shows it as not delivered and can resend it.",
+        )
+    except Exception as exc:  # an alert must never fail the sign-up's background work
+        logger.warning("The invitation failure alert could not be sent: %s", type(exc).__name__)
 
 
 def approve_or_acknowledge(request_id: uuid.UUID, organization: str, display_name: str, email: str) -> None:

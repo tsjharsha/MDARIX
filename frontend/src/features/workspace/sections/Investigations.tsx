@@ -301,6 +301,7 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                     setIntelView(view);
                     setActive("Intelligence");
                   }}
+                  onOpenBrief={() => setActive("Decision Brief")}
                 />
               </Embedded>
             </>

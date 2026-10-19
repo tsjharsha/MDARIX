@@ -955,6 +955,8 @@ export type AiStatus = {
   reason_code?: string | null;
   message?: string | null;
   manual_paths?: unknown;
+  /** A free trial, whose AI is off. */
+  trial?: boolean | null;
 };
 
 export type AiBanner = {
@@ -963,6 +965,8 @@ export type AiBanner = {
   message: string;
   /** Why the AI run buttons are off, for their tooltip and description. */
   disabledReason: string;
+  /** The same reason in a few words, shown next to each button that is off. */
+  shortReason: string;
   /** Where the same work can be done by hand. */
   manual: Array<{ view: IntelligenceView; label: string }>;
 };
@@ -974,21 +978,34 @@ const MANUAL_PATHS: AiBanner["manual"] = [
   { view: "Observations", label: "Record observations" },
 ];
 
-const BANNER_TEXT: Record<AiBanner["reason"], { title: string; message: string; disabled: string }> = {
+const BANNER_TEXT: Record<
+  AiBanner["reason"] | "TRIAL",
+  { title: string; message: string; disabled: string; short: string }
+> = {
   AI_DISABLED: {
     title: "AI is switched off for your organization",
     message: "An administrator can enable it under Security › AI processing.",
     disabled: "AI is switched off for your organization.",
+    short: "AI is switched off for your organization",
   },
   PROVIDER_UNAVAILABLE: {
     title: "The AI service is not available right now",
     message: "Try again in a few minutes.",
     disabled: "The AI service is not available right now.",
+    short: "The AI service is not available right now",
   },
   BUDGET_EXHAUSTED: {
     title: "Your organization's AI allowance is used up",
     message: "An administrator can raise the monthly allowance.",
     disabled: "Your organization's AI allowance is used up.",
+    short: "Your AI allowance is used up",
+  },
+  // A free trial runs without AI: said plainly, without pointing at a setting nobody in the trial can change.
+  TRIAL: {
+    title: "AI is off for free trials",
+    message: "Every step works by hand, and Ask MDARIX answers from your records.",
+    disabled: "AI is off for free trials.",
+    short: "AI is off for free trials",
   },
 };
 
@@ -1009,8 +1026,9 @@ export function aiStatusBanner(status: AiStatus | null | undefined): AiBanner | 
           ? "PROVIDER_UNAVAILABLE"
           : null;
   if (!reason) return null;
-  const text = BANNER_TEXT[reason];
-  const server = safeText(status.message);
+  const trial = status.trial === true && reason !== "BUDGET_EXHAUSTED";
+  const text = BANNER_TEXT[trial ? "TRIAL" : reason];
+  const server = trial ? null : safeText(status.message);
   const offered = list<string>(status.manual_paths)
     .map((path) => MANUAL_PATHS.find((item) => code(item.view) === code(path) || code(path).includes(code(item.view))))
     .filter((item): item is AiBanner["manual"][number] => Boolean(item));
@@ -1019,6 +1037,7 @@ export function aiStatusBanner(status: AiStatus | null | undefined): AiBanner | 
     title: text.title,
     message: server ?? text.message,
     disabledReason: server ? `${text.disabled} ${server}` : text.disabled,
+    shortReason: text.short,
     manual: offered.length ? Array.from(new Set(offered)) : MANUAL_PATHS,
   };
 }

@@ -9,6 +9,7 @@ import {
   chapterStatus,
   chapterTone,
   loopFromStory,
+  STORY_FAILED,
   storyHeadline,
   type StoryChapter,
   type TrialStory,
@@ -412,5 +413,13 @@ describe("booking a one-to-one demo from the trial", () => {
     expect(
       renderToStaticMarkup(<SampleDataPanel counts={{ products: 0 }} allowed={() => true} onOpen={() => undefined} />),
     ).toBe("");
+  });
+});
+
+describe("Getting started when the story cannot be read", () => {
+  it("says so and never stays on Reading your trial's records", () => {
+    expect(storyHeadline(null, true)).toEqual(STORY_FAILED);
+    expect(STORY_FAILED.title).toBe("Your trial's story could not be loaded");
+    expect(storyHeadline(null, false).title).toBe("Reading your trial's records…");
   });
 });

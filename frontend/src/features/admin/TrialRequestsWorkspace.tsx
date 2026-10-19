@@ -21,6 +21,9 @@ type TrialRequest = {
   data_delete_after: string | null;
   data_deleted: boolean;
   owner_status: string | null;
+  // The latest invitation email: SENT, FAILED (retried by MDARIX, resend here), NOT_CONFIGURED; null before 0.10.29.
+  invitation_delivery?: string | null;
+  invitation_attempted_at?: string | null;
   // What the requester told MDARIX about their company and trial, as readable lines (trial/request_profile.py).
   profile?: { job_title?: string; country?: string; [key: string]: unknown };
   profile_lines?: { label: string; value: string }[];
@@ -65,6 +68,17 @@ export function trialRequestsPath({
 
 const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+/**
+ * Why an approved trial's owner has not activated yet, when it is the email: the invitation did not go out (MDARIX
+ * retries it and alerts operations; Resend invitation sends it now) or this server sends no email. Null otherwise.
+ */
+export function invitationProblem(row: Pick<TrialRequest, "status" | "owner_status" | "invitation_delivery">) {
+  if (row.status !== "APPROVED" || row.owner_status !== "INVITED") return null;
+  if (row.invitation_delivery === "FAILED") return "Invitation not delivered";
+  if (row.invitation_delivery === "NOT_CONFIGURED") return "Invitation not sent: email is not set up";
+  return null;
+}
 
 // Free-trial requests from the website. Approve creates the private 30-day trial workspace and sends the invitation.
 export function TrialRequestsWorkspace() {
@@ -299,6 +313,12 @@ export function TrialRequestsWorkspace() {
               render: (row) =>
                 row.status === "APPROVED" ? (
                   <span className="cc-stack">
+                    {invitationProblem(row) && (
+                      <span className="trial-queue-pill is-problem" role="status">
+                        {invitationProblem(row)}
+                        {row.invitation_attempted_at ? ` · tried ${formatDate(row.invitation_attempted_at)}` : ""}
+                      </span>
+                    )}
                     {row.tenant_key}
                     {row.data_deleted ? (
                       <small>Trial data deleted</small>

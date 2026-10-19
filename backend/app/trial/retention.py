@@ -4,6 +4,12 @@ Only workspaces still on the Free Trial plan whose data lives in the shared tria
 was extended or converted no longer qualifies. Everything the trial stored is deleted and its people pseudonymized
 (backend/app/tenant_purge.py); the workspace is archived. A trial under a legal hold is left alone, with an audit
 record of the skipped run. ``delete_tenant_records`` (business records only) is what the demo workspace reset uses.
+
+Trial requests that never became a trial are kept no longer than needed either: ``REQUEST_RETENTION_DAYS`` (90) after
+a request was declined, or after the invitation of an approved one expired unused, the requester's name, email, job
+title, phone and free-text goal are erased (``tenant_purge.erase_trial_request``; the organization's name and its
+answers about the organization stay as the record of the request), and the account made for them, never activated,
+is erased with it. The same scheduled job does it. A request whose trial is under a legal hold is left alone.
 """
 
 from __future__ import annotations
@@ -22,6 +28,8 @@ from backend.app.db.models.stage2 import SubscriptionLifecycle
 from backend.app.trial.service import FREE_TRIAL_PLAN
 
 RETENTION_DAYS = 30
+# Days a declined request, or an approved one whose invitation expired unused, keeps the requester's personal data.
+REQUEST_RETENTION_DAYS = 90
 
 # Records the trial created or uploaded. Identity, plan, subscription and audit tables are deliberately absent.
 TRIAL_DATA_TABLES = (
@@ -239,6 +247,102 @@ def _note_legal_hold(db: Session, trial: dict, actor_ref: str, now: datetime) ->
     db.commit()
 
 
+def _unused_invitation_expired(db: Session, request, owner, now: datetime) -> datetime | None:
+    """When the last invitation of a never-activated trial owner expired (None while one is still open)."""
+    from sqlalchemy import func
+
+    from backend.app.db.models.stage2 import UserInvitation
+    from backend.app.trial.service import TRIAL_INVITATION_TTL_SECONDS
+
+    latest = (
+        db.query(func.max(UserInvitation.expires_at))
+        .filter(UserInvitation.user_id == owner.id, UserInvitation.tenant_id == owner.tenant_id)
+        .scalar()
+    )
+    if latest is None:
+        sent = request.invitation_attempted_at or request.reviewed_at
+        latest = sent + timedelta(seconds=TRIAL_INVITATION_TTL_SECONDS) if sent else None
+    return latest if latest is not None and latest <= now else None
+
+
+def requests_due(db: Session, now: datetime | None = None) -> list[dict]:
+    """Trial requests whose requester's personal data is due for erasure: declined, or approved with an invitation
+    that expired unused, ``REQUEST_RETENTION_DAYS`` ago or more, and not erased yet. ``legal_hold`` marks the ones
+    whose trial is under a legal hold."""
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.db.models.stage2 import OnboardingRequest
+    from backend.app.tenant_purge import REMOVED_DOMAIN
+
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=REQUEST_RETENTION_DAYS)
+    due: list[dict] = []
+    kept = db.query(OnboardingRequest).filter(~OnboardingRequest.email.like(f"%{REMOVED_DOMAIN}"))
+    for row in kept.filter(OnboardingRequest.status == "DECLINED", OnboardingRequest.reviewed_at <= cutoff):
+        due.append({"request": row, "why": "DECLINED", "owner": None, "legal_hold": False})
+    approved = kept.filter(
+        OnboardingRequest.status == "APPROVED",
+        OnboardingRequest.tenant_id.is_not(None),
+        OnboardingRequest.reviewed_at <= cutoff,
+    )
+    for row in approved:
+        owner = (
+            db.query(AuthUser)
+            .filter(AuthUser.tenant_id == row.tenant_id, AuthUser.username == row.email.strip().lower())
+            .first()
+        )
+        if owner is None or owner.status != "INVITED":
+            continue  # activated: the trial's own retention (above) erases it with the workspace
+        expired = _unused_invitation_expired(db, row, owner, now)
+        if expired is None or expired > cutoff:
+            continue
+        tenant = db.get(Tenant, row.tenant_id)
+        legal_hold = bool(tenant is not None and tenant.legal_hold)
+        due.append({"request": row, "why": "INVITATION_UNUSED", "owner": owner, "legal_hold": legal_hold})
+    return due
+
+
+def _decider_tenant(db: Session, row):
+    """The organization whose people decided the request (the platform's): its erasure is logged there."""
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.support_access import platform_tenant_id
+
+    decider = db.query(AuthUser.tenant_id).filter(AuthUser.id == row.reviewed_by).scalar() if row.reviewed_by else None
+    return decider or platform_tenant_id(db) or row.tenant_id
+
+
+def erase_stale_requests(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
+    """Erase the requester's personal data from every request ``requests_due`` lists (see the module docstring), one
+    request per transaction. Returns how many were erased and the MDARIX IDs of those left alone under a legal hold."""
+    from backend.app.db.tenant_scope import bind_system
+    from backend.app.tenant_purge import erase_person, erase_trial_request
+
+    now = now or datetime.now(timezone.utc)
+    scope = "trial retention: erase requests that never became a trial"
+    bind_system(db, scope)
+    erased, held = [], []
+    for item in requests_due(db, now):
+        row = item["request"]
+        if item["legal_hold"]:
+            held.append(row.business_id)
+            continue
+        if item["why"] == "DECLINED":
+            reason = f"Trial request declined more than {REQUEST_RETENTION_DAYS} days ago (privacy policy period)."
+        else:
+            reason = (
+                f"Trial invitation expired unused more than {REQUEST_RETENTION_DAYS} days ago (privacy policy period)."
+            )
+        erase_trial_request(db, row, _decider_tenant(db, row), actor_ref, reason, now)
+        owner = item["owner"]
+        if owner is not None:
+            # The account made for the requester was never activated: it is erased with the request.
+            owner.status = "OFFBOARDED"
+            erase_person(db, owner, actor_ref, reason, now)
+        db.commit()
+        bind_system(db, scope)
+        erased.append(row.business_id)
+    return {"erased": len(erased), "requests": erased, "legal_hold": held}
+
+
 def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> dict:
     """Purge every trial that is due. A trial under a legal hold is skipped with an audit note. A trial that cannot
     be purged completely is left untouched and reported, and one whose files or plane could not be removed stays
@@ -263,4 +367,5 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
             failed.append({**trial, "error": "INCOMPLETE:" + ",".join(sorted(outcome.get("incomplete") or {}))})
             continue
         results.append({**trial, **outcome})
-    return {"purged": len(results), "trials": results, "failed": failed, "skipped": skipped}
+    requests = erase_stale_requests(db, actor_ref, now)
+    return {"purged": len(results), "trials": results, "failed": failed, "skipped": skipped, "requests": requests}

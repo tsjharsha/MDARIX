@@ -346,11 +346,15 @@ const scoreOf = (value: unknown): ScoreResult => {
 };
 
 /** The checks a version reports: its own readiness, else the composed content's. */
+// Checks about the brief itself and the decision after it: a brief's own scorecard, recorded while it was written,
+// cannot show them truthfully ("No brief generated yet" on the brief), and its submission ignores them.
+const NOT_ON_THE_BRIEF = new Set(["brief_ready", "decision"]);
+
 export function briefChecks(version: Pick<BriefVersion, "readiness" | "content"> | null | undefined): BriefCheck[] {
   const own = version?.readiness?.checks;
-  if (Array.isArray(own)) return own;
   const content = record(record(version?.content)?.readiness)?.checks;
-  return Array.isArray(content) ? (content as BriefCheck[]) : [];
+  const checks = Array.isArray(own) ? own : Array.isArray(content) ? (content as BriefCheck[]) : [];
+  return checks.filter((check) => !NOT_ON_THE_BRIEF.has(String(check.key ?? "")));
 }
 
 /**

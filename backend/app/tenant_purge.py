@@ -261,12 +261,70 @@ def _pseudonymize_people(db: Session, tenant_id, now: datetime) -> int:
         {"status": "REMOVED", "updated_at": now}, synchronize_session=False
     )
     for request in db.query(OnboardingRequest).filter(OnboardingRequest.tenant_id == tenant_id).all():
-        request.email = f"removed-{request.id.hex[:16]}{REMOVED_DOMAIN}"
-        request.display_name = "Removed"
-        # The person's job title, phone and free-text goal go too; the company facts stay for the record.
-        request.profile = erase_personal(request.profile)
-        request.updated_at = now
+        _pseudonymize_request(request, now)
     return len(users)
+
+
+REMOVED_REQUESTER = "Removed"
+# What _pseudonymize_request replaces or removes, recorded with a request's erasure.
+REQUEST_ERASED_FIELDS = ["email", "display_name", "profile.job_title", "profile.phone", "profile.evaluation_goal"]
+
+
+def _pseudonymize_request(request: OnboardingRequest, now: datetime) -> None:
+    request.email = f"removed-{request.id.hex[:16]}{REMOVED_DOMAIN}"
+    request.display_name = REMOVED_REQUESTER
+    # The person's job title, phone and free-text goal go too; the company facts stay for the record.
+    request.profile = erase_personal(request.profile)
+    request.updated_at = now
+
+
+def request_is_pseudonymized(request: OnboardingRequest) -> bool:
+    return str(request.email or "").endswith(REMOVED_DOMAIN) and request.display_name == REMOVED_REQUESTER
+
+
+def erase_trial_request(
+    db: Session,
+    request: OnboardingRequest,
+    log_tenant_id,
+    actor_ref: str,
+    reason: str,
+    now: datetime | None = None,
+    *,
+    reapply: bool = False,
+) -> dict:
+    """Erase the requester's personal data from a trial request that did not lead to a trial (backend/app/trial/
+    retention.py): name and email replaced, job title, phone and free-text goal removed; the organization's name and
+    its answers about the organization stay as the record of the request. Written to ``erasure_log`` (in
+    ``log_tenant_id``'s name: the platform organization that decided the request) so a restore re-applies it, and to the
+    audit trail without the data itself. Does not commit."""
+    now = now or datetime.now(timezone.utc)
+    _pseudonymize_request(request, now)
+    result = {"request_id": str(request.id), "status": request.status, "pseudonymized": REQUEST_ERASED_FIELDS}
+    db.add(
+        ErasureLog(
+            tenant_id=log_tenant_id,
+            kind="TRIAL_REQUEST_ERASED",
+            subject_ref=str(request.id),
+            performed_by=actor_ref,
+            reason=reason,
+            details={**result, "reapplied": reapply},
+            performed_at=now,
+        )
+    )
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=log_tenant_id,
+            actor_ref=actor_ref,
+            action="TRIAL_REQUEST_DATA_ERASED",
+            entity_type="OnboardingRequest",
+            entity_id=request.id,
+            reason=reason,
+            details=result,
+            created_at=now,
+        )
+    )
+    return result
 
 
 def _dedicated_plane(control: Session, tenant_id):
@@ -745,6 +803,24 @@ def reapply_erasures(
                 db.rollback()
                 summary["failed"].append({**item, "error": str(exc) or type(exc).__name__})
                 continue
+            summary["reapplied"].append(item)
+        elif log.kind == "TRIAL_REQUEST_ERASED":
+            try:
+                request = db.get(OnboardingRequest, uuid.UUID(log.subject_ref))
+            except ValueError:
+                request = None
+            if request is None:
+                summary["skipped"].append({**item, "why": "REQUEST_NOT_PRESENT"})
+                continue
+            if request_is_pseudonymized(request):
+                summary["skipped"].append({**item, "why": "ALREADY_ERASED"})
+                continue
+            if dry_run:
+                summary["pending"].append(item)
+                continue
+            erase_trial_request(db, request, log.tenant_id, actor_ref, _reapply_reason(log), now, reapply=True)
+            db.get(ErasureLog, log.id).reapplied_at = now
+            db.commit()
             summary["reapplied"].append(item)
         elif log.kind == "TENANT_PURGED":
             if tenant is None:

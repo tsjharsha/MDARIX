@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import uuid
@@ -39,6 +40,7 @@ from communication.email.inbound import classify_inbound_event, verify_resend_we
 from object_storage.service import ObjectStorageService
 from backend.app.access.permissions import AI_RUN, DATA_EXPORT, RECORDS_WRITE, require_permission
 
+logger = logging.getLogger("mdarix.stage3")
 router = APIRouter(prefix="/api/v1/stage3", tags=["Stage 3 Workflow"])
 NOW = lambda: datetime.now(timezone.utc)
 
@@ -158,13 +160,51 @@ def _ensure_own_records(db: Session, tenant_id, payload: InteractionRequest) -> 
             raise HTTPException(404, detail={"code": code, "message": "Not found in your organization"})
 
 
+def _is_trial(control_db: Session, tenant_id) -> bool:
+    from backend.app.trial.service import trial_subscription
+
+    try:
+        return trial_subscription(control_db, tenant_id) is not None
+    except Exception:
+        return False
+
+
+# What a records-only answer says about counting once fixed-rule answers to the question are attached.
+COUNTS_ANSWERED = (
+    "Counts come from fixed rules over your complaint records, the same answers as Getting started › Automatic "
+    "insights."
+)
+
+
+def _rule_answers(db: Session, tenant_id, question: str) -> list[dict]:
+    """Getting started's fixed-rule answers (backend/app/trial/insight_questions.py) to what ``question`` asks about
+    (lots, versions, a rise, harm, problem codes, countries): how Ask answers a counting question without AI instead
+    of searching evidence for its words. Empty when the workspace has none; never fails the question."""
+    from backend.app.trial import insight_questions
+    from backend.app.trial.imports import insights
+
+    try:
+        with db.begin_nested():
+            questions = insights(db, tenant_id).get("questions") or []
+        return [
+            {"key": item["key"], "question": item["question"], "answer": item["answer"]}
+            for item in insight_questions.answers_for(questions, question)
+        ]
+    except Exception:
+        logger.warning("Ask: the fixed-rule answers could not be read", exc_info=True)
+        return []
+
+
 @router.post("/interactions", dependencies=[Depends(require_permission(AI_RUN))])
 def create_interaction(
     payload: InteractionRequest,
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     _ensure_own_records(db, ctx.tenant_id, payload)
+    # A free trial runs without AI: when no model answers, the screen says that, not why no provider answered.
+    trial = _is_trial(control_db, ctx.tenant_id)
     now = NOW()
     session = AIInteractionSession(
         id=uuid.uuid4(),
@@ -292,6 +332,11 @@ def create_interaction(
         shown_answer, shown_known = answer, known
         response["answer_check"] = answer_check
         response["limitations"] = result.output.get("limitations", []) + answer_check["notes"]
+        if result.output.get("status") == "PROVIDER_NOT_CONFIGURED":
+            # No model was asked: say so in plain words (the provider's own note is for operators).
+            from genai.structured_answer import AI_NOTE_NOT_CONFIGURED, AI_NOTE_TRIAL
+
+            response["limitations"] = [AI_NOTE_TRIAL if trial else AI_NOTE_NOT_CONFIGURED]
         if reading.status == "INVALID":
             from genai.structured_answer import AI_NOTE_INVALID
 
@@ -308,6 +353,8 @@ def create_interaction(
     except GenAIUnavailable as exc:
         # Why no model answered, with what the user can do about it (AI switched off, allowance used up, ...).
         refusal = genai_refusal(exc)
+        if trial and refusal.get("code") in ("GENAI_DISABLED_FOR_ORGANIZATION", "GENAI_PROVIDER_NOT_ALLOWED"):
+            refusal = {**refusal, "user_message": "AI is off for free trials."}
         response["refusal"] = refusal
         response["limitations"] = [refusal["user_message"]]
         provenance = {
@@ -326,7 +373,8 @@ def create_interaction(
 
     if reading is not None and reading.status != "OK" and ai_note is None:
         if (response.get("provider_output") or {}).get("status") == "PROVIDER_NOT_CONFIGURED":
-            ai_note, reason_code = structured_module.AI_NOTE_NOT_CONFIGURED, "PROVIDER_UNAVAILABLE"
+            ai_note = structured_module.AI_NOTE_TRIAL if trial else structured_module.AI_NOTE_NOT_CONFIGURED
+            reason_code = "PROVIDER_UNAVAILABLE"
         else:
             ai_note = {
                 "NOT_JSON": structured_module.AI_NOTE_NOT_SECTIONED,
@@ -349,6 +397,17 @@ def create_interaction(
     from trust_engine.auto import assess_answer
 
     model_answered = bool(shown_answer) and provenance.get("provider") not in (None, "unavailable", "controlled")
+    if not model_answered:
+        # Without AI, a counting question (lots, versions, a rise, harm, codes, countries) gets the fixed-rule answer
+        # Getting started gives, instead of only a search for its words.
+        rule_answers = _rule_answers(db, uuid.UUID(ctx.tenant_id), payload.prompt)
+        if rule_answers:
+            response["rule_answers"] = rule_answers
+            structured = response["structured"]
+            structured["limitations"] = [
+                COUNTS_ANSWERED if "It does not count complaints" in str(text) else text
+                for text in structured.get("limitations") or []
+            ]
     response["trust"] = assess_answer(
         check_shown(shown_answer, shown_known) if model_answered else {},
         provider=provenance.get("provider"),
@@ -398,6 +457,8 @@ def create_interaction(
         "response": response,
         # Phase 4 (additive): the structured answer, also stored in response["structured"].
         "structured": response["structured"],
+        # Without AI: fixed-rule answers to the counting part of the question (empty when there is none).
+        "rule_answers": response.get("rule_answers") or [],
     }
     if provenance.get("refusal_code"):
         # The organization's AI switch, budget or provider policy refused the model (or no provider answered): say

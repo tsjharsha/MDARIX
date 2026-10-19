@@ -217,6 +217,9 @@ def _request_view(row: OnboardingRequest, tenant, subscription, owner_status: st
         "data_delete_after": (subscription.expires_at + timedelta(days=30)).isoformat() if subscription else None,
         "data_deleted": bool(tenant and tenant.status == "ARCHIVED"),
         "owner_status": owner_status,
+        # The latest invitation email (SENT, FAILED or NOT_CONFIGURED; None before md47) and when it was tried.
+        "invitation_delivery": row.invitation_delivery,
+        "invitation_attempted_at": row.invitation_attempted_at.isoformat() if row.invitation_attempted_at else None,
     }
 
 
@@ -340,6 +343,81 @@ def _send_invitation(
     if delivery != "SENT" and is_development():
         result["activation_path"] = f"/activate-account?token={token}"
     return result
+
+
+def record_invitation(
+    db: Session, row: OnboardingRequest, result: dict, actor_ref: str, *, source: str, retry: bool = False
+) -> None:
+    """Keep what became of an approved request's invitation email on the request (the queue shows it) and in the audit
+    trail, without the address. With ``retry`` a failed one is queued to be sent again: the outbox retries it with its
+    usual back-off (about five hours in all), then dead-letters it and alerts the operators. Commits."""
+    now = datetime.now(timezone.utc)
+    delivery = str(result.get("email_delivery") or "FAILED")
+    row.invitation_delivery = delivery
+    row.invitation_attempted_at = now
+    row.updated_at = now
+    # In the reviewer's (the platform's) trail, next to TRIAL_REQUEST_APPROVED.
+    trail = _actor_tenant(db, row.reviewed_by) or row.tenant_id
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=trail,
+            actor_ref=actor_ref,
+            action="TRIAL_INVITATION_SENT" if delivery == "SENT" else "TRIAL_INVITATION_NOT_DELIVERED",
+            entity_type="OnboardingRequest",
+            entity_id=row.id,
+            details={
+                "request_id": str(row.id),
+                "delivery": delivery,
+                "error": result.get("email_error"),
+                "source": source,
+                "retry_queued": bool(retry and delivery == "FAILED"),
+            },
+            created_at=now,
+        )
+    )
+    if retry and delivery == "FAILED":
+        from backend.app.notifications import TRIAL_INVITATION_RETRY, _queue
+
+        _queue(
+            db,
+            trail,
+            TRIAL_INVITATION_RETRY,
+            "OnboardingRequest",
+            row.id,
+            {"request_id": str(row.id)},
+        )
+    db.commit()
+
+
+def _actor_tenant(db: Session, user_id):
+    return db.query(AuthUser.tenant_id).filter(AuthUser.id == user_id).scalar() if user_id else None
+
+
+def retry_invitation(db: Session, request_id) -> str:
+    """Send a failed trial invitation again (the outbox's TRIAL_INVITATION_RETRY event). SKIPPED when it is no longer
+    needed: the request was declined or purged, an invitation went out meanwhile (a resend), or the owner has
+    activated. Returns SENT or FAILED otherwise; the caller raises on FAILED so the outbox tries again later."""
+    row = db.get(OnboardingRequest, uuid.UUID(str(request_id)))
+    if row is None or row.status != "APPROVED" or row.tenant_id is None or row.invitation_delivery == "SENT":
+        return "SKIPPED"
+    user = (
+        db.query(AuthUser)
+        .filter(AuthUser.tenant_id == row.tenant_id, AuthUser.username == row.email.strip().lower())
+        .first()
+    )
+    if user is None or user.status != "INVITED":
+        return "SKIPPED"
+    result = _send_invitation(db, user, row.organization, row.reviewed_by)
+    delivery = str(result.get("email_delivery") or "FAILED")
+    if delivery == "SENT":
+        record_invitation(db, row, result, "system:invitation-retry", source="RETRY")
+    else:
+        # Each failed attempt is on the request; the trail records the first failure and the eventual delivery.
+        row.invitation_delivery = delivery
+        row.invitation_attempted_at = datetime.now(timezone.utc)
+        db.commit()
+    return delivery
 
 
 def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict:
@@ -491,6 +569,13 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
 
     seed_demo_signals(db, user.tenant_id)
     invitation = _send_invitation(db, user, row.organization, admin.id)
+    # The approval stands whatever happens to the email; a failed one is on the request and retried. Recording it can
+    # never undo the committed approval either: a failure there is logged.
+    try:
+        record_invitation(db, row, invitation, str(admin.id), source="APPROVAL", retry=True)
+    except Exception:
+        db.rollback()
+        logging.getLogger(__name__).exception("The outcome of a trial invitation could not be recorded")
     return {**serialize_request(db, row), **invitation}
 
 
@@ -552,4 +637,6 @@ def resend_invitation(db: Session, request_id: uuid.UUID, admin: AuthUser) -> di
     )
     if user is None or user.status != "INVITED":
         raise _error(409, "TRIAL_USER_ALREADY_ACTIVE", "This user has already activated their account")
-    return {**serialize_request(db, row), **_send_invitation(db, user, row.organization, admin.id)}
+    invitation = _send_invitation(db, user, row.organization, admin.id)
+    record_invitation(db, row, invitation, str(admin.id), source="RESEND")
+    return {**serialize_request(db, row), **invitation}

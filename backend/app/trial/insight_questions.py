@@ -12,6 +12,7 @@ tenant's products, versions and lots; everything read here is filtered to the sa
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -854,6 +855,27 @@ QUESTIONS = (
     _origin_question,
     _evidence_question,
 )
+
+
+# The words of a question typed into Ask MDARIX that name what one of the questions above answers. Without AI, Ask
+# answers such a question with the same fixed-rule answer as Getting started instead of a search for the words.
+ASK_TOPICS = (
+    ("lots", ("lot", "lots", "batch", "batches")),
+    ("version", ("version", "versions", "rev", "revision", "changed", "change", "changes")),
+    ("rise", ("rise", "rising", "rose", "increase", "increased", "trend", "more devices")),
+    ("harm", ("harm", "injury", "injuries", "malfunction", "malfunctions", "death", "deaths")),
+    ("codes", ("problem code", "problem codes", "codes", "failure mode", "failure modes")),
+    ("origin", ("country", "countries", "coming from", "region", "regions")),
+)
+ASK_ANSWERS_MAX = 2
+
+
+def answers_for(questions: list[dict], text: str) -> list[dict]:
+    """The questions above (as ``build`` returns them) that ``text`` asks about, in ``ASK_TOPICS`` order."""
+    words = " " + " ".join(re.findall(r"[a-z0-9]+", str(text or "").lower())) + " "
+    keys = [key for key, terms in ASK_TOPICS if any(f" {term} " in words for term in terms)]
+    by_key = {item["key"]: item for item in questions}
+    return [by_key[key] for key in keys if key in by_key][:ASK_ANSWERS_MAX]
 
 
 def build(db: Session, tenant_id, scope: str, complaints, products, versions, lots) -> dict:

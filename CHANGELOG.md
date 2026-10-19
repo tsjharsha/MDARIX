@@ -10,6 +10,74 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.29] - 2026-10-19
+
+### Fixed
+
+- Free trial: an invitation email that fails after a trial is approved (automatically or by the MDARIX team) is no
+  longer silent. The approval stands; the request records what happened to its latest invitation (sent, not
+  delivered, or email not set up) and when, and Platform Admin › Identity & Access › Onboarding shows **Invitation not
+  delivered** next to **Resend invitation** until the owner activates. MDARIX sends a failed invitation again through
+  the outbox (with the outbox's usual back-off, about five hours in all, then a dead-letter alert), alerts operations
+  through the configured alert channels when an automatic approval's invitation fails (the request's MDARIX ID and
+  the provider's error, never the address), and records `TRIAL_INVITATION_SENT` or
+  `TRIAL_INVITATION_NOT_DELIVERED` in the audit trail. Migration `md47invitedelivery` adds the two columns to
+  `onboarding_requests`.
+- Getting started no longer stays on "Reading your trial's records…" when the trial's story cannot be read (a failed
+  or timed-out request): it says the story could not be loaded and offers **Try again** and **Go to Investigations**,
+  and a story already on screen stays there while it reloads.
+- The sample case of a free trial now shows what MDARIX does differently: the sample author recorded by hand, with no
+  AI, two competing hypotheses (the NovaSense sensors of supplier change SAMPLE-CHG-014, partially supported by the
+  change record and the inspection of lots 003 and 004; and ward pressure-limit settings, which the same evidence
+  speaks against), two open questions (the bench test of returned pumps; the wards' occlusion limits) and a failure
+  chain with one link still unknown. The sample Decision Brief carries them as its leading and alternative hypotheses
+  and open unknowns; signing the decision asks you to confirm you have read them. Removing the sample data removes
+  them too. Applies to new trials.
+- The sample case's progress counts its Decision Brief: "Investigation brief" reads "Decision Brief version 1: waits
+  for its quality review" (and passes once the brief is approved for decision) instead of "No brief yet". The brief's
+  own readiness scorecard no longer lists the brief and the decision as pending checks about itself. The sample case's
+  owner shows as "MDARIX sample author", never as an address on sample.invalid (existing trials too).
+- Ask MDARIX without AI answers the natural trial question. A question about lots, versions, a rise, harm, problem
+  codes or countries gets the same fixed-rule answers as Getting started › Automatic insights, with their tables, next
+  to the evidence the search found; the sample case's evidence is found from the first minute (new trials), also with
+  a version chosen in the context bar. It never shows "Live GenAI provider is not configured": a free trial reads "AI
+  is off for free trials, so this answer comes from your records only". The page offers questions to try and its
+  introduction is in plain words.
+
+### Changed
+
+- The case Workspace tab speaks plainly. System codes (NO_CAUSAL_CONCLUSION, NO_DIRECT_EVIDENCE,
+  NO_RELEVANT_EVIDENCE, ...) are shown as sentences ("MDARIX does not decide the root cause", "No evidence on this
+  case yet", "No further matching records"), Context Health is "Case at a glance" (evidence and linked records),
+  Retrieval & Guardrails is "What MDARIX checked", and the "Deterministic Trust Engine" panel is a folded "How MDARIX
+  checks AI output". The codes stay in the API and the audit trail.
+- With AI off, each AI step of the case Workspace tab shows why in a few words ("AI is off for free trials") and the
+  step that does the same job by hand (**Record observations**, **Add hypotheses by hand**, **Record unknowns**,
+  **Build a failure chain**, **Write the Decision Brief**) instead of a greyed-out button. `GET /api/v1/ai/status`
+  tells a free trial so (`trial: true`). AI stays off.
+- Privacy policy, "How long we keep it", and the data retention schedule: trial requests that do not lead to a trial
+  lose the requester's personal details after 90 days (see Security).
+
+### Security
+
+- An Excel upload can no longer exhaust the API's memory. A workbook is refused before it is unpacked when its parts
+  are too many, too large (20 MB unpacked in all for a free trial, 60 MB otherwise; 5 MB for the workbook, styles and
+  relationship parts) or packed more than 100 times; the worksheet and its shared strings are read as a stream, and
+  reading stops at the import's row limit plus 100 rows, or at a cap on cells and XML elements. The 60 KB "zip bomb"
+  of the final review (59 MB of empty cells, 1.3 GB of memory before) is refused in milliseconds with "The workbook
+  is too large to read. Save the sheet as CSV UTF-8 and upload that."; a sheet with too many rows says so.
+- Invitation emails are rate-limited with the existing limiter: a free trial's owner can resend an invitation 3 times
+  per address per hour and 10 times per organization per day, invite 10 colleagues per person and per organization
+  per day, and remove 10 colleagues per organization per day (`invite-resend:address`, `invite-resend:org`,
+  `invite:user`, `invite:org`, `team-remove:org` in `backend/app/rate_limit.py`). Over a limit the API answers 429
+  with `Retry-After` and a sentence the Team tab shows; no email is sent.
+- Free-trial requests that never became a trial are no longer kept for ever: 90 days after a request was declined, or
+  after the invitation of an approved one expired unused, the daily `trial-retention` job erases the requester's
+  name, email, job title, phone and free-text goal (pseudonymized as a purge does; the organization's name and its
+  answers about the organization stay) and erases the never-activated account with it. Each erasure is written to
+  `erasure_log` (TRIAL_REQUEST_ERASED, re-applied after a restore by `scripts/reapply_erasures.py`) and audited as
+  `TRIAL_REQUEST_DATA_ERASED` without the data. Requests still waiting for review are not erased automatically.
+
 ## [0.10.28] - 2026-10-19
 
 ### Fixed
