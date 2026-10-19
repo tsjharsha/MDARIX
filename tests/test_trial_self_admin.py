@@ -26,6 +26,7 @@ from tests.test_free_trial import (
     _approved_trial_client,
     _purge_trial_business_data,
 )
+from tests.test_mapping_release_self_approval import _organization
 from tests.test_support_access_customer_approval import GRANTS, _request, _start_now
 from tests.test_support_access_sod import _platform_admin
 
@@ -227,7 +228,30 @@ def _awaiting_grant(tenant_id) -> tuple[str, TestClient]:
     return grant_id, recipient
 
 
-def test_the_trial_owner_decides_on_support_access_and_a_colleague_cannot():
+def test_until_after_launch_mdarix_cannot_ask_a_trial_for_support_access():
+    """Owner decision 2026-10-19: a request would wait for a trial owner whose Team tab no longer shows it. Other
+    organizations are asked as before, and the picker of Request access can leave the trials out."""
+    _owner, approval, _ = _approved_trial_client()
+    requester, _ = _platform_admin()
+    _recipient, recipient_id = _platform_admin()
+    refused = _request(requester, approval["tenant_id"], recipient_id, areas=[access.CONFIGURATION])
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["detail"] == {
+        "code": "SUPPORT_ACCESS_TRIALS_LATER",
+        "message": "Support access for free trials is not available yet.",
+    }
+    customer_tenant = _organization()
+    assert _request(requester, customer_tenant, recipient_id, areas=[access.CONFIGURATION]).status_code == 200
+    options = {
+        item["id"]: item for item in requester.get("/api/v1/platform-admin/customer-admin-tenants").json()["items"]
+    }
+    assert options[approval["tenant_id"]]["is_trial"] is True
+    assert options[customer_tenant]["is_trial"] is False
+
+
+def test_the_trial_owner_decides_on_support_access_and_a_colleague_cannot(monkeypatch):
+    # The decisions are kept for when support access for trials comes back (support_access.TRIAL_SUPPORT_ACCESS_ENABLED).
+    monkeypatch.setattr(access, "TRIAL_SUPPORT_ACCESS_ENABLED", True)
     owner, approval, _, colleague, _ = _trial_with_colleague()
     tenant_id = approval["tenant_id"]
     grant_id, recipient = _awaiting_grant(tenant_id)

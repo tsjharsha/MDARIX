@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { requestJson } from "../../../app/apiClient";
+import { TRIAL_SUPPORT_ACCESS_ENABLED } from "../../../app/featureSet";
 import { Panel } from "../../admin/console/charts";
 import { ConfirmDialog, send, useResource, type Confirmation, type Resource } from "../../customer-admin/shared";
 import { TrialSupportAccess } from "./TrialSupportAccess";
@@ -73,8 +74,9 @@ type Message = { tone: "good" | "bad"; text: string; link?: string };
 
 /**
  * Getting started › Team: who is on the trial, and, for the person who started it, inviting colleagues up to the
- * trial's limit, removing one (the seat is free again), resetting a colleague's MFA, and the support access MDARIX
- * asks for (backend/app/trial/team.py). A trial has no admin console: these are its owner's.
+ * trial's limit, removing one (the seat is free again), resetting a colleague's MFA, and (once
+ * TRIAL_SUPPORT_ACCESS_ENABLED is on again) the support access MDARIX asks for (backend/app/trial/team.py). A trial has
+ * no admin console: these are its owner's.
  */
 export function TeamPanel({ onChanged }: { onChanged: () => void }) {
   const team = useResource<Team>(TEAM_PATH);
@@ -134,7 +136,7 @@ export function TeamPanel({ onChanged }: { onChanged: () => void }) {
         }}
         onChanged={changed}
       />
-      {team.data?.can_manage && <TrialSupportAccess />}
+      {TRIAL_SUPPORT_ACCESS_ENABLED && team.data?.can_manage && <TrialSupportAccess />}
       <ConfirmDialog
         request={confirm}
         onClose={() => setConfirm(null)}

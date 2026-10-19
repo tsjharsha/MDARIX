@@ -10,6 +10,36 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.31] - 2026-10-19
+
+### Added
+
+- Free trial: when the trial owner removes a colleague, withdraws an invitation not yet accepted, or resets a
+  colleague's MFA, everyone concerned is now told by email, once each, after the change is saved. The colleague learns
+  who removed them (they can no longer sign in, were signed out, and what they did stays in the trial under their
+  name), that their invitation was withdrawn (the earlier activation link no longer works), or that their
+  authenticator was removed and they set up a new one at their next sign-in; the owner's reason for an MFA reset stays
+  in the audit trail and is not in the email. The owner gets a confirmation of each change, with when, that also
+  serves as a security notice ("If this was not you, change your password and contact support"). The MDARIX team gets
+  a short "Trial team change" alert at the address of the MVP-request alert (`MDARIX_DEMO_ALERT_EMAIL`, else
+  `MDARIX_TRIAL_ALERT_EMAIL`; none is sent when neither is set). A failed email is logged and never undoes the change.
+  Platform Admin › Customers & Tenants › Trials lists each trial's latest **Team changes** under its people.
+- A trial owner can reset colleagues' MFA up to 10 times a day (`team-mfa-reset:org`), like removals, so the new
+  emails cannot be sent without end.
+
+### Changed
+
+- The Platform Admin menu no longer shows a number after each area's description (it was only the number of tabs in
+  the area), and the dashboard's administration areas no longer say "N sections". The Customer Administrator and
+  workspace menus had no such counts; tab counts of real work (support requests awaiting a decision, My Work) stay.
+- Support access for free trials waits for after the launch (owner decision): a trial's Getting started › Team no
+  longer shows Support access, Platform Admin › Security › Support access › Request access no longer offers free
+  trials, and the server refuses such a request (422 `SUPPORT_ACCESS_TRIALS_LATER`, "Support access for free trials is
+  not available yet."). One switch on each side brings it back (`TRIAL_SUPPORT_ACCESS_ENABLED` in
+  `backend/app/support_access.py` and `frontend/src/app/featureSet.ts`). The trial's support-access API and any grant
+  already made are unchanged: an open trial grant simply expires within 24 hours. The user guide no longer describes
+  it.
+
 ## [0.10.30] - 2026-10-19
 
 ### Fixed

@@ -431,6 +431,18 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
         raise HTTPException(422, detail={"code": "SUPPORT_SCOPE_INVALID", "message": str(exc)}) from exc
     if db.query(Tenant).filter(Tenant.id == payload.tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
+    if not support_access.TRIAL_SUPPORT_ACCESS_ENABLED:
+        from backend.app.trial.service import trial_subscription
+
+        # A request would wait for a trial owner whose Team tab no longer shows it.
+        if trial_subscription(db, payload.tenant_id) is not None:
+            raise HTTPException(
+                422,
+                detail={
+                    "code": "SUPPORT_ACCESS_TRIALS_LATER",
+                    "message": "Support access for free trials is not available yet.",
+                },
+            )
     if str(payload.tenant_id) == str(support_access.platform_tenant_id(db)):
         raise HTTPException(
             422,

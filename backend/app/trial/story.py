@@ -583,6 +583,57 @@ def _people_by_tenant(db: Session, tenant_ids: list) -> dict:
     }
 
 
+# How many of a trial's latest team changes the overview lists.
+TEAM_CHANGES_SHOWN = 5
+
+
+def _team_changes_by_tenant(data: Session, db: Session, tenant_ids: list) -> dict:
+    """``{tenant id: [{change, person, at}]}``: the latest removals, withdrawn invitations and MFA resets each trial's
+    owner made (backend/app/trial/team.py), newest first, from the trial's audit trail (``data``, in system scope);
+    ``person`` is the email of the account changed (``db``)."""
+    from backend.app.db.models.foundation import AuditEvent, AuthUser
+    from backend.app.trial.team import SOURCE
+
+    if not tenant_ids:
+        return {}
+    try:
+        events = (
+            data.query(
+                AuditEvent.tenant_id, AuditEvent.action, AuditEvent.entity_id, AuditEvent.details, AuditEvent.created_at
+            )
+            .filter(
+                AuditEvent.tenant_id.in_(tenant_ids),
+                AuditEvent.action.in_(("TRIAL_COLLEAGUE_REMOVED", "USER_MFA_RESET")),
+                AuditEvent.details["source"].astext == SOURCE,
+            )
+            .order_by(AuditEvent.created_at.desc(), AuditEvent.chain_seq.desc())
+            .all()
+        )
+    except Exception:
+        logger.exception("Trial overview: the team changes could not be read")
+        data.rollback()
+        return {}
+    people = {event.entity_id for event in events if event.entity_id}
+    emails = dict(db.query(AuthUser.id, AuthUser.username).filter(AuthUser.id.in_(people))) if people else {}
+    found: dict = {}
+    for event in events:
+        changes = found.setdefault(event.tenant_id, [])
+        if len(changes) >= TEAM_CHANGES_SHOWN:
+            continue
+        if event.action == "USER_MFA_RESET":
+            change = "MFA_RESET"
+        else:
+            change = "INVITATION_WITHDRAWN" if (event.details or {}).get("invitation_withdrawn") else "REMOVED"
+        changes.append(
+            {
+                "change": change,
+                "person": emails.get(event.entity_id),
+                "at": event.created_at.isoformat() if event.created_at else None,
+            }
+        )
+    return found
+
+
 def trial_overview(
     db: Session,
     now: datetime | None = None,
@@ -653,6 +704,8 @@ def trial_overview(
                 "state": "ENDED" if ended else "ENDING_SOON" if seconds_left <= 7 * 86400 else "ACTIVE",
                 "days_left": 0 if ended else max(0, int(-(-seconds_left // 86400))),
                 "users": {"used": 0, "limit": TRIAL_USER_LIMIT},
+                # The owner's latest removals, withdrawn invitations and MFA resets (filled in for the trials shown).
+                "team_changes": [],
                 "rows": {"used": 0, "limit": TRIAL_ROW_LIMIT},
                 "story": _reached(
                     counts.get(row.tenant_id) or dict.fromkeys(CODES, 0),
@@ -691,10 +744,12 @@ def trial_overview(
         page_items = shown[(page - 1) * page_size : page * page_size]
         attention = [item for item in sorted(items, key=_attention_rank) if item["state"] != "ENDED"][:ATTENTION_SHOWN]
 
-        # The people and uploads of the trials shown (the page and the attention list), in two more statements.
+        # The people, uploads and team changes of the trials shown (the page and the attention list), in four more
+        # statements.
         shown_ids = list(dict.fromkeys(tenant_of[id(item)] for item in [*page_items, *attention]))
         people = _people_by_tenant(db, shown_ids)
         uploaded = uploaded_rows_by_tenant(data, shown_ids)
+        team_changes = _team_changes_by_tenant(data, db, shown_ids)
     for item in {id(item): item for item in [*page_items, *attention]}.values():
         tenant_id = tenant_of[id(item)]
         seats, owner, seated = people.get(tenant_id, (0, None, []))
@@ -702,6 +757,7 @@ def trial_overview(
         item["people"] = seated
         item["users"]["used"] = seats
         item["rows"]["used"] = uploaded.get(tenant_id, 0)
+        item["team_changes"] = team_changes.get(tenant_id, [])
 
     active = [item for item in items if item["state"] != "ENDED"]
     return {

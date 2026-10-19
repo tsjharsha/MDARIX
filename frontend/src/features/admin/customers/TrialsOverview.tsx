@@ -20,6 +20,7 @@ import {
   chapterFunnel,
   nextChapterTitle,
   storyStage,
+  teamChangeText,
   trialStateOf,
   trialsPath,
   type TrialItem,
@@ -362,7 +363,10 @@ export function trialMfaReset(person: TrialPerson, trial: Pick<TrialItem, "name"
   };
 }
 
-/** The trial's owner, then its colleagues, each with Reset MFA once they have activated their account. */
+/**
+ * The trial's owner, then its colleagues, each with Reset MFA once they have activated their account, then the team
+ * changes the owner made (removals, withdrawn invitations, MFA resets), newest first.
+ */
 function TrialPeople({ row, onReset }: { row: TrialItem; onReset: (person: TrialPerson) => void }) {
   const owner = row.owner;
   const others = (row.people ?? []).filter((person) => person.id !== owner?.id);
@@ -384,6 +388,16 @@ function TrialPeople({ row, onReset }: { row: TrialItem; onReset: (person: Trial
           {person.name || person.email} · {person.status === "INVITED" ? "invited" : "colleague"} {reset(person)}
         </small>
       ))}
+      {row.team_changes?.length ? (
+        <>
+          <small className="cc-trial-changes">Team changes</small>
+          {row.team_changes.map((item, index) => (
+            <small key={`${item.at}-${index}`}>
+              {teamChangeText(item)} · {formatDate(item.at)}
+            </small>
+          ))}
+        </>
+      ) : null}
     </span>
   );
 }

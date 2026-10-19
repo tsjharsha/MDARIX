@@ -1005,12 +1005,6 @@ th.num .table-sort {
 .ac-areas small {
   color: var(--ac-muted);
 }
-.ac-areas em {
-  color: var(--ac-teal);
-  font-size: 12px;
-  font-style: normal;
-  font-weight: 600;
-}
 
 /* Domain pages */
 .ac-tabs {

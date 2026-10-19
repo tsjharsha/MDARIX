@@ -37,6 +37,8 @@ export type TenantSummary = {
   tenant_name?: string | null;
   customer_name?: string | null;
   customer_business_id?: string | null;
+  // A free trial (the tenant picker of Request access leaves trials out until support access for them returns).
+  is_trial?: boolean;
 };
 
 /** One customer (the legal and commercial parent) with the tenants it owns. */

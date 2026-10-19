@@ -961,13 +961,17 @@ def resend_trial_colleague_invitation(
 def remove_trial_colleague(
     user_id: uuid.UUID,
     request: Request,
+    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
 ):
     """The trial owner takes a colleague off the trial (or withdraws an invitation): the seat is free again, the
-    account can no longer sign in, and what they did stays (backend/app/trial/team.py)."""
+    account can no longer sign in, and what they did stays (backend/app/trial/team.py). The colleague, the owner and
+    the MDARIX team are emailed after the response."""
     _require_trial(db, ctx)
-    return team.remove_colleague(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id, request)
+    outcome = team.remove_colleague(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id, request)
+    background.add_task(team.send_team_change_emails, outcome.pop("notify"))
+    return outcome
 
 
 class ColleagueMfaReset(BaseModel):
@@ -980,13 +984,17 @@ def reset_trial_colleague_mfa(
     user_id: uuid.UUID,
     payload: ColleagueMfaReset,
     request: Request,
+    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
 ):
-    """The trial owner resets the MFA of a colleague who lost their authenticator and recovery codes."""
+    """The trial owner resets the MFA of a colleague who lost their authenticator and recovery codes. The colleague,
+    the owner and the MDARIX team are emailed after the response (without the reason, which stays in the audit)."""
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    return team.reset_colleague_mfa(db, tenant_id, _current_user(db, ctx), user_id, payload.reason, request)
+    outcome = team.reset_colleague_mfa(db, tenant_id, _current_user(db, ctx), user_id, payload.reason, request)
+    background.add_task(team.send_team_change_emails, outcome.pop("notify"))
+    return outcome
 
 
 # ------------------------------------------------------------------------------------------- Support access

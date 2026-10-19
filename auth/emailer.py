@@ -471,6 +471,124 @@ def send_trial_exit_request_alert(
     )
 
 
+# ------------------------------------------------------------------------------------------- the trial team
+# What a trial owner's change to their team means for the person changed and for the owner
+# (backend/app/trial/team.py). No links into MDARIX: nobody is asked to do anything there.
+
+TEAM_REMOVED = "REMOVED"
+TEAM_INVITATION_WITHDRAWN = "INVITATION_WITHDRAWN"
+TEAM_MFA_RESET = "MFA_RESET"
+
+
+def _named(name: str, email: str) -> str:
+    """The person as "Name (email)", or the email alone when they have no other name."""
+    return email if not name or name == email else f"{name} ({email})"
+
+
+def _questions() -> str:
+    support = company().support_email
+    return f"If you have questions about MDARIX, write to {support}." if support else "Questions: reply to this email."
+
+
+def send_trial_colleague_removed(recipient: str, *, owner: str, organization: str) -> str:
+    """Tell a colleague that the trial's owner removed them from the trial."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"{owner} removed you from the MDARIX free trial of {organization}",
+            heading=f"{owner} removed you from the MDARIX free trial of {organization}",
+            paragraphs=(
+                "You can no longer sign in to this trial, and you were signed out.",
+                f"What you did in the trial stays there under your name: it is part of the trial data of {organization}.",
+                f"If this is unexpected, please contact {owner}.",
+            ),
+            closing=(_questions(),),
+            reason=f"You are receiving this email because you were on the MDARIX free trial of {organization}.",
+        ),
+    )
+
+
+def send_trial_invitation_withdrawn(recipient: str, *, owner: str, organization: str) -> str:
+    """Tell an invited colleague, who had not activated yet, that the trial's owner withdrew the invitation."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"{owner} withdrew your invitation to the MDARIX free trial of {organization}",
+            heading=f"{owner} withdrew your invitation to the MDARIX free trial of {organization}",
+            paragraphs=(
+                "The activation link in the earlier invitation email no longer works. You do not need to do anything.",
+            ),
+            closing=(_questions(),),
+            reason=f"You are receiving this email because {owner} invited you to the MDARIX free trial of "
+            f"{organization}.",
+        ),
+    )
+
+
+def send_trial_mfa_reset_notice(recipient: str, *, owner: str, organization: str, when: str) -> str:
+    """Tell a colleague that the trial's owner removed their authenticator. The owner's reason stays in the audit
+    trail: it is not part of this email."""
+    support = company().support_email
+    return _send(
+        recipient,
+        Message(
+            subject="The authenticator app of your MDARIX account was removed",
+            heading=f"{owner} removed the authenticator app of your MDARIX account",
+            paragraphs=(
+                f"{owner}, who runs the MDARIX free trial of {organization}, removed the authenticator app of your "
+                "account, and you were signed out.",
+                "At your next sign-in, sign in with your password as usual: MDARIX then asks you to set up a new "
+                "authenticator app on your phone and gives you new recovery codes.",
+            ),
+            details=(("When", when),),
+            closing=(f"If you did not ask for this, contact {owner}" + (f" or {support}." if support else "."),),
+            reason="You are receiving this email because the sign-in settings of your MDARIX account changed.",
+        ),
+    )
+
+
+def send_trial_team_change_confirmation(
+    recipient: str, *, change: str, person: str, person_email: str, organization: str, when: str
+) -> str:
+    """Confirm to the trial's owner a change they made to their team. It is also a security notice: if the owner's
+    account is misused, the owner learns of it."""
+    if change == TEAM_REMOVED:
+        subject = f"You removed {person} from your MDARIX trial"
+        what = (
+            f"{_named(person, person_email)} can no longer sign in to the MDARIX free trial of {organization} and was "
+            "signed out. Their seat is free for someone else, and what they did stays in the trial under their name. "
+            "MDARIX has told them by email."
+        )
+    elif change == TEAM_INVITATION_WITHDRAWN:
+        subject = f"You withdrew the invitation to {person}"
+        what = (
+            f"The activation link MDARIX sent to {person_email} no longer works, and the seat is free for someone "
+            "else. MDARIX has told them by email."
+        )
+    else:
+        subject = f"You reset {person}'s authenticator"
+        what = (
+            f"The authenticator app of {_named(person, person_email)} was removed and they were signed out of the MDARIX "
+            f"free trial of {organization}. They set up a new one at their next sign-in. MDARIX has told them by "
+            "email."
+        )
+    support = company().support_email
+    return _send(
+        recipient,
+        Message(
+            subject=subject,
+            heading=subject,
+            paragraphs=(what,),
+            details=(("When", when),),
+            closing=(
+                "If this was not you, change your password now"
+                + (f" and contact {support}." if support else " and reply to this email."),
+            ),
+            reason=f"You are receiving this email because you run the MDARIX free trial of {organization}.",
+        ),
+    )
+
+
 # ------------------------------------------------------------------------------------------- customer administrators
 
 
@@ -659,6 +777,47 @@ def send_trial_mvp_request_alert(
             button=("Open Platform Admin", f"{company().app_url}/app/admin"),
             closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
             reason="You are receiving this email because you handle MDARIX demo requests.",
+        ),
+    )
+
+
+_TEAM_CHANGE_WORDS = {
+    TEAM_REMOVED: "removed {person}",
+    TEAM_INVITATION_WITHDRAWN: "withdrew the invitation to {person}",
+    TEAM_MFA_RESET: "reset MFA for {person}",
+}
+
+
+def send_trial_team_change_alert(
+    recipient: str,
+    *,
+    change: str,
+    organization: str,
+    tenant_key: str,
+    owner: str,
+    owner_email: str,
+    person_email: str,
+    when: str,
+) -> str:
+    """Tell the MDARIX team that a trial owner removed a colleague, withdrew an invitation or reset a colleague's MFA
+    (Platform Admin > Customers & Tenants > Trials shows the trial's team changes too)."""
+    done = _TEAM_CHANGE_WORDS.get(change, "changed {person}").format(person=person_email)
+    line = f"Trial team change: {organization} ({tenant_key}): {owner} {done}"
+    return _send(
+        recipient,
+        Message(
+            subject=line[:180],
+            heading=line,
+            details=(
+                ("Organization", organization),
+                ("Tenant key", tenant_key),
+                ("Trial owner", _named(owner, owner_email)),
+                ("Person", person_email),
+                ("When", when),
+            ),
+            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
+            closing=("The trial's team changes are under Platform Admin > Customers & Tenants > Trials.",),
+            reason="You are receiving this email because you handle MDARIX free trials.",
         ),
     )
 

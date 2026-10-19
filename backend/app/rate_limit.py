@@ -59,6 +59,8 @@ LIMITS: dict[str, Limit] = {
     "invite-resend:address": Limit(3, 3600),
     "invite-resend:org": Limit(10, 86400),
     "team-remove:org": Limit(10, 86400),
+    # Each MFA reset by a trial owner emails the colleague, the owner and MDARIX.
+    "team-mfa-reset:org": Limit(10, 86400),
 }
 
 # What a person is told when an invitation limit stops them (the generic sentence fits sign-in, not invitations).

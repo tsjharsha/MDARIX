@@ -23,6 +23,7 @@ organization (staff accountability); and the continuity cases where nobody in th
 recovering the only active Customer Administrator's authenticator, activating the first one, and recovering the
 authenticator of a free trial's people (a trial has no administrator; backend/app/access/platform_customer_admins.py).
 In a free trial, its owner decides on support access in place of a Customer Administrator (support_access_api.py).
+Until after the launch, MDARIX asks no free trial for support access (``TRIAL_SUPPORT_ACCESS_ENABLED``).
 """
 
 from __future__ import annotations
@@ -52,6 +53,10 @@ AREAS: dict[str, str] = {
     PEOPLE: "People: the user directory, account recovery and erasure of personal data",
     DATA_EXPORT: "A full export: a copy of every record of the organization",
 }
+
+# Hidden until after launch; owner decision 2026-10-19. While False, Platform Admin cannot request support access to
+# a free trial (POST /platform-admin/support-access answers 422) and a trial's Team tab does not show it.
+TRIAL_SUPPORT_ACCESS_ENABLED = False
 
 PENDING = "PENDING"  # requested; a second platform administrator approves it for MDARIX
 AWAITING_CUSTOMER = "AWAITING_CUSTOMER"  # approved by MDARIX; the customer decides

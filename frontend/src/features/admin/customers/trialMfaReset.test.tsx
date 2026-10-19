@@ -95,3 +95,22 @@ describe("Platform Admin resets a trial user's MFA from the trials overview", ()
     expect(done).toHaveBeenCalledOnce();
   });
 });
+
+describe("the trials overview shows the owner's team changes", () => {
+  it("lists removals, withdrawn invitations and MFA resets under the trial's people, and nothing when there are none", () => {
+    const html = render([
+      trial({
+        team_changes: [
+          { change: "MFA_RESET", person: "casey@example.invalid", at: "2026-10-19T09:30:00+00:00" },
+          { change: "INVITATION_WITHDRAWN", person: "robin@example.invalid", at: "2026-10-18T09:30:00+00:00" },
+          { change: "REMOVED", person: "alex@example.invalid", at: "2026-10-17T09:30:00+00:00" },
+        ],
+      }),
+    ]);
+    expect(html).toContain("Team changes");
+    expect(html).toContain("MFA reset: casey@example.invalid");
+    expect(html).toContain("Invitation withdrawn: robin@example.invalid");
+    expect(html).toContain("Removed alex@example.invalid");
+    expect(render([trial()])).not.toContain("Team changes");
+  });
+});

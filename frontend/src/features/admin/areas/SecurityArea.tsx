@@ -18,6 +18,7 @@ import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatDay } from "../../../app/dates";
+import { TRIAL_SUPPORT_ACCESS_ENABLED } from "../../../app/featureSet";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { PersonCell } from "./common";
 
@@ -558,7 +559,11 @@ function RequestAccess({
           Access to part of one customer's data, starting now. A second platform administrator approves it for MDARIX,
           then the customer's administrators decide.
         </p>
-        <TenantPicker value={form.tenant_id} onChange={(tenant_id) => setForm({ ...form, tenant_id })} />
+        <TenantPicker
+          value={form.tenant_id}
+          onChange={(tenant_id) => setForm({ ...form, tenant_id })}
+          withoutTrials={!TRIAL_SUPPORT_ACCESS_ENABLED}
+        />
         <label className="ca-field">
           For
           <select
