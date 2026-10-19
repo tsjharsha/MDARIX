@@ -173,7 +173,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
               <small>Live platform status</small>
             </span>
           </button>
-          {SECTIONS.map(([label, description, Icon, items]) => (
+          {SECTIONS.map(([label, description, Icon]) => (
             <button
               type="button"
               key={label}
@@ -184,9 +184,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
               <Icon size={18} aria-hidden="true" />
               <span>
                 <strong>{label}</strong>
-                <small>
-                  {description} · {items.length}
-                </small>
+                <small>{description}</small>
               </span>
             </button>
           ))}
@@ -241,12 +239,11 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
               <section className="ac-areas" aria-label="Administration areas">
                 <h2>Administration areas</h2>
                 <div>
-                  {SECTIONS.map(([label, description, Icon, items]) => (
+                  {SECTIONS.map(([label, description, Icon]) => (
                     <button type="button" key={label} onClick={() => open(label)}>
                       <Icon size={20} aria-hidden="true" />
                       <strong>{label}</strong>
                       <small>{description}</small>
-                      <em>{items.length} sections</em>
                     </button>
                   ))}
                 </div>

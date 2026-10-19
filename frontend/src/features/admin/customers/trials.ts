@@ -9,6 +9,19 @@ export type TrialState = "ACTIVE" | "ENDING_SOON" | "ENDED";
 
 export type TrialPerson = { id?: string; email: string; name: string | null; status: string };
 
+/** One change the trial's owner made to their team (backend/app/trial/story.py, from the trial's audit trail). */
+export type TrialTeamChange = { change: string; person: string | null; at: string | null };
+
+const TEAM_CHANGE: Record<string, string> = {
+  REMOVED: "Removed",
+  INVITATION_WITHDRAWN: "Invitation withdrawn:",
+  MFA_RESET: "MFA reset:",
+};
+
+/** "Removed casey@example.com", "MFA reset: casey@example.com": what the owner did, and to whom. */
+export const teamChangeText = (item: TrialTeamChange) =>
+  `${TEAM_CHANGE[item.change] ?? item.change} ${item.person ?? "a former colleague"}`;
+
 export type TrialItem = {
   tenant_id: string;
   tenant_business_id?: string | null;
@@ -17,6 +30,8 @@ export type TrialItem = {
   owner: TrialPerson | null;
   /** The people holding a seat (active or invited), owner first: Platform Admin may reset one's MFA. */
   people?: TrialPerson[];
+  /** The owner's latest removals, withdrawn invitations and MFA resets, newest first. */
+  team_changes?: TrialTeamChange[];
   starts_at: string | null;
   expires_at: string;
   data_deleted_at: string;

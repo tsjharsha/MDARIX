@@ -553,6 +553,11 @@ dl.cw-review {
 .cc-trial-org small {
   color: var(--ac-muted);
 }
+.cc-trial-org small.cc-trial-changes {
+  margin-top: 4px;
+  color: var(--ac-ink-2);
+  font-weight: 600;
+}
 .cc-trial-progress {
   display: inline-flex;
   gap: 3px;

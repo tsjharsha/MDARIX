@@ -10,6 +10,7 @@ export function TenantPicker({
   label = "Tenant",
   allLabel,
   inline = false,
+  withoutTrials = false,
 }: {
   value: string;
   onChange: (tenantId: string) => void;
@@ -18,9 +19,11 @@ export function TenantPicker({
   allLabel?: string;
   // In a filter toolbar the label is not shown (the select is still named for screen readers).
   inline?: boolean;
+  // Leave the free trials out (the server marks them is_trial).
+  withoutTrials?: boolean;
 }) {
   const tenants = useResource<{ items: TenantSummary[] }>("/api/v1/platform-admin/customer-admin-tenants");
-  const options = tenants.data?.items ?? [];
+  const options = (tenants.data?.items ?? []).filter((tenant) => !(withoutTrials && tenant.is_trial));
   return (
     <label className={`ca-field ar-picker${inline ? " ar-inline" : ""}`}>
       {!inline && label}

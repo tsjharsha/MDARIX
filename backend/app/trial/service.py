@@ -74,6 +74,17 @@ def trial_subscription(db: Session, tenant_id) -> SubscriptionLifecycle | None:
     )
 
 
+def trial_tenant_ids(db: Session) -> set:
+    """The tenants on the Free Trial plan (each one ``trial_subscription`` finds), in one query."""
+    return {
+        tenant_id
+        for (tenant_id,) in db.query(SubscriptionLifecycle.tenant_id)
+        .join(PlanDefinition, PlanDefinition.id == SubscriptionLifecycle.plan_id)
+        .filter(PlanDefinition.code == FREE_TRIAL_PLAN)
+        .distinct()
+    }
+
+
 def trial_has_ended(db: Session, tenant_id, now: datetime | None = None) -> bool:
     """True when the tenant is on the Free Trial plan and its end date (and any grace period) has passed.
 

@@ -162,7 +162,10 @@ def list_customer_admins(
 
 @router.get("/platform-admin/customer-admin-tenants")
 def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db)):
-    """The tenants an administrator can be added to (active ones), for a picker: one light query."""
+    """The tenants an administrator can be added to (active ones), for a picker: one light query, and one more for
+    which are free trials (``is_trial``: a picker may leave them out)."""
+    from backend.app.trial.service import trial_tenant_ids
+
     _require_platform_admin(request, db)
     rows = (
         db.query(
@@ -178,6 +181,7 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
         .order_by(func.lower(func.coalesce(Customer.display_name, Tenant.display_name)), Tenant.tenant_key)
         .all()
     )
+    trials = trial_tenant_ids(db) if rows else set()
     return {
         "items": [
             {
@@ -188,6 +192,7 @@ def customer_admin_tenant_options(request: Request, db: Session = Depends(get_db
                 "tenant_name": row[2],
                 "customer_name": row[3],
                 "customer_business_id": row[5],
+                "is_trial": row[0] in trials,
             }
             for row in rows
         ]
