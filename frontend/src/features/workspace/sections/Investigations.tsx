@@ -111,6 +111,11 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
         : "All investigations",
   );
   const [starting, setStarting] = useState(() => prefill !== null);
+  // The Decision tab's "Review the brief first" opens the Decision Brief tab on its quality review.
+  const [reviewFocus, setReviewFocus] = useState(false);
+  useEffect(() => {
+    if (active !== "Decision Brief") setReviewFocus(false);
+  }, [active]);
   useEffect(() => {
     if (!pending) return;
     work.clearOpenInvestigationRequest();
@@ -368,6 +373,8 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               investigationId={work.investigationId}
               caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
               readOnly={caseIsClosed(selected)}
+              focusReview={reviewFocus}
+              onOpenDecision={() => setActive("Decision")}
             />
           ) : (
             <Panel title="No investigation selected">
@@ -388,6 +395,10 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               onCaseChanged={() => {
                 all.reload();
                 work.refreshInvestigations();
+              }}
+              onReviewBrief={() => {
+                setReviewFocus(true);
+                setActive("Decision Brief");
               }}
             />
           ) : (

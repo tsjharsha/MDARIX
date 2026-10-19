@@ -239,9 +239,55 @@ def send_trial_invitation(
     users: int,
     rows: int,
     valid_for: str = INVITATION_VALID_FOR,
+    invited_by: str | None = None,
+    sample_data: bool = True,
 ) -> str:
-    """The invitation to a free-trial workspace: what the trial includes and what happens when it ends."""
+    """The invitation to a free-trial workspace: what the trial includes and what happens when it ends. The person
+    who requested the trial gets it as their own; a colleague the trial's owner invited (``invited_by``, the owner's
+    name) learns who invited them, what MDARIX is and that their phone is needed, and hears of the sample
+    investigation only while the trial still has it (``sample_data``)."""
     url = f"{company().app_url}/activate-account?token={token}"
+    if invited_by:
+        return _send(
+            recipient,
+            Message(
+                subject=f"{invited_by} invited you to the MDARIX free trial",
+                heading=f"{invited_by} invited you to the MDARIX free trial of {organization}",
+                paragraphs=(
+                    "MDARIX helps medical-device quality teams handle complaints and post-market surveillance "
+                    "investigations: complaints, reporting clocks, trend signals, investigations and CAPA in one "
+                    "traceable place.",
+                    *(
+                        (
+                            "The trial workspace includes a ready-made sample investigation, so you can see MDARIX at "
+                            "work before using any data.",
+                        )
+                        if sample_data
+                        else ()
+                    ),
+                    "Have your phone ready: when you first sign in, you add MDARIX to an authenticator app on your "
+                    "phone (two-factor sign-in) and save your recovery codes.",
+                ),
+                details=(
+                    ("Trial ends", ends_on),
+                    ("Included", f"up to {users} users and {rows:,} uploaded rows"),
+                    ("Trial data", "deleted 30 days after the trial ends, unless your organization continues"),
+                ),
+                items=(
+                    "Activate your account and choose a password.",
+                    "Set up the authenticator app on your phone.",
+                    "Open the guided investigation in Getting started."
+                    if sample_data
+                    else "Open Getting started to see what you can try.",
+                ),
+                button=("Activate my account", url),
+                closing=(f"This link works once and expires in {valid_for}.",),
+                reason=(
+                    f"You are receiving this email because {invited_by}, who runs your organization's trial, "
+                    "invited you."
+                ),
+            ),
+        )
     return _send(
         recipient,
         Message(

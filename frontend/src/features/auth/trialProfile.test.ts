@@ -8,6 +8,7 @@ import {
   EMPTY_PROFILE,
   MARKETS,
   TRIAL_DATA,
+  isPersonalEmail,
   signupBody,
   toggleMarket,
 } from "./trialProfile";
@@ -104,5 +105,18 @@ describe("country and phone", () => {
     expect(phoneWithDialCode("", "+91")).toBe("+91 ");
     expect(phoneWithDialCode("+44", "+91")).toBe("+91 ");
     expect(phoneWithDialCode("+44 20 7946 0958", "+91")).toBe("+44 20 7946 0958");
+  });
+});
+
+describe("personal email addresses", () => {
+  it("are recognised by the server's free-mail list, including its subdomains, and only once the list is known", () => {
+    const list = ["gmail.com", "yahoo.co.in", "outlook.com"];
+    expect(isPersonalEmail("asha@gmail.com", list)).toBe(true);
+    expect(isPersonalEmail("  Asha@GMAIL.com ", list)).toBe(true);
+    expect(isPersonalEmail("asha@mail.yahoo.co.in", list)).toBe(true);
+    expect(isPersonalEmail("asha@acme-devices.com", list)).toBe(false);
+    expect(isPersonalEmail("asha@notgmail.com", list)).toBe(false);
+    expect(isPersonalEmail("asha@", list)).toBe(false);
+    expect(isPersonalEmail("asha@gmail.com", undefined)).toBe(false);
   });
 });

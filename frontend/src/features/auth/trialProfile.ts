@@ -89,6 +89,24 @@ export const EMPTY_PROFILE: TrialProfile = {
 };
 
 /** Adds the market when it is not chosen yet, removes it when it is. */
+/**
+ * Whether an email is at a personal or disposable mail domain (or a subdomain of one), by the server's own list
+ * (site-info): such a request is reviewed by a person instead of being approved at once. False while the list is not
+ * known.
+ */
+export function isPersonalEmail(email: string, freeMailDomains: readonly string[] | undefined): boolean {
+  const at = email.lastIndexOf("@");
+  const domain =
+    at < 0
+      ? ""
+      : email
+          .slice(at + 1)
+          .trim()
+          .toLowerCase();
+  if (!domain || !freeMailDomains?.length) return false;
+  return freeMailDomains.some((free) => domain === free || domain.endsWith(`.${free}`));
+}
+
 export function toggleMarket(markets: string[], code: string): string[] {
   return markets.includes(code) ? markets.filter((item) => item !== code) : [...markets, code];
 }

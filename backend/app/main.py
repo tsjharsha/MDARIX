@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -390,6 +392,15 @@ async def safe_internal_error(request: Request, exc: Exception) -> JSONResponse:
         "correlation_id": request_id,
     }
     return JSONResponse(status_code=500, content={"detail": body}, headers={"X-Request-ID": request_id})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_without_input(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """FastAPI's 422 answer (``{"detail": [{"type", "loc", "msg", ...}]}``, which the app reads field by field),
+    without each error's ``input``: what was submitted is never sent back, so a password or an oversized body does not
+    come back in the answer."""
+    errors = [{key: value for key, value in error.items() if key != "input"} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
 
 
 # First, so its fixed path /api/v1/investigations/mine/summary is matched before any /{investigation_id} route.

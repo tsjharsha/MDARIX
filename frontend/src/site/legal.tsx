@@ -14,7 +14,14 @@ export type SiteInfo = {
   support_email: string | null;
   privacy_email: string | null;
   legal_text_approved: boolean;
-  trial: { days: number; users: number; rows: number; data_deleted_after_days: number };
+  trial: {
+    days: number;
+    users: number;
+    rows: number;
+    data_deleted_after_days: number;
+    /** Personal and disposable mail domains: a person reviews these requests (backend/app/trial/auto_approval.py). */
+    free_mail_domains?: string[];
+  };
 };
 
 let siteInfoRequest: Promise<SiteInfo | null> | null = null;
@@ -261,7 +268,7 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
       "All traffic uses TLS, including the connection to the database.",
       "Authenticator secrets and connector credentials are encrypted before they are stored.",
       "Every uploaded file is scanned for malware before it is accepted, and files over the size limit are refused.",
-      "The database runs on a managed service with encrypted, continuous backups that allow recovery to a point in time; restoring follows a written recovery procedure.",
+      "During the validation phase the database runs on MDARIX's own server in Mumbai. It is backed up every day: an encrypted copy goes to Delhi, and a daily snapshot of the server's disk is kept in Mumbai. Restoring follows a written, rehearsed procedure.",
     ],
   },
   {

@@ -60,6 +60,7 @@ export function Panel({
   action,
   children,
   className = "",
+  id,
 }: {
   title: string;
   eyebrow?: string;
@@ -73,10 +74,12 @@ export function Panel({
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** For a link or a button that scrolls to this panel. */
+  id?: string;
 }) {
   const shown = source ?? { state, error, code, requestId, reload: onRetry };
   return (
-    <section className={`ac-panel ${className}`} aria-busy={shown.state === "loading"}>
+    <section id={id} className={`ac-panel ${className}`} aria-busy={shown.state === "loading"}>
       <header className="ac-panel-head">
         <div>
           {eyebrow && <p className="ac-eyebrow">{eyebrow}</p>}

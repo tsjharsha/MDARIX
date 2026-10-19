@@ -18,7 +18,7 @@ the move to managed services when the first design partners pay (section 5).
 | VM, 8 GB (compose limits 5.25 GB plus PostgreSQL) | Compute Engine `e2-standard-2` (2 vCPU, 8 GB), Ubuntu 24.04, 50 GB balanced disk, static IP, Shielded VM | $58.75 |
 | PostgreSQL 16, `vector` + `pgcrypto`, TLS, `verify-full` | On the VM: `docker-compose.staging-oracle.yml` layered on the production file; its own CA from `infrastructure/staging/prepare-database.sh` | included |
 | Uploaded files | Encrypted on the VM disk (`MDARIX_OBJECT_STORAGE_PROVIDER=local`): up to 24 hours of uploads at risk, as `.env.production.example` says | included |
-| Disk safety net | Daily snapshot schedule `mdarix-daily`, 14 days | about $2 |
+| Disk safety net | Daily snapshot schedule `mdarix-daily`, 14 days, stored in Mumbai (`--storage-location=asia-south1`) | about $2 |
 | Off-site backup copies | Bucket `PROJECT-mdarix-backups` in `asia-south2`: versioning, 30-day retention policy, deleted after 89 days (lifecycle; the privacy policy says up to 90 days) | cents |
 | Firewall | VPC rules: 80/443 to the VM's tag `mdarix-web`; SSH only through Identity-Aware Proxy (`35.235.240.0/20`); the default SSH and RDP rules removed | free |
 | Email | ZeptoMail (`smtp.zeptomail.in:587`, user `emailapikey`), sender `no-reply@mdarix.in`; mailboxes on Zoho Mail | ZeptoMail credits |
@@ -77,10 +77,15 @@ gcloud compute instances create mdarix-prod --machine-type=e2-standard-2 \
   --image-family=ubuntu-2404-lts-amd64 --image-project=ubuntu-os-cloud --boot-disk-size=50GB --boot-disk-type=pd-balanced \
   --address=mdarix-ip --tags=mdarix-web --shielded-secure-boot --shielded-vtpm --shielded-integrity-monitoring \
   --metadata=enable-oslogin=TRUE
-gcloud compute resource-policies create snapshot-schedule mdarix-daily --region=asia-south1 --max-retention-days=14 --daily-schedule --start-time=21:00
+gcloud compute resource-policies create snapshot-schedule mdarix-daily --region=asia-south1 --max-retention-days=14 --daily-schedule --start-time=21:00 \n  --storage-location=asia-south1
 gcloud compute disks add-resource-policies mdarix-prod --resource-policies=mdarix-daily
 gcloud compute ssh mdarix-prod --tunnel-through-iap
 ```
+
+The snapshots hold the database, so they must stay in India: `--storage-location=asia-south1` keeps them in
+Mumbai. Without it Google stores them in the `asia` multi-region, which is not limited to India, while the privacy
+policy says that we do not transfer personal data outside India. Check with
+`gcloud compute snapshots list --format="table(name,storageLocations)"`: every snapshot shows `asia-south1`.
 
 From Windows, copy a script with `gcloud compute scp` and run it with `--command`: piping a script into `ssh` loses
 its first line to PuTTY's host-key prompt.
@@ -126,7 +131,7 @@ Go-live, once the operator has approved the legal texts and the rehearsal is don
    the mail records (MX, SPF, DKIM, DMARC, the ZeptoMail bounce CNAME) as they are.
 2. **Keep a way back**: a final backup (`docker compose --profile backup run --rm backup`), copied off-site at once
    with the cron's `gcloud storage rsync` command and listed in the bucket, its `MANIFEST.sha256` checked; and a disk
-   snapshot (`gcloud compute disks snapshot mdarix-prod --zone=asia-south1-a --snapshot-names=mdarix-pre-golive-<date>`).
+   snapshot (`gcloud compute disks snapshot mdarix-prod --zone=asia-south1-a --snapshot-names=mdarix-pre-golive-<date> --storage-location=asia-south1`).
 3. **Draft the production settings** beside the live file (`.env.production.next`, mode 600): `MDARIX_ENV=production`,
    `MDARIX_DOMAIN=mdarix.in`, `MDARIX_APP_URL` and `MDARIX_ALLOWED_ORIGINS` to `https://mdarix.in` (the app URL is the
    only trusted origin: a wrong value refuses every sign-in), `MDARIX_WWW_REDIRECT=on`, `MDARIX_SITE_ACCESS=public`;

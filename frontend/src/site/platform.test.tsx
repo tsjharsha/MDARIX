@@ -64,6 +64,13 @@ describe("the Platform pages", () => {
     expect(html).toContain("does not certify compliance");
     expect(html).toContain("not yet a validated (GxP) system");
   });
+
+  it("says only investigation decisions are signed; a reportability decision is recorded with its reason", () => {
+    const html = renderToStaticMarkup(<RegulationsPage />);
+    expect(html).toContain("Reportability decisions are recorded by a named person with their reason.");
+    expect(html).toContain("Investigation decisions are signed electronically, with re-authentication.");
+    expect(html).not.toMatch(/[Rr]eportability decisions[^.<]*signed/);
+  });
 });
 
 describe("diagram text", () => {

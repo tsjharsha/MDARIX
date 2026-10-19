@@ -42,8 +42,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 
 | Layer | Kept |
 |---|---|
-| Managed database point-in-time recovery | The provider's recovery window (at least 7 days) |
-| Managed database snapshots | 14 days or more (provider setting) |
+| Daily snapshot of the server's disk (database and uploaded files; validation phase, stored in Mumbai) | **14 days** (snapshot schedule `mdarix-daily`, docs/runbooks/GCP_DEPLOYMENT.md) |
 | MDARIX encrypted backup (all databases and uploaded files) | **14 days** on the server (`MDARIX_BACKUP_KEEP_DAYS`) and **up to 90 days** off-site (bucket lifecycle rule) |
 | Uploaded files on a versioned bucket | Deleted files keep a noncurrent version until the bucket's noncurrent-version expiry rule removes it (set it to 30 days) |
 

@@ -11,8 +11,11 @@ import { BASIS_DISCLAIMER, basisOf } from "../features/shared/standards";
 /* ------------------------------------------------------------------------- An investigation in numbers */
 
 // The free trial's sample story (backend/app/trial/sample_data.py): OrbitCare 300 Rev B moved its pressure sensor to a
-// new supplier (change CHG-014), released in week 13; pressure-alarm complaints rise afterwards.
-const WEEKLY = [3, 2, 4, 3, 2, 3, 4, 2, 3, 3, 2, 3, 4, 6, 7, 6, 9, 8, 11, 10, 9, 12, 10, 11, 9, 10];
+// new supplier (change CHG-014), released in week 13; pressure-alarm complaints rise afterwards. One synthetic case,
+// INV-031, told the same way on every page: 42 complaints in 26 weeks, 6 in the 13 weeks before Rev B (2 a month) and
+// 36 in the 13 weeks after (12 a month, six times as many); 40 name a lot, 2 do not; lots 003 and 004 hold 30.
+// The Platform scenes (site/scenes) use the same numbers.
+const WEEKLY = [1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 2, 2, 3, 2, 3, 3, 3, 3, 4, 3, 3, 4];
 const RELEASE_WEEK = 13;
 // Complaints per lot; lots built with the new supplier's first sensors are marked.
 const LOTS = [
@@ -20,14 +23,16 @@ const LOTS = [
   { lot: "Lot 002", count: 3, sensor: false, rev: "Rev A" },
   { lot: "Lot 003", count: 17, sensor: true, rev: "Rev B" },
   { lot: "Lot 004", count: 13, sensor: true, rev: "Rev B" },
-  { lot: "Lot 005", count: 4, sensor: false, rev: "Rev B" },
-  { lot: "Lot 006", count: 3, sensor: false, rev: "Rev B" },
+  { lot: "Lot 005", count: 3, sensor: false, rev: "Rev B" },
+  { lot: "Lot 006", count: 2, sensor: false, rev: "Rev B" },
 ];
+/** The example's numbers, for its tests; 2 complaints name no lot (the hero's evidence list says so too). */
+export const EXAMPLE_NUMBERS = { weekly: WEEKLY, releaseWeek: RELEASE_WEEK, lots: LOTS, withoutLot: 2 } as const;
 export function WeeklyChart() {
   const width = 520;
   const height = 240;
   const pad = { left: 34, right: 16, top: 30, bottom: 34 };
-  const max = 14;
+  const max = 5;
   const x = (index: number) => pad.left + (index / (WEEKLY.length - 1)) * (width - pad.left - pad.right);
   const y = (value: number) => pad.top + (1 - value / max) * (height - pad.top - pad.bottom);
   const line = WEEKLY.map((value, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join(
@@ -38,9 +43,10 @@ export function WeeklyChart() {
   return (
     <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-weekly-title">
       <title id="viz-weekly-title">
-        Weekly complaints rise from about 3 a week to about 10 a week after Rev B is released in week 13
+        Weekly complaints: 6 in the 13 weeks before Rev B is released in week 13, 36 in the 13 weeks after (from about 2
+        a month to about 12)
       </title>
-      {[0, 4, 8, 12].map((tick) => (
+      {[0, 2, 4].map((tick) => (
         <g key={tick}>
           <line className="ms-viz-grid" x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} />
           <text className="ms-viz-axis" x={pad.left - 8} y={y(tick) + 4} textAnchor="end">
@@ -85,7 +91,8 @@ export function LotChart() {
   return (
     <svg className="ms-viz" viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby="viz-lots-title">
       <title id="viz-lots-title">
-        Complaints per lot: the two lots built with the new supplier's sensors hold 30 of 42 complaints
+        Complaints per lot: the two lots built with the new supplier's sensors hold 30 of 42 complaints; 2 complaints
+        name no lot
       </title>
       {LOTS.map((item, index) => {
         const top = pad.top + index * rowHeight;

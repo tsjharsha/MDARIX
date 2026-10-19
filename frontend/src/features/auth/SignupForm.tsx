@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { CheckCircle2, Smartphone } from "lucide-react";
+import { CheckCircle2, Info, Smartphone } from "lucide-react";
 
 import {
   COMPANY_SIZES,
@@ -11,6 +11,7 @@ import {
   TRIAL_DATA,
   countries,
   isInternationalPhone,
+  isPersonalEmail,
   phoneWithDialCode,
   signupBody,
   toggleMarket,
@@ -18,6 +19,7 @@ import {
   type TrialProfile,
 } from "./trialProfile";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
+import { useSiteInfo } from "../../site/legal";
 
 /** Answers whose problems are fixed on the first step: a refusal for one of them takes the person back there. */
 const STEP_ONE_CODES = new Set([
@@ -35,6 +37,9 @@ const MESSAGES: Record<string, string> = {
 };
 
 const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
+const EMAIL_HINT =
+  "With a company email, the activation link arrives within minutes. Requests from personal addresses such as Gmail " +
+  "are reviewed by the MDARIX team, usually within one business day.";
 
 /** The asterisk of a required field (the input itself carries `required`, which screen readers announce). */
 function Req() {
@@ -71,6 +76,40 @@ function Choice({
   );
 }
 
+/** Before the request is sent: what happens next, for a company or a personal address. */
+export function WhatHappensNext({ personal }: { personal: boolean }) {
+  return (
+    <p className="su-hint su-wide">
+      <strong>What happens next:</strong>{" "}
+      {personal
+        ? "the MDARIX team reviews your request, usually within one business day, and then emails you the invitation."
+        : "with a company email, we email you the activation link within minutes."}{" "}
+      Your workspace comes with sample data, and AI is off during the trial.
+    </p>
+  );
+}
+
+/** The consent to the legal texts. Each opens in a new tab, so reading them never loses what was typed. */
+export function TrialConsent() {
+  return (
+    <p className="auth-consent su-wide">
+      For professionals aged 18 or over, requesting for their organization. By requesting a trial you agree to the{" "}
+      <a href="/terms" target="_blank" rel="noopener">
+        Terms of Service
+      </a>{" "}
+      and the{" "}
+      <a href="/trial-agreement" target="_blank" rel="noopener">
+        Free Trial Agreement
+      </a>
+      , and acknowledge the{" "}
+      <a href="/privacy" target="_blank" rel="noopener">
+        Privacy Policy
+      </a>{" "}
+      (each opens in a new tab). Trial data is deleted 30 days after the trial ends unless you continue.
+    </p>
+  );
+}
+
 /**
  * The free-trial request, in two short steps: who you are, then your trial. Required fields carry an asterisk. No
  * password is asked for: the requester sets it from the invitation email and MDARIX staff never see it. An email that
@@ -91,6 +130,8 @@ export function SignupForm() {
   const stepOne = useRef<HTMLFieldSetElement>(null);
   const phoneInput = useRef<HTMLInputElement>(null);
   const allCountries = useMemo(() => countries(), []);
+  // A personal address (the server's free-mail list) waits for a person's review: said before the request is sent.
+  const personal = isPersonalEmail(email, useSiteInfo()?.trial.free_mail_domains);
   const answer =
     <K extends keyof TrialProfile>(key: K) =>
     (value: TrialProfile[K]) =>
@@ -215,8 +256,8 @@ export function SignupForm() {
       <span className="eyebrow">Request access</span>
       <h1>Start your free trial</h1>
       <p className="auth-lead">
-        30 days, up to 3 users and 5,000 uploaded rows, no credit card. You set your own password from the invitation
-        email; MDARIX never sees it.
+        30 days, up to 3 users and 5,000 uploaded rows, with sample data from day one and no credit card. AI is off
+        during the trial. You set your own password from the invitation email; MDARIX never sees it.
       </p>
       <div className="su-mfa-note" role="note">
         <Smartphone size={20} aria-hidden="true" />
@@ -275,10 +316,22 @@ export function SignupForm() {
               type="email"
               maxLength={254}
               autoComplete="email"
+              aria-describedby="su-email-hint"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
+            <small id="su-email-hint">{EMAIL_HINT}</small>
           </label>
+          {personal && (
+            <div className="su-mfa-note su-wide" role="status">
+              <Info size={20} aria-hidden="true" />
+              <p>
+                <strong>This looks like a personal address.</strong> The MDARIX team reviews requests from personal
+                addresses, usually within one business day. With your company email, the activation link arrives within
+                minutes.
+              </p>
+            </div>
+          )}
           <label className="auth-field">
             <span>
               Company <Req />
@@ -409,12 +462,8 @@ export function SignupForm() {
               We will not upload patient-identifiable data during the trial. <Req />
             </span>
           </label>
-          <p className="auth-consent su-wide">
-            For professionals aged 18 or over, requesting for their organization. By requesting a trial you agree to the{" "}
-            <a href="/terms">Terms of Service</a> and the <a href="/trial-agreement">Free Trial Agreement</a>, and
-            acknowledge the <a href="/privacy">Privacy Policy</a>. Trial data is deleted 30 days after the trial ends
-            unless you continue.
-          </p>
+          <WhatHappensNext personal={personal} />
+          <TrialConsent />
           {alert && <div className="su-wide">{alert}</div>}
           <div className="su-actions su-wide">
             <button className="su-secondary" type="button" onClick={() => setStep(1)} disabled={busy}>

@@ -33,10 +33,12 @@ from backend.app.db.models.foundation import (
 
 SAMPLE_SOURCE = "MDARIX_SAMPLE"
 
-# (identifier, name, family, symptom, complaint pattern). The pattern lists days-ago for each complaint:
+# (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
 # OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints
 # (_STORY_COMPLAINTS), PulseWatch and VentraLink Rev B each have at most 2 complaints in the trend check's last 30 days,
 # so neither is flagged as a rise (VentraLink's last one was at day 14, which made 3 there: a "significant rise").
+# OrbitCare's complaints carry the problem code PRESSURE_ALARM, so its signal reads "5 complaints: pressure alarm on
+# OrbitCare 300 ..." rather than "unspecified problem"; the others keep none.
 _PRODUCTS = [
     (
         "SAMPLE-ORBIT-300",
@@ -44,6 +46,7 @@ _PRODUCTS = [
         "Infusion therapy",
         "pressure alarm during infusion",
         [170, 150, 128, 96, 70, 64, 58, 51, 47, 41, 36, 33, 29, 24, 20, 16, 11, 6],
+        "PRESSURE_ALARM",
     ),
     (
         "SAMPLE-PULSE-410",
@@ -51,6 +54,7 @@ _PRODUCTS = [
         "Patient monitoring",
         "SpO2 signal dropout",
         [160, 131, 102, 77, 45, 19],
+        None,
     ),
     (
         "SAMPLE-VENTRA-250",
@@ -58,6 +62,7 @@ _PRODUCTS = [
         "Respiratory support",
         "flow reading variance",
         [140, 99, 52, 33],
+        None,
     ),
 ]
 
@@ -292,7 +297,7 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
     db.add(change)
     db.flush()
 
-    for index, (identifier, name, family, symptom, complaint_days) in enumerate(_PRODUCTS, 1):
+    for index, (identifier, name, family, symptom, complaint_days, problem_code) in enumerate(_PRODUCTS, 1):
         product = Product(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
@@ -426,6 +431,7 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                     f"Customer reported {symptom} on {version.version_identifier}, lot {lot.lot_identifier}. "
                     "Device returned for evaluation; no patient injury reported."
                 ),
+                problem_code=problem_code,
                 status="open" if days_ago < 60 else "closed",
                 source_identifier=f"{identifier}-CMP-{c_index:03d}",
                 **_stamp(now, days_ago),

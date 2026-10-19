@@ -45,6 +45,20 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 		max_size 25MB
 	}
 
+	# A body the API reads as JSON is parsed whole before any sign-in check or rate limit, so a large one ties up an
+	# API worker: above 1 MiB it is refused here (413). The API reads a body as JSON when its Content-Type is
+	# application/json or application/*+json (any case, any parameters), or when there is no Content-Type at all.
+	# The largest JSON the application sends is a case scope (up to about 650 KB, usually under 150 KB); webhooks are
+	# capped at 1 MiB by the API itself. Files go as multipart, text/csv or Excel bytes and keep the limit above.
+	@json_body header_regexp Content-Type (?i)^\s*(application/([a-z0-9.+-]*\+)?json\b|$)
+	request_body @json_body {
+		max_size 1MiB
+	}
+	@no_content_type header !Content-Type
+	request_body @no_content_type {
+		max_size 1MiB
+	}
+
 	header {
 		# HSTS preload: add "; preload" and submit the domain at hstspreload.org only once every subdomain of the
 		# registered domain serves HTTPS for good: removal from browsers' preload lists takes months.

@@ -406,3 +406,21 @@ def test_signal_tables_are_deleted_with_trial_data_children_first():
     for parent in ("complaints", "products", "investigations", "product_versions"):
         assert order["signals"] < order[parent]
     assert "signal_rules" in order
+
+
+def test_recurring_words_leave_out_what_did_not_happen_outcomes_boilerplate_and_identifiers():
+    """A complaint saying "no patient injury reported" never counts as the word "injury" (it reads as five injuries);
+    nor do outcome words, which have their own sentence, "returned for evaluation" or a lot number."""
+    from backend.app.signals.insight import _words
+
+    sample = (
+        "Customer reported pressure alarm during infusion on Rev B, lot SAMPLE-ORBIT-300-LOT-003. "
+        "Device returned for evaluation; no patient injury reported."
+    )
+    assert _words(sample) == {"pressure", "alarm", "infusion"}
+    assert _words("Occlusion alarm without harm or delay to therapy") == {"occlusion", "alarm"}
+    assert _words("The alarm did not sound during an occlusion") == {"alarm"}
+    assert _words("Alarm didn't sound; display froze") == {"alarm", "display", "froze"}
+    assert _words("Patient was injured when the door opened, but no death") == {"door", "opened"}
+    assert _words("Screen flicker, never caused delay") == {"screen", "flicker"}
+    assert _words(None) == set()

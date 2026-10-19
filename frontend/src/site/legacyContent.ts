@@ -235,9 +235,9 @@ if (lifecycleMonitorGroup) {
 
 export const pages: Record<string, { eyebrow: string; title: string; copy: string }> = {
   "/": {
-    eyebrow: "Product investigation intelligence for medical devices",
+    eyebrow: "Post-market surveillance and complaint handling for medical devices",
     title: "Turn post-market signals into defensible product decisions.",
-    copy: "Connect complaints, product context, lifecycle evidence, risk, and human review in one governed investigation story.",
+    copy: "Complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place, linked to the product version, lot and supplier behind each complaint. People decide and sign.",
   },
   "/platform": {
     eyebrow: "Platform & AI",

@@ -57,7 +57,7 @@ export const PAGE_META = {
   "/trust": {
     title: "Trust: human decisions, audit trails and validated AI · MDARIX",
     description:
-      "Decisions signed by people with an audit trail, authenticator-app MFA, isolated customer data, and AI that cites its evidence and stays off until validated.",
+      "Investigation decisions signed by people, an audit trail, authenticator MFA, isolated customer data, and AI that cites evidence and stays off until validated.",
   },
   "/trust/regulations": {
     title: "FDA, EU MDR, UK and Canada reporting and MedTech standards · MDARIX",
