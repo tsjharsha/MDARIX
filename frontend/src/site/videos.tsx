@@ -19,7 +19,7 @@ export const TRIAL_VIDEOS: readonly { number: number; title: string; summary: st
   {
     number: 2,
     title: "Signing up for your free trial",
-    summary: "From the website to a trial that is prepared for you at once.",
+    summary: "From the website to a trial that, with a company email, is ready within minutes.",
   },
   {
     number: 3,

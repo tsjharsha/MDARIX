@@ -5,6 +5,9 @@
   ``tenant_scope``. In staging and production a model request with no organization is refused, so content is never
   sent without its owner's controls being checked.
 * **Switch.** ``tenants.ai_processing_allowed`` off: no model is called and the features answer from rules.
+* **Free trials.** An organization on the Free Trial plan never reaches a model during the product validation phase,
+  whatever its switch says (the trial agreement, terms and privacy policy promise it; ``backend/app/ai_settings.py``
+  also refuses to switch it on).
 * **Budget.** Tokens used this calendar month (``ai_usage_monthly``) may not exceed the organization's
   ``ai_monthly_token_budget``, or ``MDARIX_GENAI_TENANT_MONTHLY_TOKENS`` when it has none.
 * **Rest periods.** A provider that rate-limits or fails is skipped by every process until ``genai_provider_rest``
@@ -109,6 +112,13 @@ def usage(db, tenant_id, now: datetime | None = None) -> dict:
     }
 
 
+def is_free_trial(db, tenant_id) -> bool:
+    """Whether the organization is on the Free Trial plan, whose AI stays off during the product validation phase."""
+    from backend.app.trial.service import trial_subscription
+
+    return trial_subscription(db, uuid.UUID(str(tenant_id))) is not None
+
+
 def check_allowed(estimated_tokens: int) -> str | None:
     """Raise GenAIUnavailable when this request's organization may not use a model now; returns its id (or None)."""
     from backend.app.runtime_env import is_production_like
@@ -123,7 +133,9 @@ def check_allowed(estimated_tokens: int) -> str | None:
     db = _session(tenant_id)
     try:
         state = usage(db, tenant_id)
-        if not state["ai_processing_allowed"]:
+        if is_free_trial(db, tenant_id):
+            refusal = "GENAI_OFF_FOR_FREE_TRIAL"
+        elif not state["ai_processing_allowed"]:
             refusal = "GENAI_DISABLED_FOR_ORGANIZATION"
         elif state["tokens_used"] + estimated_tokens > state["monthly_token_budget"]:
             refusal = "GENAI_MONTHLY_BUDGET_REACHED"

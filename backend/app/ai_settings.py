@@ -12,6 +12,10 @@ acknowledgement and that provider's name, and every answer says which provider i
 In production, switching AI processing on is also refused until the AI release gate is met (ai_release_gate.py:
 contracted provider, golden dataset signed off by a person, golden evaluation passed with this model, automatic trust
 check); every answer carries the gate's four bars.
+
+An organization on the Free Trial plan cannot have AI switched on during the product validation phase (409
+AI_OFF_FOR_FREE_TRIALS), by its own administrators or by a Platform Administrator, and ``genai/governance.py`` refuses
+its model requests whatever the switch says: the trial agreement, the terms and the privacy policy promise it.
 """
 
 from __future__ import annotations
@@ -79,6 +83,8 @@ def _settings(db: Session, tenant_id) -> dict:
     models = _models_in_use()
     return {
         **governance.usage(db, tenant_id),
+        # A free trial keeps AI off during the product validation phase; switching it on is refused.
+        "free_trial": governance.is_free_trial(db, tenant_id),
         "models": models,
         "provider_name": _provider_name(models),
         "masking": pii.enabled(),
@@ -98,6 +104,19 @@ def _require_acknowledgement(switching_on: bool, acknowledgement: bool) -> None:
                 "to the AI provider shown before switching AI processing on.",
             },
         )
+
+
+FREE_TRIAL_AI_REFUSAL = {
+    "code": "AI_OFF_FOR_FREE_TRIALS",
+    "message": "AI stays off for free trials during the product validation phase, as the free trial agreement says. "
+    "It can be switched on once the organization continues on a paid plan.",
+}
+
+
+def _refuse_for_free_trial(db: Session, tenant_id, switching_on: bool) -> None:
+    """Switching AI processing on for an organization on the Free Trial plan is refused (409)."""
+    if switching_on and governance.is_free_trial(db, tenant_id):
+        raise HTTPException(409, detail=dict(FREE_TRIAL_AI_REFUSAL))
 
 
 def _acknowledgement_details(switching_on: bool) -> dict:
@@ -120,6 +139,7 @@ def update_customer_ai_settings(payload: CustomerAiSettings, request: Request, d
     if tenant is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Organization is not available"})
     switching_on = payload.ai_processing_allowed and not tenant.ai_processing_allowed
+    _refuse_for_free_trial(db, tenant.id, switching_on)
     _require_acknowledgement(switching_on, payload.acknowledgement)
     require_release_gate(switching_on)
     before = {"ai_processing_allowed": tenant.ai_processing_allowed}
@@ -177,6 +197,7 @@ def update_platform_ai_settings(
         "ai_monthly_token_budget": tenant.ai_monthly_token_budget,
     }
     switching_on = bool(payload.ai_processing_allowed) and not tenant.ai_processing_allowed
+    _refuse_for_free_trial(db, tenant.id, switching_on)
     _require_acknowledgement(switching_on, payload.acknowledgement)
     require_release_gate(switching_on)
     if payload.ai_processing_allowed is not None:
@@ -264,6 +285,8 @@ def ai_ready(db: Session, tenant_id) -> bool:
     """Whether AI really answers for this organization now: a provider is configured and allowed here, the
     organization switched AI on, and its allowance is not used up."""
     try:
+        if governance.is_free_trial(db, tenant_id):
+            return False
         return ai_status_for(governance.usage(db, tenant_id), _models_in_use())["reason_code"] is None
     except Exception:
         return False
@@ -279,8 +302,13 @@ def ai_status(db: Session = Depends(get_db), ctx: AuthenticatedRequestContext = 
     is true for a free trial, whose AI is off."""
     from backend.app.trial.service import trial_subscription
 
-    status = ai_status_for(governance.usage(db, ctx.tenant_id), _models_in_use())
-    status["trial"] = trial_subscription(db, ctx.tenant_id) is not None
-    if status["trial"] and status["reason_code"] in ("PROVIDER_UNAVAILABLE", "AI_DISABLED"):
+    trial = trial_subscription(db, ctx.tenant_id) is not None
+    state = governance.usage(db, ctx.tenant_id)
+    if trial:
+        # Off whatever the switch says (genai/governance.py refuses a trial's model requests).
+        state = {**state, "ai_processing_allowed": False}
+    status = ai_status_for(state, _models_in_use())
+    status["trial"] = trial
+    if trial and status["reason_code"] in ("PROVIDER_UNAVAILABLE", "AI_DISABLED"):
         status["message"] = TRIAL_AI_OFF_MESSAGE
     return status

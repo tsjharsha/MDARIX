@@ -23,7 +23,11 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
     eyebrow: "Free 30-day trial",
     title: "Watch MDARIX find the pattern in your complaints.",
     points: [
-      [ShieldCheck, "Your own private workspace", "Approved by our team, isolated from every other customer."],
+      [
+        ShieldCheck,
+        "Your own private workspace",
+        "Ready within minutes with a company email, isolated from every other customer.",
+      ],
       [FileSearch, "Sample data on day one", "Explore a full device investigation before sharing anything."],
       [UserCheck, "Then your own exports", "CSV templates, checked for personal data before import."],
     ],
@@ -331,7 +335,7 @@ export function AuthPage({ mode }: { mode: string }) {
     if (mode === "signup") {
       setDone(true);
       setMessage(
-        `Thank you. We review every request, usually within one business day. Once it is approved, we email ${email} an invitation to your free trial workspace.`,
+        `Thank you. Once your request is approved, we email ${email} an invitation to your free trial workspace.`,
       );
     } else if (mode === "activate-account") {
       const signedIn = typeof data.email === "string" ? await signInAfterActivation(data.email) : null;
@@ -619,6 +623,16 @@ export function AuthPage({ mode }: { mode: string }) {
                 />
                 {isTokenPassword && <small>Only you know it: administrators never see passwords.</small>}
               </label>
+            )}
+            {mode === "activate-account" && (
+              <p className="auth-consent">
+                Your account is processed as described in our{" "}
+                <a href="/privacy" target="_blank" rel="noopener">
+                  Privacy Policy
+                </a>{" "}
+                (opens in a new tab): your name, email address, role and sign-in records, to give you access and keep an
+                audit trail. MDARIX stores only a salted hash of your password.
+              </p>
             )}
             {mode === "signup" && (
               <p className="auth-consent">

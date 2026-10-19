@@ -353,7 +353,11 @@ def create_interaction(
     except GenAIUnavailable as exc:
         # Why no model answered, with what the user can do about it (AI switched off, allowance used up, ...).
         refusal = genai_refusal(exc)
-        if trial and refusal.get("code") in ("GENAI_DISABLED_FOR_ORGANIZATION", "GENAI_PROVIDER_NOT_ALLOWED"):
+        if trial and refusal.get("code") in (
+            "GENAI_DISABLED_FOR_ORGANIZATION",
+            "GENAI_PROVIDER_NOT_ALLOWED",
+            "GENAI_OFF_FOR_FREE_TRIAL",
+        ):
             refusal = {**refusal, "user_message": "AI is off for free trials."}
         response["refusal"] = refusal
         response["limitations"] = [refusal["user_message"]]

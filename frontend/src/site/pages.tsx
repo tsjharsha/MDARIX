@@ -385,7 +385,7 @@ export function HomePage() {
         <SectionHead
           eyebrow="Inspection readiness"
           title="See your quality loop the way an inspector will."
-          copy="Eight checks drawn from 2026 FDA warning letters, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
+          copy="Eight checks shaped by what recent FDA warning letters and inspections cite and by the EU, UK and Canadian vigilance rules, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
         />
         <Reveal>
           <QualityLoop
@@ -1377,7 +1377,7 @@ export function CompanyPage() {
             {[
               [
                 "Request your free trial",
-                "Tell us your name, company and work email. We review every request, usually within one business day.",
+                "Tell us your name, company and work email. With a company email your trial is approved automatically and ready within minutes, up to a daily limit; requests from personal email addresses are reviewed by the MDARIX team, usually within one business day.",
               ],
               [
                 "Explore a ready-made investigation",

@@ -38,8 +38,9 @@ describe("free trial user guide", () => {
       "Inspection pack (ZIP)",
     ])
       expect(text).toContain(label);
-    // Nobody is ever sent a password.
-    expect(text).toContain("MDARIX never sees it");
+    // Nobody is ever sent a password, and how it is kept is said precisely.
+    expect(text).toContain("stores only a salted hash of it, so no one at MDARIX can read it");
+    expect(text).not.toContain("never sees it");
   });
 
   it("draws every step and the journey, and can be saved as a PDF", () => {

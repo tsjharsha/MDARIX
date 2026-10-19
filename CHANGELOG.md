@@ -10,6 +10,80 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.33] - 2026-10-19
+
+### Added
+
+- Sign-up records which legal texts a trial requester accepted, and when. Sending the request stores, with its time,
+  the version of the Terms of Service, the Free Trial Agreement and the Privacy Policy the website served at that
+  moment: each text's "Last updated" date and the SHA-256 of its exact text (`backend/app/site_info.py`
+  `legal_versions`). The record names nobody, so it stays when the requester's personal data is erased. Platform
+  Admin › Onboarding shows it under the request's answers. The consent line above **Request free trial** says that the
+  versions are recorded. Migration `md48legalacceptance` adds the column `onboarding_requests.legal_acceptance`
+  (nullable, empty for earlier requests; downgrade drops it).
+- Invited people see the privacy policy before they activate: the **Activate your MDARIX account** page links it
+  (in a new tab) and says what the account holds, and the activation and both trial invitation emails end with the
+  privacy policy's address.
+- An accessibility statement at `/accessibility`, linked from the footer and the legal pages: what was done, the gaps
+  we know of (header menu keyboard order, focus outline contrast, legal page heading levels, burned-in video captions
+  without a transcript) and how to report a problem. It claims no conformance.
+- A trademark line in the website footer, the Terms (8.3) and the Privacy Policy: product names such as the
+  complaint systems offered at sign-up belong to their owners, and MDARIX is not affiliated with them.
+- `docs/compliance/LEGAL_DRAFTS_FOR_REVIEW.md`: drafts for the lawyer, not published, for a GDPR / UK GDPR section,
+  a "not a medical device, no medical, legal or regulatory advice" clause, the contracting party and a role-based
+  grievance contact, and a sanctions and export clause, each with its open questions.
+
+### Changed
+
+- AI stays off for free trials by a server rule, as the trial agreement, the terms and the privacy policy say. Turning
+  AI on for an organization on the Free Trial plan is refused (409 `AI_OFF_FOR_FREE_TRIALS`), for its administrators
+  and for a Platform Administrator, and every model request of a trial is refused whatever its switch says
+  (`GENAI_OFF_FOR_FREE_TRIAL`, "AI is off for free trials during the product validation phase"). The trial's screens
+  report AI as off. Platform Admin › tenant › AI shows "Free trial: AI stays off" and the **Turn AI on** button is
+  disabled; turning AI off and the token allowance still work.
+- Sign-up no longer lists Cuba, Iran, North Korea or Syria, and the server refuses those countries and the Crimea,
+  so-called Donetsk People's Republic and Luhansk People's Republic regions, also when typed by name or sent another way
+  (422 `COUNTRY_NOT_SERVED`).
+- The deletion date in the trial reminder, trial-ended and ended-early emails, and on Getting started › Your trial,
+  counts a grace extension and an open request to move the data into the MVP (`backend/app/trial/retention.py`
+  `deletion_date`), and the emails say "Data deleted, at the earliest, on". The trial-ended screen says the same.
+- The privacy policy now lists what was missing: server request logs (IP address, browser, page without its query
+  string) and how long rotation keeps them; browser error reports and help-menu problem reports, and when they are
+  deleted; the record of accepted texts; what is kept after a trial is deleted; and the time of last activity kept in
+  the browser for automatic sign-out. The trial agreement (5.3) and the ended-early email say what is kept after
+  deletion.
+- The audit trail is described as it is kept: unchanged and never deleted while a customer's account exists, handed to
+  the customer in the export at the end, and, for a free trial, deleted with the trial unless an export is asked for
+  (privacy policy, terms 4.3, trial agreement 5.3, Customer Admin › Audit, `legal/README.md`). The "at least 7 years"
+  promise is gone.
+- Feedback: the texts say what a published quote is credited with (your job title and your company's name, or only
+  your area of work when anonymous; never your own name), and so do the consent sentence and the choices in the
+  feedback questionnaire.
+- How trial requests are approved is said the same way everywhere: a company email is approved automatically, within
+  minutes, up to a daily limit; personal email addresses, and requests beyond the limit, are reviewed by the MDARIX
+  team, usually within one business day (trial agreement 1.2, sign-up, Company page, the acknowledgement email, the
+  trial guide, the video summary).
+- Passwords: "MDARIX never sees it" now reads "MDARIX stores only a salted hash of it, so no one at MDARIX can read it"
+  on sign-up and in the guides.
+- The home page says the eight inspection checks are shaped by what recent FDA warning letters and inspections cite
+  and by the EU, UK and Canadian vigilance rules, instead of "drawn from 2026 FDA warning letters".
+- The Security page and the privacy policy say which files are scanned for malware: every file MDARIX stores, such as
+  evidence attachments; imported CSV and Excel files are read as data only, never stored, and macro workbooks are
+  refused. Imports are still not scanned.
+- The roadmap no longer lists "A dedicated database for each customer" as planned: every MVP already has a dedicated
+  database run by MDARIX, and free trials share the platform (also on the Company page).
+- Resources lists the FDA AI guidance under its official title, "Artificial Intelligence-Enabled Device Software
+  Functions: Lifecycle Management and Marketing Submission Recommendations (draft guidance)".
+
+### Fixed
+
+- A legal page whose text cannot be loaded (no answer, or an error) no longer says "formal legal text pending
+  approval". It says the document could not be loaded, offers **Try again** and **Email us for the text**, and keeps
+  the pending summary only for a document the server reports as not provided.
+
+The legal texts `legal/privacy.md`, `legal/terms.md` and `legal/trial-agreement.md` changed (Last updated: 19 October
+2026); on the server they are live after the API restarts with the new `legal/` folder.
+
 ## [0.10.32] - 2026-10-19
 
 ### Fixed

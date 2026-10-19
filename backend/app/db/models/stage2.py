@@ -208,6 +208,10 @@ class OnboardingRequest(Base):
     # The latest invitation email of an approved request (md47): SENT, FAILED or NOT_CONFIGURED, and when it was tried.
     invitation_delivery: Mapped[str | None] = mapped_column(String(20))
     invitation_attempted_at = _ts()
+    # Which legal texts the requester accepted by sending the request, and when (md48): {"accepted_at": ...,
+    # "documents": {"terms" | "trial-agreement" | "privacy": {"available", "last_updated", "sha256"}}}. Names nobody,
+    # so it stays when the request's personal data is erased. Empty for requests sent before md48.
+    legal_acceptance = mapped_column(JSONB)
 
 
 class DemoRequest(Base):

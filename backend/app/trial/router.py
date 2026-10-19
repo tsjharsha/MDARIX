@@ -150,8 +150,9 @@ def trial_status(
         "plan": "Free Trial",
         "starts_at": subscription.starts_at.isoformat(),
         "expires_at": subscription.expires_at.isoformat(),
-        # When the trial's data is deleted unless the organization continues (backend/app/trial/retention.py).
-        "data_deleted_at": (subscription.expires_at + timedelta(days=retention.RETENTION_DAYS)).isoformat(),
+        # When the trial's data is deleted at the earliest unless the organization continues: counting a grace
+        # extension and an open request to move the data into the MVP (backend/app/trial/retention.py).
+        "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
         "usage": {"users": int(users or 0), "rows": imports.uploaded_rows(data, tenant_id)},

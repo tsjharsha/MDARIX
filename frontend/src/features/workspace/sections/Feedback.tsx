@@ -512,8 +512,8 @@ export function FeedbackSection({ isTrial = false }: { isTrial?: boolean }) {
           </legend>
           {(
             [
-              ["NAMED", `Yes, with my company's name: ${company}`],
-              ["ANONYMOUS", "Yes, anonymously, without naming my company"],
+              ["NAMED", `Yes, with my job title and my company's name: ${company}`],
+              ["ANONYMOUS", "Yes, anonymously, without my name or my company's name"],
               ["PRIVATE", "No, keep my feedback private to the MDARIX team"],
             ] as [Consent, string][]
           ).map(([value, label]) => (

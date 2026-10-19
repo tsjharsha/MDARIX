@@ -1734,6 +1734,9 @@
   color: inherit;
   text-decoration: underline;
 }
+.ms-footer-trademarks {
+  flex-basis: 100%;
+}
 
 /* Legal, security, contact and not-found pages: one readable column. */
 .ms-legal {
@@ -1772,6 +1775,16 @@
 }
 .ms-legal-notice strong {
   color: #765317;
+}
+.ms-legal-error {
+  border-color: #e3a3a3;
+  background: #fff5f5;
+}
+.ms-legal-error strong {
+  color: #8f2424;
+}
+.ms-legal-error .ms-cta-row {
+  margin-top: 8px;
 }
 .ms-legal-summary {
   display: grid;

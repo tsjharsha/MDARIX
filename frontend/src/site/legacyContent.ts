@@ -557,11 +557,6 @@ export const capabilityStatus: {
         title: "Ready-made vendor connectors",
         detail: "Connectors for named QMS, PLM and ERP products, set up without custom integration work.",
       },
-      {
-        icon: "database",
-        title: "A dedicated database for each customer",
-        detail: "Your records in a database of their own, for organisations that need that separation.",
-      },
     ],
   },
 ];
@@ -844,8 +839,9 @@ export const postMarketResources: {
   {
     type: "FDA guidance",
     date: "2025",
-    title: "AI-enabled medical devices: lifecycle and postmarket performance considerations",
-    text: "FDA draft guidance covering lifecycle documentation, transparency, bias, and postmarket performance monitoring for AI-enabled devices.",
+    title:
+      "Artificial Intelligence-Enabled Device Software Functions: Lifecycle Management and Marketing Submission Recommendations (draft guidance)",
+    text: "FDA draft guidance, announced in January 2025, on lifecycle management and marketing submissions for AI-enabled device software, including transparency, bias and performance monitoring after release.",
     href: "https://www.fda.gov/news-events/press-announcements/fda-issues-comprehensive-draft-guidance-developers-artificial-intelligence-enabled-medical-devices",
   },
   {

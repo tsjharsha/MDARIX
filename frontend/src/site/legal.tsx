@@ -96,7 +96,7 @@ const LEGAL_SUMMARIES: Record<LegalPath, { intro: string; sections: { title: str
     sections: [
       {
         title: "What we collect",
-        body: "We collect information needed to respond to demo and trial requests, operate accounts, protect the service, maintain audit history, and provide customer-requested investigation workflows.",
+        body: "We collect information needed to respond to trial requests, operate accounts, protect the service, maintain audit history, and provide customer-requested investigation workflows.",
       },
       {
         title: "Customer content",
@@ -162,33 +162,86 @@ function EmailLink({ address }: { address: string }) {
   return <a href={`mailto:${address}`}>{address}</a>;
 }
 
+export type LegalDocumentState = { status: "LOADING" | "READY" | "PENDING" | "ERROR"; markdown?: string };
+
+/** What the legal text request answered: the text, "not provided yet" (the server says `available: false`), or
+ * an error (no answer, or not a readable one). Only the server's own "not provided" shows the pending summary: a
+ * failed request never suggests the published texts are unapproved. */
+export function legalDocumentState(
+  response: { ok: boolean } | null,
+  body: { available?: boolean; markdown?: string | null } | null,
+): LegalDocumentState {
+  if (!response?.ok || body === null || typeof body !== "object") return { status: "ERROR" };
+  if (body.available && body.markdown) return { status: "READY", markdown: body.markdown };
+  if (body.available === false) return { status: "PENDING" };
+  return { status: "ERROR" };
+}
+
 export function LegalDocumentPage({ path }: { path: LegalPath }) {
-  const { document, title } = LEGAL_PAGES[path];
+  const { document } = LEGAL_PAGES[path];
   const info = useSiteInfo();
-  const [state, setState] = useState<{ status: "LOADING" | "READY" | "PENDING"; markdown?: string }>({
-    status: "LOADING",
-  });
+  const [state, setState] = useState<LegalDocumentState>({ status: "LOADING" });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let active = true;
     setState({ status: "LOADING" });
     fetch(`/api/v1/public/legal/${document}`, { headers: { Accept: "application/json" } })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((body: { available?: boolean; markdown?: string | null } | null) => {
-        if (!active) return;
-        if (body?.available && body.markdown) setState({ status: "READY", markdown: body.markdown });
-        else setState({ status: "PENDING" });
+      .then(async (response) => {
+        const body = response.ok ? await response.json().catch(() => null) : null;
+        if (active) setState(legalDocumentState(response, body));
       })
-      .catch(() => active && setState({ status: "PENDING" }));
+      .catch(() => active && setState({ status: "ERROR" }));
     return () => {
       active = false;
     };
-  }, [document]);
-  const contact = info?.privacy_email ?? info?.support_email;
+  }, [document, attempt]);
+  return (
+    <LegalDocumentView
+      path={path}
+      state={state}
+      contact={info?.privacy_email ?? info?.support_email ?? null}
+      onRetry={() => setAttempt((count) => count + 1)}
+    />
+  );
+}
+
+/** A legal page in one of its states (exported for its test). */
+export function LegalDocumentView({
+  path,
+  state,
+  contact,
+  onRetry,
+}: {
+  path: LegalPath;
+  state: LegalDocumentState;
+  contact: string | null;
+  onRetry: () => void;
+}) {
+  const { title } = LEGAL_PAGES[path];
+  // When the request failed the server's addresses may be unknown too: the ones the published texts give.
+  const writeTo = contact ?? PUBLISHED_CONTACT.privacy;
   return (
     <article className="ms-section ms-legal" aria-labelledby="legal-title">
       <span className="ms-eyebrow">Legal</span>
       <h1 id="legal-title">{title}</h1>
       {state.status === "LOADING" && <p className="ms-legal-note">Loading…</p>}
+      {state.status === "ERROR" && (
+        <div className="ms-legal-notice ms-legal-error" role="alert">
+          <strong>The {title.toLowerCase()} could not be loaded</strong>
+          <span>
+            This is a problem reaching MDARIX, not a change to the document. Please try again, or write to{" "}
+            <EmailLink address={writeTo} /> and we will send you the text.
+          </span>
+          <span className="ms-cta-row">
+            <button type="button" className="ms-btn ms-btn-primary" onClick={onRetry}>
+              Try again
+            </button>
+            <a className="ms-btn ms-btn-outline" href={`mailto:${writeTo}?subject=${encodeURIComponent(title)}`}>
+              Email us for the text
+            </a>
+          </span>
+        </div>
+      )}
       {state.status === "PENDING" && (
         <>
           <div className="ms-legal-notice" role="status">
@@ -229,6 +282,7 @@ function LegalLinks({ current }: { current: string }) {
     ["/terms", "Terms of service"],
     ["/trial-agreement", "Free trial agreement"],
     ["/security", "Security"],
+    ["/accessibility", "Accessibility"],
     ["/contact", "Contact"],
   ];
   return (
@@ -267,7 +321,7 @@ const SECURITY_SECTIONS: { title: string; points: string[] }[] = [
     points: [
       "All traffic uses TLS, including the connection to the database.",
       "Authenticator secrets and connector credentials are encrypted before they are stored.",
-      "Every uploaded file is scanned for malware before it is accepted, and files over the size limit are refused.",
+      "Every file MDARIX stores, such as evidence attachments, is scanned for malware before it is stored, and files over the size limit are refused. Imported CSV and Excel files are read as data only and are not stored; workbooks with macros are refused.",
       "During the validation phase the database runs on MDARIX's own server in Mumbai. It is backed up every day: an encrypted copy goes to Delhi, and a daily snapshot of the server's disk is kept in Mumbai. Restoring follows a written, rehearsed procedure.",
     ],
   },
@@ -317,6 +371,69 @@ export function SecurityPage() {
         </section>
       </div>
       <LegalLinks current="/security" />
+    </article>
+  );
+}
+
+// What was done and what is known to fall short, as tested; no conformance is claimed (CMP-16). Engineering keeps it
+// current: a fixed gap leaves the list, and the date changes.
+export const ACCESSIBILITY_UPDATED = "19 October 2026";
+const ACCESSIBILITY_DONE = [
+  "Every page can be used with a keyboard, shows where the focus is, and starts with a link that skips to the content.",
+  "Form fields on the website have visible labels, and required fields are marked.",
+  "Diagrams and animated scenes carry a text description, and animations stop when your device asks for reduced motion.",
+  "Body text was checked for colour contrast on the main pages, and an automated accessibility check (axe) runs on the home page in our tests.",
+  "The website was reviewed at phone, laptop and desktop widths. Each page declares its language and has one main heading and its own title.",
+];
+const ACCESSIBILITY_GAPS = [
+  "The menus in the website header: after a menu is opened with the keyboard, the Tab key moves to the next menu instead of into the open menu. Its links are reached after the rest of the header; Escape closes it.",
+  "On the light header, the focus outline has low contrast, and the skip link shows as a thin dark line at the top-left of each page.",
+  "The legal pages skip a heading level (from the page title straight to the third level).",
+  "The videos have English captions as part of the picture: they cannot be switched off or resized, and there is no separate transcript yet.",
+  "A few small labels, such as the video durations, are close to the minimum contrast.",
+  "The signed-in application has not been reviewed as fully as the website.",
+];
+
+export function AccessibilityPage() {
+  const info = useSiteInfo();
+  const address = info?.support_email ?? PUBLISHED_CONTACT.support;
+  return (
+    <article className="ms-section ms-legal" aria-labelledby="accessibility-title">
+      <span className="ms-eyebrow">Legal</span>
+      <h1 id="accessibility-title">Accessibility statement</h1>
+      <p className="ms-legal-lead">
+        We want everyone to be able to use the MDARIX website and the MDARIX application. We use the Web Content
+        Accessibility Guidelines (WCAG) 2.2, level AA, as our guide. MDARIX has not been audited against them and we do
+        not claim that it conforms.
+      </p>
+      <div className="ms-legal-body">
+        <p>Last updated: {ACCESSIBILITY_UPDATED}</p>
+        <section>
+          <h2>What we have done</h2>
+          <ul>
+            {ACCESSIBILITY_DONE.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2>Known gaps</h2>
+          <p>We know of these problems and are working on them:</p>
+          <ul>
+            {ACCESSIBILITY_GAPS.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </section>
+        <section>
+          <h2>Tell us about a problem</h2>
+          <p>
+            If something on the website or in the application is hard to use, or you need information in another format,
+            email <EmailLink address={address} />. Say which page you were on and what happened, and we will reply.
+          </p>
+        </section>
+      </div>
+      <LegalLinks current="/accessibility" />
     </article>
   );
 }

@@ -31,8 +31,8 @@ def test_the_owner_is_told_the_data_is_deleted_and_asked_why_by_reply(sent):
 def test_the_owner_is_told_until_when_the_data_is_kept(sent):
     emailer.send_trial_ended_early("owner@acme.invalid", "Acme", data_deleted=False, delete_on="13 November 2026")
     message = sent[0][1]
-    assert ("Data deleted on", "13 November 2026") in message.details
-    assert "kept until the date below" in " ".join(message.paragraphs)
+    assert ("Data deleted, at the earliest, on", "13 November 2026") in message.details
+    assert "kept at least until the date below" in " ".join(message.paragraphs)
     plain, html = emailer.render(message)
     assert "13 November 2026" in plain and "13 November 2026" in html
 

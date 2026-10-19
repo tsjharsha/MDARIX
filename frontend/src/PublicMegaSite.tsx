@@ -22,6 +22,7 @@ import {
 import {
   ContactPage,
   LEGAL_PAGES,
+  AccessibilityPage,
   LegalDocumentPage,
   NotFoundPage,
   SecurityPage,
@@ -30,7 +31,7 @@ import {
 } from "./site/legal";
 
 // Pages outside the main navigation: legal documents, security and contact. Anything else is "not found".
-const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/contact"] as const;
+const INFO_PAGES = ["/privacy", "/terms", "/trial-agreement", "/security", "/accessibility", "/contact"] as const;
 type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
 // The website was consolidated from ~65 URLs into a few pages. Every old URL lands on the section that now holds its
@@ -203,6 +204,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
       ["Terms of service", "/terms"],
       ["Free trial agreement", "/trial-agreement"],
       ["Security", "/security"],
+      ["Accessibility", "/accessibility"],
     ],
   },
 ];
@@ -363,6 +365,7 @@ export function PublicMegaSite({ path }: { path: string }) {
         {page === "/videos" && <VideosPage />}
         {page in LEGAL_PAGES && <LegalDocumentPage path={page as LegalPath} />}
         {page === "/security" && <SecurityPage />}
+        {page === "/accessibility" && <AccessibilityPage />}
         {page === "/contact" && <ContactPage />}
         {page === "not-found" && <NotFoundPage />}
       </main>
@@ -409,6 +412,10 @@ export function PublicMegaSite({ path }: { path: string }) {
             )}
           </span>
           <span>System of Intelligence, not System of Record · Evidence before inference · Humans decide</span>
+          <span className="ms-footer-trademarks">
+            Product names mentioned on this site and in MDARIX are trademarks of their owners. MDARIX is not affiliated
+            with or endorsed by them.
+          </span>
         </div>
       </footer>
     </div>

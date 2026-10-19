@@ -23,6 +23,7 @@ test.describe("public MDARIX shell", () => {
       ["/terms", "Terms of service"],
       ["/trial-agreement", "Free trial agreement"],
       ["/security", "Security at MDARIX"],
+      ["/accessibility", "Accessibility statement"],
       ["/contact", "Contact MDARIX"],
       ["/no-such-page", "Page not found"],
     ] as const) {

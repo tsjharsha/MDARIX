@@ -62,7 +62,8 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "On Activate your MDARIX account, choose a New password: 12 to 128 characters. A phrase of several words works well; do not include your email name.",
               "Choose Activate account. You are signed in and asked to set up your authenticator app.",
             ],
-            result: "MDARIX never sees or sends your password: only you know it.",
+            result:
+              "MDARIX stores only a salted hash of your password, so no one at MDARIX can read it, and it never sends one: only you know it.",
           },
           {
             title: "Set up your authenticator app",

@@ -6,7 +6,7 @@ address instead.
 
 | File | Shown at | Linked from |
 |---|---|---|
-| `privacy.md` | `/privacy` | Footer, signup, demo request, the in-app privacy notice |
+| `privacy.md` | `/privacy` | Footer, signup, the account activation page and invitation emails, the in-app privacy notice |
 | `terms.md` | `/terms` | Footer, signup, demo request |
 | `trial-agreement.md` | `/trial-agreement` | Footer, signup, the trial invitation email |
 
@@ -28,12 +28,21 @@ These describe what the software does today, so the documents match it. Engineer
 in the footer, on `/contact` and in every email.
 
 **Personal data collected**
-- Trial signup: name, work email and organization name.
-- Demo requests: name, work email and phone number. The requester's IP address is stored only as a salted one-way
-  hash, to limit repeated requests.
+- Trial signup: name, work email, organization name, job title, country, optional phone and answers about the
+  organization; and, since 0.10.33, when the request was sent and the version ("Last updated" date and SHA-256) of
+  each of the three documents served at that moment (`onboarding_requests.legal_acceptance`). Sign-up refuses
+  countries under comprehensive sanctions (Cuba, Iran, North Korea, Syria, the Crimea and the so-called DNR/LNR).
+- Demo requests: booked from inside a trial (name, work email, optional phone, times and topics). The website form
+  is parked; when it was offered it stored the requester's IP address only as a salted one-way hash.
+- Server request logs (Caddy, stdout): client IP, user agent, path without query string, time; kept by Docker's
+  size-based log rotation (`docker-compose.prod.yml`, 10 x 20 MB per service), so no fixed period.
+- Browser error reports (`client_error_reports`) and help-menu problem reports (`support_problem_reports`, also
+  emailed to the support mailbox): deleted with the organization's data; error reports sent before sign-in have no
+  organization and no automatic deletion yet.
 - Trial feedback: the questionnaire answers, linked to the user and organization. Nothing is shown publicly unless
-  the person chose "named" or "anonymous" publication and a platform administrator published it; withdrawing
-  consent unpublishes it.
+  the person chose "named" publication (credited with their job title and company name, never their own name) or
+  "anonymous" (credited by their area of work only) and a platform administrator published it; withdrawing consent
+  unpublishes it.
 - Signed-in use: user name, email, role, sign-in times, authenticator (MFA) secret (encrypted), and an audit trail
   of actions taken (who, what, when). Electronic signatures record the signer, meaning and time.
 - Customer content: quality, complaint, supplier and product records a customer uploads or connects. Customers are
@@ -57,10 +66,11 @@ in the footer, on `/contact` and in every email.
 - Paid customers: kept for the subscription term. At the end, the customer's data is handed back as a full export
   (or the customer's written waiver is recorded) and then deleted; one person's data can be exported or erased on
   request (`docs/runbooks/DATA_REQUESTS.md`).
-- Audit trail and electronic signatures: append-only and never changed. Each event is kept for at least 7 years from
-  the event (the database dates every event), and for as long as the customer's account exists if that is longer.
+- Audit trail and electronic signatures: append-only and never changed or deleted while the account exists (each
+  event carries a 7-year `retention_until`, but the documents must not promise 7 years: an account can end sooner).
   When an organization's data is deleted at the end of the contract, its trail goes to the customer in the export and
-  is then deleted with everything else; the customer keeps it for its own regulatory period.
+  is then deleted with everything else; the customer keeps it for its own regulatory period. A free trial's trail is
+  deleted with the trial (no export unless asked for).
 - Erasure leaves some things behind, and the documents should say so: audit rows keep the person's account id (which
   no longer identifies them) and the network address and browser recorded at the time; free text that colleagues
   typed into quality records or reasons (for example a name in a complaint description) is not searched out.
@@ -84,12 +94,14 @@ in the footer, on `/contact` and in every email.
 
 **Security measures** (also stated on `/security`): TLS for all traffic, row-level isolation between organizations
 in the database, encrypted authenticator secrets and connector credentials, passwords hashed with scrypt and checked
-against known breached passwords, sign-in rate limits and lockout, authenticator-app MFA, virus scanning of uploads,
+against known breached passwords, sign-in rate limits and lockout, authenticator-app MFA, virus scanning of every stored file (evidence
+attachments; CSV and Excel imports are read in memory, never stored, and macro workbooks are refused),
 an append-only, hash-chained audit trail verified daily, and encrypted backups.
 
 **Not offered today** (the documents should not promise them): single sign-on (OIDC/SAML), certifications such as
 ISO 27001, SOC 2 or HIPAA attestation, a validated (GxP/Part 11) system, data residency choices beyond the chosen
-hosting region, and dedicated databases per customer during pilots.
+hosting region, and dedicated databases for free trials (trials share the platform; each paid MVP gets a dedicated database
+hosted and run by MDARIX). AI is off for free trials and the server refuses to switch it on for them.
 
 ## What the lawyer still has to produce
 

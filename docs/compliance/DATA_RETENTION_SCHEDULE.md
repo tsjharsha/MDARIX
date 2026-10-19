@@ -26,7 +26,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 | Account (name, email, role, authenticator secret) | While the account is in use | Personal-data erasure on request (pseudonymized: name, email and credentials replaced) or the organization purge | `erase_person` in `tenant_purge.py` |
 | Free-trial requests that did not lead to a trial: declined, or approved with an invitation that expired unused (name, email, job title, phone, free-text goal) | **90 days** after the decline, or after the last invitation expired unused (`REQUEST_RETENTION_DAYS`). Requests still waiting for review are not erased automatically (open item) | Scheduler job `trial-retention` (`erase_trial_request`: pseudonymized like a purge; the organization's name and its answers about the organization stay; the never-activated account is erased with `erase_person`; logged in `erasure_log` as TRIAL_REQUEST_ERASED) | `backend/app/trial/retention.py`, `tenant_purge.py` |
 | Sessions, sign-in history, invitations, password-reset requests | While the account exists (no time-based deletion yet) | Erasure of the person or the organization purge | as above |
-| Pseudonymized account and trial-request rows | For the life of the platform, as the record of the contract and of consent; they identify nobody | Not deleted | `tenant_purge.py` (`KEEP_TABLES`) |
+| Pseudonymized account and trial-request rows | For the life of the platform, as the record of the contract and of consent; they identify nobody. A request sent since 0.10.33 also holds which version of the Terms, the Free Trial Agreement and the Privacy Policy was accepted, and when (`legal_acceptance`, migration md48) | Not deleted | `tenant_purge.py` (`KEEP_TABLES`) |
 | Published trial feedback | While the person's consent stands | Unpublishing (withdrawal of consent), then erasure or purge | Platform Admin > Trial feedback |
 | Erasure log (`erasure_log`) | For the life of the platform: needed to repeat erasures after a restore. Holds ids, counts and the stated reason only | Not deleted | `tenant_purge.py`; `scripts/reapply_erasures.py` |
 | Personal values inside audit rows | Audit payloads name people by account id. Rows written before this rule, and free-text reasons typed by administrators, may still contain a name or address; they stay for the audit period above, because audit rows cannot be changed | Organization purge | — |
@@ -38,7 +38,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 | Support problem reports | No automatic deletion yet | Organization purge (they belong to the organization) |
 | Website demo requests (the form is parked; requests made before it was) | No automatic deletion yet (open item) | Deleted with the trial when booked from inside one |
 | Browser error reports | No automatic deletion yet; reports sent before sign-in carry no organization and are not removed by a purge | Not yet defined (open item) |
-| Application logs | As set by the host's log rotation (infrastructure) | Log rotation |
+| Application and web server request logs (client IP, browser, path without query string, time) | Until Docker's size-based rotation overwrites them (`docker-compose.prod.yml`: 10 files of 20 MB per service), so no fixed period; also inside the daily disk snapshot for its 14 days | Log rotation |
 
 ## Backups
 

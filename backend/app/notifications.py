@@ -567,7 +567,11 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
     if row is None or request is None:
         return
     organization = _organization(db, row.tenant_id)
-    delete_on = _long_date(row.expires_at + timedelta(days=30))
+    from backend.app.trial.retention import deletion_date
+
+    # 30 days after the trial ends, counting a grace extension and an open request to move the data into the MVP;
+    # the emails say "at the earliest", since the date can still move later (backend/app/trial/retention.py).
+    delete_on = _long_date(deletion_date(db, db, row))
     if payload.get("stage") == "ENDED" and payload.get("early"):
         # Ended early at the owner's request, data kept until the usual date (backend/app/trial/early_exit.py).
         _deliver(

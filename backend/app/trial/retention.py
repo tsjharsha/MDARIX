@@ -208,6 +208,21 @@ def retention_plan(ended: datetime, requests: dict | None, movable: bool, now: d
     }
 
 
+def deletion_date(db: Session, data: Session, subscription, now: datetime | None = None) -> datetime:
+    """The day one trial's data is deleted at the earliest, as people are told it (trial emails, Getting started): 30
+    days after the trial ends, counting any grace extension, or later while an open request to move the data into the
+    MVP holds it (``retention_plan``). The scheduled job runs daily, and the date can still move later (a grace
+    extension, a new request, a legal hold), so it is always worded "at the earliest". ``data`` reads the trial's
+    records (whether its data may move)."""
+    from backend.app.trial.mvp_request import data_move
+
+    now = now or datetime.now(timezone.utc)
+    ended = max(subscription.expires_at, subscription.grace_ends_at or subscription.expires_at)
+    asked = move_requests(db, [subscription.tenant_id]).get(subscription.tenant_id)
+    movable = bool(asked and asked["open"] is not None and data_move(data, subscription.tenant_id)["allowed"])
+    return retention_plan(ended, asked, movable, now)["delete_after"]
+
+
 def plans(db: Session, now: datetime | None = None, tenant_ids=None) -> list[dict]:
     """The deletion plan (``retention_plan``) of every Free Trial workspace still holding data in the shared trial
     store (or of those among ``tenant_ids``), with its tenant. ``db`` reads every tenant (system scope)."""

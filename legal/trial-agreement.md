@@ -10,9 +10,11 @@ This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we",
 
 1.1 You can request a trial on our website with your name, job title, work email address, organization name and country, and some answers about your organization.
 
-1.2 We may approve a request at once, for example when it comes from a company email address, or review it first; we may decline a request at our discretion. When a request is approved, we create a private workspace for your organization and email an invitation to the person who made the request.
+1.2 A request from a company email address is approved automatically, usually within minutes, up to a daily limit of new trials. Other requests, for example from a personal email address, from an organization that already has a trial or a request, or beyond that daily limit, are reviewed by the MDARIX team first, usually within one business day. We may decline a request at our discretion. When a request is approved, we create a private workspace for your organization and email an invitation to the person who made the request.
 
-1.3 A trial is for professionals aged 18 or over, acting for their organization. This applies to the person who requests it and to every user they invite.
+1.3 Sending the request accepts this agreement and the Terms of service and acknowledges the Privacy policy. We record when you sent it and which version of each text was published at that moment.
+
+1.4 A trial is for professionals aged 18 or over, acting for their organization. This applies to the person who requests it and to every user they invite.
 
 ## 2. What the trial includes
 
@@ -22,7 +24,7 @@ This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we",
 - **Sample data:** the workspace starts with sample data so you can explore the Service straight away.
 - **Price:** the trial is free of charge, and no payment details are needed.
 
-Some features may be limited or unavailable during the trial. AI features are off during the product validation phase.
+Some features may be limited or unavailable during the trial. AI features are off for free trials during the product validation phase, and they cannot be switched on for a trial.
 
 ## 3. Using the trial
 
@@ -48,7 +50,7 @@ Some features may be limited or unavailable during the trial. AI features are of
 
 5.2 When the trial ends, access to the workspace stops.
 
-5.3 Your trial workspace and everything in it are deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and deleted no later than 90 days after the trial ends. Deleted data cannot be recovered after that, except that encrypted backups are kept for a limited period, as described in the Privacy policy.
+5.3 Your trial workspace and everything in it are deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and deleted no later than 90 days after the trial ends. The trial's audit trail is deleted with it; if you want a copy, ask us for an export before then. Deleted data cannot be recovered after that, except that encrypted backups are kept for a limited period, as described in the Privacy policy. After deletion we keep only a minimal record that the trial existed: the organization's name, its trial dates and its answers about the organization, the accounts with their names and email addresses removed, and any feedback quote you agreed to have published, as the Privacy policy describes.
 
 5.4 If your organization goes on as a design partner or subscriber before the workspace is deleted, we will agree with you in writing whether the trial workspace and its data carry over.
 
@@ -60,7 +62,7 @@ Some features may be limited or unavailable during the trial. AI features are of
 
 6.2 We may use your feedback to improve the Service.
 
-6.3 We publish a quote from your feedback only if you chose to have it published, either with your name or anonymously, and only after we review it. You can withdraw that choice at any time and the quote will be removed.
+6.3 We publish a quote from your feedback only if you chose to have it published, and only after we review it: either with your job title and your company's name, or anonymously, credited only by your area of work (for example "Quality lead, medical-device company"). Your own name is never published with it. You can withdraw that choice at any time and the quote will be removed.
 
 ## 7. Contact
 

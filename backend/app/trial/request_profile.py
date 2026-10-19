@@ -59,6 +59,60 @@ TRIAL_DATA = {
     "ANONYMIZED_EXPORTS": "Our anonymized exports",
 }
 
+# Countries and regions under comprehensive sanctions, where MDARIX does not offer trials: Cuba, Iran, North Korea,
+# Syria, and the Crimea, so-called Donetsk People's Republic and Luhansk People's Republic regions of Ukraine. The
+# sign-up list leaves them out (frontend/src/features/auth/trialProfile.ts SANCTIONED_REGIONS); this refuses them when
+# typed or sent another way. Names are compared lower-cased, with punctuation and "the" / "republic of" ignored. Which
+# places belong here is a legal decision (docs/compliance/LEGAL_DRAFTS_FOR_REVIEW.md).
+SANCTIONED_COUNTRY_CODES = frozenset({"CU", "IR", "KP", "SY"})
+_SANCTIONED_NAMES = frozenset(
+    {
+        "cuba",
+        "iran",
+        "islamic iran",
+        "iran islamic",
+        "persia",
+        "north korea",
+        "korea north",
+        "korea democratic peoples",
+        "democratic peoples korea",
+        "dprk",
+        "syria",
+        "syrian arab",
+        "crimea",
+        "sevastopol",
+        "donetsk peoples",
+        "dpr",
+        "dnr",
+        "luhansk peoples",
+        "lugansk peoples",
+        "lpr",
+        "lnr",
+    }
+)
+_SANCTIONED_MARKERS = ("crimea", "sevastopol", "donetsk", "luhansk", "lugansk")
+COUNTRY_NOT_SERVED = (
+    "MDARIX cannot offer a free trial to organizations in this country or region. If you think this is a mistake, "
+    "write to support@mdarix.in."
+)
+
+
+def _country_key(value: str) -> str:
+    words = re.sub(r"[^a-z ]", " ", value.lower().replace("'", "").replace("\u2019", "")).split()
+    return " ".join(word for word in words if word not in {"the", "of", "republic", "so", "called"})
+
+
+def is_sanctioned_region(country: str | None) -> bool:
+    """Whether a sign-up's country names a place under comprehensive sanctions (see ``SANCTIONED_COUNTRY_CODES``)."""
+    text = (country or "").strip()
+    if not text:
+        return False
+    if text.upper() in SANCTIONED_COUNTRY_CODES:
+        return True
+    key = _country_key(text)
+    return key in _SANCTIONED_NAMES or any(marker in key.split() for marker in _SANCTIONED_MARKERS)
+
+
 # A phone number in international format: +, the country code and the number (E.164: at most 15 digits), with the
 # spaces, dashes, dots or brackets people type.
 _PHONE_CHARS = re.compile(r"^\+[1-9][0-9 ().-]*$")
@@ -95,6 +149,8 @@ def build_profile(data) -> dict:
     country = _text(data.country)
     if not country:
         raise ProfileError("COUNTRY_REQUIRED", "Enter your country")
+    if is_sanctioned_region(country):
+        raise ProfileError("COUNTRY_NOT_SERVED", COUNTRY_NOT_SERVED)
     if data.no_patient_data is not True:
         raise ProfileError(
             "NO_PATIENT_DATA_CONFIRMATION_REQUIRED",

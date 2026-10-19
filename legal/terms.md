@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial and no fees are charged. Once the company is registered, these terms will be updated with the company's details and we will tell you by email.
 
-Last updated: 16 October 2026
+Last updated: 19 October 2026
 
 These terms govern your organization's use of the MDARIX product investigation platform (the "Service"), which the founder of MDARIX, operating it ("MDARIX", "we", "us"), provides. "Customer" or "you" means the organization that signs up for the Service. "Users" are the people the customer allows to use it.
 
@@ -45,7 +45,7 @@ The Service is for professionals aged 18 or over, acting for their organization.
 
 4.2 Where your content contains personal data, we process it only on your instructions, as described in our [Privacy policy](/privacy), which also explains how we handle the personal data we control. Design partners receive a separate data processing agreement with their order form.
 
-4.3 At the end of your subscription or trial we return your data as a full export if you ask for it (for a paid subscription, unless you waive this in writing) and then delete it, as described in our Privacy policy. We keep the audit trail and electronic signatures unchanged while your account exists; they are included in the export.
+4.3 At the end of your subscription or trial we return your data as a full export if you ask for it (for a paid subscription, unless you waive this in writing) and then delete it, as described in our Privacy policy. We keep the audit trail and electronic signatures unchanged while your account exists; they are included in the export. For a free trial, the audit trail is deleted with the trial workspace, as the Free trial agreement describes, unless you ask for an export before then.
 
 4.4 We may use aggregated information about how the Service is used, which does not identify you or any person, to operate and improve it. We do not use your content to train AI models.
 
@@ -72,6 +72,8 @@ Each party will keep the other's non-public information confidential. It will us
 8.1 We own the Service and everything we provide as part of it, apart from your content. These terms give you a right to use the Service during your trial or subscription and nothing more.
 
 8.2 If you give us suggestions or feedback, we may use them to improve the Service without any obligation to you.
+
+8.3 Product names of other companies that appear in the Service or on our website, for example the names of quality and enterprise systems you can choose from, are trademarks of their owners. They are used only to describe those products. MDARIX is not affiliated with or endorsed by their owners.
 
 ## 9. Warranties and liability
 
