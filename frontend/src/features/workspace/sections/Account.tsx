@@ -8,6 +8,7 @@ import { signOut } from "../../shared/session";
 import { TRIAL_ONLY_SECTIONS, WORKSPACE_SECTIONS, sectionAllowed, useWorkspace } from "../workspaceContext";
 import { hideUuid, safeText } from "../../../app/displayId";
 import { roleLabel, rolesSummary } from "../../../app/roles";
+import { PUBLISHED_CONTACT, useSiteInfo } from "../../../site/legal";
 
 const TABS = ["Profile", "Security", "Access"] as const;
 type Tab = (typeof TABS)[number];
@@ -30,15 +31,22 @@ export function AccountSection({ tab }: { tab?: string }) {
   );
 }
 
-function Profile() {
-  const { session } = useWorkspace();
+/**
+ * Who you are in MDARIX. A free trial has no administrator, and its people never need the internal user or organization
+ * IDs: there the panel names neither and says whom to write to instead (UX-27). Exported for its test.
+ */
+export function Profile() {
+  const { session, isTrial } = useWorkspace();
+  const support = useSiteInfo()?.support_email || PUBLISHED_CONTACT.support;
   return (
     <Panel eyebrow="My account" title={session?.display_name ?? "Your profile"}>
       <dl className="ca-facts">
-        <div>
-          <dt>User ID</dt>
-          <dd>{hideUuid(session?.business_id)}</dd>
-        </div>
+        {!isTrial && (
+          <div>
+            <dt>User ID</dt>
+            <dd>{hideUuid(session?.business_id)}</dd>
+          </div>
+        )}
         <div>
           <dt>Email</dt>
           <dd>{session?.email ?? "—"}</dd>
@@ -51,7 +59,7 @@ function Profile() {
           <dt>Organization</dt>
           <dd>
             {session?.current_tenant?.tenant_name ?? "—"}
-            {safeText(session?.tenant_business_id) ? ` · ${session?.tenant_business_id}` : ""}
+            {!isTrial && safeText(session?.tenant_business_id) ? ` · ${session?.tenant_business_id}` : ""}
           </dd>
         </div>
         <div>
@@ -59,9 +67,16 @@ function Profile() {
           <dd>{titleCase(session?.environment ?? "—")}</dd>
         </div>
       </dl>
-      <p className="ac-muted">
-        Your name, email and role are managed by your organization's administrator. Ask them if anything is wrong.
-      </p>
+      {isTrial ? (
+        <p className="ac-muted">
+          This is a free trial workspace. To change your name or email, write to{" "}
+          <a href={`mailto:${support}`}>{support}</a>.
+        </p>
+      ) : (
+        <p className="ac-muted">
+          Your name, email and role are managed by your organization's administrator. Ask them if anything is wrong.
+        </p>
+      )}
     </Panel>
   );
 }

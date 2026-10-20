@@ -106,7 +106,8 @@ def trial_has_ended(db: Session, tenant_id, now: datetime | None = None) -> bool
 
 
 def trial_end_dates(db: Session, tenant_id) -> tuple[str | None, str | None]:
-    """When a Free Trial ended and when its data is deleted (long dates), for the trial-ended page."""
+    """When a Free Trial ended and when its data is deleted, with the time and its zone (``long_moment``), for the
+    trial-ended page."""
     from backend.app.trial.retention import RETENTION_DAYS
 
     free_trial = select(PlanDefinition.id).where(PlanDefinition.code == FREE_TRIAL_PLAN).scalar_subquery()
@@ -118,7 +119,7 @@ def trial_end_dates(db: Session, tenant_id) -> tuple[str | None, str | None]:
     if row is None or not isinstance(row.expires_at, datetime):
         return None, None
     ended = max(row.expires_at, row.grace_ends_at or row.expires_at)
-    return long_date(ended), long_date(ended + timedelta(days=RETENTION_DAYS))
+    return long_moment(ended), long_moment(ended + timedelta(days=RETENTION_DAYS))
 
 
 def _free_trial_plan(db: Session, now: datetime) -> PlanDefinition:
@@ -311,8 +312,17 @@ def request_queue(
 
 
 def long_date(value: datetime) -> str:
-    """An unambiguous date for people in any country, e.g. 3 November 2026 (UTC)."""
+    """A date whose day and month cannot be swapped, e.g. 3 November 2026, of the value as given (UTC from the
+    database). Where the day matters to the reader, ``long_moment`` adds the time and its zone."""
     return f"{value.day} {value:%B %Y}"
+
+
+def long_moment(value: datetime) -> str:
+    """When a trial ends, or its data is deleted at the earliest, for people in any country: e.g. "18 November 2026,
+    21:51 UTC". A trial ends 30 days after the minute it was approved, so a bare UTC date was a day off in the Americas,
+    and in India for an approval after 18:30 IST (FUN-15)."""
+    value = value.astimezone(timezone.utc)
+    return f"{long_date(value)}, {value:%H:%M} UTC"
 
 
 def has_sample_investigation(db: Session, tenant_id) -> bool:
@@ -333,7 +343,7 @@ def _send_invitation(
     a colleague's."""
     token = issue_invitation(db, user.id, user.tenant_id, admin_id, ttl=TRIAL_INVITATION_TTL_SECONDS)
     subscription = trial_subscription(db, user.tenant_id)
-    ends_on = long_date(subscription.expires_at) if subscription else f"{TRIAL_DAYS} days after activation"
+    ends_on = long_moment(subscription.expires_at) if subscription else f"{TRIAL_DAYS} days after activation"
     colleague = (
         {"invited_by": invited_by, "sample_data": has_sample_investigation(db, user.tenant_id)} if invited_by else {}
     )

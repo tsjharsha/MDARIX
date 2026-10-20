@@ -617,8 +617,17 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
     email = data.email.strip().lower()
     enforce("signup:ip", client_ip(request))
     enforce("signup:email", email)
-    if "@" not in email or email.startswith("@") or email.endswith("@") or " " in email:
+    from backend.app.trial.team import _EMAIL
+
+    # The colleague invitation's pattern: one "@" and a dot in the domain, so "name@company" or "x@@..." is refused
+    # instead of waiting for an email that can never arrive (FUN-12).
+    if not _EMAIL.match(email):
         raise HTTPException(422, detail={"code": "VALID_EMAIL_REQUIRED", "message": "Enter a valid work email"})
+    # HTML "required" accepts spaces, and the names are stored with their whitespace collapsed (FUN-12).
+    if not data.display_name.split():
+        raise HTTPException(422, detail={"code": "NAME_REQUIRED", "message": "Enter your full name"})
+    if not data.organization.split():
+        raise HTTPException(422, detail={"code": "ORGANIZATION_REQUIRED", "message": "Enter your company's name"})
     from backend.app.plain_names import looks_like_link
 
     # Both names go into the emails MDARIX sends to this address: never a link (SEC-04).

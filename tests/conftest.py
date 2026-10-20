@@ -26,6 +26,8 @@ os.environ.setdefault("MDARIX_REQUIRE_MFA_FOR_SIGNATURES", "false")
 os.environ.setdefault("MDARIX_RATE_LIMITS_ENABLED", "false")
 # Trial requests wait for review in tests unless a test switches automatic approval on (backend/app/trial/auto_approval.py).
 os.environ.setdefault("MDARIX_TRIAL_AUTO_APPROVE", "off")
+# Test company domains (acme-1a2b3c4d.com) do not exist: automatic approval skips its DNS lookup unless a test asks.
+os.environ.setdefault("MDARIX_TRIAL_DOMAIN_CHECK", "off")
 os.environ.setdefault("MDARIX_PASSWORD_SCRYPT_LOG2_N", "14")
 # Provider rest periods stay per process in tests (test_ai_controls.py exercises the shared table itself).
 os.environ.setdefault("MDARIX_GENAI_SHARED_REST", "false")
