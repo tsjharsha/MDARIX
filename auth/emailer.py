@@ -250,8 +250,8 @@ def send_trial_invitation(
 ) -> str:
     """The invitation to a free-trial workspace: what the trial includes and what happens when it ends. The person
     who requested the trial gets it as their own; a colleague the trial's owner invited (``invited_by``, the owner's
-    name) learns who invited them, what MDARIX is and that their phone is needed, and hears of the sample
-    investigation only while the trial still has it (``sample_data``)."""
+    name) learns who invited them and what MDARIX is, and hears of the sample investigation only while the trial
+    still has it (``sample_data``). Both are told to have their phone ready for two-factor sign-in."""
     url = f"{company().app_url}/activate-account?token={token}"
     if invited_by:
         return _send(
@@ -294,14 +294,18 @@ def send_trial_invitation(
                 ),
             ),
         )
+    # The subject says it is the trial, and the phone is mentioned before the first sign-in asks for it, as in the
+    # colleague's invitation (UX-13).
     return _send(
         recipient,
         Message(
-            subject="Activate your MDARIX account",
+            subject="Your MDARIX free trial is ready: activate your account",
             heading="Your MDARIX free trial is ready",
             paragraphs=(
                 f"Your private workspace for {organization} is set up with a ready-made sample investigation, so you "
                 "can see MDARIX at work before sharing any data.",
+                "Have your phone ready: when you first sign in, you add MDARIX to an authenticator app on your phone "
+                "(two-factor sign-in) and save your recovery codes.",
             ),
             details=(
                 ("Trial ends", ends_on),
@@ -310,6 +314,7 @@ def send_trial_invitation(
             ),
             items=(
                 "Activate your account and choose a password.",
+                "Set up the authenticator app on your phone.",
                 "Open the guided investigation in Getting started.",
                 "Try your own data with the CSV templates (no patient-identifiable data, please).",
             ),

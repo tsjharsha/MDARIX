@@ -95,7 +95,8 @@ not list.
 | `MDARIX_SMTP_FROM` | yes | Sender, e.g. `MDARIX <no-reply@example.com>`. |
 | `MDARIX_SMTP_VERIFIED_DOMAIN` | no | Refuse a sender outside this domain. |
 | `MDARIX_TRIAL_AUTO_APPROVE` | no | `company-domains` (default): a free-trial request from a company email is approved right after sign-up (`backend/app/trial/auto_approval.py`); free-mail and disposable addresses, a second request from the same company and anything over the day's cap wait for a Platform Administrator. `off`: every request waits for review. |
-| `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX` | no | How many trials are approved automatically per UTC day (default 20); the rest wait for review. |
+| `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX` | no | How many company-email trial requests per UTC day can be approved automatically (default 20). Every such request counts, approved or not; the rest wait for review. |
+| `MDARIX_TRIAL_DOMAIN_CHECK` | no | `dns` (default): automatic approval needs the email's domain to resolve (an A or AAAA record, 2-second lookup); otherwise the request waits for review. `off` skips the lookup on a development or test machine only (`MDARIX_ENV=development` or `test`); staging and production always look it up. |
 | `MDARIX_TRIAL_ALERT_EMAIL`, `MDARIX_DEMO_ALERT_EMAIL` | no | Who hears about new trial and demo requests, MVP conversation requests from trials (Next steps; the demo address first), and customer feedback (feedback falls back to `MDARIX_SUPPORT_EMAIL`). |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO`, `RESEND_VERIFIED_DOMAIN`, `RESEND_WEBHOOK_SECRET` | no | Inbound evidence email through Resend (optional feature). |
 

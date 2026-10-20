@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
-import { formatDay } from "../../../app/dates";
+import { formatDay, localDay } from "../../../app/dates";
 import { sectionAllowed, useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
 import { MVP_RECORDS_TABS, recordsAuditView, type MvpRecordsTab } from "../../../app/featureSet";
 import { ReportsPanel } from "../../reports/ReportsPanel";
@@ -315,7 +315,8 @@ export function CheckBody({ detail, onChanged }: { detail: CapaDetail; onChanged
   const state = stateOf(detail.state);
   const planIssue = planProblem(plan, detail);
   const signIssue = signProblem(sign);
-  const early = detail.check?.status === "PLANNED" && detail.check.planned_on > new Date().toISOString().slice(0, 10);
+  // Today where the person is, not the UTC date (DEV-020).
+  const early = detail.check?.status === "PLANNED" && detail.check.planned_on > localDay();
   /** Send a change; true when it was saved. */
   const run = async (action: () => Promise<unknown>, done: string, fallback: string): Promise<boolean> => {
     setBusy(true);

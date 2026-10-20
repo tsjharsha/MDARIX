@@ -3,9 +3,15 @@
 A request from a company domain is approved right after sign-up, so the requester has the activation email within a
 minute instead of the next business day. Everything else waits for a Platform Administrator as before: a free-mail or
 disposable address, a company that already has a trial or a request (the second colleague is invited by the first),
-and every request beyond the day's cap. ``MDARIX_TRIAL_AUTO_APPROVE`` (``company-domains``, the default, or ``off``)
-switches it; ``MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX`` caps it per UTC day (20 by default). A Platform Administrator can
-still end any trial (Customers & Tenants > Trials).
+a domain that does not exist in DNS, and every request beyond the day's cap. ``MDARIX_TRIAL_AUTO_APPROVE``
+(``company-domains``, the default, or ``off``) switches it; ``MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX`` caps it per UTC
+day (20 by default). A Platform Administrator can still end any trial (Customers & Tenants > Trials).
+
+Made-up company domains could use up the day's automatic approvals with junk workspaces whose invitations bounce
+(pre-launch review SEC-07). So the domain must resolve (an A or AAAA record, looked up with a short timeout; a domain
+with mail but no address record waits for review), and the cap counts the day's company-email requests, not the
+approvals: a burst of sign-ups beyond it is seen by a person. ``MDARIX_TRIAL_DOMAIN_CHECK=off`` skips the lookup on a
+development or test machine only; staging and production always look the domain up.
 
 The approval is the usual one (``service.approve_request``), made by the platform's "automatic approval" account, an
 account that cannot sign in; it runs after sign-up's response in its own session, and a failure leaves the request
@@ -19,8 +25,11 @@ from __future__ import annotations
 import logging
 import os
 import secrets
+import socket
+import threading
 import uuid
 from datetime import datetime, time, timezone
+from time import monotonic
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -30,6 +39,11 @@ logger = logging.getLogger("mdarix.trial.auto_approval")
 APPROVER_USERNAME = "automatic-approval@mdarix.invalid"
 APPROVER_NAME = "Automatic approval (company email)"
 DEFAULT_DAILY_MAX = 20
+# Sign-up waits for the lookup (it says "approving" or "we review" at once), so it is short; a slower answer is "no".
+DNS_TIMEOUT_SECONDS = 2.0
+# A domain found in DNS is not looked up again for an hour: sign-up and the approval after it ask the same question.
+DNS_CACHE_SECONDS = 3600
+_resolved: dict[str, float] = {}
 
 # Addresses anyone can create: their requests are reviewed by a person.
 FREE_MAIL_DOMAINS = frozenset(
@@ -109,6 +123,39 @@ def domain_of(email: str) -> str:
 RESERVED_SUFFIXES = (".invalid", ".test", ".example", ".localhost", ".local")
 
 
+def domain_check() -> str:
+    """``dns`` (look the domain up), or ``off`` on a development or test machine whose
+    ``MDARIX_TRIAL_DOMAIN_CHECK`` says so; staging and production always look it up."""
+    from backend.app.runtime_env import is_local
+
+    value = (os.getenv("MDARIX_TRIAL_DOMAIN_CHECK") or "dns").strip().lower()
+    return "off" if value in ("off", "false", "0", "no") and is_local() else "dns"
+
+
+def _lookup(domain: str, found: list) -> None:
+    try:
+        found.append(bool(socket.getaddrinfo(domain, None)))
+    except (OSError, UnicodeError):  # socket.gaierror: no such domain, or DNS could not be asked
+        found.append(False)
+
+
+def domain_resolves(domain: str) -> bool:
+    """Whether the domain exists in DNS (an A or AAAA record, through the system resolver). No answer within
+    ``DNS_TIMEOUT_SECONDS``, or DNS that cannot be reached, counts as no: the request waits for review."""
+    checked = _resolved.get(domain)
+    if checked is not None and monotonic() - checked < DNS_CACHE_SECONDS:
+        return True
+    found: list = []
+    # getaddrinfo has no timeout of its own; a lookup still running after the timeout ends on its own, unread.
+    worker = threading.Thread(target=_lookup, args=(domain, found), daemon=True)
+    worker.start()
+    worker.join(DNS_TIMEOUT_SECONDS)
+    if found and found[0]:
+        _resolved[domain] = monotonic()
+        return True
+    return False
+
+
 def is_company_domain(domain: str) -> bool:
     """A domain that names an organization: not free mail or disposable, not reserved, with a dot and no IP-like
     form."""
@@ -119,7 +166,6 @@ def is_company_domain(domain: str) -> bool:
 
 def eligible(db: Session, request_id: uuid.UUID, now: datetime | None = None) -> tuple[bool, str]:
     """Whether this request is approved at once, and why not (for the log and the test)."""
-    from backend.app.db.models.foundation import AuditEvent
     from backend.app.db.models.stage2 import OnboardingRequest
 
     if mode() == "off":
@@ -137,23 +183,24 @@ def eligible(db: Session, request_id: uuid.UUID, now: datetime | None = None) ->
     )
     if same_company is not None:
         return False, "COMPANY_ALREADY_HAS_A_REQUEST"
-    now = now or datetime.now(timezone.utc)
-    start = datetime.combine(now.date(), time.min, tzinfo=timezone.utc)
-    approver = _approver(db, create=False)
-    today = 0
-    if approver is not None:
-        today = (
-            db.query(func.count(AuditEvent.id))
-            .filter(
-                AuditEvent.actor_ref == str(approver.id),
-                AuditEvent.action == "TRIAL_REQUEST_APPROVED",
-                AuditEvent.created_at >= start,
-            )
-            .scalar()
-            or 0
+    sent = row.created_at or now or datetime.now(timezone.utc)
+    start = datetime.combine(sent.astimezone(timezone.utc).date(), time.min, tzinfo=timezone.utc)
+    # The earlier requests from company emails on the request's UTC day, approved or not: counting only approvals let
+    # made-up domains use up the cap unseen (SEC-07). Earlier ones only, so sign-up and the approval after it give the
+    # same answer.
+    earlier = (
+        db.query(OnboardingRequest.email)
+        .filter(
+            OnboardingRequest.id != row.id,
+            OnboardingRequest.created_at >= start,
+            OnboardingRequest.created_at < row.created_at,
         )
-    if today >= daily_max():
+        .all()
+    )
+    if sum(1 for (email,) in earlier if is_company_domain(domain_of(email))) >= daily_max():
         return False, "DAILY_CAP"
+    if domain_check() == "dns" and not domain_resolves(domain):
+        return False, "DOMAIN_NOT_FOUND"
     return True, "COMPANY_DOMAIN"
 
 

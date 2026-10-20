@@ -67,8 +67,11 @@ def test_the_requester_and_an_invited_colleague_each_get_their_own_trial_invitat
         "lee@acme.example", "tok3", "Acme Devices", invited_by="Priya Raman", sample_data=False, **kwargs
     )
     own, colleague, after_removal = outbox
-    assert own["subject"] == "Activate your MDARIX account"
+    # The requester's subject names the trial and their phone is mentioned too (UX-13).
+    assert own["subject"] == "Your MDARIX free trial is ready: activate your account"
     assert "Your MDARIX free trial is ready" in own["text"]
+    for body in (own["text"], own["html"]):
+        assert "Have your phone ready" in body and "authenticator app" in body
     assert "because you requested a free MDARIX trial" in own["text"]
     assert colleague["subject"] == "Priya Raman invited you to the MDARIX free trial"
     for body in (colleague["text"], colleague["html"]):

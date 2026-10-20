@@ -22,12 +22,18 @@ import {
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
 import { useSiteInfo } from "../../site/legal";
 
-/** Answers whose problems are fixed on the first step: a refusal for one of them takes the person back there. */
-const STEP_ONE_CODES = new Set([
+/** Answers whose problems are fixed on the first step: a refusal for one of them takes the person back there. Exported
+ * for its test. */
+export const STEP_ONE_CODES = new Set([
   "JOB_TITLE_REQUIRED",
   "COUNTRY_REQUIRED",
   "COUNTRY_NOT_SERVED",
   "VALID_EMAIL_REQUIRED",
+  // A name or company that is blank once spaces are removed, or carries a link (FUN-12, SEC-04).
+  "NAME_REQUIRED",
+  "ORGANIZATION_REQUIRED",
+  "NAME_HAS_LINK",
+  "ORGANIZATION_HAS_LINK",
   "VALID_PHONE_REQUIRED",
   "EMAIL_ALREADY_REGISTERED",
   "TRIAL_ALREADY_REQUESTED",
@@ -36,6 +42,8 @@ const STEP_ONE_CODES = new Set([
 const MESSAGES: Record<string, string> = {
   RATE_LIMITED: "Too many attempts. Please wait a few minutes and try again.",
   VALID_EMAIL_REQUIRED: "Enter a valid work email.",
+  NAME_REQUIRED: "Enter your full name.",
+  ORGANIZATION_REQUIRED: "Enter your company's name.",
 };
 
 const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
