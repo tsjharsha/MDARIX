@@ -111,13 +111,15 @@ export function readyVideos(document: unknown): Map<number, ReadyVideo> {
   return ready;
 }
 
-export function VideoCards({ ready }: { ready: Map<number, ReadyVideo> }) {
+/** The cards. ``ready`` is null until videos.json has answered: then no card says "Coming soon" yet, so the page
+ * pre-rendered for crawlers (WEB-05) and the first paint never call a ready video unfinished. */
+export function VideoCards({ ready }: { ready: Map<number, ReadyVideo> | null }) {
   return (
     <ol className="ms-videos" aria-label="The free-trial videos">
       {TRIAL_VIDEOS.map((video) => {
-        const item = ready.get(video.number);
+        const item = ready?.get(video.number);
         return (
-          <li key={video.number} className={`ms-card ms-video${item ? "" : " is-soon"}`}>
+          <li key={video.number} className={`ms-card ms-video${ready && !item ? " is-soon" : ""}`}>
             {item ? (
               <video
                 controls
@@ -137,15 +139,13 @@ export function VideoCards({ ready }: { ready: Map<number, ReadyVideo> }) {
             </span>
             <strong>{video.title}</strong>
             <p>{video.summary}</p>
-            {item ? (
-              item.minutes && (
-                <span className="ms-badge ms-badge-current">
-                  <Clock size={13} aria-hidden="true" /> {Math.round(item.minutes)} min
-                </span>
-              )
-            ) : (
-              <span className="ms-badge ms-badge-future">Coming soon</span>
-            )}
+            {item
+              ? item.minutes && (
+                  <span className="ms-badge ms-badge-current">
+                    <Clock size={13} aria-hidden="true" /> {Math.round(item.minutes)} min
+                  </span>
+                )
+              : ready && <span className="ms-badge ms-badge-future">Coming soon</span>}
           </li>
         );
       })}
@@ -154,13 +154,14 @@ export function VideoCards({ ready }: { ready: Map<number, ReadyVideo> }) {
 }
 
 export function VideosPage() {
-  const [ready, setReady] = useState<Map<number, ReadyVideo>>(() => new Map());
+  // null until videos.json answers (VideoCards); an answer that fails lists every video as coming soon, as before.
+  const [ready, setReady] = useState<Map<number, ReadyVideo> | null>(null);
   useEffect(() => {
     let live = true;
     fetch(VIDEO_BASE + "videos.json", { cache: "no-cache" })
       .then((response) => (response.ok ? response.json() : null))
       .then((document) => live && setReady(readyVideos(document)))
-      .catch(() => undefined);
+      .catch(() => live && setReady(new Map()));
     return () => {
       live = false;
     };

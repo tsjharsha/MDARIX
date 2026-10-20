@@ -13,6 +13,7 @@ import {
 import { displayCode } from "../customers/model";
 import { StatusBadge } from "../customers/StatusBadge";
 import { Banner, Intro, TenantCell, type BannerMessage } from "./common";
+import { ProblemReports } from "./ProblemReports";
 
 type Ops = {
   database: string;
@@ -65,6 +66,7 @@ type Ops = {
 export function Operations({ section }: { section: string }) {
   if (section === "Queues & jobs") return <Queues />;
   if (section === "Email & notifications") return <Email />;
+  if (section === "Problem reports") return <ProblemReports />;
   if (section === "Developer API") return <DeveloperApi />;
   if (section === "Tenant cells") return <Cells />;
   return <Health />;

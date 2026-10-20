@@ -1,0 +1,29 @@
+/* The website without JavaScript (index.html links this sheet inside <noscript> only). Nothing then marks the
+   animated parts "is-visible" (site/motion.tsx Reveal, site/scenes/kit.tsx, the roadmap), so they would stay at their
+   hidden start. Here they are shown complete, as with reduced motion, so the pre-rendered pages read in full (WEB-05). */
+.ms-reveal {
+  opacity: 1 !important;
+  transform: none !important;
+}
+.ms-roadmap-stop,
+.ms-roadmap-list li,
+.ms-roadmap-promise,
+.ms-roadmap-ribbon {
+  opacity: 1 !important;
+}
+.ms-roadmap-rail-done,
+.ms-roadmap-rail-next {
+  transform: none !important;
+}
+.sc .sc-rise,
+.sc .sc-pop,
+.sc .sc-fade {
+  opacity: 1 !important;
+}
+.sc .sc-draw {
+  stroke-dashoffset: 0 !important;
+}
+.sc .sc-grow-x,
+.sc .sc-grow-y {
+  transform: none !important;
+}

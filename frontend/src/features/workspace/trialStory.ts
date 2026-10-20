@@ -62,10 +62,11 @@ export function chapterTone(chapter: StoryChapter): Tone {
   return chapter.finding.state === "NOT_SET" ? "neutral" : checkStateOf(chapter.finding.state).tone;
 }
 
-/** A chapter not tried yet is simply still to do: said neutrally, never as a failure. */
+/** A chapter not tried yet is simply still to do: said neutrally, never as a failure. A tried chapter says "Tried",
+ * as the progress ring counts it: "Done N times" counted the records it made, so one import of 6 rows read "Done 6
+ * times" and a chapter whose sample was removed read "Done 0 times" (UX-28). */
 export function chapterStatus(chapter: StoryChapter): string {
-  if (chapter.acted.done) return chapter.acted.count === 1 ? "Done once" : `Done ${chapter.acted.count} times`;
-  return "To do";
+  return chapter.acted.done ? "Tried" : "To do";
 }
 
 /** The chapters as stations on the loop picture. */

@@ -176,12 +176,17 @@
   grid-template-columns: 236px minmax(0, 1fr);
   min-height: calc(100vh - 64px);
 }
+/* The panel reaches the bottom of the window on every page, however few its items, at 80%, 90% and 100% page
+   scale (100vh follows the page scale, postcss.config.js): it stopped after its last item before (UX-14). */
 .ac-nav {
   position: sticky;
   top: 64px;
   align-self: start;
+  align-content: start;
   display: grid;
   gap: 2px;
+  box-sizing: border-box;
+  height: calc(100vh - 64px);
   max-height: calc(100vh - 64px);
   overflow: auto;
   padding: 16px 10px;
@@ -1180,6 +1185,7 @@ th.num .table-sort {
     left: 0;
     z-index: 30;
     width: min(290px, 85vw);
+    height: auto;
     max-height: none;
     box-shadow: 0 12px 30px rgb(16 32 47 / 25%);
     transform: translateX(-105%);

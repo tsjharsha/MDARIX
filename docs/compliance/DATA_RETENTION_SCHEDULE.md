@@ -37,7 +37,7 @@ handed back or a waiver recorded, and never while a legal hold is set.
 |---|---|---|
 | Support problem reports | No automatic deletion yet | Organization purge (they belong to the organization) |
 | Website demo requests (the form is parked; requests made before it was) | No automatic deletion yet (open item) | Deleted with the trial when booked from inside one |
-| Browser error reports | No automatic deletion yet; reports sent before sign-in carry no organization and are not removed by a purge | Not yet defined (open item) |
+| Browser error reports | Filed under an organization: until the organization purge. Sent before sign-in (no organization, so no purge reaches them): **90 days** after they arrive (`ANONYMOUS_RETENTION_DAYS`, since 0.10.37) | Organization purge; reports sent before sign-in: scheduler job `trial-retention`, daily (`backend/app/client_errors.py` `delete_anonymous_reports`) |
 | Application and web server request logs (client IP, browser, path without query string, time) | Until Docker's size-based rotation overwrites them (`docker-compose.prod.yml`: 10 files of 20 MB per service), so no fixed period; also inside the daily disk snapshot for its 14 days | Log rotation |
 
 ## Backups

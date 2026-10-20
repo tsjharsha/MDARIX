@@ -224,7 +224,18 @@ export function LegalDocumentView({
     <article className="ms-section ms-legal" aria-labelledby="legal-title">
       <span className="ms-eyebrow">Legal</span>
       <h1 id="legal-title">{title}</h1>
-      {state.status === "LOADING" && <p className="ms-legal-note">Loading…</p>}
+      {state.status === "LOADING" && (
+        <>
+          <p className="ms-legal-note">Loading the current text…</p>
+          {/* The text is served live (MDARIX_LEGAL_DIR) and so is not part of the pre-rendered page (WEB-05). */}
+          <noscript>
+            <p className="ms-legal-note">
+              This page loads the current text of the {title.toLowerCase()} with JavaScript. Without it, write to{" "}
+              <EmailLink address={writeTo} /> and we will send you the text.
+            </p>
+          </noscript>
+        </>
+      )}
       {state.status === "ERROR" && (
         <div className="ms-legal-notice ms-legal-error" role="alert">
           <strong>The {title.toLowerCase()} could not be loaded</strong>

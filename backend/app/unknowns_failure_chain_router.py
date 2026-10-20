@@ -7,6 +7,7 @@ from backend.app.db.models.foundation import Investigation
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.saved_results import nothing_saved
 from backend.app.fault_injection import dependency_failure_simulated
 from failure_chain.service import UnknownsFailureChainError, UnknownsFailureChainService
 from investigator.business_ids import with_failure_chain_business_ids, with_unknown_business_ids
@@ -73,7 +74,8 @@ def latest_unknowns(
 ):
     item = service.latest(db, uuid.UUID(ctx.tenant_id), investigation_id, U_PROVIDER, U_VERSION, UnknownSet)
     if not item:
-        raise HTTPException(404, detail={"code": "UNKNOWN_SET_NOT_FOUND", "message": "No unknown set exists"})
+        # 404, or 200 with nothing saved for the case workspace (?missing=empty; backend/app/saved_results.py, UX-15).
+        return nothing_saved(request, "unknown_set", "UNKNOWN_SET_NOT_FOUND", "No unknown set exists")
     result, row = item
     return with_unknown_business_ids(
         db, uuid.UUID(ctx.tenant_id), UnknownResponse(unknown_set=result, persisted=True, ai_execution_id=row)
@@ -153,9 +155,7 @@ def latest_chains(
 ):
     item = service.latest(db, uuid.UUID(ctx.tenant_id), investigation_id, F_PROVIDER, F_VERSION, FailureChainSet)
     if not item:
-        raise HTTPException(
-            404, detail={"code": "FAILURE_CHAIN_SET_NOT_FOUND", "message": "No failure-chain set exists"}
-        )
+        return nothing_saved(request, "failure_chain_set", "FAILURE_CHAIN_SET_NOT_FOUND", "No failure-chain set exists")
     result, row = item
     return with_failure_chain_business_ids(
         db,

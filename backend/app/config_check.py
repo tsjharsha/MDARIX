@@ -320,11 +320,31 @@ def _alerting_problems() -> list[str]:
     found = []
     if not _get("MDARIX_ALERT_WEBHOOK") and not _get("MDARIX_ALERT_EMAIL"):
         found.append("Set MDARIX_ALERT_WEBHOOK and/or MDARIX_ALERT_EMAIL: operational alerts need a destination")
-    if not _get("MDARIX_TRIAL_ALERT_EMAIL") and not _get("MDARIX_DEMO_ALERT_EMAIL"):
+    # Free trials exist on a MULTI deployment only. There, the alerts for a request waiting for review and for a trial
+    # that asks to end early read MDARIX_TRIAL_ALERT_EMAIL alone (auth_router.py, trial/router.py), and the demo and MVP
+    # alerts fall back to it, so it must be set: MDARIX_DEMO_ALERT_EMAIL alone left the first two unheard (FUN-09).
+    if _deployment_role_is_multi():
+        if not _get("MDARIX_TRIAL_ALERT_EMAIL"):
+            found.append(
+                "Set MDARIX_TRIAL_ALERT_EMAIL: nobody would hear about trial requests waiting for review or trials that "
+                "ask to end early (MDARIX_DEMO_ALERT_EMAIL covers demo and MVP requests only)"
+            )
+    elif not _get("MDARIX_TRIAL_ALERT_EMAIL") and not _get("MDARIX_DEMO_ALERT_EMAIL"):
         found.append(
             "Set MDARIX_TRIAL_ALERT_EMAIL and/or MDARIX_DEMO_ALERT_EMAIL: nobody would hear about trial and demo requests"
         )
     return found
+
+
+def _deployment_role_is_multi() -> bool:
+    """True for a MULTI deployment (the default), the one that offers free trials. An unknown role counts as MULTI
+    here; _deployment_role_problems reports it."""
+    from backend.app import deployment_role as roles
+
+    try:
+        return roles.deployment_role() == roles.MULTI
+    except RuntimeError:
+        return True
 
 
 def _https_url_problem(name: str, purpose: str) -> str | None:

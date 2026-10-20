@@ -61,6 +61,7 @@ import { TrustSection } from "./sections/Trust";
 import { AccountSection } from "./sections/Account";
 import { GettingStartedSection, type TrialStatus } from "./sections/GettingStarted";
 import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
+import { ColleagueWelcome } from "./sections/ColleagueWelcome";
 import { ImportDataSection } from "./sections/ImportData";
 import { TrialNextStepsSection } from "./sections/TrialNextSteps";
 import { NEXT_STEPS_SUBTITLE, NEXT_STEPS_SUMMARY } from "../help/trialNextSteps";
@@ -532,6 +533,8 @@ export function UserWorkspace({
                   </div>
                 </div>
                 {NAV[section].context && <ContextBar />}
+                {/* A colleague the owner invited is greeted by name on their first screens (UX-26). */}
+                {trial?.is_trial && <ColleagueWelcome me={trial.me} />}
                 {trial?.is_trial && section !== "Share feedback" && (
                   <FeedbackPrompt onOpen={() => open("Share feedback")} />
                 )}

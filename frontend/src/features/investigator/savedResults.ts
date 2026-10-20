@@ -54,25 +54,34 @@ export function counterfactualFrom(payload: unknown): SavedCounterfactual | null
 
 export const hasSavedResults = (saved: SavedResults) => Object.values(saved).some(Boolean);
 
+// A step never run answers 200 with its field null instead of 404, so opening a new case logs no errors in the
+// browser console (backend/app/saved_results.py; UX-15).
+const NOTHING_SAVED_IS_EMPTY = "?missing=empty";
+
 /**
  * Read the latest saved result of every AI step in parallel. Reading never runs AI again. A step with nothing
- * saved (404), one the role may not read, or one that fails to load simply comes back empty.
+ * saved, one the role may not read, or one that fails to load simply comes back empty. ``counterfactuals: false``
+ * (the MVP feature set, where the counterfactual is parked) leaves that read out instead of asking for a route the
+ * server does not offer.
  */
 export async function loadSavedResults(
   investigationId: string,
   get: (path: string) => Promise<unknown>,
+  { counterfactuals = true }: { counterfactuals?: boolean } = {},
 ): Promise<SavedResults> {
   const base = `/api/v1/investigations/${investigationId}`;
   const read = <T>(path: string, map: (payload: unknown) => T | null): Promise<T | null> =>
     get(`${base}/${path}`).then(map, () => null);
+  const latest = <T>(path: string, map: (payload: unknown) => T | null) =>
+    read(`${path}${NOTHING_SAVED_IS_EMPTY}`, map);
   const [analysis, hypothesisSet, challengeSet, unknownSet, failureChains, brief, counterfactual] = await Promise.all([
-    read("analysis/latest", analysisFrom),
-    read("hypotheses", hypothesisSetFrom),
-    read("challenges", challengeSetFrom),
-    read("unknowns", unknownSetFrom),
-    read("failure-chains", failureChainsFrom),
-    read("briefs/latest", briefFrom),
-    read("counterfactuals", counterfactualFrom),
+    latest("analysis/latest", analysisFrom),
+    latest("hypotheses", hypothesisSetFrom),
+    latest("challenges", challengeSetFrom),
+    latest("unknowns", unknownSetFrom),
+    latest("failure-chains", failureChainsFrom),
+    latest("briefs/latest", briefFrom),
+    counterfactuals ? read("counterfactuals", counterfactualFrom) : Promise.resolve(null),
   ]);
   return { analysis, hypothesisSet, challengeSet, unknownSet, failureChains, brief, counterfactual };
 }

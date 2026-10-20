@@ -155,7 +155,7 @@ describe("feature set", () => {
     expect(plans?.[3]).toEqual(["Plans", "Subscriptions"]);
     expect(plans?.[1]).toBe("Plans and subscriptions");
     const operations = mvp.find((area) => area[0] === "Operations");
-    expect(operations?.[3]).toEqual(["System health", "Queues & jobs", "Email & notifications"]);
+    expect(operations?.[3]).toEqual(["System health", "Queues & jobs", "Email & notifications", "Problem reports"]);
   });
 
   it("offers the six data types the MVP reads first, in loading order, and the rest on request", () => {
