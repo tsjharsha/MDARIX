@@ -290,7 +290,8 @@ export function InvestigationWorkspacePanel({
       });
     // Show the latest saved AI results instead of making people pay for the same runs again. A result produced by
     // an action started meanwhile is newer, so it is kept (each setter only fills what is still empty).
-    loadSavedResults(investigationId, api).then((saved) => {
+    // Under mvp the counterfactual is parked: its saved results are not asked for (UX-15).
+    loadSavedResults(investigationId, api, { counterfactuals: !mvp }).then((saved) => {
       if (!current()) return;
       setAnalysis((shown) => shown ?? saved.analysis);
       setHypothesisSet((shown) => shown ?? saved.hypothesisSet);

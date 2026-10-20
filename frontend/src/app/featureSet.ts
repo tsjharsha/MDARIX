@@ -82,7 +82,7 @@ export const PARKED_ADMIN_SECTIONS: Readonly<Record<string, readonly string[]>> 
 /** The one-line purpose of an area whose parked sections it no longer names. */
 const MVP_ADMIN_PURPOSE: Readonly<Record<string, string>> = {
   "Plans & Licensing": "Plans and subscriptions",
-  Operations: "Health, queues and email",
+  Operations: "Health, queues, email and problem reports",
 };
 export const PARKED_ADMIN_FALLBACK: Readonly<Record<string, string>> = {
   Renewals: "Subscriptions",

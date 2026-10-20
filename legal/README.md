@@ -38,7 +38,7 @@ in the footer, on `/contact` and in every email.
   size-based log rotation (`docker-compose.prod.yml`, 10 x 20 MB per service), so no fixed period.
 - Browser error reports (`client_error_reports`) and help-menu problem reports (`support_problem_reports`, also
   emailed to the support mailbox): deleted with the organization's data; error reports sent before sign-in have no
-  organization and no automatic deletion yet.
+  organization and are deleted 90 days after they arrive (scheduler job `trial-retention`, since 0.10.37).
 - Trial feedback: the questionnaire answers, linked to the user and organization. Nothing is shown publicly unless
   the person chose "named" publication (credited with their job title and company name, never their own name) or
   "anonymous" (credited by their area of work only) and a platform administrator published it; withdrawing consent

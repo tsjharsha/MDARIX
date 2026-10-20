@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
@@ -8,6 +8,7 @@ from backend.app.request_context import AuthenticatedRequestContext, get_request
 from briefs.schemas import BriefCreateRequest, BriefListResponse, BriefResponse
 from briefs.service import BriefError, BriefService
 from backend.app.access.permissions import AI_RUN, require_permission
+from backend.app.saved_results import nothing_saved
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Brief"])
 service = BriefService()
@@ -50,12 +51,16 @@ def list_briefs(
 @router.get("/{investigation_id}/briefs/latest", response_model=BriefResponse)
 def latest_brief(
     investigation_id: uuid.UUID,
+    request: Request,
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     try:
         return service.get(db, uuid.UUID(ctx.tenant_id), investigation_id, latest=True)
     except BriefError as exc:
+        # A case without a brief yet: 404, or 200 with nothing saved for the case workspace (?missing=empty; UX-15).
+        if exc.code == "BRIEF_NOT_FOUND":
+            return nothing_saved(request, "brief", exc.code, exc.message)
         raise err(exc) from exc
 
 

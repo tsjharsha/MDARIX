@@ -8,6 +8,7 @@ from backend.app.db.data_plane import get_data_plane_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.fault_injection import dependency_failure_simulated
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.saved_results import nothing_saved
 from challenger.schemas import ChallengeRequest, ChallengeResponse
 from challenger.service import ChallengerError, ChallengerService
 from investigator.business_ids import with_evidence_business_ids
@@ -108,7 +109,6 @@ def latest_challenges(
 ):
     result = service.latest(db, uuid.UUID(ctx.tenant_id), investigation_id)
     if result is None:
-        raise HTTPException(
-            status_code=404, detail={"code": "CHALLENGE_SET_NOT_FOUND", "message": "No challenge set exists"}
-        )
+        # 404, or 200 with nothing saved for the case workspace (?missing=empty; backend/app/saved_results.py, UX-15).
+        return nothing_saved(request, "challenge_set", "CHALLENGE_SET_NOT_FOUND", "No challenge set exists")
     return with_evidence_business_ids(db, result)

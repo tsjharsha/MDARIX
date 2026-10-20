@@ -5,17 +5,22 @@ only trace the operator gets. It is therefore defensive: rate limited per addres
 cut to its column, and nothing that goes wrong while storing the report reaches the browser (the answer is 202 either
 way; a failure is logged with the request id). When the request carries a valid session cookie the report is filed
 under that organization and user, otherwise it is anonymous (``tenant_id`` empty), which the row-level policy allows.
+
+A report filed under an organization is deleted with the organization's data. An anonymous one belongs to no
+organization, so no purge reaches it: ``delete_anonymous_reports`` deletes it ``ANONYMOUS_RETENTION_DAYS`` (90) after
+it was received, run by the daily ``trial-retention`` job (privacy policy, "How long we keep it"; NEW-3, 0.10.37).
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError
+from sqlalchemy.orm import Session
 
 from auth.cookies import read_session_token
 from auth.durable import hash_token
@@ -24,7 +29,7 @@ from backend.app.client_ip import client_ip
 from backend.app.db.models.pilot_support import ClientErrorReport
 from backend.app.db.models.stage2 import AuthSession
 from backend.app.db.session import SessionLocal
-from backend.app.db.tenant_scope import bind_tenant
+from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.logging_setup import accept_request_id, current_request_id
 from backend.app.rate_limit import enforce
 
@@ -36,6 +41,8 @@ MAX_BODY_BYTES = 64 * 1024
 MAX_STACK_CHARS = 20_000
 # The column holds 64 characters; a longer id is not ours and is dropped rather than cut (a cut id matches nothing).
 MAX_REQUEST_ID_CHARS = 64
+# Days an error report sent before sign-in (no organization) is kept; the privacy policy states the same period.
+ANONYMOUS_RETENTION_DAYS = 90
 
 
 class ClientErrorIn(BaseModel):
@@ -151,3 +158,25 @@ async def report_client_error(request: Request):
     except Exception:  # the browser is already in an error state; never add a failed report on top
         logger.exception("client error report could not be stored request_id=%s", current_request_id(request))
     return _accepted()
+
+
+def delete_anonymous_reports(db: Session, now: datetime | None = None) -> int:
+    """Delete the error reports that belong to no organization (sent before sign-in, or on the public website) and
+    were received ``ANONYMOUS_RETENTION_DAYS`` ago or more. Commits; returns how many were deleted. A report filed
+    under an organization is left to that organization's purge."""
+    now = now or datetime.now(timezone.utc)
+    bind_system(db, "retention: delete error reports sent before sign-in")
+    deleted = (
+        db.query(ClientErrorReport)
+        .filter(
+            ClientErrorReport.tenant_id.is_(None),
+            ClientErrorReport.created_at <= now - timedelta(days=ANONYMOUS_RETENTION_DAYS),
+        )
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    if deleted:
+        logger.info(
+            "deleted %d error report(s) sent before sign-in, older than %d days", deleted, ANONYMOUS_RETENTION_DAYS
+        )
+    return int(deleted or 0)

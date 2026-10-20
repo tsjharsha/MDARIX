@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
@@ -222,6 +222,7 @@ export function PublicMegaSite({ path }: { path: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [{ page, hash }, setLocation] = useState(() => resolveSitePath(path, window.location.hash.slice(1)));
   const siteInfo = useSiteInfo();
+  const firstPage = useRef(true);
 
   // Normalize legacy URLs in the address bar (a "not found" address is left as typed), then bring the requested
   // section into view.
@@ -231,7 +232,10 @@ export function PublicMegaSite({ path }: { path: string }) {
       window.history.replaceState(null, "", target);
     applyPageMeta(page === "not-found" ? null : page);
     if (hash) window.setTimeout(() => document.getElementById(hash)?.scrollIntoView({ block: "start" }), 60);
-    else window.scrollTo({ top: 0 });
+    // A page opened from its address keeps where the reader already is: it was readable before the app started
+    // (pre-rendered, WEB-05), and a jump to the top would undo any scrolling done meanwhile.
+    else if (!firstPage.current) window.scrollTo({ top: 0 });
+    firstPage.current = false;
   }, [page, hash]);
 
   useEffect(() => {

@@ -23,6 +23,7 @@ import {
   briefPath,
   briefReview,
   briefReviewActionLabel,
+  briefReviewDoneMessage,
   briefReviewBody,
   briefReviewProblem,
   briefStatusView,
@@ -637,8 +638,9 @@ function ComposedSections({ version }: { version: BriefVersion }) {
           <p className="ac-muted">No scope recorded.</p>
         )}
       </Section>
-      <Section title="Established facts" count={facts.length}>
-        <Lines lines={facts} empty="No established facts yet." />
+      {/* Not "Established facts": each statement shows its own kind, often a source assertion (UX-21). */}
+      <Section title="What the evidence says" count={facts.length}>
+        <Lines lines={facts} empty="No statements from the evidence yet." />
       </Section>
       <Section title="Evidence">
         {briefCounts(inventory.counts).length > 0 && (
@@ -889,7 +891,6 @@ function QualityReviewPanel({
   const starting = useStartReview(investigationId, version, onDone);
   const history = version.review_actions ?? [];
   const problem = briefReviewProblem(action, comment);
-  const name = safeText(version.business_id) ?? "The brief";
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (problem || busy) return;
@@ -902,11 +903,7 @@ function QualityReviewPanel({
         briefReviewBody(action, comment),
       );
       const acceptedNow = action === "ACCEPT_FOR_DECISION";
-      notify(
-        acceptedNow
-          ? `${name}: accepted for decision. Next: sign the decision on the Decision tab.`
-          : `${name}: ${briefReviewActionLabel({ action }).toLowerCase()} recorded.`,
-      );
+      notify(briefReviewDoneMessage(action, version.business_id));
       setAction("");
       setComment("");
       if (acceptedNow) onAccepted();

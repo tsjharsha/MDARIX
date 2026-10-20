@@ -117,10 +117,15 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 		file_server
 	}
 
+	# The website's pages are pre-rendered at build time (frontend/scripts/prerender.mjs, WEB-05): the home page is
+	# /home.html and /platform is /platform/index.html, each with its own title, description, canonical and text.
+	# /index.html is the plain application shell, for the application, sign-in and every other address (a website
+	# page that is not pre-rendered gets it too, and the browser draws the page as before).
 	handle {
 		header Cache-Control "no-cache"
 		root * /srv
-		try_files {path} /index.html
+		rewrite / /home.html
+		try_files {path} {path}/index.html /index.html
 		file_server
 	}
 

@@ -111,9 +111,18 @@ describe("the brief for the decision maker", () => {
   });
 
   it("reads a reviewer line without codes or UUIDs", () => {
+    // A quality review action is one plain sentence, never "Quality · Start Review" (UX-21).
     expect(
       reviewerLine({ kind: "QUALITY_REVIEW", name: "Ana Silva", role: "REVIEWER", action: "ACCEPT_FOR_DECISION" }),
-    ).toMatchObject({ kind: "Quality Review", name: "Ana Silva", action: "Accept For Decision" });
+    ).toMatchObject({ kind: "Accepted for decision", name: "Ana Silva", action: null });
+    expect(reviewerLine({ kind: "QUALITY", action: "START_REVIEW", label: "Quality review started" })).toMatchObject({
+      kind: "Quality review started",
+      action: null,
+    });
+    expect(reviewerLine({ kind: "RISK", action: "COMPLETED", outcome: "NO_NEW_RISK" })).toMatchObject({
+      kind: "Risk review",
+      action: "No new risk",
+    });
     expect(reviewerLine({ name: UUID }).name).toBeNull();
   });
 });

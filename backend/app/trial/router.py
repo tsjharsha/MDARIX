@@ -144,9 +144,13 @@ def trial_status(
         .filter(AuthUser.tenant_id == tenant_id, AuthUser.status.in_(["ACTIVE", "INVITED"]))
         .scalar()
     )
+    viewer = _current_user(db, ctx)
     return {
         "is_trial": True,
-        "is_owner": team.is_trial_owner(db, tenant_id, _current_user(db, ctx)),
+        "is_owner": team.is_trial_owner(db, tenant_id, viewer),
+        # When this person first signed in and who invited them: the feedback prompt waits until the person has had
+        # MDARIX for 2 days, and an invited colleague is greeted with the owner's name (UX-26).
+        "me": team.person(db, tenant_id, viewer),
         "plan": "Free Trial",
         "starts_at": subscription.starts_at.isoformat(),
         "expires_at": subscription.expires_at.isoformat(),

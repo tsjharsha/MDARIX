@@ -18,6 +18,7 @@ venv
 node_modules
 frontend/node_modules
 frontend/dist
+frontend/dist-prerender
 frontend/test-results
 frontend/artifacts
 frontend/playwright-report

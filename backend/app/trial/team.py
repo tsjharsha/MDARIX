@@ -194,6 +194,41 @@ def _owner_name(owner: AuthUser) -> str:
     return (owner.display_name or "").strip() or owner.username
 
 
+def person(db: Session, tenant_id, user: AuthUser) -> dict:
+    """The signed-in person in their trial, for Getting started and the feedback prompt (UX-26): when they first
+    signed in (their first session; their account's creation if none is recorded), and, for a colleague, who invited
+    them and to which organization. In a trial only the owner invites (``require_owner``), so the owner is the
+    inviter."""
+    from sqlalchemy import func
+
+    from backend.app.db.models.stage2 import AuthSession
+
+    first = (
+        db.query(func.min(AuthSession.created_at))
+        .filter(AuthSession.tenant_id == tenant_id, AuthSession.user_id == user.id)
+        .scalar()
+    )
+    joined = first or user.created_at
+    invited_by = None
+    if not is_trial_owner(db, tenant_id, user):
+        request = trial_request(db, tenant_id)
+        owner_email = (request.email if request else "").strip().lower()
+        owner = (
+            db.query(AuthUser)
+            .filter(AuthUser.tenant_id == tenant_id, AuthUser.username == owner_email, AuthUser.status == "ACTIVE")
+            .first()
+            if owner_email
+            else None
+        )
+        invited_by = _owner_name(owner) if owner is not None else None
+    tenant = db.get(Tenant, tenant_id)
+    return {
+        "joined_at": joined.isoformat() if joined else None,
+        "invited_by": invited_by,
+        "organization": ((tenant.display_name or tenant.name) if tenant else None),
+    }
+
+
 def _colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID, *, own: str) -> AuthUser:
     """A person of this trial the owner acts on: never the owner themself (``own`` says what to do instead), an
     MDARIX staff account or the sample author (an account nobody signs in with)."""
