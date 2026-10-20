@@ -4,7 +4,7 @@
 // screens they describe (frontend/src/features/workspace/**, auth/AuthPage.tsx, help/HelpMenu.tsx) and describe the
 // MVP screens (app/featureSet.ts), which every workspace uses.
 
-export const USER_GUIDE_PATH = "/help/user-guide";
+export { USER_GUIDE_PATH } from "./paths";
 
 export type GuideTask = {
   title: string;

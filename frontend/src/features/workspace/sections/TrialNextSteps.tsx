@@ -56,8 +56,8 @@ export function mvpRequestText(request: MvpRequest | null | undefined): string |
   if (!request) return null;
   const on = request.created_at ? ` on ${formatDay(request.created_at)}` : "";
   if (request.status === "NEW")
-    return `You asked for an MVP conversation${on}. The MDARIX team will reply to arrange a scoping call.`;
-  if (request.status === "CONTACTED") return `The MDARIX team has been in touch about your MVP (asked${on}).`;
+    return `You asked for a pilot conversation${on}. The MDARIX team will reply to arrange a scoping call.`;
+  if (request.status === "CONTACTED") return `The MDARIX team has been in touch about your pilot (asked${on}).`;
   return null;
 }
 
@@ -83,10 +83,10 @@ function usePrintOpensDetails() {
 }
 
 /**
- * Next steps, from trial to MVP (trial workspaces only, for everyone in one): what changes from the trial to the MVP,
- * how the MVP starts, how the data is connected, the Customer Administrator, what MDARIX needs, the price (in a written
- * proposal, never a figure here), common questions, and the request for an MVP conversation. The words are in
- * help/trialNextSteps.ts, shared with the free trial user guide. "Download this page as PDF" is the browser's print
+ * Next steps, from trial to pilot (trial workspaces only, for everyone in one): what changes from the trial to the
+ * pilot, how the pilot starts, how the data is connected, the Customer Administrator, what MDARIX needs, the price (in
+ * a written proposal, never a figure here), common questions, and the request for a pilot conversation. The words are
+ * in help/trialNextSteps.ts, shared with the free trial user guide. "Download this page as PDF" is the browser's print
  * (trialNextSteps.css lays the page out for paper), as the trial user guide's "Save as PDF".
  */
 export function TrialNextStepsSection() {
@@ -253,7 +253,7 @@ export function TrialNextStepsSection() {
 }
 
 /**
- * The request for an MVP conversation: what the organization expects, the products, sites and systems in mind, how to
+ * The request for a pilot conversation: what the organization expects, the products, sites and systems in mind, how to
  * reach the person (optional) and, only when the server says the trial data may move (the sample removed, own data
  * in), whether to move it. Otherwise a short explanation stands in its place. An open request is updated, not doubled.
  */
@@ -278,7 +278,8 @@ export function MvpRequestForm({
   const [done, setDone] = useState<{ heading: string; text: string } | null>(null);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (expectations.trim().length < 10) return setError("Tell us in a sentence or two what you expect from the MVP.");
+    if (expectations.trim().length < 10)
+      return setError("Tell us in a sentence or two what you expect from the pilot.");
     setBusy(true);
     setError("");
     try {

@@ -24,7 +24,7 @@ export const teamChangeText = (item: TrialTeamChange) =>
 
 /**
  * When a trial's data is deleted (backend/app/trial/retention.py): 30 days after the trial ends, or later while an open
- * request asks to move the data into the MVP (held until the request closes, at the latest until ``hold_until``).
+ * request asks to move the data into the pilot (held until the request closes, at the latest until ``hold_until``).
  */
 export type TrialRetention = {
   delete_after: string;
@@ -34,14 +34,14 @@ export type TrialRetention = {
   mvp_request: { id: string; status: string } | null;
 };
 
-/** The deletion line for the Platform Administrator: held for the MVP request, or the day the data is deleted. */
+/** The deletion line for the Platform Administrator: held for the pilot request, or the day the data is deleted. */
 export function retentionText(
   retention: TrialRetention | null | undefined,
   format: (value: string) => string,
   deletedAt?: string | null,
 ): string | null {
   if (retention?.held_for_mvp_request)
-    return `Data held for its MVP request (would have been deleted ${format(retention.original_delete_after)}); deleted ${format(retention.hold_until)} at the latest`;
+    return `Data held for its pilot request (would have been deleted ${format(retention.original_delete_after)}); deleted ${format(retention.hold_until)} at the latest`;
   const day = retention?.delete_after ?? deletedAt;
   return day ? `Data deleted ${format(day)}` : null;
 }
@@ -139,10 +139,10 @@ export const TRIAL_STATE: Record<TrialState, { label: string; tone: Tone }> = {
   ENDED: { label: "Ended, data kept 30 days", tone: "neutral" },
 };
 
-/** An ended trial whose data an open MVP request holds says so, instead of "data kept 30 days". */
+/** An ended trial whose data an open pilot request holds says so, instead of "data kept 30 days". */
 export const trialBadgeOf = (row: Pick<TrialItem, "state" | "retention">) =>
   row.state === "ENDED" && row.retention?.held_for_mvp_request
-    ? { label: "Ended, data held for its MVP request", tone: "warning" as Tone }
+    ? { label: "Ended, data held for its pilot request", tone: "warning" as Tone }
     : trialStateOf(row.state);
 
 export const trialStateOf = (state: string | null | undefined) =>

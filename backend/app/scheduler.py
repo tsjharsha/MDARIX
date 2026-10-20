@@ -300,7 +300,7 @@ JOBS: tuple[Job, ...] = (
         "trial-retention",
         timedelta(hours=24),
         trial_retention,
-        "Delete trial data 30 days after the trial ends (held while its move into the MVP is requested), and error "
+        "Delete trial data 30 days after the trial ends (held while its move into the pilot is requested), and error "
         "reports sent before sign-in after 90 days",
         PLATFORM_JOBS,
     ),

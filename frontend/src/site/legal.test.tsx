@@ -41,7 +41,10 @@ describe("accessibility statement (CMP-16)", () => {
       expect(html).toContain(heading);
     expect(html).toContain("do not claim that it conforms");
     expect(html).toContain("mailto:support@mdarix.in");
-    expect(html).toContain("Last updated: 19 October 2026");
+    expect(html).toContain("Last updated: 20 October 2026");
+    // The header menus' keyboard order was fixed in 0.10.38 (WEB-10): no longer a known gap.
+    expect(html).not.toContain("the Tab key moves to the next menu instead of into the open menu");
+    expect(html).toContain("Tab moves from a menu&#x27;s button into its links");
     expect(html).not.toMatch(/fully conform|is compliant|WCAG[^.]*certified/i);
   });
 });
