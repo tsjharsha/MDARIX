@@ -28,6 +28,9 @@ KEPT = (
 )
 # The static agent catalog (fixed text describing "agents"), parked on its own (Phase 6).
 AGENT_CATALOG = "/api/v1/ai/agents/catalog"
+# The public demo request: the website offers none, and it mailed a typed name to any address (SEC-04, 0.10.35). The
+# Platform Admin list of earlier requests stays.
+PUBLIC_DEMO_REQUEST = "/api/v1/public/demo-requests"
 
 
 def _paths() -> list[str]:
@@ -55,8 +58,9 @@ def test_mvp_parks_exactly_the_routes_of_the_parked_areas(mvp):
     parked = {path for path in _paths() if not sets.serves_path(path)}
     expected = _router_paths(
         regulatory_router, risk_router, counterfactual_router, scenario_router, legacy_decision_router
-    ) | {AGENT_CATALOG}
+    ) | {AGENT_CATALOG, PUBLIC_DEMO_REQUEST}
     assert parked == expected
+    assert sets.serves_path("/api/v1/platform-admin/demo-requests")
     assert len(parked) >= 15
     for path in KEPT:
         assert path in _paths(), path

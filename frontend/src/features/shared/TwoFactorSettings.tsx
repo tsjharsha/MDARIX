@@ -228,18 +228,11 @@ export function ReauthFields({
   );
 }
 
-/** The new codes, shown this once, to copy or download. Exported for its test. */
-export function RecoveryCodesList({
-  codes,
-  account,
-  issued,
-  onDone,
-}: {
-  codes: readonly string[];
-  account?: string | null;
-  issued: Date;
-  onDone: () => void;
-}) {
+/**
+ * Copy and Download for recovery codes shown once: on My Account after new codes, and on the first setup page
+ * (AuthPage), so nobody has to copy them by hand. The message says what happened.
+ */
+export function useRecoveryCodeSaving(codes: readonly string[], account: string | null | undefined, issued: Date) {
   const [said, setSaid] = useState("");
   const text = recoveryCodesText(codes, account, issued);
   const copy = async () => {
@@ -261,6 +254,22 @@ export function RecoveryCodesList({
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     setSaid("Downloaded. Keep the file somewhere private, then delete other copies.");
   };
+  return { said, copy, download };
+}
+
+/** The new codes, shown this once, to copy or download. Exported for its test. */
+export function RecoveryCodesList({
+  codes,
+  account,
+  issued,
+  onDone,
+}: {
+  codes: readonly string[];
+  account?: string | null;
+  issued: Date;
+  onDone: () => void;
+}) {
+  const { said, copy, download } = useRecoveryCodeSaving(codes, account, issued);
   return (
     <div className="ca-mfa-codes">
       <p className="ca-mfa-message is-good" role="status">

@@ -1,9 +1,20 @@
 import React, { useEffect, useRef, useState, type ReactNode } from "react";
-import { CalendarCheck, Eye, EyeOff, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
+import {
+  CalendarCheck,
+  Copy,
+  Download,
+  Eye,
+  EyeOff,
+  FileSearch,
+  LockKeyhole,
+  ShieldCheck,
+  UserCheck,
+} from "lucide-react";
 import { SignupForm } from "./SignupForm";
 import { SignupMotion } from "./SignupMotion";
 import { QrCodeSvg } from "../../app/QrCodeSvg";
 import { MfaAlreadyOn } from "./MfaAlreadyOn";
+import { useRecoveryCodeSaving } from "../shared/TwoFactorSettings";
 
 const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
   signin: {
@@ -150,6 +161,25 @@ const MESSAGES: Record<string, string> = {
   MFA_TEMPORARILY_LOCKED: "Too many wrong codes. Wait 15 minutes, then try again.",
 };
 
+/**
+ * What to say when a one-time link can no longer be used (asked as its page opens), or null when it still works or
+ * the check could not be made: then the form shows and the server decides on submit (exported for its test).
+ */
+export async function spentLinkMessage(token: string, kind: "activation" | "reset"): Promise<string | null> {
+  try {
+    const response = await fetch("/api/v1/auth/link-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, kind }),
+    });
+    const data = response.ok ? ((await response.json()) as { usable?: boolean; code?: string }) : null;
+    if (data?.usable !== false) return null;
+    return MESSAGES[data.code ?? ""] ?? MESSAGES[kind === "reset" ? "INVALID_RESET" : "INVALID_ACTIVATION"];
+  } catch {
+    return null;
+  }
+}
+
 function problemMessage(data: { detail?: { code?: string; message?: string } } | null, fallback: string): string {
   const code = data?.detail?.code;
   if (code && MESSAGES[code]) return MESSAGES[code];
@@ -171,6 +201,22 @@ export function AuthPage({ mode }: { mode: string }) {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const isTokenPassword = mode === "activate-account" || mode === "reset-password";
+  // A link already used, withdrawn or expired says so as its page opens, with no password form (DEV-004). When the
+  // check cannot be made the form shows as before, and the server still refuses a spent link.
+  const [linkSpent, setLinkSpent] = useState(false);
+  useEffect(() => {
+    if (!isTokenPassword || !tokenFromLink || !token) return;
+    let current = true;
+    void spentLinkMessage(token, mode === "reset-password" ? "reset" : "activation").then((spent) => {
+      if (!current || !spent) return;
+      setLinkSpent(true);
+      setMessage(spent);
+    });
+    return () => {
+      current = false;
+    };
+    // Checked once, for the link the page was opened with.
+  }, []);
   const isMfa = mode === "mfa";
   const [mfaCode, setMfaCode] = useState("");
   const [mfaSecret, setMfaSecret] = useState("");
@@ -415,25 +461,12 @@ export function AuthPage({ mode }: { mode: string }) {
   if (isMfa && recoveryCodes.length)
     return (
       <AuthFrame mode="security">
-        <div className="auth-card">
-          <span className="eyebrow">Account security</span>
-          <h1>Save your recovery codes</h1>
-          {replacingMfa && message && <p role="status">{message}</p>}
-          <p>
-            Each code signs you in once if your phone is lost or not at hand. They are shown only now: print them or
-            keep them in a password manager.
-          </p>
-          <ol className="mfa-recovery-codes" aria-label="Recovery codes">
-            {recoveryCodes.map((code) => (
-              <li key={code}>
-                <code>{code}</code>
-              </li>
-            ))}
-          </ol>
-          <button className="primary-action" type="button" onClick={() => (window.location.href = returnTo)}>
-            I have saved these codes, continue
-          </button>
-        </div>
+        <FirstRecoveryCodes
+          codes={recoveryCodes}
+          account={email || null}
+          message={replacingMfa ? message : ""}
+          onDone={() => (window.location.href = returnTo)}
+        />
       </AuthFrame>
     );
   if (isMfa && mfaEnrollment && mfaAlreadyOn)
@@ -564,9 +597,11 @@ export function AuthPage({ mode }: { mode: string }) {
               ? "30 days, up to 3 users and 5,000 uploaded rows, no credit card. You create your password from the invitation email and set up an authenticator app for two-factor sign-in (MFA)."
               : mode === "forgot-password"
                 ? "Enter your work email and we will send you a secure reset link."
-                : "Choose a password of at least 12 characters. A phrase of several words works well."}
+                : linkSpent
+                  ? "This link can no longer be used."
+                  : "Choose a password of at least 12 characters. A phrase of several words works well."}
         </p>
-        {!done && (
+        {!done && !linkSpent && (
           <>
             {mode === "signup" && (
               <>
@@ -736,5 +771,55 @@ export function PasswordInput({
         {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
       </button>
     </span>
+  );
+}
+
+/**
+ * The recovery codes right after the authenticator is set up, shown this once: copy them into a password manager or
+ * download them, then continue (pre-launch review UX-12: the page said "print them" but offered no way to save them).
+ * Exported for its test.
+ */
+export function FirstRecoveryCodes({
+  codes,
+  account,
+  message,
+  onDone,
+}: {
+  codes: string[];
+  account: string | null;
+  message: string;
+  onDone: () => void;
+}) {
+  const [issued] = useState(() => new Date());
+  const { said, copy, download } = useRecoveryCodeSaving(codes, account, issued);
+  return (
+    <div className="auth-card">
+      <span className="eyebrow">Account security</span>
+      <h1>Save your recovery codes</h1>
+      {message && <p role="status">{message}</p>}
+      <p>
+        Each code signs you in once if your phone is lost or not at hand. They are shown only now: copy them into a
+        password manager or download them.
+      </p>
+      <ol className="mfa-recovery-codes" aria-label="Recovery codes">
+        {codes.map((code) => (
+          <li key={code}>
+            <code>{code}</code>
+          </li>
+        ))}
+      </ol>
+      <div className="auth-code-actions">
+        <button type="button" className="secondary-action" onClick={() => void copy()}>
+          <Copy size={16} aria-hidden="true" /> Copy all
+        </button>
+        <button type="button" className="secondary-action" onClick={download}>
+          <Download size={16} aria-hidden="true" /> Download
+        </button>
+      </div>
+      {said && <p role="status">{said}</p>}
+      <button className="primary-action" type="button" onClick={onDone}>
+        I have saved these codes, continue
+      </button>
+    </div>
   );
 }

@@ -529,12 +529,18 @@ def _staff_alert_address() -> str:
     return (os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or os.getenv("MDARIX_SUPPORT_EMAIL") or "").strip()
 
 
+def _days_left(expires_at: datetime) -> int:
+    """Whole days left until ``expires_at``, rounded up as on every screen (trial status, early exit); 0 once passed.
+    A floor said "ends today" the day before the end and "in 6 days" in the 7-day reminder (FUN-03)."""
+    return max(0, int(-(-(expires_at - datetime.now(timezone.utc)).total_seconds() // 86400)))
+
+
 def _subscription_reminder(db: Session, payload: dict, emailer) -> None:
     row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
     if row is None:
         return
     organization = _organization(db, row.tenant_id)
-    days_left = max(0, (row.expires_at - datetime.now(timezone.utc)).days)
+    days_left = _days_left(row.expires_at)
     expires_on = _long_date(row.expires_at)
     from auth.emailer import company
 
@@ -594,7 +600,7 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
         lambda recipient, **kw: emailer.send_trial_reminder(recipient, **kw),
         [request.email],
         organization=organization,
-        days_left=max(0, (row.expires_at - datetime.now(timezone.utc)).days),
+        days_left=_days_left(row.expires_at),
         ends_on=_long_date(row.expires_at),
         delete_on=delete_on,
     )
