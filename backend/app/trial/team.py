@@ -97,6 +97,11 @@ def invite_colleague(db: Session, tenant_id, inviter: AuthUser, email: str, disp
         raise _error(422, "INVALID_EMAIL", "Enter a valid work email address")
     if not name or len(name) > 120:
         raise _error(422, "INVALID_NAME", "Enter the colleague's name")
+    from backend.app.plain_names import looks_like_link
+
+    # The name goes into the invitation email to the colleague: never a link (SEC-04).
+    if looks_like_link(name):
+        raise _error(422, "NAME_HAS_LINK", "Write the colleague's name without a web or email address")
     if db.query(AuthUser.id).filter(AuthUser.username == email).first() is not None:
         raise _error(409, "ACCOUNT_EXISTS", "This person already has an MDARIX account")
     # Lock the trial's request row so two simultaneous invites cannot both take the last seat.
