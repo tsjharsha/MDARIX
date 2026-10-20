@@ -3,6 +3,7 @@ import { Panel, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import { ConfirmDialog, formatDate, send, useResource, type Confirmation } from "../../customer-admin/shared";
 import {
   accessText,
+  areaDetails,
   areaNames,
   supportStatus,
   type SupportActivity,
@@ -31,7 +32,7 @@ export function supportConfirmation(decision: SupportDecision, grant: SupportGra
     return {
       title: `Give ${who} access?`,
       body:
-        `${accessText(grant.write)} access to ${areaNames(grant.areas).toLowerCase()} until ${formatDate(grant.expires_at)}. ` +
+        `${accessText(grant.write)} access until ${formatDate(grant.expires_at)}, to: ${areaDetails(grant.areas)}. ` +
         "Every use is recorded in your audit trail, and you can revoke it at any time.",
       confirmLabel: "Approve",
       reason: REASON,
@@ -144,6 +145,7 @@ export function SupportAccessView({
                     {accessText(grant.write)} · from {formatDate(grant.starts_at)} until {formatDate(grant.expires_at)}{" "}
                     ({durationText(grant.starts_at, grant.expires_at)})
                   </small>
+                  <small>Areas: {areaDetails(grant.areas)}</small>
                   <small>Why: {grant.reason}</small>
                   {grant.decided_by && <small>Decided by {grant.decided_by}</small>}
                   {grant.uses > 0 && <small>Used {grant.uses === 1 ? "once" : `${grant.uses} times`}</small>}
@@ -210,6 +212,7 @@ export function SupportHistoryView({ items, source }: { items: SupportActivity[]
               <small>
                 {item.who ?? "MDARIX"} · {formatDate(item.at)}
               </small>
+              {item.covers && <small>{item.covers}</small>}
               {item.reason && <small>{item.reason}</small>}
             </li>
           ))}

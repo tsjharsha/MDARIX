@@ -50,6 +50,11 @@ line (`release/0.10`). No migration: the new area and the new emails need no sch
   ("Support access to <organization> is approved", with who, until when and the areas; also a security notice) and
   when an approved access ends ("Support access to <organization> has ended": its time ran out, the organization
   revoked it, or MDARIX ended it). Outbox events `SUPPORT_ACCESS_GRANTED` and `SUPPORT_ACCESS_ENDED`.
+- In a free trial, every other active member is told too (owner decision 21 October), for information only and with
+  no button: "MDARIX support has read-only access to <organization>'s trial" (who, the areas, who approved it, until
+  when, that each use is recorded in the trial's audit trail and that only the person who runs the trial decides) and
+  "MDARIX support access to <organization>'s trial has ended". A paying customer's other users get nothing new; its
+  administrators get the emails above.
 - Scheduler job `support-access-expiry` (every 5 minutes): closes support access whose time ran out, writes
   `SUPPORT_ACCESS_EXPIRED` to the organization's audit trail and queues the ended email. Access itself ends at the
   second it expires, whether the job has run or not.
@@ -66,13 +71,20 @@ line (`release/0.10`). No migration: the new area and the new emails need no sch
 - The email that MDARIX asks for support access now reaches a trial's owner (a trial has no Customer Administrators,
   so before it reached nobody), with a button to Getting started › Team. Customers' administrators get it as before.
 - An MDARIX revocation is marked `source: PLATFORM_ADMIN` in the organization's audit trail.
+- Read-only access names People as what it opens: "People: the user directory, to read", not "account recovery and
+  erasure of personal data", which only a grant with changes allows. It reads so in the emails, the approve dialog
+  (which now lists every area with what it covers), the lists of requests and the History (which shows what the
+  request and the approval covered). With changes allowed the words are unchanged. No other area's words name a change.
 - A support access History (the trial owner's, and a customer's in Customer Administration) names an MDARIX colleague
   whose account the organization cannot read "MDARIX support", never an account id, and says what each use opened.
 
 ### Legal
 
-- No change. The privacy policy, terms and trial agreement do not mention support access, so nothing in them says it
-  is unavailable for trials or contradicts it.
+- Privacy policy, "How we protect it": a new paragraph on support access (who approves it, the areas, read-only unless
+  changes are approved, 24 hours at most, each use in the audit trail, the emails, revocation). Its "Last updated" is
+  21 October 2026, so a trial request sent from now on records the new date and SHA-256 (`legal_acceptance`); the
+  sitemap's `lastmod` of `/privacy` is 21 October 2026. `legal/README.md` lists the facts. The terms and the trial
+  agreement are unchanged: nothing in them contradicts it.
 
 ## [0.10.38] - 2026-10-20
 

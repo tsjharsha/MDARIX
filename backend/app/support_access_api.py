@@ -378,6 +378,7 @@ def grant_activity(db: Session, admin: AuthUser, grant_id: uuid.UUID) -> dict:
         .all()
     )
     people = _people(db, {uuid.UUID(event.actor_ref) for event in events if _is_uuid(event.actor_ref)})
+    covers = scope_text(access.SupportScope.stored(row.scope))
     return {
         "grant_id": str(row.id),
         "items": [
@@ -391,6 +392,8 @@ def grant_activity(db: Session, admin: AuthUser, grant_id: uuid.UUID) -> dict:
                 "method": (event.details or {}).get("method"),
                 "path": (event.details or {}).get("path"),
                 "reason": event.reason or (event.details or {}).get("reason"),
+                # What was asked for and approved, in the words of the decision (read-only wording when read-only).
+                "covers": covers if event.action in _COVERS else None,
             }
             for event in events
         ],
@@ -415,6 +418,15 @@ _ACTIONS = {
     "SUPPORT_ACCESS_REVOKED": "Access revoked",
     access.ACCESS_EXPIRED: "Access ended on its own",
 }
+
+
+_COVERS = frozenset({"SUPPORT_ACCESS_REQUESTED", "SUPPORT_ACCESS_CUSTOMER_APPROVED"})
+
+
+def scope_text(scope: access.SupportScope) -> str:
+    """A grant's scope in one line: "Read only. Audit trail: ...; People: the user directory, to read"."""
+    areas = "; ".join(item["label"] for item in scope.describe()) or "no area"
+    return f"{'Read and change' if scope.write else 'Read only'}. {areas}"
 
 
 def _what(event: AuditEvent) -> str:

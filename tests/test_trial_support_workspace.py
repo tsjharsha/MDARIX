@@ -396,3 +396,67 @@ def test_the_support_emails_name_the_trial_owner_s_place_and_escape_what_they_sh
     )
     assert "one of your administrators approves it" in pages[0][1] and "/app/customer-admin" in pages[0][1]
     assert re.search(r"as an administrator of Orbit <Medical>", pages[0][1])
+
+
+def test_a_trial_s_colleagues_are_told_when_access_is_granted_and_when_it_ends(monkeypatch):
+    """Owner decision 2026-10-21: every other active member of a free trial gets a short notice, for information
+    only. The owner gets the decision maker's emails as before."""
+    owner, approval, owner_email, _colleague, colleague_email = _trial_with_colleague()
+    tenant_id = approval["tenant_id"]
+    grant_id, _recipient, _ = _granted(owner, tenant_id, [access.RECORDS, access.PEOPLE])
+    sent = []
+    for name in (
+        "send_support_access_granted",
+        "send_support_access_ended",
+        "send_support_access_colleague_granted",
+        "send_support_access_colleague_ended",
+    ):
+        monkeypatch.setattr(f"auth.emailer.{name}", lambda to, _name=name, **kw: sent.append((_name, to, kw)))
+    _deliver(grant_id, notifications.SUPPORT_ACCESS_GRANTED)
+    assert [(name, to) for name, to, _ in sent] == [
+        ("send_support_access_granted", owner_email),
+        ("send_support_access_colleague_granted", colleague_email),
+    ]
+    told = sent[1][2]
+    assert told["write"] is False and told["approved_by"] and told["expires"].endswith(" UTC")
+    # Read only, People reads as what it opens.
+    assert told["areas"] == ["People: the user directory, to read", access.AREAS[access.RECORDS]]
+    assert "trial" not in told  # no decision-maker wording or button for a colleague
+
+    sent.clear()
+    assert owner.post(f"{SUPPORT}/{grant_id}/revoke", json={"reason": "The question is answered"}).status_code == 200
+    _deliver(grant_id, notifications.SUPPORT_ACCESS_ENDED)
+    assert [(name, to) for name, to, _ in sent] == [
+        ("send_support_access_ended", owner_email),
+        ("send_support_access_colleague_ended", colleague_email),
+    ]
+    assert sent[1][2]["ended"] == "REVOKED_BY_CUSTOMER"
+
+
+def test_a_paying_customer_s_administrators_are_told_and_no_one_else():
+    from tests.test_export_purge_mfa import _account
+    from tests.test_mapping_release_self_approval import _organization
+
+    tenant = _organization()
+    admin_email = _account("CUSTOMER_ADMIN", tenant)
+    leader_email = _account("LEADER", tenant)
+    with SessionLocal() as db:
+        bind_system(db, "test: who is told")
+        recipients, trial = notifications.support_decision_maker_emails(db, uuid.UUID(tenant))
+        assert trial is False and admin_email in recipients and leader_email not in recipients
+
+
+def test_read_only_access_names_people_as_reading_the_directory(monkeypatch):
+    owner, approval, _ = _approved_trial_client()
+    tenant_id = approval["tenant_id"]
+    grant_id, _recipient, _ = _asked(tenant_id, [access.PEOPLE])
+    item = next(item for item in owner.get(SUPPORT).json()["items"] if item["id"] == grant_id)
+    assert item["areas"] == [{"code": access.PEOPLE, "label": "People: the user directory, to read"}]
+    sent = []
+    monkeypatch.setattr("auth.emailer.send_support_access_request", lambda to, **kw: sent.append(kw) or "SENT")
+    _deliver(grant_id, notifications.SUPPORT_ACCESS_AWAITING_CUSTOMER)
+    assert sent[0]["areas"] == ["People: the user directory, to read"]
+    covers = [row["covers"] for row in owner.get(f"{SUPPORT}/{grant_id}/activity").json()["items"] if row["covers"]]
+    assert covers == ["Read only. People: the user directory, to read"]
+    # With changes allowed, the words of the area are unchanged.
+    assert access.SupportScope(frozenset({access.PEOPLE}), True).describe()[0]["label"] == access.AREAS[access.PEOPLE]

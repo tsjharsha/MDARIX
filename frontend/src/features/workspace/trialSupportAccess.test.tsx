@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { TeamPanel, TEAM_PATH } from "./sections/TrialTeam";
-import { SupportHistoryView, durationText, supportDecisions } from "./sections/TrialSupportAccess";
+import { SupportHistoryView, durationText, supportConfirmation, supportDecisions } from "./sections/TrialSupportAccess";
+import { areaDetails } from "../customer-admin/supportAccessModel";
 import { TenantPicker } from "../admin/areas/common";
 import { RequestAccess } from "../admin/areas/SecurityArea";
 import {
@@ -38,7 +39,7 @@ const { AREAS, waiting } = vi.hoisted(() => {
     status: "AWAITING_CUSTOMER",
     person: "Ravi Support",
     reason: "Ticket 77: import question",
-    areas: [AREAS[3]],
+    areas: [AREAS[3], { code: "PEOPLE", label: "People: the user directory, to read" }],
     write: false,
     starts_at: "2026-10-20T10:00:00+00:00",
     expires_at: "2026-10-20T14:00:00+00:00",
@@ -171,7 +172,10 @@ describe("the trial owner decides on support access", () => {
     const markup = renderToStaticMarkup(<TeamPanel onChanged={() => undefined} />);
     expect(markup).toContain("Support access");
     expect(markup).toContain("1 waiting for you");
-    expect(markup).toContain("Ravi Support: Quality records");
+    expect(markup).toContain("Ravi Support: Quality records, People");
+    expect(markup).toContain(
+      "Areas: Quality records (complaints, investigations, decisions and data imports, to read); People (the user directory, to read)",
+    );
     expect(markup).toContain("Read only · from");
     expect(markup).toContain("(4 hours)");
     expect(markup).toContain("Why: Ticket 77: import question");
@@ -181,6 +185,20 @@ describe("the trial owner decides on support access", () => {
     expect(supportDecisions({ ...waiting, status: "APPROVED", can_approve: false, can_deny: false })).toEqual([
       "revoke",
     ]);
+  });
+
+  it("asks the owner to approve the areas in the words of the grant, read-only People included", () => {
+    const confirmation = supportConfirmation("approve", waiting, () => undefined);
+    expect(confirmation.body).toContain("Read only access until");
+    expect(confirmation.body).toContain("People (the user directory, to read)");
+    expect(confirmation.body).not.toContain("erasure");
+    expect(confirmation.mfaCode).toBe(true);
+    expect(
+      areaDetails([
+        { code: "PEOPLE", label: "People: the user directory, account recovery and erasure of personal data" },
+      ]),
+    ).toBe("People (the user directory, account recovery and erasure of personal data)");
+    expect(areaDetails([])).toBe("Nothing (deny this request)");
   });
 
   it("says how long a request lasts", () => {
@@ -194,7 +212,13 @@ describe("the trial owner decides on support access", () => {
       <SupportHistoryView
         source={{ state: "ready" }}
         items={[
-          { action: "SUPPORT_ACCESS_CUSTOMER_APPROVED", what: "Access approved", who: "Asha Rao", at: null },
+          {
+            action: "SUPPORT_ACCESS_CUSTOMER_APPROVED",
+            what: "Access approved",
+            who: "Asha Rao",
+            at: null,
+            covers: "Read only. People: the user directory, to read",
+          },
           { action: "SUPPORT_ACCESS_USED", what: "Read the complaints", who: "Ravi Support", at: null },
           { action: "SUPPORT_ACCESS_EXPIRED", what: "Access ended on its own", who: "MDARIX (automatic)", at: null },
         ]}
@@ -203,6 +227,7 @@ describe("the trial owner decides on support access", () => {
     expect(markup).toContain("From your trial&#x27;s audit trail");
     expect(markup).toContain("Read the complaints");
     expect(markup).toContain("Access ended on its own");
+    expect(markup).toContain("Read only. People: the user directory, to read");
   });
 });
 

@@ -38,6 +38,8 @@ export type SupportActivity = {
   reason?: string | null;
   /** What happened, in the organization's words (backend/app/support_access_api.py). */
   what?: string | null;
+  /** On the request and the approval: what they cover ("Read only. People: the user directory, to read"). */
+  covers?: string | null;
 };
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -61,6 +63,22 @@ export const accessText = (write: boolean) => (write ? "Read and change" : "Read
 /** The areas of the organization's data a grant opens, by their short names ("Configuration, Audit trail"). */
 export function areaNames(areas: SupportArea[]) {
   return areas.map((area) => area.label.split(":")[0].trim()).join(", ") || "Nothing (deny this request)";
+}
+
+/**
+ * The areas with what each covers, as the server words them for this grant ("People (the user directory, to read)"
+ * when read only): what a decision maker approves.
+ */
+export function areaDetails(areas: SupportArea[]) {
+  return (
+    areas
+      .map((area) => {
+        const [name, ...rest] = area.label.split(":");
+        const what = rest.join(":").trim();
+        return what ? `${name.trim()} (${what})` : name.trim();
+      })
+      .join("; ") || "Nothing (deny this request)"
+  );
 }
 
 const AREA_SHORT: Record<string, string> = {

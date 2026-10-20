@@ -11,7 +11,7 @@ approved**. The code is `backend/app/support_access.py` (the rule and the gate),
 |---|---|
 | Configuration | Products and versions, integrations, data mappings, AI settings |
 | Audit trail | Everything people and systems did in the organization |
-| People | The user directory, account recovery, erasure of personal data |
+| People | The user directory, account recovery, erasure of personal data (read only: the user directory, to read) |
 | Quality records | Complaints, investigations, decisions and data imports, to read (the read-only support workspace; since 0.10.39) |
 | Full export | A copy of every record of the organization (creating it and downloading it) |
 
@@ -29,7 +29,8 @@ Every grant is **read-only unless it asks for changes**, names one platform coll
    (Getting started > Team > Support access; `require_decision_maker` in `backend/app/support_access_api.py`): a
    colleague, or any Customer Administrator account in a trial, is refused (`TRIAL_OWNER_REQUIRED`). The decision
    makers (the Customer Administrators, or the trial owner) are emailed when MDARIX asks, when they approve, and when an
-   approved access ends (revoked by either side, or expired).
+   approved access ends (revoked by either side, or expired). In a free trial every other active member is also told
+   when it is approved and when it ends, for information only (no button: only the owner decides).
 4. **Use**: the colleague's use of the grant is written to the organization's own audit trail
    (`SUPPORT_ACCESS_USED`, with the area, whether it changed something, and the address opened). Every change is
    written; repeated reads of the same address within 10 minutes are written once, so paging through a list (or the

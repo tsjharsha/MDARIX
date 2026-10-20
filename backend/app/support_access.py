@@ -56,6 +56,11 @@ AREAS: dict[str, str] = {
     RECORDS: "Quality records: complaints, investigations, decisions and data imports, to read",
     DATA_EXPORT: "A full export: a copy of every record of the organization",
 }
+#: How an area reads in a read-only grant, where its words above name changes (People: recovery and erasure are
+#: changes, which a read-only grant never opens). The other areas read the same either way.
+READ_ONLY_AREAS: dict[str, str] = {
+    PEOPLE: "People: the user directory, to read",
+}
 
 PENDING = "PENDING"  # requested; a second platform administrator approves it for MDARIX
 AWAITING_CUSTOMER = "AWAITING_CUSTOMER"  # approved by MDARIX; the customer decides
@@ -121,8 +126,13 @@ class SupportScope:
         return {"areas": sorted(self.areas), "write": self.write}
 
     def describe(self) -> list[dict]:
-        """The areas as the customer reads them, in the order of AREAS."""
-        return [{"code": code, "label": label} for code, label in AREAS.items() if code in self.areas]
+        """The areas as the customer reads them, in the order of AREAS; read-only, an area whose words name changes
+        reads as what it opens (READ_ONLY_AREAS)."""
+        return [
+            {"code": code, "label": label if self.write else READ_ONLY_AREAS.get(code, label)}
+            for code, label in AREAS.items()
+            if code in self.areas
+        ]
 
 
 # ------------------------------------------------------------------------------------------- decisions

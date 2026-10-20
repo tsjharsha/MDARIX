@@ -23,7 +23,8 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
 * ``SUPPORT_PROBLEM_REPORTED`` (backend/app/support_api.py): the support team.
 * ``SUPPORT_ACCESS_AWAITING_CUSTOMER``, ``SUPPORT_ACCESS_GRANTED`` and ``SUPPORT_ACCESS_ENDED`` (support access,
   backend/app/support_access.py): the organization's decision makers (``support_decision_maker_emails``: its customer
-  administrators, or a free trial's owner), when MDARIX asks, when they approve, and when an approved access ends.
+  administrators, or a free trial's owner), when MDARIX asks, when they approve, and when an approved access ends;
+  a free trial's other active members are also told when it is approved and when it ends, without a way to decide.
 * ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
   Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
 """
@@ -537,23 +538,61 @@ def _support_access_notice(db: Session, event_name: str, payload: dict, emailer)
     recipients, trial = support_decision_maker_emails(db, tenant_id)
     scope = SupportScope.stored(grant.scope)
     common = {"organization": _organization(db, tenant_id), "person": who, "trial": trial}
+    # A free trial's other members are told too, without a way to decide (only the owner decides).
+    colleagues = trial_colleague_emails(db, tenant_id, recipients) if trial else []
+    organization = common["organization"]
     if event_name == SUPPORT_ACCESS_GRANTED:
         if grant.status != APPROVED:
             return
         decider = db.query(AuthUser).filter(AuthUser.id == grant.customer_decided_by).first()
+        details = {
+            "areas": [item["label"] for item in scope.describe()],
+            "write": scope.write,
+            "expires": _utc_moment(grant.expires_at),
+            "approved_by": (decider.display_name or decider.username) if decider else "Your organization",
+        }
+        _deliver(emailer.send_support_access_granted, recipients, **details, **common)
         _deliver(
-            emailer.send_support_access_granted,
-            recipients,
-            areas=[item["label"] for item in scope.describe()],
-            write=scope.write,
-            expires=_utc_moment(grant.expires_at),
-            approved_by=(decider.display_name or decider.username) if decider else "Your organization",
-            **common,
+            emailer.send_support_access_colleague_granted, colleagues, organization=organization, person=who, **details
         )
         return
     ended = str(payload.get("ended") or "EXPIRED")
     at = grant.revoked_at if ended != "EXPIRED" and grant.revoked_at else grant.expires_at
     _deliver(emailer.send_support_access_ended, recipients, ended=ended, when=_utc_moment(at), **common)
+    _deliver(
+        emailer.send_support_access_colleague_ended,
+        colleagues,
+        organization=organization,
+        person=who,
+        ended=ended,
+        when=_utc_moment(at),
+    )
+
+
+def trial_colleague_emails(db: Session, tenant_id, exclude: list[str]) -> list[str]:
+    """The other active people of a free trial: its colleagues, never the owner (in ``exclude``), MDARIX staff
+    accounts or the sample author (an account nobody signs in with)."""
+    from backend.app.access.authz import platform_account_clause
+
+    left_out = {address.strip().lower() for address in exclude}
+    rows = (
+        db.query(AuthUser.username)
+        .filter(
+            AuthUser.tenant_id == tenant_id,
+            func.upper(AuthUser.status) == "ACTIVE",
+            ~platform_account_clause(),
+        )
+        .all()
+    )
+    return sorted(
+        {
+            row.username
+            for row in rows
+            if row.username
+            and row.username.strip().lower() not in left_out
+            and not row.username.startswith("sample-author+")
+        }
+    )
 
 
 def notify_security_notice(db: Session, tenant_id, *, user_id, kind: str, **_refs) -> OutboxEvent | None:

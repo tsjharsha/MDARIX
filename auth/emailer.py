@@ -1204,6 +1204,73 @@ def send_support_access_ended(
     )
 
 
+_COLLEAGUE_ENDINGS = {
+    "EXPIRED": "Its time ran out.",
+    "REVOKED_BY_CUSTOMER": "The person who runs the trial ended it.",
+    "REVOKED_BY_MDARIX": "MDARIX support ended it.",
+}
+
+
+def _colleague_reason(organization: str) -> str:
+    return f"You are receiving this email because you are on the MDARIX free trial of {organization}."
+
+
+def send_support_access_colleague_granted(
+    recipient: str,
+    *,
+    organization: str,
+    person: str,
+    areas: list[str],
+    write: bool,
+    expires: str,
+    approved_by: str,
+) -> str:
+    """Tell a colleague in a free trial that MDARIX support was given access. For information only: the trial's owner
+    decides, so this email has no button."""
+    access = "read and change" if write else "read-only"
+    return _send(
+        recipient,
+        Message(
+            subject=f"MDARIX support has {access} access to the {organization} trial",
+            heading="MDARIX support has access to your trial",
+            paragraphs=(
+                f"{approved_by} gave {person} of MDARIX support {access} access to part of the data in the MDARIX "
+                f"free trial of {organization}, until the time below.",
+                "Every use is recorded in the trial's audit trail. Only the person who runs the trial decides on "
+                "support access and can end it at any time. You do not need to do anything.",
+            ),
+            details=(
+                ("Who", person),
+                ("Access", access.capitalize()),
+                ("Approved by", approved_by),
+                ("Until", expires),
+            ),
+            items=tuple(areas),
+            reason=_colleague_reason(organization),
+        ),
+    )
+
+
+def send_support_access_colleague_ended(
+    recipient: str, *, organization: str, person: str, ended: str, when: str
+) -> str:
+    """Tell a colleague in a free trial that MDARIX support's access ended. For information only, with no button."""
+    return _send(
+        recipient,
+        Message(
+            subject=f"MDARIX support access to the {organization} trial has ended",
+            heading="MDARIX support access has ended",
+            paragraphs=(
+                f"{person} of MDARIX support can no longer see the data in the MDARIX free trial of {organization}. "
+                f"{_COLLEAGUE_ENDINGS.get(ended, '')}".strip(),
+                "What was opened while it lasted is in the trial's audit trail. You do not need to do anything.",
+            ),
+            details=(("Who", person), ("Ended", when)),
+            reason=_colleague_reason(organization),
+        ),
+    )
+
+
 _DIGEST_STATES = {"CLEAR": "Clear", "ATTENTION": "Needs attention", "CRITICAL": "Critical", "NOT_SET": "Not set up"}
 
 
