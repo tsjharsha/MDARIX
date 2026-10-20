@@ -10,6 +10,39 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.35] - 2026-10-20
+
+The P1 findings left after the free-trial launch. First release of the trial maintenance line (`release/0.10`).
+
+### Security
+
+- A name or organization that carries a web address, an email address or a bare domain (`secure-login.com`) is
+  refused at sign-up (422 `NAME_HAS_LINK` / `ORGANIZATION_HAS_LINK`) and when a trial owner invites a colleague.
+  Both names go into emails MDARIX sends to an address the requester chose, so such a name let anyone send a genuine
+  MDARIX email carrying their own link (pre-launch review SEC-04; `backend/app/plain_names.py`). Dotted abbreviations
+  such as "St. Jude" or "Co. Ltd" are still accepted.
+- The public demo-request route (`POST /api/v1/public/demo-requests`) answers 404 under the MVP feature set: the
+  website offers no demo request, and the route mailed the name a visitor typed to any address (SEC-04).
+
+### Fixed
+
+- Trial and subscription reminders count the days left rounded up, as every screen does: the day before the end the
+  email says "ends tomorrow" (not "ends today"), and the 7-day reminder says "in 7 days" (not "in 6 days") (FUN-03).
+- The welcome email no longer says that only administrators set up an authenticator app. A person whose role must
+  use two-factor sign-in (trial users included) is told to have their phone ready for it at the first sign-in; anyone
+  else is told nothing about it (FUN-13).
+- The recovery codes shown right after setting up the authenticator can be copied or downloaded (**Copy all**,
+  **Download**), as on My Account; the page no longer asks people to print them (UX-12).
+- A used, withdrawn or expired activation or reset link says so as its page opens, with a link to request a new one,
+  instead of showing the password form and refusing only after a password was typed (validation finding DEV-004).
+  The page asks the new `POST /api/v1/auth/link-status` (`{token, kind}` → `{usable}`), which does not spend the link
+  and names no account; when the check cannot be made, the form shows as before and the server still decides.
+
+### Changed
+
+- Website, Trust › Enterprise Administration: the "Available today" card no longer lists connections, mappings and
+  plans as customer self-service; they are marked as configured with design partners (WEB-12).
+
 ## [0.10.34] - 2026-10-20
 
 Fixes for what the free-trial validation run of 0.10.33 found (document MDARIX-FT-VER v1.0, interim).

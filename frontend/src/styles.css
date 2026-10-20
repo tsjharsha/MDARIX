@@ -10303,6 +10303,20 @@ html[data-public-path="/platform/investigation-brief"] .public-shell .capability
 .auth-page .auth-card .primary-action:hover {
   background: #06625f;
 }
+.auth-page .auth-card .auth-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.auth-page .auth-card .auth-code-actions .secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 .auth-page .auth-card [role="status"] {
   margin: 0;
   padding: 12px 14px;

@@ -114,6 +114,11 @@ class Reset(BaseModel):
     password: str = Field(max_length=128)
 
 
+class LinkCheck(BaseModel):
+    token: str = Field(max_length=200)
+    kind: str = Field(pattern="^(activation|reset)$")
+
+
 class PasswordChange(BaseModel):
     current_password: str = Field(max_length=128)
     new_password: str = Field(max_length=128)
@@ -614,6 +619,21 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
     enforce("signup:email", email)
     if "@" not in email or email.startswith("@") or email.endswith("@") or " " in email:
         raise HTTPException(422, detail={"code": "VALID_EMAIL_REQUIRED", "message": "Enter a valid work email"})
+    from backend.app.plain_names import looks_like_link
+
+    # Both names go into the emails MDARIX sends to this address: never a link (SEC-04).
+    if looks_like_link(data.display_name):
+        raise HTTPException(
+            422, detail={"code": "NAME_HAS_LINK", "message": "Write your name without a web or email address"}
+        )
+    if looks_like_link(data.organization):
+        raise HTTPException(
+            422,
+            detail={
+                "code": "ORGANIZATION_HAS_LINK",
+                "message": "Write your organization's name without a web or email address",
+            },
+        )
     from backend.app.trial.request_profile import ProfileError, build_profile
 
     bind_system(db, "trial sign-up: is this email already known")
@@ -1133,17 +1153,35 @@ def _redeem(db: Session, request: Request, data: Reset, kind: str) -> AuthUser:
     return row
 
 
+@router.post("/link-status")
+def link_status(data: LinkCheck, request: Request, db: Session = Depends(get_db)):
+    """Whether a one-time link can still be used, asked as its page opens, so a spent, withdrawn or expired link says
+    so before anyone types a new password (validation finding DEV-004). Read-only: the link is not spent, and the
+    answer names no account. The token travels in the body, never in a URL that would be logged."""
+    enforce("token:ip", client_ip(request))
+    bind_system(db, f"check single-use {data.kind} token")
+    invalid = "INVALID_RESET" if data.kind == "reset" else "INVALID_ACTIVATION"
+    try:
+        user_id = peek(db, data.token, data.kind)
+    except ValueError:
+        return {"usable": False, "code": invalid}
+    row = db.query(AuthUser).filter(AuthUser.id == user_id).first()
+    if row is None or _admin_blocked(row):
+        return {"usable": False, "code": invalid}
+    return {"usable": True}
+
+
 @router.post("/reset-password")
 def reset(data: Reset, request: Request, db: Session = Depends(get_db)):
     _redeem(db, request, data, "reset")
     return {"status": "PASSWORD_RESET"}
 
 
-def _send_welcome_quietly(email: str, organization: str) -> None:
+def _send_welcome_quietly(email: str, organization: str, mfa_required: bool = False) -> None:
     try:
         from auth.emailer import send_welcome_email
 
-        send_welcome_email(email, organization)
+        send_welcome_email(email, organization, mfa_required=mfa_required)
     except Exception as exc:  # the account is active either way
         logger.warning("Welcome email failed: %s", type(exc).__name__)
 
@@ -1151,7 +1189,12 @@ def _send_welcome_quietly(email: str, organization: str) -> None:
 @router.post("/activate-account")
 def activate(data: Reset, request: Request, background: BackgroundTasks, db: Session = Depends(get_db)):
     row = _redeem(db, request, data, "activation")
+    from backend.app import mfa
+
     background.add_task(
-        _send_welcome_quietly, row.username, _organization_name(db, row.tenant_id) or "your organization"
+        _send_welcome_quietly,
+        row.username,
+        _organization_name(db, row.tenant_id) or "your organization",
+        mfa.required_for(row),
     )
     return {"status": "ACTIVE", "user_id": str(row.id), "business_id": row.business_id, "email": row.username}

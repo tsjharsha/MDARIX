@@ -272,7 +272,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
       },
       {
         title: "Customer self-administration",
-        text: "Customer administrators invite users, assign roles, configure connections and mappings, and review their own audit trail.",
+        text: "Customer administrators invite users, assign roles and review their own audit trail. Connections and field mappings are configured with design partners.",
       },
       {
         title: "Identity and access",
@@ -280,7 +280,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
       },
       {
         title: "Plans and entitlements",
-        text: "Plans, seats and features are controlled centrally and visible to each customer.",
+        text: "With design partners: plans, seats and features are set centrally and visible to each customer.",
       },
     ],
     steps: ["Tenant", "Identity", "Access", "Integrations", "Assurance", "Operations"],

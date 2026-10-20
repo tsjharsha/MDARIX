@@ -40,6 +40,9 @@ _PARKED_API = tuple(
         # The legacy Decision Center (the current decision is /investigations/{id}/decision and /decisions/...).
         r"^/api/v1/investigations/decisions(/|$)",
         r"^/api/v1/investigations/[^/]+/(decisions|decision-context|decision-advisory)(/|$)",
+        # Public demo requests: the website offers none (frontend/src/site/offer.ts), and the route mailed the name a
+        # visitor typed to any address they chose (pre-launch review SEC-04).
+        r"^/api/v1/public/demo-requests/?$",
         # The static agent catalog (fixed text describing "agents"); the trust policy (/api/v1/ai/trust-policy)
         # shows what every AI result is checked for instead.
         r"^/api/v1/ai/agents/catalog/?$",
