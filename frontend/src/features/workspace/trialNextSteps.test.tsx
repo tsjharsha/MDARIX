@@ -13,6 +13,7 @@ import {
   MVP_STEPS,
   NEXT_STEPS_INTRO,
   NEXT_STEPS_PATH,
+  NEXT_STEPS_SUBTITLE,
   QUESTIONS,
   TRIAL_TO_MVP,
   dataMoveExplanation,
@@ -50,16 +51,16 @@ const move = (overrides: Partial<DataMove> = {}): DataMove => ({
 // A price or a discount figure: a currency, a percentage, or "per month/user".
 const PRICE = /[$€£₹]|\d\s?%|\bper (month|user|year)\b|\bINR\b|\bUSD\b/i;
 
-describe("Next steps, from trial to MVP", () => {
+describe("Next steps, from trial to pilot", () => {
   it("shows every section of the approved page, in order, and no price", () => {
     const html = renderToStaticMarkup(<TrialNextStepsSection />);
     const order = [
       NEXT_STEPS_INTRO.title,
       NEXT_STEPS_INTRO.talk,
       NEXT_STEPS_INTRO.download,
-      "The MVP works only with your real data",
-      "What changes from the trial to the MVP",
-      "How the MVP starts",
+      "The pilot works only with your real data",
+      "What changes from the trial to the pilot",
+      "How the pilot starts",
       "How your data is connected",
       "A new role: Customer Administrator",
       "What we need from you",
@@ -75,6 +76,9 @@ describe("Next steps, from trial to MVP", () => {
       at = found;
     }
     for (const row of TRIAL_TO_MVP) expect(html).toContain(row.mvp);
+    // The paid step after the trial is a pilot wherever a customer reads it; "MVP" stays an internal word (UX-09).
+    expect(html).not.toContain("MVP");
+    expect(NEXT_STEPS_SUBTITLE).toBe("From trial to pilot");
     expect(MVP_STEPS).toHaveLength(5);
     for (const step of MVP_STEPS) expect(html).toContain(step.title);
     for (const item of QUESTIONS) expect(html).toContain(item.question);
@@ -97,9 +101,9 @@ describe("Next steps, from trial to MVP", () => {
         onSent={() => undefined}
       />,
     );
-    expect(allowed).toContain("Move our trial data into the MVP");
+    expect(allowed).toContain("Move our trial data into the pilot");
     expect(allowed).toContain('type="checkbox"');
-    expect(allowed).toContain("What do you expect from the MVP?");
+    expect(allowed).toContain("What do you expect from the pilot?");
     expect(allowed).toContain("Products, sites and systems you have in mind (optional)");
     expect(allowed).toContain("Contact preferences (optional)");
     expect(allowed).toContain("Send the request");
@@ -127,8 +131,8 @@ describe("Next steps, from trial to MVP", () => {
 
   it("says where the organization's request stands", () => {
     expect(mvpRequestText(null)).toBeNull();
-    expect(mvpRequestText(request())).toContain("You asked for an MVP conversation on");
-    expect(mvpRequestText(request({ status: "CONTACTED" }))).toContain("has been in touch about your MVP");
+    expect(mvpRequestText(request())).toContain("You asked for a pilot conversation on");
+    expect(mvpRequestText(request({ status: "CONTACTED" }))).toContain("has been in touch about your pilot");
     expect(mvpRequestText(request({ status: "CLOSED" }))).toBeNull();
     expect(isOpenMvpRequest(request())).toBe(true);
     expect(isOpenMvpRequest(request({ status: "CONTACTED" }))).toBe(true);
@@ -147,8 +151,8 @@ describe("Next steps, from trial to MVP", () => {
   });
 
   it("shows Platform Admin what the trial expects and what to do with its data", () => {
-    expect(mvpDataText({ move_trial_data: true })).toBe("Move the trial data into the MVP");
-    expect(mvpDataText({ move_trial_data: false })).toBe("Start the MVP without the trial data");
+    expect(mvpDataText({ move_trial_data: true })).toBe("Move the trial data into the pilot");
+    expect(mvpDataText({ move_trial_data: false })).toBe("Start the pilot without the trial data");
     expect(mvpRequestLines({ scope: "Pumps", contact_preference: "Tuesday", days_left: 1 })).toEqual([
       "In scope: Pumps",
       "Reach them: Tuesday",
@@ -163,7 +167,8 @@ describe("the trial user guide's After your trial chapter", () => {
     expect(html).toContain('id="after-your-trial"');
     expect(html).toContain('href="#after-your-trial"');
     for (const step of MVP_STEPS) expect(html).toContain(step.title);
-    expect(html).toContain("The MVP works only with your real data");
+    expect(html).toContain("The pilot works only with your real data");
+    expect(html).not.toContain("MVP");
     expect(html).not.toMatch(PRICE);
     // Trial data is moved only on request: it never simply stays where it is.
     expect(AFTER_THE_TRIAL.join(" ")).not.toContain("your records stay where they are");

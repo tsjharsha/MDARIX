@@ -35,7 +35,7 @@ export function exitRequestText(request: TrialExitRequest | null | undefined): s
 /**
  * Ending the trial early (backend/app/trial/early_exit.py), for the person who started it: a request with an optional
  * reason and whether to delete the data. The MDARIX team confirms it; until then it can be withdrawn. `onNextSteps`
- * opens Next steps, for an owner who would rather continue with an MVP.
+ * opens Next steps, for an owner who would rather continue with a pilot.
  */
 export function EndTrialPanel({ onNextSteps }: { onNextSteps?: () => void } = {}) {
   const state = useResource<ExitState>(EXIT_REQUEST_PATH);

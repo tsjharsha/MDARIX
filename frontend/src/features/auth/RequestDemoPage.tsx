@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { CircleCheck } from "lucide-react";
-import { AuthFrame } from "./AuthPage";
+import { AuthFrame } from "./AuthFrame";
 
 const FAILED = "Your request could not be sent. Please check your details and try again.";
 

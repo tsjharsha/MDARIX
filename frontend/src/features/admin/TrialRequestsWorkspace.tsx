@@ -73,7 +73,7 @@ export const keptBecause = (trial: Pick<DueTrial, "legal_hold" | "held_for_mvp_r
   trial.legal_hold
     ? "under a legal hold"
     : trial.held_for_mvp_request
-      ? `held for its MVP request${trial.hold_until ? ` until ${new Date(trial.hold_until).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} at the latest` : ""}`
+      ? `held for its pilot request${trial.hold_until ? ` until ${new Date(trial.hold_until).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })} at the latest` : ""}`
       : null;
 type ReviewResult = TrialRequest & { email_delivery?: string; email_error?: string; activation_path?: string };
 
@@ -231,7 +231,7 @@ export function TrialRequestsWorkspace() {
 
   // The server sends only the chosen tab's page (older answers may hold every status).
   const rows = items.filter((item) => item.status === filter);
-  // Due trials a legal hold or an open MVP request keeps are listed apart: the run skips them.
+  // Due trials a legal hold or an open pilot request keeps are listed apart: the run skips them.
   const deleting = (retention ?? []).filter((trial) => !keptBecause(trial));
   const kept = (retention ?? []).filter((trial) => keptBecause(trial));
   return (

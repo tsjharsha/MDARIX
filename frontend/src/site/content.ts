@@ -623,24 +623,24 @@ export { capabilityStatus };
  */
 export const afterTheTrial = {
   eyebrow: "After the trial",
-  title: "Then an MVP on your real data.",
-  copy: "When the trial has shown how MDARIX works, the next step is an MVP: MDARIX working on your real complaints, connected to your own systems, run by your own team.",
+  title: "Then a pilot on your real data.",
+  copy: "When the trial has shown how MDARIX works, the next step is a pilot: MDARIX working on your real complaints, connected to your own systems, run by your own team.",
   points: [
     [
       "Your real data only",
-      "The MVP works on your own records from your complaint, QMS, PLM and ERP systems. There is no sample data in it.",
+      "The pilot works on your own records from your complaint, QMS, PLM and ERP systems. There is no sample data in it.",
     ],
     [
       "A dedicated database, run by MDARIX",
-      "Your MVP has a dedicated MDARIX transactional database, set up only for your organization and run by MDARIX. Your systems stay the systems of record. Free trials share the MDARIX platform, with each organization's records kept apart.",
+      "Your pilot has a dedicated MDARIX transactional database, set up only for your organization and run by MDARIX. Your systems stay the systems of record. Free trials share the MDARIX platform, with each organization's records kept apart.",
     ],
     [
       "2 to 3 weeks of setup and validation",
-      "Setup, configuration and validation testing take at least 2 to 3 weeks. The MVP starts once you have signed off the setup.",
+      "Setup, configuration and validation testing take at least 2 to 3 weeks. The pilot starts once you have signed off the setup.",
     ],
     [
       "Paid, with a design-partner discount",
-      "The MVP runs from 3 months to 1 year, priced for your scope and usage in a written proposal. Design partners receive a discount.",
+      "The pilot runs from 3 months to 1 year, priced for your scope and usage in a written proposal. Design partners receive a discount.",
     ],
   ] as const,
 } as const;

@@ -73,7 +73,7 @@ export const WORKSPACE_VIEWS: readonly AppView[] = [
   "regulatory-copilot",
   "risk-traceability",
   "signature-verification",
-  // From trial to MVP: the workspace shows it in free-trial workspaces only (UserWorkspace).
+  // From trial to pilot: the workspace shows it in free-trial workspaces only (UserWorkspace).
   "next-steps",
 ];
 

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
 import { applyPageMeta } from "./site/seo";
+import { menuMove, menuPanelId, type MenuFocus } from "./site/menuKeys";
 import { lifecycleStages, platformGroups, platformPageOf, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
 import {
   CompanyPage,
@@ -248,22 +249,62 @@ export function PublicMegaSite({ path }: { path: string }) {
     };
   }, []);
 
+  // The header menus' buttons and the open menu's panel, for the keyboard order (WEB-10, site/menuKeys.ts).
+  const menuButtons = useRef<Record<string, HTMLButtonElement | null>>({});
+  const menuPanel = useRef<HTMLDivElement | null>(null);
+  const navigation = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // Escape from inside an open menu, or from its button, puts the focus back on the button.
+        const opener = openMenu ? menuButtons.current[openMenu] : null;
+        const active = document.activeElement;
+        if (opener && active && (active === opener || menuPanel.current?.contains(active))) opener.focus();
         setOpenMenu(null);
         setMobileOpen(false);
       }
     };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, []);
+  }, [openMenu]);
 
   const closeMenus = () => {
     setOpenMenu(null);
     setMobileOpen(false);
   };
   const activeMenu = NAV_MENUS.find((menu) => menu.name === openMenu);
+
+  // Tab from an open menu's button goes into the menu; Shift+Tab from its first link back to the button; Tab past its
+  // last link closes it and goes on to the header item after the button. Escape is handled above.
+  const menuLinks = () => Array.from(menuPanel.current?.querySelectorAll<HTMLAnchorElement>("a[href]") ?? []);
+  const moveInMenu = (event: React.KeyboardEvent, focus: MenuFocus) => {
+    if (!openMenu || event.key === "Escape") return;
+    const move = menuMove(event.key, event.shiftKey, focus);
+    const opener = menuButtons.current[openMenu];
+    if (!move || !opener) return;
+    const links = menuLinks();
+    if (move === "first-link") {
+      if (!links.length) return;
+      event.preventDefault();
+      links[0].focus();
+    } else if (move === "button") {
+      event.preventDefault();
+      opener.focus();
+    } else if (move === "close-and-continue") {
+      const items = Array.from(navigation.current?.querySelectorAll<HTMLElement>("button, a[href]") ?? []);
+      const next = items[items.indexOf(opener) + 1];
+      if (!next) return;
+      event.preventDefault();
+      setOpenMenu(null);
+      next.focus();
+    }
+  };
+  const onMenuKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const links = menuLinks();
+    const index = links.indexOf(document.activeElement as HTMLAnchorElement);
+    if (index >= 0) moveInMenu(event, { at: "link", index, count: links.length });
+  };
 
   return (
     <div className="mdx-site" onClick={() => openMenu && setOpenMenu(null)}>
@@ -289,14 +330,19 @@ export function PublicMegaSite({ path }: { path: string }) {
         >
           {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <nav id="public-navigation" className={mobileOpen ? "is-open" : ""} aria-label="Main">
+        <nav id="public-navigation" ref={navigation} className={mobileOpen ? "is-open" : ""} aria-label="Main">
           {NAV_MENUS.map(({ name }) => (
             <button
               key={name}
+              ref={(element) => {
+                menuButtons.current[name] = element;
+              }}
               type="button"
               aria-expanded={openMenu === name}
+              aria-controls={openMenu === name ? menuPanelId(name) : undefined}
               className={isCurrentMenu(name, page) ? "is-current" : ""}
               onClick={() => setOpenMenu(openMenu === name ? null : name)}
+              onKeyDown={(event) => openMenu === name && moveInMenu(event, { at: "button" })}
             >
               {name} <ChevronDown size={14} aria-hidden="true" />
             </button>
@@ -321,7 +367,14 @@ export function PublicMegaSite({ path }: { path: string }) {
           </div>
         </nav>
         {activeMenu && (
-          <div className="ms-mega" role="region" aria-label={`${activeMenu.title} menu`}>
+          <div
+            className="ms-mega"
+            id={menuPanelId(activeMenu.name)}
+            ref={menuPanel}
+            role="region"
+            aria-label={`${activeMenu.title} menu`}
+            onKeyDown={onMenuKeyDown}
+          >
             <div className="ms-mega-intro">
               <span className="ms-eyebrow">{activeMenu.title}</span>
               <a className="ms-link" href={activeMenu.href} onClick={closeMenus}>

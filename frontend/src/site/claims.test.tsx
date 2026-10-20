@@ -21,12 +21,15 @@ describe("website claims", () => {
     expect(TRIAL_VIDEOS.map((video) => video.summary).join(" ")).not.toContain("prepared for you at once");
   });
 
-  it("agrees on the dedicated database: every MVP has one, trials share the platform (CMP-20)", () => {
+  it("agrees on the dedicated database: every pilot has one, trials share the platform (CMP-20)", () => {
     const company = renderToStaticMarkup(<CompanyPage />);
     expect(company).toContain("dedicated MDARIX transactional database");
     expect(company).toContain("Free trials share the MDARIX platform");
+    // The paid step after the trial is a pilot wherever a customer reads it (UX-09).
+    expect(company).toContain("Then a pilot on your real data.");
+    expect(company).not.toContain("MVP");
     const roadmap = renderToStaticMarkup(<RoadmapPage />);
-    // Every MVP already has its own database, so the roadmap plans no database item (owner decision 2026-10-19).
+    // Every pilot already has its own database, so the roadmap plans no database item (owner decision 2026-10-19).
     expect(roadmap).not.toContain("A dedicated database for each customer");
     expect(roadmap).not.toContain("own cloud");
   });

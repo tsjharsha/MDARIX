@@ -388,16 +388,16 @@ export function SecurityPage() {
 
 // What was done and what is known to fall short, as tested; no conformance is claimed (CMP-16). Engineering keeps it
 // current: a fixed gap leaves the list, and the date changes.
-export const ACCESSIBILITY_UPDATED = "19 October 2026";
+export const ACCESSIBILITY_UPDATED = "20 October 2026";
 const ACCESSIBILITY_DONE = [
   "Every page can be used with a keyboard, shows where the focus is, and starts with a link that skips to the content.",
+  "The menus in the website header work with the keyboard. Tab moves from a menu's button into its links, Escape closes it and returns to the button, and Tab past its last link goes on to the rest of the header.",
   "Form fields on the website have visible labels, and required fields are marked.",
   "Diagrams and animated scenes carry a text description, and animations stop when your device asks for reduced motion.",
   "Body text was checked for colour contrast on the main pages, and an automated accessibility check (axe) runs on the home page in our tests.",
   "The website was reviewed at phone, laptop and desktop widths. Each page declares its language and has one main heading and its own title.",
 ];
 const ACCESSIBILITY_GAPS = [
-  "The menus in the website header: after a menu is opened with the keyboard, the Tab key moves to the next menu instead of into the open menu. Its links are reached after the rest of the header; Escape closes it.",
   "On the light header, the focus outline has low contrast, and the skip link shows as a thin dark line at the top-left of each page.",
   "The legal pages skip a heading level (from the page title straight to the third level).",
   "The videos have English captions as part of the picture: they cannot be switched off or resized, and there is no separate transcript yet.",

@@ -10,6 +10,61 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.38] - 2026-10-20
+
+A faster website on phones, keyboard access to the header menus, faster large imports, and "pilot" as the name of the
+paid step after the free trial, on the trial maintenance line (`release/0.10`). No migration. The web image changes
+(the build), so the web container must be rebuilt; the usual upgrade script rebuilds all images. Findings: WEB-06,
+WEB-10, NEW-4, UX-09.
+
+### Changed
+
+- The website no longer downloads the signed-in application (WEB-06). A visitor to `/` downloaded one 2,090,800-byte
+  script (562 KB compressed); it now downloads 568,902 bytes in six files (163 KB compressed), and 293 KB of
+  stylesheets instead of 435 KB. The workspace, both administration consoles, the investigator screens, sign-in and
+  the other account pages, the help guides and the demo request each load only on their own address
+  (`React.lazy` in `frontend/src/app/App.tsx`; the signed-in application is `src/app/PrivateApp.tsx`). React is a
+  script of its own, which a returning visitor's browser usually still holds after a release (`vite.config.ts`).
+  - The website pages and the trial sign-up page stay in the first script, so a pre-rendered page (0.10.37, WEB-05) is
+    replaced by the same page at once, with no blank or loading state in between. The application shows its
+    "Checking your session" card while its script loads.
+  - A screen whose script cannot be fetched (a new release replaced it, or the connection dropped) reloads the page
+    once to fetch the current one.
+  - The pre-render build is unchanged, and no inline script or style is added: the CSP (`script-src 'self'`) holds.
+- The paid step after the free trial is called a pilot everywhere a customer reads it (UX-09): "From trial to
+  pilot" in the workspace's navigation and on Next steps, "Request a pilot conversation", "Talk to us about a
+  pilot", "Then a pilot on your real data." on the Company page, the free trial user guide, the pilot guide, the trial
+  reminder emails ("What a pilot on your real data involves is in Next steps"), the messages of the pilot request
+  form, and the Platform Admin's "Pilot requests". "MVP" stays an internal word: code, the `mvp` feature set, the
+  `trial_mvp_requests` table and the `/mvp-request` API paths are unchanged.
+  - The legal texts change the name only, with the same meaning. The privacy policy ("How long we keep it") and the
+    free trial agreement (5.3) say "move your trial data into a pilot", not "an MVP". The trial agreement's "Last
+    updated" is 20 October 2026 (the privacy policy's already was). Their SHA-256 changes, so a trial request sent from
+    now on records the new versions (`legal_acceptance`, since 0.10.33). The terms of service are unchanged.
+  - The sitemap's `lastmod` of `/trial-agreement` and `/accessibility` is 20 October 2026.
+
+### Fixed
+
+- The header menus of the website work with the keyboard in the order a reader expects (WEB-10, WCAG 2.4.3). Tab
+  from an open menu's button moves to its first link; Shift+Tab from the first link returns to the button; Tab past
+  the last link closes the menu and moves to the next item of the header; Escape closes it and puts the focus back on
+  its button. The open menu's button names its panel (`aria-controls`) and says it is expanded. Opening a menu with
+  the mouse works as before. The accessibility statement no longer lists this as a known gap, and its "Last updated"
+  is 20 October 2026.
+- A large import is about fifteen times faster, with the same result (NEW-4). Locally, checking and writing a free
+  trial's 4,993-row complaints file took 358 s; it now takes 14 to 24 s, and a re-import that updates every row 35 s.
+  In the browser, locally, the whole import with the signals and insights after it takes 37 s; on production it took
+  166 s. Each row cost about 12 statements; the whole file now takes about 80.
+  - The check and the import read the complaints a file names at once, not one by one, and each lot's version once.
+  - The new complaints, their evidence rows, links and chunks are inserted in batches of up to 1,000 rows
+    (`backend/app/db/bulk.py`), and the old links, chunks and embeddings of the records a file updates are deleted
+    together (`retrieval/record_evidence.py` `upsert_record_evidences`, `EvidenceChunker.create_chunks_for_evidences`).
+    A record is chunked again only when its text changed, as before. Investigations, CAPAs, changes, requirements,
+    risks, failure modes and controls use the same batch. `upsert_record_evidence` for one record is unchanged.
+  - The audit record, the uploaded-row count, the signals run after the import and the background embeddings are
+    unchanged. `tests/test_trial_imports_0_10_38.py` imports and re-imports the same files one record at a time (as
+    before) and in batches, and checks that both leave the same complaints, evidence, links and chunks.
+
 ## [0.10.37] - 2026-10-20
 
 Search engines, and P2 findings of the pre-launch review, on the trial maintenance line (`release/0.10`). No

@@ -369,7 +369,7 @@ def send_password_reset_email(recipient: str, token: str, organization: str | No
 
 
 # The deletion date in trial emails is the earliest one (backend/app/trial/retention.py deletion_date): a grace
-# extension, a request to move the data into the MVP or a legal hold can only make it later.
+# extension, a request to move the data into the pilot or a legal hold can only make it later.
 DELETED_ON = "Data deleted, at the earliest, on"
 
 
@@ -386,7 +386,7 @@ def send_trial_reminder(recipient: str, organization: str, *, days_left: int, en
                 "paid plan with you.",
                 "If you do nothing, the workspace closes when the trial ends and its data is deleted 30 days later, "
                 "on the date above at the earliest.",
-                f"What an MVP on your real data involves is in Next steps, in your workspace: "
+                f"What a pilot on your real data involves is in Next steps, in your workspace: "
                 f"{company().app_url}/app/next-steps",
             ),
             button=("Open MDARIX", f"{company().app_url}/app"),
@@ -773,25 +773,25 @@ def send_trial_mvp_request_alert(
     days_left: int = 0,
     updated: bool = False,
 ) -> str:
-    """Tell the MDARIX team that someone in a free trial asked for an MVP conversation (or updated their request)."""
+    """Tell the MDARIX team that someone in a free trial asked for a pilot conversation (or updated their request)."""
     details = [("Name", display_name), ("Email", email), ("Organization", organization)]
     if phone:
         details.append(("Phone", phone))
     if contact_preference:
         details.append(("How and when to reach them", contact_preference))
-    details.append(("Trial data", "Move it into the MVP" if move_trial_data else "Start the MVP without it"))
+    details.append(("Trial data", "Move it into the pilot" if move_trial_data else "Start the pilot without it"))
     details.append(("Days left in the trial", str(days_left)))
-    paragraphs = [f"What they expect from the MVP: {expectations}"]
+    paragraphs = [f"What they expect from the pilot: {expectations}"]
     if scope:
         paragraphs.append(f"Products, sites and systems in mind: {scope}")
     return _send(
         recipient,
         Message(
-            subject=f"MVP conversation {'request updated' if updated else 'requested'}: {organization}",
+            subject=f"Pilot conversation {'request updated' if updated else 'requested'}: {organization}",
             heading=(
-                "A free trial updated its request for an MVP conversation."
+                "A free trial updated its request for a pilot conversation."
                 if updated
-                else "Someone in a free trial asked for an MVP conversation. Please reply to arrange a scoping call."
+                else "Someone in a free trial asked for a pilot conversation. Please reply to arrange a scoping call."
             ),
             details=tuple(details),
             paragraphs=tuple(paragraphs),
