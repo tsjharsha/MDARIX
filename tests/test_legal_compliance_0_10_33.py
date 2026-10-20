@@ -218,10 +218,12 @@ def test_the_deletion_date_counts_a_grace_extension_and_is_worded_at_the_earlies
             notifications._trial_reminder(
                 db, {"subscription_id": str(subscription.id), "stage": stage, "early": early}, fake
             )
-    long_date = f"{expected.day} {expected:%B %Y}"
-    assert captured["reminder"]["delete_on"] == long_date
-    assert captured["ended"]["delete_on"] == long_date
-    assert captured["early"]["delete_on"] == long_date
+    # With the time and "UTC" since 0.10.36, so it is never read as a day earlier or later (FUN-15).
+    utc = expected.astimezone(timezone.utc)
+    long_moment = f"{utc.day} {utc:%B %Y}, {utc:%H:%M} UTC"
+    assert captured["reminder"]["delete_on"] == long_moment
+    assert captured["ended"]["delete_on"] == long_moment
+    assert captured["early"]["delete_on"] == long_moment
     # Getting started shows the same date.
     status = user.get("/api/v1/trial/status").json()
     assert datetime.fromisoformat(status["data_deleted_at"]) == expected

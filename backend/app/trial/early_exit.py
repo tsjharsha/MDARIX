@@ -240,13 +240,21 @@ def _end_subscription(db: Session, tenant_id: uuid.UUID, now: datetime):
 def _queue_ended_email(db: Session, subscription, now: datetime) -> None:
     """The owner's "trial ended early, data kept" email goes through the trial reminders (notifications.py), which also
     keeps the scheduler from sending the usual "trial ended" email as well."""
+    from backend.app.notifications import trial_reminder_end
+
     db.add(
         OutboxEvent(
             tenant_id=subscription.tenant_id,
             event_name="TRIAL_REMINDER",
             aggregate_type="SubscriptionLifecycle",
             aggregate_id=subscription.id,
-            payload={"subscription_id": str(subscription.id), "stage": "ENDED", "early": True},
+            payload={
+                "subscription_id": str(subscription.id),
+                "stage": "ENDED",
+                "early": True,
+                # The end date it is sent for, as the scheduler's reminders keep it (FUN-04).
+                "expires_at": trial_reminder_end(subscription.expires_at),
+            },
             occurred_at=now,
         )
     )

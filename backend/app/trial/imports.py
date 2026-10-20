@@ -30,6 +30,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from backend.app.csv_safe import FORMULA_TRIGGERS
 from backend.app.db.models.foundation import Complaint, LotBatch, ManufacturingSite, Product, ProductVersion
 from backend.app.trial import business_imports, insight_questions
 from backend.app.trial.columns import examples as column_examples
@@ -180,7 +181,33 @@ TEMPLATES: dict[str, dict] = {
                 "N",
                 "Y",
                 "AquaFlow 200 Infusion Pump",
-            ]
+            ],
+            # The investigations example links both complaints, so the templates load in the order they are offered
+            # (FUN-10).
+            [
+                "CMP-10022",
+                "PUMP-200",
+                "Occlusion alarm during infusion; the line was clear when checked.",
+                "Rev D",
+                "L24-0902",
+                "2026-09-01",
+                "2026-09-02",
+                "open",
+                "2026-09-02",
+                "major",
+                "IE",
+                "Healthcare professional",
+                "Device malfunction",
+                "ALM-OCC-FALSE",
+                "SN-200D-004519",
+                "",
+                "N",
+                "Y",
+                "N",
+                "N",
+                "Y",
+                "AquaFlow 200 Infusion Pump",
+            ],
         ],
     },
     **business_imports.TEMPLATES,
@@ -240,10 +267,15 @@ def template_csv(entity: str) -> str:
     return out.getvalue()
 
 
+# A plain signed number ("-5", "+0.25"): it starts with a sign, but a spreadsheet reads it as the number it is.
+_SIGNED_NUMBER = re.compile(r"^[+-]\d+(\.\d+)?$")
+
+
 def _spreadsheet_formula(value: str) -> bool:
-    """Text a spreadsheet would run as a formula when the data is exported and opened (CSV injection)."""
-    first = value[:1]
-    return first in {"=", "+", "@", "\t", "\r"} or (first == "-" and "(" in value[:40])
+    """Text a spreadsheet would run as a formula when the data is exported and opened (CSV injection): anything that
+    starts with a character csv_safe escapes on export, except a plain signed number. The check refused "-" only with
+    a "(" in the first 40 characters, so "-2+3+cmd|..." went through (SEC-06)."""
+    return value.startswith(FORMULA_TRIGGERS) and not _SIGNED_NUMBER.match(value)
 
 
 def _personal_data(value: str, labels: bool = True) -> str | None:
@@ -589,7 +621,9 @@ def _check_values(
                     )
                     report.add(line, column, f"This looks like it contains {found}. {advice}")
                 if _spreadsheet_formula(value):
-                    report.add(line, column, "Text cannot start with =, +, @ or a formula; spreadsheets would run it.")
+                    report.add(
+                        line, column, "Text cannot start with =, +, - or @: spreadsheets would run it as a formula."
+                    )
         # The quality system's own status is kept (Cancelled, Void, Closed - no action, Inquiry...): the second look
         # reads those words to find complaints that were closed off (backend/app/complaint_review/rules.py).
         if entity == "complaints" and len(row.get("status") or "") > COMPLAINT_STATUS_MAX:

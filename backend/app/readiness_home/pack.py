@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from backend.app.csv_safe import safe_cell
 from backend.app.readiness_home import service, summary
 from backend.app.standards import BY_ID, DISCLAIMER, entries, known
 
@@ -46,13 +47,22 @@ def _text(value) -> str:
     return " ".join(str(value).split())
 
 
+def _cell(value):
+    """A value as the pack's CSV holds it: a number as itself, anything else as text a spreadsheet never runs as a
+    formula (csv_safe.safe_cell). Record names and descriptions come from people, and colleagues and inspectors open
+    the pack in a spreadsheet (SEC-06)."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return value
+    return safe_cell(_text(value))
+
+
 def _csv(header: list[str], rows: list[list]) -> bytes:
     """UTF-8 with a byte-order mark, so spreadsheet programs read the characters right."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
     writer.writerow(header)
     for row in rows:
-        writer.writerow([_text(value) for value in row])
+        writer.writerow([_cell(value) for value in row])
     return ("﻿" + buffer.getvalue()).encode("utf-8")
 
 

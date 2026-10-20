@@ -246,6 +246,17 @@ describe("CAPA effectiveness", () => {
     expect(dueText({ state: "NOT_PLANNED", days_left: null })).toBe("No check planned");
   });
 
+  it("counts the days to a check from today where the person is, not from the UTC date (DEV-020)", () => {
+    // Planned at 01:05 on 20 October for 18 January: 90 days. The server, counting from the UTC date (still
+    // 19 October in India), said 91.
+    const justAfterMidnight = new Date(2026, 9, 20, 1, 5);
+    const check = { state: "SCHEDULED" as const, days_left: 91, planned_on: "2027-01-18" };
+    expect(dueText(check, justAfterMidnight)).toBe("Due in 90 days");
+    expect(dueText({ ...check, planned_on: "2026-10-20" }, justAfterMidnight)).toBe("Due today");
+    expect(dueText({ ...check, planned_on: "2026-10-17" }, justAfterMidnight)).toBe("3 days overdue");
+    expect(clockText({ days_left: 3, due_date: "2026-10-22" }, justAfterMidnight)).toBe("Due in 2 days");
+  });
+
   it("leads with overdue checks and CAPAs closed without one", () => {
     const urgent = boardHeadline(board({ overdue: 1, closed_without_check: 2 }));
     expect(urgent.title).toBe("1 check overdue · 2 CAPAs closed without an effectiveness check");

@@ -4,6 +4,7 @@
 // a person decides; MDARIX never submits a report.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
+import { daysUntil } from "../../app/dates";
 
 export const REPORT_LIMITS = {
   reasonMin: 10,
@@ -165,10 +166,13 @@ export const WATCH_STATE: Record<WatchState, { label: string; tone: Tone }> = {
 export const watchStateOf = (state: string | null | undefined) =>
   WATCH_STATE[(state ?? "") as WatchState] ?? { label: "—", tone: "neutral" as Tone };
 
-/** "Due in 2 days", "Due today", "10 days overdue". */
-export function clockText(clock: Pick<Clock, "days_left"> | null | undefined): string {
+/** "Due in 2 days", "Due today", "10 days overdue": from today where the person is to the due date (DEV-020). */
+export function clockText(
+  clock: (Pick<Clock, "days_left"> & Partial<Pick<Clock, "due_date">>) | null | undefined,
+  now = new Date(),
+): string {
   if (!clock) return "No reporting window applies";
-  const left = clock.days_left;
+  const left = daysUntil(clock.due_date, now) ?? clock.days_left;
   if (left < 0) return `${plural(-left, "day")} overdue`;
   if (left === 0) return "Due today";
   return `Due in ${plural(left, "day")}`;
