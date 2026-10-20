@@ -4,6 +4,7 @@ import {
   endsSession,
   errorMessageFrom,
   lastFailedRequestId,
+  onApiActivity,
   requestJson,
   signInPath,
   mfaRedirectFor,
@@ -22,6 +23,23 @@ describe("shared API client", () => {
       "/api/v1/session/context",
       expect.objectContaining({ credentials: "same-origin" }),
     );
+  });
+
+  it("counts a request as activity unless it is a background read, which it marks for the server", async () => {
+    const ok = () => Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(ok));
+    const activity = vi.fn();
+    const stop = onApiActivity(activity);
+    await requestJson("/api/v1/trial/story", { background: true });
+    expect(activity).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/v1/trial/story",
+      expect.objectContaining({ headers: expect.objectContaining({ "X-MDARIX-Background": "1" }) }),
+    );
+    await requestJson("/api/v1/session/context");
+    expect(activity).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(fetch).mock.lastCall?.[1]?.headers).not.toHaveProperty("X-MDARIX-Background");
+    stop();
   });
 
   it("converts structured API failures into safe ApiError values", async () => {

@@ -442,9 +442,20 @@ def required_reviews(content: Mapping | None) -> list[dict]:
 # ------------------------------------------------------------------------------------------------- the signature
 
 
-def signature_meaning(brief_business_id: str | None, brief_version: int | None, outcome: str) -> str:
+def signature_meaning(
+    brief_business_id: str | None,
+    brief_version: int | None,
+    outcome: str,
+    signer_name: str | None = None,
+    signer_role_label: str | None = None,
+) -> str:
+    """The meaning of the signature, in the signer's words: "I, Asha Rao, Leader (Quality Manager), have reviewed
+    Decision Brief DBV000001 version 1 and decide: Accept the conclusion" (without a name: "I have reviewed ...")."""
+    name = str(signer_name or "").strip()
+    role = str(signer_role_label or "").strip()
+    subject = f"I, {name}{f', {role}' if role else ''}," if name else "I"
     return (
-        f"I have reviewed Decision Brief {brief_business_id} version {brief_version} and decide: "
+        f"{subject} have reviewed Decision Brief {brief_business_id} version {brief_version} and decide: "
         f"{outcome_label(outcome)}"
     )
 
@@ -512,6 +523,8 @@ CHECK_LABELS: dict[str, str] = {
     "signature": "Signature",
     "brief_hash": "Decision Brief fingerprint",
     "snapshot": "Context snapshot",
+    "authority": "Approval authority",
+    "separation": "Segregation of duties",
 }
 
 
@@ -600,6 +613,32 @@ def verification_checks(
             "The context snapshot is unchanged"
             if snapshot_ok
             else ("The context snapshot has changed" if snapshot_found else "The context snapshot is missing"),
+        ),
+    ]
+
+
+def signer_checks(*, signer_user_id, signer_role_label: str | None, authority_id, author_refs) -> list[dict]:
+    """The two rules enforced when signing, read back from what was recorded:
+
+    - ``authority``: the decision records the approval authority the signer decided under (set only when one granted
+      their role at signing);
+    - ``separation``: the signer is not among the people who wrote, edited or submitted the brief."""
+    role = f" as {signer_role_label}" if signer_role_label else ""
+    separated = not is_author(signer_user_id, author_refs)
+    return [
+        _check(
+            "authority",
+            authority_id is not None,
+            f"The signer held approval authority{role} when signing"
+            if authority_id is not None
+            else "No approval authority is recorded for the signer",
+        ),
+        _check(
+            "separation",
+            separated,
+            "The signer did not write, edit or submit the brief"
+            if separated
+            else "The signer also wrote, edited or submitted the brief",
         ),
     ]
 

@@ -154,6 +154,33 @@ def test_an_idle_session_ends_on_the_server(monkeypatch):
     assert client.get("/api/v1/session/context").status_code == 401  # revoked, not just refused once
 
 
+def test_a_background_read_does_not_keep_an_idle_session_alive():
+    # A page's own poll (the trial's chapter banner) is served but is no activity: the idle timeout still ends it.
+    from backend.app.auth_router import hash_token
+    from backend.app.db.models.stage2 import AuthSession
+
+    client, _ = _sign_in(_make_user(role="INVESTIGATOR"))
+    assert client.get("/api/v1/session/context").status_code == 200
+    session_hash = hash_token(client.cookies.get("mdarix_session"))
+    aged = datetime.now(timezone.utc) - timedelta(minutes=20)
+    with SessionLocal() as db:
+        bind_system(db, "test: age a session")
+        db.query(AuthSession).filter(AuthSession.session_hash == session_hash).update({AuthSession.last_seen_at: aged})
+        db.commit()
+    background = {"X-MDARIX-Background": "1"}
+    assert client.get("/api/v1/session/context", headers=background).status_code == 200
+    with SessionLocal() as db:
+        bind_system(db, "test: read the session")
+        row = db.query(AuthSession).filter(AuthSession.session_hash == session_hash).one()
+        assert abs((row.last_seen_at - aged).total_seconds()) < 1  # the idle window did not restart
+        db.query(AuthSession).filter(AuthSession.session_hash == session_hash).update(
+            {AuthSession.last_seen_at: datetime.now(timezone.utc) - timedelta(minutes=31)}
+        )
+        db.commit()
+    expired = client.get("/api/v1/session/context", headers=background)
+    assert expired.status_code == 401 and expired.json()["detail"]["code"] == "SESSION_IDLE_TIMEOUT"
+
+
 @pytest.fixture
 def decision():
     with SessionLocal() as db:

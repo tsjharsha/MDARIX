@@ -101,7 +101,13 @@ export const FOLLOW_UP_ACTION_LABELS: Record<FollowUpAction, string> = {
   REGULATORY_ACTION_REQUIRED: "Regulatory action required",
 };
 
-export type OutcomeOption = { code: string; label: string; description: string | null };
+export type OutcomeOption = {
+  code: string;
+  label: string;
+  description: string | null;
+  /** The exact words the signature will carry for this outcome, as the server builds them (when it sends them). */
+  signatureMeaning?: string | null;
+};
 export type FollowUpOption = { code: string; label: string };
 
 /** The outcomes offered: the server's list (with its words) when it sends one, else the four known outcomes. */
@@ -117,6 +123,7 @@ export function outcomeOptions(server: unknown): OutcomeOption[] {
             code: value,
             label: safeText(row?.label) ?? known?.label ?? titleCase(value),
             description: safeText(row?.description) ?? known?.description ?? null,
+            ...(safeText(row?.signature_meaning) ? { signatureMeaning: safeText(row?.signature_meaning) } : {}),
           };
         })
         .filter((item): item is OutcomeOption => !!item)

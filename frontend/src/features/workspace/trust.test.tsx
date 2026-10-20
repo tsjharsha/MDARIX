@@ -32,16 +32,19 @@ const blocked: TrustSummary = {
   ],
 };
 
-function workspace(permissions: string[]): WorkspaceApi {
+function workspace(permissions: string[], isTrial = false): WorkspaceApi {
   return {
     session: { allowed_menu: ["products", "investigations"], business_permissions: permissions },
+    isTrial,
     open: vi.fn(),
     notify: vi.fn(),
     work: { products: [], requestOpenInvestigation: vi.fn() },
   } as unknown as WorkspaceApi;
 }
-const render = (node: ReactNode, permissions: string[] = []) =>
-  renderToStaticMarkup(<WorkspaceContext.Provider value={workspace(permissions)}>{node}</WorkspaceContext.Provider>);
+const render = (node: ReactNode, permissions: string[] = [], isTrial = false) =>
+  renderToStaticMarkup(
+    <WorkspaceContext.Provider value={workspace(permissions, isTrial)}>{node}</WorkspaceContext.Provider>,
+  );
 
 describe("the automatic trust check", () => {
   it("reads a check from the server and refuses anything else", () => {
@@ -174,6 +177,8 @@ describe("the second look's AI explanation", () => {
   it("offers the explanation only to people allowed to run AI, and says why when there is none", () => {
     expect(render(<ExplainWithAi item={item()} name="CMP000012" />, ["ai.run"])).toContain("Explain with AI");
     expect(render(<ExplainWithAi item={item()} name="CMP000012" />, [])).toBe("");
+    // A free trial has no AI, so it is not offered there (the server refuses it either way).
+    expect(render(<ExplainWithAi item={item()} name="CMP000012" />, ["ai.run"], true)).toBe("");
     // A viewer still sees an explanation someone asked for.
     expect(render(<ExplainWithAi item={item({ explanation })} name="CMP000012" />, [])).toContain(
       "The description alleges",

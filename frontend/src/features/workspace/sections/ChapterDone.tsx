@@ -23,7 +23,8 @@ export function ChapterDone({ refreshKey, onOpen }: { refreshKey: number; onOpen
   useEffect(() => {
     let cancelled = false;
     const read = () =>
-      requestJson<TrialStory>(TRIAL_STORY_PATH)
+      // A background read: the poll must not keep an untouched page signed in past the idle timeout.
+      requestJson<TrialStory>(TRIAL_STORY_PATH, { background: true })
         .then((story) => {
           if (cancelled) return;
           const fresh = newlyTried(known.current, story);

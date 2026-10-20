@@ -1149,6 +1149,26 @@
   font-size: 13px;
   font-weight: 600;
 }
+/* Records › Verify a signature: one card per signature, a line per fact. */
+.uw-embedded .signature-report-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+.uw-embedded .signature-report-grid article {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-embedded .signature-report-grid small {
+  color: var(--ac-muted);
+  font-size: 13px;
+}
 .uw-embedded label {
   display: grid;
   gap: 4px;

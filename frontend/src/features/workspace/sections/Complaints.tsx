@@ -16,7 +16,7 @@ import { BarList, Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admi
 import { Drawer, Table, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { offeredTab } from "../../../app/featureSet";
-import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
+import { investigationRequestFor, useCan, useCanRunAi, useOpenInvestigation, useWorkspace } from "../workspaceContext";
 import { StatusBadge, countOf } from "./common";
 import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
@@ -343,7 +343,7 @@ export function SecondLookCard({
  * above stand either way, and a person decides (exported for its unit test).
  */
 export function ExplainWithAi({ item, name }: { item: SecondLookItem; name: string }) {
-  const canRun = useCan("ai.run");
+  const canRun = useCanRunAi();
   const [explanation, setExplanation] = useState<SecondLookExplanation | null>(item.explanation ?? null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

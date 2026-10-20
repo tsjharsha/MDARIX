@@ -24,13 +24,20 @@ type RequestOptions = RequestInit & {
   retries?: number;
   /** A 401 normally sends the person to sign-in; the session check that decides where to go turns it off. */
   redirectOnUnauthorized?: boolean;
+  /** A read the page makes on its own (a poll), not the person: it neither restarts the idle window here nor, through
+   * BACKGROUND_HEADER, on the server, so a page left open still signs out after the idle timeout. */
+  background?: boolean;
 };
+
+/** Marks a background request; the server then leaves the session's idle window alone (request_context.py). */
+export const BACKGROUND_HEADER = "X-MDARIX-Background";
 
 // The request id of the latest failed call, offered with "Report a problem" so support can find the server log.
 let lastFailureRequestId: string | undefined;
 export const lastFailedRequestId = () => lastFailureRequestId;
 
 // Every successful call keeps the server session alive (it resets the idle timer); the session watch listens.
+// Background reads (option `background`) do neither.
 const activityListeners = new Set<() => void>();
 export function onApiActivity(listener: () => void): () => void {
   activityListeners.add(listener);
@@ -130,6 +137,7 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
     timeoutMs = 15000,
     retries = options.method && options.method !== "GET" ? 0 : 1,
     redirectOnUnauthorized = true,
+    background = false,
     ...init
   } = options;
   let lastError: unknown;
@@ -153,6 +161,7 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
           Accept: "application/json",
           // Files and form data carry their own type; a string body is JSON unless the caller says otherwise.
           ...(typeof init.body === "string" ? { "Content-Type": "application/json" } : {}),
+          ...(background ? { [BACKGROUND_HEADER]: "1" } : {}),
           ...init.headers,
         },
       });
@@ -184,7 +193,7 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
         if (mfaPage) window.location.replace(mfaPage);
         throw error;
       }
-      activityListeners.forEach((listener) => listener());
+      if (!background) activityListeners.forEach((listener) => listener());
       return payload as T;
     } catch (error) {
       lastError = error;

@@ -664,9 +664,8 @@ def read_decisions(found: Gathered) -> None:
 
     db, case = found.db, found.case
     decisions = case_decisions(db, case)
-    by_id = {}
+    by_id = {decision.id: decision for decision in decisions}
     for decision in decisions:
-        by_id[decision.id] = decision
         ref = found.remember("Decision", decision.id, decision.business_id)
         if decision.decision_kind == BRIEF_KIND:
             found.add(
@@ -701,6 +700,8 @@ def read_decisions(found: Gathered) -> None:
                 match=(decision.id,),
             )
         if decision.superseded_at is not None:
+            # The person who superseded it is the one who signed the decision that replaced it.
+            successor = by_id.get(decision.superseded_by_decision_id)
             found.add(
                 at=decision.superseded_at,
                 category="DECISION",
@@ -710,6 +711,8 @@ def read_decisions(found: Gathered) -> None:
                 reason=decision.supersede_reason,
                 details={},
                 origin=rules.HUMAN,
+                actor_ref=(successor.decided_by_user_id or successor.authorized_by_ref) if successor else None,
+                actor_role=successor.decided_under_role if successor else None,
                 match=(decision.id,),
             )
     for record in signature_records(found.control_db, case.tenant_id, list(by_id)):

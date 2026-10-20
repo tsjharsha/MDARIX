@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { importUrl } from "./ImportData";
+import { ApiError } from "../../../app/apiClient";
+import { IMPORT_TIMEOUT_MS, importFailureText, importUrl } from "./ImportData";
 
 describe("importUrl", () => {
   const base = "/api/v1/data/import";
@@ -16,6 +17,18 @@ describe("importUrl", () => {
     );
     expect(importUrl(base, "complaints", "check", "MDY", { skipProblems: true, maskPersonal: true })).toBe(
       "/api/v1/data/import/complaints/check?date_format=MDY&on_problems=skip&personal_data=mask",
+    );
+  });
+});
+
+describe("a slow import", () => {
+  it("waits minutes for a full allowance, and a timeout never claims nothing was saved", () => {
+    expect(IMPORT_TIMEOUT_MS).toBeGreaterThanOrEqual(5 * 60_000);
+    const timeout = importFailureText(new ApiError("MDARIX took too long to answer", 0, "TIMEOUT"));
+    expect(timeout).toContain("The import may still finish");
+    expect(timeout).not.toContain("nothing was saved");
+    expect(importFailureText(new ApiError("Fix the listed problems first", 422, "IMPORT_CHECK_FAILED"))).toBe(
+      "Fix the listed problems first",
     );
   });
 });

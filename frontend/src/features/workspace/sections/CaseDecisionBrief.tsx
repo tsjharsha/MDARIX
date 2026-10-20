@@ -6,7 +6,7 @@ import { Drawer, Table, errorText, formatDate, send, useResource } from "../../c
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
 import { AiInterpretationNote, StatementKind } from "../../shared/StatementKind";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCanRunAi, useWorkspace } from "../workspaceContext";
 import {
   ACTION_MAX,
   BRIEF_REVIEW_ACTIONS,
@@ -95,7 +95,7 @@ export function CaseDecisionBriefPanel({
   onOpenDecision?: () => void;
 }) {
   const { notify } = useWorkspace();
-  const canRunAi = useCan("ai.run");
+  const canRunAi = useCanRunAi();
   const brief = useResource<BriefState>(briefPath(investigationId));
   const state = brief.data;
   const current = state?.current ?? null;

@@ -70,6 +70,12 @@ describe("outcomes and their rules", () => {
       { code: "ACCEPT_CONCLUSION", label: "Accept", description: "As written." },
     ]);
     expect(outcomeOptions([{ code: "REJECT_CONCLUSION" }])[0].label).toBe("Reject the conclusion");
+    // The words the signature will carry come from the server, so the form shows exactly what is stored.
+    const meaning =
+      "I, Asha Rao, Leader (Quality Manager), have reviewed Decision Brief DBV000001 version 1 and decide";
+    expect(outcomeOptions([{ code: "ACCEPT_CONCLUSION", signature_meaning: meaning }])[0].signatureMeaning).toBe(
+      meaning,
+    );
     expect(followUpOptions(undefined)).toHaveLength(5);
     expect(followUpOptions([{ code: "CAPA_REQUIRED" }])).toEqual([{ code: "CAPA_REQUIRED", label: "CAPA required" }]);
   });

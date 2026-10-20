@@ -174,6 +174,13 @@ export function useCan(permission: BusinessPermission): boolean {
   return !Array.isArray(granted) || granted.includes(permission);
 }
 
+/** Whether to offer an AI action: the role may run AI and the workspace is not a free trial, whose AI is off (the
+ * server refuses it there either way: genai/governance.py, GENAI_OFF_FOR_FREE_TRIAL). */
+export function useCanRunAi(): boolean {
+  const value = useContext(WorkspaceContext);
+  return useCan("ai.run") && !value?.isTrial;
+}
+
 const text = (value: unknown): string | null =>
   value === null || value === undefined || value === "" ? null : String(value);
 
