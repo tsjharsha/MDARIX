@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WORKSPACE_SECTIONS, WorkspaceContext, sectionAllowed, type WorkspaceApi } from "./workspaceContext";
 import { WatchCard } from "./sections/ReportabilityWatch";
 import { WindowsBody } from "./sections/ReportingWindows";
@@ -11,6 +11,14 @@ import { viewFromPath } from "../../app/router";
 import type { ReportabilitySettings, WatchItem } from "./reportability";
 import type { CapaDetail, CapaItem } from "./effectiveness";
 import { BASIS_DISCLAIMER, SIGNATURE_BASIS } from "../shared/standards";
+
+// The fixtures' clocks are counted from 13 October 2026: day counts are made in the browser from the due date
+// (DEV-020), so today is pinned (only Date is faked).
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 13, 12));
+});
+afterAll(() => vi.useRealTimers());
 
 function workspace(permissions: string[]): WorkspaceApi {
   return {

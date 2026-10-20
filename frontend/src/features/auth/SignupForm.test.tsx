@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { SignupForm, TrialConsent, WhatHappensNext } from "./SignupForm";
+import { STEP_ONE_CODES, SignupForm, TrialConsent, WhatHappensNext } from "./SignupForm";
 import { GUIDE_STEPS } from "../help/trialGuide";
 
 describe("free trial request form", () => {
@@ -35,6 +35,13 @@ describe("free trial request form", () => {
     expect(html.match(/<a /g)).toHaveLength(3);
     // The request records which version of each text was accepted (backend/app/auth_router.py signup).
     expect(html).toContain("records which version of each text you accepted, and when");
+  });
+
+  it("takes the person back to the first step when the server refuses their name, company or email", () => {
+    // Release 0.10.36 (FUN-12): the server refuses a blank name or company and an email such as x@localhost; the
+    // form shows the server's message on the step that holds the field.
+    for (const code of ["NAME_REQUIRED", "ORGANIZATION_REQUIRED", "VALID_EMAIL_REQUIRED", "NAME_HAS_LINK"])
+      expect(STEP_ONE_CODES.has(code)).toBe(true);
   });
 
   it("says precisely how the password is kept, never that MDARIX cannot see it", () => {

@@ -33,7 +33,7 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import AuthUser, Tenant
@@ -566,6 +566,7 @@ def _subscription_reminder(db: Session, payload: dict, emailer) -> None:
 
 
 def _trial_reminder(db: Session, payload: dict, emailer) -> None:
+    from backend.app.trial.service import long_moment
     from backend.app.trial.team import trial_request
 
     row = db.get(SubscriptionLifecycle, uuid.UUID(str(payload["subscription_id"])))
@@ -576,8 +577,9 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
     from backend.app.trial.retention import deletion_date
 
     # 30 days after the trial ends, counting a grace extension and an open request to move the data into the MVP;
-    # the emails say "at the earliest", since the date can still move later (backend/app/trial/retention.py).
-    delete_on = _long_date(deletion_date(db, db, row))
+    # the emails say "at the earliest", since the date can still move later (backend/app/trial/retention.py). Both
+    # dates carry the time and "UTC", so no reader takes them for a day earlier or later (FUN-15).
+    delete_on = long_moment(deletion_date(db, db, row))
     if payload.get("stage") == "ENDED" and payload.get("early"):
         # Ended early at the owner's request, data kept until the usual date (backend/app/trial/early_exit.py).
         _deliver(
@@ -601,7 +603,7 @@ def _trial_reminder(db: Session, payload: dict, emailer) -> None:
         [request.email],
         organization=organization,
         days_left=_days_left(row.expires_at),
-        ends_on=_long_date(row.expires_at),
+        ends_on=long_moment(row.expires_at),
         delete_on=delete_on,
     )
 
@@ -788,8 +790,42 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
     return False
 
 
+# How far before (or after) the end each trial reminder's window opens.
+_STAGE_OPENS = {"7_DAY": timedelta(days=7), "1_DAY": timedelta(days=1), "ENDED": timedelta(0)}
+
+
+def trial_reminder_end(expires_at: datetime) -> str:
+    """The end date a trial reminder is sent for, as kept in its outbox payload (``expires_at``): UTC ISO, so the
+    same end always reads the same whatever the database session's time zone."""
+    return expires_at.astimezone(timezone.utc).isoformat()
+
+
+def _trial_reminder_sent(db: Session, row: SubscriptionLifecycle, stage: str) -> bool:
+    """Whether this stage's reminder was already queued for the trial's current end date. An extension moves the end
+    date, so the 7-day, 1-day and ended emails come again for the new date, once each (FUN-04). A reminder queued
+    before 0.10.36 has no ``expires_at``; it counts for the current end when it was queued inside this stage's window
+    for that end, which an extension moves past."""
+    sent_for = OutboxEvent.payload["expires_at"].as_string()
+    return (
+        db.query(OutboxEvent.id)
+        .filter(
+            OutboxEvent.tenant_id == row.tenant_id,
+            OutboxEvent.event_name == "TRIAL_REMINDER",
+            OutboxEvent.payload["subscription_id"].as_string() == str(row.id),
+            OutboxEvent.payload["stage"].as_string() == stage,
+            or_(
+                sent_for == trial_reminder_end(row.expires_at),
+                and_(sent_for.is_(None), OutboxEvent.occurred_at >= row.expires_at - _STAGE_OPENS[stage]),
+            ),
+        )
+        .first()
+        is not None
+    )
+
+
 def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
-    """Queue each trial's reminders once: 7 days and 1 day before it ends, and when it has ended (caller commits)."""
+    """Queue each trial's reminders once per end date: 7 days and 1 day before it ends, and when it has ended (caller
+    commits). An extended trial gets them again for its new end date (FUN-04)."""
     from backend.app.trial.service import FREE_TRIAL_PLAN
     from backend.app.db.models.foundation import PlanDefinition
 
@@ -815,19 +851,7 @@ def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
             stage = "7_DAY"
         else:
             stage = None
-        if stage is None:
-            continue
-        exists = (
-            db.query(OutboxEvent.id)
-            .filter(
-                OutboxEvent.tenant_id == row.tenant_id,
-                OutboxEvent.event_name == "TRIAL_REMINDER",
-                OutboxEvent.payload["subscription_id"].as_string() == str(row.id),
-                OutboxEvent.payload["stage"].as_string() == stage,
-            )
-            .first()
-        )
-        if exists:
+        if stage is None or _trial_reminder_sent(db, row, stage):
             continue
         db.add(
             OutboxEvent(
@@ -835,7 +859,11 @@ def queue_trial_reminders(db: Session, now: datetime | None = None) -> int:
                 event_name="TRIAL_REMINDER",
                 aggregate_type="SubscriptionLifecycle",
                 aggregate_id=row.id,
-                payload={"subscription_id": str(row.id), "stage": stage},
+                payload={
+                    "subscription_id": str(row.id),
+                    "stage": stage,
+                    "expires_at": trial_reminder_end(row.expires_at),
+                },
                 occurred_at=now,
             )
         )

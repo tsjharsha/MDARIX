@@ -63,3 +63,23 @@ export function formatUtc(value: DateInput, fallback = "—"): string {
   const date = toDate(value);
   return date ? `${date.toISOString().slice(0, 19).replace("T", " ")} UTC` : fallback;
 }
+
+/** Today's calendar date where the person is ("2026-10-20"): in India the UTC date is still the day before until 05:30. */
+export function localDay(now = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * Calendar days from today, where the person is, to a calendar date ("2027-01-18"); negative once it has passed, null
+ * for anything but a calendar date. The server counts from the UTC date, which said "Due in 91 days" for a 90-day check
+ * planned just after midnight in India (validation finding DEV-020, FUN-15).
+ */
+export function daysUntil(day: unknown, now = new Date()): number | null {
+  if (!isDateOnly(day)) return null;
+  const date = toDate(day as string);
+  if (!date) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Rounded: a day across a daylight-saving change is 23 or 25 hours long.
+  return Math.round((date.getTime() - today.getTime()) / 86_400_000);
+}

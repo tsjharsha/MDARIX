@@ -10,6 +10,49 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.36] - 2026-10-20
+
+P2 and P3 findings of the pre-launch review, on the trial maintenance line (`release/0.10`). No migration.
+
+### Security
+
+- Automatic trial approval needs the email's domain to exist: it must resolve in DNS (an A or AAAA record, looked up
+  with a 2-second timeout). A domain that does not resolve, or a lookup that does not answer in time, sends the
+  request to a Platform Administrator instead. The daily cap (20) now counts the day's company-email requests,
+  approved or not, so made-up domains can no longer use up the day's approvals unseen (SEC-07). The new
+  `MDARIX_TRIAL_DOMAIN_CHECK=off` skips the lookup on a development or test machine only; staging and production
+  always look the domain up.
+- The inspection pack's CSV files escape any cell a spreadsheet would run as a formula, as every other MDARIX export
+  does (SEC-06; `backend/app/csv_safe.py`). The import now refuses every text that starts with `=`, `+`, `-` or `@`,
+  as the export would escape it; a plain signed number such as `-5` is still accepted. Before, a `-` was refused only
+  with a `(` in the first 40 characters, so `-2+3+cmd|...` went through.
+
+### Fixed
+
+- An extended trial gets its 7-day, 1-day and "trial has ended" emails again for the new end date. Each is still sent
+  once per end date (FUN-04). Reminders sent before this release count for the end date they were sent for.
+- Trial emails give the end of the trial and the earliest deletion date with the time and "UTC", for example
+  "18 November 2026, 21:51 UTC": the reminders, the "trial has ended" emails and the invitations. A trial ends 30 days
+  after the minute it was approved, so a bare UTC date was a day off in the Americas, and in India for an approval
+  after 18:30 IST. The trial-ended page says the same (FUN-15).
+- "Due in N days" on CAPA effectiveness checks and on reporting clocks counts from today where the person is. A
+  90-day check planned just after midnight in India said "Due in 91 days" (validation finding DEV-020). The trial's
+  "N days left" counts whole days to the end time, so it was not affected.
+- Sign-up refuses an email without a dot in its domain or with two `@` (`name@company`, `x@@...`), with the same rule
+  as a colleague's invitation, and a name or company that is only spaces (422 `NAME_REQUIRED` /
+  `ORGANIZATION_REQUIRED`). The form takes the person back to the step with that field and shows the message
+  (FUN-12).
+- The trial's six import templates load in the order they are offered. The complaints template now holds the second
+  complaint (`CMP-10022`) that the investigations template links, so investigations and CAPAs no longer fail
+  (FUN-10).
+
+### Changed
+
+- The trial owner's invitation has the subject "Your MDARIX free trial is ready: activate your account" and says to
+  have your phone ready for the authenticator app, as the colleague's invitation does (UX-13).
+- My Account in a free trial shows no internal user or organization IDs, and no longer says to ask an administrator:
+  it says to write to support@mdarix.in to change your name or email. Other organizations see it as before (UX-27).
+
 ## [0.10.35] - 2026-10-20
 
 The P1 findings left after the free-trial launch. First release of the trial maintenance line (`release/0.10`).
