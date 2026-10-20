@@ -1,4 +1,4 @@
-"""A free trial's request for an MVP conversation, from Next steps in the trial workspace.
+"""A free trial's request for a pilot conversation (the paid step after the trial; "MVP" in code), from Next steps in the trial workspace.
 
 Anyone in the trial may ask. They say what they expect from the MVP, the products, sites and systems they have in mind
 and, if they like, how and when to reach them. The MVP runs on a dedicated MDARIX database for the organization and
@@ -160,7 +160,7 @@ def submit(
     wanted = _lines(expectations, TEXT_MAX)
     if not wanted or len(wanted) < EXPECTATIONS_MIN:
         raise _error(
-            422, "MVP_REQUEST_INVALID", "Tell us in a sentence or two what you expect from the MVP", "expectations"
+            422, "MVP_REQUEST_INVALID", "Tell us in a sentence or two what you expect from the pilot", "expectations"
         )
     number = " ".join((phone or "").split()) or None
     if number and (not _PHONE.match(number) or len(re.sub(r"\D", "", number)) < 7):
@@ -170,7 +170,7 @@ def submit(
         raise _error(
             422,
             "MVP_DATA_MOVE_NOT_ALLOWED",
-            "Trial data can be moved into the MVP only once the sample data is removed and your own data is imported",
+            "Trial data can be moved into the pilot only once the sample data is removed and your own data is imported",
             "move_trial_data",
         )
     fields = {

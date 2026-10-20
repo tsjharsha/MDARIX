@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this agreement will be updated with the company's details and we will tell you by email.
 
-Last updated: 19 October 2026
+Last updated: 20 October 2026
 
 This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we", "us"), gives your organization a free trial of the MDARIX product investigation platform (the "Service"). Our [Terms of service](/terms) and [Privacy policy](/privacy) also apply to the trial. Where they conflict with this agreement, this agreement prevails for the trial.
 
@@ -50,7 +50,7 @@ Some features may be limited or unavailable during the trial. AI features are of
 
 5.2 When the trial ends, access to the workspace stops.
 
-5.3 Your trial workspace and everything in it are deleted 30 days after the trial ends. If you asked us to move your trial data into an MVP, it is kept while that request is open, and deleted no later than 90 days after the trial ends. The trial's audit trail is deleted with it; if you want a copy, ask us for an export before then. Deleted data cannot be recovered after that, except that encrypted backups are kept for a limited period, as described in the Privacy policy. After deletion we keep only a minimal record that the trial existed: the organization's name, its trial dates and its answers about the organization, the accounts with their names and email addresses removed, and any feedback quote you agreed to have published, as the Privacy policy describes.
+5.3 Your trial workspace and everything in it are deleted 30 days after the trial ends. If you asked us to move your trial data into a pilot, it is kept while that request is open, and deleted no later than 90 days after the trial ends. The trial's audit trail is deleted with it; if you want a copy, ask us for an export before then. Deleted data cannot be recovered after that, except that encrypted backups are kept for a limited period, as described in the Privacy policy. After deletion we keep only a minimal record that the trial existed: the organization's name, its trial dates and its answers about the organization, the accounts with their names and email addresses removed, and any feedback quote you agreed to have published, as the Privacy policy describes.
 
 5.4 If your organization goes on as a design partner or subscriber before the workspace is deleted, we will agree with you in writing whether the trial workspace and its data carry over.
 

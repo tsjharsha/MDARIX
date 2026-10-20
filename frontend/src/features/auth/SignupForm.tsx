@@ -19,7 +19,7 @@ import {
   type Option,
   type TrialProfile,
 } from "./trialProfile";
-import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
+import { TRIAL_GUIDE_PATH } from "../help/paths";
 import { useSiteInfo } from "../../site/legal";
 
 /** Answers whose problems are fixed on the first step: a refusal for one of them takes the person back there. Exported

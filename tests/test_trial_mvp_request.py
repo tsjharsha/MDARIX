@@ -62,11 +62,14 @@ def test_a_trial_asks_for_an_mvp_conversation_and_mdarix_sees_it(monkeypatch):
 
         short = user.post("/api/v1/trial/mvp-request", json={"expectations": "MVP"})
         assert short.status_code == 422 and short.json()["detail"]["field"] == "expectations"
+        # The paid step after the trial is a pilot in what a customer reads (UX-09).
+        assert short.json()["detail"]["message"] == "Tell us in a sentence or two what you expect from the pilot"
         bad_phone = user.post("/api/v1/trial/mvp-request", json={"expectations": EXPECTATIONS, "phone": "abc"})
         assert bad_phone.status_code == 422 and bad_phone.json()["detail"]["field"] == "phone"
         # The server refuses the data move however the screen was bypassed.
         move = user.post("/api/v1/trial/mvp-request", json={"expectations": EXPECTATIONS, "move_trial_data": True})
         assert move.status_code == 422 and move.json()["detail"]["code"] == "MVP_DATA_MOVE_NOT_ALLOWED"
+        assert move.json()["detail"]["message"].startswith("Trial data can be moved into the pilot only once")
         assert user.get("/api/v1/trial/mvp-request").json()["request"] is None
 
         asked = user.post(

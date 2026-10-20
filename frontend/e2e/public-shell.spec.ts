@@ -66,4 +66,37 @@ test.describe("public MDARIX shell", () => {
     }
     expect(hrefs.size).toBeGreaterThan(20);
   });
+  test("opens a header menu with the keyboard and moves through it in order (WEB-10)", async ({ page }) => {
+    // The desktop header; on a phone the menus sit behind the menu button.
+    test.skip(test.info().project.name !== "chromium", "desktop header only");
+    await page.goto("/");
+    const platform = page.locator("#public-navigation > button", { hasText: "Platform" });
+    await platform.focus();
+    await page.keyboard.press("Enter");
+    await expect(platform).toHaveAttribute("aria-expanded", "true");
+    await expect(platform).toHaveAttribute("aria-controls", "ms-menu-platform");
+    const panel = page.locator("#ms-menu-platform");
+    await expect(panel).toBeVisible();
+    // Tab goes into the open menu, to its first link.
+    await page.keyboard.press("Tab");
+    await expect(panel.locator("a").first()).toBeFocused();
+    // Shift+Tab goes back to the button; Escape closes the menu and keeps the focus there.
+    await page.keyboard.press("Shift+Tab");
+    await expect(platform).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+    await expect(platform).toBeFocused();
+    await expect(platform).toHaveAttribute("aria-expanded", "false");
+    await expect(platform).not.toHaveAttribute("aria-controls", /.+/);
+    // Tab past the last link closes the menu and goes on to the next header item.
+    await page.keyboard.press("Enter");
+    const links = panel.locator("a");
+    const count = await links.count();
+    for (let index = 0; index < count; index += 1) await page.keyboard.press("Tab");
+    await expect(links.last()).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(panel).toHaveCount(0);
+    await expect(page.locator("#public-navigation > button", { hasText: "Solutions" })).toBeFocused();
+  });
 });

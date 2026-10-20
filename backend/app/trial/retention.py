@@ -378,7 +378,7 @@ def _note_mvp_hold(db: Session, trial: dict, actor_ref: str, now: datetime) -> N
             action="TRIAL_RETENTION_SKIPPED_MVP_REQUEST",
             entity_type="Tenant",
             entity_id=tenant_id,
-            reason="The organization asked for its trial data to be moved into the MVP; the request is open.",
+            reason="The organization asked for its trial data to be moved into the pilot; the request is open.",
             details={
                 "original_delete_after": trial["original_delete_after"],
                 "hold_until": trial["hold_until"],
@@ -445,13 +445,13 @@ def alert_holds(db: Session, actor_ref: str, now: datetime | None = None) -> int
         if item["stage"] == ALERT_BEFORE_DELETION:
             lines.append(
                 f"- {name}: its trial data would be deleted on {plan['original_delete_after']:%d %b %Y}. It is kept "
-                f"because its MVP request asks to move the data. Close the request (Platform Admin, MVP requests) once "
+                f"because its pilot request asks to move the data. Close the request (Platform Admin, Pilot requests) once "
                 f"the data is moved or will not be; deletion then follows {MVP_HOLD_GRACE_DAYS} days later. The hold "
                 f"ends on {plan['hold_until']:%d %b %Y} at the latest."
             )
         else:
             lines.append(
-                f"- {name}: the hold for its MVP request ends on {plan['hold_until']:%d %b %Y}, {MVP_HOLD_MAX_DAYS} "
+                f"- {name}: the hold for its pilot request ends on {plan['hold_until']:%d %b %Y}, {MVP_HOLD_MAX_DAYS} "
                 "days after the trial ended, and the trial data is deleted then, unless the organization has moved to "
                 "a paid plan by that day."
             )
@@ -474,8 +474,8 @@ def alert_holds(db: Session, actor_ref: str, now: datetime | None = None) -> int
         )
     db.commit()
     alerts.send_alert(
-        "Trial data held for an MVP request",
-        f"{len(wanted)} trial(s) keep their data because the organization asked to move it into the MVP:\n"
+        "Trial data held for a pilot request",
+        f"{len(wanted)} trial(s) keep their data because the organization asked to move it into the pilot:\n"
         + "\n".join(lines),
     )
     return len(wanted)

@@ -29,7 +29,7 @@ export const MVP_REQUESTS_PATH = "/api/v1/platform-admin/mvp-requests";
 
 /** What the trial wants done with its data, in the MDARIX team's words. */
 export const mvpDataText = (row: Pick<MvpRequestItem, "move_trial_data">) =>
-  row.move_trial_data ? "Move the trial data into the MVP" : "Start the MVP without the trial data";
+  row.move_trial_data ? "Move the trial data into the pilot" : "Start the pilot without the trial data";
 
 /** The request's other lines: what is in scope, how to reach the person, and the trial's days left. */
 export function mvpRequestLines(row: Pick<MvpRequestItem, "days_left" | "scope" | "contact_preference">): string[] {
@@ -61,7 +61,7 @@ const formatDate = (value: string | null) =>
       })
     : "—";
 
-// Requests for an MVP conversation, sent from Next steps inside free trials (backend/app/trial/mvp_request.py): what
+// Requests for a pilot conversation, sent from Next steps inside free trials (backend/app/trial/mvp_request.py): what
 // the organization expects, what is in scope, how to reach the person, and whether to move the trial data. Staff reply
 // to arrange a scoping call, mark the request contacted, and close it when the conversation is over.
 export function MvpRequestsWorkspace() {
@@ -108,8 +108,8 @@ export function MvpRequestsWorkspace() {
     <section className="platform-admin-card trial-queue" aria-labelledby="mvp-queue-title">
       <div className="platform-admin-card-title">
         <div>
-          <span className="eyebrow">MVP requests</span>
-          <h3 id="mvp-queue-title">Free trials that asked for an MVP conversation</h3>
+          <span className="eyebrow">Pilot requests</span>
+          <h3 id="mvp-queue-title">Free trials that asked for a pilot conversation</h3>
           <p>
             Reply to each requester to arrange a scoping call, then mark the request contacted. Close it when the
             conversation is over; the organization can then ask again. Prices go only in the written proposal. While a
@@ -124,7 +124,7 @@ export function MvpRequestsWorkspace() {
         </div>
       </div>
 
-      <div className="trial-queue-filters" role="tablist" aria-label="MVP request status">
+      <div className="trial-queue-filters" role="tablist" aria-label="Pilot request status">
         {FILTERS.map(([value, label]) => (
           <button
             key={value}
@@ -145,17 +145,17 @@ export function MvpRequestsWorkspace() {
       )}
 
       {state === "error" ? (
-        <p className="trial-queue-empty">MVP requests could not be loaded. Refresh to try again.</p>
+        <p className="trial-queue-empty">Pilot requests could not be loaded. Refresh to try again.</p>
       ) : state === "loading" && !items.length ? (
-        <p className="trial-queue-empty">Loading MVP requests…</p>
+        <p className="trial-queue-empty">Loading pilot requests…</p>
       ) : rows.length === 0 ? (
-        <p className="trial-queue-empty">{filter === "NEW" ? "No new MVP requests." : "Nothing here yet."}</p>
+        <p className="trial-queue-empty">{filter === "NEW" ? "No new pilot requests." : "Nothing here yet."}</p>
       ) : (
         <Table
-          caption="MVP requests"
+          caption="Pilot requests"
           rows={rows}
           rowKey={(row) => row.id}
-          empty={{ title: "Nothing here yet", detail: "Requests appear here as free trials ask for an MVP." }}
+          empty={{ title: "Nothing here yet", detail: "Requests appear here as free trials ask for a pilot." }}
           columns={[
             {
               key: "organization",

@@ -194,8 +194,8 @@ function CustomerAdministrators() {
 }
 
 /**
- * People asking to use MDARIX: demo requests from the website, free-trial requests, and requests from free trials for an
- * MVP conversation. Approving a trial creates its customer and tenant (under Customers & Tenants) and the requester's
+ * People asking to use MDARIX: demo requests from the website, free-trial requests, and requests from free trials for a
+ * pilot conversation. Approving a trial creates its customer and tenant (under Customers & Tenants) and the requester's
  * account.
  */
 function Onboarding() {
@@ -205,7 +205,7 @@ function Onboarding() {
         <div>
           <h2>Demo and trial requests</h2>
           <p className="ac-muted">
-            The people who asked for a demo, a free trial or, from a trial, an MVP conversation. Approving a trial
+            The people who asked for a demo, a free trial or, from a trial, a pilot conversation. Approving a trial
             creates the requester&apos;s account, and the customer and tenant it belongs to, which are then managed
             under Customers &amp; Tenants.
           </p>

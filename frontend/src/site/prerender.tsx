@@ -4,7 +4,7 @@
 // createRoot, which replaces the pre-rendered markup with the same page (src/main.tsx).
 import { renderToStaticMarkup } from "react-dom/server";
 import { PublicMegaSite } from "../PublicMegaSite";
-import { AuthPage } from "../features/auth/AuthPage";
+import { SignupPage } from "../features/auth/SignupPage";
 import { INDEXED_PATHS, SITE_URL, pageHead, type IndexedPath, type PageHead } from "./seo";
 
 export { INDEXED_PATHS, pageHead, type IndexedPath, type PageHead };
@@ -22,7 +22,7 @@ export function renderPage(path: IndexedPath): string {
   const location: Location = { pathname: path, search: "", hash: "", origin: SITE_URL, href: `${SITE_URL}${path}` };
   scope.window = { location };
   try {
-    return renderToStaticMarkup(path === "/signup" ? <AuthPage mode="signup" /> : <PublicMegaSite path={path} />);
+    return renderToStaticMarkup(path === "/signup" ? <SignupPage /> : <PublicMegaSite path={path} />);
   } finally {
     if (previous === undefined) delete scope.window;
     else scope.window = previous;

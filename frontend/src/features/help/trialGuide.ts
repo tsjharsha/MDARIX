@@ -6,7 +6,7 @@
 
 import { CALL_TO_ACTION, NEXT_STEPS_SECTION } from "./trialNextSteps";
 
-export const TRIAL_GUIDE_PATH = "/help/trial-guide";
+export { TRIAL_GUIDE_PATH } from "./paths";
 
 export type GuideStep = {
   key: JourneyKey;
@@ -141,8 +141,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
 
 export const AFTER_THE_TRIAL: readonly string[] = [
   "The trial runs for 30 days. The days left are shown at the top of every screen.",
-  "When it ends, the workspace closes and your trial data is kept for 30 more days, then deleted, unless you asked for it to be moved into your MVP.",
-  `To continue, open ${NEXT_STEPS_SECTION} in your workspace and choose ${CALL_TO_ACTION.action}: the MVP runs on your real data, in a database set up only for your organization and run by MDARIX (see After your trial, above).`,
+  "When it ends, the workspace closes and your trial data is kept for 30 more days, then deleted, unless you asked for it to be moved into your pilot.",
+  `To continue, open ${NEXT_STEPS_SECTION} in your workspace and choose ${CALL_TO_ACTION.action}: the pilot runs on your real data, in a database set up only for your organization and run by MDARIX (see After your trial, above).`,
   "To stop sooner, the person who started the trial chooses End my trial early at the bottom of Getting started. The MDARIX team confirms it by email and, if you ask, deletes all your trial data.",
 ];
 

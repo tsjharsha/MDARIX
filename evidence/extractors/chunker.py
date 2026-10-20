@@ -1,7 +1,8 @@
 import hashlib
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from backend.app.db.models.evidence_intelligence import EvidenceChunk
 from backend.app.db.models.retrieval_intelligence import EvidenceChunkEmbedding
@@ -44,28 +45,61 @@ class EvidenceChunker:
             EvidenceChunk.evidence_id == evidence_id,
         ).delete(synchronize_session=False)
 
-        raw_chunks = self._chunk_text(content)
-        chunk_objects: List[EvidenceChunk] = []
-
-        for seq, (chunk_text, anchor) in enumerate(raw_chunks, start=1):
-            chksum = hashlib.sha256(chunk_text.encode("utf-8")).hexdigest()
-            token_est = len(chunk_text.split())
-
-            chunk_obj = EvidenceChunk(
-                id=uuid.uuid4(),
-                tenant_id=tenant_id,
-                evidence_id=evidence_id,
-                sequence_number=seq,
-                text_content=chunk_text,
-                source_anchor=anchor,
-                token_count=token_est,
-                checksum=chksum,
-            )
-            db.add(chunk_obj)
-            chunk_objects.append(chunk_obj)
-
+        chunk_objects = self._chunk_rows(tenant_id, evidence_id, content)
+        db.add_all(chunk_objects)
         db.flush()
         return chunk_objects
+
+    def create_chunks_for_evidences(
+        self,
+        db: Session,
+        tenant_id: uuid.UUID,
+        contents: Sequence[Tuple[uuid.UUID, str]],
+        replace: Iterable[uuid.UUID] = (),
+    ) -> int:
+        """create_chunks_for_evidence for many evidence rows at once (an import, NEW-4).
+
+        The chunks of the rows in ``replace``, and their embeddings, are deleted with one statement each per 1,000 rows;
+        then the chunks of every row in ``contents`` (evidence id, text) are inserted in batches (db/bulk.py). A new
+        evidence row has no chunks to replace. Returns how many chunks were added.
+        """
+        from backend.app.db.bulk import insert_rows
+
+        replace = list(replace)
+        for start in range(0, len(replace), 1000):
+            part = replace[start : start + 1000]
+            old_chunks = select(EvidenceChunk.id).where(
+                EvidenceChunk.tenant_id == tenant_id, EvidenceChunk.evidence_id.in_(part)
+            )
+            db.query(EvidenceChunkEmbedding).filter(
+                EvidenceChunkEmbedding.tenant_id == tenant_id, EvidenceChunkEmbedding.chunk_id.in_(old_chunks)
+            ).delete(synchronize_session=False)
+            db.query(EvidenceChunk).filter(
+                EvidenceChunk.tenant_id == tenant_id, EvidenceChunk.evidence_id.in_(part)
+            ).delete(synchronize_session=False)
+        rows = [row for evidence_id, content in contents for row in self._chunk_values(tenant_id, evidence_id, content)]
+        insert_rows(db, EvidenceChunk, rows)
+        return len(rows)
+
+    def _chunk_rows(self, tenant_id: uuid.UUID, evidence_id: uuid.UUID, content: str) -> List[EvidenceChunk]:
+        """The EvidenceChunk rows of one evidence text, numbered from 1, not yet added to the session."""
+        return [EvidenceChunk(**values) for values in self._chunk_values(tenant_id, evidence_id, content)]
+
+    def _chunk_values(self, tenant_id: uuid.UUID, evidence_id: uuid.UUID, content: str) -> List[Dict[str, Any]]:
+        """The column values of the chunks of one evidence text, numbered from 1."""
+        return [
+            {
+                "id": uuid.uuid4(),
+                "tenant_id": tenant_id,
+                "evidence_id": evidence_id,
+                "sequence_number": seq,
+                "text_content": chunk_text,
+                "source_anchor": anchor,
+                "token_count": len(chunk_text.split()),
+                "checksum": hashlib.sha256(chunk_text.encode("utf-8")).hexdigest(),
+            }
+            for seq, (chunk_text, anchor) in enumerate(self._chunk_text(content), start=1)
+        ]
 
     def _chunk_text(self, content: str) -> List[tuple[str, Dict[str, Any]]]:
         """Deterministically breaks content into paragraph or section blocks."""

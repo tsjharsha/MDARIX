@@ -33,7 +33,7 @@ from backend.app.db.models.foundation import (
     Risk,
     Supplier,
 )
-from retrieval.record_evidence import summary, upsert_record_evidence
+from retrieval.record_evidence import RecordEvidence, summary, upsert_record_evidences
 
 TEMPLATES: dict[str, dict] = {
     "components": {
@@ -399,6 +399,7 @@ def write(
     """Write one checked batch. stamp(row_date) gives the source and timestamp columns; parse_date reads a date."""
     records = Records(db, tenant_id)
     created = updated = 0
+    evidence: list[RecordEvidence] = []
     for _, row in rows:
         product = lookup.product(row["product_id"]) if row.get("product_id") else None
         version = lookup.version(product, row["version"]) if product is not None and row.get("version") else None
@@ -427,7 +428,9 @@ def write(
                 updated += 1
             db.flush()
             _links(entity, row, record, db, tenant_id, lookup, records, now)
-            _index(entity, row, record, product, version, db, tenant_id, source)
+            item = _index(entity, row, record, product, version, db, tenant_id, source)
+            if item is not None:
+                evidence.append(item)
             continue
 
         if entity == "bom":
@@ -500,6 +503,7 @@ def write(
             else:
                 updated += 1
         db.flush()
+    upsert_record_evidences(db, tenant_id, evidence)
     return created, updated
 
 
@@ -643,8 +647,11 @@ def _links(entity: str, row: dict, record, db: Session, tenant_id, lookup, recor
     db.flush()
 
 
-def _index(entity: str, row: dict, record, product, version, db: Session, tenant_id, source: str) -> None:
-    """Make the record searchable by the AI (see retrieval/record_evidence.py)."""
+def _index(
+    entity: str, row: dict, record, product, version, db: Session, tenant_id, source: str
+) -> RecordEvidence | None:
+    """Make the record searchable by the AI (see retrieval/record_evidence.py): its evidence row, which write() adds
+    for the whole batch at once (NEW-4). An imported evidence record is chunked here, as it is its own evidence."""
     product_link = [("Product", product.id if product else None), ("ProductVersion", version.id if version else None)]
     facts: dict[str, object]
     if entity == "investigations":
@@ -659,9 +666,7 @@ def _index(entity: str, row: dict, record, product, version, db: Session, tenant
             },
             f"Question: {row['question']}",
         )
-        upsert_record_evidence(
-            db,
-            tenant_id,
+        return RecordEvidence(
             kind="INVESTIGATION",
             identifier=row["investigation_id"],
             title=f"Investigation {row['investigation_id']}",
@@ -678,9 +683,7 @@ def _index(entity: str, row: dict, record, product, version, db: Session, tenant
             "Product": row.get("product_id"),
             "Due": record.due_at,
         }
-        upsert_record_evidence(
-            db,
-            tenant_id,
+        return RecordEvidence(
             kind="CAPA",
             identifier=row["capa_id"],
             title=f"CAPA {row['capa_id']}: {row['title']}",
@@ -695,9 +698,7 @@ def _index(entity: str, row: dict, record, product, version, db: Session, tenant
             "Effective": record.event_timestamp,
             "Affects": row.get("affected_ids", "").replace(";", ", "),
         }
-        upsert_record_evidence(
-            db,
-            tenant_id,
+        return RecordEvidence(
             kind="CHANGE",
             identifier=row["change_id"],
             title=f"Change {row['change_id']}",
@@ -720,9 +721,7 @@ def _index(entity: str, row: dict, record, product, version, db: Session, tenant
             "Status": row.get("status"),
             "Risk": row.get("risk_id"),
         }
-        upsert_record_evidence(
-            db,
-            tenant_id,
+        return RecordEvidence(
             kind=entity.upper().rstrip("S"),
             identifier=row[key],
             title=f"{label} {row[key]}",

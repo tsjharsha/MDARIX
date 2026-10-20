@@ -135,7 +135,7 @@ describe("an invitation that did not go out", () => {
   });
 });
 
-describe("trial data held for an MVP request", () => {
+describe("trial data held for a pilot request", () => {
   const day = (value: string) => value.slice(0, 10);
   const plan = {
     delete_after: "2027-01-18T00:00:00+00:00",
@@ -145,24 +145,24 @@ describe("trial data held for an MVP request", () => {
     mvp_request: { id: "r1", status: "CONTACTED" },
   };
 
-  it("says when the data goes, or that the MVP request holds it", () => {
+  it("says when the data goes, or that the pilot request holds it", () => {
     expect(retentionText(plan, day)).toBe(
-      "Data held for its MVP request (would have been deleted 2026-11-19); deleted 2027-01-18 at the latest",
+      "Data held for its pilot request (would have been deleted 2026-11-19); deleted 2027-01-18 at the latest",
     );
     expect(
       retentionText({ ...plan, held_for_mvp_request: false, delete_after: "2026-12-03T00:00:00+00:00" }, day),
     ).toBe("Data deleted 2026-12-03");
     expect(retentionText(null, day, "2026-11-19T00:00:00+00:00")).toBe("Data deleted 2026-11-19");
     expect(retentionText(null, day)).toBeNull();
-    expect(trialBadgeOf({ state: "ENDED", retention: plan }).label).toBe("Ended, data held for its MVP request");
+    expect(trialBadgeOf({ state: "ENDED", retention: plan }).label).toBe("Ended, data held for its pilot request");
     expect(trialBadgeOf({ state: "ENDED", retention: null }).label).toBe("Ended, data kept 30 days");
   });
 
   it("keeps a held trial out of the deletion run's list", () => {
     expect(keptBecause({ legal_hold: true })).toBe("under a legal hold");
-    expect(keptBecause({ held_for_mvp_request: true })).toBe("held for its MVP request");
+    expect(keptBecause({ held_for_mvp_request: true })).toBe("held for its pilot request");
     expect(keptBecause({ held_for_mvp_request: true, hold_until: "2027-01-18T12:00:00+00:00" })).toMatch(
-      /^held for its MVP request until .+ at the latest$/,
+      /^held for its pilot request until .+ at the latest$/,
     );
     expect(keptBecause({})).toBeNull();
   });
