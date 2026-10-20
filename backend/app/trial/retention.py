@@ -18,6 +18,9 @@ data may still be moved (sample removed, own data in), the purge skips it with a
 later at the earliest (never the same night), and never after the hold's end. The MDARIX team is alerted
 ``MVP_HOLD_ALERT_DAYS`` before the date the data would otherwise have been deleted and before the hold ends, once
 each. A legal hold works as before, whatever the request.
+
+The same daily run deletes the browser error reports that were sent before sign-in, 90 days after they arrived
+(``client_errors.delete_anonymous_reports``): they belong to no organization, so no purge would ever reach them.
 """
 
 from __future__ import annotations
@@ -605,6 +608,11 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
         results.append({**trial, **outcome})
     requests = erase_stale_requests(db, actor_ref, now)
     alerted = alert_holds(db, actor_ref, now)
+    # Error reports sent before sign-in belong to no organization, so no purge reaches them: deleted after 90 days
+    # (backend/app/client_errors.py; privacy policy; NEW-3).
+    from backend.app.client_errors import delete_anonymous_reports
+
+    error_reports = delete_anonymous_reports(db, now)
     return {
         "purged": len(results),
         "trials": results,
@@ -612,4 +620,5 @@ def run_retention(db: Session, actor_ref: str, now: datetime | None = None) -> d
         "skipped": skipped,
         "requests": requests,
         "hold_alerts": alerted,
+        "error_reports_deleted": error_reports,
     }

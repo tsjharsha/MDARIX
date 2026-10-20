@@ -9,6 +9,8 @@ __pycache__/
 *.pyc
 node_modules/
 dist/
+# The website pages' server-side renderer, built and removed again by npm run build (frontend/scripts/prerender.mjs).
+frontend/dist-prerender/
 build/
 .pytest_cache/
 .pytest_tmp/

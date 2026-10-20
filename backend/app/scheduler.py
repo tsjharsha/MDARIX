@@ -89,6 +89,8 @@ def trial_retention(db: Session, _state: dict) -> dict:
         # Trials kept because the organization asked to move their data into the MVP, and alerts sent about them.
         "held_for_mvp_request": sum(1 for item in result["skipped"] if item.get("why") == "MVP_REQUEST"),
         "hold_alerts": result.get("hold_alerts", 0),
+        # Error reports sent before sign-in, deleted after their 90 days (backend/app/client_errors.py).
+        "error_reports_deleted": result.get("error_reports_deleted", 0),
     }
 
 
@@ -298,7 +300,8 @@ JOBS: tuple[Job, ...] = (
         "trial-retention",
         timedelta(hours=24),
         trial_retention,
-        "Delete trial data 30 days after the trial ends (held while its move into the MVP is requested)",
+        "Delete trial data 30 days after the trial ends (held while its move into the MVP is requested), and error "
+        "reports sent before sign-in after 90 days",
         PLATFORM_JOBS,
     ),
     Job(

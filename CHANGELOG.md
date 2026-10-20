@@ -10,6 +10,78 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.37] - 2026-10-20
+
+Search engines, and P2 findings of the pre-launch review, on the trial maintenance line (`release/0.10`). No
+migration. The web image changes (Caddyfile and the build), so the web container must be rebuilt; the usual upgrade
+script rebuilds all images.
+
+### Added
+
+- Every website page in the sitemap has its own HTML file, pre-rendered at build time (WEB-05). Its head carries the
+  page's own title, description, canonical address, robots rule, `og:title`, `og:description` and `og:url`, from the
+  same data the browser uses (`frontend/src/site/seo.ts`). Its body holds the page's text, so crawlers and link
+  previews that run no JavaScript (LinkedIn, Slack, Teams, email) read the page itself, not the home page. `npm run
+  build` now ends with `vite build --ssr src/site/prerender.tsx` and `node scripts/prerender.mjs`, which writes
+  `dist/home.html` for `/` and `dist/<page>/index.html` for the 20 others, and stops the build if a page renders
+  almost nothing. The web image runs the same `npm run build`.
+  - The browser still mounts the app with `createRoot`, which replaces the pre-rendered markup with the same page, so
+    nothing is hydrated and no mismatch can break a page. A page opened from its address keeps its scroll position.
+  - The pages' inline styles become classes of one stylesheet (`/assets/prerender-<hash>.css`), since the CSP allows
+    no inline style. No inline script is added; the JSON-LD block is unchanged.
+  - Without JavaScript, the animated parts of the pages show complete (`/noscript.css`, linked inside `<noscript>`).
+  - `/videos` lists the fourteen videos before `videos.json` answers, without calling any of them "Coming soon".
+  - The privacy policy, terms and trial agreement are served live from `MDARIX_LEGAL_DIR`, so their text is not baked
+    into the page: the pre-rendered page has the frame, and without JavaScript it says how to get the text.
+- Platform Admin, Operations, **Problem reports** (FUN-07): every problem reported from the help menu, with its
+  organization, reporter, words, page and reference, filtered by open, closed or all. **Reply by email** writes to the
+  reporter; **Close** records what was done, which the customer's audit trail keeps.
+- An invited colleague is greeted once, on their first screens: "Asha Rao invited you to Orbit Medical Devices' free
+  trial." It closes with **Got it** and does not come back after the person's first 2 days (UX-26).
+  `GET /api/v1/trial/status` names when the person first signed in and who invited them (`me`).
+
+### Changed
+
+- Caddy serves each website page its own file: `/` is `/home.html`, and `try_files {path} {path}/index.html
+  /index.html` serves `/platform/index.html` for `/platform`. `/index.html` stays the plain application shell, with no
+  page text and no canonical address, for the application, sign-in and every other address
+  (`infrastructure/docker/Caddyfile`). `scripts/production_smoke.py --front-door` checks both.
+- The sitemap's `lastmod` of `/privacy` is 20 October 2026.
+- Privacy policy, "How long we keep it", and the data retention schedule: error reports sent before sign-in are
+  deleted 90 days after they arrive (see Security). The privacy policy's "Last updated" is 20 October 2026, so a
+  trial request sent from now on records the new date and SHA-256 of the policy (`legal_acceptance`, since 0.10.33).
+- The feedback prompt waits until the person has had MDARIX for 2 days, and then, as before, until the trial is 3 days
+  old or holds the organization's own data. A colleague invited on day 5 is no longer asked on their first screen
+  (UX-26).
+- Plain words where codes showed (UX-21). After a quality review the message reads "Decision Brief DBV000001 accepted
+  for decision. Next: sign the decision on the Decision tab." (or "returned to its author for more evidence", and so
+  on), not "DBV000001: accept for decision recorded.". The brief's Reviewers list reads "Quality review started" and
+  "Accepted for decision", not "Quality · Start Review"; a risk review outcome reads "No new risk". "Established facts"
+  is "What the evidence says", since its statements are often source assertions.
+- A tried chapter of Getting started says "Tried", as the progress ring counts it. "Done N times" counted records: one
+  import of 6 rows read "Done 6 times", and a chapter whose sample was removed read "Done 0 times" (UX-28).
+- The left navigation panel reaches the bottom of the window on every page of the workspace and both consoles, at
+  80%, 90% and 100% page scale (UX-14).
+- The configuration check of a MULTI deployment (the one with free trials) requires `MDARIX_TRIAL_ALERT_EMAIL`. The
+  alerts for a trial request waiting for review and for a trial asking to end early read only that key, so
+  `MDARIX_DEMO_ALERT_EMAIL` alone left them unheard (FUN-09). Other deployments keep "one of the two". Production sets
+  both, so it is not affected.
+
+### Fixed
+
+- Opening a case no longer logs browser console errors (UX-15). The case workspace reads the latest saved AI results
+  with `?missing=empty`, and a step never run answers 200 with its field null and `persisted: false`. Without the
+  parameter the routes answer 404 as before (`backend/app/saved_results.py`). Under the MVP feature set the workspace
+  no longer asks for the parked counterfactuals.
+- A reply to the support team's email about a problem report reaches the person who reported it: the email's
+  Reply-To is the reporter, not the support address (FUN-07).
+
+### Security
+
+- Browser error reports sent before sign-in belong to no organization, so no purge reached them. They are now deleted
+  90 days after they arrive, by the daily `trial-retention` job (`client_errors.delete_anonymous_reports`, NEW-3).
+  Reports filed under an organization are deleted with its data, as before.
+
 ## [0.10.36] - 2026-10-20
 
 P2 and P3 findings of the pre-launch review, on the trial maintenance line (`release/0.10`). No migration.

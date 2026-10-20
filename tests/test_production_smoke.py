@@ -24,6 +24,16 @@ SECURITY = {
 COOKIE = "__Host-mdarix_session=abc; Path=/; Secure; HttpOnly; SameSite=Strict"
 
 
+SHELL = b'<!doctype html><head><title>MDARIX</title></head><body><div id="root"></div></body>'
+
+
+def _page(path: str) -> bytes:
+    return (
+        f'<!doctype html><head><link rel="canonical" href="https://mdarix.in{path}" /></head>'
+        '<body><div id="root"><div class="mdx-site">Page text</div></div></body>'
+    ).encode()
+
+
 def _headers(values: dict) -> Message:
     message = Message()
     for name, value in values.items():
@@ -42,6 +52,10 @@ def fake_server(overrides: dict | None = None):
         "/redoc": (404, {}, b""),
         "/api/v1/auth/session": (401, {"Cache-Control": "no-store"}, b"{}"),
         "/api/v1/session/context": (403, {}, b'{"detail":{"code":"MFA_ENROLLMENT_REQUIRED"}}'),
+        # Behind the front door: the pre-rendered website pages and the application shell (WEB-05).
+        **{path: (200, {}, _page(path)) for path in smoke.WEBSITE_PAGES},
+        "/app": (200, {}, SHELL),
+        "/signin": (200, {}, SHELL),
         **(overrides or {}),
     }
 
@@ -106,3 +120,18 @@ def test_the_web_apps_page_at_docs_is_not_mistaken_for_api_documentation(monkeyp
     assert run(monkeypatch, {"/docs": swagger}) == 1
     schema = (200, {}, b'{"openapi": "3.1.0", "paths": {}}')
     assert run(monkeypatch, {"/openapi.json": schema}) == 1
+
+
+def test_behind_the_front_door_each_website_page_is_pre_rendered_and_the_application_gets_the_shell(
+    monkeypatch, capsys
+):
+    hidden = {"/health/ready": (404, {}, b"")}
+    assert run(monkeypatch, hidden, "--front-door") == 0
+    # Every address answered with the shell, as before 0.10.37 (try_files {path} /index.html): the pages fail.
+    shell_everywhere = {**hidden, **{path: (200, {}, SHELL) for path in smoke.WEBSITE_PAGES}}
+    assert run(monkeypatch, shell_everywhere, "--front-door") == 1
+    assert "FAIL  /platform serves its own pre-rendered page" in capsys.readouterr().out
+    # The application must not get a website page (its marketing text and canonical address).
+    page_for_the_app = {**hidden, "/app": (200, {}, _page("/"))}
+    assert run(monkeypatch, page_for_the_app, "--front-door") == 1
+    assert "FAIL  /app gets the plain application shell" in capsys.readouterr().out

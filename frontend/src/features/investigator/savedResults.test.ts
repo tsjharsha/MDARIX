@@ -67,24 +67,24 @@ describe("saved AI result mapping", () => {
 describe("loadSavedResults", () => {
   it("reads the latest result of every step and keeps the ids later steps build on", async () => {
     const { calls, get } = reader({
-      [`${base}/analysis/latest`]: { analysis, persisted: true },
-      [`${base}/hypotheses`]: { hypothesis_set: hypothesisSet, persisted: true },
-      [`${base}/challenges`]: { challenge_set: challengeSet, persisted: true },
-      [`${base}/unknowns`]: { unknown_set: unknownSet, persisted: true },
-      [`${base}/failure-chains`]: { failure_chain_set: failureChainSet, persisted: true },
-      [`${base}/briefs/latest`]: brief,
+      [`${base}/analysis/latest?missing=empty`]: { analysis, persisted: true },
+      [`${base}/hypotheses?missing=empty`]: { hypothesis_set: hypothesisSet, persisted: true },
+      [`${base}/challenges?missing=empty`]: { challenge_set: challengeSet, persisted: true },
+      [`${base}/unknowns?missing=empty`]: { unknown_set: unknownSet, persisted: true },
+      [`${base}/failure-chains?missing=empty`]: { failure_chain_set: failureChainSet, persisted: true },
+      [`${base}/briefs/latest?missing=empty`]: brief,
       [`${base}/counterfactuals`]: [scenario("SUCCESS", "newest")],
     });
     const saved = await loadSavedResults("inv-1", get);
     expect(calls.sort()).toEqual(
       [
-        "analysis/latest",
-        "briefs/latest",
-        "challenges",
+        "analysis/latest?missing=empty",
+        "briefs/latest?missing=empty",
+        "challenges?missing=empty",
         "counterfactuals",
-        "failure-chains",
-        "hypotheses",
-        "unknowns",
+        "failure-chains?missing=empty",
+        "hypotheses?missing=empty",
+        "unknowns?missing=empty",
       ].map((path) => `${base}/${path}`),
     );
     // Generate Hypotheses sends the analysis on screen; the challenger sends the hypothesis set on screen.
@@ -100,9 +100,9 @@ describe("loadSavedResults", () => {
 
   it("keeps the results it could read when others are missing, forbidden or failing", async () => {
     const { get } = reader({
-      [`${base}/analysis/latest`]: { analysis, persisted: true },
-      [`${base}/hypotheses`]: new ApiError("Forbidden", 403, "FORBIDDEN"),
-      [`${base}/challenges`]: new ApiError("MDARIX could not be reached.", 0, "NETWORK_ERROR"),
+      [`${base}/analysis/latest?missing=empty`]: { analysis, persisted: true },
+      [`${base}/hypotheses?missing=empty`]: new ApiError("Forbidden", 403, "FORBIDDEN"),
+      [`${base}/challenges?missing=empty`]: new ApiError("MDARIX could not be reached.", 0, "NETWORK_ERROR"),
       [`${base}/counterfactuals`]: [],
     });
     const saved = await loadSavedResults("inv-1", get);
@@ -113,6 +113,23 @@ describe("loadSavedResults", () => {
     expect(saved.failureChains).toBeNull();
     expect(saved.brief).toBeNull();
     expect(saved.counterfactual).toBeNull();
+  });
+
+  it("asks for nothing-saved answers as 200, and leaves out the parked counterfactual under mvp (UX-15)", async () => {
+    const { calls, get } = reader({
+      // What the server answers with ?missing=empty for a step never run (backend/app/saved_results.py).
+      [`${base}/analysis/latest?missing=empty`]: { analysis: null, persisted: false },
+      [`${base}/hypotheses?missing=empty`]: { hypothesis_set: null, persisted: false },
+      [`${base}/challenges?missing=empty`]: { challenge_set: null, persisted: false },
+      [`${base}/unknowns?missing=empty`]: { unknown_set: null, persisted: false },
+      [`${base}/failure-chains?missing=empty`]: { failure_chain_set: null, persisted: false },
+      [`${base}/briefs/latest?missing=empty`]: { brief: null, persisted: false },
+    });
+    const saved = await loadSavedResults("inv-1", get, { counterfactuals: false });
+    expect(calls).toHaveLength(6);
+    expect(calls.some((path) => path.includes("counterfactuals"))).toBe(false);
+    expect(calls.every((path) => path.endsWith("?missing=empty"))).toBe(true);
+    expect(hasSavedResults(saved)).toBe(false);
   });
 
   it("reports nothing saved for a case with no AI runs yet", async () => {

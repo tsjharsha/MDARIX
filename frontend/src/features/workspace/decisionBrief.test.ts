@@ -12,6 +12,7 @@ import {
   briefPath,
   briefReview,
   briefReviewBody,
+  briefReviewDoneMessage,
   briefReviewProblem,
   briefStatusView,
   briefTiles,
@@ -331,5 +332,23 @@ describe("the brief's own scorecard", () => {
       content: null,
     } as never);
     expect(checks.map((check) => check.key)).toEqual(["evidence_reviewed"]);
+  });
+});
+
+describe("what a quality review says once it is recorded (UX-21)", () => {
+  it("reads as a sentence that names the Decision Brief, never as a code", () => {
+    expect(briefReviewDoneMessage("ACCEPT_FOR_DECISION", "DBV000001")).toBe(
+      "Decision Brief DBV000001 accepted for decision. Next: sign the decision on the Decision tab.",
+    );
+    expect(briefReviewDoneMessage("RETURN_FOR_EVIDENCE", "DBV000002")).toBe(
+      "Decision Brief DBV000002 returned to its author for more evidence.",
+    );
+    expect(briefReviewDoneMessage("ESCALATE", null)).toBe(
+      "The Decision Brief escalated. A leader takes it from the task list.",
+    );
+    for (const action of ["ACCEPT_FOR_DECISION", "RETURN_FOR_ANALYSIS", "REJECT_PROPOSED_CONCLUSION"]) {
+      const message = briefReviewDoneMessage(action, "DBV000001");
+      expect(message).not.toMatch(/DBV000001:|recorded\.$|[A-Z]{3,}_[A-Z]/);
+    }
   });
 });

@@ -48,6 +48,24 @@ def api_docs_served(status: int, body: bytes) -> bool:
     return status == 200 and (b"swagger-ui" in lowered or b'"openapi"' in lowered or b"redoc.standalone" in lowered)
 
 
+# Website pages behind the front door: each has its own pre-rendered file, with its canonical address and its text
+# in the page (frontend/scripts/prerender.mjs, infrastructure/docker/Caddyfile; WEB-05). The canonical names the
+# production site whatever the host the check runs against.
+WEBSITE_PAGES = ("/", "/platform", "/trust/regulations", "/videos")
+SITE_URL = "https://mdarix.in"
+
+
+def website_page(body: bytes, path: str) -> bool:
+    """The pre-rendered page for ``path``: its own canonical address and the page's markup inside the root."""
+    canonical = f'<link rel="canonical" href="{SITE_URL}{path}"'.encode()
+    return canonical in (body or b"") and b'<div id="root"><' in (body or b"")
+
+
+def application_shell(body: bytes) -> bool:
+    """The plain application shell: an empty root and no canonical address (it is served for every other path)."""
+    return b'<div id="root"></div>' in (body or b"") and b'rel="canonical"' not in (body or b"")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--base", required=True)
@@ -87,6 +105,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.front_door:
         status, headers, _ = call(args.base, "GET", "/api/v1/auth/session")
         check("API responses are not cacheable", "no-store" in (headers.get("Cache-Control") or ""), status)
+        for path in WEBSITE_PAGES:
+            status, _, body = call(args.base, "GET", path)
+            check(f"{path} serves its own pre-rendered page", status == 200 and website_page(body, path), status)
+        for path in ("/app", "/signin"):
+            status, _, body = call(args.base, "GET", path)
+            check(f"{path} gets the plain application shell", status == 200 and application_shell(body), status)
 
     status, _, body = call(
         args.base,

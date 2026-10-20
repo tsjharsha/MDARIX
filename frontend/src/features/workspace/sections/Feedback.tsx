@@ -93,18 +93,31 @@ const STATUS: Record<Submission["publication_status"], string> = {
 
 const DISMISSED_KEY = "mdarix.trial.feedback-dismissed-until";
 
-// Ask once people have had time to form a view: from day 3 of the trial, or as soon as they import their own data.
+// Ask once people have had time to form a view: from day 3 of the trial, or once its own data is imported. And never
+// in a person's first 2 days: a colleague invited on day 5 is not asked on their first screen (UX-26).
 const ASK_AFTER_DAYS = 3;
+const PERSON_ASK_AFTER_DAYS = 2;
 
-/** Whether to ask for feedback yet: not on a first visit, only after real use (exported for tests). */
-export function readyForFeedback(
-  status: { starts_at?: string; own_data?: { products: number; lots: number; complaints: number } },
-  now = Date.now(),
-): boolean {
-  const started = status.starts_at ? Date.parse(status.starts_at) : NaN;
-  const days = Number.isFinite(started) ? (now - started) / (24 * 3600 * 1000) : 0;
+type FeedbackTiming = {
+  starts_at?: string;
+  own_data?: { products: number; lots: number; complaints: number };
+  /** When this person first signed in (GET /api/v1/trial/status, backend/app/trial/team.py person). */
+  me?: { joined_at?: string | null } | null;
+};
+
+const daysSince = (value: string | null | undefined, now: number) => {
+  const at = value ? Date.parse(value) : NaN;
+  return Number.isFinite(at) ? (now - at) / (24 * 3600 * 1000) : 0;
+};
+
+/** Whether to ask for feedback yet: not on a person's first days, only after real use (exported for tests). Without
+ * the person's own date (an older server) the trial's start stands in for it. */
+export function readyForFeedback(status: FeedbackTiming, now = Date.now()): boolean {
+  const trialDays = daysSince(status.starts_at, now);
+  const personDays = daysSince(status.me?.joined_at ?? status.starts_at, now);
+  if (personDays < PERSON_ASK_AFTER_DAYS) return false;
   const own = status.own_data ?? { products: 0, lots: 0, complaints: 0 };
-  return days >= ASK_AFTER_DAYS || own.products + own.lots + own.complaints > 0;
+  return trialDays >= ASK_AFTER_DAYS || own.products + own.lots + own.complaints > 0;
 }
 
 /** Invitation shown across the trial workspace until the person has given feedback (or chose "Not now"). */
@@ -120,9 +133,7 @@ export function FeedbackPrompt({ onOpen }: { onOpen: () => void }) {
     if (until > Date.now()) return;
     Promise.all([
       requestJson<FeedbackForm>("/api/v1/trial/feedback"),
-      requestJson<{ starts_at?: string; own_data?: { products: number; lots: number; complaints: number } }>(
-        "/api/v1/trial/status",
-      ),
+      requestJson<FeedbackTiming>("/api/v1/trial/status"),
     ])
       .then(([data, status]) => setState(!data.submissions.length && readyForFeedback(status) ? "shown" : "hidden"))
       .catch(() => setState("hidden"));

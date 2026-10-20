@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from backend.app.db.data_plane import get_data_plane_db
@@ -25,6 +25,7 @@ from investigator.schemas import (
 from investigator.service import EvidenceGroundedInvestigatorService, InvestigatorError
 from backend.app.access.permissions import AI_RUN, require_permission
 from backend.app.db.tenant_scope import scoped_bind
+from backend.app.saved_results import nothing_saved
 
 router = APIRouter(prefix="/api/v1/investigations", tags=["Investigation Workspace"])
 service = InvestigationWorkspaceService()
@@ -96,15 +97,15 @@ def create_investigation_analysis(
 @router.get("/{investigation_id}/analysis/latest", response_model=InvestigationAnalysisResponse)
 def get_latest_investigation_analysis(
     investigation_id: uuid.UUID,
+    request: Request,
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> InvestigationAnalysisResponse:
     tenant_id = ctx.tenant_id
     result = investigator_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
-        raise HTTPException(
-            status_code=404, detail={"code": "ANALYSIS_NOT_FOUND", "message": "No investigation analysis exists"}
-        )
+        # 404, or 200 with nothing saved for the case workspace (?missing=empty; backend/app/saved_results.py, UX-15).
+        return nothing_saved(request, "analysis", "ANALYSIS_NOT_FOUND", "No investigation analysis exists")
     return with_evidence_business_ids(data_db, result)
 
 
@@ -146,15 +147,14 @@ def create_hypotheses(
 @router.get("/{investigation_id}/hypotheses", response_model=HypothesisSetResponse)
 def list_latest_hypotheses(
     investigation_id: uuid.UUID,
+    request: Request,
     data_db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ) -> HypothesisSetResponse:
     tenant_id = ctx.tenant_id
     result = hypothesis_service.latest(data_db, tenant_id, investigation_id)
     if result is None:
-        raise HTTPException(
-            status_code=404, detail={"code": "HYPOTHESIS_SET_NOT_FOUND", "message": "No hypothesis set exists"}
-        )
+        return nothing_saved(request, "hypothesis_set", "HYPOTHESIS_SET_NOT_FOUND", "No hypothesis set exists")
     return with_hypothesis_business_ids(data_db, tenant_id, result)
 
 

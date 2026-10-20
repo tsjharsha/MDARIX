@@ -78,6 +78,8 @@ export const OPERATIONS_SECTIONS = [
   "System health",
   "Queues & jobs",
   "Email & notifications",
+  // Problems people report from the help menu (FUN-07, 0.10.37).
+  "Problem reports",
   "Tenant cells",
   "Developer API",
 ] as const;
@@ -123,6 +125,8 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
     "System health": "Whether the platform's services are up and the background worker is running.",
     "Queues & jobs": "Work waiting in the background, work that gave up after retries, and customer setup jobs.",
     "Email & notifications": "Whether the platform can send email, and the renewal reminders waiting to go out.",
+    "Problem reports":
+      "Problems people reported from the help menu: answer the reporter by email, then close the report.",
     "Tenant cells": "Each customer's own MDARIX, as its heartbeats describe it: health, versions, jobs and packages.",
     "Developer API": "For developers: what other systems can ask MDARIX to do. Not needed to run the platform.",
   },

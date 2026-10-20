@@ -493,8 +493,9 @@ function BriefForDecision({ brief, reviewers }: { brief: DecisionBrief; reviewer
           <p className="ac-muted">None listed.</p>
         )}
       </Section>
-      <Section title="Established facts" count={facts.length}>
-        <Lines lines={facts} kind="FACT" empty="No established facts listed." />
+      {/* Not "Established facts": each statement shows its own kind, often a source assertion (UX-21). */}
+      <Section title="What the evidence says" count={facts.length}>
+        <Lines lines={facts} kind="FACT" empty="No statements from the evidence yet." />
       </Section>
       <Section title="Contradictions" count={contradictions.length}>
         <Lines lines={contradictions} empty="No contradictions listed." />

@@ -30,6 +30,7 @@ import { InsightsPanel } from "./TrialInsights";
 import type { Insights } from "../trialInsights";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
+import type { TrialPerson } from "./ColleagueWelcome";
 import {
   CHAPTER_ACTION,
   TRIAL_STORY_PATH,
@@ -52,6 +53,8 @@ export type TrialStatus = {
   sample?: SampleCounts;
   own_data?: { products: number; lots: number; complaints: number };
   templates?: ImportTemplate[];
+  /** The signed-in person: when they first signed in and who invited them (UX-26). */
+  me?: TrialPerson | null;
 };
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 

@@ -33,4 +33,11 @@ describe("free-trial videos", () => {
     expect(html).toContain("5 min");
     expect(html.match(/Coming soon/g)).toHaveLength(13);
   });
+
+  it("calls no video unfinished before videos.json has answered (the pre-rendered page, WEB-05)", () => {
+    const html = renderToStaticMarkup(<VideoCards ready={null} />);
+    expect(html).not.toContain("Coming soon");
+    expect(html).not.toContain("is-soon");
+    expect(html.match(/<strong>/g)).toHaveLength(14);
+  });
 });

@@ -109,10 +109,21 @@ def test_operational_alerts_need_a_destination(production):
 
 
 def test_staff_must_hear_about_trial_and_demo_requests(production):
+    # A MULTI deployment (free trials): the trial alert address itself is required, since the alerts for a request
+    # waiting for review and for an early end read only it (FUN-09, 0.10.37).
     production.delenv("MDARIX_TRIAL_ALERT_EMAIL")
-    assert "trial and demo requests" in found()
+    assert "Set MDARIX_TRIAL_ALERT_EMAIL: nobody would hear about trial requests" in found()
     production.setenv("MDARIX_DEMO_ALERT_EMAIL", "sales@mdarix-pilot.test")
-    assert "trial and demo requests" not in found()
+    assert "Set MDARIX_TRIAL_ALERT_EMAIL" in found()
+    # Both set, as production is: nothing to report.
+    production.setenv("MDARIX_TRIAL_ALERT_EMAIL", "trials@mdarix-pilot.test")
+    assert "MDARIX_TRIAL_ALERT_EMAIL" not in found()
+    # A deployment without free trials keeps the either-or rule.
+    production.setenv("MDARIX_DEPLOYMENT_ROLE", "PLATFORM")
+    production.delenv("MDARIX_TRIAL_ALERT_EMAIL")
+    assert "MDARIX_TRIAL_ALERT_EMAIL" not in found()
+    production.delenv("MDARIX_DEMO_ALERT_EMAIL")
+    assert "trial and demo requests" in found()
 
 
 # ------------------------------------------------------------------ MFA and sessions

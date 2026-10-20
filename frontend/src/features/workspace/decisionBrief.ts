@@ -420,6 +420,25 @@ export const briefReviewActionLabel = (action: Pick<BriefReviewAction, "action" 
   BRIEF_REVIEW_ACTIONS.find((item) => item.value === code(action.action))?.label ??
   titleCase(String(action.action ?? "Review"));
 
+// What a review did, as the sentence the toast shows after it (UX-21): "Decision Brief DBV000001 accepted for
+// decision.", never "DBV000001: accept for decision recorded.".
+const REVIEW_DONE: Record<string, string> = {
+  ACCEPT_FOR_DECISION: "accepted for decision. Next: sign the decision on the Decision tab.",
+  RETURN_FOR_EVIDENCE: "returned to its author for more evidence.",
+  RETURN_FOR_ANALYSIS: "returned to its author for more analysis.",
+  RETURN_FOR_RISK_REVIEW: "returned to its author for a risk review.",
+  RETURN_FOR_REGULATORY_REVIEW: "returned to its author for a regulatory review.",
+  REJECT_PROPOSED_CONCLUSION: "returned to its author. Its proposed conclusion was rejected.",
+  ESCALATE: "escalated. A leader takes it from the task list.",
+};
+
+/** The toast after a quality review action on a brief version, named by its MDARIX ID when it has one. */
+export function briefReviewDoneMessage(action: string, businessId: unknown): string {
+  const id = safeText(businessId);
+  const brief = id ? `Decision Brief ${id}` : "The Decision Brief";
+  return `${brief} ${REVIEW_DONE[action] ?? "was reviewed. Your review is recorded."}`;
+}
+
 /** Why the review action cannot be sent yet, or null: a comment is required for everything except accepting. */
 export function briefReviewProblem(action: string, comment: string): string | null {
   const known = BRIEF_REVIEW_ACTIONS.find((item) => item.value === action);
@@ -630,7 +649,8 @@ export function briefParts(
     { key: "conclusion", label: "Proposed conclusion", items: one(narrative.proposed_conclusion) },
     { key: "actions", label: "Recommended actions", items: actionsOf(narrative.recommended_actions) },
     { key: "notes", label: "Author notes", items: one(narrative.author_notes) },
-    { key: "facts", label: "Established facts", items: count("Facts", content.established_facts) },
+    // Not "Established facts": each statement carries its own kind, often a source assertion (UX-21).
+    { key: "facts", label: "What the evidence says", items: count("Statements", content.established_facts) },
     {
       key: "evidence",
       label: "Evidence",

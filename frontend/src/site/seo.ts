@@ -2,6 +2,8 @@
 // search with (complaint handling, post-market surveillance, MDR reportability, CAPA), the page's one canonical
 // address, and whether it may be indexed. public/sitemap.xml lists the same indexable pages (seo.test.ts checks it).
 // Keep every description true to what the product does today, under 160 characters, and free of personal names.
+// The same tags are written into each page's own HTML file at build time (scripts/prerender.mjs, pageHead below), so
+// crawlers and link previews that run no JavaScript read them too (WEB-05); the browser keeps them up to date.
 
 export const SITE_URL = "https://mdarix.in";
 export const SHARE_IMAGE = `${SITE_URL}/og-image.png`;
@@ -145,18 +147,33 @@ function setCanonical(href: string | null) {
   link.href = href;
 }
 
+/** What a website page's head says: its title and description, the indexing rule, its canonical address and the
+ * link-preview tags. ``url`` is null for the "not found" page, which is never indexed. */
+export type PageHead = { title: string; description: string; robots: string; url: string | null };
+
+/** The head of a website page (``null``: the "not found" page). One source for the browser (applyPageMeta) and for
+ * the pre-rendered HTML files (scripts/prerender.mjs). */
+export function pageHead(path: IndexedPath | null): PageHead {
+  const meta = path ? PAGE_META[path] : NOT_FOUND;
+  return {
+    title: meta.title,
+    description: meta.description,
+    robots: path ? "index, follow" : "noindex, follow",
+    url: path ? `${SITE_URL}${path === "/" ? "/" : path}` : null,
+  };
+}
+
 /** Title, description, canonical address, link-preview tags and indexing rule for a website page. ``null`` is the
  * "not found" page: never indexed, no canonical address. */
 export function applyPageMeta(path: IndexedPath | null) {
-  const meta = path ? PAGE_META[path] : NOT_FOUND;
-  const url = path ? `${SITE_URL}${path === "/" ? "/" : path}` : null;
-  document.title = meta.title;
-  setMeta("name", "description", meta.description);
-  setMeta("name", "robots", path ? "index, follow" : "noindex, follow");
-  setCanonical(url);
-  setMeta("property", "og:title", meta.title);
-  setMeta("property", "og:description", meta.description);
-  if (url) setMeta("property", "og:url", url);
+  const head = pageHead(path);
+  document.title = head.title;
+  setMeta("name", "description", head.description);
+  setMeta("name", "robots", head.robots);
+  setCanonical(head.url);
+  setMeta("property", "og:title", head.title);
+  setMeta("property", "og:description", head.description);
+  if (head.url) setMeta("property", "og:url", head.url);
 }
 
 /** Sign-in, account and application screens: kept out of search results. */
