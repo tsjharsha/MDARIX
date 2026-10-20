@@ -843,8 +843,9 @@ def send_trial_team_change_alert(
     )
 
 
-def send_operations_alert(recipient: str, subject: str, body: str) -> str:
-    """An operational alert for the team running MDARIX (backend/app/alerts.py)."""
+def send_operations_alert(recipient: str, subject: str, body: str, *, reply_to: str | None = None) -> str:
+    """An operational alert for the team running MDARIX (backend/app/alerts.py). ``reply_to`` is the person a reply
+    should reach (a problem report's reporter, FUN-07); without it a reply goes to the support address."""
     return _send(
         recipient,
         Message(
@@ -853,6 +854,7 @@ def send_operations_alert(recipient: str, subject: str, body: str) -> str:
             paragraphs=tuple(line for line in body.split("\n") if line.strip()),
             reason="You are receiving this email because you are on the MDARIX operations alert list.",
         ),
+        reply_to=reply_to,
     )
 
 

@@ -482,3 +482,11 @@
 .ar-technical[open] summary {
   margin-bottom: 8px;
 }
+
+/* A problem report's own words, kept readable in the list (Operations > Problem reports, FUN-07). */
+.ar-problem-details {
+  display: block;
+  max-width: 48ch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

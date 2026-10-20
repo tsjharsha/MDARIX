@@ -8,7 +8,9 @@
       name="description"
       content="Medical device complaint handling, FDA and EU MDR reporting clocks, trend signals, investigations and CAPA in one traceable place. Free 30-day trial."
     />
-    <!-- Link previews (LinkedIn, email, chat) read these; each website page refines title and description (src/site/seo.ts). -->
+    <!-- Link previews (LinkedIn, email, chat) read these. Each website page has its own title, description, canonical
+         and og:url in its pre-rendered copy of this file (scripts/prerender.mjs, from src/site/seo.ts), and the browser
+         keeps them up to date. This file itself is the application shell, served for every other address. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="MDARIX" />
     <meta property="og:title" content="MDARIX · Post-market surveillance and complaint handling for medical devices" />
@@ -52,6 +54,8 @@
     </script>
     <meta name="theme-color" content="#183249" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Without JavaScript the pre-rendered pages show their animated parts complete (public/noscript.css). -->
+    <noscript><link rel="stylesheet" href="/noscript.css" /></noscript>
   </head>
   <body>
     <div id="root"></div>

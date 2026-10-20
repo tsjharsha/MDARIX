@@ -15,10 +15,23 @@ describe("when to ask a trial user for feedback", () => {
     expect(readyForFeedback({ starts_at: new Date(now - 3 * DAY).toISOString(), own_data: none }, now)).toBe(true);
   });
 
-  it("asks earlier once the person imported their own data", () => {
+  it("asks earlier once the organization imported its own data, but not on the person's first 2 days", () => {
     const now = Date.parse("2026-10-10T12:00:00Z");
     const own = { products: 0, lots: 0, complaints: 4 };
-    expect(readyForFeedback({ starts_at: new Date(now - DAY).toISOString(), own_data: own }, now)).toBe(true);
+    const at = (days: number) => new Date(now - days * DAY).toISOString();
+    // Imported on the first day: not yet (UX-26, 0.10.37).
+    expect(readyForFeedback({ starts_at: at(1), own_data: own }, now)).toBe(false);
+    expect(readyForFeedback({ starts_at: at(2.5), own_data: own, me: { joined_at: at(2.5) } }, now)).toBe(true);
+  });
+
+  it("does not ask a colleague on their first screens, however old the trial is (UX-26)", () => {
+    const now = Date.parse("2026-10-10T12:00:00Z");
+    const at = (days: number) => new Date(now - days * DAY).toISOString();
+    // Invited on day 5 of the trial and signed in an hour ago.
+    expect(readyForFeedback({ starts_at: at(5), own_data: none, me: { joined_at: at(1 / 24) } }, now)).toBe(false);
+    expect(readyForFeedback({ starts_at: at(5), own_data: none, me: { joined_at: at(1.9) } }, now)).toBe(false);
+    // From the person's third day.
+    expect(readyForFeedback({ starts_at: at(7), own_data: none, me: { joined_at: at(2) } }, now)).toBe(true);
   });
 });
 

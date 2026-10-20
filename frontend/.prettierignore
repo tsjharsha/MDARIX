@@ -1,4 +1,5 @@
 dist/
+dist-prerender/
 node_modules/
 artifacts/
 test-results/

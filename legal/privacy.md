@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
 
-Last updated: 19 October 2026
+Last updated: 20 October 2026
 
 This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a free trial or a demo, or use the MDARIX product investigation platform (the "Service").
 
@@ -73,7 +73,7 @@ The Service and its data are hosted in India, by Google Cloud in its Mumbai regi
 - Customer accounts and content: kept for the subscription term. At the end, the customer's data is returned as a full export (unless the customer waives this in writing) and then deleted.
 - Audit trail and electronic signatures of a customer's account: kept unchanged, and never deleted, while the account exists. When a customer's data is deleted at the end of its contract, its audit trail is given to the customer in the export, for the customer to keep for its own regulatory period, and then deleted. Free trials are different: their audit trail is deleted with the trial workspace, as described above.
 - Server request logs: kept only until the server's log rotation overwrites them. The server keeps a fixed amount of log data and replaces the oldest first, so how long a record lasts depends on how busy the Service is.
-- Error reports and problem reports: deleted with the organization's data when its account or trial is deleted. Error reports sent before anyone signed in belong to no organization; no automatic deletion period is set for them yet, and you can ask us to delete them.
+- Error reports and problem reports: deleted with the organization's data when its account or trial is deleted. Error reports sent before anyone signed in belong to no organization: we delete them 90 days after we receive them, and you can ask us to delete them sooner.
 - Backups: encrypted and kept for up to 90 days, after which deleted data no longer exists in them.
 - A legal hold (where a court, regulator or the customer requires data to be preserved) pauses deletion for that organization until it is lifted.
 

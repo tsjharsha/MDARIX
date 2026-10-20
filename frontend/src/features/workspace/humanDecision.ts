@@ -232,6 +232,8 @@ export type DecisionBrief = {
 export type DecisionReviewer = {
   kind?: string | null;
   kind_label?: string | null;
+  /** The server's words for a quality review action ("Quality review started"; decision_brief/rules.py). */
+  label?: string | null;
   name?: string | null;
   role?: string | null;
   action?: string | null;
@@ -290,16 +292,62 @@ export function awaitsBriefReview(brief: Pick<DecisionBrief, "status"> | null | 
   return !!brief && code(brief.status) !== "APPROVED_FOR_DECISION";
 }
 
+// A quality review action as the brief's own review history words it (backend/app/decision_brief/rules.py
+// ACTION_LABELS), so the Reviewers list never shows a code title-cased, such as "Quality · Start Review" (UX-21).
+const QUALITY_ACTION_SENTENCES: Record<string, string> = {
+  START_REVIEW: "Quality review started",
+  ACCEPT_FOR_DECISION: "Accepted for decision",
+  RETURN_FOR_EVIDENCE: "Returned for more evidence",
+  RETURN_FOR_ANALYSIS: "Returned for more analysis",
+  RETURN_FOR_RISK_REVIEW: "Returned for a risk review",
+  RETURN_FOR_REGULATORY_REVIEW: "Returned for a regulatory review",
+  REJECT_PROPOSED_CONCLUSION: "Proposed conclusion rejected",
+  ESCALATE: "Escalated",
+};
+const REVIEW_KINDS: Record<string, string> = {
+  QUALITY: "Quality review",
+  QUALITY_REVIEW: "Quality review",
+  RISK: "Risk review",
+  RISK_REVIEW: "Risk review",
+  REGULATORY: "Regulatory review",
+  REGULATORY_REVIEW: "Regulatory review",
+};
+const isCode = (value: string) => /^[A-Z0-9_]+$/.test(value);
+/** A code in plain words: "NO_NEW_RISK" reads "No new risk", not "No New Risk". */
+const sentenceOf = (value: string) => {
+  const words = value.replace(/_/g, " ").toLowerCase().trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** One line of the brief's Reviewers list. A quality review action is one sentence ("Quality review started",
+ * "Accepted for decision"); a risk or regulatory review reads "Risk review · No new risk". */
 export function reviewerLine(reviewer: DecisionReviewer | null | undefined) {
   const row = reviewer ?? {};
-  const action = safeText(row.outcome_label) ?? safeText(row.outcome) ?? safeText(row.action);
-  return {
-    kind: safeText(row.kind_label) ?? (safeText(row.kind) ? titleCase(String(row.kind)) : "Review"),
+  const kindCode = String(row.kind ?? "")
+    .trim()
+    .toUpperCase();
+  const people = {
     name: safeText(row.name),
     role: safeText(row.role),
-    action: action ? (/^[A-Z0-9_]+$/.test(action) ? titleCase(action) : action) : null,
     comment: safeText(row.comment),
     at: safeText(row.at),
+  };
+  if (kindCode === "QUALITY" || kindCode === "QUALITY_REVIEW") {
+    const code = String(row.action ?? "").toUpperCase();
+    const sentence =
+      QUALITY_ACTION_SENTENCES[code] ??
+      safeText(row.label) ??
+      (safeText(row.action) ? sentenceOf(String(row.action)) : "Quality review");
+    return { kind: sentence, action: null, ...people };
+  }
+  const action = safeText(row.outcome_label) ?? safeText(row.outcome) ?? safeText(row.action);
+  return {
+    kind:
+      safeText(row.kind_label) ??
+      REVIEW_KINDS[kindCode] ??
+      (safeText(row.kind) ? sentenceOf(String(row.kind)) : "Review"),
+    action: action ? (isCode(action) ? sentenceOf(action) : action) : null,
+    ...people,
   };
 }
 

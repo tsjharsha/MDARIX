@@ -18,5 +18,5 @@ export const DOMAINS = [
   ["Data & Integrations", "Define, connect, map, release and run customer data", Database, DATA_INTEGRATION_SECTIONS],
   ["AI Control Center", "Models, evaluations and assurance", ShieldCheck, AI_SECTIONS],
   ["Security", "Isolation, audit, support access and retention", LockKeyhole, SECURITY_SECTIONS],
-  ["Operations", "Health, queues, email and API", LifeBuoy, OPERATIONS_SECTIONS],
+  ["Operations", "Health, queues, email, problem reports and API", LifeBuoy, OPERATIONS_SECTIONS],
 ] as const;

@@ -195,6 +195,9 @@ def deliver_problem_report(db: Session, payload: dict) -> str:
     organization = (tenant.display_name or tenant.name) if tenant else str(row.tenant_id)
     user = db.get(AuthUser, row.user_id) if row.user_id else None
     reporter = f"{user.display_name} <{user.username}>" if user else row.reporter_ref
+    # A reply to this email reaches the person who reported the problem, not the support mailbox itself (FUN-07).
+    address = (user.username or "").strip() if user else ""
+    reply_to = address if "@" in address and not any(ch in address for ch in '\r\n,;<>"') else None
     lines = [
         f"Organization: {organization}",
         f"Reported by: {reporter}",
@@ -202,11 +205,13 @@ def deliver_problem_report(db: Session, payload: dict) -> str:
         f"Request id: {row.request_id or 'not given'}",
         f"Reported at: {row.created_at.isoformat(timespec='seconds')}",
         f"Report: {row.business_id} (id {row.id})",
+        f"Reply to this email to answer {address}." if reply_to else "The reporter's address is not known.",
+        "Close the report in Platform Admin, Operations, Problem reports, once it is handled.",
         "",
         row.details,
     ]
     return send_operations_alert(
-        recipient, f"Problem reported by {organization}: {row.summary}"[:180], "\n".join(lines)
+        recipient, f"Problem reported by {organization}: {row.summary}"[:180], "\n".join(lines), reply_to=reply_to
     )
 
 

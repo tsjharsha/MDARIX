@@ -150,7 +150,10 @@ describe("the trial's story", () => {
     expect(chapterStatus(chapter("HIDDEN_COMPLAINTS"))).toBe("To do");
     const done = chapter("HIDDEN_COMPLAINTS", { acted: { done: true, count: 3 } });
     expect(chapterTone(done)).toBe("good");
-    expect(chapterStatus(done)).toBe("Done 3 times");
+    // "Tried", as the ring counts it, whatever the number of records (UX-28): never "Done 6 times" or "Done 0 times".
+    expect(chapterStatus(done)).toBe("Tried");
+    expect(chapterStatus(chapter("YOUR_DATA", { acted: { done: true, count: 6 } }))).toBe("Tried");
+    expect(chapterStatus(chapter("DECIDE_AND_SIGN", { acted: { done: true, count: 0 } }))).toBe("Tried");
     expect(chapterTone(chapter("YOUR_DATA", { finding: { value: null, text: null, state: "NOT_SET" } }))).toBe(
       "neutral",
     );
@@ -199,7 +202,8 @@ describe("the trial's story", () => {
       </ol>,
     );
     expect(done).toContain("Open again");
-    expect(done).toContain("Done once");
+    expect(done).toContain("Tried");
+    expect(done).not.toContain("Done once");
     expect(done).toContain("disabled");
     expect(done).toContain("Your role does not include this screen");
   });
