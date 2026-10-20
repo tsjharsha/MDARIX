@@ -61,7 +61,7 @@ in the footer, on `/contact` and in every email.
 **How long it is kept** (the full schedule, with what enforces each period, is
 `docs/compliance/DATA_RETENTION_SCHEDULE.md`)
 - A free trial lasts 30 days for up to 3 users and 5,000 uploaded rows. Trial data is deleted 30 days after the trial
-  ends; while the organization's request to move it into an MVP is open, it is kept, at most 90 days after the end.
+  ends; while the organization's request to move it into a pilot is open, it is kept, at most 90 days after the end.
   The person who requested the trial is emailed 7 days and 1 day before the end and when it ends.
 - Paid customers: kept for the subscription term. At the end, the customer's data is handed back as a full export
   (or the customer's written waiver is recorded) and then deleted; one person's data can be exported or erased on
@@ -100,7 +100,7 @@ an append-only, hash-chained audit trail verified daily, and encrypted backups.
 
 **Not offered today** (the documents should not promise them): single sign-on (OIDC/SAML), certifications such as
 ISO 27001, SOC 2 or HIPAA attestation, a validated (GxP/Part 11) system, data residency choices beyond the chosen
-hosting region, and dedicated databases for free trials (trials share the platform; each paid MVP gets a dedicated database
+hosting region, and dedicated databases for free trials (trials share the platform; each paid pilot gets a dedicated database
 hosted and run by MDARIX). AI is off for free trials and the server refuses to switch it on for them.
 
 ## What the lawyer still has to produce

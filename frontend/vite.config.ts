@@ -16,6 +16,16 @@ function builtVersion(): string {
 export default defineConfig({
   plugins: [react()],
   define: { __MDARIX_VERSION__: JSON.stringify(builtVersion()) },
+  build: {
+    rolldownOptions: {
+      output: {
+        // React in a script of its own, shared by the website and the application (src/app/App.tsx loads the
+        // application, sign-in and the guides only on their own addresses, WEB-06). React changes less often than
+        // MDARIX, so a returning visitor's browser usually still holds it after a release.
+        codeSplitting: { groups: [{ name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ }] },
+      },
+    },
+  },
   server: {
     headers: {
       "X-Content-Type-Options": "nosniff",

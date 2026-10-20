@@ -18,7 +18,7 @@ import "./trialGuide.css";
 
 /**
  * The free trial user guide at /help/trial-guide: the journey from the first visit to the one-to-one demo, one step at
- * a time, each with a picture of the screen it happens on, then After your trial: the MVP, in the words of the
+ * a time, each with a picture of the screen it happens on, then After your trial: the pilot, in the words of the
  * workspace's Next steps page (trialNextSteps.ts). It holds no organization data, so it opens without a
  * session: it can be read before the first sign-in, linked from the sign-up confirmation and Getting started, and
  * saved as a PDF (the browser's print) to attach to an email.
@@ -147,7 +147,7 @@ export function TrialGuidePage() {
   );
 }
 
-/** After your trial: how the trial becomes an MVP on the organization's real data, from the Next steps text. */
+/** After your trial: how the trial becomes a pilot on the organization's real data, from the Next steps text. */
 export function AfterYourTrial() {
   return (
     <section id="after-your-trial" className="tg-chapter" aria-labelledby="after-your-trial-title">

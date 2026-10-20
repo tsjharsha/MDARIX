@@ -32,10 +32,10 @@ def test_the_team_hears_what_the_trial_expects_and_whether_to_move_its_data(sent
     )
     recipient, message = sent[0]
     assert recipient == "support@mdarix.invalid"
-    assert message.subject == "MVP conversation requested: Orbit Medical Devices"
+    assert message.subject == "Pilot conversation requested: Orbit Medical Devices"
     details = dict(message.details)
     assert details["Email"] == "priya@orbit.invalid" and details["Phone"] == "+91 98450 12345"
-    assert details["Trial data"] == "Move it into the MVP" and details["Days left in the trial"] == "12"
+    assert details["Trial data"] == "Move it into the pilot" and details["Days left in the trial"] == "12"
     assert "Find hidden complaints across two pump lines." in " ".join(message.paragraphs)
     assert "OrbitCare 300; TrackWise and SAP" in " ".join(message.paragraphs)
     plain, html = emailer.render(message)
@@ -52,10 +52,10 @@ def test_an_update_says_so_and_leaves_out_what_was_not_given(sent):
         updated=True,
     )
     message = sent[0][1]
-    assert message.subject == "MVP conversation request updated: Orbit <Devices>"
+    assert message.subject == "Pilot conversation request updated: Orbit <Devices>"
     labels = [label for label, _ in message.details]
     assert "Phone" not in labels and "How and when to reach them" not in labels
-    assert dict(message.details)["Trial data"] == "Start the MVP without it"
+    assert dict(message.details)["Trial data"] == "Start the pilot without it"
     # What people typed is escaped in the HTML version.
     assert "Orbit &lt;Devices&gt;" in emailer.render(message)[1]
 
@@ -67,5 +67,7 @@ def test_the_last_reminders_point_to_next_steps(sent, monkeypatch):
     )
     text = " ".join(sent[0][1].paragraphs)
     assert "https://app.mdarix.invalid/app/next-steps" in text
+    # The paid step after the trial is a pilot in what a customer reads; "MVP" is an internal word (UX-09).
+    assert "What a pilot on your real data involves is in Next steps" in text and "MVP" not in text
     # No prices or discount figures in any of it.
     assert not any(symbol in text for symbol in ("$", "€", "₹", "%"))

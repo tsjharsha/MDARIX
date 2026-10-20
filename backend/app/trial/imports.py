@@ -646,6 +646,27 @@ class _Lookup:
         self.products: dict[str, Product | None] = {}
         self.versions: dict[tuple[str, str], ProductVersion | None] = {}
         self.lots: dict[str, LotBatch | None] = {}
+        self.versions_by_id: dict[uuid.UUID, ProductVersion | None] = {}
+
+    def complaints(self, identifiers) -> dict[str, Complaint]:
+        """The workspace's complaints among ``identifiers``, by identifier: one query per 1,000 identifiers, not one
+        per row (NEW-4)."""
+        wanted = list(dict.fromkeys(identifiers))
+        found: dict[str, Complaint] = {}
+        for start in range(0, len(wanted), 1000):
+            for complaint in self.db.query(Complaint).filter(
+                Complaint.tenant_id == self.tenant_id, Complaint.complaint_identifier.in_(wanted[start : start + 1000])
+            ):
+                found[complaint.complaint_identifier] = complaint
+        return found
+
+    def version_by_id(self, version_id) -> ProductVersion | None:
+        """A lot's version, read once per version (NEW-4)."""
+        if version_id not in self.versions_by_id:
+            self.versions_by_id[version_id] = (
+                self.db.query(ProductVersion).filter(ProductVersion.id == version_id).first()
+            )
+        return self.versions_by_id[version_id]
 
     def product(self, identifier: str) -> Product | None:
         if identifier not in self.products:
@@ -704,6 +725,7 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
     new_lots: set[str] = set()
     new_complaints: set[str] = set()
     report.new_rows = 0
+    held = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
     for line, row in rows:
         if entity == "products":
             product = lookup.product(row["product_id"])
@@ -749,17 +771,10 @@ def _check_references(entity: str, rows, lookup: _Lookup, report: _Report, creat
             if lot is None:
                 report.add(line, "lot_id", f"Lot '{row['lot_id']}' is not loaded yet.")
             else:
-                lot_version = (
-                    lookup.db.query(ProductVersion).filter(ProductVersion.id == lot.product_version_id).first()
-                )
+                lot_version = lookup.version_by_id(lot.product_version_id)
                 if lot_version is not None and lot_version.product_id != product.id:
                     report.add(line, "lot_id", f"Lot '{row['lot_id']}' belongs to a different product.")
-        exists = (
-            lookup.db.query(Complaint.id)
-            .filter(Complaint.tenant_id == lookup.tenant_id, Complaint.complaint_identifier == row["complaint_id"])
-            .first()
-        )
-        if exists is None and row["complaint_id"] not in new_complaints:
+        if row["complaint_id"] not in held and row["complaint_id"] not in new_complaints:
             new_complaints.add(row["complaint_id"])
             new += 1
             report.new_rows += 1
@@ -775,6 +790,7 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
     products: set[str] = set()
     versions: set[tuple[str, str]] = set()
     lots: dict[str, str] = {}
+    held = lookup.complaints(row["complaint_id"] for _, row in rows)
     for line, row in rows:
         product_id = row["product_id"]
         product = lookup.product(product_id)
@@ -791,19 +807,10 @@ def _check_complaints_creating(rows, lookup: _Lookup, report: _Report) -> int:
                     report.add(line, "lot_id", f"Lot '{lot_id}' is named for two products in this file.")
             else:
                 # A lot tied to a version belongs to that version's product; a lot without a version belongs to none.
-                lot_version = (
-                    lookup.db.query(ProductVersion).filter(ProductVersion.id == lot.product_version_id).first()
-                    if lot.product_version_id
-                    else None
-                )
+                lot_version = lookup.version_by_id(lot.product_version_id) if lot.product_version_id else None
                 if lot_version is not None and (product is None or lot_version.product_id != product.id):
                     report.add(line, "lot_id", f"Lot '{lot_id}' belongs to a different product.")
-        exists = (
-            lookup.db.query(Complaint.id)
-            .filter(Complaint.tenant_id == lookup.tenant_id, Complaint.complaint_identifier == row["complaint_id"])
-            .first()
-        )
-        if exists is None and row["complaint_id"] not in complaints:
+        if row["complaint_id"] not in held and row["complaint_id"] not in complaints:
             complaints.add(row["complaint_id"])
             new += 1
     report.new_rows = new
@@ -1111,6 +1118,11 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     now = datetime.now(timezone.utc)
     created = updated = 0
     also_created: dict[str, int] = {}
+    # A complaints file: its complaints that exist already, read at once; their evidence written in one batch after
+    # the rows (NEW-4). Each row used to cost about 13 statements; the result is the same.
+    complaints = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
+    new_complaints: dict[str, dict] = {}
+    evidence: list = []
     if entity in business_imports.TEMPLATES:
         created, updated = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
@@ -1206,11 +1218,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         lot = lookup.lot(row["lot_id"]) if row.get("lot_id") else None
         event = _date(row["event_date"]) if row.get("event_date") else None
         received = _date(row["received_date"]) if row.get("received_date") else None
-        complaint = (
-            db.query(Complaint)
-            .filter(Complaint.tenant_id == tenant_id, Complaint.complaint_identifier == row["complaint_id"])
-            .first()
-        )
+        complaint = complaints.get(row["complaint_id"])
         values = {
             "product_id": product.id,
             "product_version_id": version.id if version else (lot.product_version_id if lot else None),
@@ -1222,23 +1230,34 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
             **_complaint_details(row),
         }
         if complaint is None:
-            complaint = Complaint(
-                id=uuid.uuid4(),
-                tenant_id=tenant_id,
-                complaint_identifier=row["complaint_id"],
-                source_identifier=row["complaint_id"],
+            fields = {
+                "id": uuid.uuid4(),
+                "tenant_id": tenant_id,
+                "complaint_identifier": row["complaint_id"],
+                "source_identifier": row["complaint_id"],
                 **values,
                 **_stamp(now, received or event, source),
-            )
-            db.add(complaint)
+            }
+            # Not added to the session: the new complaints are inserted together after the rows (db/bulk.py).
+            complaint = Complaint(**fields)
+            complaints[row["complaint_id"]] = complaint
+            new_complaints[row["complaint_id"]] = fields
             created += 1
         else:
             for name, value in values.items():
                 setattr(complaint, name, value)
             complaint.updated_at = now
+            if row["complaint_id"] in new_complaints:  # named twice in the file: the later row wins, as before
+                new_complaints[row["complaint_id"]].update(values, updated_at=now)
             updated += 1
+        evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
+    if evidence:
+        from backend.app.db.bulk import insert_rows
+        from retrieval.record_evidence import upsert_record_evidences
+
         db.flush()
-        _index_complaint(db, tenant_id, complaint, row, product, version, lot, source)
+        insert_rows(db, Complaint, list(new_complaints.values()))
+        upsert_record_evidences(db, tenant_id, evidence)
     result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
     if also_created:
         result["also_created"] = also_created
@@ -1314,9 +1333,10 @@ def _complaint_details(row: dict) -> dict:
     return details
 
 
-def _index_complaint(db: Session, tenant_id, complaint: Complaint, row: dict, product, version, lot, source: str):
-    """Make the complaint searchable by Ask MDARIX and the investigator (retrieval/record_evidence.py)."""
-    from retrieval.record_evidence import summary, upsert_record_evidence
+def _complaint_evidence(complaint: Complaint, row: dict, product, version, lot, source: str):
+    """What makes the complaint searchable by Ask MDARIX and the investigator (retrieval/record_evidence.py): its
+    evidence row, written for the whole file at once by upsert_record_evidences."""
+    from retrieval.record_evidence import RecordEvidence, summary
 
     facts = {
         "Product": row["product_id"],
@@ -1335,9 +1355,7 @@ def _index_complaint(db: Session, tenant_id, complaint: Complaint, row: dict, pr
         "Death": complaint.death,
         "Malfunction": complaint.malfunction,
     }
-    upsert_record_evidence(
-        db,
-        tenant_id,
+    return RecordEvidence(
         kind="COMPLAINT",
         identifier=complaint.complaint_identifier,
         title=f"Complaint {complaint.complaint_identifier}",

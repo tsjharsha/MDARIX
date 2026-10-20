@@ -2,14 +2,10 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { Copy, Download, KeyRound, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { Panel } from "../admin/console/charts";
 import { formatDate, send, useResource } from "../customer-admin/shared";
-import {
-  cleanCode,
-  reauthMessage,
-  recoveryCodesNote,
-  recoveryCodesText,
-  replaceAuthenticatorHref,
-  type MfaStatus,
-} from "./twoFactor";
+import { cleanCode, reauthMessage, recoveryCodesNote, replaceAuthenticatorHref, type MfaStatus } from "./twoFactor";
+import { useRecoveryCodeSaving } from "./recoveryCodeSaving";
+
+export { useRecoveryCodeSaving };
 
 /**
  * Two-factor sign-in on one's own account (My Account, Security; the customer administrator's Security page).
@@ -232,31 +228,6 @@ export function ReauthFields({
  * Copy and Download for recovery codes shown once: on My Account after new codes, and on the first setup page
  * (AuthPage), so nobody has to copy them by hand. The message says what happened.
  */
-export function useRecoveryCodeSaving(codes: readonly string[], account: string | null | undefined, issued: Date) {
-  const [said, setSaid] = useState("");
-  const text = recoveryCodesText(codes, account, issued);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setSaid("Copied. Paste them into your password manager.");
-    } catch {
-      setSaid("Copying is not allowed here. Select the codes and copy them, or download them instead.");
-    }
-  };
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "mdarix-recovery-codes.txt";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setSaid("Downloaded. Keep the file somewhere private, then delete other copies.");
-  };
-  return { said, copy, download };
-}
-
 /** The new codes, shown this once, to copy or download. Exported for its test. */
 export function RecoveryCodesList({
   codes,

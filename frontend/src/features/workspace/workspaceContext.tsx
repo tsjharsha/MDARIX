@@ -24,7 +24,7 @@ export const WORKSPACE_SECTIONS = [
   "Import data",
   "My Account",
   "Share feedback",
-  // From trial to MVP: shown only in free-trial workspaces, to everyone in one (sections/TrialNextSteps.tsx).
+  // From trial to pilot: shown only in free-trial workspaces, to everyone in one (sections/TrialNextSteps.tsx).
   "Next steps",
 ] as const;
 
