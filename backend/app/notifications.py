@@ -21,6 +21,9 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
   ``MDARIX_SUPPORT_EMAIL``).
 * ``SECURITY_NOTICE`` (``notify_security_notice``): the account's owner (auth/security_notices.py builds it).
 * ``SUPPORT_PROBLEM_REPORTED`` (backend/app/support_api.py): the support team.
+* ``SUPPORT_ACCESS_AWAITING_CUSTOMER``, ``SUPPORT_ACCESS_GRANTED`` and ``SUPPORT_ACCESS_ENDED`` (support access,
+  backend/app/support_access.py): the organization's decision makers (``support_decision_maker_emails``: its customer
+  administrators, or a free trial's owner), when MDARIX asks, when they approve, and when an approved access ends.
 * ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
   Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
 """
@@ -421,37 +424,136 @@ def notify_trial_request_declined(db: Session, tenant_id, *, request_id, **_refs
 SUPPORT_ACCESS_AWAITING_CUSTOMER = "SUPPORT_ACCESS_AWAITING_CUSTOMER"
 
 
+SUPPORT_ACCESS_GRANTED = "SUPPORT_ACCESS_GRANTED"
+SUPPORT_ACCESS_ENDED = "SUPPORT_ACCESS_ENDED"
+# How an approved support access ended, as SUPPORT_ACCESS_ENDED carries it.
+SUPPORT_ACCESS_ENDINGS = frozenset({"EXPIRED", "REVOKED_BY_CUSTOMER", "REVOKED_BY_MDARIX"})
+
+
 def notify_support_access_awaiting_customer(db: Session, tenant_id, *, grant_id, **_refs) -> OutboxEvent:
-    """Tell the organization's administrators that MDARIX asks for support access (backend/app/support_access.py)."""
+    """Tell the organization's decision makers that MDARIX asks for support access (backend/app/support_access.py)."""
     return _queue(
         db, tenant_id, SUPPORT_ACCESS_AWAITING_CUSTOMER, "SupportAccessGrant", grant_id, {"grant_id": _id(grant_id)}
     )
 
 
+def notify_support_access_granted(db: Session, tenant_id, *, grant_id, **_refs) -> OutboxEvent:
+    """Confirm to the decision makers that support access was approved, and until when (also a security notice)."""
+    return _queue(db, tenant_id, SUPPORT_ACCESS_GRANTED, "SupportAccessGrant", grant_id, {"grant_id": _id(grant_id)})
+
+
+def notify_support_access_ended(db: Session, tenant_id, *, grant_id, ended: str, **_refs) -> OutboxEvent:
+    """Tell the decision makers that an approved support access ended: on its own, or revoked by them or MDARIX."""
+    if ended not in SUPPORT_ACCESS_ENDINGS:
+        raise ValueError(f"Unknown end of support access: {ended}")
+    return _queue(
+        db,
+        tenant_id,
+        SUPPORT_ACCESS_ENDED,
+        "SupportAccessGrant",
+        grant_id,
+        {"grant_id": _id(grant_id), "ended": ended},
+    )
+
+
+def support_decision_maker_emails(db: Session, tenant_id) -> tuple[list[str], bool]:
+    """Who decides on support access to the organization, and whether it is a free trial: a trial's owner (its only
+    decision maker, backend/app/support_access_api.py require_decision_maker) while their account is active, else the
+    organization's active customer administrators."""
+    from backend.app.trial.service import trial_subscription
+    from backend.app.trial.team import trial_request
+
+    if trial_subscription(db, tenant_id) is None:
+        return customer_admin_emails(db, tenant_id), False
+    request = trial_request(db, tenant_id)
+    email = (request.email if request else "").strip().lower()
+    owner = (
+        db.query(AuthUser.username)
+        .filter(
+            AuthUser.tenant_id == tenant_id,
+            func.lower(AuthUser.username) == email,
+            func.upper(AuthUser.status) == "ACTIVE",
+        )
+        .first()
+        if email
+        else None
+    )
+    return ([owner.username] if owner else []), True
+
+
+def _utc_moment(value: datetime) -> str:
+    """A grant's time as its emails write it: the day and time in UTC, so no reader takes it for another day."""
+    moment = (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).astimezone(timezone.utc)
+    return f"{_long_date(moment)}, {moment:%H:%M} UTC"
+
+
 def _support_access_request(db: Session, payload: dict, emailer) -> None:
-    from backend.app.db.models.customer_lifecycle import SupportAccessGrant
     from backend.app.support_access import AWAITING_CUSTOMER, SupportScope
 
     tenant_id = _uuid(payload.get("tenant_id"))
-    grant = (
-        db.query(SupportAccessGrant)
-        .filter(SupportAccessGrant.id == _uuid(payload.get("grant_id")), SupportAccessGrant.tenant_id == tenant_id)
-        .first()
-    )
+    grant = _support_grant(db, payload)
     if grant is None or grant.status != AWAITING_CUSTOMER:
         return  # decided, revoked or expired before the email went out: nothing to ask any more
     person = db.query(AuthUser).filter(AuthUser.id == grant.platform_user_id).first()
     scope = SupportScope.stored(grant.scope)
+    recipients, trial = support_decision_maker_emails(db, tenant_id)
     _deliver(
         emailer.send_support_access_request,
-        customer_admin_emails(db, tenant_id),
+        recipients,
         organization=_organization(db, tenant_id),
         person=(person.display_name or person.username) if person else "An MDARIX support colleague",
         areas=[item["label"] for item in scope.describe()],
         write=scope.write,
-        expires=f"{_long_date(grant.expires_at)}, {grant.expires_at:%H:%M} UTC",
+        expires=_utc_moment(grant.expires_at),
         reason=grant.reason,
+        trial=trial,
     )
+
+
+def _support_grant(db: Session, payload: dict):
+    from backend.app.db.models.customer_lifecycle import SupportAccessGrant
+
+    return (
+        db.query(SupportAccessGrant)
+        .filter(
+            SupportAccessGrant.id == _uuid(payload.get("grant_id")),
+            SupportAccessGrant.tenant_id == _uuid(payload.get("tenant_id")),
+        )
+        .first()
+    )
+
+
+def _support_access_notice(db: Session, event_name: str, payload: dict, emailer) -> None:
+    """The confirmation of an approval, or the notice that an approved access ended. An approval revoked before the
+    email goes out sends no confirmation (the ended notice follows instead)."""
+    from backend.app.support_access import APPROVED, SupportScope
+
+    grant = _support_grant(db, payload)
+    if grant is None:
+        return
+    tenant_id = grant.tenant_id
+    person = db.query(AuthUser).filter(AuthUser.id == grant.platform_user_id).first()
+    who = (person.display_name or person.username) if person else "An MDARIX support colleague"
+    recipients, trial = support_decision_maker_emails(db, tenant_id)
+    scope = SupportScope.stored(grant.scope)
+    common = {"organization": _organization(db, tenant_id), "person": who, "trial": trial}
+    if event_name == SUPPORT_ACCESS_GRANTED:
+        if grant.status != APPROVED:
+            return
+        decider = db.query(AuthUser).filter(AuthUser.id == grant.customer_decided_by).first()
+        _deliver(
+            emailer.send_support_access_granted,
+            recipients,
+            areas=[item["label"] for item in scope.describe()],
+            write=scope.write,
+            expires=_utc_moment(grant.expires_at),
+            approved_by=(decider.display_name or decider.username) if decider else "Your organization",
+            **common,
+        )
+        return
+    ended = str(payload.get("ended") or "EXPIRED")
+    at = grant.revoked_at if ended != "EXPIRED" and grant.revoked_at else grant.expires_at
+    _deliver(emailer.send_support_access_ended, recipients, ended=ended, when=_utc_moment(at), **common)
 
 
 def notify_security_notice(db: Session, tenant_id, *, user_id, kind: str, **_refs) -> OutboxEvent | None:
@@ -768,6 +870,9 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name == SUPPORT_ACCESS_AWAITING_CUSTOMER:
         _support_access_request(db, payload, emailer)
+        return True
+    if event_name in (SUPPORT_ACCESS_GRANTED, SUPPORT_ACCESS_ENDED):
+        _support_access_notice(db, event_name, payload, emailer)
         return True
     if event_name == "READINESS_DIGEST":
         from backend.app.readiness_home.digest import deliver

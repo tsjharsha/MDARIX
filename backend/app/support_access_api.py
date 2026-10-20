@@ -7,7 +7,12 @@ their own audit trail. Platform administrators cannot decide for a customer, eve
 
 A free trial has no Customer Administrators: there its owner decides, from Getting started › Team
 (backend/app/trial/router.py), through the same functions below and with the same rules (an authenticator code to
-approve, a reason for every decision, the same audit events, marked with the source TRIAL_OWNER).
+approve, a reason for every decision, the same audit events, marked with the source TRIAL_OWNER). Who may decide is
+checked in one place for both routes (:func:`require_decision_maker`): in a free trial its owner and nobody else (a
+colleague, or any Customer Administrator account in a trial, is refused); elsewhere a Customer Administrator.
+
+The decision makers are emailed when MDARIX asks, when they approve (a confirmation that also says when it ends) and
+when an approved access ends early or on its own (backend/app/notifications.py).
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ DECISIONS = {
     "SUPPORT_ACCESS_DENIED",
     "SUPPORT_ACCESS_REVOKED",
     access.ACCESS_USED,
+    access.ACCESS_EXPIRED,
 }
 
 
@@ -62,6 +68,26 @@ def _customer_admin(request: Request, db: Session) -> AuthUser:
             },
         )
     return user
+
+
+def require_decision_maker(db: Session, user: AuthUser) -> None:
+    """Who decides on support access to ``user``'s organization: in a free trial its owner only (a trial has no
+    Customer Administrators, and its colleagues never decide); in any other organization one of its Customer
+    Administrators. Every approval, denial and revocation passes here, whichever route it came through."""
+    from backend.app.trial.service import trial_subscription
+    from backend.app.trial.team import require_owner
+
+    if trial_subscription(db, user.tenant_id) is not None:
+        require_owner(db, user.tenant_id, user, "Only the person who started this trial decides on support access")
+        return
+    if not is_customer_admin_role(user.role):
+        raise HTTPException(
+            403,
+            detail={
+                "code": "CUSTOMER_ADMIN_REQUIRED",
+                "message": "Only the organization's Customer Administrators decide on support access",
+            },
+        )
 
 
 def _grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, *, lock: bool = True) -> SupportAccessGrant:
@@ -169,6 +195,7 @@ def _audit(
 def list_support_access(request: Request, db: Session = Depends(get_db)):
     """Every request MDARIX approved for this organization, newest first, and how many waits for a decision."""
     admin = _customer_admin(request, db)
+    require_decision_maker(db, admin)
     return grants_of(db, admin.tenant_id)
 
 
@@ -223,6 +250,9 @@ def approve_grant(
 ) -> dict:
     """The organization's approval (one of its Customer Administrators, or a trial's owner): with a current
     authenticator code, for a request MDARIX approved that names at least one area and is still inside its window."""
+    from backend.app.notifications import notify_support_access_granted
+
+    require_decision_maker(db, admin)
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     _awaiting(row, now)
@@ -252,11 +282,13 @@ def approve_grant(
         {**access.SupportScope.stored(row.scope).as_dict(), "expires_at": row.expires_at.isoformat()},
         source=source,
     )
+    notify_support_access_granted(db, admin.tenant_id, grant_id=row.id)
     db.commit()
     return _decided(db, admin, row)
 
 
 def deny_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, request, source: str) -> dict:
+    require_decision_maker(db, admin)
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     _awaiting(row, now)
@@ -271,7 +303,11 @@ def deny_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, r
 
 
 def revoke_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str, request, source: str) -> dict:
-    """End a request or an approved access at once, whatever its window says."""
+    """End a request or an approved access at once, whatever its window says. Ending an approved access is emailed
+    to the decision makers (the one who revoked it included: it is also a security notice)."""
+    from backend.app.notifications import notify_support_access_ended
+
+    require_decision_maker(db, admin)
     row = _grant(db, admin, grant_id)
     now = datetime.now(timezone.utc)
     if row.status not in {access.AWAITING_CUSTOMER, access.APPROVED} or access._aware(row.expires_at) <= now:
@@ -279,11 +315,14 @@ def revoke_grant(db: Session, admin: AuthUser, grant_id: uuid.UUID, reason: str,
             409,
             detail={"code": "SUPPORT_ACCESS_NOT_OPEN", "message": "This access has already ended"},
         )
+    was_active = row.status == access.APPROVED
     row.status = access.REVOKED
     row.revoked_at = now
     row.revoked_by = admin.id
     row.updated_at = now
     _audit(db, admin, row, "SUPPORT_ACCESS_REVOKED", reason.strip(), request, source=source)
+    if was_active:
+        notify_support_access_ended(db, admin.tenant_id, grant_id=row.id, ended="REVOKED_BY_CUSTOMER")
     db.commit()
     return _decided(db, admin, row)
 
@@ -318,6 +357,13 @@ def support_access_activity(grant_id: uuid.UUID, request: Request, db: Session =
     """The life of one grant, from the organization's own audit trail: the request, MDARIX's approval, the
     customer's decision, and every use of the access (what was opened, when, by whom)."""
     admin = _customer_admin(request, db)
+    require_decision_maker(db, admin)
+    return grant_activity(db, admin, grant_id)
+
+
+def grant_activity(db: Session, admin: AuthUser, grant_id: uuid.UUID) -> dict:
+    """One grant's life in ``admin``'s organization's audit trail (for its Customer Administrators, or a trial's
+    owner): the request, MDARIX's approval, the decision, every use (each page read, each export) and its end."""
     row = _grant(db, admin, grant_id, lock=False)
     events = (
         db.query(AuditEvent)
@@ -338,7 +384,8 @@ def support_access_activity(grant_id: uuid.UUID, request: Request, db: Session =
             {
                 "at": _iso(event.created_at),
                 "action": event.action,
-                "who": people.get(str(event.actor_ref), {}).get("name") or event.actor_ref,
+                "who": people.get(str(event.actor_ref), {}).get("name") or _someone(event.actor_ref),
+                "what": _what(event),
                 "area": (event.details or {}).get("area"),
                 "write": (event.details or {}).get("write"),
                 "method": (event.details or {}).get("method"),
@@ -348,6 +395,51 @@ def support_access_activity(grant_id: uuid.UUID, request: Request, db: Session =
             for event in events
         ],
     }
+
+
+# What a use of the access opened, in the words the organization reads (the support workspace's pages and the export;
+# support_workspace.py). Any other address is named by its area.
+_USE_PAGES = {
+    "complaints": "Read the complaints",
+    "investigations": "Read the investigations",
+    "decisions": "Read the decisions",
+    "imports": "Read the data imports",
+    "team": "Read the team",
+    "audit": "Read the audit trail",
+}
+_ACTIONS = {
+    "SUPPORT_ACCESS_REQUESTED": "MDARIX asked for access",
+    "SUPPORT_ACCESS_APPROVED": "Approved inside MDARIX",
+    "SUPPORT_ACCESS_CUSTOMER_APPROVED": "Access approved",
+    "SUPPORT_ACCESS_DENIED": "Request denied",
+    "SUPPORT_ACCESS_REVOKED": "Access revoked",
+    access.ACCESS_EXPIRED: "Access ended on its own",
+}
+
+
+def _what(event: AuditEvent) -> str:
+    if event.action != access.ACCESS_USED:
+        return _ACTIONS.get(event.action, event.action)
+    details = event.details or {}
+    path = str(details.get("path") or "").rstrip("/")
+    last = path.rsplit("/", 1)[-1]
+    if "/support-workspace" in path:
+        return _USE_PAGES.get(last, "Opened the read-only workspace")
+    if path.endswith("/download"):
+        return "Downloaded a full export"
+    if path.endswith("/exports"):
+        return "Asked for a full export"
+    area = access.AREAS.get(str(details.get("area") or ""), "")
+    label = area.split(":")[0] if area else "the data"
+    return f"{'Changed' if details.get('write') else 'Read'}: {label.lower()}"
+
+
+def _someone(actor_ref) -> str:
+    """Who did it, when their account is not one the organization can read: MDARIX staff accounts live in the
+    platform's organization, so a customer's session reads them as "MDARIX support", never as an account id."""
+    if str(actor_ref or "").startswith("system:"):
+        return "MDARIX (automatic)"
+    return "MDARIX support" if _is_uuid(actor_ref) else str(actor_ref or "")
 
 
 def _is_uuid(value) -> bool:

@@ -7,13 +7,6 @@ import type { AppView } from "./router";
  */
 export type FeatureSet = "full" | "mvp";
 
-/**
- * Support access for free trials (the trial owner's decisions in Getting started › Team, and trials in Platform
- * Admin's Request access). Hidden until after launch; owner decision 2026-10-19 (the server refuses such requests while
- * backend/app/support_access.py TRIAL_SUPPORT_ACCESS_ENABLED is off).
- */
-export const TRIAL_SUPPORT_ACCESS_ENABLED = false;
-
 /** Anything other than "mvp" (missing, older servers, an unexpected value) is the full product. */
 export function featureSetOf(value: unknown): FeatureSet {
   return typeof value === "string" && value.trim().toLowerCase() === "mvp" ? "mvp" : "full";

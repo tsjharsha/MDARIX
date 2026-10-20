@@ -1087,6 +1087,22 @@ def send_connector_sync_failed_notice(recipient: str, *, organization: str, conn
     )
 
 
+def _support_decider(organization: str, trial: bool) -> tuple[str, tuple[str, str], str]:
+    """Who decides on support access, where, and why they get the email: a free trial's owner in Getting started ›
+    Team; elsewhere the organization's administrators in Customer Administration."""
+    if trial:
+        return (
+            "you approve it",
+            ("Open Getting started › Team", f"{company().app_url}/app"),
+            f"You are receiving this email because you run the MDARIX free trial of {organization}.",
+        )
+    return (
+        "one of your administrators approves it",
+        ("Review the request", f"{company().app_url}/app/customer-admin"),
+        f"You are receiving this email as an administrator of {organization} in MDARIX.",
+    )
+
+
 def send_support_access_request(
     recipient: str,
     *,
@@ -1096,8 +1112,11 @@ def send_support_access_request(
     write: bool,
     expires: str,
     reason: str,
+    trial: bool = False,
 ) -> str:
-    """MDARIX asks to see part of the organization's data: nothing opens until one of its administrators approves."""
+    """MDARIX asks to see part of the organization's data: nothing opens until its decision maker approves (one of its
+    administrators, or a free trial's owner)."""
+    who_decides, button, why = _support_decider(organization, trial)
     return _send(
         recipient,
         Message(
@@ -1105,7 +1124,7 @@ def send_support_access_request(
             heading="MDARIX asks for your approval",
             paragraphs=(
                 f"MDARIX support would like {person} to have temporary access to part of {organization}'s data. "
-                "Nothing is opened until one of your administrators approves it, and you can revoke it at any time.",
+                f"Nothing is opened until {who_decides}, and you can revoke it at any time.",
                 "Every use of the access is recorded in your audit trail.",
             ),
             details=(
@@ -1115,8 +1134,72 @@ def send_support_access_request(
                 ("Why", reason),
             ),
             items=tuple(areas),
-            button=("Review the request", f"{company().app_url}/app/customer-admin"),
-            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
+            button=button,
+            reason=why,
+        ),
+    )
+
+
+def send_support_access_granted(
+    recipient: str,
+    *,
+    organization: str,
+    person: str,
+    areas: list[str],
+    write: bool,
+    expires: str,
+    approved_by: str,
+    trial: bool = False,
+) -> str:
+    """Confirm an approved support access: who has it, to what, and when it ends. Also a security notice."""
+    _, button, why = _support_decider(organization, trial)
+    support = company().support_email
+    return _send(
+        recipient,
+        Message(
+            subject=f"Support access to {organization} is approved",
+            heading="You gave MDARIX support access",
+            paragraphs=(
+                f"{approved_by} approved access for {person} to part of {organization}'s data. "
+                f"It is {'read and change' if write else 'read only'} and ends on its own at the time below.",
+                "Every use is recorded in your audit trail. You can revoke the access at any time.",
+            ),
+            details=(("Who", person), ("Approved by", approved_by), ("Until", expires)),
+            items=tuple(areas),
+            button=(("Revoke or review it", button[1]) if trial else button),
+            closing=(
+                "If you did not approve this, revoke it now"
+                + (f" and contact {support}." if support else " and reply to this email."),
+            ),
+            reason=why,
+        ),
+    )
+
+
+_SUPPORT_ENDINGS = {
+    "EXPIRED": "Its time ran out.",
+    "REVOKED_BY_CUSTOMER": "Your organization revoked it.",
+    "REVOKED_BY_MDARIX": "MDARIX support ended it.",
+}
+
+
+def send_support_access_ended(
+    recipient: str, *, organization: str, person: str, ended: str, when: str, trial: bool = False
+) -> str:
+    """An approved support access ended: on its own, or revoked by the organization or by MDARIX."""
+    _, button, why = _support_decider(organization, trial)
+    return _send(
+        recipient,
+        Message(
+            subject=f"Support access to {organization} has ended",
+            heading="MDARIX support access has ended",
+            paragraphs=(
+                f"{person} can no longer see {organization}'s data. {_SUPPORT_ENDINGS.get(ended, '')}".strip(),
+                "What was opened while it lasted is in your audit trail. MDARIX needs a new approval to look again.",
+            ),
+            details=(("Who", person), ("Ended", when)),
+            button=(("See the history", button[1]) if trial else button),
+            reason=why,
         ),
     )
 

@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { Panel, ToneBadge, type PanelSource } from "../../admin/console/charts";
 import { ConfirmDialog, formatDate, send, useResource, type Confirmation } from "../../customer-admin/shared";
-import { accessText, areaNames, supportStatus, type SupportGrant } from "../../customer-admin/supportAccessModel";
+import {
+  accessText,
+  areaNames,
+  supportStatus,
+  type SupportActivity,
+  type SupportGrant,
+} from "../../customer-admin/supportAccessModel";
 
 export const TRIAL_SUPPORT_PATH = "/api/v1/trial/support-access";
 const REASON = { label: "Reason (kept in your audit trail)", min: 10 };
@@ -72,17 +78,21 @@ export function TrialSupportAccess() {
   const grants = useResource<{ items: SupportGrant[]; awaiting_decision: number }>(TRIAL_SUPPORT_PATH);
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [notice, setNotice] = useState("");
+  const [history, setHistory] = useState<string | null>(null);
   return (
     <>
       <SupportAccessView
         grants={grants.data?.items ?? []}
         source={grants}
         notice={notice}
+        history={history}
+        onHistory={(grant) => setHistory(history === grant.id ? null : grant.id)}
         onDecide={(decision, grant) => {
           setNotice("");
           setConfirm(supportConfirmation(decision, grant, grants.reload));
         }}
       />
+      {history && <TrialSupportHistory grantId={history} />}
       <ConfirmDialog
         request={confirm}
         onClose={() => setConfirm(null)}
@@ -101,18 +111,24 @@ export function SupportAccessView({
   source,
   notice,
   onDecide,
+  history = null,
+  onHistory,
 }: {
   grants: SupportGrant[];
   source: PanelSource;
   notice: string;
   onDecide: (decision: SupportDecision, grant: SupportGrant) => void;
+  /** The request whose history is open, if any. */
+  history?: string | null;
+  onHistory?: (grant: SupportGrant) => void;
 }) {
   const waiting = grants.filter((grant) => grant.can_approve || grant.can_deny).length;
   return (
     <Panel title="Support access" eyebrow={waiting ? `${waiting} waiting for you` : "MDARIX support"} source={source}>
       <p className="uw-trial-note">
         MDARIX support never sees your trial's data unless you approve it here: only the areas named, read-only unless
-        you allow changes, and only until the time shown.
+        you allow changes, and only until the time shown. Only you decide; your colleagues cannot. Every page MDARIX
+        opens is in the history of the request.
       </p>
       {grants.length ? (
         <ul className="uw-support">
@@ -125,9 +141,12 @@ export function SupportAccessView({
                     {grant.person ?? "MDARIX support"}: {areaNames(grant.areas)}
                   </strong>
                   <small>
-                    {accessText(grant.write)} until {formatDate(grant.expires_at)} · {grant.reason}
+                    {accessText(grant.write)} · from {formatDate(grant.starts_at)} until {formatDate(grant.expires_at)}{" "}
+                    ({durationText(grant.starts_at, grant.expires_at)})
                   </small>
+                  <small>Why: {grant.reason}</small>
                   {grant.decided_by && <small>Decided by {grant.decided_by}</small>}
+                  {grant.uses > 0 && <small>Used {grant.uses === 1 ? "once" : `${grant.uses} times`}</small>}
                 </div>
                 <ToneBadge tone={status.tone} label={status.label} />
                 {supportDecisions(grant).map((decision) => (
@@ -140,6 +159,16 @@ export function SupportAccessView({
                     {LABEL[decision]}
                   </button>
                 ))}
+                {onHistory && (
+                  <button
+                    type="button"
+                    className="ac-link"
+                    aria-expanded={history === grant.id}
+                    onClick={() => onHistory(grant)}
+                  >
+                    {history === grant.id ? "Hide history" : "History"}
+                  </button>
+                )}
               </li>
             );
           })}
@@ -151,6 +180,42 @@ export function SupportAccessView({
         <div className="uw-trial-message is-good" role="status">
           <span>{notice}</span>
         </div>
+      )}
+    </Panel>
+  );
+}
+
+/** How long a request lasts, in hours ("4 hours"), from its start and end. */
+export function durationText(starts?: string | null, expires?: string | null): string {
+  if (!starts || !expires) return "time not set";
+  const hours = Math.round((new Date(expires).getTime() - new Date(starts).getTime()) / 3_600_000);
+  if (hours < 1) return "less than an hour";
+  return hours === 1 ? "1 hour" : `${hours} hours`;
+}
+
+/** One request's life, from the trial's own audit trail: who asked, the decision, each page read, each export, the end. */
+function TrialSupportHistory({ grantId }: { grantId: string }) {
+  const activity = useResource<{ items: SupportActivity[] }>(`${TRIAL_SUPPORT_PATH}/${grantId}/activity`);
+  return <SupportHistoryView items={activity.data?.items ?? []} source={activity} />;
+}
+
+export function SupportHistoryView({ items, source }: { items: SupportActivity[]; source: PanelSource }) {
+  return (
+    <Panel title="History of this access" eyebrow="From your trial's audit trail" source={source}>
+      {items.length ? (
+        <ol className="uw-support-history">
+          {items.map((item, index) => (
+            <li key={`${item.at}-${index}`}>
+              <strong>{item.what ?? item.action}</strong>
+              <small>
+                {item.who ?? "MDARIX"} · {formatDate(item.at)}
+              </small>
+              {item.reason && <small>{item.reason}</small>}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="uw-trial-note">The request, your decision and every use will appear here.</p>
       )}
     </Panel>
   );

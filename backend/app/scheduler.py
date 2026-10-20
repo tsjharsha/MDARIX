@@ -180,6 +180,14 @@ def connector_sync(db: Session, _state: dict) -> dict:
     return run_scheduled_syncs(db)
 
 
+def support_access_expiry(db: Session, _state: dict) -> dict:
+    """Close support access whose window passed, audit it and email the organization that it ended. Access itself
+    ends at the second it expires (support_access.evaluate); this records it and tells the customer."""
+    from backend.app.support_access import expire
+
+    return {"closed": expire(db)}
+
+
 def export_expiry(db: Session, _state: dict) -> dict:
     from backend.app.tenant_export import expire_exports
 
@@ -310,6 +318,13 @@ JOBS: tuple[Job, ...] = (
         embedding_catch_up,
         "Embed evidence that has no embedding yet",
         CELL_JOBS,
+    ),
+    Job(
+        "support-access-expiry",
+        timedelta(minutes=5),
+        support_access_expiry,
+        "Close support access whose time ran out and tell the organization",
+        PLATFORM_JOBS,
     ),
     Job("operations-alerts", timedelta(minutes=5), operations_alerts, "Alert on dead letters and a stopped worker"),
     Job(

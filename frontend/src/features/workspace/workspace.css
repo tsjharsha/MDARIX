@@ -1089,6 +1089,24 @@
   color: var(--ac-muted);
   overflow-wrap: anywhere;
 }
+/* The history of one request, from the trial's audit trail. */
+.uw-support-history {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-support-history li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--ac-grid);
+}
+.uw-support-history small {
+  color: var(--ac-muted);
+  overflow-wrap: anywhere;
+}
 
 /*
  * Older screens shown inside the workspace (investigation workspace, story, signals, evidence library, decisions,

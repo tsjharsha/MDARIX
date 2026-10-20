@@ -37,7 +37,7 @@ export type TenantSummary = {
   tenant_name?: string | null;
   customer_name?: string | null;
   customer_business_id?: string | null;
-  // A free trial (the tenant picker of Request access leaves trials out until support access for them returns).
+  // A free trial (its owner decides on support access; the tenant picker can leave trials out).
   is_trial?: boolean;
 };
 

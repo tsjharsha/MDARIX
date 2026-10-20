@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { CalendarCheck, CalendarClock, MessageSquare, Rocket, Sparkles, Upload, Users } from "lucide-react";
+import {
+  CalendarCheck,
+  CalendarClock,
+  Eye,
+  LifeBuoy,
+  MessageSquare,
+  Rocket,
+  Sparkles,
+  Upload,
+  Users,
+} from "lucide-react";
 import { BarList, Panel, StatTile, ToneBadge } from "../console/charts";
 import {
   ConfirmDialog,
@@ -29,6 +39,48 @@ import {
   type TrialPerson,
 } from "./trials";
 import { TrialExitRequests } from "./TrialExitRequests";
+import { RequestAccess, type Area, type RequestAccessDraft } from "../areas/SecurityArea";
+
+export const SUPPORT_ACCESS_STATE_PATH = "/api/v1/platform-admin/support-workspace/access";
+
+/** Where support access to one trial stands (backend/app/support_workspace.py support_access_by_organization). */
+export type TrialSupportState = {
+  tenant_id: string;
+  request: {
+    id: string;
+    status: string;
+    person?: string | null;
+    mine: boolean;
+    areas: Area[];
+    write: boolean;
+    expires_at?: string | null;
+  } | null;
+  open_for_me: boolean;
+  expires_at?: string | null;
+};
+type SupportStates = { items: TrialSupportState[]; areas: Area[]; me: string };
+
+/** What Request support access fills in: this trial, the signed-in administrator, the areas the read-only workspace
+ * reads (not changes, not a full export: those are ticked on purpose), and a reason to complete. */
+export function supportDraft(trial: Pick<TrialItem, "tenant_id" | "name">, me: string | undefined): RequestAccessDraft {
+  return {
+    tenant_id: trial.tenant_id,
+    platform_user_id: me,
+    areas: ["RECORDS", "PEOPLE", "AUDIT"],
+    reason: `Help ${trial.name} with their free trial`,
+    hours: 4,
+  };
+}
+
+/** A trial's open request, in words. */
+export function supportStateText(state: TrialSupportState | undefined): string | null {
+  const request = state?.request;
+  if (!request) return null;
+  if (state?.open_for_me) return `Open to you until ${formatDate(state.expires_at)}`;
+  if (request.status === "PENDING") return "Requested: waiting for a second MDARIX approval";
+  if (request.status === "AWAITING_CUSTOMER") return "Requested: waiting for the trial owner";
+  return `Approved for ${request.person ?? "a colleague"} until ${formatDate(request.expires_at)}`;
+}
 
 /**
  * Trials: every free trial still holding data, as MDARIX staff need to see it to help a prospect succeed. How many
@@ -37,33 +89,69 @@ import { TrialExitRequests } from "./TrialExitRequests";
  * chapter counts only when the trial acted in it (a record it created), never on page views. The figures cover every
  * trial; the table shows one page at a time, searched, filtered and sorted by the server.
  */
-export function TrialsOverview({ onOpenTenant }: { onOpenTenant: (tenantId: string) => void }) {
+export function TrialsOverview({
+  onOpenTenant,
+  onOpenWorkspace,
+}: {
+  onOpenTenant: (tenantId: string) => void;
+  onOpenWorkspace?: (tenantId: string) => void;
+}) {
   const [page, setPage] = useState(1);
   const [state, setState] = useState("");
   const [query, setQuery] = useState("");
   const { sort, onSort } = useServerSort(() => setPage(1));
   const overview = useResource<TrialOverview>(trialsPath({ page, sort, state, q: query }));
+  const support = useResource<SupportStates>(SUPPORT_ACCESS_STATE_PATH);
+  const [requesting, setRequesting] = useState<RequestAccessDraft | null>(null);
+  const [requested, setRequested] = useState("");
   return (
-    <TrialsOverviewView
-      overview={overview}
-      onOpenTenant={onOpenTenant}
-      table={{
-        page,
-        onPage: setPage,
-        state,
-        onState: (value) => {
-          setState(value);
-          setPage(1);
-        },
-        query,
-        onQuery: (value) => {
-          setQuery(value);
-          setPage(1);
-        },
-        sort,
-        onSort,
-      }}
-    />
+    <>
+      {requested && (
+        <div className="ac-message tone-good" role="status">
+          {requested}
+        </div>
+      )}
+      <TrialsOverviewView
+        overview={overview}
+        onOpenTenant={onOpenTenant}
+        support={Object.fromEntries((support.data?.items ?? []).map((item) => [item.tenant_id, item]))}
+        onRequestSupport={(trial) => {
+          setRequested("");
+          setRequesting(supportDraft(trial, support.data?.me));
+        }}
+        onOpenWorkspace={onOpenWorkspace}
+        table={{
+          page,
+          onPage: setPage,
+          state,
+          onState: (value) => {
+            setState(value);
+            setPage(1);
+          },
+          query,
+          onQuery: (value) => {
+            setQuery(value);
+            setPage(1);
+          },
+          sort,
+          onSort,
+        }}
+      />
+      {requesting && (
+        <RequestAccess
+          areas={support.data?.areas ?? []}
+          initial={requesting}
+          onClose={() => setRequesting(null)}
+          onRequested={() => {
+            setRequesting(null);
+            setRequested(
+              "Support access requested. A second platform administrator approves it for MDARIX, then the trial owner decides.",
+            );
+            support.reload();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -83,10 +171,17 @@ export function TrialsOverviewView({
   overview,
   onOpenTenant,
   table,
+  support = {},
+  onRequestSupport,
+  onOpenWorkspace,
 }: {
   overview: Resource<TrialOverview>;
   onOpenTenant: (tenantId: string) => void;
   table: TrialTableControls;
+  /** Support access to each trial, by tenant id. */
+  support?: Record<string, TrialSupportState>;
+  onRequestSupport?: (trial: TrialItem) => void;
+  onOpenWorkspace?: (tenantId: string) => void;
 }) {
   const data = overview.data;
   const summary = data?.summary;
@@ -310,6 +405,29 @@ export function TrialsOverviewView({
                 row.feedback
                   ? `${row.feedback.overall ?? "—"}/5 overall · ${row.feedback.recommend ?? "—"}/10 recommend`
                   : "None yet",
+            },
+            {
+              key: "support",
+              label: "Support access",
+              render: (row) => {
+                const state = support[row.tenant_id];
+                const text = supportStateText(state);
+                return (
+                  <span className="cc-trial-support">
+                    {text && <small>{text}</small>}
+                    {state?.open_for_me && onOpenWorkspace ? (
+                      <button type="button" className="ac-link" onClick={() => onOpenWorkspace(row.tenant_id)}>
+                        <Eye size={13} aria-hidden="true" /> Open read-only workspace
+                      </button>
+                    ) : null}
+                    {!state?.request && onRequestSupport ? (
+                      <button type="button" className="ac-link" onClick={() => onRequestSupport(row)}>
+                        <LifeBuoy size={13} aria-hidden="true" /> Request support access
+                      </button>
+                    ) : null}
+                  </span>
+                );
+              },
             },
             {
               key: "open",
