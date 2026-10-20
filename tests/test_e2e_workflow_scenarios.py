@@ -1643,7 +1643,8 @@ def test_15_a_signature_needs_re_authentication_and_verifies(org):
     assert signature["status"] == "SIGNED" and signature["signer_name"] == "Decider E2E"
     assert re.fullmatch(r"[0-9a-f]{64}", signature["fingerprint_full"])
     assert signature["signature_meaning"] == (
-        f"I have reviewed Decision Brief {brief['business_id']} version 1 and decide: Accept the conclusion"
+        f"I, Decider E2E, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        "and decide: Accept the conclusion"
     )
     assert signed["verification"]["status"] == "VALID"
     assert {item["key"]: item["ok"] for item in signed["verification"]["checks"]} == {
@@ -1651,6 +1652,8 @@ def test_15_a_signature_needs_re_authentication_and_verifies(org):
         "signature": True,
         "brief_hash": True,
         "snapshot": True,
+        "authority": True,
+        "separation": True,
     }
     decision = signed["decision"]
     assert decision["decided_by_user_id"] == decider_id and decision["brief_content_hash"] == brief["content_hash"]

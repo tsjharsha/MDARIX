@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Download, Upload } from "lucide-react";
-import { requestJson } from "../../../app/apiClient";
+import { ApiError, requestJson } from "../../../app/apiClient";
 import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
@@ -15,6 +15,20 @@ import { countOf } from "./common";
  * import the rows that pass (the others come back as a rejects file to fix) and to have personal data in the text
  * replaced by placeholders such as [PERSON] instead of refused.
  */
+
+/** How long the page waits for a check or an import: a trial's full allowance (5,000 rows) takes the server minutes. */
+export const IMPORT_TIMEOUT_MS = 10 * 60_000;
+
+/** What to say when an import fails. A timeout is not a failure the server reported: the import may have finished. */
+export function importFailureText(error: unknown): string {
+  if (error instanceof ApiError && error.code === "TIMEOUT")
+    return (
+      "MDARIX is taking longer than expected, so the page stopped waiting. The import may still finish: check your " +
+      "complaints in a few minutes before importing again. Importing the same file again updates its rows; it does " +
+      "not add them twice."
+    );
+  return errorText(error, "The import failed; nothing was saved.");
+}
 
 export type ImportTemplate = {
   entity: string;
@@ -237,7 +251,7 @@ export function ImportPanel({
       method: "POST",
       body: file,
       headers: { "Content-Type": isWorkbook(file) ? XLSX_TYPE : "text/csv" },
-      timeoutMs: 60_000,
+      timeoutMs: IMPORT_TIMEOUT_MS,
     });
   };
   const check = async () => {
@@ -263,7 +277,7 @@ export function ImportPanel({
         onImported();
       }
     } catch (error) {
-      setMessage({ tone: "bad", text: errorText(error, "The import failed; nothing was saved.") });
+      setMessage({ tone: "bad", text: importFailureText(error) });
     } finally {
       setBusy(false);
     }

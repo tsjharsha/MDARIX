@@ -5,7 +5,7 @@ import { TemporalMode, DecisionContext } from "../../app/types";
 import { api } from "../../app/api";
 import { AI_TIMEOUT_MS, ApiError, describeError, isUnreachable, postJson, requestJson } from "../../app/apiClient";
 import { formatDateTime } from "../../app/dates";
-import { useCan } from "../workspace/workspaceContext";
+import { useCan, useCanRunAi } from "../workspace/workspaceContext";
 import { displayId, safeText } from "../../app/displayId";
 import { titleCase } from "../admin/console/dashboardModel";
 import { Table, formatDate, idColumn } from "../customer-admin/shared";
@@ -74,7 +74,7 @@ export function DecisionCenterView({
   const [signedResult, setSignedResult] = useState<{ decisionId: string; data: any } | null>(null);
   const rationaleRef = useRef<HTMLTextAreaElement>(null);
   const [rationaleError, setRationaleError] = useState("");
-  const canRunAi = useCan("ai.run");
+  const canRunAi = useCanRunAi();
   const canWrite = useCan("records.write");
   useEffect(() => {
     let active = true;

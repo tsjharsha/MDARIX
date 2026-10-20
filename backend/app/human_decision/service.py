@@ -500,6 +500,12 @@ def verify_signature(db: Session, record: SignedApprovalRecord | None, decision:
         brief_stored_hash=brief.content_hash if brief is not None else None,
         brief_recomputed_hash=brief_rules.content_hash(brief.content, brief.narrative) if brief is not None else None,
     )
+    checks += rules.signer_checks(
+        signer_user_id=record.signer_user_id,
+        signer_role_label=role_label(record.signer_role),
+        authority_id=decision.approval_authority_id,
+        author_refs=brief_author_refs(db, brief) if brief is not None else (),
+    )
     return {"status": rules.verification_status(checks), "checks": checks}
 
 

@@ -614,8 +614,10 @@ function DecisionFormPanel({
   const setFollowUp = (key: string, change: Partial<FollowUpChoice>) =>
     set({ followUps: { ...form.followUps, [key]: { ...(form.followUps[key] ?? emptyFollowUp()), ...change } } });
   const chosen = outcomes.find((item) => item.code === form.outcome);
+  // The server's words for the chosen outcome are the ones stored with the signature, so they are shown first.
   const meaning = form.outcome
-    ? (safeText(context.signature_meaning) ??
+    ? (chosen?.signatureMeaning ??
+      safeText(context.signature_meaning) ??
       signatureMeaning({
         signer: session?.display_name,
         role: signerRole(session),

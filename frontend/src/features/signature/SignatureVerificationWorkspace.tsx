@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { describeError, requestJson } from "../../app/apiClient";
 import { formatDateTime, formatUtc } from "../../app/dates";
 import { titleCase } from "../admin/console/dashboardModel";
-import { WorkspaceContext } from "../workspace/workspaceContext";
+import { WorkspaceContext, useFeatureSet } from "../workspace/workspaceContext";
 import { displayId, safeText } from "../../app/displayId";
 import { isCaseDecision } from "../workspace/humanDecision";
 import { DecisionRecordDrawer } from "../workspace/sections/DecisionRecord";
@@ -16,6 +16,10 @@ type Decision = {
   selected_action?: string;
   decision_timestamp?: string;
   updated_at?: string;
+  // A decision on a case's brief (the decision screen, GET /api/v1/investigations/{id}/decision).
+  outcome_label?: string | null;
+  decision_status_label?: string | null;
+  decided_at?: string | null;
 };
 type Person = { id: string; display_name: string };
 
@@ -40,12 +44,29 @@ export function signerLabel(
 export function decisionLabel(decision: Decision): string {
   return [
     displayId(decision, "decision_identifier", "Decision"),
-    decision.selected_action ? titleCase(decision.selected_action) : null,
-    decision.decision_status ? titleCase(decision.decision_status) : null,
-    decision.decision_timestamp ? formatDateTime(decision.decision_timestamp) : null,
+    decision.selected_action ? titleCase(decision.selected_action) : (decision.outcome_label ?? null),
+    decision.decision_status_label ?? (decision.decision_status ? titleCase(decision.decision_status) : null),
+    decision.decision_timestamp || decision.decided_at
+      ? formatDateTime(String(decision.decision_timestamp || decision.decided_at))
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+// What a signature's decision code says, in words: a case decision's outcome or a legacy approval.
+const SIGNED_DECISIONS: Record<string, string> = {
+  ACCEPT: "Accept the conclusion",
+  ACCEPT_COND: "Accept with conditions",
+  REJECT: "Reject the conclusion",
+  CLOSE_NFA: "Close with no further action",
+  APPROVE: "Approved",
+};
+
+/** The decision a signature records, in words ("ACCEPT_COND" → "Accept with conditions"). */
+export function signedDecisionLabel(code: unknown): string {
+  const value = String(code ?? "").toUpperCase();
+  return SIGNED_DECISIONS[value] ?? (value ? titleCase(value) : "Signature");
 }
 
 /**
@@ -76,6 +97,9 @@ export function SignatureVerificationWorkspace() {
   // Inside the workspace the case chosen in the context bar is used; on its own the person chooses a case here.
   const workspace = useContext(WorkspaceContext);
   const contextCase = workspace?.work.investigationId ?? "";
+  // The lightweight MVP (and every free trial) parks the legacy decision list; its cases' decisions are those of the
+  // decision screen, newest first.
+  const mvp = useFeatureSet() === "mvp";
   const [cases, setCases] = useState<
     Array<{ id: string; business_id?: string | null; investigation_identifier?: string }>
   >([]);
@@ -108,14 +132,18 @@ export function SignatureVerificationWorkspace() {
     setDecisionId("");
     setReport(null);
     if (!caseId) return;
-    requestJson<Decision[]>(`/api/v1/investigations/${encodeURIComponent(caseId)}/decisions`)
+    const path = `/api/v1/investigations/${encodeURIComponent(caseId)}`;
+    (mvp
+      ? requestJson<{ decisions?: Decision[] }>(`${path}/decision`).then((screen) => screen?.decisions ?? [])
+      : requestJson<Decision[]>(`${path}/decisions`)
+    )
       .then((rows) => {
         const list = Array.isArray(rows) ? rows : [];
         setDecisions(list);
         setDecisionId(list[0]?.id ? String(list[0].id) : "");
       })
       .catch((error) => setMessage(describeError(error, "The decisions of this case could not be loaded.")));
-  }, [caseId]);
+  }, [caseId, mvp]);
 
   const verify = async () => {
     if (!decisionId) return;
@@ -214,8 +242,7 @@ export function SignatureVerificationWorkspace() {
             {(report.signatures ?? []).map((item: any) => (
               <article key={String(item.signature_id)}>
                 <strong>
-                  {titleCase(String(item.decision ?? "Signature"))} ·{" "}
-                  {item.valid ? "Valid" : "Does not match the signed version"}
+                  {signedDecisionLabel(item.decision)} · {item.valid ? "Valid" : "Does not match the signed version"}
                 </strong>
                 {safeText(item.business_id ?? item.signature_business_id) && (
                   <span>Signature ID: {safeText(item.business_id ?? item.signature_business_id)}</span>

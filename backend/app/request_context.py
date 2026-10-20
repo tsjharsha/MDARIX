@@ -122,6 +122,17 @@ def _idle_limit() -> timedelta:
     return timedelta(minutes=max(1, minutes))
 
 
+# Sent by the browser on reads the page makes on its own (a poll), not the person (frontend apiClient.ts).
+BACKGROUND_HEADER = "X-MDARIX-Background"
+
+
+def is_background_request(request: Request | None) -> bool:
+    """A background read: it is served as usual but is no activity, so it neither restarts the idle timeout nor
+    renews the session. A page left open therefore still signs out after MDARIX_SESSION_IDLE_MINUTES."""
+    headers = getattr(request, "headers", None)
+    return bool(headers) and headers.get(BACKGROUND_HEADER, "").strip() == "1"
+
+
 def session_expiry(session_row, now: datetime | None = None) -> dict[str, str]:
     """When this session ends if nothing changes: the absolute ``expires_at`` and the ``idle_expires_at`` the idle
     timeout implies (whichever comes first wins), as ISO strings for the browser's warning."""
@@ -205,8 +216,9 @@ def get_request_context(
         # Password checked, second factor not yet: only the MFA steps (under /api/v1/auth) are open.
         code = "MFA_ENROLLMENT_REQUIRED" if mfa_state == "ENROLL" else "MFA_REQUIRED"
         raise HTTPException(403, detail={"code": code, "message": "Complete multi-factor authentication first"})
-    durable.last_seen_at = now
-    renew_session_if_due(durable, now, response, token)
+    if not is_background_request(request):
+        durable.last_seen_at = now
+        renew_session_if_due(durable, now, response, token)
     set_database_tenant_context(db, str(durable.tenant_id))
     if hasattr(db, "commit"):
         db.commit()

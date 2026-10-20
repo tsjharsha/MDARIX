@@ -428,13 +428,21 @@ def _screen(data: Session, control_db: Session, ctx: AuthenticatedRequestContext
     )
     briefs = service.briefs_by_id(data, case.tenant_id, [decision.brief_version_id for decision in decisions])
     approved = row if row is not None and row.status == brief_rules.APPROVED_FOR_DECISION else None
-    actions = Decider(control_db, ctx).evaluate(data, case, approved, current)
+    decider = Decider(control_db, ctx)
+    actions = decider.evaluate(data, case, approved, current)
     business_ids = {str(decision.id): decision.business_id for decision in decisions}
     outcomes = rules.outcome_options()
+    # The signed-in person's name and the role they would sign under, as the signature names them.
+    signer_name = service.names(control_db, case.tenant_id, [decider.user_id]).get(decider.user_id)
+    signer_role = decider.authority(approved)[1] if approved is not None and actions.get("can_sign") else None
     for option in outcomes:
         # What the signature will say, built here so the screen shows the exact words that are signed.
         option["signature_meaning"] = (
-            rules.signature_meaning(approved.business_id, approved.version, option["code"]) if approved else None
+            rules.signature_meaning(
+                approved.business_id, approved.version, option["code"], signer_name, service.role_label(signer_role)
+            )
+            if approved
+            else None
         )
     return {
         "investigation": service.investigation_view(data, case),
@@ -874,7 +882,13 @@ def sign_decision(
         remarks=payload.rationale,
         signer_user_id=user_id,
         signer_role=signer_role,
-        signature_meaning=rules.signature_meaning(row.business_id, row.version, payload.outcome),
+        signature_meaning=rules.signature_meaning(
+            row.business_id,
+            row.version,
+            payload.outcome,
+            service.names(control_db, tenant.id, [user_id]).get(user_id),
+            service.role_label(role),
+        ),
         content_fingerprint=content_fingerprint,
         signature_hash=rules.signature_hash(content_fingerprint, user_id, version),
         status="SIGNED",

@@ -205,8 +205,10 @@ def test_the_queue_the_dashboard_and_the_decision_screen(org):
         "CLOSE_NO_FURTHER_ACTION",
     ]
     assert len(body["follow_up_options"]) == 5
+    # The exact words signed, naming the person who would sign and the role they sign under.
     assert body["outcomes"][0]["signature_meaning"] == (
-        f"I have reviewed Decision Brief {brief['business_id']} version 1 and decide: Accept the conclusion"
+        f"I, Approver Brief, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        "and decide: Accept the conclusion"
     )
     assert item["investigation"]["product"]["id"] and (
         item["investigation"]["product"]["id"] == body["investigation"]["product"]["id"]
@@ -270,8 +272,15 @@ def test_signing_a_decision_records_everything_and_verifies(org):
     assert signature["business_id"] and signature["status"] == "SIGNED"
     assert signature["signer_name"] == "Approver Brief"
     assert signature["signature_meaning"] == (
-        f"I have reviewed Decision Brief {brief['business_id']} version 1 and decide: Accept with conditions"
+        f"I, Approver Brief, Authorized Decision Maker, have reviewed Decision Brief {brief['business_id']} version 1 "
+        "and decide: Accept with conditions"
     )
+    # The rules enforced at signing are read back on the record: approval authority and segregation of duties.
+    checks = {item["key"]: item for item in record["verification"]["checks"]}
+    assert checks["authority"]["ok"] and checks["authority"]["detail"] == (
+        "The signer held approval authority as Authorized Decision Maker when signing"
+    )
+    assert checks["separation"]["ok"] and checks["separation"]["label"] == "Segregation of duties"
     assert len(signature["fingerprint_full"]) == 64 and "…" in signature["fingerprint"]
     assert record["verification"]["status"] == "VALID"
     assert {item["key"]: item["ok"] for item in record["verification"]["checks"]} == {
@@ -279,6 +288,8 @@ def test_signing_a_decision_records_everything_and_verifies(org):
         "signature": True,
         "brief_hash": True,
         "snapshot": True,
+        "authority": True,
+        "separation": True,
     }
     assert record["snapshot"]["evidence_set_hash"] == decision["evidence_set_hash"]
     assert record["snapshot"]["scope_version"] == 1
@@ -476,6 +487,11 @@ def test_a_new_decision_supersedes_the_current_one(org):
     assert old_record["superseded_by"]["id"] == new["decision"]["id"]
     assert old_record["verification"]["status"] == "VALID"  # superseding never breaks the earlier signature
     assert "CASE_DECISION_SUPERSEDED" in _audit(tenant_id, first_id)
+    # The case timeline names who superseded it: the signer of the new decision.
+    timeline = approver.get(f"/api/v1/investigations/{case['id']}/trust/timeline", params={"page_size": 200})
+    assert timeline.status_code == 200, timeline.text
+    superseded = next(item for item in timeline.json()["items"] if item["event"] == "CASE_DECISION_SUPERSEDED")
+    assert superseded["actor"] is not None and superseded["actor"]["name"] == "Approver2 Brief"
 
     screen = approver.get(_path(case["id"])).json()
     assert screen["current_decision"]["id"] == new["decision"]["id"]

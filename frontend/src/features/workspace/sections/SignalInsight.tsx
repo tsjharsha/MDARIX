@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Sparkles, TrendingUp } from "lucide-react";
 import { Panel, ToneBadge } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
-import { useCan, useWorkspace } from "../workspaceContext";
+import { useCanRunAi, useWorkspace } from "../workspaceContext";
 import {
   aiSummaryNote,
   insightPath,
@@ -24,7 +24,7 @@ import { TrustBadge } from "./TrustBadge";
 export function SignalInsightPanel({ signalId }: { signalId: string }) {
   const insight = useResource<SignalInsight>(insightPath(signalId));
   const { notify } = useWorkspace();
-  const canRunAi = useCan("ai.run");
+  const canRunAi = useCanRunAi();
   const [ai, setAi] = useState<SignalSummary | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

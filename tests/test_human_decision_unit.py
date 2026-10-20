@@ -444,6 +444,25 @@ def test_a_signed_decision_verifies_and_each_change_shows():
 def test_the_signature_meaning_names_the_brief_version_and_outcome():
     meaning = rules.signature_meaning("DBV000012", 3, "CLOSE_NO_FURTHER_ACTION")
     assert meaning == "I have reviewed Decision Brief DBV000012 version 3 and decide: Close with no further action"
+    named = rules.signature_meaning("DBV000012", 3, "ACCEPT_CONCLUSION", "Asha Rao", "Leader (Quality Manager)")
+    assert named == (
+        "I, Asha Rao, Leader (Quality Manager), have reviewed Decision Brief DBV000012 version 3 and decide: "
+        "Accept the conclusion"
+    )
+    assert rules.signature_meaning("DBV000012", 3, "ACCEPT_CONCLUSION", "Asha Rao").startswith("I, Asha Rao, have")
+
+
+def test_the_signer_checks_read_back_authority_and_segregation_of_duties():
+    def checks(**values):
+        base = {"signer_user_id": "u-1", "signer_role_label": "Approver", "authority_id": "a-1", "author_refs": {"u-2"}}
+        return {item["key"]: item for item in rules.signer_checks(**{**base, **values})}
+
+    good = checks()
+    assert good["authority"]["ok"] and good["separation"]["ok"]
+    assert good["authority"]["label"] == "Approval authority" and good["separation"]["label"] == "Segregation of duties"
+    assert checks(authority_id=None)["authority"]["ok"] is False
+    assert checks(author_refs={"U-1"})["separation"]["ok"] is False  # the signer wrote the brief
+    assert rules.verification_status(list(checks(author_refs={"u-1"}).values())) == "INVALID"
 
 
 # ------------------------------------------------------------------------------------------------------ routes

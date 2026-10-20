@@ -10,6 +10,43 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.34] - 2026-10-20
+
+Fixes for what the free-trial validation run of 0.10.33 found (document MDARIX-FT-VER v1.0, interim).
+
+### Fixed
+
+- A trial page left open now signs out after the idle timeout. The "chapter done" banner reads the trial story every
+  30 seconds, and every read counted as activity, in the browser and on the server, so an untouched trial page never
+  timed out (DEV-006). Reads a page makes on its own now carry the header `X-MDARIX-Background: 1` (`apiClient`
+  option `background`): the server answers them but neither restarts the idle window nor renews the session
+  (`backend/app/request_context.py` `is_background_request`), and the browser's idle watch does not count them.
+- A free trial no longer offers AI actions it cannot run. **Explain with AI** on the second-look cards,
+  **Write an AI summary** on a signal, **Start from an AI draft** on the Decision Brief and **Generate AI Advisory**
+  are hidden in a trial workspace (`useCanRunAi`); before, "Explain with AI" answered "No AI provider is set up yet"
+  (DEV-007). The server refused these model calls for a trial either way.
+- The case timeline names who superseded a decision: the entry "Decision superseded by a new decision" shows the
+  signer of the decision that replaced it, not "Not recorded" (DEV-014).
+- Records › **Verify a signature** works in the lightweight MVP and in free trials. It listed a case's decisions from
+  the legacy Decision Center route, which the MVP parks (404 "This part of MDARIX is not offered in this
+  deployment"); it now lists them from the decision screen (`GET /api/v1/investigations/{id}/decision`) (DEV-015).
+  Its report shows each signature as a card with one fact per line, and names the signed outcome in words ("Accept
+  with conditions", not "Accept Cond").
+- A large import no longer stops waiting after 60 seconds: the page waits up to 10 minutes for a check or an import,
+  so a trial's full allowance of 5,000 rows completes on screen. If it still times out, the page says that the import
+  may still finish and that importing the same file again updates its rows, not that nothing was saved (DEV-016).
+
+### Changed
+
+- The signed decision record lists the two rules enforced when signing, read back from what was recorded:
+  **Approval authority** (the decision records the approval authority the signer decided under) and **Segregation of
+  duties** (the signer did not write, edit or submit the brief). A record whose signer wrote the brief verifies as
+  Invalid (DEV-011).
+- The meaning of a signature names the signer and the role they signed under: "I, Asha Rao, Leader (Quality Manager),
+  have reviewed Decision Brief DBV000001 version 1 and decide: Accept the conclusion". The decision form shows the
+  server's exact words for the chosen outcome, so what is shown is what is stored. Signatures made before keep their
+  stored words; the meaning is not part of the signed fingerprint, so they still verify (DEV-011).
+
 ## [0.10.33] - 2026-10-19
 
 ### Added
