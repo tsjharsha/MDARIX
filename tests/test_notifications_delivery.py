@@ -534,6 +534,9 @@ def test_reminders_follow_the_saved_recipients_and_wording(db, tenant_id, sent):
         )
     )
     row = _subscription(db, tenant_id)
+    # Days left are rounded up, as on every screen (FUN-03): 29 days and 23 hours left read "30 days left".
+    row.expires_at = datetime.now(timezone.utc) + timedelta(days=29, hours=23)
+    db.flush()  # within this test's session only, rolled back with its template
     assert notifications.handle_event(db, "SUBSCRIPTION_REMINDER", {"subscription_id": str(row.id), "stage": "30_DAY"})
     recipients = sorted(recipient for _, recipient, _ in sent)
     assert recipients == sorted([admin.username, billing]) and business not in recipients

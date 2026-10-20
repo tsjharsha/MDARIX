@@ -320,16 +320,20 @@ def send_trial_invitation(
     )
 
 
-def send_welcome_email(recipient: str, organization: str) -> str:
+def send_welcome_email(recipient: str, organization: str, *, mfa_required: bool = False) -> str:
+    # Whether this person's role must use two-factor sign-in (backend/app/mfa.py required_for): trial users must.
+    paragraphs = [f"You can now sign in to MDARIX for {organization} with your email and the password you chose."]
+    if mfa_required:
+        paragraphs.append(
+            "At your first sign-in you set up an authenticator app on your phone (two-factor sign-in) and save your "
+            "recovery codes, so have your phone ready."
+        )
     return _send(
         recipient,
         Message(
             subject="Welcome to MDARIX",
             heading="Your account is active",
-            paragraphs=(
-                f"You can now sign in to MDARIX for {organization} with your email and the password you chose.",
-                "Administrators must also set up an authenticator app at their first sign-in.",
-            ),
+            paragraphs=tuple(paragraphs),
             button=("Sign in", f"{company().app_url}/signin"),
             reason="You are receiving this email because you activated an MDARIX account.",
         ),
