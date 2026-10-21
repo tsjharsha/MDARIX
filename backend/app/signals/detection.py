@@ -39,10 +39,7 @@ def _linked_keys(db: Session, tenant_id, start) -> dict:
     rows = (
         db.query(SignalComplaint.complaint_id, Signal.product_id, Signal.product_version_id, Signal.problem_key)
         .join(Signal, and_(Signal.tenant_id == SignalComplaint.tenant_id, Signal.id == SignalComplaint.signal_id))
-        .join(
-            Complaint,
-            and_(Complaint.tenant_id == SignalComplaint.tenant_id, Complaint.id == SignalComplaint.complaint_id),
-        )
+        .join(Complaint, service.LINKED_COMPLAINT)
         .filter(SignalComplaint.tenant_id == tenant_id, service.COMPLAINT_EVENT_AT >= start)
     )
     linked: dict = {}

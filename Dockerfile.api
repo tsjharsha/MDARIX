@@ -67,4 +67,7 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
 
 # Behind Caddy: the client address comes from X-Forwarded-For via MDARIX_TRUSTED_PROXY_HOPS=1, so uvicorn's own
 # proxy-header rewriting stays off. Access logs come from the API's request log line instead.
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-proxy-headers", "--no-access-log", "--timeout-graceful-shutdown", "20"]
+# uvicorn restarts a worker that does not answer its health check in time, dropping the requests it is serving. Its
+# default of 5 s killed busy workers on a 2-CPU server right after a large import (in a test with the server's CPU
+# limits, 0.10.42), the import's own request among them; 30 s still replaces a hung worker.
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-proxy-headers", "--no-access-log", "--timeout-graceful-shutdown", "20", "--timeout-worker-healthcheck", "30"]

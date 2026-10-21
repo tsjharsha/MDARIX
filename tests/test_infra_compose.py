@@ -8,6 +8,7 @@ limit, or makes Caddy publish readiness detail fails here by name.
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -62,6 +63,16 @@ def test_services_stop_gracefully(name, grace):
 def test_every_service_has_memory_and_cpu_limits(name, memory):
     assert SERVICES[name]["mem_limit"] == memory
     assert float(SERVICES[name]["cpus"]) > 0
+
+
+def test_the_background_service_yields_the_cpu_to_the_api_and_a_busy_api_worker_is_not_killed():
+    # An import's embeddings run in the background service (0.10.42): when both want the CPU, the API comes first.
+    assert int(SERVICES["background"]["cpu_shares"]) < 1024 and "cpu_shares" not in SERVICES["api"]
+    # uvicorn's default worker health check (5 s) restarted busy workers after a large import, dropping requests.
+    command = json.loads(
+        re.search(r"^CMD (\[.*\])$", (ROOT / "Dockerfile.api").read_text(encoding="utf-8"), re.M).group(1)
+    )
+    assert int(command[command.index("--timeout-worker-healthcheck") + 1]) >= 30
 
 
 def test_every_service_keeps_bounded_logs():
