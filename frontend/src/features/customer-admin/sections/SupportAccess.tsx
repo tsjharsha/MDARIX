@@ -6,6 +6,7 @@ import { Table, formatDate, send, useResource } from "../shared";
 import {
   accessText,
   activityText,
+  areaDetails,
   areaNames,
   supportStatus,
   type SupportActivity,
@@ -33,7 +34,7 @@ export function SupportAccess() {
     confirm({
       title: `Give ${row.person ?? "MDARIX support"} access?`,
       body:
-        `${accessText(row.write)} access to ${areaNames(row.areas).toLowerCase()} until ${formatDate(row.expires_at)}. ` +
+        `${accessText(row.write)} access until ${formatDate(row.expires_at)}, to: ${areaDetails(row.areas)}. ` +
         "Every use is recorded in your audit trail, and you can revoke it at any time.",
       confirmLabel: "Approve access",
       reason: REASON,
@@ -124,6 +125,7 @@ export function SupportAccess() {
                 <span className="cc-stack">
                   <strong>{areaNames(row.areas)}</strong>
                   <small>{accessText(row.write)}</small>
+                  <small>{areaDetails(row.areas)}</small>
                 </span>
               ),
             },
@@ -208,6 +210,7 @@ function Activity({ grantId }: { grantId: string }) {
               render: (item) => (
                 <span className="cc-stack">
                   <strong>{activityText(item)}</strong>
+                  {item.covers && <small>{item.covers}</small>}
                   {item.reason && <small>{item.reason}</small>}
                 </span>
               ),

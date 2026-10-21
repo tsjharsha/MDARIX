@@ -1063,6 +1063,18 @@ def revoke_trial_support_access(
     return support_access_api.revoke_grant(db, owner, grant_id, payload.reason, request, team.SOURCE)
 
 
+@router.get("/trial/support-access/{grant_id}/activity")
+def trial_support_access_activity(
+    grant_id: uuid.UUID,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+):
+    """The life of one request in the trial's own audit trail: who asked, the owner's decision, every page MDARIX
+    support read and every export, and how it ended."""
+    owner = _trial_owner(db, ctx)
+    return support_access_api.grant_activity(db, owner, grant_id)
+
+
 # ------------------------------------------------------------------------------------------- Data retention
 
 

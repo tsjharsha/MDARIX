@@ -36,6 +36,10 @@ export type SupportActivity = {
   method?: string | null;
   path?: string | null;
   reason?: string | null;
+  /** What happened, in the organization's words (backend/app/support_access_api.py). */
+  what?: string | null;
+  /** On the request and the approval: what they cover ("Read only. People: the user directory, to read"). */
+  covers?: string | null;
 };
 
 const STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -61,10 +65,27 @@ export function areaNames(areas: SupportArea[]) {
   return areas.map((area) => area.label.split(":")[0].trim()).join(", ") || "Nothing (deny this request)";
 }
 
+/**
+ * The areas with what each covers, as the server words them for this grant ("People (the user directory, to read)"
+ * when read only): what a decision maker approves.
+ */
+export function areaDetails(areas: SupportArea[]) {
+  return (
+    areas
+      .map((area) => {
+        const [name, ...rest] = area.label.split(":");
+        const what = rest.join(":").trim();
+        return what ? `${name.trim()} (${what})` : name.trim();
+      })
+      .join("; ") || "Nothing (deny this request)"
+  );
+}
+
 const AREA_SHORT: Record<string, string> = {
   CONFIGURATION: "configuration",
   AUDIT: "the audit trail",
   PEOPLE: "people",
+  RECORDS: "quality records",
   DATA_EXPORT: "a full export",
 };
 
@@ -81,7 +102,10 @@ export function activityText(item: SupportActivity) {
       return "Your administrator denied the access";
     case "SUPPORT_ACCESS_REVOKED":
       return "The access was revoked";
+    case "SUPPORT_ACCESS_EXPIRED":
+      return "The access ended on its own";
     case "SUPPORT_ACCESS_USED": {
+      if (item.what) return item.what;
       const area = AREA_SHORT[String(item.area ?? "")] ?? "your data";
       return `${item.write ? "Changed" : "Viewed"} ${area}`;
     }

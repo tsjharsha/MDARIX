@@ -431,18 +431,6 @@ def create_support_access(payload: SupportAccessRequest, request: Request, db: S
         raise HTTPException(422, detail={"code": "SUPPORT_SCOPE_INVALID", "message": str(exc)}) from exc
     if db.query(Tenant).filter(Tenant.id == payload.tenant_id).first() is None:
         raise HTTPException(404, detail={"code": "TENANT_NOT_FOUND", "message": "Tenant is not available"})
-    if not support_access.TRIAL_SUPPORT_ACCESS_ENABLED:
-        from backend.app.trial.service import trial_subscription
-
-        # A request would wait for a trial owner whose Team tab no longer shows it.
-        if trial_subscription(db, payload.tenant_id) is not None:
-            raise HTTPException(
-                422,
-                detail={
-                    "code": "SUPPORT_ACCESS_TRIALS_LATER",
-                    "message": "Support access for free trials is not available yet.",
-                },
-            )
     if str(payload.tenant_id) == str(support_access.platform_tenant_id(db)):
         raise HTTPException(
             422,
@@ -564,6 +552,7 @@ def revoke_support_access(
         raise HTTPException(
             409, detail={"code": "SUPPORT_ACCESS_NOT_OPEN", "message": "This support access has already ended"}
         )
+    was_active = row.status == support_access.APPROVED
     row.status = support_access.REVOKED
     row.revoked_at = now
     row.revoked_by = admin.id
@@ -576,10 +565,15 @@ def revoke_support_access(
             action="SUPPORT_ACCESS_REVOKED",
             entity_type="SupportAccessGrant",
             entity_id=row.id,
-            details={"reason": payload.reason},
+            details={"reason": payload.reason, "source": "PLATFORM_ADMIN"},
             created_at=now,
         )
     )
+    if was_active:
+        from backend.app.notifications import notify_support_access_ended
+
+        # The organization approved it: its decision makers learn that it ended, and that MDARIX ended it.
+        notify_support_access_ended(db, row.tenant_id, grant_id=row.id, ended="REVOKED_BY_MDARIX")
     db.commit()
     return {"id": str(row.id), "status": row.status, "revoked_at": row.revoked_at}
 

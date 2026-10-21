@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this policy will be updated with the company's details and we will tell you by email.
 
-Last updated: 20 October 2026
+Last updated: 21 October 2026
 
 This policy explains how the founder of MDARIX, operating it ("MDARIX", "we", "us"), collects and uses personal data when you visit our website, request a free trial or a demo, or use the MDARIX product investigation platform (the "Service").
 
@@ -94,6 +94,8 @@ Your browser's local storage keeps preferences only, such as dismissed notices, 
 - Sign-in rate limits and lockout, and two-factor sign-in.
 - Virus scanning of every file we store, such as evidence attachments. Imported CSV and Excel files are read as data only and are not stored.
 - A tamper-evident audit trail that is verified daily.
+
+Within the Service, our staff see a customer's content only through support access that the customer approves. Each request names the areas of the customer's data it needs. Another MDARIX administrator, not the one who asked for it or the one who would use it, approves it first; then an authorized person at the customer approves it: the owner of a free trial, or one of the customer's administrators. Support access opens only the areas named, is read-only unless changes were asked for and approved, and lasts 24 hours at most. Its use is recorded in the customer's audit trail. The customer is told by email when the request reaches them, when access is approved and when it ends, and can revoke it at any time. Separately, the people who run the Service's servers can reach its database and backups directly; they do so only to operate, secure, back up and restore the Service, or where the law requires it.
 
 More detail is on our [Security page](/security).
 
