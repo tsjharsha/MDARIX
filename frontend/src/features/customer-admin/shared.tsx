@@ -41,9 +41,64 @@ export type Resource<T> = {
   reload: () => void;
 };
 
-export function useResource<T>(path: string | null): Resource<T> {
+/** How often, and for how long, a resource is read again while ``refreshWhile`` says its data is not final yet. */
+export const REFRESH_MS = 3_000;
+export const REFRESH_FOR_MS = 120_000;
+
+/** Whether a loaded resource is to be read again: its data is there and ``refreshWhile`` says it is not final. */
+export function stillUnfinished<T>(
+  result: { state: PanelState; data: T | null },
+  refreshWhile?: (data: T) => boolean,
+): boolean {
+  return result.state === "ready" && result.data !== null && !!refreshWhile?.(result.data);
+}
+
+export function useResource<T>(
+  path: string | null,
+  options: {
+    /** Read again (in the background) every few seconds while this is true of the data, for two minutes at most:
+     * for example while an import's signals are still being found. */
+    refreshWhile?: (data: T) => boolean;
+    /** A small status read (``{ pending: boolean }``) asked meanwhile instead of the resource itself, which is read
+     * again once the status says it is no longer pending. */
+    statusPath?: string;
+  } = {},
+): Resource<T> {
   const [version, setVersion] = useState(0);
   const [result, setResult] = useState<Omit<Resource<T>, "reload">>({ state: "loading", data: null });
+  const refreshWhile = useRef(options.refreshWhile);
+  refreshWhile.current = options.refreshWhile;
+  const statusPath = options.statusPath;
+  const unfinished = stillUnfinished(result, refreshWhile.current);
+  // Background reads: a page left open does not keep its session alive (apiClient ``background``). They replace the
+  // data only, so the panel never flickers back to "loading". One read at a time: the next is asked for a few seconds
+  // after the last one answered, so a slow server never gets a pile of them.
+  useEffect(() => {
+    if (!path || !unfinished) return;
+    let current = true;
+    let timer: number | undefined;
+    const started = Date.now();
+    const reload = () =>
+      requestJson<T>(path, { background: true }).then((data) => current && setResult({ state: "ready", data }));
+    const read = () => {
+      if (!current || Date.now() - started > REFRESH_FOR_MS) return;
+      const step = statusPath
+        ? requestJson<{ pending?: boolean }>(statusPath, { background: true }).then((status) =>
+            status.pending ? undefined : reload(),
+          )
+        : reload();
+      step
+        .catch(() => undefined)
+        .finally(() => {
+          if (current) timer = window.setTimeout(read, REFRESH_MS);
+        });
+    };
+    timer = window.setTimeout(read, REFRESH_MS);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [path, version, unfinished, statusPath]);
   useEffect(() => {
     if (!path) return;
     let current = true;

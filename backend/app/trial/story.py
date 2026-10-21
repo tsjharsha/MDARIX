@@ -296,6 +296,10 @@ def _trends_finding(db: Session, tenant_id: uuid.UUID, trends: dict | None) -> d
     }
 
 
+# The trend chapter's finding while an import's signals are being found (they appear within seconds).
+FINDING_SIGNALS = "Finding signals in the complaints you just imported…"
+
+
 def _plural(count: int, noun: str) -> str:
     return f"{count} {noun}{'' if count == 1 else 's'}"
 
@@ -328,11 +332,14 @@ def story(
     ai_ready: bool = False,
     cited: tuple = (),
     tried_before: tuple = (),
+    signals_pending: bool = False,
 ) -> dict:
     """Every chapter with its finding from the organization's records and whether it acted on it. ``ai_ready``: AI
     answers for this organization now (backend/app/ai_settings.py ai_ready); without it the investigation chapter
     says what the case page does by itself. ``cited``: the chapters answering what the organization was cited for
-    (backend/app/trial/citations.py): they are marked, and the next step is the first of them not yet tried."""
+    (backend/app/trial/citations.py): they are marked, and the next step is the first of them not yet tried.
+    ``signals_pending``: an import's signals are still being found (backend/app/signals/hooks.py detection_pending):
+    the trend chapter says so rather than count the signals found so far."""
     from backend.app.readiness_home.service import readiness
 
     today = today or datetime.now(timezone.utc).date()
@@ -360,7 +367,9 @@ def story(
     for number, (code, title, promise, pain, opens, check_code) in enumerate(CHAPTERS, 1):
         title, promise, pain = chapter_text(code, title, promise, pain, ai_ready)
         check = checks.get(check_code) if check_code else None
-        if code == "TRENDS_TO_CASES":
+        if code == "TRENDS_TO_CASES" and signals_pending:
+            finding = {"value": None, "text": FINDING_SIGNALS, "state": "NOT_SET"}
+        elif code == "TRENDS_TO_CASES":
             finding = _trends_finding(db, tenant_id, checks.get("TRENDS_WITHOUT_ACTION"))
         elif code == "SHOW_THE_INSPECTOR":
             needing = [item for item in checks.values() if item.get("state") in ("CRITICAL", "ATTENTION")]
@@ -399,6 +408,7 @@ def story(
     waiting = [chapter["code"] for chapter in chapters if not chapter["acted"]["done"]]
     return {
         "as_of": today.isoformat(),
+        "signals_pending": signals_pending,
         "acted": acted,
         "total": len(chapters),
         # What the organization was cited for comes first, then the story's order.

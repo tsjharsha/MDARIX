@@ -14,6 +14,9 @@ from access_control.personas import R1_PERSONAS as PERSONAS
 from access_control.personas import get_persona
 from auth.durable import issue_invitation, issue_reset, revoke_user_sessions
 from auth.emailer import (
+    TEAM_INVITED,
+    TEAM_MFA_RESET,
+    TEAM_ROLE_CHANGED,
     EmailDeliveryError,
     send_activation_email,
     send_password_reset_email,
@@ -32,6 +35,7 @@ from backend.app.db.models.foundation import (
 )
 from backend.app.db.models.workflow import UserAdditionalRole
 from backend.app.db.session import get_db
+from backend.app import team_notices
 from backend.app.access.schemas import (
     AdditionalRolesRequest,
     MembershipRequest,
@@ -250,6 +254,9 @@ def assign_role(payload: RoleAssignmentRequest, request: Request, db: Session = 
             },
         )
     row = db.query(RoleAssignment).filter_by(tenant_id=admin.tenant_id, user_id=user.id, role_id=role.id).first()
+    if row is None or str(row.status).upper() != "ACTIVE":
+        # The person is told which role they were given (backend/app/team_notices.py).
+        team_notices.queue_organization_change(db, admin, user, TEAM_ROLE_CHANGED, custom_roles_added=(role.id,))
     if row is None:
         row = RoleAssignment(
             id=uuid.uuid4(),
@@ -321,6 +328,10 @@ def update_user_status(user_id: uuid.UUID, payload: UserStatusRequest, request: 
     user.status = payload.status
     user.updated_at = now
     revoked = revoke_user_sessions(db, user.id, user.tenant_id) if payload.status != "ACTIVE" else 0
+    change = team_notices.status_change(previous_status, user.status)
+    if change:
+        # The person, and for an administrator account the other administrators, are told by email.
+        team_notices.queue_organization_change(db, admin, user, change, now=now)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -356,6 +367,7 @@ def reset_user_mfa(user_id: uuid.UUID, payload: MfaResetRequest, request: Reques
     _guard_user_administration(admin, target=user, changes_access=True)
     now = datetime.now(timezone.utc)
     revoked = mfa.reset(db, user, now)
+    team_notices.queue_organization_change(db, admin, user, TEAM_MFA_RESET, now=now)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -537,6 +549,16 @@ def set_user_roles(
             row.revoked_by = str(admin.id)
             row.revoked_at = now
             changes.append(("ROLE_REVOKED", code))
+    if changes:
+        team_notices.queue_organization_change(
+            db,
+            admin,
+            user,
+            TEAM_ROLE_CHANGED,
+            now=now,
+            roles_added=tuple(code for action, code in changes if action == "ROLE_GRANTED"),
+            roles_removed=tuple(code for action, code in changes if action == "ROLE_REVOKED"),
+        )
     for action, code in changes:
         db.add(
             AuditEvent(
@@ -562,7 +584,14 @@ DELIVERY_FAILED_MESSAGE = (
 )
 
 
-def _send_invitation(user: AuthUser, token: str, organization: str | None) -> str:
+def _inviter(admin: AuthUser) -> str | None:
+    """How an invitation names the administrator who sent it: by name; MDARIX staff are not named."""
+    if _is_platform_admin(admin):
+        return None
+    return (admin.display_name or "").strip() or admin.username
+
+
+def _send_invitation(user: AuthUser, token: str, organization: str | None, invited_by: str | None = None) -> str:
     """Email the activation link; the delivery result ("SENT", "NOT_CONFIGURED", or "FAILED").
 
     The account and its link are already committed (``issue_invitation`` commits), so a mail outage must not turn
@@ -570,7 +599,7 @@ def _send_invitation(user: AuthUser, token: str, organization: str | None) -> st
     and MDARIX support can issue a fresh activation link (``POST /api/v1/platform-admin/users/{id}/activation-link``).
     """
     try:
-        return send_activation_email(user.username, token, organization or "")
+        return send_activation_email(user.username, token, organization or "", invited_by=invited_by)
     except EmailDeliveryError as exc:
         # No address in the log: the account id is enough to find the person.
         logger.warning("Invitation email for user %s was not delivered: %s", user.id, exc)
@@ -625,7 +654,9 @@ def reactivate_user(user_id: uuid.UUID, request: Request, db: Session = Depends(
         membership.status = "INVITED"
         membership.updated_at = now
     token = issue_invitation(db, user.id, user.tenant_id, admin.id)
-    delivery = _send_invitation(user, token, user.company)
+    delivery = _send_invitation(user, token, user.company, _inviter(admin))
+    # Inviting a Customer Administrator is told to the other administrators (the invitation is its own email).
+    team_notices.queue_organization_change(db, admin, user, TEAM_INVITED, now=now, tell_person=False)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -817,7 +848,8 @@ def create_user(payload: UserCreateRequest, request: Request, db: Session = Depe
             membership.status = "INVITED"
             membership.updated_at = now
     token = issue_invitation(db, row.id, row.tenant_id, admin.id)
-    delivery = _send_invitation(row, token, payload.company.strip())
+    delivery = _send_invitation(row, token, payload.company.strip(), _inviter(admin))
+    team_notices.queue_organization_change(db, admin, row, TEAM_INVITED, now=now, tell_person=False)
     db.add(
         AuditEvent(
             id=uuid.uuid4(),
@@ -1034,8 +1066,19 @@ def update_role_assignment_status(
             404,
             detail={"code": "ROLE_ASSIGNMENT_NOT_FOUND", "message": "Role assignment is not available for this tenant"},
         )
+    was_active, active = str(row.status).upper() == "ACTIVE", str(payload.status).upper() == "ACTIVE"
     row.status = payload.status
     row.updated_at = datetime.now(timezone.utc)
+    person = db.query(AuthUser).filter(AuthUser.id == row.user_id, AuthUser.tenant_id == admin.tenant_id).first()
+    if person is not None and was_active != active:
+        team_notices.queue_organization_change(
+            db,
+            admin,
+            person,
+            TEAM_ROLE_CHANGED,
+            custom_roles_added=(row.role_id,) if active else (),
+            custom_roles_removed=() if active else (row.role_id,),
+        )
     _audit_configuration(db, admin, "ROLE_ASSIGNMENT_STATUS_CHANGED", "RoleAssignment", row.id, "v1")
     db.commit()
     return {"id": str(row.id), "status": row.status}

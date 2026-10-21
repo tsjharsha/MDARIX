@@ -6,14 +6,13 @@ console, so the owner also removes a colleague (the account is offboarded, never
 and the seat is free again) and resets a colleague's MFA after they lost their authenticator and recovery codes. The
 owner's own MFA is never reset here: they replace their authenticator in My Account, or MDARIX support resets it.
 
-Each removal, withdrawn invitation and MFA reset is emailed once committed (``send_team_change_emails``, run by the
-router after the response): to the person changed, to the owner as a confirmation, and to the MDARIX team. A failed
-email is only logged: the change stands.
+Each removal, withdrawn invitation and MFA reset is emailed to the person changed, to the owner as a confirmation,
+and to the MDARIX team: one outbox event per email, queued with the change (backend/app/team_notices.py), so a slow
+or failing mail provider never delays or undoes the change, and the worker retries each failed email on its own.
 """
 
 from __future__ import annotations
 
-import logging
 import os
 import re
 import secrets
@@ -24,8 +23,8 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from auth import emailer
-from auth.security_notices import _when
 from auth.service import _hash
+from backend.app import team_notices
 from backend.app.access.authz import platform_account_clause
 from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant, TenantMembership
 from backend.app.db.models.stage2 import OnboardingRequest, UserInvitation
@@ -36,8 +35,6 @@ SEATED_STATUSES = ("ACTIVE", "INVITED")
 REMOVED_STATUS = "OFFBOARDED"
 SOURCE = "TRIAL_OWNER"
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-
-logger = logging.getLogger(__name__)
 
 
 def _error(status: int, code: str, message: str) -> HTTPException:
@@ -296,8 +293,9 @@ def remove_colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID
             created_at=now,
         )
     )
-    db.commit()
     change = emailer.TEAM_INVITATION_WITHDRAWN if previous == "INVITED" else emailer.TEAM_REMOVED
+    team_notices.queue_trial_change(db, tenant_id, owner, user, change, now)
+    db.commit()
     return {
         "id": str(user.id),
         "business_id": user.business_id,
@@ -305,7 +303,6 @@ def remove_colleague(db: Session, tenant_id, owner: AuthUser, user_id: uuid.UUID
         "status": "REMOVED",
         "invitation_withdrawn": previous == "INVITED",
         "sessions_revoked": revoked,
-        "notify": _team_change(db, tenant_id, owner, user, change, now),
     }
 
 
@@ -345,96 +342,32 @@ def reset_colleague_mfa(db: Session, tenant_id, owner: AuthUser, user_id: uuid.U
             created_at=now,
         )
     )
+    team_notices.queue_trial_change(db, tenant_id, owner, user, emailer.TEAM_MFA_RESET, now)
     db.commit()
     return {
         "id": str(user.id),
         "business_id": user.business_id,
         "status": "MFA_RESET",
         "sessions_revoked": revoked,
-        "notify": _team_change(db, tenant_id, owner, user, emailer.TEAM_MFA_RESET, now),
     }
 
 
 # ------------------------------------------------------------------------------------------- Team change emails
 
 
-def _team_change(db: Session, tenant_id, owner: AuthUser, user: AuthUser, change: str, now: datetime) -> dict:
-    """What ``send_team_change_emails`` needs about one committed change, read now (the router pops it from the
-    response and sends after it). The organization is named as the invitations name it (the owner's company)."""
+def organization_name(db: Session, tenant_id, owner: AuthUser | None) -> str:
+    """How the team change emails name the organization: as the invitations name it (the owner's company), else as
+    the trial was requested, else the tenant's name."""
     request = trial_request(db, tenant_id)
-    tenant = db.query(Tenant.tenant_key, Tenant.name).filter(Tenant.id == tenant_id).first()
-    organization = (
-        (owner.company or "").strip()
+    tenant = db.query(Tenant.name).filter(Tenant.id == tenant_id).first()
+    return (
+        ((owner.company if owner else "") or "").strip()
         or (request.organization if request else "")
         or (tenant.name if tenant else "your organization")
     )
-    return {
-        "change": change,
-        "organization": organization,
-        "tenant_key": tenant.tenant_key if tenant else "",
-        "owner": _owner_name(owner),
-        "owner_email": owner.username,
-        "person": (user.display_name or "").strip() or user.username,
-        "person_email": user.username,
-        "when": _when(now),
-    }
 
 
 def team_alert_recipient() -> str:
-    """Where the MDARIX team hears of trial team changes: the same address as the MVP-request alert
+    """Where the MDARIX team hears of trial team changes: the same address as the pilot-request alert
     (backend/app/trial/router.py), or nobody when none is configured."""
     return (os.getenv("MDARIX_DEMO_ALERT_EMAIL") or os.getenv("MDARIX_TRIAL_ALERT_EMAIL") or "").strip()
-
-
-def send_team_change_emails(notice: dict) -> None:
-    """Email one team change, after the response: the person changed, the owner (a confirmation that is also a
-    security notice) and the MDARIX team, one email each. A failure is only logged, without the address: the change
-    is already saved."""
-    change, organization, owner = notice["change"], notice["organization"], notice["owner"]
-    if change == emailer.TEAM_REMOVED:
-        to_person = (emailer.send_trial_colleague_removed, {"owner": owner, "organization": organization})
-    elif change == emailer.TEAM_INVITATION_WITHDRAWN:
-        to_person = (emailer.send_trial_invitation_withdrawn, {"owner": owner, "organization": organization})
-    else:
-        to_person = (
-            emailer.send_trial_mfa_reset_notice,
-            {"owner": owner, "organization": organization, "when": notice["when"]},
-        )
-    sends = [
-        ("colleague", to_person[0], notice["person_email"], to_person[1]),
-        (
-            "owner",
-            emailer.send_trial_team_change_confirmation,
-            notice["owner_email"],
-            {
-                "change": change,
-                "person": notice["person"],
-                "person_email": notice["person_email"],
-                "organization": organization,
-                "when": notice["when"],
-            },
-        ),
-    ]
-    recipient = team_alert_recipient()
-    if recipient:
-        sends.append(
-            (
-                "MDARIX team",
-                emailer.send_trial_team_change_alert,
-                recipient,
-                {
-                    "change": change,
-                    "organization": organization,
-                    "tenant_key": notice["tenant_key"],
-                    "owner": owner,
-                    "owner_email": notice["owner_email"],
-                    "person_email": notice["person_email"],
-                    "when": notice["when"],
-                },
-            )
-        )
-    for who, send, address, details in sends:
-        try:
-            send(address, **details)
-        except Exception as exc:
-            logger.warning("Trial team change email to the %s failed (%s): %s", who, change, type(exc).__name__)
