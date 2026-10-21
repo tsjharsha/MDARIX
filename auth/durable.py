@@ -70,10 +70,14 @@ def revoke_session(db: Session, raw: str):
 
 
 def revoke_user_sessions(db: Session, user_id, tenant_id, keep_raw: str | None = None) -> int:
-    """Revoke every live session of one user except ``keep_raw`` (caller commits).
+    """Revoke every session of one user not revoked yet, except ``keep_raw`` (caller commits), and return how many of
+    them were still live: sessions that had already expired or gone idle are revoked too but not counted, so "2 other
+    sessions were signed out" counts only sessions someone could still use (NEW-5).
 
     Used when access is suspended or removed, and when the password changes (a stolen session must not survive it).
     """
+    from backend.app.request_context import session_is_live
+
     query = db.query(AuthSession).filter(
         AuthSession.user_id == user_id, AuthSession.tenant_id == tenant_id, AuthSession.revoked_at.is_(None)
     )
@@ -81,9 +85,10 @@ def revoke_user_sessions(db: Session, user_id, tenant_id, keep_raw: str | None =
         query = query.filter(AuthSession.session_hash != hash_token(keep_raw))
     rows = query.all()
     now = datetime.now(timezone.utc)
+    live = sum(1 for row in rows if session_is_live(row, now))
     for row in rows:
         row.revoked_at = now
-    return len(rows)
+    return live
 
 
 def _retire_open_links(db: Session, model, user_id, tenant_id, now: datetime) -> None:

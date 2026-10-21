@@ -1,6 +1,7 @@
 """Readiness API: the checks an inspector would make, from the organization's records, and their summary as a PDF.
 
-- ``GET /api/v1/readiness``: every check (the four home numbers first), open to every signed-in member.
+- ``GET /api/v1/readiness``: every check (the four home numbers first), open to every signed-in member, and
+  ``detection_pending`` while an import's signals are still being found (the trend check waits for them).
 - ``GET /api/v1/readiness/summary``: the summary's data for a period (30 to 1095 days; 365 by default).
 - ``GET /api/v1/readiness/summary.pdf``: the same as a PDF for management review (data.export), audited.
 - ``GET /api/v1/readiness/inspection-pack.zip``: the inspection pack (pack.py): the PDF, every check and every record
@@ -46,9 +47,13 @@ def _organization(control_db: Session, tenant_id: uuid.UUID) -> str:
 @router.get("")
 def readiness(
     db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    return service.readiness(db, _tenant(ctx))
+    from backend.app.signals.hooks import detection_pending
+
+    tenant_id = _tenant(ctx)
+    return {**service.readiness(db, tenant_id), "detection_pending": detection_pending(control_db, db, tenant_id)}
 
 
 @router.get("/summary")

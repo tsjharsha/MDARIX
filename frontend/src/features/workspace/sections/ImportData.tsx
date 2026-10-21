@@ -6,7 +6,7 @@ import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
 import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
 import { importTemplatesFor } from "../../../app/featureSet";
-import { countOf } from "./common";
+import { countOf, formatCount } from "./common";
 
 /*
  * CSV import into the organization's own records. The same validated import serves free trials (their own routes
@@ -28,6 +28,13 @@ export function importFailureText(error: unknown): string {
       "not add them twice."
     );
   return errorText(error, "The import failed; nothing was saved.");
+}
+
+/** What to say when a check is refused. A file without a single data row is a problem of the file, said plainly as
+ * the other problems are (no support reference: nothing went wrong on the server, DEV-018). */
+export function checkFailureText(error: unknown): string {
+  if (error instanceof ApiError && error.code === "IMPORT_FILE_EMPTY") return error.message;
+  return errorText(error, "The file could not be checked.");
 }
 
 export type ImportTemplate = {
@@ -72,8 +79,8 @@ const CREATES: [string, string, string][] = [
 
 /** "1 product and 2 lots": what a complaints file adds besides its complaints, or "" when nothing. */
 export function alsoCreatesText(creates: Record<string, number> | null | undefined): string {
-  const parts = CREATES.filter(([key]) => (creates?.[key] ?? 0) > 0).map(
-    ([key, one, many]) => `${creates?.[key]} ${creates?.[key] === 1 ? one : many}`,
+  const parts = CREATES.filter(([key]) => (creates?.[key] ?? 0) > 0).map(([key, one, many]) =>
+    countOf(creates?.[key] ?? 0, one, many),
   );
   if (!parts.length) return "";
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
@@ -96,7 +103,7 @@ export function readyText(
     : "";
   const also = alsoCreatesText(report.also_creates);
   if (report.row_limit)
-    return `${rows} ready to import (${countOf(report.new_rows ?? 0, "new row")} of your ${report.row_limit.toLocaleString()})${masked}${
+    return `${rows} ready to import (${countOf(report.new_rows ?? 0, "new row")} of your ${formatCount(report.row_limit)})${masked}${
       also ? `; the complaints also add ${also} they name, which do not count as rows` : ""
     }.`;
   return `${rows} ready to import (${countOf(report.new_records, "new record")})${masked}${
@@ -119,7 +126,10 @@ export type ImportResult = {
 export const FINDING_SIGNALS_TEXT =
   "MDARIX is now finding signals in these complaints: they show in Signals in a moment.";
 
-/** "Imported complaints: 4 new, 0 updated, and 2 products and 3 lots they name." (exported for its test). */
+/**
+ * "Imported complaints: 4 new, 0 updated, and 2 products and 3 lots they name." (exported for its test). Every count
+ * is grouped the en-US way, "4,993 updated" (DEV-025).
+ */
 export function importedText(title: string, result: ImportResult): string {
   const also = alsoCreatesText(result.also_created);
   const added = Object.values(result.also_created ?? {}).reduce((sum, count) => sum + count, 0);
@@ -129,7 +139,7 @@ export function importedText(title: string, result: ImportResult): string {
     result.masked_values ? `personal data replaced in ${countOf(result.masked_values, "value")}` : "",
   ].filter(Boolean);
   const [first, ...rest] = notes;
-  return `Imported ${title.toLowerCase()}: ${(result.created ?? 0) - added} new, ${result.updated ?? 0} updated${
+  return `Imported ${title.toLowerCase()}: ${formatCount((result.created ?? 0) - added)} new, ${formatCount(result.updated ?? 0)} updated${
     first ? `${also ? ", " : "; "}${first}` : ""
   }${rest.length ? `; ${rest.join("; ")}` : ""}.${result.signals === "FINDING" ? ` ${FINDING_SIGNALS_TEXT}` : ""}`;
 }
@@ -201,7 +211,8 @@ export function ImportPanel({
   /** /api/v1/data/import for every organization; /api/v1/trial/imports for the free trial's own limits. */
   basePath: string;
   fileLimitBytes?: number;
-  onImported: () => void;
+  /** After an import: what it imported, and of which template. */
+  onImported: (result: ImportResult, entity: string) => void;
   id?: string;
   eyebrow?: string;
   /** A complaints export alone is enough (a free trial): the products, versions and lots it names are added. */
@@ -266,7 +277,7 @@ export function ImportPanel({
     try {
       setReport(await send("check"));
     } catch (error) {
-      setMessage({ tone: "bad", text: errorText(error, "The file could not be checked.") });
+      setMessage({ tone: "bad", text: checkFailureText(error) });
     } finally {
       setBusy(false);
     }
@@ -280,7 +291,7 @@ export function ImportPanel({
         setRejects(result.rejects_csv ? { csv: result.rejects_csv, rows: result.rejected_rows ?? 0 } : null);
         setReport(null);
         setFile(null);
-        onImported();
+        onImported(result, template.entity);
       }
     } catch (error) {
       setMessage({ tone: "bad", text: importFailureText(error) });
@@ -452,8 +463,7 @@ export function ImportPanel({
           ) : (
             <>
               <p className="uw-trial-message is-bad">
-                {report.error_count} problem{report.error_count === 1 ? "" : "s"} found. Nothing has been saved. Fix the
-                file and check it again.
+                {countOf(report.error_count, "problem")} found. Nothing has been saved. Fix the file and check it again.
               </p>
               <ul className="uw-trial-issues">
                 {report.issues.map((issue, index) => (
@@ -544,8 +554,8 @@ export function ImportDataSection() {
         <>
           {templates.data.row_limit ? (
             <p className="ac-note">
-              Up to {templates.data.row_limit.toLocaleString()} rows and {readableSize(templates.data.file_limit_bytes)}{" "}
-              per file.
+              Up to {formatCount(templates.data.row_limit)} rows and {readableSize(templates.data.file_limit_bytes)} per
+              file.
             </p>
           ) : null}
           <ImportPanel

@@ -144,6 +144,16 @@ def session_expiry(session_row, now: datetime | None = None) -> dict[str, str]:
     }
 
 
+def session_is_live(session_row, now: datetime | None = None) -> bool:
+    """Whether a session still lets its person in: not revoked, before its absolute ``expires_at`` and used within the
+    idle timeout (the rules of ``get_request_context``)."""
+    now = now or datetime.now(timezone.utc)
+    if getattr(session_row, "revoked_at", None) is not None or session_row.expires_at <= now:
+        return False
+    last_seen = getattr(session_row, "last_seen_at", None)
+    return last_seen is None or now - last_seen <= _idle_limit()
+
+
 def renew_session_if_due(session_row, now: datetime, response: Response | None, token: str | None) -> bool:
     """Sliding renewal: when less than SESSION_RENEWAL_SECONDS of the window remain, extend the window, never past
     SESSION_SECONDS after sign-in. Re-issues the cookie with the new lifetime when a response is at hand.

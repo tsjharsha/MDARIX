@@ -41,7 +41,7 @@ def _assurance(run_id):
 @pytest.mark.parametrize("passed, outcome", [(12, "PASS"), (11, "FAIL")])
 def test_the_stored_status_is_the_computed_one(monkeypatch, passed, outcome):
     monkeypatch.setattr(evaluation_router, "run_golden_evaluation", lambda scenario_ids: _report(passed))
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     run_id = _start(client)
     body = client.get(f"{RUNS}/{run_id}").json()
     assert body["status"] == outcome and body["results"]["passed"] == passed and body["completed_at"]
@@ -53,7 +53,7 @@ def test_a_run_that_fails_to_complete_is_an_error_never_a_pass(monkeypatch):
         raise RuntimeError("embedding model missing")
 
     monkeypatch.setattr(evaluation_router, "run_golden_evaluation", broken)
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     run_id = _start(client)
     body = client.get(f"{RUNS}/{run_id}").json()
     assert body["status"] == "ERROR" and body["results"]["error"] == "RuntimeError"
@@ -62,12 +62,12 @@ def test_a_run_that_fails_to_complete_is_an_error_never_a_pass(monkeypatch):
 
 def test_no_scenario_evaluated_is_not_a_pass(monkeypatch):
     monkeypatch.setattr(evaluation_router, "run_golden_evaluation", lambda scenario_ids: _report(0, total=0))
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     assert client.get(f"{RUNS}/{_start(client)}").json()["status"] == "FAIL"
 
 
 def test_the_real_pipeline_is_scored_on_one_scenario():
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     run_id = _start(client, scenario_ids=["VS001"])
     body = client.get(f"{RUNS}/{run_id}").json()
     assert body["status"] in {"PASS", "FAIL"}, body
@@ -78,7 +78,7 @@ def test_the_real_pipeline_is_scored_on_one_scenario():
 
 
 def test_one_run_at_a_time_and_requests_are_validated(monkeypatch):
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     assert client.post(RUNS, json={"scenario_ids": ["VS999"]}).status_code == 422
     assert role_client("VIEWER")[0].post(RUNS, json={}).status_code == 403
     now = datetime.now(timezone.utc)
@@ -113,8 +113,29 @@ def test_all_fifteen_golden_scenarios_can_be_requested(monkeypatch):
     monkeypatch.setattr(
         evaluation_router, "run_golden_evaluation", lambda scenario_ids: requested.append(scenario_ids) or _report(3, 3)
     )
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     run_id = _start(client, scenario_ids=["VS013", "vs014", "VS015"])
     assert requested == [{"VS013", "VS014", "VS015"}]
     assert client.get(f"{RUNS}/{run_id}").json()["status"] == "PASS"
     assert client.post(RUNS, json={"scenario_ids": SCENARIO_IDS + ["VS001"]}).status_code == 422  # over 15
+
+
+def test_only_a_platform_administrator_starts_a_run(monkeypatch):
+    """SEC-08: a run reads the synthetic golden organization in system scope and keeps a CPU busy for minutes, so a
+    free trial's Leader, a customer's investigator or administrator cannot start one; nothing is recorded for them."""
+    from tests.test_free_trial import _approved_trial_client
+
+    started = []
+    monkeypatch.setattr(
+        evaluation_router, "run_golden_evaluation", lambda scenario_ids: started.append(1) or _report(1)
+    )
+    trial_owner, approval, _email = _approved_trial_client()
+    refused = trial_owner.post(RUNS, json={"scenario_ids": ["VS001"]})
+    assert refused.status_code == 403 and refused.json()["detail"]["code"] == "PLATFORM_ADMIN_REQUIRED"
+    for role in ("INVESTIGATOR", "LEADER", "CUSTOMER_ADMIN"):
+        assert role_client(role)[0].post(RUNS, json={}).status_code == 403
+    assert started == []
+    with SessionLocal() as db:
+        assert db.query(EvaluationRun).filter(EvaluationRun.tenant_id == uuid.UUID(approval["tenant_id"])).count() == 0
+    # The published evaluation stays readable to everyone signed in (the Trust page).
+    assert trial_owner.get("/api/v1/evaluations/golden/latest").status_code == 200

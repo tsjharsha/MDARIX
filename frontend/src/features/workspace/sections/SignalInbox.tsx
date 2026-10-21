@@ -38,6 +38,8 @@ import {
   statusFilterLabel,
   triageCountTiles,
   DETECTION_STATUS_PATH,
+  FINDING_SIGNALS_NOW,
+  WHILE_FINDING_SIGNALS,
   type NewSignalForm,
   type SignalFilters,
   type SignalList,
@@ -632,9 +634,13 @@ function NewSignalDrawer({ onClose, onCreated }: { onClose: () => void; onCreate
   );
 }
 
+/** The dashboard's Signal triage while an import's signals are being found. */
+export const FINDING_SIGNALS_TRIAGE = `${FINDING_SIGNALS_NOW} The counts update by themselves when they are ready.`;
+
 /**
  * The dashboard's "Signal triage" for people who triage signals: how many signals wait in each state, each opening
- * the inbox filtered to them, and the five open signals to look at first.
+ * the inbox filtered to them, and the five open signals to look at first. Right after an import it says that its
+ * signals are being found, and reads them again once they are (as the inbox does).
  */
 export function SignalTriagePanel() {
   const { session, open } = useWorkspace();
@@ -644,9 +650,14 @@ export function SignalTriagePanel() {
   return <SignalTriageSummary onOpen={(tab) => open("Signals", tab)} />;
 }
 
-function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void }) {
-  const summary = useResource<TriageSummary>("/api/v1/triage/summary");
-  const top = useResource<SignalList>(signalListPath({ status: "OPEN", sort: "priority" }, 1, 5));
+/** The panel's content (exported so its test renders each state without the server). */
+export function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void }) {
+  const summary = useResource<TriageSummary>("/api/v1/triage/summary", WHILE_FINDING_SIGNALS);
+  const top = useResource<SignalList>(
+    signalListPath({ status: "OPEN", sort: "priority" }, 1, 5),
+    WHILE_FINDING_SIGNALS,
+  );
+  const finding = !!(summary.data?.detection_pending || top.data?.detection_pending);
   const tiles = triageCountTiles(summary.data);
   const ready = summary.state === "ready";
   const signals = rankSignals(listOf(top.data?.items) as SignalSummary[]).slice(0, 5);
@@ -674,6 +685,11 @@ function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void }) {
           </button>
         ))}
       </div>
+      {finding && (
+        <p className="uw-cited-line uw-signals-finding" role="status">
+          {FINDING_SIGNALS_TRIAGE}
+        </p>
+      )}
       {top.state === "ready" && signals.length > 0 && (
         <ul className="uw-list" aria-label="Open signals to look at first">
           {signals.map((signal) => {
@@ -702,7 +718,11 @@ function SignalTriageSummary({ onOpen }: { onOpen: (tab: string) => void }) {
         </ul>
       )}
       {top.state === "ready" && !signals.length && (
-        <Empty title="No open signals" detail="Signals waiting for triage appear here." />
+        <Empty
+          {...(finding
+            ? inboxEmpty({} as SignalFilters, true)
+            : { title: "No open signals", detail: "Signals waiting for triage appear here." })}
+        />
       )}
       {top.state === "error" && <p className="ac-muted">{top.error ?? "Open signals could not be loaded."}</p>}
     </Panel>

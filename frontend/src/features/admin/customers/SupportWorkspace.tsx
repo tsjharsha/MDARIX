@@ -65,6 +65,8 @@ export const recordType = (value: unknown) =>
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/^./, (first) => first.toUpperCase());
+// Import counts grouped the en-US way ("4,993"), as the import result says them (DEV-025).
+const count = (value: unknown) => Number(value).toLocaleString("en-US");
 const yesNo = (value: unknown) => (value === true ? "Yes" : value === false ? "No" : "—");
 const short = (value: unknown, length = 140) => {
   const text = String(value ?? "");
@@ -123,10 +125,10 @@ const COLUMNS: Record<string, Column<Row>[]> = {
       numeric: true,
       render: (row) => (
         <span className="cc-stack">
-          <strong>{row.rows ?? "—"}</strong>
+          <strong>{row.rows === undefined || row.rows === null ? "—" : count(row.rows)}</strong>
           <small>
-            {row.created ?? 0} added · {row.updated ?? 0} updated
-            {row.set_aside ? ` · ${row.set_aside} set aside` : ""}
+            {count(row.created ?? 0)} added · {count(row.updated ?? 0)} updated
+            {row.set_aside ? ` · ${count(row.set_aside)} set aside` : ""}
           </small>
         </span>
       ),

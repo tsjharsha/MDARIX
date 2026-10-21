@@ -15,6 +15,8 @@
   --ms-good: #0ca30c;
   --ms-warn: #c98500;
   --ms-crit: #d03b3b;
+  /* The focus ring's colour on light grounds; the navy stages set the bright teal (see :focus-visible below). */
+  --ms-focus: var(--ms-teal-dark);
   --ms-radius: 14px;
   --ms-max: 1200px;
 
@@ -84,23 +86,35 @@
   display: block;
   max-width: 100%;
 }
+/* The focus ring (WEB-18): dark teal on the light grounds (6.6:1 on the grey ground, 7.2:1 on white), the bright teal
+   on the navy stages, where the dark one would vanish (7.7:1 on navy, 9.4:1 on the deep navy). */
+.ms-hero,
+.ms-roadmap,
+.ms-featured,
+.ms-dp,
+.ms-cta-band,
+.ms-footer {
+  --ms-focus: var(--ms-teal-bright);
+}
 .mdx-site :focus-visible {
-  outline: 3px solid var(--ms-teal-bright);
+  outline: 3px solid var(--ms-focus);
   outline-offset: 3px;
   border-radius: 6px;
 }
+/* Kept above the page by its own height and more until it is focused, so no edge of it shows (WEB-16). */
 .ms-skip {
   position: absolute;
-  top: -40px;
+  top: 12px;
   left: 16px;
   z-index: 100;
   padding: 8px 14px;
   border-radius: 8px;
   background: var(--ms-navy);
   color: #fff !important;
+  transform: translateY(calc(-100% - 24px));
 }
 .ms-skip:focus {
-  top: 12px;
+  transform: none;
 }
 
 /* Type */
@@ -847,8 +861,8 @@
   margin-top: 8px;
 }
 
-/* What you get, as a roadmap (pages.tsx ScopeClarity): a navy stage with a track from "Live now" to "Planned", the
-   free trial's capabilities on a white card, then the next and planned stages. Hidden start states and motion only
+/* What you get, as a roadmap (pages.tsx ScopeClarity): a navy stage with a track from "Available today" to "Planned",
+   the free trial's capabilities on a white card, then the "In a pilot" and planned stages. Hidden start states and motion only
    apply when the visitor has not asked for reduced motion, so without motion everything is simply shown. */
 .ms-roadmap {
   --rm-live: var(--ms-teal-bright);
@@ -1805,12 +1819,9 @@
   margin-top: 28px;
   color: var(--ms-ink-2);
 }
-.ms-legal-body h2 {
-  margin-top: 32px;
-  color: var(--ms-navy);
-  font-size: 22px;
-  font-weight: 700;
-}
+/* A document's sections ("## 1. The Service") are h2 under the page's h1 (markdown.tsx) and keep the look they had
+   as h3 (WEB-18): the heading level changed, not the page. */
+.ms-legal-body h2,
 .ms-legal-body h3,
 .ms-legal-body h4 {
   margin-top: 22px;

@@ -306,7 +306,8 @@ def triage_summary(
     control_db: Session = Depends(get_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
-    """How many signals wait at each triage step, are unowned or overdue, and the open ones by priority."""
+    """How many signals wait at each triage step, are unowned or overdue, and the open ones by priority.
+    ``detection_pending``: an import's signals are still being found (the dashboard's Signal triage says so)."""
     actor = _actor(control_db, ctx)
     now = service.now_utc()
     base = db.query(func.count(Signal.id)).filter(Signal.tenant_id == actor.tenant_id)
@@ -333,7 +334,11 @@ def triage_summary(
     ):
         if code in by_priority:
             by_priority[code] = int(number)
-    return {"counts": counts, "by_priority": by_priority}
+    return {
+        "counts": counts,
+        "by_priority": by_priority,
+        "detection_pending": hooks.detection_pending(control_db, db, actor.tenant_id),
+    }
 
 
 @router.get("/signals/{signal_id}")

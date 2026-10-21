@@ -39,12 +39,12 @@ export const PAGE_META = {
   "/platform/trust": {
     title: "Human review, audit trail and AI safeguards · MDARIX",
     description:
-      "Signed human review, an append-only audit trail and customer administration today. AI assurance comes with design partners; AI is off in the trial.",
+      "Signed human review, an append-only audit trail and customer administration today. AI assurance comes in a pilot; AI is off in the trial.",
   },
   "/roadmap": {
-    title: "Roadmap: available today, with design partners, planned · MDARIX",
+    title: "Roadmap: available today, in a pilot, planned · MDARIX",
     description:
-      "What every MDARIX workspace and the free trial can use today, what is built with design partners, and what is planned, such as single sign-on.",
+      "What every MDARIX workspace and the free trial can use today, what comes in a pilot, and what is planned, such as single sign-on.",
   },
   "/solutions": {
     title: "Solutions for medical device quality and regulatory teams · MDARIX",

@@ -259,3 +259,26 @@ def test_invitation_emails_state_the_real_link_lifetime():
     from auth.emailer import INVITATION_VALID_FOR
 
     assert INVITATION_VALID_FOR == f"{INVITATION_SECONDS // 3600} hours"
+
+
+def test_staff_alerts_name_and_open_onboarding_under_identity_and_access(company, outbox):
+    """FUN-11: demo, trial and pilot requests are handled in Platform Admin > Identity & Access > Onboarding (not under
+    Customers & Tenants), and each alert's button opens that screen."""
+    emailer.send_trial_request_alert(
+        "team@example.com", organization="Acme", display_name="Ada", email="a@acme.example"
+    )
+    emailer.send_demo_request_alert("team@example.com", display_name="Ada", email="a@acme.example", phone="+1 555")
+    emailer.send_trial_demo_request_alert(
+        "team@example.com", display_name="Ada", email="a@acme.example", organization="Acme"
+    )
+    emailer.send_trial_mvp_request_alert(
+        "team@example.com", display_name="Ada", email="a@acme.example", organization="Acme", expectations="Fewer misses"
+    )
+    assert len(outbox) == 4
+    for message in outbox:
+        for body in (message["text"], message["html"]):
+            assert "Platform Admin &gt; Identity &amp; Access &gt; Onboarding" in body or (
+                "Platform Admin > Identity & Access > Onboarding" in body
+            )
+            assert "Customers & Tenants" not in body and "Customers &amp; Tenants" not in body
+            assert "https://app.example.com/platform-admin/onboarding" in body

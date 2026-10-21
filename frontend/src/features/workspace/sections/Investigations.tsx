@@ -91,6 +91,8 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
   // "Intelligence?view=Unknowns" opens the Intelligence tab on that view (see intelligenceTab).
   const { tab, view: requestedView } = parseInvestigationsTab(requested);
   const [intelView, setIntelView] = useState<IntelligenceView>(requestedView ?? "Hypotheses");
+  // "Add hypotheses by hand" opens the view with its form to add one (DEV-019), once.
+  const [intelAdd, setIntelAdd] = useState(false);
   // Bumped when the case's AI run ends, so the results below are read again.
   const [aiRound, setAiRound] = useState(0);
   // "Reviews?review=<id>" opens the Reviews tab on that review (a review task, the dashboard).
@@ -297,8 +299,9 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
                   temporalMode={work.mode}
                   asOf={work.asOf}
                   onOpenDecision={() => (featureSet === "mvp" ? setActive("Decision") : open("Decisions"))}
-                  onOpenIntelligence={(view) => {
+                  onOpenIntelligence={(view, add) => {
                     setIntelView(view);
+                    setIntelAdd(!!add);
                     setActive("Intelligence");
                   }}
                   onOpenBrief={() => setActive("Decision Brief")}
@@ -321,6 +324,8 @@ export function InvestigationsSection({ tab: requested }: { tab?: string }) {
               caseLabel={selected ? displayId(selected, "investigation_identifier") : "Selected investigation"}
               view={intelView}
               onView={setIntelView}
+              adding={intelAdd}
+              onAddingShown={() => setIntelAdd(false)}
               readOnly={caseIsClosed(selected)}
             />
           ) : (

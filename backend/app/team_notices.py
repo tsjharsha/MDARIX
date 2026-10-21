@@ -11,6 +11,10 @@ Two kinds of organization change their team:
   concerns an administrator account (the person is a Customer Administrator, becomes one or stops being one), the
   organization's other active Customer Administrators are told too; inviting a Customer Administrator is told to
   them as well (the invitation itself is its own email, sent at once with its link).
+* The same emails when MDARIX support makes such a change in Platform Admin (adding, suspending or restoring a
+  Customer Administrator, resetting an account's MFA: backend/app/access/platform_customer_admins.py), with the actor
+  shown as "MDARIX support", never the staff member's name. Nothing for a free trial: its emails name its owner as the
+  one who made the change.
 
 Each recipient's email is one ``TEAM_CHANGE_NOTICE`` outbox event, queued in the same transaction as the change, so
 the worker retries a failed address alone (outbox/worker.py: one event, one commit) and nobody gets the same email
@@ -44,6 +48,9 @@ PERSON = "PERSON"  # the person changed
 OWNER = "OWNER"  # a trial's owner, who made the change: the confirmation
 ADMIN = "ADMIN"  # another Customer Administrator of the organization (``recipient_user_id``)
 MDARIX_TEAM = "MDARIX_TEAM"  # the team running MDARIX (trial team changes)
+# Who made an organization change, when it was not one of its administrators (``actor`` in the payload).
+MDARIX_SUPPORT = "MDARIX_SUPPORT"
+MDARIX_SUPPORT_NAME = "MDARIX support"
 
 TRIAL_CHANGES = frozenset({emailer.TEAM_REMOVED, emailer.TEAM_INVITATION_WITHDRAWN, emailer.TEAM_MFA_RESET})
 ORGANIZATION_CHANGES = frozenset(
@@ -135,12 +142,68 @@ def queue_organization_change(
     are ``queue_trial_change``) or for a change made by or to an MDARIX staff account. Roles are given as codes
     (``role_before``/``role_now``: the account role; ``roles_added``/``roles_removed``: workflow roles) or, for the
     organization's own roles, as their ids. Returns how many emails were queued."""
-    from backend.app.trial.service import trial_subscription
+    if change not in ORGANIZATION_CHANGES:
+        raise ValueError(f"Unknown team change {change}")
+    if is_platform_admin_role(admin.role) or admin.tenant_id != person.tenant_id:
+        return 0
+    return _queue_organization(
+        db,
+        person,
+        change,
+        {"actor_user_id": str(admin.id)},
+        exclude=admin.id,
+        now=now,
+        role_before=role_before,
+        role_now=role_now,
+        roles_added=roles_added,
+        roles_removed=roles_removed,
+        custom_roles_added=custom_roles_added,
+        custom_roles_removed=custom_roles_removed,
+        tell_person=tell_person,
+    )
+
+
+def queue_support_change(
+    db: Session, person: AuthUser, change: str, *, now: datetime | None = None, tell_person: bool = True
+) -> int:
+    """Queue the emails of a change MDARIX support made to a paying organization's team in Platform Admin (the caller
+    commits, with the change), as ``queue_organization_change`` does for an administrator's: the person changed
+    (unless ``tell_person`` is false) and, when it concerns an administrator account, the organization's active
+    Customer Administrators. The actor reads "MDARIX support": the staff member is never named. Nothing for a free
+    trial, for MDARIX's own organization or for an MDARIX staff account. Returns how many emails were queued."""
+    from backend.app.support_access import platform_tenant_id
 
     if change not in ORGANIZATION_CHANGES:
         raise ValueError(f"Unknown team change {change}")
+    if str(person.tenant_id) == str(platform_tenant_id(db)):
+        return 0
+    return _queue_organization(
+        db, person, change, {"actor_user_id": None, "actor": MDARIX_SUPPORT}, now=now, tell_person=tell_person
+    )
+
+
+def _queue_organization(
+    db: Session,
+    person: AuthUser,
+    change: str,
+    actor: dict,
+    *,
+    exclude=None,
+    now: datetime | None = None,
+    role_before: str | None = None,
+    role_now: str | None = None,
+    roles_added: tuple[str, ...] = (),
+    roles_removed: tuple[str, ...] = (),
+    custom_roles_added: tuple = (),
+    custom_roles_removed: tuple = (),
+    tell_person: bool = True,
+) -> int:
+    """The organization change's events: to the person changed and, when it concerns an administrator account, to the
+    other active Customer Administrators (less ``exclude``, the administrator who made it)."""
+    from backend.app.trial.service import trial_subscription
+
     tenant_id = person.tenant_id
-    if is_platform_admin_role(admin.role) or is_platform_admin_role(person.role) or admin.tenant_id != tenant_id:
+    if is_platform_admin_role(person.role):
         return 0
     if trial_subscription(db, tenant_id) is not None:
         return 0
@@ -149,7 +212,7 @@ def queue_organization_change(
         "kind": ORGANIZATION,
         "change": change,
         "user_id": str(person.id),
-        "actor_user_id": str(admin.id),
+        **actor,
         "occurred_at": now.isoformat(),
         "role_before": role_before,
         "role_now": role_now,
@@ -163,7 +226,7 @@ def queue_organization_change(
         _queue(db, tenant_id, person.id, PERSON, base, now)
         queued += 1
     if concerns_administrator(person, role_before, role_now):
-        for admin_id in customer_admin_ids(db, tenant_id, exclude=(admin.id, person.id)):
+        for admin_id in customer_admin_ids(db, tenant_id, exclude=(exclude, person.id)):
             _queue(db, tenant_id, person.id, ADMIN, {**base, "recipient_user_id": str(admin_id)}, now)
             queued += 1
     return queued
@@ -297,7 +360,9 @@ def _organization_email(db: Session, payload: dict, tenant_id, person: AuthUser 
     if person is None:
         return None
     organization = _organization(db, tenant_id)
-    actor_name = _name(actor, f"An administrator of {organization}")
+    # A change MDARIX support made in Platform Admin names MDARIX support, never the staff member.
+    by_support = payload.get("actor") == MDARIX_SUPPORT
+    actor_name = MDARIX_SUPPORT_NAME if by_support else _name(actor, f"An administrator of {organization}")
     when = _when(datetime.fromisoformat(str(payload["occurred_at"])))
     before, now = payload.get("role_before"), payload.get("role_now")
     roles = {
@@ -320,6 +385,7 @@ def _organization_email(db: Session, payload: dict, tenant_id, person: AuthUser 
                 + _custom_roles(db, tenant_id, payload.get("custom_roles_added")),
                 "roles_removed": tuple(role_label(code) for code in payload.get("roles_removed") or ())
                 + _custom_roles(db, tenant_id, payload.get("custom_roles_removed")),
+                "by_support": by_support,
             },
         )
     recipient = _account(db, tenant_id, payload.get("recipient_user_id"))
@@ -331,7 +397,8 @@ def _organization_email(db: Session, payload: dict, tenant_id, person: AuthUser 
         {
             "change": change,
             "actor": actor_name,
-            "actor_email": actor.username if actor else "",
+            "actor_email": actor.username if actor and not by_support else "",
+            "by_support": by_support,
             "person": _name(person, person.username),
             "person_email": person.username,
             "organization": organization,

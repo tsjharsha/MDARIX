@@ -5,6 +5,10 @@
 gets them: the configured language model, or the rules in controlled mode when no provider is configured). The run
 reads the synthetic golden organization in a short-lived system-scope session; nothing about it is saved there. Only
 a computed result is stored: PASS when every scenario passed, FAIL otherwise, ERROR when the run could not complete.
+
+Only a Platform Administrator starts a run (pre-launch review SEC-08): it reads another organization (the synthetic
+golden one) in system scope and keeps a CPU busy for minutes, so it is MDARIX's own release check (Platform Admin >
+AI > Evaluations), never something a customer or a free trial starts. Reading the published result stays open.
 """
 
 import hashlib
@@ -14,13 +18,15 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import EvaluationRun, ReleaseAssuranceResult
 from backend.app.db.data_plane import get_data_plane_db
+from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
+from backend.app.access.authz import _require_platform_admin
 from backend.app.access.permissions import AI_RUN, require_permission
 from evaluation.harness import SCENARIO_IDS
 
@@ -143,14 +149,19 @@ def _complete_run(run_id: uuid.UUID, tenant_id: str, release_version: str, scena
 @router.post("/runs", status_code=202, dependencies=[Depends(require_permission(AI_RUN))])
 def run_evaluation(
     request: EvaluationRequest,
+    http_request: Request,
     background: BackgroundTasks,
+    control_db: Session = Depends(get_db),
     db: Session = Depends(get_data_plane_db),
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
 ):
     """Start an honest golden evaluation; 202 with the run id. Poll ``GET /runs/{id}`` until the status is PASS,
-    FAIL or ERROR (RUNNING until then). One run at a time per organization."""
+    FAIL or ERROR (RUNNING until then). One run at a time per organization. A Platform Administrator only, who holds
+    every permission (403 ``PLATFORM_ADMIN_REQUIRED`` for anyone else who may run AI, SEC-08)."""
     from evaluation.harness import DATASET_VERSION
     from evaluation.real_pipeline import EVALUATION_VERSION
+
+    _require_platform_admin(http_request, control_db)
 
     scenario_ids = _scenario_ids(request.scenario_ids)
     now = datetime.now(timezone.utc)

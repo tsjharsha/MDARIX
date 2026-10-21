@@ -12,6 +12,7 @@ import {
   otherDecision,
   reasonSlices,
   recordId,
+  recordName,
   recordTone,
   secondLookHeadline,
   secondLookPath,
@@ -118,6 +119,16 @@ describe("the second look", () => {
     expect(recordId({ business_id: "CMP000012", complaint_identifier: "SRC-1" })).toBe("CMP000012");
     expect(recordId({ business_id: null, complaint_identifier: "SRC-1" })).toBe("SRC-1");
     expect(recordId({ business_id: null, complaint_identifier: null })).toBe("Complaint");
+  });
+
+  it("names a record in a drawer or a toast by its MDARIX ID with its source number beside it (DEV-008)", () => {
+    expect(recordName({ business_id: "CMP000029", complaint_identifier: "SAMPLE-RV-01" })).toBe(
+      "CMP000029 (SAMPLE-RV-01)",
+    );
+    expect(recordName({ business_id: "CMP000029", complaint_identifier: " " })).toBe("CMP000029");
+    expect(recordName({ business_id: "CMP000029", complaint_identifier: "CMP000029" })).toBe("CMP000029");
+    expect(recordName({ business_id: null, complaint_identifier: "SAMPLE-RV-06" })).toBe("SAMPLE-RV-06");
+    expect(recordName({ business_id: null, complaint_identifier: null })).toBe("Complaint");
   });
 });
 
