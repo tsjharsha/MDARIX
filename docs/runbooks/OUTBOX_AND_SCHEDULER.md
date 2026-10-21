@@ -23,6 +23,7 @@ What the worker delivers (`publish` in `scripts/run_outbox_worker.py`):
 |---|---|
 | `PROVIDER_RECORD_RECEIVED` | Stored in the tenant's data plane (resolved from the registry, never from the event) |
 | `TENANT_EXPORT_REQUESTED` | The export is built |
+| `RECORD_EMBEDDINGS_REQUESTED` | An import's records are embedded for semantic search, after its signals are found (`retrieval/record_evidence.py`): about 20 s per delivery at a lower CPU priority, the rest handed to a follow-up event. A failure is retried on the schedule below; the scheduled embedding catch-up leaves the organization to this job while one is queued |
 | `SUPPORT_PROBLEM_REPORTED` | The problem report is emailed to support |
 | Notification events | Email through SMTP (`backend/app/notifications.py`) |
 | Anything else | Acknowledged (`MDARIX_OUTBOX_PUBLISHER=noop`, the only supported value; any other value stops the worker at startup) |

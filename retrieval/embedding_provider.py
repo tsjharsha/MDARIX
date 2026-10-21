@@ -22,6 +22,10 @@ from backend.app.db.models.retrieval_intelligence import (
 
 TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9]+")
 DEFAULT_CACHE_DIR = Path(__file__).resolve().parents[1] / ".model-cache"
+# The local model runs on one CPU thread. ONNX Runtime otherwise starts a thread per physical core of the host, not of
+# the container: in a container limited to fewer CPUs they compete (12 texts/s instead of 19 in a 1.5-CPU container
+# on an 8-CPU host, 0.10.42), and an embedding run never takes more than one CPU from the API and the database.
+LOCAL_EMBEDDING_THREADS = 1
 
 
 @dataclass(frozen=True)
@@ -111,7 +115,12 @@ class LocalModelEmbeddingProvider:
                     raise EmbeddingUnavailable("fastembed is not installed") from exc
                 cache_dir = os.environ.get("MDARIX_EMBEDDING_CACHE_DIR") or str(DEFAULT_CACHE_DIR)
                 try:
-                    cls._model = TextEmbedding(LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir, local_files_only=True)
+                    cls._model = TextEmbedding(
+                        LOCAL_EMBEDDING_MODEL,
+                        cache_dir=cache_dir,
+                        local_files_only=True,
+                        threads=LOCAL_EMBEDDING_THREADS,
+                    )
                 except Exception as missing:
                     from backend.app.runtime_env import is_production_like
 
@@ -124,7 +133,9 @@ class LocalModelEmbeddingProvider:
                         ) from missing
                     # First use on this machine: download once into the cache, then it works offline.
                     try:
-                        cls._model = TextEmbedding(LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir)
+                        cls._model = TextEmbedding(
+                            LOCAL_EMBEDDING_MODEL, cache_dir=cache_dir, threads=LOCAL_EMBEDDING_THREADS
+                        )
                     except Exception as exc:
                         raise EmbeddingUnavailable(f"Local embedding model could not be loaded: {exc}") from exc
         return cls._model

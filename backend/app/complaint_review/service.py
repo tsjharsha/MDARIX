@@ -10,7 +10,8 @@ import uuid
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import exists, func, or_
+from sqlalchemy import any_, exists, func, or_
+from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session
 
 from backend.app.complaint_review import rules
@@ -50,6 +51,15 @@ def settings_of(db: Session, tenant_id: uuid.UUID, control_db: Session | None = 
         "updated_by_name": (names.get(editor) or "A colleague") if editor else None,
         "updated_at": row.updated_at.isoformat() if row and row.updated_at else None,
     }
+
+
+def _same_organization(column):
+    """``column`` (a link's organization) is the complaint's, written so that PostgreSQL can only use it to look up each
+    complaint's links by organization and complaint at once (0.10.42). As a plain equality it joins the organization
+    of the outer query, and while the planner's statistics do not know a new organization's rows yet (until autovacuum
+    analyzes the tables, after a large import) it read every link of the organization for every complaint: 10 s and
+    more for one import's backlog check, on the trial's story and Readiness."""
+    return column == any_(array([Complaint.tenant_id]))
 
 
 def _records(db: Session, tenant_id: uuid.UUID):
@@ -259,10 +269,10 @@ def backlog(
     today = today or today_utc()
     target = settings_of(db, tenant_id)["backlog_target_days"]
     in_signal = exists().where(
-        SignalComplaint.tenant_id == Complaint.tenant_id, SignalComplaint.complaint_id == Complaint.id
+        _same_organization(SignalComplaint.tenant_id), SignalComplaint.complaint_id == Complaint.id
     )
     in_case = exists().where(
-        InvestigationComplaint.tenant_id == Complaint.tenant_id, InvestigationComplaint.complaint_id == Complaint.id
+        _same_organization(InvestigationComplaint.tenant_id), InvestigationComplaint.complaint_id == Complaint.id
     )
     query = (
         _records(db, tenant_id)

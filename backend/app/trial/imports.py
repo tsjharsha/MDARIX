@@ -1392,21 +1392,26 @@ def _complaint_evidence(complaint: Complaint, row: dict, product, version, lot, 
 
 
 def after_import(background, tenant_id, result: dict, *, source: str) -> dict:
-    """Schedule what follows an import, after its response (``background``: the route's BackgroundTasks): signals
-    from the complaints it created or changed (backend/app/signals/hooks.py ``detect_after_import``), then semantic
-    search over its records (their text is already searchable). Each runs in a session of its own bound to the
-    organization, and neither can fail or undo the import. The answer says when signals are being found
+    """Schedule what follows an import, after its response (``background``: the route's BackgroundTasks, run in
+    order): signals from the complaints it created or changed (backend/app/signals/hooks.py ``detect_after_import``,
+    in a session of its own bound to the organization), then, once they are found, the embeddings for semantic search
+    over its records are queued for the background service (retrieval/record_evidence.py ``queue_embeddings``; their
+    text is already searchable). Neither can fail or undo the import. The answer says when signals are being found
     (``signals: "FINDING"``, until ``hooks.detection_pending`` turns false); the insights are read from their own
     route (GET /api/v1/trial/insights), so the answer does not wait for them."""
     from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.signals import hooks as signal_hooks
-    from retrieval.record_evidence import embed_tenant_evidence
+    from retrieval.record_evidence import queue_embeddings
 
+    records = int(result.get("rows") or 0)
     if signal_hooks.imported_complaints(result):
-        background.add_task(signal_hooks.detect_after_import, open_tenant_data_session, tenant_id, source=source)
+        background.add_task(
+            signal_hooks.detect_after_import, open_tenant_data_session, tenant_id, source=source, records=records
+        )
         result = {**result, "signals": "FINDING"}
-    if result.get("rows"):
-        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
+    if records:
+        imported_at = datetime.now(timezone.utc).isoformat()
+        background.add_task(queue_embeddings, tenant_id, source=source, records=records, imported_at=imported_at)
     return result
 
 

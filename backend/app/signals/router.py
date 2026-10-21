@@ -122,8 +122,13 @@ def _clean(text: str | None) -> str | None:
 # ------------------------------------------------------------------------------------------------------- reading
 
 
-def _filtered(query, actor, *, statuses, priorities, origins, product_id, owner, q, overdue=False, review_due=False):
+def _filtered(
+    query, actor, *, statuses, priorities, origins, product_id, owner, q, overdue=False, review_due=False, source=None
+):
     now = service.now_utc()
+    if source:
+        # Where the signal's complaints came from (service.from_source: imported, sample or another system).
+        query = query.filter(service.from_source(source))
     if overdue:
         # As the summary counts it and SignalSummary.overdue flags it: still awaiting triage past its due date.
         query = query.filter(Signal.status.in_(AWAITING_TRIAGE), Signal.due_at < now)
@@ -234,6 +239,7 @@ def list_signals(
     q: str | None = Query(default=None, max_length=200),
     overdue: bool = False,
     review_due: bool = False,
+    source_system: str = Query(default="", max_length=120),
     sort: str | None = Query(default=None, pattern=SORT_PATTERN),
     order: str | None = Query(default=None, pattern="^(asc|desc)$"),
     page: int = Query(default=1, ge=1, le=100000),
@@ -245,9 +251,12 @@ def list_signals(
     """One page of the organization's signals with the count per status (for the other filters). ``status`` may
     name several statuses (comma-separated) or OPEN for every open one, ``priority`` several priorities;
     ``overdue=true`` keeps signals awaiting triage (NEW, TRIAGE) past their due date, ``review_due=true`` monitored
-    signals whose review date has come. ``sort`` alone keeps its natural direction (``-`` reverses it); with
-    ``order`` (asc or desc) it is a column heading's sort, and the inbox's columns (title, product, owner…) can be
-    named as well. ``detection_pending``: an import's signals are still being found."""
+    signals whose review date has come; ``source_system`` the signals whose complaints come from that source
+    (``service.from_source``: TRIAL_UPLOAD, a free trial's imported data, or MDARIX_SAMPLE, the sample's), and
+    ``sources`` the sources the organization's complaints come from, as the complaint list gives them. ``sort`` alone
+    keeps its natural direction (``-`` reverses it); with ``order`` (asc or desc) it is a column heading's sort, and
+    the inbox's columns (title, product, owner…) can be named as well. ``detection_pending``: an import's signals are
+    still being found."""
     actor = _actor(control_db, ctx)
     statuses = _codes(status, (*SIGNAL_STATUSES, "OPEN"), "status")
     filters = {
@@ -258,6 +267,7 @@ def list_signals(
         "q": q,
         "overdue": overdue,
         "review_due": review_due,
+        "source": source_system.strip() or None,
     }
     base = db.query(Signal).filter(Signal.tenant_id == actor.tenant_id)
     query = _filtered(base, actor, statuses=statuses, **filters)
@@ -283,6 +293,7 @@ def list_signals(
         "page": page,
         "page_size": page_size,
         "counts_by_status": counts,
+        "sources": service.complaint_sources(db, actor.tenant_id),
         # Signals from an import that answered moments ago are still being found (the inbox says so and reads again).
         "detection_pending": hooks.detection_pending(control_db, db, actor.tenant_id),
     }

@@ -160,6 +160,8 @@ export type SignalList = {
   page: number;
   page_size: number;
   counts_by_status?: Partial<Record<string, number>> | null;
+  /** The sources the organization's complaints come from (the Data filter shows while the sample data is there). */
+  sources?: string[] | null;
   /** Signals from an import that answered moments ago are still being found. */
   detection_pending?: boolean;
 };
@@ -273,6 +275,11 @@ export type SignalFilters = {
   overdue: boolean;
   /** Only monitored signals whose review date has come (from the dashboard's "Monitor review due"). */
   reviewDue: boolean;
+  /**
+   * Where the signals' complaints come from (the complaint list's Data filter, complaintList.ts): TRIAL_UPLOAD, at
+   * least one complaint is the organization's imported data; MDARIX_SAMPLE, all of them are the sample's. Empty: all.
+   */
+  source: string;
 };
 
 export const DEFAULT_SIGNAL_FILTERS: SignalFilters = {
@@ -286,6 +293,7 @@ export const DEFAULT_SIGNAL_FILTERS: SignalFilters = {
   order: "",
   overdue: false,
   reviewDue: false,
+  source: "",
 };
 
 // The column a "Sort by" choice orders and its direction (Created: newest first, the youngest age first).
@@ -346,6 +354,7 @@ export function signalListPath(filters: Partial<SignalFilters>, page = 1, pageSi
   if (value.q.trim()) params.set("q", value.q.trim());
   if (value.overdue) params.set("overdue", "true");
   if (value.reviewDue) params.set("review_due", "true");
+  if (value.source) params.set("source_system", value.source);
   params.set("sort", value.sort);
   if (value.order) params.set("order", value.order);
   params.set("page", String(Math.max(1, page)));
@@ -373,6 +382,7 @@ export function signalsTab(target: SignalsTarget): string {
   if (filters.sort && filters.sort !== DEFAULT_SIGNAL_FILTERS.sort) params.set("sort", filters.sort);
   if (filters.overdue) params.set("overdue", "1");
   if (filters.reviewDue) params.set("review_due", "1");
+  if (filters.source) params.set("source", filters.source);
   const signal = signalRefText(target.signal);
   if (signal) params.set("signal", signal);
   const rest = params.toString();
@@ -411,9 +421,13 @@ export function parseSignalsTab(value: string | null | undefined): {
     sort: isSort(sort) ? sort : DEFAULT_SIGNAL_FILTERS.sort,
     overdue: params.has("overdue"),
     reviewDue: params.has("review_due"),
+    source: SOURCE_TEXT.test(params.get("source") ?? "") ? (params.get("source") as string) : "",
   };
   return { tab, filters, signal: signalRefText(params.get("signal")) };
 }
+
+// A complaint source as the server names it (TRIAL_UPLOAD, MDARIX_SAMPLE); anything else in an address is ignored.
+const SOURCE_TEXT = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/;
 
 // A signal as people quote it (SIG000023) or its id; anything else in an address is ignored.
 const SIGNAL_REF = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;

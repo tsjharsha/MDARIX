@@ -26,7 +26,7 @@ from backend.app.complaint_review import rules as review_rules
 from backend.app.db.models.complaint_review import ComplaintSecondLook
 from backend.app.db.models.foundation import Complaint, LotBatch, Product, ProductVersion
 from backend.app.db.models.signals import OPEN_SIGNAL_STATUSES, Signal, SignalComplaint
-from backend.app.signals import logic, trend_rules
+from backend.app.signals import logic, service, trend_rules
 
 EVENT_AT = func.coalesce(Complaint.event_timestamp, Complaint.complaint_timestamp, Complaint.created_at)
 READ_LIMIT = 50000
@@ -433,10 +433,7 @@ def trend_for_signal(db: Session, signal: Signal, today: date | None = None) -> 
 def _signal_complaints(db: Session, signal: Signal) -> list:
     return (
         db.query(Complaint, LotBatch.lot_identifier)
-        .join(
-            SignalComplaint,
-            (SignalComplaint.tenant_id == Complaint.tenant_id) & (SignalComplaint.complaint_id == Complaint.id),
-        )
+        .join(SignalComplaint, service.LINKED_COMPLAINT)
         .outerjoin(LotBatch, (LotBatch.tenant_id == Complaint.tenant_id) & (LotBatch.id == Complaint.lot_batch_id))
         .filter(SignalComplaint.tenant_id == signal.tenant_id, SignalComplaint.signal_id == signal.id)
         .order_by(EVENT_AT.desc(), Complaint.id)
