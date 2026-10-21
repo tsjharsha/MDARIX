@@ -427,7 +427,10 @@ def test_csv_import_checks_everything_before_saving():
     )
     imported = user.post("/api/v1/trial/imports/complaints", content=good)
     assert imported.status_code == 200, imported.text
-    assert imported.json()["created"] == 2 and imported.json()["insights"]["scope"] == "your data"
+    # Signals are found after the answer (0.10.40); the insights are read from their own route, at once.
+    assert imported.json()["created"] == 2 and imported.json()["signals"] == "FINDING"
+    assert "insights" not in imported.json()
+    assert user.get("/api/v1/trial/insights").json()["scope"] == "your data"
     # Re-uploading updates instead of duplicating.
     assert user.post("/api/v1/trial/imports/complaints", content=good).json()["updated"] == 2
     status = user.get("/api/v1/trial/status").json()

@@ -37,6 +37,7 @@ import {
   statusChips,
   statusFilterLabel,
   triageCountTiles,
+  DETECTION_STATUS_PATH,
   type NewSignalForm,
   type SignalFilters,
   type SignalList,
@@ -47,6 +48,21 @@ import {
 } from "../signals";
 import { StatusBadge } from "./common";
 import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } from "./SignalDetail";
+
+/** The inbox's line while an import's signals are being found. */
+export const FINDING_SIGNALS =
+  "Finding signals in the complaints you just imported… The list updates by itself when they are ready.";
+
+/** What the inbox says when it lists no signal: they are still being found, none match, or there are none. */
+export function inboxEmpty(filters: SignalFilters, finding: boolean): { title: string; detail: string } {
+  if (finding) return { title: "Finding signals…", detail: "The signals from your import appear here in a moment." };
+  if (filters.q || filters.priorities.length || filters.productId || filters.origin || filters.owner)
+    return { title: "No matching signals", detail: "Change the filters or the search to see more." };
+  return {
+    title: `No ${filters.status === "ALL" ? "" : `${statusFilterLabel(filters.status).toLowerCase()} `}signals`,
+    detail: "Signals appear when the detection rule finds a pattern, or when someone creates one.",
+  };
+}
 
 const PAGE_SIZE = 50;
 // The "Sort by" choice that stands for a column heading's sort.
@@ -81,7 +97,12 @@ export function SignalInbox({
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
-  const list = useResource<SignalList>(signalListPath(filters, page, PAGE_SIZE));
+  // Opened right after an import, its signals may still be being found: the list is read again until they are.
+  const list = useResource<SignalList>(signalListPath(filters, page, PAGE_SIZE), {
+    refreshWhile: (data) => !!data.detection_pending,
+    statusPath: DETECTION_STATUS_PATH,
+  });
+  const finding = !!list.data?.detection_pending;
   const change = (next: Partial<SignalFilters>) => {
     setFilters((current) => ({ ...current, ...next }));
     setPage(1);
@@ -246,18 +267,16 @@ export function SignalInbox({
             )}
           </ul>
         )}
+        {finding && (
+          <p className="uw-cited-line uw-signals-finding" role="status">
+            {FINDING_SIGNALS}
+          </p>
+        )}
         <Table
           caption="Signal inbox"
           rows={rows}
           rowKey={(row) => String(row.id)}
-          empty={
-            filters.q || filters.priorities.length || filters.productId || filters.origin || filters.owner
-              ? { title: "No matching signals", detail: "Change the filters or the search to see more." }
-              : {
-                  title: `No ${filters.status === "ALL" ? "" : `${statusFilterLabel(filters.status).toLowerCase()} `}signals`,
-                  detail: "Signals appear when the detection rule finds a pattern, or when someone creates one.",
-                }
-          }
+          empty={inboxEmpty(filters, finding)}
           columns={columns}
           serverSort={{
             sort: tableSort,

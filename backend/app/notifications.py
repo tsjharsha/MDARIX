@@ -25,6 +25,10 @@ email could not be sent, so the outbox retries (and finally dead-letters and ale
   backend/app/support_access.py): the organization's decision makers (``support_decision_maker_emails``: its customer
   administrators, or a free trial's owner), when MDARIX asks, when they approve, and when an approved access ends;
   a free trial's other active members are also told when it is approved and when it ends, without a way to decide.
+  One event per recipient (``recipient_user_id``), so a retry after one address failed sends that one email only.
+* ``TEAM_CHANGE_NOTICE`` (backend/app/team_notices.py): one email about a change to an organization's team, to one
+  person: a free trial's colleague, owner or the MDARIX team; a paying organization's user, or its other Customer
+  Administrators when the change concerns an administrator account.
 * ``READINESS_DIGEST`` (scheduler, backend/app/readiness_home/digest.py): the organization's quality leads (Leader and
   Quality Reviewer) who have not switched the weekly readiness email off; once per ISO week.
 """
@@ -57,6 +61,8 @@ FEEDBACK_SUBMITTED = "FEEDBACK_SUBMITTED"
 TRIAL_REQUEST_DECLINED = "TRIAL_REQUEST_DECLINED"
 # A trial invitation the mail provider refused, sent again (backend/app/trial/service.py retry_invitation).
 TRIAL_INVITATION_RETRY = "TRIAL_INVITATION_RETRY"
+# One email about a change to an organization's team, to one person (backend/app/team_notices.py).
+TEAM_CHANGE_NOTICE = "TEAM_CHANGE_NOTICE"
 AI_BUDGET_THRESHOLDS = (80, 100)
 # Roles whose holders approve decisions and review risks (backend/app/access/permissions.py).
 APPROVER_ROLES = frozenset({"APPROVER", "LEADER"})
@@ -431,30 +437,70 @@ SUPPORT_ACCESS_ENDED = "SUPPORT_ACCESS_ENDED"
 SUPPORT_ACCESS_ENDINGS = frozenset({"EXPIRED", "REVOKED_BY_CUSTOMER", "REVOKED_BY_MDARIX"})
 
 
-def notify_support_access_awaiting_customer(db: Session, tenant_id, *, grant_id, **_refs) -> OutboxEvent:
+# Who one support access event's email is for (``audience``, with ``recipient_user_id``): a decision maker, or a free
+# trial's colleague, told for information only.
+SUPPORT_DECIDER = "DECIDER"
+SUPPORT_COLLEAGUE = "COLLEAGUE"
+
+
+def _queue_support_access(
+    db: Session, tenant_id, event_name: str, grant_id, payload: dict, *, colleagues: bool = False
+) -> list[OutboxEvent]:
+    """One event per recipient (0.10.40): the worker retries a failed address alone, and a retry never sends anyone
+    else's email again. The recipients are the decision makers (and, with ``colleagues``, a free trial's other active
+    members) now, as account ids; each is checked again when its email is sent."""
+    tenant = _uuid(tenant_id)
+    deciders, trial = support_decision_maker_emails(db, tenant)
+    targets = [(SUPPORT_DECIDER, address) for address in deciders]
+    if colleagues and trial:
+        targets += [(SUPPORT_COLLEAGUE, address) for address in trial_colleague_emails(db, tenant, deciders)]
+    events = []
+    for audience, address in targets:
+        user_id = _user_id(db, tenant, address)
+        if user_id:
+            events.append(
+                _queue(
+                    db,
+                    tenant,
+                    event_name,
+                    "SupportAccessGrant",
+                    grant_id,
+                    {**payload, "grant_id": _id(grant_id), "audience": audience, "recipient_user_id": user_id},
+                )
+            )
+    return events
+
+
+def notify_support_access_awaiting_customer(db: Session, tenant_id, *, grant_id, **_refs) -> list[OutboxEvent]:
     """Tell the organization's decision makers that MDARIX asks for support access (backend/app/support_access.py)."""
-    return _queue(
-        db, tenant_id, SUPPORT_ACCESS_AWAITING_CUSTOMER, "SupportAccessGrant", grant_id, {"grant_id": _id(grant_id)}
-    )
+    return _queue_support_access(db, tenant_id, SUPPORT_ACCESS_AWAITING_CUSTOMER, grant_id, {})
 
 
-def notify_support_access_granted(db: Session, tenant_id, *, grant_id, **_refs) -> OutboxEvent:
-    """Confirm to the decision makers that support access was approved, and until when (also a security notice)."""
-    return _queue(db, tenant_id, SUPPORT_ACCESS_GRANTED, "SupportAccessGrant", grant_id, {"grant_id": _id(grant_id)})
+def notify_support_access_granted(db: Session, tenant_id, *, grant_id, **_refs) -> list[OutboxEvent]:
+    """Confirm to the decision makers that support access was approved, and until when (also a security notice); a
+    free trial's colleagues are told too."""
+    return _queue_support_access(db, tenant_id, SUPPORT_ACCESS_GRANTED, grant_id, {}, colleagues=True)
 
 
-def notify_support_access_ended(db: Session, tenant_id, *, grant_id, ended: str, **_refs) -> OutboxEvent:
-    """Tell the decision makers that an approved support access ended: on its own, or revoked by them or MDARIX."""
+def notify_support_access_ended(db: Session, tenant_id, *, grant_id, ended: str, **_refs) -> list[OutboxEvent]:
+    """Tell the decision makers that an approved support access ended: on its own, or revoked by them or MDARIX; a
+    free trial's colleagues are told too."""
     if ended not in SUPPORT_ACCESS_ENDINGS:
         raise ValueError(f"Unknown end of support access: {ended}")
-    return _queue(
-        db,
-        tenant_id,
-        SUPPORT_ACCESS_ENDED,
-        "SupportAccessGrant",
-        grant_id,
-        {"grant_id": _id(grant_id), "ended": ended},
-    )
+    return _queue_support_access(db, tenant_id, SUPPORT_ACCESS_ENDED, grant_id, {"ended": ended}, colleagues=True)
+
+
+def _one_recipient(db: Session, tenant_id, payload: dict, deciders: list[str], colleagues: list[str]):
+    """The decision makers and colleagues one event's email goes to: its one recipient while they still are one (an
+    account deactivated, or no longer a decision maker, gets nothing). An event queued before 0.10.40 names no
+    recipient and goes to everyone, as it did then."""
+    if not payload.get("recipient_user_id"):
+        return deciders, colleagues
+    user = _active_user(db, tenant_id, payload["recipient_user_id"])
+    address = user.username if user else None
+    if payload.get("audience") == SUPPORT_COLLEAGUE:
+        return [], [address] if address in colleagues else []
+    return ([address] if address in deciders else []), []
 
 
 def support_decision_maker_emails(db: Session, tenant_id) -> tuple[list[str], bool]:
@@ -498,6 +544,7 @@ def _support_access_request(db: Session, payload: dict, emailer) -> None:
     person = db.query(AuthUser).filter(AuthUser.id == grant.platform_user_id).first()
     scope = SupportScope.stored(grant.scope)
     recipients, trial = support_decision_maker_emails(db, tenant_id)
+    recipients, _ = _one_recipient(db, tenant_id, payload, recipients, [])
     _deliver(
         emailer.send_support_access_request,
         recipients,
@@ -540,6 +587,7 @@ def _support_access_notice(db: Session, event_name: str, payload: dict, emailer)
     common = {"organization": _organization(db, tenant_id), "person": who, "trial": trial}
     # A free trial's other members are told too, without a way to decide (only the owner decides).
     colleagues = trial_colleague_emails(db, tenant_id, recipients) if trial else []
+    recipients, colleagues = _one_recipient(db, tenant_id, payload, recipients, colleagues)
     organization = common["organization"]
     if event_name == SUPPORT_ACCESS_GRANTED:
         if grant.status != APPROVED:
@@ -912,6 +960,11 @@ def handle_event(db: Session, event_name: str, payload: dict) -> bool:
         return True
     if event_name in (SUPPORT_ACCESS_GRANTED, SUPPORT_ACCESS_ENDED):
         _support_access_notice(db, event_name, payload, emailer)
+        return True
+    if event_name == TEAM_CHANGE_NOTICE:
+        from backend.app.team_notices import deliver
+
+        deliver(db, payload)
         return True
     if event_name == "READINESS_DIGEST":
         from backend.app.readiness_home.digest import deliver

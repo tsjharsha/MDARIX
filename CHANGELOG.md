@@ -10,6 +10,68 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.40] - 2026-10-21
+
+Team-change emails for pilot organizations, retried team and support-access emails, and an import that answers
+before its signals are found, on the trial maintenance line (`release/0.10`). No migration: the emails use the
+existing outbox (`outbox_events`, its JSON payload) and the "finding signals" state is read from the existing audit
+trail and signal rule rows. The API, worker and web images change; the usual upgrade script rebuilds all images.
+Findings: NEW-2, NEW-4 (follow-up).
+
+### Added
+
+- A paying organization's people are told by email when a Customer Administrator changes their account (NEW-2), as a
+  free trial's colleagues already were: removed ("Ada Fernandes removed you from MDARIX for Northwind Infusion
+  Systems"), invitation withdrawn, suspended, active again (with a Sign in button), role changed (the role before and
+  now, or the workflow and custom roles added and removed) and authenticator removed. Each says who made the change
+  and when, in UTC. The words follow the trial's emails, without trial wording. An administrator's reason for an MFA
+  reset stays in the audit trail, never in an email.
+  - When the change concerns an administrator account (the person is a Customer Administrator, becomes one or stops
+    being one), the organization's other active Customer Administrators are told too ("Ada Fernandes suspended Ben
+    Okafor, a Customer Administrator of Northwind Infusion Systems": who, whom, when, a Review the users button). So
+    is inviting a Customer Administrator. The administrator who made the change gets nothing.
+  - The invitation names the administrator who sent it ("Ada Fernandes invited you to MDARIX for ..."). It is still
+    sent at once, with its link, as before.
+  - Covered: Customer Administration › Users (status, base role, workflow roles, custom roles, MFA reset, invite and
+    reactivate) and the user edit (`PATCH /admin/control-plane/users/{id}`). Nothing for a free trial (its own emails
+    stay), for a change made by or to an MDARIX staff account, or for an erasure.
+- Outbox event `TEAM_CHANGE_NOTICE` (`backend/app/team_notices.py`): one event per email, with ids and codes only.
+
+### Changed
+
+- Team emails are retried (NEW-2). A free trial's team emails (colleague removed, invitation withdrawn, MFA reset:
+  to the colleague, the owner and the MDARIX team) were sent once after the answer and only logged when the mail
+  provider refused them. They and the new organization emails are now outbox events, queued with the change and
+  delivered by the worker with its usual retries (about five hours, then a dead letter and an alert). Each email is
+  its own event, so a failed address is retried alone and nobody gets an email twice. The wording is unchanged.
+- Support access emails are retried per recipient. In 0.10.39 the owner's and the colleagues' emails about one
+  access (approved, ended) were one event, so a retry after one colleague's address failed sent the owner's email
+  again. Each recipient's email is now its own event (`recipient_user_id`), for the request too; a recipient who is no
+  longer a decision maker or member when it is sent gets nothing. The emails are unchanged. Events queued before
+  this release are delivered as before.
+- An import answers before its signals are found (NEW-4 follow-up). Signal detection ran inside the import, so the
+  browser waited for it, and for the insights the answer carried, after the records were saved. It now runs after
+  the answer, as the embeddings already did, in a session of its own bound to the organization (row-level security
+  as before; a failure is logged and the next scheduled run catches up). The answer no longer carries the insights:
+  Getting started reads them from `GET /api/v1/trial/insights` at once, as it already did. Locally, in the browser,
+  with the 4,993-row `ft-complaints-4994.csv` (two runs each, on the same machine and database): on Getting started
+  the import result shows after 16 to 18 s instead of 31 to 32 s; the signals show in the story after 45 to 46 s, as
+  before (43 s). With the Signal inbox opened as the import answers, the result shows after 11 to 18 s instead of 17
+  to 31 s, and the signals after 26 to 37 s (27 to 64 s before). Detection itself takes 13 to 17 s after the answer;
+  the time until the signals show is unchanged because the screens read them again while the background embeddings
+  run.
+  - The import result says "MDARIX is now finding signals in these complaints: they show in Signals in a moment."
+    (`signals: "FINDING"` in the answer).
+  - Until they are found, the Signal inbox says "Finding signals in the complaints you just imported…" and the
+    story's trend chapter in Getting started reads "Finding signals in the complaints you just imported…" instead of
+    a count. Meanwhile they ask a small status read every 3 seconds (`GET /api/v1/triage/detection`, one at a time,
+    as background reads that do not keep the session alive, for two minutes at most), then read their data once more
+    and show the signals without a reload (`detection_pending` in `GET /api/v1/triage/signals`, `signals_pending` in
+    `GET /api/v1/trial/story`).
+  - "See it on your own data" is ticked by the imported complaints, so as soon as the import answers, as before.
+  - Both imports (`/api/v1/trial/imports/{entity}` and `/api/v1/data/import/{entity}`) work this way. A connector
+    sync still detects signals at once.
+
 ## [0.10.39] - 2026-10-21
 
 Full support access for free trials (NEW-1, owner decision 19 October: after the launch), on the trial maintenance

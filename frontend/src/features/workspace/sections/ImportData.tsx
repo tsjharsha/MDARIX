@@ -111,7 +111,13 @@ export type ImportResult = {
   also_created?: Record<string, number>;
   rejected_rows?: number;
   masked_values?: number;
+  /** "FINDING": signals from these complaints are being found after the answer (they show within seconds). */
+  signals?: string;
 };
+
+/** What the import result adds while its signals are being found. */
+export const FINDING_SIGNALS_TEXT =
+  "MDARIX is now finding signals in these complaints: they show in Signals in a moment.";
 
 /** "Imported complaints: 4 new, 0 updated, and 2 products and 3 lots they name." (exported for its test). */
 export function importedText(title: string, result: ImportResult): string {
@@ -125,7 +131,7 @@ export function importedText(title: string, result: ImportResult): string {
   const [first, ...rest] = notes;
   return `Imported ${title.toLowerCase()}: ${(result.created ?? 0) - added} new, ${result.updated ?? 0} updated${
     first ? `${also ? ", " : "; "}${first}` : ""
-  }${rest.length ? `; ${rest.join("; ")}` : ""}.`;
+  }${rest.length ? `; ${rest.join("; ")}` : ""}.${result.signals === "FINDING" ? ` ${FINDING_SIGNALS_TEXT}` : ""}`;
 }
 
 /** What to do with rows that have a problem, and with personal data in the text. */

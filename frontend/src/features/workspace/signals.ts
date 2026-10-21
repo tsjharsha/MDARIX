@@ -141,12 +141,17 @@ export type SignalDetail = SignalSummary & {
   actions?: SignalActions | null;
 };
 
+/** Whether an import's signals are still being found: a small read, asked while a screen says "Finding signals". */
+export const DETECTION_STATUS_PATH = "/api/v1/triage/detection";
+
 export type SignalList = {
   items: SignalSummary[];
   total: number;
   page: number;
   page_size: number;
   counts_by_status?: Partial<Record<string, number>> | null;
+  /** Signals from an import that answered moments ago are still being found. */
+  detection_pending?: boolean;
 };
 
 export type TriageSummary = {
