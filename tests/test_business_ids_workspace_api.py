@@ -430,7 +430,7 @@ def test_evaluation_runs_carry_their_business_id(monkeypatch):
         "run_golden_evaluation",
         lambda scenario_ids: {"evaluation_version": "TEST", "passed": 1, "total": 1, "results": []},
     )
-    client = role_client("INVESTIGATOR")[0]
+    client = role_client("PLATFORM_ADMIN")[0]
     started = client.post("/api/v1/evaluations/runs", json={})
     assert started.status_code == 202, started.text
     assert _matches(r"EVAL\d{6}", started.json()["business_id"])

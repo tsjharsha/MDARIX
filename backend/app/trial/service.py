@@ -169,10 +169,23 @@ def serialize_request(db: Session, row: OnboardingRequest) -> dict:
 
 
 def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]:
-    """The queue's view of each request, with its trial workspace, the trial's end and whether the requester has
-    activated their account (INVITED until they do, then ACTIVE): three statements for any number of requests."""
+    """The queue's view of each request, with its trial workspace, the trial's end, whether the requester has
+    activated their account (INVITED until they do, then ACTIVE) and who reviewed it: four statements for any number
+    of requests."""
     tenant_ids = list({row.tenant_id for row in rows if row.tenant_id})
     tenants, subscriptions, owner_status = {}, {}, {}
+    # Who approved or declined each request (DEV-027): a Platform Administrator, or the automatic approval account.
+    reviewer_ids = list({row.reviewed_by for row in rows if row.reviewed_by})
+    reviewers = (
+        {
+            user.id: user.display_name or user.username
+            for user in db.query(AuthUser.id, AuthUser.display_name, AuthUser.username).filter(
+                AuthUser.id.in_(reviewer_ids)
+            )
+        }
+        if reviewer_ids
+        else {}
+    )
     if tenant_ids:
         tenants = {
             tenant.id: tenant
@@ -201,12 +214,15 @@ def serialize_requests(db: Session, rows: list[OnboardingRequest]) -> list[dict]
             tenants.get(row.tenant_id),
             subscriptions.get(row.tenant_id),
             owner_status.get((row.tenant_id, row.email.strip().lower())) if row.tenant_id else None,
+            reviewers.get(row.reviewed_by) if row.reviewed_by else None,
         )
         for row in rows
     ]
 
 
-def _request_view(row: OnboardingRequest, tenant, subscription, owner_status: str | None) -> dict:
+def _request_view(
+    row: OnboardingRequest, tenant, subscription, owner_status: str | None, reviewed_by_name: str | None = None
+) -> dict:
     return {
         "id": str(row.id),
         "business_id": row.business_id,
@@ -219,6 +235,7 @@ def _request_view(row: OnboardingRequest, tenant, subscription, owner_status: st
         "profile_lines": [{"label": label, "value": words} for label, words in describe_profile(row.profile)],
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "reviewed_at": row.reviewed_at.isoformat() if row.reviewed_at else None,
+        "reviewed_by_name": reviewed_by_name,
         "decision_reason": row.decision_reason,
         "tenant_id": str(row.tenant_id) if row.tenant_id else None,
         "tenant_business_id": tenant.business_id if tenant else None,

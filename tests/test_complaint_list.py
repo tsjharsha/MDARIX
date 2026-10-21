@@ -61,6 +61,14 @@ def test_filters_by_version_lot_problem_code_country_and_source():
     paged = user.get("/api/v1/complaints", params={"version": orbit_b["business_id"], "page_size": 5}).json()
     assert paged["total"] == 17 and len(paged["items"]) == 5 and paged["pages"] == 4
     assert listed(source_system="MDARIX_SAMPLE")["total"] == 37 and listed(source_system="TRIAL_UPLOAD")["total"] == 0
+    # The sources the complaints come from, for "Only your imported data" and "Only the sample data" (DEV-017).
+    assert every["sources"] == ["MDARIX_SAMPLE"]
+    own = "complaint_id,product_id,description\nVAL-CMP-001,VAL-PUMP-100,Occlusion alarm with no occlusion present\n"
+    assert user.post("/api/v1/trial/imports/complaints", content=own).status_code == 200
+    assert listed()["sources"] == ["MDARIX_SAMPLE", "TRIAL_UPLOAD"]
+    imported = listed(source_system="TRIAL_UPLOAD")
+    assert [row["complaint_identifier"] for row in imported["items"]] == ["VAL-CMP-001"]
+    assert listed(source_system="MDARIX_SAMPLE")["total"] == 37 and listed()["total"] == 38
 
     # Another organization's version or lot never matches there, and its list offers none of these.
     other = _client_with_role("VIEWER")

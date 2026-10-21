@@ -501,7 +501,7 @@ function AiAssurance({ label }: { label: string }) {
             Free trial: every step by hand
           </text>
           <text x={14} y={314} className="sc-note">
-            Design partners: after validation
+            In a pilot: after validation
           </text>
         </g>
       </Card>

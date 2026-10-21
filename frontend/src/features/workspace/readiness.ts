@@ -25,6 +25,8 @@ export type Readiness = {
   note: string;
   /** The disclaimer the screen carries once under the checks' basis. */
   basis_note?: string;
+  /** Signals from an import that answered moments ago are still being found: the trend check waits for them. */
+  detection_pending?: boolean;
 };
 
 /** The catalog ids of a check's basis, for the chips. */

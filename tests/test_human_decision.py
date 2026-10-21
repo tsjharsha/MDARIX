@@ -268,6 +268,12 @@ def test_signing_a_decision_records_everything_and_verifies(org):
     assert [(item["kind"], item["decision_id"]) for item in verification["signatures"]] == [
         ("CASE_DECISION", decision["id"])
     ]
+    # The report names the signer, for the signer too (DEV-024), and for a colleague who reads it.
+    assert verification["signatures"][0]["signer_name"] == "Approver Brief"
+    viewer, _ = org["viewer"]
+    read_by_colleague = viewer.get(f"/api/v1/governance/decisions/{decision['id']}/signature-verification")
+    assert read_by_colleague.status_code == 200, read_by_colleague.text
+    assert read_by_colleague.json()["signatures"][0]["signer_name"] == "Approver Brief"
     signature = record["signature"]
     assert signature["business_id"] and signature["status"] == "SIGNED"
     assert signature["signer_name"] == "Approver Brief"

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { UserGuidePage } from "./UserGuidePage";
 import { GUIDE_PARTS, GUIDE_SECTIONS, USER_GUIDE_PATH } from "./userGuide";
 import { TRIAL_GUIDE_PATH } from "./trialGuide";
+import { NEXT_STEPS_HELP } from "./trialNextSteps";
 import { HelpMenu, VIDEOS_PATH } from "../shared/HelpMenu";
 import { TrialJourney } from "../workspace/sections/TrialJourney";
 
@@ -125,5 +126,10 @@ describe("step-by-step user guide", () => {
     expect(menu).toContain("Watch the videos");
     expect(menu).toContain('href={VIDEOS_PATH} target="_blank"');
     expect(VIDEOS_PATH).toBe("/videos");
+    // In a trial, "Talk to us about the next step" opens Next steps, from trial to pilot (UX-25).
+    expect(NEXT_STEPS_HELP).toBe("Talk to us about the next step");
+    expect(menu).toContain("{NEXT_STEPS_HELP}");
+    expect(menu).toContain("<small>{NEXT_STEPS_LINK}</small>");
+    expect(menu).toContain('workspace.open("Next steps")');
   });
 });

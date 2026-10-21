@@ -81,6 +81,9 @@ def test_signals_are_found_after_the_answer_and_are_the_ones_found_before(held_b
     inbox = user.get("/api/v1/triage/signals").json()
     assert inbox["detection_pending"] is True
     assert user.get("/api/v1/triage/detection").json() == {"pending": True}
+    # The dashboard's Signal triage and Readiness say so too (0.10.41).
+    assert user.get("/api/v1/triage/summary").json()["detection_pending"] is True
+    assert user.get("/api/v1/readiness").json()["detection_pending"] is True
     story = user.get("/api/v1/trial/story").json()
     assert story["signals_pending"] is True
     trends = next(chapter for chapter in story["chapters"] if chapter["code"] == "TRENDS_TO_CASES")
@@ -98,6 +101,8 @@ def test_signals_are_found_after_the_answer_and_are_the_ones_found_before(held_b
     assert seen == [{"tenant": tenant_id, "bound": tenant_id, "system": None}]
     assert user.get("/api/v1/triage/signals").json()["detection_pending"] is False
     assert user.get("/api/v1/triage/detection").json() == {"pending": False}
+    assert user.get("/api/v1/triage/summary").json()["detection_pending"] is False
+    assert user.get("/api/v1/readiness").json()["detection_pending"] is False
     story = user.get("/api/v1/trial/story").json()
     assert story["signals_pending"] is False
     trends = next(chapter for chapter in story["chapters"] if chapter["code"] == "TRENDS_TO_CASES")

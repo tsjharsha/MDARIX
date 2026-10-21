@@ -20,12 +20,17 @@ export function CaseIntelligencePanel({
   caseLabel,
   view,
   onView,
+  adding = false,
+  onAddingShown,
   readOnly = false,
 }: {
   investigationId: string;
   caseLabel: string;
   view: IntelligenceView;
   onView: (view: IntelligenceView) => void;
+  /** Open the view's form to add one as it opens ("Add hypotheses by hand", DEV-019); `onAddingShown` once it is. */
+  adding?: boolean;
+  onAddingShown?: () => void;
   /** A closed or cancelled case: its intelligence can be read, not changed. */
   readOnly?: boolean;
 }) {
@@ -42,7 +47,13 @@ export function CaseIntelligencePanel({
       )}
       <Tabs tabs={INTELLIGENCE_VIEWS} active={view} onChange={onView} label="Case intelligence views">
         {view === "Hypotheses" && (
-          <HypothesesView investigationId={investigationId} caseLabel={caseLabel} readOnly={readOnly} />
+          <HypothesesView
+            investigationId={investigationId}
+            caseLabel={caseLabel}
+            readOnly={readOnly}
+            startAdding={adding}
+            onAddingShown={onAddingShown}
+          />
         )}
         {view === "Contradictions" && (
           <ContradictionsView investigationId={investigationId} caseLabel={caseLabel} onView={onView} />

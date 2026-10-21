@@ -11,6 +11,7 @@ import {
   hasComplaintFilters,
   insightComplaintFilters,
   parseComplaintListTab,
+  sourceChoices,
   sourceText,
   versionChoices,
   versionValue,
@@ -156,5 +157,43 @@ describe("Complaints › Complaint list", () => {
     expect(
       render(<ComplaintFilterBar filters={EMPTY_COMPLAINT_FILTERS} data={data} products={[]} onChange={vi.fn()} />),
     ).not.toContain("Clear filters");
+  });
+
+  it("tells a trial's imported complaints from the sample's while the sample data is there (DEV-017)", () => {
+    expect(sourceChoices(["MDARIX_SAMPLE", "TRIAL_UPLOAD"], "")).toEqual(["TRIAL_UPLOAD", "MDARIX_SAMPLE"]);
+    expect(sourceChoices(["MDARIX_SAMPLE"], "")).toEqual(["TRIAL_UPLOAD", "MDARIX_SAMPLE"]);
+    // Without the sample data every complaint is the organization's own: no filter, unless a link chose a source.
+    expect(sourceChoices(["TRIAL_UPLOAD"], "")).toEqual([]);
+    expect(sourceChoices(["CSV_IMPORT", "SAP_QM"], "")).toEqual([]);
+    expect(sourceChoices(["TRIAL_UPLOAD"], "TRIAL_UPLOAD")).toEqual(["TRIAL_UPLOAD", "MDARIX_SAMPLE"]);
+    expect(sourceChoices([], "SAP_QM")).toEqual(["TRIAL_UPLOAD", "MDARIX_SAMPLE", "SAP_QM"]);
+    const data = { sources: ["MDARIX_SAMPLE", "TRIAL_UPLOAD"] };
+    const off = render(
+      <ComplaintFilterBar filters={EMPTY_COMPLAINT_FILTERS} data={data} products={[]} onChange={vi.fn()} />,
+    );
+    expect(off).toContain('aria-label="Data"');
+    expect(off).toMatch(/<option value="" selected="">All data<\/option>/);
+    expect(off).toContain('<option value="TRIAL_UPLOAD">Only your imported data</option>');
+    expect(off).toContain('<option value="MDARIX_SAMPLE">Only the sample data</option>');
+    const on = render(
+      <ComplaintFilterBar
+        filters={{ ...EMPTY_COMPLAINT_FILTERS, source: "TRIAL_UPLOAD" }}
+        data={data}
+        products={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(on).toMatch(/<option value="TRIAL_UPLOAD" selected="">Only your imported data<\/option>/);
+    expect(on).toContain("Clear filters");
+    // A paying organization's list has no such filter.
+    const own = render(
+      <ComplaintFilterBar
+        filters={EMPTY_COMPLAINT_FILTERS}
+        data={{ sources: ["CSV_IMPORT"] }}
+        products={[]}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(own).not.toContain('aria-label="Data"');
   });
 });

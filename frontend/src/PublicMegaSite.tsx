@@ -37,7 +37,7 @@ type Page = SitePage | (typeof INFO_PAGES)[number] | "not-found";
 
 // The website was consolidated from ~65 URLs into a few pages. Every old URL lands on the section that now holds its
 // content, so existing links and bookmarks keep working.
-const LEGACY_PAGES: Record<string, string> = {
+export const LEGACY_PAGES: Record<string, string> = {
   "/why-mdarix": "/trust#principles",
   "/ai-trust": "/trust#ai",
   "/integrations": "/trust#integrations",

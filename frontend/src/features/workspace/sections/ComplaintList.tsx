@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { X } from "lucide-react";
 import { Panel } from "../../admin/console/charts";
 import { titleCase } from "../../admin/console/dashboardModel";
 import { SearchBox, Table, idColumn, listOf, sourceIdColumn, useResource } from "../../customer-admin/shared";
@@ -12,6 +11,7 @@ import {
   EMPTY_COMPLAINT_FILTERS,
   complaintListPath,
   hasComplaintFilters,
+  sourceChoices,
   sourceText,
   versionChoices,
   versionValue,
@@ -32,8 +32,8 @@ const COMPLAINT_SORTS = [
 ] as const;
 
 /**
- * Every complaint in the organization, across products: search, filter by product, status, version, lot, problem code
- * and country, page through. `initialFilters` comes from a link (Getting started › Automatic insights).
+ * Every complaint in the organization, across products: search, filter by product, status, version, lot, problem code,
+ * country and, in a free trial with the sample data, only the imported or only the sample complaints; page through. `initialFilters` comes from a link (Getting started › Automatic insights).
  */
 export function ComplaintList({
   eyebrow = "Signals",
@@ -170,6 +170,7 @@ export function ComplaintFilterBar({
   // The lot number as typed; the list asks for it when the person presses Enter or leaves the field.
   const [lotText, setLotText] = useState(filters.lot);
   const versions = versionChoices(listOf(data?.versions) as ComplaintVersionChoice[], filters.productId);
+  const sources = sourceChoices(listOf(data?.sources), filters.source);
   const applyLot = () => {
     if (lotText.trim() !== filters.lot) onChange({ lot: lotText.trim() });
   };
@@ -241,17 +242,15 @@ export function ComplaintFilterBar({
           </option>
         ))}
       </select>
-      {filters.source && (
-        <span className="uw-ins-chip">
-          {sourceText(filters.source)}
-          <button
-            type="button"
-            onClick={() => onChange({ source: "" })}
-            aria-label={`Clear the filter ${sourceText(filters.source)}`}
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </span>
+      {sources.length > 0 && (
+        <select aria-label="Data" value={filters.source} onChange={(event) => onChange({ source: event.target.value })}>
+          <option value="">All data</option>
+          {sources.map((value) => (
+            <option key={value} value={value}>
+              {sourceText(value)}
+            </option>
+          ))}
+        </select>
       )}
       {hasComplaintFilters(filters) && (
         <button type="button" className="ac-link" onClick={() => onChange(EMPTY_COMPLAINT_FILTERS)}>

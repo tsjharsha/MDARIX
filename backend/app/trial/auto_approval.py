@@ -3,7 +3,8 @@
 A request from a company domain is approved right after sign-up, so the requester has the activation email within a
 minute instead of the next business day. Everything else waits for a Platform Administrator as before: a free-mail or
 disposable address, a company that already has a trial or a request (the second colleague is invited by the first),
-a domain that does not exist in DNS, and every request beyond the day's cap. ``MDARIX_TRIAL_AUTO_APPROVE``
+a domain that does not exist in DNS, every request beyond the day's cap, and an address of MDARIX's own platform
+organization (its staff accounts' domains and the support address's; FUN-14). ``MDARIX_TRIAL_AUTO_APPROVE``
 (``company-domains``, the default, or ``off``) switches it; ``MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX`` caps it per UTC
 day (20 by default). A Platform Administrator can still end any trial (Customers & Tenants > Trials).
 
@@ -164,6 +165,21 @@ def is_company_domain(domain: str) -> bool:
     return domain not in FREE_MAIL_DOMAINS and not any(domain.endswith("." + free) for free in FREE_MAIL_DOMAINS)
 
 
+def platform_domains(db: Session) -> set[str]:
+    """The email domains of MDARIX's own platform organization: its accounts' (the staff) and the support address's.
+    A trial request from one of them is never approved automatically (FUN-14)."""
+    from backend.app.db.models.foundation import AuthUser
+    from backend.app.support_access import platform_tenant_id
+
+    found = {domain_of(os.getenv("MDARIX_SUPPORT_EMAIL") or "")}
+    tenant_id = platform_tenant_id(db)
+    if tenant_id is not None:
+        found |= {
+            domain_of(username) for (username,) in db.query(AuthUser.username).filter(AuthUser.tenant_id == tenant_id)
+        }
+    return {domain for domain in found if is_company_domain(domain)}
+
+
 def eligible(db: Session, request_id: uuid.UUID, now: datetime | None = None) -> tuple[bool, str]:
     """Whether this request is approved at once, and why not (for the log and the test)."""
     from backend.app.db.models.stage2 import OnboardingRequest
@@ -176,6 +192,8 @@ def eligible(db: Session, request_id: uuid.UUID, now: datetime | None = None) ->
     domain = domain_of(row.email)
     if not is_company_domain(domain):
         return False, "FREE_MAIL"
+    if domain in platform_domains(db):
+        return False, "PLATFORM_ORGANIZATION"
     same_company = (
         db.query(OnboardingRequest.id)
         .filter(OnboardingRequest.id != row.id, func.lower(OnboardingRequest.email).like(f"%@{domain}"))

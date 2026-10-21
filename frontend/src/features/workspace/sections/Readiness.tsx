@@ -31,6 +31,7 @@ import { InlineError } from "./boardParts";
 import { BasisChips, BasisNote } from "../../shared/Basis";
 import { QualityLoop } from "./QualityLoop";
 import { loopFromReadiness } from "../qualityLoop";
+import { FINDING_SIGNALS_NOW, WHILE_FINDING_SIGNALS } from "../signals";
 
 const HOME_ICONS: Record<string, typeof ScanSearch> = {
   COMPLAINTS_TO_RECHECK: ScanSearch,
@@ -39,14 +40,19 @@ const HOME_ICONS: Record<string, typeof ScanSearch> = {
   TRENDS_WITHOUT_ACTION: TrendingUp,
 };
 
+/** The check that reads the organization's signals: it waits for an import's signals while they are being found. */
+const TRENDS_CHECK = "TRENDS_WITHOUT_ACTION";
+
 /**
  * Readiness: what an investigator or a notified-body auditor would find in your records today, read from them (rules
  * only), the four home numbers first; every check opens the records behind it and shows its regulatory basis under
- * why it matters, with the disclaimer once at the foot. The summary for management review downloads as a PDF.
+ * why it matters, with the disclaimer once at the foot. The summary for management review downloads as a PDF. Right
+ * after an import the trend check says that its signals are being found, and the checks are read again once they are.
  */
 export function ReadinessSection() {
   const { open } = useWorkspace();
-  const data = useResource<Readiness>(READINESS_PATH);
+  const data = useResource<Readiness>(READINESS_PATH, WHILE_FINDING_SIGNALS);
+  const finding = !!data.data?.detection_pending;
   const headline = readinessHeadline(data.data);
   const go = (check: ReadinessCheck) => {
     if (check.opens) open(check.opens.section as WorkspaceSection, check.opens.tab);
@@ -70,7 +76,12 @@ export function ReadinessSection() {
       </QualityLoop>
       <div className="uw-rd-home" aria-label="The four numbers">
         {(data.data?.home ?? []).map((check) => (
-          <HomeTile key={check.code} check={check} onOpen={() => go(check)} />
+          <HomeTile
+            key={check.code}
+            check={check}
+            onOpen={() => go(check)}
+            finding={finding && check.code === TRENDS_CHECK}
+          />
         ))}
       </div>
       <Panel eyebrow="Readiness" title="Further inspection checks" source={data}>
@@ -86,20 +97,34 @@ export function ReadinessSection() {
   );
 }
 
-/** One of the four home numbers (exported for its unit test). */
-export function HomeTile({ check, onOpen }: { check: ReadinessCheck; onOpen: () => void }) {
-  const state = checkStateOf(check.state);
+/** One of the four home numbers (exported for its unit test); `finding` while the signals it reads are being found. */
+export function HomeTile({
+  check,
+  onOpen,
+  finding = false,
+}: {
+  check: ReadinessCheck;
+  onOpen: () => void;
+  finding?: boolean;
+}) {
+  const state = finding ? { label: "Finding signals", tone: "neutral" as const } : checkStateOf(check.state);
   const Icon = HOME_ICONS[check.code] ?? ShieldCheck;
-  const refs = itemsText(check);
+  const refs = finding ? null : itemsText(check);
   return (
     <button type="button" className={`uw-rd-tile tone-${state.tone}`} onClick={onOpen} disabled={!check.opens}>
       <span className="uw-rd-tile-head">
         <Icon size={18} aria-hidden="true" />
         <span>{check.title}</span>
       </span>
-      <strong className="uw-rd-value">{checkValue(check)}</strong>
+      <strong className="uw-rd-value">{finding ? "…" : checkValue(check)}</strong>
       <ToneBadge tone={state.tone} label={state.label} />
-      <span className="uw-rd-detail">{check.detail}</span>
+      {finding ? (
+        <span className="uw-rd-detail" role="status">
+          {FINDING_SIGNALS_NOW}
+        </span>
+      ) : (
+        <span className="uw-rd-detail">{check.detail}</span>
+      )}
       {refs && <span className="uw-rd-refs">{refs}</span>}
       <span className="uw-rd-why">{check.why}</span>
       <BasisChips ids={basisIds(check)} />

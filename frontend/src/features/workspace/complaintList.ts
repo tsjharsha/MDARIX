@@ -99,13 +99,28 @@ export function insightComplaintFilters(
   };
 }
 
+/** The sample data's source and a free trial's imported data's (backend/app/trial: SAMPLE_SOURCE, UPLOAD_SOURCE). */
+export const SAMPLE_SOURCE = "MDARIX_SAMPLE";
+export const IMPORTED_SOURCE = "TRIAL_UPLOAD";
+
 const SOURCE_NAMES: Record<string, string> = {
-  MDARIX_SAMPLE: "the sample data",
-  TRIAL_UPLOAD: "your imported data",
+  [SAMPLE_SOURCE]: "the sample data",
+  [IMPORTED_SOURCE]: "your imported data",
 };
 
 /** How a source filter reads: "Only the sample data". */
 export const sourceText = (source: string) => `Only ${SOURCE_NAMES[source] ?? source}`;
+
+/**
+ * What the list's data filter offers (DEV-017): while the sample data is there (a free trial), "Only your imported
+ * data" and "Only the sample data"; a source from a link stays chosen. None otherwise: every complaint is the
+ * organization's own.
+ */
+export function sourceChoices(sources: string[], chosen: string): string[] {
+  if (!sources.includes(SAMPLE_SOURCE) && !chosen) return [];
+  const choices = [IMPORTED_SOURCE, SAMPLE_SOURCE];
+  return chosen && !choices.includes(chosen) ? [...choices, chosen] : choices;
+}
 
 export type ComplaintVersionChoice = { id: string; business_id: string | null; product_id: string; label: string };
 

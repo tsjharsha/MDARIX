@@ -45,19 +45,45 @@ export const availableFieldKeys = (rows: unknown[], exclude: Iterable<string> = 
   return order.filter((key) => !unusable.has(key) && withValue.has(key) && !technical(key));
 };
 
+/** Words of a field name that read as acronyms in a heading: "mfa_enrolled" -> "MFA enrolled". */
+const ACRONYMS: Readonly<Record<string, string>> = {
+  id: "ID",
+  ids: "IDs",
+  url: "URL",
+  ip: "IP",
+  mfa: "MFA",
+  ai: "AI",
+  api: "API",
+  sso: "SSO",
+  capa: "CAPA",
+  capas: "CAPAs",
+  udi: "UDI",
+  csv: "CSV",
+  pdf: "PDF",
+  utc: "UTC",
+  sha256: "SHA-256",
+  mdr: "MDR",
+  qms: "QMS",
+  erp: "ERP",
+  plm: "PLM",
+  smtp: "SMTP",
+  dns: "DNS",
+  fda: "FDA",
+  eu: "EU",
+};
+
 /**
  * "customer_identifier" -> "Customer identifier", "created_at" -> "Created", "business_id" -> "ID",
- * "tenant_business_id" -> "Tenant ID".
+ * "tenant_business_id" -> "Tenant ID", "mfa_enrolled" -> "MFA enrolled" (acronyms read as acronyms).
  */
 export const fieldLabel = (key: string) => {
   const words = key
     .replace(/_at$/, "")
     .replace(/(^|_)business_id$/, "$1id")
-    .replace(/_/g, " ")
-    .replace(/\bid\b/g, "ID")
-    .replace(/\burl\b/g, "URL")
-    .replace(/\bip\b/g, "IP")
-    .trim();
+    .split("_")
+    .filter(Boolean)
+    .map((word) => ACRONYMS[word.toLowerCase()] ?? word)
+    .join(" ");
   return words.replace(/^\w/, (letter) => letter.toUpperCase()) || key;
 };
 

@@ -4,8 +4,14 @@ import { decisionLabel, signedDecisionLabel, signerLabel, verificationSummary } 
 const people = [{ id: "u-2", display_name: "Asha Rao" }];
 
 describe("signature verification labels", () => {
-  it("names the signer: you, a colleague by name, or the role when the name is not available", () => {
+  it("names the signer: by name and role, also when it is you, else the role when the name is not available", () => {
+    // The report's name, also for the signed-in signer (DEV-024): "Meera Iyer (Leader)", not "You (Leader)".
+    expect(signerLabel("u-1", "LEADER", people, "u-1", "Meera Iyer")).toBe("Meera Iyer (Leader)");
+    expect(signerLabel("u-2", "APPROVER", [], "u-1", "Asha Rao")).toBe("Asha Rao (Approver)");
+    expect(signerLabel("u-2", "APPROVER", people, "u-2")).toBe("Asha Rao (Approver)");
+    // Without a name anywhere: "You" for the signed-in signer, else the role.
     expect(signerLabel("u-1", "APPROVER", people, "u-1")).toBe("You (Approver)");
+    expect(signerLabel("u-1", "APPROVER", people, "u-1", " ")).toBe("You (Approver)");
     expect(signerLabel("u-2", "APPROVER", people, "u-1")).toBe("Asha Rao (Approver)");
     expect(signerLabel("u-9", "LEADER", people, "u-1")).toBe("A colleague with the Leader role");
     expect(signerLabel("u-9", undefined, [], undefined)).toBe("A colleague in your organization");
