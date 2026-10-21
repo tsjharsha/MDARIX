@@ -909,11 +909,16 @@ def execute_connector(
         raise HTTPException(exc.status, detail={"code": exc.code, "message": exc.message}) from exc
     canonical_import = outcome["canonical_import"]
     if canonical_import and canonical_import.get("status") == "IMPORTED" and canonical_import.get("rows"):
-        # Semantic search over the imported records (their text is already searchable by product and record).
-        from backend.app.db.data_plane import open_tenant_data_session
-        from retrieval.record_evidence import embed_tenant_evidence
+        # Semantic search over the imported records (their text is already searchable by product and record): queued
+        # for the background service, like an import's (retrieval/record_evidence.py).
+        from retrieval.record_evidence import queue_embeddings
 
-        background.add_task(embed_tenant_evidence, open_tenant_data_session, admin.tenant_id)
+        background.add_task(
+            queue_embeddings,
+            admin.tenant_id,
+            source=f"connector sync {row.code}",
+            records=int(canonical_import.get("rows") or 0),
+        )
     return {
         "status": "COMPLETE",
         "run_id": str(outcome["run"].id),

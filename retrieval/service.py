@@ -1,3 +1,4 @@
+import time
 import uuid
 from typing import Any
 
@@ -33,13 +34,22 @@ class TrustedRetrievalService:
     BATCH_SIZE = 64
 
     def index_evidence_chunks(
-        self, db: Session, tenant_id: uuid.UUID, reprocess: bool = False, limit: int | None = None
+        self,
+        db: Session,
+        tenant_id: uuid.UUID,
+        reprocess: bool = False,
+        limit: int | None = None,
+        budget_seconds: float | None = None,
     ) -> dict[str, Any]:
         """Embed the tenant's evidence chunks that have no current embedding (all of them with ``reprocess``).
 
-        One query finds the work (no per-chunk lookups); embeddings are computed in batches. ``limit`` caps how many
-        chunks one call embeds, so a scheduled run stays short; the rest are picked up by the next run.
+        One query finds the work (no per-chunk lookups): it reads ids and statuses only, not the chunks' text or the
+        stored vectors, and each batch then reads its own chunks. Embeddings are computed in batches. ``limit`` caps
+        how many chunks one call embeds, so a scheduled run stays short; the rest are picked up by the next run.
+        ``budget_seconds`` does the same by time: no batch starts once it has passed (the background job's slices,
+        retrieval/record_evidence.py). What is left is counted in ``deferred``.
         """
+        began = time.monotonic()
         metadata = self.embedding_provider.model_metadata()
         current = (
             (EvidenceChunkEmbedding.tenant_id == EvidenceChunk.tenant_id)
@@ -50,7 +60,7 @@ class TrustedRetrievalService:
             & (EvidenceChunkEmbedding.pipeline_version == metadata.pipeline_version)
         )
         rows = (
-            db.query(EvidenceChunk, EvidenceChunkEmbedding)
+            db.query(EvidenceChunk.id, EvidenceChunkEmbedding.id, EvidenceChunkEmbedding.indexing_status)
             .join(Evidence, Evidence.id == EvidenceChunk.evidence_id)
             .outerjoin(EvidenceChunkEmbedding, current)
             .filter(EvidenceChunk.tenant_id == tenant_id, Evidence.tenant_id == tenant_id)
@@ -64,17 +74,18 @@ class TrustedRetrievalService:
             )
             .all()
         )
-        work: list[tuple[EvidenceChunk, EvidenceChunkEmbedding | None]] = []
+        # (chunk id, id of its current embedding row to replace, if any)
+        work: list[tuple[uuid.UUID, uuid.UUID | None]] = []
         skipped = 0
         seen_chunks: set[uuid.UUID] = set()
-        for chunk, existing in rows:
-            if chunk.id in seen_chunks:
+        for chunk_id, existing_id, status in rows:
+            if chunk_id in seen_chunks:
                 continue
-            seen_chunks.add(chunk.id)
-            if existing is not None and existing.indexing_status == "INDEXED" and not reprocess:
+            seen_chunks.add(chunk_id)
+            if existing_id is not None and status == "INDEXED" and not reprocess:
                 skipped += 1
                 continue
-            work.append((chunk, existing))
+            work.append((chunk_id, existing_id))
         deferred = 0
         if limit is not None and len(work) > limit:
             deferred = len(work) - limit
@@ -103,16 +114,28 @@ class TrustedRetrievalService:
         indexed = 0
         failed = 0
         for start in range(0, len(work), self.BATCH_SIZE):
-            batch = work[start : start + self.BATCH_SIZE]
-            for _chunk, existing in batch:
-                if existing is not None:  # reprocess, or retry an earlier failure
-                    db.delete(existing)
-            db.flush()
+            if budget_seconds is not None and start and time.monotonic() - began >= budget_seconds:
+                deferred += len(work) - start
+                break
+            part = work[start : start + self.BATCH_SIZE]
+            replaced = [existing_id for _, existing_id in part if existing_id is not None]
+            if replaced:  # reprocess, or retry an earlier failure
+                db.query(EvidenceChunkEmbedding).filter(
+                    EvidenceChunkEmbedding.tenant_id == tenant_id, EvidenceChunkEmbedding.id.in_(replaced)
+                ).delete(synchronize_session=False)
+            loaded = {
+                chunk.id: chunk
+                for chunk in db.query(EvidenceChunk).filter(
+                    EvidenceChunk.tenant_id == tenant_id, EvidenceChunk.id.in_([chunk_id for chunk_id, _ in part])
+                )
+            }
+            # In the order found; a chunk deleted meanwhile (its record re-imported) is no longer there to embed.
+            batch = [loaded[chunk_id] for chunk_id, _ in part if chunk_id in loaded]
             try:
-                vectors = self.embedding_provider.embed_batch([chunk.text_content for chunk, _ in batch])
+                vectors = self.embedding_provider.embed_batch([chunk.text_content for chunk in batch])
             except Exception:
                 vectors = None  # find the chunk that fails, one at a time
-            for position, (chunk, _existing) in enumerate(batch):
+            for position, chunk in enumerate(batch):
                 if vectors is not None:
                     record(chunk, vectors[position])
                     indexed += 1

@@ -91,8 +91,8 @@ def test_signals_are_found_after_the_answer_and_are_the_ones_found_before(held_b
     # The insights do not wait for detection either.
     assert user.get("/api/v1/trial/insights").json()["scope"] == "your data"
 
-    # Detection first, then the embeddings, each after the answer.
-    assert [func.__name__ for func, _, _ in held_back] == ["detect_after_import", "embed_tenant_evidence"]
+    # Detection first, then the embeddings are queued for the background service, each after the answer.
+    assert [func.__name__ for func, _, _ in held_back] == ["detect_after_import", "queue_embeddings"]
     for func, args, kwargs in held_back:
         func(*args, **kwargs)
     found = _signals(tenant_id)
@@ -147,7 +147,7 @@ def test_an_import_without_complaints_finds_no_signals_and_says_nothing_about_th
     imported = user.post("/api/v1/trial/imports/products", content=products, headers={"Content-Type": "text/csv"})
     assert imported.status_code == 200, imported.text
     assert "signals" not in imported.json()
-    assert [func.__name__ for func, _, _ in held_back] == ["embed_tenant_evidence"]
+    assert [func.__name__ for func, _, _ in held_back] == ["queue_embeddings"]
     assert user.get("/api/v1/triage/signals").json()["detection_pending"] is False
 
 
@@ -157,5 +157,5 @@ def test_the_workspace_import_finds_signals_after_the_answer_too(held_back):
     imported = user.post("/api/v1/data/import/complaints", content=_export("WS"), headers={"Content-Type": "text/csv"})
     assert imported.status_code == 200, imported.text
     assert imported.json()["signals"] == "FINDING"
-    assert [func.__name__ for func, _, _ in held_back] == ["detect_after_import", "embed_tenant_evidence"]
+    assert [func.__name__ for func, _, _ in held_back] == ["detect_after_import", "queue_embeddings"]
     assert user.get("/api/v1/triage/signals").json()["detection_pending"] is True

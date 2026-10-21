@@ -184,6 +184,10 @@ services:
     stop_grace_period: 60s
     mem_limit: 1536m
     cpus: 1.5
+    # A quarter of the default CPU weight (1024): when the API, the database and this service all want the CPU (an
+    # import's embeddings run here), the API and the database come first; on an idle server this service still gets
+    # its 1.5 CPUs.
+    cpu_shares: 256
     depends_on:
       migrate: {condition: service_completed_successfully}
 

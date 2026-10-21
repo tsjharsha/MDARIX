@@ -150,6 +150,12 @@ def publish(event_name, payload):
 
         run_export(payload["export_id"])
         return
+    if event_name == "RECORD_EMBEDDINGS_REQUESTED":
+        # An import's records, embedded here instead of in the API (retrieval/record_evidence.py).
+        from retrieval.record_evidence import run_embeddings_job
+
+        run_embeddings_job(payload)
+        return
     if event_name == "SUPPORT_PROBLEM_REPORTED":
         from backend.app.support_api import deliver_problem_report
 
