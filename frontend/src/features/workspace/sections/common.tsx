@@ -11,6 +11,10 @@ import { Upload } from "lucide-react";
 /** A count with en-US grouping, whatever the browser's language: "4,993" (DEV-025). */
 export const formatCount = (count: number) => count.toLocaleString("en-US");
 
+/** A list's heading: its name, then how many it holds once read ("Signal inbox · 2", "Complaint list · 4,993"). */
+export const listTitle = (name: string, total: number | null | undefined) =>
+  typeof total === "number" ? `${name} · ${formatCount(total)}` : name;
+
 /** "1 complaint", "3 complaints": a count with its noun in the right number. */
 export const countOf = (count: number, noun: string, plural = `${noun}s`) =>
   `${formatCount(count)} ${count === 1 ? noun : plural}`;

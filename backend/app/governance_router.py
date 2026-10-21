@@ -893,6 +893,7 @@ def signature_verification(
     from backend.app.workflow.people import names_by_id
 
     signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
+    signed_brief = _signed_brief_label(data, item)
     result = []
     for r in rows:
         if r.decision_type == CASE_DECISION_TYPE:
@@ -922,6 +923,14 @@ def signature_verification(
                 "signer_name": signers.get(str(r.signer_user_id)),
                 "signer_role": r.signer_role,
                 "object_version": r.object_version,
+                # The signed version in words, for people: "Decision Brief DBV000012 version 2" for a decision on a
+                # brief (its object_version is the brief's content hash); None for a legacy approval, whose version is
+                # the moment the decision was last changed (the screen shows that date).
+                "version_label": (
+                    signed_brief[1]
+                    if r.decision_type == CASE_DECISION_TYPE and signed_brief and signed_brief[0] == r.object_version
+                    else None
+                ),
                 "signed_at": r.signed_at,
                 "meaning": r.signature_meaning,
                 # A decision signed on a Decision Brief: the UI links its record (/api/v1/decisions/{id}/record).
@@ -939,6 +948,25 @@ def signature_verification(
         "verification_status": verification_status(result),
         "signatures": result,
     }
+
+
+def _signed_brief_label(data: Session, decision: Decision) -> tuple[str | None, str] | None:
+    """(content hash, "Decision Brief DBV000012 version 2") of the brief version a decision was made on, else None."""
+    from backend.app.db.models.reviews import DecisionBriefVersion
+
+    if not decision.brief_version_id:
+        return None
+    brief = (
+        data.query(DecisionBriefVersion.business_id, DecisionBriefVersion.version, DecisionBriefVersion.content_hash)
+        .filter(
+            DecisionBriefVersion.tenant_id == decision.tenant_id,
+            DecisionBriefVersion.id == decision.brief_version_id,
+        )
+        .first()
+    )
+    if brief is None:
+        return None
+    return brief.content_hash, f"Decision Brief {brief.business_id} version {brief.version}"
 
 
 def verification_status(signatures: list[dict]) -> str:

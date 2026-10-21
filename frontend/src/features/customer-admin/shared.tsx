@@ -44,6 +44,56 @@ export type Resource<T> = {
 /** How often, and for how long, a resource is read again while ``refreshWhile`` says its data is not final yet. */
 export const REFRESH_MS = 3_000;
 export const REFRESH_FOR_MS = 120_000;
+/** How often the small status read (``statusPath``) is asked meanwhile: the resource itself is read again within a
+ * second or two of the status saying it is final (0.10.43). */
+export const STATUS_REFRESH_MS = 1_500;
+/** With ``retry``, how long to wait before each new read of a resource whose read failed for a passing reason. */
+export const RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
+
+/** Whether a failed read may succeed when asked again: no answer, a server error or too many requests (never a
+ * refusal such as 403 or 404, which says the same the next time). */
+export function isTransientFailure(reason: unknown): boolean {
+  return !(reason instanceof ApiError) || reason.status === 0 || reason.status === 429 || reason.status >= 500;
+}
+
+type ResourceResult<T> = Omit<Resource<T>, "reload">;
+
+/** A failed read, as a resource shows it. */
+function failedResult<T>(reason: unknown): ResourceResult<T> {
+  return {
+    state: reason instanceof ApiError && reason.status === 403 ? "forbidden" : "error",
+    data: null,
+    error: reason instanceof Error ? reason.message : undefined,
+    code: reason instanceof ApiError ? reason.code : undefined,
+    requestId: reason instanceof ApiError ? reason.requestId : undefined,
+  };
+}
+
+/**
+ * Read ``path`` once and hand the result to ``apply``. With ``retry``, a read that failed for a passing reason
+ * (``isTransientFailure``) is asked again after each of RETRY_DELAYS_MS, in the background, and only the last failure
+ * is handed on: a page whose reload failed for a moment (for example right after a large import) recovers by itself
+ * and shows no error in between. Returns the function that stops it (the page closed, or another read began).
+ */
+export function readResource<T>(path: string, apply: (result: ResourceResult<T>) => void, retry = false): () => void {
+  let current = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const attempt = (tries: number) => {
+    requestJson<T>(path, tries ? { background: true } : {})
+      .then((data) => current && apply({ state: "ready", data }))
+      .catch((reason) => {
+        if (!current) return;
+        const delay = retry && isTransientFailure(reason) ? RETRY_DELAYS_MS[tries] : undefined;
+        if (delay === undefined) apply(failedResult<T>(reason));
+        else timer = setTimeout(() => attempt(tries + 1), delay);
+      });
+  };
+  attempt(0);
+  return () => {
+    current = false;
+    if (timer !== undefined) clearTimeout(timer);
+  };
+}
 
 /** Whether a loaded resource is to be read again: its data is there and ``refreshWhile`` says it is not final. */
 export function stillUnfinished<T>(
@@ -62,6 +112,9 @@ export function useResource<T>(
     /** A small status read (``{ pending: boolean }``) asked meanwhile instead of the resource itself, which is read
      * again once the status says it is no longer pending. */
     statusPath?: string;
+    /** A read that fails for a passing reason (no answer, a server error) is asked again a few times, waiting longer
+     * each time (``readResource``); the last data read meanwhile stays as it was. */
+    retry?: boolean;
   } = {},
 ): Resource<T> {
   const [version, setVersion] = useState(0);
@@ -69,10 +122,14 @@ export function useResource<T>(
   const refreshWhile = useRef(options.refreshWhile);
   refreshWhile.current = options.refreshWhile;
   const statusPath = options.statusPath;
+  const retry = !!options.retry;
   const unfinished = stillUnfinished(result, refreshWhile.current);
+  // A read of the resource itself (the first, or a reload) is under way: no background read starts meanwhile.
+  const reading = useRef(false);
   // Background reads: a page left open does not keep its session alive (apiClient ``background``). They replace the
   // data only, so the panel never flickers back to "loading". One read at a time: the next is asked for a few seconds
-  // after the last one answered, so a slow server never gets a pile of them.
+  // after the last one answered, so a slow server never gets a pile of them; and none while a reload is under way (a
+  // reload that makes the data unfinished, as an import does for its insights, read it twice at once before 0.10.43).
   useEffect(() => {
     if (!path || !unfinished) return;
     let current = true;
@@ -82,6 +139,10 @@ export function useResource<T>(
       requestJson<T>(path, { background: true }).then((data) => current && setResult({ state: "ready", data }));
     const read = () => {
       if (!current || Date.now() - started > REFRESH_FOR_MS) return;
+      if (reading.current) {
+        timer = window.setTimeout(read, statusPath ? STATUS_REFRESH_MS : REFRESH_MS);
+        return;
+      }
       const step = statusPath
         ? requestJson<{ pending?: boolean }>(statusPath, { background: true }).then((status) =>
             status.pending ? undefined : reload(),
@@ -90,10 +151,10 @@ export function useResource<T>(
       step
         .catch(() => undefined)
         .finally(() => {
-          if (current) timer = window.setTimeout(read, REFRESH_MS);
+          if (current) timer = window.setTimeout(read, statusPath ? STATUS_REFRESH_MS : REFRESH_MS);
         });
     };
-    timer = window.setTimeout(read, REFRESH_MS);
+    timer = window.setTimeout(read, statusPath ? STATUS_REFRESH_MS : REFRESH_MS);
     return () => {
       current = false;
       window.clearTimeout(timer);
@@ -101,25 +162,21 @@ export function useResource<T>(
   }, [path, version, unfinished, statusPath]);
   useEffect(() => {
     if (!path) return;
-    let current = true;
     setResult((previous) => ({ ...previous, state: previous.data ? previous.state : "loading" }));
-    requestJson<T>(path)
-      .then((data) => current && setResult({ state: "ready", data }))
-      .catch(
-        (reason) =>
-          current &&
-          setResult({
-            state: reason instanceof ApiError && reason.status === 403 ? "forbidden" : "error",
-            data: null,
-            error: reason instanceof Error ? reason.message : undefined,
-            code: reason instanceof ApiError ? reason.code : undefined,
-            requestId: reason instanceof ApiError ? reason.requestId : undefined,
-          }),
-      );
+    reading.current = true;
+    const stop = readResource<T>(
+      path,
+      (next) => {
+        reading.current = false;
+        setResult(next);
+      },
+      retry,
+    );
     return () => {
-      current = false;
+      reading.current = false;
+      stop();
     };
-  }, [path, version]);
+  }, [path, version, retry]);
   const reload = useCallback(() => setVersion((value) => value + 1), []);
   return { ...result, reload };
 }

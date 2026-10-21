@@ -10,6 +10,63 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.43] - 2026-10-21
+
+Getting started shows an import's new signals sooner and recovers by itself when a reload fails, and small fixes from
+the review of 0.10.42, on the trial maintenance line (`release/0.10`). No migration: the schema stays at md48. The API
+and web images change; the usual upgrade script rebuilds all images, the web image with the new
+`infrastructure/docker/Caddyfile`. Measured with production's limits (2 CPUs shared by the API, the background service
+and PostgreSQL) on the 4,994-row test file, on the same database as the runs before the change: Getting started counts
+the new signals 9 to 13 s after the import answers for one person (20 to 25 s before), and 10 to 16 s with the
+Signal inbox open in a second tab (26 to 27 s before). What the story shows is unchanged.
+
+### Changed
+
+- Getting started's story reads less (`GET /api/v1/trial/story`): Readiness's trend check and its risk file check read
+  the trend board once between them, and the backlog check counts the open complaints from a few columns and reads
+  whole records only for the complaints it lists. The same story, Readiness and backlog board as before (compared on
+  the 11 organizations of the review database, five of them trials with about 5,000 imported complaints); the story's
+  read takes about half as long (0.9 to 0.45 s on a development machine; 2.4 to 1.0 s right after a large import) and
+  the timestamps parsed per read fell from about 35,000 to 8,000.
+- The workspace's "Chapter done" notice reads only which chapters were tried
+  (`GET /api/v1/trial/story?findings=false`: the same chapters and next step, every finding `NOT_SET`, Readiness not
+  read), every half minute while the page is in sight and once when it comes back into sight, instead of the whole
+  story every half minute in every open trial page.
+- While an import's signals are being found, a screen waiting for them asks the small detection status every 1.5 s
+  (3 s before), and reads its data again as soon as the status says they are in. No screen starts a background read
+  while its own reload is under way: right after an import, Getting started read the insights twice at once.
+- The complaint list is headed like the other lists, "Complaint list · 4,993": the count after "Complaints in your
+  organization" read as a stray "· 4993", it had no thousands separator, and it counts the complaints the filters
+  choose, not the whole organization. The Signal inbox's count gets the thousands separator too.
+
+### Fixed
+
+- Getting started kept the story from before an import when reading it again failed (a server error or no answer
+  while the server was busy with the import), and never read it again. A failed read for a passing reason is now read
+  again after 2, 4, 8 and 16 seconds, in the background, with the last story staying on screen and no error shown
+  meanwhile; a refusal (403, 404) is not retried. After the last try the story shown stays as it was, or with none
+  yet the page offers Try again, as before.
+- A signal's highest severity no longer depends on the order its complaints are read in: between two severities of
+  the same rank (two that MDARIX does not recognise, or SERIOUS and SEVERE) the first in alphabetical order is kept.
+- Verify a signature showed "Decision version of" and the signed brief's 64-character fingerprint. It now says
+  "Signed version: Decision Brief DBV000001 version 1" (the report's new `version_label`), and for an older approval
+  the date the decision was last changed; never the fingerprint.
+- List headings showed every word capitalized ("About The Request" in Platform Admin's trial requests): a global style
+  for table headings capitalized them. Every list heading now reads as written, in sentence case.
+- When MDARIX support resets the MFA of a free trial's owner or colleague in Platform Admin, that person is told by
+  email, as after their owner's reset, with "MDARIX support" as the one who did it (never the staff member's name;
+  the reason stays in the audit trail; the time in UTC). One `TEAM_CHANGE_NOTICE` outbox event, queued with the
+  reset. Before, nobody was told.
+- `https://mdarix.in/404.html` answered 200; it now answers 404 like any address that is no page. Every page, the
+  application under `/app` and `/platform-admin`, the email link targets and the built files still answer 200
+  (checked behind the new Caddyfile in a Caddy 2.11 container).
+
+### Documentation
+
+- STATUS.md no longer describes "Request a demo" as the website's current flow: the website has offered only the free
+  trial since 0.10.5 (`/request-demo` opens the sign-up), and the demo requests Platform Admin lists are under
+  Identity & Access › Onboarding.
+
 ## [0.10.42] - 2026-10-21
 
 An import's signals show within seconds and the workspace stays responsive while the import's follow-up work runs,

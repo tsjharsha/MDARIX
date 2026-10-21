@@ -22,6 +22,8 @@ export type StoryChapter = {
 
 export type TrialStory = {
   as_of: string;
+  /** False in a TRIAL_PROGRESS_PATH read: the findings were not read. */
+  findings?: boolean;
   /** An import's signals are still being found: the trend chapter says so, and the story is read again. */
   signals_pending?: boolean;
   acted: number;
@@ -31,6 +33,9 @@ export type TrialStory = {
 };
 
 export const TRIAL_STORY_PATH = "/api/v1/trial/story";
+/** The same chapters with which were tried and the next one, without what the records show in each (every finding
+ * NOT_SET): the workspace's "Chapter done" notice reads it every half minute, at a fraction of the story's cost. */
+export const TRIAL_PROGRESS_PATH = `${TRIAL_STORY_PATH}?findings=false`;
 
 /** Short names for the loop picture (the titles are sentences). */
 export const CHAPTER_SHORT: Record<string, string> = {

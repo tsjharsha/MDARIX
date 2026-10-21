@@ -566,23 +566,35 @@ def send_trial_invitation_withdrawn(recipient: str, *, owner: str, organization:
     )
 
 
-def send_trial_mfa_reset_notice(recipient: str, *, owner: str, organization: str, when: str) -> str:
-    """Tell a colleague that the trial's owner removed their authenticator. The owner's reason stays in the audit
-    trail: it is not part of this email."""
+def send_trial_mfa_reset_notice(
+    recipient: str, *, owner: str, organization: str, when: str, by_support: bool = False
+) -> str:
+    """Tell a colleague that the trial's owner removed their authenticator. With ``by_support`` MDARIX support removed
+    it in Platform Admin (for the owner or a colleague who lost their phone and recovery codes): ``owner`` is then
+    "MDARIX support", never the staff member's name. The reason stays in the audit trail: it is not part of this
+    email."""
     support = company().support_email
+    who = (
+        f"{owner} removed the authenticator app of your account in the MDARIX free trial of {organization}"
+        if by_support
+        else f"{owner}, who runs the MDARIX free trial of {organization}, removed the authenticator app of your account"
+    )
     return _send(
         recipient,
         Message(
             subject="The authenticator app of your MDARIX account was removed",
             heading=f"{owner} removed the authenticator app of your MDARIX account",
             paragraphs=(
-                f"{owner}, who runs the MDARIX free trial of {organization}, removed the authenticator app of your "
-                "account, and you were signed out.",
+                f"{who}, and you were signed out.",
                 "At your next sign-in, sign in with your password as usual: MDARIX then asks you to set up a new "
                 "authenticator app on your phone and gives you new recovery codes.",
             ),
             details=(("When", when),),
-            closing=(f"If you did not ask for this, contact {owner}" + (f" or {support}." if support else "."),),
+            closing=(
+                (f"If you did not ask for this, contact {support}." if support else _questions())
+                if by_support
+                else f"If you did not ask for this, contact {owner}" + (f" or {support}." if support else "."),
+            ),
             reason="You are receiving this email because the sign-in settings of your MDARIX account changed.",
         ),
     )
