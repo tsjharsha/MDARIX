@@ -7,11 +7,17 @@ import { CustomerPage } from "./CustomerPage";
 import type { Section } from "./model";
 import { TenantDirectory, TenantPage } from "./TenantPages";
 import { TrialsOverview } from "./TrialsOverview";
+import { SupportWorkspace } from "./SupportWorkspace";
 import { ColumnScopeProvider } from "../../tables/ColumnChooser";
 import "../../customer-admin/customer-admin.css";
 import "./customers.css";
 
-type Open = { kind: "customer"; id: string } | { kind: "tenant"; id: string; from?: string } | null;
+type Open =
+  | { kind: "customer"; id: string }
+  | { kind: "tenant"; id: string; from?: string }
+  // The read-only support workspace of a trial (opened from Trials, under the access its owner approved).
+  | { kind: "workspace"; id: string }
+  | null;
 
 /**
  * The platform administrator's Customers & Tenants area: the customer and tenant records, the free trials and how far
@@ -73,6 +79,8 @@ export function CustomersAndTenants({
             onOpenCustomer={(id) => setOpen({ kind: "customer", id })}
             onMessage={notify}
           />
+        ) : open?.kind === "workspace" ? (
+          <SupportWorkspace tenantId={open.id} onBack={() => setOpen(null)} onMessage={notify} />
         ) : section === "Customers" && creating ? (
           <NewCustomer
             onClose={() => setCreating(false)}
@@ -88,7 +96,10 @@ export function CustomersAndTenants({
         ) : section === "Tenants" ? (
           <TenantDirectory onOpen={(id) => setOpen({ kind: "tenant", id })} />
         ) : section === "Trials" ? (
-          <TrialsOverview onOpenTenant={(id) => setOpen({ kind: "tenant", id })} />
+          <TrialsOverview
+            onOpenTenant={(id) => setOpen({ kind: "tenant", id })}
+            onOpenWorkspace={(id) => setOpen({ kind: "workspace", id })}
+          />
         ) : (
           <div className="cc-page">
             <div className="cc-title">

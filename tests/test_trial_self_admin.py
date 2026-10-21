@@ -228,20 +228,16 @@ def _awaiting_grant(tenant_id) -> tuple[str, TestClient]:
     return grant_id, recipient
 
 
-def test_until_after_launch_mdarix_cannot_ask_a_trial_for_support_access():
-    """Owner decision 2026-10-19: a request would wait for a trial owner whose Team tab no longer shows it. Other
-    organizations are asked as before, and the picker of Request access can leave the trials out."""
+def test_mdarix_can_ask_a_trial_for_support_access_and_the_picker_offers_trials():
+    """Since 0.10.39 (owner decision 2026-10-19, after the launch) a free trial is asked like any organization; the
+    tenants of Request access still say which are trials."""
     _owner, approval, _ = _approved_trial_client()
     requester, _ = _platform_admin()
     _recipient, recipient_id = _platform_admin()
-    refused = _request(requester, approval["tenant_id"], recipient_id, areas=[access.CONFIGURATION])
-    assert refused.status_code == 422, refused.text
-    assert refused.json()["detail"] == {
-        "code": "SUPPORT_ACCESS_TRIALS_LATER",
-        "message": "Support access for free trials is not available yet.",
-    }
+    made = _request(requester, approval["tenant_id"], recipient_id, areas=[access.RECORDS])
+    assert made.status_code == 200, made.text
+    assert made.json()["scope"] == {"areas": [access.RECORDS], "write": False}
     customer_tenant = _organization()
-    assert _request(requester, customer_tenant, recipient_id, areas=[access.CONFIGURATION]).status_code == 200
     options = {
         item["id"]: item for item in requester.get("/api/v1/platform-admin/customer-admin-tenants").json()["items"]
     }
@@ -249,9 +245,7 @@ def test_until_after_launch_mdarix_cannot_ask_a_trial_for_support_access():
     assert options[customer_tenant]["is_trial"] is False
 
 
-def test_the_trial_owner_decides_on_support_access_and_a_colleague_cannot(monkeypatch):
-    # The decisions are kept for when support access for trials comes back (support_access.TRIAL_SUPPORT_ACCESS_ENABLED).
-    monkeypatch.setattr(access, "TRIAL_SUPPORT_ACCESS_ENABLED", True)
+def test_the_trial_owner_decides_on_support_access_and_a_colleague_cannot():
     owner, approval, _, colleague, _ = _trial_with_colleague()
     tenant_id = approval["tenant_id"]
     grant_id, recipient = _awaiting_grant(tenant_id)

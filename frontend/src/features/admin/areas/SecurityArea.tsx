@@ -18,7 +18,6 @@ import { StatusBadge } from "../customers/StatusBadge";
 import { Intro, Pager, TenantCell, TenantPicker } from "./common";
 import { DialogBehaviour } from "../../shared/DialogBehaviour";
 import { formatDay } from "../../../app/dates";
-import { TRIAL_SUPPORT_ACCESS_ENABLED } from "../../../app/featureSet";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { PersonCell } from "./common";
 
@@ -316,7 +315,7 @@ type Grant = {
   can_revoke: boolean;
 };
 
-type Area = { code: string; label: string };
+export type Area = { code: string; label: string };
 
 /** Where a request stands: waiting for MDARIX, waiting for the customer, then the customer's decision. */
 const GRANT_STATUS: Record<string, string> = {
@@ -493,14 +492,26 @@ const DURATIONS = [
   [24, "24 hours"],
 ] as const;
 
-function RequestAccess({
+/** What a shortcut fills in for the request (Customers & Tenants › Trials › Request support access). */
+export type RequestAccessDraft = {
+  tenant_id?: string;
+  platform_user_id?: string;
+  areas?: string[];
+  reason?: string;
+  hours?: number;
+};
+
+/** The request form: one organization, one platform colleague, the areas, read-only unless changes are asked for. */
+export function RequestAccess({
   areas,
   onClose,
   onRequested,
+  initial,
 }: {
   areas: Area[];
   onClose: () => void;
   onRequested: () => void;
+  initial?: RequestAccessDraft;
 }) {
   const users = useResource<any[]>("/api/v1/admin/identity/users");
   const people = listOf(users.data).filter(
@@ -512,11 +523,11 @@ function RequestAccess({
       ) && String(user.status ?? "").toUpperCase() === "ACTIVE",
   );
   const [form, setForm] = useState({
-    tenant_id: "",
-    platform_user_id: "",
-    hours: 4,
-    reason: "",
-    areas: [] as string[],
+    tenant_id: initial?.tenant_id ?? "",
+    platform_user_id: initial?.platform_user_id ?? "",
+    hours: initial?.hours ?? 4,
+    reason: initial?.reason ?? "",
+    areas: initial?.areas ?? ([] as string[]),
     write: false,
   });
   const toggleArea = (code: string) =>
@@ -559,11 +570,7 @@ function RequestAccess({
           Access to part of one customer's data, starting now. A second platform administrator approves it for MDARIX,
           then the customer's administrators decide.
         </p>
-        <TenantPicker
-          value={form.tenant_id}
-          onChange={(tenant_id) => setForm({ ...form, tenant_id })}
-          withoutTrials={!TRIAL_SUPPORT_ACCESS_ENABLED}
-        />
+        <TenantPicker value={form.tenant_id} onChange={(tenant_id) => setForm({ ...form, tenant_id })} />
         <label className="ca-field">
           For
           <select

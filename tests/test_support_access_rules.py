@@ -84,6 +84,6 @@ def test_naive_stored_times_are_read_as_utc():
 
 
 def test_every_area_has_words_for_the_customer():
-    assert set(access.AREAS) == {access.CONFIGURATION, access.AUDIT, access.PEOPLE, access.DATA_EXPORT}
+    assert set(access.AREAS) == {access.CONFIGURATION, access.AUDIT, access.PEOPLE, access.RECORDS, access.DATA_EXPORT}
     assert all(":" in label for label in access.AREAS.values())  # "Name: what it covers"
     assert access.OPEN == {access.PENDING, access.AWAITING_CUSTOMER, access.APPROVED}
