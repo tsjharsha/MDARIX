@@ -2,6 +2,7 @@
 // renders this module on the server side (`vite build --ssr`) and scripts/prerender.mjs writes one file per page
 // into dist: dist/home.html for "/", dist/<page>/index.html for the others. The browser then mounts the app with
 // createRoot, which replaces the pre-rendered markup with the same page (src/main.tsx).
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PublicMegaSite } from "../PublicMegaSite";
 import { SignupPage } from "../features/auth/SignupPage";
@@ -15,6 +16,19 @@ type Location = { pathname: string; search: string; hash: string; origin: string
  * trial sign-up form for /signup. Data the page loads at runtime (the ready videos, the legal texts, the company
  * details in the footer) is not there yet; the page's static text is. */
 export function renderPage(path: IndexedPath): string {
+  return renderAt(path, path === "/signup" ? <SignupPage /> : <PublicMegaSite path={path} />);
+}
+
+/** An address no page has: the website's "Page not found" page renders for it, in its frame. */
+export const NOT_FOUND_PATH = "/page-not-found";
+
+/** The "Page not found" page, which the web server sends with a 404 status for an address that is no page
+ * (dist/404.html, infrastructure/docker/Caddyfile; WEB-17). */
+export function renderNotFoundPage(): string {
+  return renderAt(NOT_FOUND_PATH, <PublicMegaSite path={NOT_FOUND_PATH} />);
+}
+
+function renderAt(path: string, page: ReactElement): string {
   // A few components read the address while they render (the website's section anchor, sign-up's query string),
   // as the tests do: a stand-in window with this page's address, for this render only.
   const scope = globalThis as unknown as { window?: { location: Location } };
@@ -22,7 +36,7 @@ export function renderPage(path: IndexedPath): string {
   const location: Location = { pathname: path, search: "", hash: "", origin: SITE_URL, href: `${SITE_URL}${path}` };
   scope.window = { location };
   try {
-    return renderToStaticMarkup(path === "/signup" ? <SignupPage /> : <PublicMegaSite path={path} />);
+    return renderToStaticMarkup(page);
   } finally {
     if (previous === undefined) delete scope.window;
     else scope.window = previous;

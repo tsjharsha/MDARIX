@@ -3,7 +3,7 @@
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -278,6 +278,31 @@ def test_change_password_signs_out_other_sessions_and_keeps_this_one():
         assert db.get(AuthUser, user.id).password_expires_at is None  # no periodic expiry
     finally:
         db.close()
+
+
+def test_change_password_counts_only_the_other_sessions_still_live():
+    """NEW-5: sessions that had already expired or gone idle are no longer counted as "signed out"."""
+    user = _user()
+    client, token = _client_for(user)
+    _live_client, live_token = _client_for(user)
+    expired, idle = _client_for(user)[1], _client_for(user)[1]
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        by_hash = lambda raw: AuthSession.session_hash == hashlib.sha256(raw.encode()).hexdigest()  # noqa: E731
+        db.query(AuthSession).filter(by_hash(expired)).update({"expires_at": now - timedelta(minutes=1)})
+        db.query(AuthSession).filter(by_hash(idle)).update({"last_seen_at": now - timedelta(hours=2)})
+        db.commit()
+    finally:
+        db.close()
+    changed = client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": PASSWORD, "new_password": "A fourth long passphrase 2026"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["other_sessions_signed_out"] == 1
+    # Every other session is ended all the same; this one stays.
+    assert _session_live(token) and not any(_session_live(raw) for raw in (live_token, expired, idle))
 
 
 def test_a_refused_password_leaves_the_reset_link_usable_and_success_ends_every_session():

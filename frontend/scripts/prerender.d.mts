@@ -3,6 +3,7 @@ export const DIST: string;
 export const RENDERER: string;
 export const SITE_URL: string;
 export const HOME_FILE: string;
+export const NOT_FOUND_FILE: string;
 export function outputFile(path: string): string;
 export function headTags(head: { title: string; description: string; robots: string; url: string | null }): string[];
 export function pageHtml(

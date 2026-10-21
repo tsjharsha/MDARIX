@@ -519,7 +519,10 @@ TEAM_MFA_RESET = "MFA_RESET"
 
 
 def _named(name: str, email: str) -> str:
-    """The person as "Name (email)", or the email alone when they have no other name."""
+    """The person as "Name (email)", the email alone when they have no other name, or the name alone without an email
+    (MDARIX support)."""
+    if not email:
+        return name
     return email if not name or name == email else f"{name} ({email})"
 
 
@@ -649,9 +652,14 @@ def send_team_change_notice(
     role_now: str | None = None,
     roles_added: tuple[str, ...] = (),
     roles_removed: tuple[str, ...] = (),
+    by_support: bool = False,
 ) -> str:
-    """Tell a person what an administrator of their organization changed about their account, and who did."""
+    """Tell a person what an administrator of their organization changed about their account, and who did. With
+    ``by_support`` the change was MDARIX support's, in Platform Admin: ``actor`` is "MDARIX support", not one of the
+    organization's administrators."""
     support = company().support_email
+    # Who made the change, in the sentence that says what they did.
+    who = actor if by_support else f"{actor}, an administrator of {organization},"
     # Said after the details, where the person has read what changed.
     contact: tuple[str, ...] = (f"If this is unexpected, please contact {actor}.",)
     button = None
@@ -689,10 +697,7 @@ def send_team_change_notice(
         contact = ()
     elif change == TEAM_ROLE_CHANGED:
         subject = f"{actor} changed your role in MDARIX for {organization}"
-        paragraphs = (
-            f"{actor}, an administrator of {organization}, changed what you can do in MDARIX. It applies from your "
-            "next action in MDARIX.",
-        )
+        paragraphs = (f"{who} changed what you can do in MDARIX. It applies from your next action in MDARIX.",)
         if role_before and role_now:
             details += [("Role before", role_before), ("Role now", role_now)]
         items = tuple(f"Added: {role}" for role in roles_added) + tuple(f"Removed: {role}" for role in roles_removed)
@@ -703,13 +708,16 @@ def send_team_change_notice(
                 subject="The authenticator app of your MDARIX account was removed",
                 heading=f"{actor} removed the authenticator app of your MDARIX account",
                 paragraphs=(
-                    f"{actor}, an administrator of {organization}, removed the authenticator app of your account, "
-                    "and you were signed out.",
+                    f"{who} removed the authenticator app of your account, and you were signed out.",
                     "At your next sign-in, sign in with your password as usual: MDARIX then asks you to set up a new "
                     "authenticator app on your phone and gives you new recovery codes.",
                 ),
                 details=(("When", when),),
-                closing=(f"If you did not ask for this, contact {actor}" + (f" or {support}." if support else "."),),
+                closing=(
+                    (f"If you did not ask for this, contact {support}." if support else _questions())
+                    if by_support
+                    else f"If you did not ask for this, contact {actor}" + (f" or {support}." if support else "."),
+                ),
                 reason="You are receiving this email because the sign-in settings of your MDARIX account changed.",
             ),
         )
@@ -740,9 +748,11 @@ def send_team_admin_change_notice(
     when: str,
     role_before: str | None = None,
     role_now: str | None = None,
+    by_support: bool = False,
 ) -> str:
     """Tell a Customer Administrator that another administrator changed an administrator account of the organization
-    (or made someone one, or took the role away). A security notice: a change nobody expected is noticed."""
+    (or made someone one, or took the role away). A security notice: a change nobody expected is noticed. With
+    ``by_support`` MDARIX support made the change in Platform Admin (``actor`` is "MDARIX support")."""
     title = "a Customer Administrator"
     if change == TEAM_INVITED:
         subject = f"{actor} invited {person} as a Customer Administrator of {organization}"
@@ -776,7 +786,13 @@ def send_team_admin_change_notice(
             details=(*details, ("When", when)),
             button=("Review the users", f"{company().app_url}/app/customer-admin"),
             closing=(
-                f"If you did not expect this, check with {actor}"
+                (
+                    f"If you did not expect this, contact {support}."
+                    if support
+                    else "If you did not expect this, reply to this email."
+                )
+                if by_support
+                else f"If you did not expect this, check with {actor}"
                 + (f" and contact {support}." if support else " and reply to this email."),
             ),
             reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
@@ -863,6 +879,11 @@ def send_supplier_evidence_request(
 
 # ------------------------------------------------------------------------------------------- the MDARIX team
 
+# Where Platform Admin handles demo, trial and pilot requests, and the address that opens it (FUN-11: it is under
+# Identity & Access, not Customers & Tenants; frontend/src/app/router.ts "platform-onboarding").
+ONBOARDING_PLACE = "Platform Admin > Identity & Access > Onboarding"
+ONBOARDING_PATH = "/platform-admin/onboarding"
+
 
 def send_trial_request_alert(
     recipient: str, *, organization: str, display_name: str, email: str, profile_lines: tuple = ()
@@ -875,8 +896,8 @@ def send_trial_request_alert(
             subject=f"New MDARIX free trial request: {organization}",
             heading="A free trial request is waiting for review",
             details=(("Company", organization), ("Name", display_name), ("Email", email), *profile_lines),
-            button=("Review in Platform Admin", f"{company().app_url}/app/admin"),
-            closing=("Platform Admin > Customers & Tenants > Onboarding.",),
+            button=("Review in Platform Admin", f"{company().app_url}{ONBOARDING_PATH}"),
+            closing=(f"{ONBOARDING_PLACE}.",),
             reason="You are receiving this email because you are on the MDARIX trial review rota.",
         ),
     )
@@ -890,8 +911,8 @@ def send_demo_request_alert(recipient: str, *, display_name: str, email: str, ph
             subject=f"New MDARIX demo request: {display_name}",
             heading="A website visitor asked for a demo. Please contact them.",
             details=(("Name", display_name), ("Email", email), ("Phone", phone)),
-            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
-            closing=("Mark it contacted in Platform Admin > Customers & Tenants > Onboarding.",),
+            button=("Open Platform Admin", f"{company().app_url}{ONBOARDING_PATH}"),
+            closing=(f"Mark it contacted in {ONBOARDING_PLACE}.",),
             reason="You are receiving this email because you handle MDARIX demo requests.",
         ),
     )
@@ -926,8 +947,8 @@ def send_trial_demo_request_alert(
             heading="Someone in a free trial booked a one-to-one demo. Please contact them.",
             details=tuple(details),
             paragraphs=(f"Their note: {note}",) if note else (),
-            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
-            closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
+            button=("Open Platform Admin", f"{company().app_url}{ONBOARDING_PATH}"),
+            closing=(f"Mark it contacted in {ONBOARDING_PLACE}.",),
             reason="You are receiving this email because you handle MDARIX demo requests.",
         ),
     )
@@ -969,8 +990,8 @@ def send_trial_mvp_request_alert(
             ),
             details=tuple(details),
             paragraphs=tuple(paragraphs),
-            button=("Open Platform Admin", f"{company().app_url}/app/admin"),
-            closing=("Mark it contacted in Platform Admin > Identity & Access > Onboarding.",),
+            button=("Open Platform Admin", f"{company().app_url}{ONBOARDING_PATH}"),
+            closing=(f"Mark it contacted in {ONBOARDING_PLACE}.",),
             reason="You are receiving this email because you handle MDARIX demo requests.",
         ),
     )

@@ -499,6 +499,8 @@ class _Report:
         self.creates: dict[str, int] = {}
         # Rows of the file that would add a record (not update one): what a free trial's row allowance counts.
         self.new_rows = 0
+        # The file holds no data row at all: nothing in it, or a header alone (DEV-018).
+        self.no_rows = False
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -523,8 +525,10 @@ def _parse(
     reader = iter(table)
     header = next(reader, None)
     if not header or not any(cell.strip() for cell in header):
+        report.no_rows = True
         report.add(None, None, "The file is empty.")
         return []
+    report.no_rows = not any(any(cell.strip() for cell in cells) for cells in table[1:])
     spec = TEMPLATES[entity]
     allowed = spec["required"] + spec["optional"]
     # The export's headers matched to the template (backend/app/trial/columns.py): a header under another name is
@@ -930,7 +934,24 @@ def check_file(
     skip_problem_rows: bool = False,
     mask_personal_data: bool = False,
 ) -> dict:
-    return _checked_file(db, tenant_id, entity, raw, policy, date_format, skip_problem_rows, mask_personal_data)[0]
+    """The check report of an upload. A file without a single data row (empty, or a header alone, such as a JSON
+    body read as a one-line table) is refused with 422, as importing it is, with its first problem as the message and
+    the report (DEV-018); any other file answers its report, ready or with the problems to fix."""
+    report = _Report()
+    rows = _parse(entity, raw, report, policy, date_format)
+    result, _kept = _check_rows(
+        db, tenant_id, entity, rows, report, policy, date_format, skip_problem_rows, mask_personal_data
+    )
+    if report.no_rows:
+        raise HTTPException(
+            422,
+            detail={
+                "code": "IMPORT_FILE_EMPTY",
+                "message": result["issues"][0]["message"] if result["issues"] else "The file has no data rows.",
+                "report": result,
+            },
+        )
+    return result
 
 
 def _checked_file(

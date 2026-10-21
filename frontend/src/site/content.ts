@@ -272,7 +272,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
       },
       {
         title: "Customer self-administration",
-        text: "Customer administrators invite users, assign roles and review their own audit trail. Connections and field mappings are configured with design partners.",
+        text: "Customer administrators invite users, assign roles and review their own audit trail. Connections and field mappings are configured in a pilot.",
       },
       {
         title: "Identity and access",
@@ -280,7 +280,7 @@ const writtenCapabilities: Record<string, Omit<Capability, "slug" | "label" | "i
       },
       {
         title: "Plans and entitlements",
-        text: "With design partners: plans, seats and features are set centrally and visible to each customer.",
+        text: "In a pilot: plans, seats and features are set centrally and visible to each customer.",
       },
     ],
     steps: ["Tenant", "Identity", "Access", "Integrations", "Assurance", "Operations"],
@@ -360,24 +360,24 @@ function capabilityFor(slug: string, label: string): Capability {
 }
 
 /** The website's three availability labels, the stages of the roadmap (capabilityStatus), in its order. */
-export type Availability = "Available today" | "With design partners" | "Planned";
-export const AVAILABILITY: readonly Availability[] = ["Available today", "With design partners", "Planned"];
+export type Availability = "Available today" | "In a pilot" | "Planned";
+export const AVAILABILITY: readonly Availability[] = ["Available today", "In a pilot", "Planned"];
 
 /**
  * Where each Platform capability stands, from the roadmap (capabilityStatus) and the product as it runs: a free trial
  * always gets the MVP's screens (backend/app/feature_set.py, app/featureSet.ts), and what the MVP parks (the Products
- * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product built with design partners. AI
- * is off during the trial, so every AI capability is "With design partners". `note` says what the label means in the
- * product today. Nothing moves to "Available today" until it works in a trial workspace.
+ * screen, the Decision Center, counterfactuals, AI assurance) runs on the full product, in a pilot. AI is off during
+ * the trial, so every AI capability is "In a pilot". `note` says what the label means in the product today. Nothing
+ * moves to "Available today" until it works in a trial workspace (WEB-14: the labels are the roadmap's three words).
  */
 export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; note: string }> = {
   "product-360": {
-    status: "With design partners",
-    note: "The Product 360 screen is not in the free trial: there, products, versions and lots are read through Readiness, Complaints and Signals. The screen itself is opened with design partners.",
+    status: "In a pilot",
+    note: "The Product 360 screen is not in the free trial: there, products, versions and lots are read through Readiness, Complaints and Signals. The screen itself is opened in a pilot.",
   },
   "reality-graph": {
-    status: "With design partners",
-    note: "The connected graph is part of the Product 360 screen, opened with design partners. In the free trial each complaint and case is linked to its product version and lot.",
+    status: "In a pilot",
+    note: "The connected graph is part of the Product 360 screen, opened in a pilot. In the free trial each complaint and case is linked to its product version and lot.",
   },
   "product-version": {
     status: "Available today",
@@ -389,7 +389,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "ask-mdarix": {
     status: "Available today",
-    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI come with design partners.",
+    note: "AI is off during the trial: Ask MDARIX answers from your records by its rules and says so. Answers written by AI come in a pilot, once AI is validated and switched on.",
   },
   investigation: {
     status: "Available today",
@@ -397,15 +397,15 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   evidence: {
     status: "Available today",
-    note: "Evidence comes from the exports you import. Live connections to your systems are built with design partners.",
+    note: "Evidence comes from the exports you import. Live connections to your systems are built in a pilot.",
   },
   hypotheses: {
     status: "Available today",
     note: "Hypotheses, contradictions and open questions are written and judged by hand in a case's Intelligence tab.",
   },
   challenger: {
-    status: "With design partners",
-    note: "AI is off during the trial. The AI challenge of a hypothesis is switched on with design partners once it is validated.",
+    status: "In a pilot",
+    note: "AI is off during the trial. The AI challenge of a hypothesis is switched on in a pilot once it is validated.",
   },
   unknowns: {
     status: "Available today",
@@ -416,8 +416,8 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
     note: "Written by hand in a case's Intelligence tab. Ready-made chain templates are not in the free trial.",
   },
   counterfactual: {
-    status: "With design partners",
-    note: "Not in the free trial. Scenario comparison is built and validated with design partners.",
+    status: "In a pilot",
+    note: "Not in the free trial. Scenario comparison comes in a pilot, once it is validated.",
   },
   "decision-center": {
     status: "Available today",
@@ -428,12 +428,12 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
     note: "A case's Decision Brief, versioned and reviewed before the decision is signed.",
   },
   "ai-assurance": {
-    status: "With design partners",
-    note: "AI is off during the trial. Its assurance checks are validated with design partners before AI is switched on.",
+    status: "In a pilot",
+    note: "AI is off during the trial. Its assurance checks are validated in a pilot before AI is switched on.",
   },
   "ai-provenance": {
-    status: "With design partners",
-    note: "AI is off during the trial. Each AI output records its sources and model once AI is switched on with design partners.",
+    status: "In a pilot",
+    note: "AI is off during the trial. Each AI output records its sources and model once AI is switched on in a pilot.",
   },
   "human-review": {
     status: "Available today",
@@ -445,7 +445,7 @@ export const CAPABILITY_AVAILABILITY: Record<string, { status: Availability; not
   },
   "enterprise-administration": {
     status: "Available today",
-    note: "Users, roles, MFA and your own audit trail today. Connections and field mappings come with design partners; single sign-on is planned.",
+    note: "Users, roles, MFA and your own audit trail today. Connections and field mappings come in a pilot; single sign-on is planned.",
   },
 };
 
@@ -487,7 +487,7 @@ const PLATFORM_PAGE_DEFS: Record<
     path: "/platform/trust",
     name: "Trust",
     headline: "People decide, every step is recorded, and AI stays off until it is validated.",
-    copy: "Signed human review, a complete audit trail and customer administration today; the AI safeguards that come with design partners.",
+    copy: "Signed human review, a complete audit trail and customer administration today; the AI safeguards come in a pilot.",
     blurb: "Human review, audit trail and AI safeguards",
   },
 };

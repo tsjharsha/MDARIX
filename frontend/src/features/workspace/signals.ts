@@ -144,6 +144,16 @@ export type SignalDetail = SignalSummary & {
 /** Whether an import's signals are still being found: a small read, asked while a screen says "Finding signals". */
 export const DETECTION_STATUS_PATH = "/api/v1/triage/detection";
 
+/** What a screen says while an import's signals are being found (the trial story's words, backend/app/trial/story.py). */
+export const FINDING_SIGNALS_NOW = "Finding signals in the complaints you just imported…";
+
+/** Read a resource again, after a light status read every few seconds, while it says an import's signals are being
+ * found (customer-admin/shared.tsx useResource). */
+export const WHILE_FINDING_SIGNALS = {
+  refreshWhile: (data: { detection_pending?: boolean }) => !!data.detection_pending,
+  statusPath: DETECTION_STATUS_PATH,
+};
+
 export type SignalList = {
   items: SignalSummary[];
   total: number;
@@ -169,6 +179,8 @@ export type TriageSummary = {
     >
   > | null;
   by_priority?: Partial<Record<SignalPriority, number>> | null;
+  /** Signals from an import that answered moments ago are still being found. */
+  detection_pending?: boolean;
 };
 
 export type DetectionRule = {
@@ -585,20 +597,23 @@ export function ruleParametersText(parameters: Record<string, unknown> | null | 
     .join(" · ");
 }
 
-/** One related record (a change, an open CAPA, an open case) as a line: its ID, what it is about, its status. */
+/**
+ * One related record (a change, an open CAPA, an open case) as a line: its ID, what it is about, its status. The ID is
+ * its MDARIX ID with its number in the source system beside it, "CHG000001 (SAMPLE-CHG-014)" (DEV-008), else the one
+ * it has.
+ */
 export function relatedItem(row: Record<string, unknown> | null | undefined): {
   id: string;
   text: string | null;
   status: string | null;
 } {
   const record = row ?? {};
-  const id =
-    safeText(record.business_id) ??
-    Object.entries(record)
-      .filter(([key]) => key.endsWith("_identifier") || key === "reference")
-      .map(([, value]) => safeText(value))
-      .find(Boolean) ??
-    "—";
+  const own = safeText(record.business_id);
+  const source = Object.entries(record)
+    .filter(([key]) => key === "identifier" || key.endsWith("_identifier") || key === "reference")
+    .map(([, value]) => safeText(value))
+    .find(Boolean);
+  const id = own && source && source !== own ? `${own} (${source})` : (own ?? source ?? "—");
   const text =
     ["title", "investigation_question", "description", "summary", "name", "change_type"]
       .map((key) => safeText(record[key]))

@@ -347,6 +347,18 @@ describe("how a signal reads", () => {
       status: null,
     });
     expect(relatedItem({ id: UUID }).id).toBe("—");
+    // The MDARIX ID with the record's number in the source system beside it (DEV-008).
+    expect(relatedItem({ id: UUID, business_id: "CHG000001", identifier: "SAMPLE-CHG-014" }).id).toBe(
+      "CHG000001 (SAMPLE-CHG-014)",
+    );
+    expect(relatedItem({ id: UUID, business_id: "CAPA000002", identifier: "SAMPLE-CAPA-02", status: "OPEN" })).toEqual({
+      id: "CAPA000002 (SAMPLE-CAPA-02)",
+      text: null,
+      status: "OPEN",
+    });
+    expect(relatedItem({ id: UUID, business_id: "INV000001", identifier: "INV000001" }).id).toBe("INV000001");
+    expect(relatedItem({ id: UUID, identifier: "SAMPLE-CHG-014" }).id).toBe("SAMPLE-CHG-014");
+    expect(relatedItem({ id: UUID, business_id: "CHG000001", identifier: UUID }).id).toBe("CHG000001");
   });
 });
 

@@ -10,8 +10,10 @@
 /** The workspace section's name and its line in the menu. */
 export const NEXT_STEPS_SECTION = "Next steps";
 export const NEXT_STEPS_SUBTITLE = "From trial to pilot";
-/** How a link to the page names it (Getting started, End your trial early). */
+/** How a link to the page names it (Getting started, End your trial early, the Help menu's line under its entry). */
 export const NEXT_STEPS_LINK = `${NEXT_STEPS_SECTION}: from trial to pilot`;
+/** The Help menu's entry for the page in a trial workspace (UX-25). */
+export const NEXT_STEPS_HELP = "Talk to us about the next step";
 /** The page in one line, where it is linked (the menu's page heading, Getting started). */
 export const NEXT_STEPS_SUMMARY =
   "The pilot is MDARIX on your real data: what changes from the trial, how the pilot starts, and what we need from you.";

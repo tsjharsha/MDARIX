@@ -13,7 +13,10 @@ describe("what you get, as a roadmap (the /roadmap page)", () => {
       for (const item of status.items) expect(html).toContain(item.title);
     }
     expect(html).toContain("Included in your free trial");
-    expect(capabilityStatus.map((status) => status.badge)).toEqual(["Live now", "Next", "Planned"]);
+    // The roadmap's badges are the website's three availability labels (WEB-14), never "Live now" or "Next".
+    expect(capabilityStatus.map((status) => status.badge)).toEqual(["Available today", "In a pilot", "Planned"]);
+    expect(capabilityStatus.map((status) => status.label)).toEqual(["Available today", "In a pilot", "Planned"]);
+    expect(html).not.toMatch(/Live now|>Next<|With design partners|with design partners/);
     // Later stages say what they add and the running total.
     const [today, next, planned] = capabilityStatus.map((status) => status.items.length);
     expect(html).toContain(`${today} capabilities`);

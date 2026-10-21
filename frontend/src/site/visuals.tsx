@@ -124,7 +124,7 @@ export function LotChart() {
 
 /* ------------------------------------------------------------------------------ Customer systems */
 
-// Typical source systems, by kind: named vendor connectors are not offered yet (they are built with design partners).
+// Typical source systems, by kind: named vendor connectors are not offered yet (they are planned, as the roadmap says).
 const SOURCES = [
   ["QMS", "Complaints · CAPAs"],
   ["Document control", "Quality events · documents"],
@@ -222,8 +222,8 @@ export function SourceFlow() {
         <span className="ms-eyebrow">Typical source systems</span>
         <h2 id="source-flow-title">Your systems stay the record. MDARIX connects the story.</h2>
         <p>
-          Each system keeps its data. Today MDARIX imports CSV exports from them; live connections are built with design
-          partners. Every record is checked and linked to versions, lots, components, suppliers, risks and evidence.
+          Each system keeps its data. Today MDARIX imports CSV exports from them; live connections are built in a pilot.
+          Every record is checked and linked to versions, lots, components, suppliers, risks and evidence.
         </p>
       </Reveal>
       <Reveal className="ms-sysflow">

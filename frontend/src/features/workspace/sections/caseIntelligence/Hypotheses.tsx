@@ -1,5 +1,5 @@
 /** The case's hypotheses: the AI's as it wrote them, and how people judge each one, with evidence links. (Part of CaseIntelligence.tsx.) */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link2, Plus, Scale } from "lucide-react";
 import { Empty, Panel, ToneBadge } from "../../../admin/console/charts";
 import { Drawer, formatDate, listOf, useResource } from "../../../customer-admin/shared";
@@ -43,16 +43,25 @@ export function HypothesesView({
   investigationId,
   caseLabel,
   readOnly,
+  startAdding = false,
+  onAddingShown,
 }: {
   investigationId: string;
   caseLabel: string;
   readOnly: boolean;
+  /** Opened from "Add hypotheses by hand": the form to add one opens at once (DEV-019). */
+  startAdding?: boolean;
+  onAddingShown?: () => void;
 }) {
   const canWork = useCan("investigation.work");
   const canReview = useCan("evidence.review");
   const [includeRetired, setIncludeRetired] = useState(false);
   const hypotheses = useResource<HypothesisList>(hypothesesPath(investigationId, { includeRetired }));
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(() => startAdding && canWork && !readOnly);
+  // The request is used once: coming back to the view later does not open the form again.
+  useEffect(() => {
+    if (startAdding) onAddingShown?.();
+  }, [startAdding]);
   const [judging, setJudging] = useState<IntelHypothesis | null>(null);
   const [linking, setLinking] = useState<IntelHypothesis | null>(null);
   const [retracting, setRetracting] = useState<{ hypothesis: IntelHypothesis; link: EvidenceLink } | null>(null);

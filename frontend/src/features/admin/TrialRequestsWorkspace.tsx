@@ -3,6 +3,7 @@ import { DialogBehaviour } from "../shared/DialogBehaviour";
 import { Check, Copy, MailCheck, RefreshCw, Trash2, X } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { sortParams, useServerSort, type SortState } from "../../app/tableSort";
+import { formatUtc } from "../../app/dates";
 import { SearchBox, Table, idColumn } from "../customer-admin/shared";
 import { Pager } from "./areas/common";
 
@@ -14,6 +15,8 @@ type TrialRequest = {
   status: "PENDING_REVIEW" | "APPROVED" | "DECLINED" | string;
   created_at: string | null;
   reviewed_at: string | null;
+  /** Who approved or declined it: a Platform Administrator, or "Automatic approval (company email)". */
+  reviewed_by_name?: string | null;
   decision_reason: string | null;
   tenant_key: string | null;
   tenant_identifier: string | null;
@@ -40,8 +43,9 @@ const LEGAL_TEXT_NAMES: [string, string][] = [
   ["privacy", "Privacy Policy"],
 ];
 
-/** The legal texts a request accepted, as review lines: each text's version ("Last updated" date and the start of its
- * fingerprint), then when it was accepted. Empty for a request sent before the versions were recorded. */
+/** The legal texts a request accepted, as review lines: each text's version ("Last updated" date and its full SHA-256
+ * fingerprint, which wraps), then when it was accepted, to the second in UTC (DEV-027). Empty for a request sent
+ * before the versions were recorded. */
 export function legalAcceptanceLines(
   acceptance: LegalAcceptance | null | undefined,
 ): { label: string; value: string }[] {
@@ -51,11 +55,27 @@ export function legalAcceptanceLines(
     const value = !version?.available
       ? "not published when the request was sent"
       : `${version.last_updated ? `last updated ${version.last_updated}` : "no date in the text"}${
-          version.sha256 ? ` (fingerprint ${version.sha256.slice(0, 12)})` : ""
+          version.sha256 ? ` · SHA-256 ${version.sha256}` : ""
         }`;
     return { label: name, value };
   });
-  return [...lines, { label: "Accepted", value: formatDate(acceptance.accepted_at) }];
+  return [...lines, { label: "Accepted", value: formatUtc(acceptance.accepted_at) }];
+}
+
+/** Everything "About the request" lists: the requester's answers, the legal texts accepted and who reviewed it. */
+export const requestLines = (row: TrialRequest) => [
+  ...(row.profile_lines ?? []),
+  ...legalAcceptanceLines(row.legal_acceptance),
+  ...reviewLines(row),
+];
+
+/** Who approved or declined the request, and when in UTC (DEV-027); nothing while it waits for review. */
+export function reviewLines(
+  row: Pick<TrialRequest, "status" | "reviewed_at" | "reviewed_by_name">,
+): { label: string; value: string }[] {
+  const decided = row.status === "APPROVED" ? "Approved" : row.status === "DECLINED" ? "Declined" : null;
+  if (!decided || !row.reviewed_at) return [];
+  return [{ label: decided, value: `${row.reviewed_by_name ?? "—"}, ${formatUtc(row.reviewed_at)}` }];
 }
 /** A closed trial past its 30 days (backend/app/trial/retention.py trials_due); a held one is kept by the run. */
 type DueTrial = {
@@ -343,7 +363,7 @@ export function TrialRequestsWorkspace() {
                   <details className="trial-queue-answers">
                     <summary>{row.profile_lines.length} answers</summary>
                     <dl>
-                      {[...row.profile_lines, ...legalAcceptanceLines(row.legal_acceptance)].map((line) => (
+                      {requestLines(row).map((line) => (
                         <div key={line.label}>
                           <dt>{line.label}</dt>
                           <dd>{line.value}</dd>
@@ -369,6 +389,11 @@ export function TrialRequestsWorkspace() {
                       </span>
                     )}
                     {row.tenant_key}
+                    {reviewLines(row).map((line) => (
+                      <small key={line.label}>
+                        {line.label} by {line.value}
+                      </small>
+                    ))}
                     {row.data_deleted ? (
                       <small>Trial data deleted</small>
                     ) : (

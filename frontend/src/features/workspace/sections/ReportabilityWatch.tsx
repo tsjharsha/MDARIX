@@ -13,7 +13,7 @@ import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console
 import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
 import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
-import { recordId, type ComplaintsTab } from "../complaintReview";
+import { recordId, recordName, type ComplaintsTab } from "../complaintReview";
 import {
   AWARE_SOURCE,
   EMPTY_DECISION,
@@ -208,6 +208,10 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
       <div className="uw-cr-body">
         <div className="uw-cr-head">
           <strong className="uw-cr-id">{name}</strong>
+          {/* The complaint's number in the source system, as on the second look (DEV-008). */}
+          {item.business_id && item.complaint_identifier && (
+            <span className="uw-cr-meta">Source ID {item.complaint_identifier}</span>
+          )}
           <span className="uw-cr-meta">
             {item.product_name ?? "No product"}
             {item.version ? ` · ${item.version}` : ""} · {item.country ?? "Country not recorded"}
@@ -314,7 +318,8 @@ function DecisionDrawer({ item, onClose, onDecided }: { item: WatchItem; onClose
   const [form, setForm] = useState<DecisionForm>(() => (item.decision ? decisionForm(item.decision) : EMPTY_DECISION));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const name = recordId(item);
+  // "CMP000034 (SAMPLE-RV-06): reportability decision", with the source system's number (DEV-008).
+  const name = recordName(item);
   // A starter begins the rationale; the person finishes it in their own words (workspace/starters.ts).
   const starters = form.decision ? REPORTABILITY_STARTERS[form.decision] : [];
   const problem = decisionProblem(form, todayIso(), item.aware_date) ?? starterProblem(form.rationale, starters);

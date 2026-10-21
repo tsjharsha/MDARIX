@@ -24,6 +24,8 @@ const SITEMAP = join(FRONTEND, "public", "sitemap.xml");
 export const SITE_URL = "https://mdarix.in";
 /** The home page's file: dist/index.html is the application shell, so "/" has a file of its own (Caddyfile). */
 export const HOME_FILE = "home.html";
+/** The "Page not found" page, sent with a 404 status for an address that is no page (Caddyfile, WEB-17). */
+export const NOT_FOUND_FILE = "404.html";
 const ROOT = '<div id="root"></div>';
 
 /** Where the page at ``path`` is written, relative to dist. */
@@ -146,7 +148,7 @@ async function main() {
   if (!existsSync(shell)) throw new Error("dist/index.html is missing: run vite build first");
   if (!existsSync(RENDERER)) throw new Error("dist-prerender/prerender.js is missing: run vite build --ssr first");
   const template = readFileSync(shell, "utf-8");
-  const { INDEXED_PATHS, pageHead, renderPage } = await import(pathToFileURL(RENDERER).href);
+  const { INDEXED_PATHS, pageHead, renderPage, renderNotFoundPage } = await import(pathToFileURL(RENDERER).href);
   const listed = sitemapPaths(readFileSync(SITEMAP, "utf-8"));
   if (JSON.stringify(listed) !== JSON.stringify(INDEXED_PATHS))
     throw new Error(`public/sitemap.xml and src/site/seo.ts list different pages: ${listed} / ${INDEXED_PATHS}`);
@@ -159,6 +161,10 @@ async function main() {
     if (/\sstyle="/.test(markup)) throw new Error(`${path} still holds an inline style`);
     return { path, markup, words };
   });
+  // The "Page not found" page: never indexed, no canonical address (pageHead(null)).
+  const missing = moveInlineStyles(renderNotFoundPage(), classes);
+  if (!visibleText(missing).includes("Page not found")) throw new Error("the not-found page rendered no heading");
+  if (/\sstyle="/.test(missing)) throw new Error("the not-found page still holds an inline style");
   const css = inlineStylesheet(classes);
   const stylesheet = `/assets/prerender-${createHash("sha256").update(css).digest("hex").slice(0, 10)}.css`;
   writeFileSync(join(DIST, stylesheet.slice(1)), css);
@@ -169,10 +175,12 @@ async function main() {
     writeFileSync(file, pageHtml(template, pageHead(path), markup, stylesheet));
     written.push({ path, file: outputFile(path), bytes: statSync(file).size, words });
   }
+  writeFileSync(join(DIST, NOT_FOUND_FILE), pageHtml(template, pageHead(null), missing, stylesheet));
   rmSync(join(FRONTEND, "dist-prerender"), { recursive: true, force: true });
   const width = Math.max(...written.map((item) => item.path.length));
   console.log(`Pre-rendered ${written.length} website pages (dist/index.html stays the application shell),`);
-  console.log(`their ${classes.size} inline styles in dist${stylesheet} (${(css.length / 1024).toFixed(1)} kB):`);
+  console.log(`their ${classes.size} inline styles in dist${stylesheet} (${(css.length / 1024).toFixed(1)} kB),`);
+  console.log(`and the "Page not found" page as dist/${NOT_FOUND_FILE}:`);
   for (const item of written)
     console.log(
       `  ${item.path.padEnd(width)}  dist/${item.file}  ${(item.bytes / 1024).toFixed(1)} kB  ${item.words} words`,

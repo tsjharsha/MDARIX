@@ -967,12 +967,12 @@ export type AiBanner = {
   disabledReason: string;
   /** The same reason in a few words, shown next to each button that is off. */
   shortReason: string;
-  /** Where the same work can be done by hand. */
-  manual: Array<{ view: IntelligenceView; label: string }>;
+  /** Where the same work can be done by hand; `add` opens the view's form to add one at once (DEV-019). */
+  manual: Array<{ view: IntelligenceView; label: string; add?: boolean }>;
 };
 
 const MANUAL_PATHS: AiBanner["manual"] = [
-  { view: "Hypotheses", label: "Add hypotheses by hand" },
+  { view: "Hypotheses", label: "Add hypotheses by hand", add: true },
   { view: "Unknowns", label: "Record unknowns" },
   { view: "Failure chain", label: "Build a failure chain" },
   { view: "Observations", label: "Record observations" },

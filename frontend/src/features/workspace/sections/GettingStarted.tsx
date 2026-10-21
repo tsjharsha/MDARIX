@@ -13,7 +13,7 @@ import {
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
 import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
-import { ImportPanel, templateSummary, type ImportTemplate } from "./ImportData";
+import { ImportPanel, templateSummary, type ImportResult, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
 import { countOf } from "./common";
 import { QualityLoop } from "./QualityLoop";
@@ -28,6 +28,7 @@ import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../h
 import { SampleDataPanel } from "./SampleData";
 import { InsightsPanel } from "./TrialInsights";
 import type { Insights } from "../trialInsights";
+import { IMPORTED_SOURCE } from "../complaintList";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
 import { DETECTION_STATUS_PATH } from "../signals";
@@ -59,6 +60,16 @@ export type TrialStatus = {
 };
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
+/** How many complaints of its own an import added (not the products, versions and lots it named, nor updates). */
+export const newComplaints = (entity: string, result: ImportResult) =>
+  entity === "complaints"
+    ? (result.created ?? 0) - Object.values(result.also_created ?? {}).reduce((sum, count) => sum + count, 0)
+    : 0;
+
+/** Whether the insights are read from the organization's own imported complaints (not the sample's). */
+export const ownInsights = (insights: Pick<Insights, "source_system"> | null | undefined) =>
+  insights?.source_system === IMPORTED_SOURCE;
+
 /** The tabs below the story: everything that is not the story itself, one click away. */
 export const TRIAL_TABS = ["Your data", "Team", "About the sample data", "Your trial"] as const;
 export type TrialTab = (typeof TRIAL_TABS)[number];
@@ -74,7 +85,14 @@ export const trialTabFor = (name?: string): TrialTab | undefined => TRIAL_TABS.f
 export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const { open, work, session, notify } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
-  const insights = useResource<Insights>("/api/v1/trial/insights");
+  // Complaints imported on this page: until the insights are read from them (a busy server takes a while, and the
+  // first read may time out), the panel says it is reading them and reads again, rather than showing the sample's
+  // figures as if they were current (item 9).
+  const [ownImported, setOwnImported] = useState(false);
+  const insights = useResource<Insights>("/api/v1/trial/insights", {
+    refreshWhile: (data) => ownImported && !ownInsights(data),
+  });
+  const readingImported = ownImported && insights.state !== "error" && !ownInsights(insights.data);
   // Right after an import its signals are still being found: the story is read again until they are.
   const loadedStory = useResource<TrialStory>(TRIAL_STORY_PATH, {
     refreshWhile: (data) => !!data.signals_pending,
@@ -279,14 +297,15 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                 templates={trial?.templates ?? []}
                 basePath="/api/v1/trial/imports"
                 fileLimitBytes={trial?.limits?.file_bytes}
-                onImported={() => {
+                onImported={(result, entity) => {
+                  if (newComplaints(entity, result) > 0) setOwnImported(true);
                   status.reload();
                   insights.reload();
                   story.reload();
                   work.refreshProducts();
                 }}
               />
-              <InsightsPanel insights={insights.data} source={insights} />
+              <InsightsPanel insights={insights.data} source={insights} reading={readingImported} />
             </>
           )}
           {tab === "Team" && <TeamPanel onChanged={status.reload} />}

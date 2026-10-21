@@ -287,6 +287,18 @@ export const otherDecision = (decision: string | null | undefined): "CONFIRMED" 
 export const recordId = (record: Pick<ReviewRecord, "business_id" | "complaint_identifier">) =>
   record.business_id || record.complaint_identifier || "Complaint";
 
+/**
+ * A record as a drawer, a toast or a button names it: its MDARIX ID with its number in the source system beside it,
+ * "CMP000029 (SAMPLE-RV-01)", so the complaint can be found in the export it came from (DEV-008); either alone when
+ * it has only one.
+ */
+export const recordName = (record: Pick<ReviewRecord, "business_id" | "complaint_identifier">) => {
+  const source = record.complaint_identifier?.trim();
+  return record.business_id && source && source !== record.business_id
+    ? `${record.business_id} (${source})`
+    : recordId(record);
+};
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**

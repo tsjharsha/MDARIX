@@ -8,6 +8,11 @@ resend an activation, send a password-reset email, and suspend or reactivate one
 without an active Customer Administrator: suspending the last one is refused (add or replace one first, or
 suspend the tenant instead). Every change is audited in the administrator's tenant with the reason given.
 
+Adding, suspending or restoring a Customer Administrator and resetting an account's MFA are told by email as an
+administrator's own changes are (backend/app/team_notices.py): the person changed and the organization's other active
+Customer Administrators, with "MDARIX support" as the one who made the change. Nothing for a free trial, and nothing
+for an erasure (an erased person has no address); the platform administrator sees the result on screen.
+
 When an invitation email does not arrive, MDARIX support issues a fresh activation link for any account still
 waiting to be activated (``POST /platform-admin/users/{id}/activation-link``) and hands it over.
 """
@@ -23,10 +28,17 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from auth.durable import hash_token, issue_invitation, issue_reset, revoke_user_sessions
-from auth.emailer import EmailDeliveryError, company, send_activation_email, send_password_reset_email
+from auth.emailer import (
+    TEAM_INVITED,
+    TEAM_MFA_RESET,
+    EmailDeliveryError,
+    company,
+    send_activation_email,
+    send_password_reset_email,
+)
 from auth.service import _hash
 from backend.app.access.authz import _require_platform_admin
-from backend.app import support_access
+from backend.app import support_access, team_notices
 from backend.app.access.common import _development_token, _enforce_invite_limits, erasure_refused
 from backend.app.access.schemas import (
     CustomerAdminActionRequest,
@@ -273,6 +285,8 @@ def create_customer_admin(
         {"reason": reason, "email_delivery": delivery},
         now,
     )
+    # The organization's other administrators are told; the invitation above is the new administrator's email.
+    team_notices.queue_support_change(db, user, TEAM_INVITED, now=now, tell_person=False)
     return user, token, delivery
 
 
@@ -513,6 +527,8 @@ def reset_user_mfa(
         {"reason": payload.reason, "sessions_revoked": revoked, **({"trial_user": True} if trial_user else {})},
         now,
     )
+    # Never the reason in an email: it stays in the audit trail.
+    team_notices.queue_support_change(db, user, TEAM_MFA_RESET, now=now)
     db.commit()
     return {"id": str(user.id), "business_id": user.business_id, "status": "MFA_RESET", "sessions_revoked": revoked}
 
@@ -565,6 +581,7 @@ def change_customer_admin_status(
         old={"status": current},
         new={"status": target},
     )
+    team_notices.queue_support_change(db, user, team_notices.status_change(current, target), now=now)
     db.commit()
     tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     customer = db.query(Customer).filter(Customer.id == tenant.customer_id).first() if tenant else None

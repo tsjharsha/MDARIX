@@ -88,14 +88,17 @@ export function renderInline(text: string): ReactNode[] {
 
 export function Markdown({ source }: { source: string }) {
   const blocks = parseMarkdown(source);
-  // The page shows the document's title as its own h1, so a leading "# Title" line is not repeated.
-  if (blocks[0]?.kind === "heading" && blocks[0].level === 1) blocks.shift();
+  // The page shows the document's title as its own h1, so a leading "# Title" line is not repeated, and the document's
+  // sections ("## 1. The Service") follow it as h2: the outline never jumps from h1 to h3 (WEB-18). A document without
+  // a title line starts its headings one level lower, under the page's h1.
+  const titled = blocks[0]?.kind === "heading" && blocks[0].level === 1;
+  if (titled) blocks.shift();
+  const shift = titled ? 2 : 1;
   return (
     <>
       {blocks.map((block, index) => {
         if (block.kind === "heading") {
-          // The page already has its own h1, so document headings start one level lower.
-          const Tag = (["h2", "h3", "h4"] as const)[block.level - 1];
+          const Tag = (["h2", "h3", "h4"] as const)[Math.min(2, Math.max(0, block.level - shift))];
           return <Tag key={index}>{renderInline(block.text)}</Tag>;
         }
         if (block.kind === "list") {

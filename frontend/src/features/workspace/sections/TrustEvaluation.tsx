@@ -34,7 +34,11 @@ function Score({ label, passed, total, detail }: { label: string; passed: number
   );
 }
 
-export function TrustEvaluation() {
+/**
+ * The published evaluation; with `canStart` (Platform Admin > AI > Evaluations) also a run of it. Only a Platform
+ * Administrator may start one (POST /api/v1/evaluations/runs, SEC-08), so the workspace shows the result alone.
+ */
+export function TrustEvaluation({ canStart = false }: { canStart?: boolean } = {}) {
   const resource = useResource<any>("/api/v1/evaluations/golden/latest");
   const evaluation = resource.data?.evaluation;
   return (
@@ -121,7 +125,7 @@ export function TrustEvaluation() {
           </div>
         )}
       </Panel>
-      <RunEvaluation />
+      {canStart && <RunEvaluation />}
     </>
   );
 }

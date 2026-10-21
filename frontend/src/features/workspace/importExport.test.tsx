@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { HowItWasRead, alsoCreatesText, importedText, readyText } from "./sections/ImportData";
+import { ApiError } from "../../app/apiClient";
+import { HowItWasRead, alsoCreatesText, checkFailureText, importedText, readyText } from "./sections/ImportData";
 
 describe("uploading a quality system's export as it comes", () => {
   it("says what a complaints file adds besides its complaints", () => {
@@ -29,6 +30,36 @@ describe("uploading a quality system's export as it comes", () => {
       "Imported products and versions: 2 new, 0 updated; 1 row set aside to fix.",
     );
     expect(importedText("Lots and batches", {})).toBe("Imported lots and batches: 0 new, 0 updated.");
+  });
+
+  it("says plainly that a file without data rows cannot be checked (DEV-018)", () => {
+    const empty = new ApiError("The file has a header but no data rows.", 422, "IMPORT_FILE_EMPTY", "abc123");
+    expect(checkFailureText(empty)).toBe("The file has a header but no data rows.");
+    // Anything else keeps its reference for support.
+    expect(checkFailureText(new ApiError("Server error", 500, "INTERNAL", "abc123"))).toBe(
+      "Server error (reference abc123)",
+    );
+  });
+
+  it("groups every count in the result the en-US way, whatever the browser's language (DEV-025)", () => {
+    expect(importedText("Complaints", { created: 0, updated: 4993 })).toBe(
+      "Imported complaints: 0 new, 4,993 updated.",
+    );
+    expect(
+      importedText("Complaints", {
+        created: 13_251,
+        updated: 1200,
+        also_created: { products: 1000, versions: 1, lots: 1250 },
+        rejected_rows: 2500,
+        masked_values: 1001,
+      }),
+    ).toBe(
+      "Imported complaints: 11,000 new, 1,200 updated, and 1,000 products, 1 version and 1,250 lots they name; 2,500 rows set aside to fix; personal data replaced in 1,001 values.",
+    );
+    expect(alsoCreatesText({ lots: 4993 })).toBe("4,993 lots");
+    expect(readyText({ rows: 4993, new_records: 4993, new_rows: 4993, row_limit: 5000 })).toBe(
+      "4,993 rows ready to import (4,993 new rows of your 5,000).",
+    );
   });
 
   it("says a free trial's rows as its allowance counts them: one row in the file is one row", () => {
