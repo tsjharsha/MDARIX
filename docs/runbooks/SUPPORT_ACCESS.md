@@ -30,7 +30,9 @@ Every grant is **read-only unless it asks for changes**, names one platform coll
    colleague, or any Customer Administrator account in a trial, is refused (`TRIAL_OWNER_REQUIRED`). The decision
    makers (the Customer Administrators, or the trial owner) are emailed when MDARIX asks, when they approve, and when an
    approved access ends (revoked by either side, or expired). In a free trial every other active member is also told
-   when it is approved and when it ends, for information only (no button: only the owner decides).
+   when it is approved and when it ends, for information only (no button: only the owner decides). Each recipient's
+   email is its own outbox event (since 0.10.40), so the worker retries a failed address alone and nobody else gets
+   their email twice.
 4. **Use**: the colleague's use of the grant is written to the organization's own audit trail
    (`SUPPORT_ACCESS_USED`, with the area, whether it changed something, and the address opened). Every change is
    written; repeated reads of the same address within 10 minutes are written once, so paging through a list (or the

@@ -1,20 +1,23 @@
 """A trial owner's change to their team is emailed (backend/app/trial/team.py, auth/emailer.py): removing a colleague,
 withdrawing an invitation and resetting a colleague's MFA each tell the person changed, confirm it to the owner and
-alert the MDARIX team, once each, after the change is saved.
+alert the MDARIX team, once each, through the outbox (backend/app/team_notices.py: one event per email, queued with
+the change).
 
 The emails are checked as they are rendered (text and HTML from the same message, escaped, with the usual footer), and
-through the real API: who gets what, the owner's reason for an MFA reset never reaching the colleague, no team alert
-without an alert address, an email failure leaving the change in place, the MFA-reset limit, and the change listed in
-Platform Admin's Trials overview.
+through the real API and the outbox worker: who gets what, the owner's reason for an MFA reset never reaching the
+colleague, no team alert without an alert address, an email failure leaving the change in place and retried alone,
+the MFA-reset limit, and the change listed in Platform Admin's Trials overview.
 """
 
-import logging
 import secrets
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from auth import emailer
+from backend.app import notifications
 from backend.app.db.models.foundation import AuthUser, Tenant
+from backend.app.db.models.stage2 import OutboxEvent
 from backend.app.db.session import SessionLocal
 from backend.app.db.tenant_scope import bind_system
 from tests.conftest import authenticated_client
@@ -46,6 +49,38 @@ def outbox(monkeypatch):
         ),
     )
     return sent
+
+
+AUDIENCES = ("PERSON", "OWNER", "ADMIN", "MDARIX_TEAM")
+
+
+def team_notices(tenant_id) -> list[OutboxEvent]:
+    """The organization's queued team change emails not yet delivered, the person changed first."""
+    with SessionLocal() as db:
+        bind_system(db, "test: the queued team change emails")
+        rows = (
+            db.query(OutboxEvent)
+            .filter(
+                OutboxEvent.tenant_id == uuid.UUID(str(tenant_id)),
+                OutboxEvent.event_name == notifications.TEAM_CHANGE_NOTICE,
+                OutboxEvent.published_at.is_(None),
+                OutboxEvent.dead_lettered_at.is_(None),
+            )
+            .order_by(OutboxEvent.occurred_at)
+            .all()
+        )
+        db.expunge_all()
+    return sorted(rows, key=lambda row: AUDIENCES.index(row.payload["audience"]))
+
+
+def deliver_team_notices(tenant_id) -> None:
+    """What the outbox worker does with them: each delivered once, then marked delivered."""
+    for event in team_notices(tenant_id):
+        with SessionLocal() as db:
+            bind_system(db, "test: deliver a team change email")
+            assert notifications.handle_event(db, event.event_name, event.payload) is True
+            db.get(OutboxEvent, event.id).published_at = datetime.now(timezone.utc)
+            db.commit()
 
 
 def _footer(message: dict) -> None:
@@ -218,6 +253,12 @@ def test_removing_a_colleague_emails_them_the_owner_and_the_mdarix_team_once_eac
     removed = owner.post(f"{TEAM}/{member['id']}/remove")
     assert removed.status_code == 200, removed.text
     assert "notify" not in removed.json()  # what the emails need stays on the server
+    # Queued with the change, one event per email, with ids only (never an address).
+    queued = team_notices(approval["tenant_id"])
+    assert [event.payload["audience"] for event in queued] == ["PERSON", "OWNER", "MDARIX_TEAM"]
+    assert not any("@" in str(value) for event in queued for value in event.payload.values())
+    assert sent == []
+    deliver_team_notices(approval["tenant_id"])
 
     assert [message["to"] for message in sent] == [member["email"], owner_email, ALERT]
     to_colleague, to_owner, to_team = sent
@@ -231,6 +272,7 @@ def test_removing_a_colleague_emails_them_the_owner_and_the_mdarix_team_once_eac
     )
     # Removing again is refused, so it sends nothing more.
     assert owner.post(f"{TEAM}/{member['id']}/remove").status_code == 409
+    deliver_team_notices(approval["tenant_id"])
     assert len(sent) == 3
 
     # Platform Admin sees the change on the trial's row of the Trials overview.
@@ -249,6 +291,7 @@ def test_withdrawing_an_invitation_tells_the_invitee_and_the_owner(company, outb
 
     withdrawn = owner.post(f"{TEAM}/{invited.json()['id']}/remove")
     assert withdrawn.status_code == 200 and withdrawn.json()["invitation_withdrawn"] is True
+    deliver_team_notices(approval["tenant_id"])
     assert [message["to"] for message in outbox] == [email, owner_email, ALERT]
     assert (
         outbox[0]["subject"] == "Taylor Quality withdrew your invitation to the MDARIX free trial of Trial Devices Inc"
@@ -270,6 +313,7 @@ def test_an_mfa_reset_tells_the_colleague_without_the_owner_s_reason(company, ou
     reset = owner.post(f"{TEAM}/{member['id']}/mfa-reset", json={"reason": REASON})
     assert reset.status_code == 200, reset.text
     assert "notify" not in reset.json()
+    deliver_team_notices(approval["tenant_id"])
     assert [message["to"] for message in outbox] == [member["email"], owner_email, ALERT]
     to_colleague = outbox[0]
     assert to_colleague["subject"] == "The authenticator app of your MDARIX account was removed"
@@ -288,37 +332,76 @@ def test_an_mfa_reset_tells_the_colleague_without_the_owner_s_reason(company, ou
 def test_without_an_alert_address_the_mdarix_team_is_not_emailed(company, outbox, monkeypatch):
     monkeypatch.delenv("MDARIX_DEMO_ALERT_EMAIL", raising=False)
     monkeypatch.delenv("MDARIX_TRIAL_ALERT_EMAIL", raising=False)
-    owner, _approval, owner_email, _colleague, member = _trial_with_colleague()
+    owner, approval, owner_email, _colleague, member = _trial_with_colleague()
     outbox.clear()
     assert owner.post(f"{TEAM}/{member['id']}/remove").status_code == 200
+    deliver_team_notices(approval["tenant_id"])
     assert [message["to"] for message in outbox] == [member["email"], owner_email]
 
 
 def test_the_trial_alert_address_is_used_when_there_is_no_demo_alert_address(company, outbox, monkeypatch):
     monkeypatch.delenv("MDARIX_DEMO_ALERT_EMAIL", raising=False)
     monkeypatch.setenv("MDARIX_TRIAL_ALERT_EMAIL", "ops@mdarix.invalid")
-    owner, _approval, _owner_email, _colleague, member = _trial_with_colleague()
+    owner, approval, _owner_email, _colleague, member = _trial_with_colleague()
     outbox.clear()
     assert owner.post(f"{TEAM}/{member['id']}/remove").status_code == 200
+    deliver_team_notices(approval["tenant_id"])
     assert outbox[-1]["to"] == "ops@mdarix.invalid" and outbox[-1]["subject"].startswith("Trial team change: ")
 
 
-def test_an_email_failure_never_undoes_the_change(company, monkeypatch, caplog):
+def test_an_email_failure_never_undoes_the_change_and_only_that_email_is_retried(company, monkeypatch):
+    from outbox.worker import OutboxWorker
+
     monkeypatch.setenv("MDARIX_DEMO_ALERT_EMAIL", ALERT)
-    owner, _approval, _owner_email, colleague, member = _trial_with_colleague()
+    owner, approval, owner_email, colleague, member = _trial_with_colleague()
+    sent, refused = [], {owner_email}
 
-    def refuse(*_args, **_kwargs):
-        raise emailer.EmailDeliveryError("The email provider refused the message")
+    def smtp(to, subject, text, html=None, reply_to=None):
+        if to in refused:
+            raise emailer.EmailDeliveryError("The email provider refused the message")
+        sent.append(to)
+        return "SENT"
 
-    monkeypatch.setattr(emailer, "_send_email", refuse)
-    with caplog.at_level(logging.WARNING, logger="backend.app.trial.team"):
-        removed = owner.post(f"{TEAM}/{member['id']}/remove")
+    monkeypatch.setattr(emailer, "_send_email", smtp)
+    removed = owner.post(f"{TEAM}/{member['id']}/remove")
     assert removed.status_code == 200, removed.text
     assert _status(member["id"]) == "OFFBOARDED"
     assert colleague.get("/api/v1/trial/status").status_code == 401
-    failures = [record.getMessage() for record in caplog.records if "Trial team change email" in record.getMessage()]
-    assert len(failures) == 3 and all("EmailDeliveryError" in line for line in failures)
-    assert not any(member["email"] in line for line in failures)  # never the address
+
+    def publish(name, payload):
+        with SessionLocal() as db:
+            bind_system(db, "test: the outbox worker delivers")
+            assert notifications.handle_event(db, name, payload)
+
+    # The worker's own per-event transaction (outbox/worker.py), on this trial's events only.
+    worker = OutboxWorker(publish, base_delay_seconds=1, max_delay_seconds=1)
+    ids = [event.id for event in team_notices(approval["tenant_id"])]
+    stats = {"published": 0, "failed": 0, "dead_lettered": 0}
+
+    def cycle():
+        with SessionLocal() as db:
+            bind_system(db, "test: one worker cycle")
+            for event_id in ids:
+                worker._deliver_one(db, event_id, stats)
+            # Due again at once for the retry below.
+            db.query(OutboxEvent).filter(OutboxEvent.id.in_(ids)).update(
+                {"next_attempt_at": None}, synchronize_session=False
+            )
+            db.commit()
+
+    cycle()
+    # The owner's address failed: the colleague and the MDARIX team have their email, once.
+    assert sent == [member["email"], ALERT] and stats["published"] == 2 and stats["failed"] == 1
+    (waiting,) = team_notices(approval["tenant_id"])
+    assert waiting.payload["audience"] == "OWNER" and waiting.attempts == 1
+    assert "could not be delivered" in waiting.last_error and owner_email not in waiting.last_error
+    # The retry sends the owner's email alone; another cycle sends nothing.
+    refused.clear()
+    cycle()
+    assert sent == [member["email"], ALERT, owner_email]
+    assert team_notices(approval["tenant_id"]) == []
+    cycle()
+    assert len(sent) == 3
 
 
 def test_mfa_resets_are_limited_so_they_cannot_send_mail_without_end(company, outbox, monkeypatch):
@@ -327,13 +410,14 @@ def test_mfa_resets_are_limited_so_they_cannot_send_mail_without_end(company, ou
     monkeypatch.setenv("MDARIX_RATE_LIMITS_ENABLED", "true")
     monkeypatch.setenv("MDARIX_RATE_LIMIT_SALT", secrets.token_hex(16))
     monkeypatch.setitem(rate_limit.LIMITS, "team-mfa-reset:org", rate_limit.Limit(1, 86400))
-    owner, _approval, _owner_email, _colleague, member = _trial_with_colleague()
+    owner, approval, _owner_email, _colleague, member = _trial_with_colleague()
     outbox.clear()
     assert owner.post(f"{TEAM}/{member['id']}/mfa-reset", json={"reason": REASON}).status_code == 200
+    deliver_team_notices(approval["tenant_id"])
     before = len(outbox)
     again = owner.post(f"{TEAM}/{member['id']}/mfa-reset", json={"reason": REASON})
     assert again.status_code == 429 and "reset as many authenticators" in again.json()["detail"]["message"]
-    assert len(outbox) == before
+    assert team_notices(approval["tenant_id"]) == [] and len(outbox) == before
 
 
 def test_a_trial_without_team_changes_lists_none():

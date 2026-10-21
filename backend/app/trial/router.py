@@ -21,8 +21,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.access.authz import _require_platform_admin
-from backend.app.db.data_plane import get_data_plane_db, open_tenant_data_session
-from retrieval.record_evidence import embed_tenant_evidence
+from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import (
     AuditEvent,
     AuthUser,
@@ -243,11 +242,6 @@ def _trial_import_and_audit(
         raise HTTPException(
             500, detail={"code": "TRIAL_IMPORT_FAILED", "message": "The import failed; nothing was saved"}
         ) from exc
-    from backend.app.signals import hooks as signal_hooks
-
-    if signal_hooks.imported_complaints(result):
-        # Signals from the new complaints (backend/app/signals/detection.py); never fails or undoes the import.
-        signal_hooks.after_complaints_saved(data, tenant_id, source="trial import")
     return result
 
 
@@ -289,11 +283,7 @@ async def run_trial_import(
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request)
     result = await run_in_threadpool(_trial_import_and_audit, db, data, ctx, tenant_id, entity, raw, order, options)
-    if result.get("rows"):
-        # Semantic search over the imported records, after the response (their text is already searchable).
-        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
-    insights = await run_in_threadpool(imports.insights, data, tenant_id)
-    return {**result, "insights": insights}
+    return imports.after_import(background, tenant_id, result, source="trial import")
 
 
 @router.get("/trial/insights")
@@ -312,8 +302,11 @@ def trial_story_chapters(
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
-    """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it."""
+    """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it. Right
+    after an import, while its signals are still being found, ``signals_pending`` is true and the trend chapter says
+    so (Getting started reads the story again until it is false)."""
     from backend.app.ai_settings import ai_ready
+    from backend.app.signals.hooks import detection_pending
     from backend.app.trial import citations, story
 
     _require_trial(db, ctx)
@@ -322,7 +315,12 @@ def trial_story_chapters(
     profile = request.profile if request else None
     cited = citations.chapters_for((profile or {}).get("citations"))
     return story.story(
-        data, tenant_id, ai_ready=ai_ready(db, tenant_id), cited=tuple(cited), tried_before=story.remembered(profile)
+        data,
+        tenant_id,
+        ai_ready=ai_ready(db, tenant_id),
+        cited=tuple(cited),
+        tried_before=story.remembered(profile),
+        signals_pending=detection_pending(db, data, tenant_id),
     )
 
 
@@ -966,17 +964,14 @@ def resend_trial_colleague_invitation(
 def remove_trial_colleague(
     user_id: uuid.UUID,
     request: Request,
-    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
 ):
     """The trial owner takes a colleague off the trial (or withdraws an invitation): the seat is free again, the
     account can no longer sign in, and what they did stays (backend/app/trial/team.py). The colleague, the owner and
-    the MDARIX team are emailed after the response."""
+    the MDARIX team are emailed through the outbox (backend/app/team_notices.py)."""
     _require_trial(db, ctx)
-    outcome = team.remove_colleague(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id, request)
-    background.add_task(team.send_team_change_emails, outcome.pop("notify"))
-    return outcome
+    return team.remove_colleague(db, uuid.UUID(str(ctx.tenant_id)), _current_user(db, ctx), user_id, request)
 
 
 class ColleagueMfaReset(BaseModel):
@@ -989,17 +984,14 @@ def reset_trial_colleague_mfa(
     user_id: uuid.UUID,
     payload: ColleagueMfaReset,
     request: Request,
-    background: BackgroundTasks,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
 ):
     """The trial owner resets the MFA of a colleague who lost their authenticator and recovery codes. The colleague,
-    the owner and the MDARIX team are emailed after the response (without the reason, which stays in the audit)."""
+    the owner and the MDARIX team are emailed through the outbox (without the reason, which stays in the audit)."""
     _require_trial(db, ctx)
     tenant_id = uuid.UUID(str(ctx.tenant_id))
-    outcome = team.reset_colleague_mfa(db, tenant_id, _current_user(db, ctx), user_id, payload.reason, request)
-    background.add_task(team.send_team_change_emails, outcome.pop("notify"))
-    return outcome
+    return team.reset_colleague_mfa(db, tenant_id, _current_user(db, ctx), user_id, payload.reason, request)
 
 
 # ------------------------------------------------------------------------------------------- Support access

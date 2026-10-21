@@ -33,7 +33,7 @@ from backend.app.db.models.signals import (
 from backend.app.db.session import get_db
 from backend.app.enterprise_audit import make_audit_event
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.signals import logic, service
+from backend.app.signals import hooks, logic, service
 from backend.app.signals.labels import (
     AWAITING_TRIAGE,
     CASE_FROM,
@@ -247,7 +247,7 @@ def list_signals(
     ``overdue=true`` keeps signals awaiting triage (NEW, TRIAGE) past their due date, ``review_due=true`` monitored
     signals whose review date has come. ``sort`` alone keeps its natural direction (``-`` reverses it); with
     ``order`` (asc or desc) it is a column heading's sort, and the inbox's columns (title, product, owner…) can be
-    named as well."""
+    named as well. ``detection_pending``: an import's signals are still being found."""
     actor = _actor(control_db, ctx)
     statuses = _codes(status, (*SIGNAL_STATUSES, "OPEN"), "status")
     filters = {
@@ -283,7 +283,21 @@ def list_signals(
         "page": page,
         "page_size": page_size,
         "counts_by_status": counts,
+        # Signals from an import that answered moments ago are still being found (the inbox says so and reads again).
+        "detection_pending": hooks.detection_pending(control_db, db, actor.tenant_id),
     }
+
+
+@router.get("/detection")
+def detection_status(
+    db: Session = Depends(get_data_plane_db),
+    control_db: Session = Depends(get_db),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+):
+    """Whether signals from an import that answered moments ago are still being found: two small reads, for a screen
+    that shows "Finding signals" to ask every few seconds before it reads its own (larger) data again."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    return {"pending": hooks.detection_pending(control_db, db, tenant_id)}
 
 
 @router.get("/summary")

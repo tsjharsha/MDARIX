@@ -213,13 +213,25 @@ def _privacy_line() -> str:
     return f"How MDARIX uses your personal data is explained in our privacy policy: {company().app_url}/privacy"
 
 
-def send_activation_email(recipient: str, token: str, organization: str, valid_for: str = INVITATION_VALID_FOR) -> str:
+def send_activation_email(
+    recipient: str,
+    token: str,
+    organization: str,
+    valid_for: str = INVITATION_VALID_FOR,
+    *,
+    invited_by: str | None = None,
+) -> str:
+    """The invitation to an organization's MDARIX; ``invited_by`` names the administrator who sent it."""
     url = f"{company().app_url}/activate-account?token={token}"
     return _send(
         recipient,
         Message(
             subject="Activate your MDARIX account",
-            heading=f"You are invited to MDARIX for {organization}",
+            heading=(
+                f"{invited_by} invited you to MDARIX for {organization}"
+                if invited_by
+                else f"You are invited to MDARIX for {organization}"
+            ),
             paragraphs=(
                 "MDARIX connects complaints, product versions, suppliers, lots and evidence so your team can "
                 "investigate product signals in one place.",
@@ -231,7 +243,12 @@ def send_activation_email(recipient: str, token: str, organization: str, valid_f
                 "a new invitation.",
                 _privacy_line(),
             ),
-            reason=f"You are receiving this email because an administrator of {organization} invited you to MDARIX.",
+            reason=(
+                f"You are receiving this email because {invited_by}, an administrator of {organization}, invited you "
+                "to MDARIX."
+                if invited_by
+                else f"You are receiving this email because an administrator of {organization} invited you to MDARIX."
+            ),
         ),
     )
 
@@ -606,6 +623,163 @@ def send_trial_team_change_confirmation(
                 + (f" and contact {support}." if support else " and reply to this email."),
             ),
             reason=f"You are receiving this email because you run the MDARIX free trial of {organization}.",
+        ),
+    )
+
+
+# ------------------------------------------------------------------------------------------- an organization's team
+# What a Customer Administrator's change to a paying organization's team means for the person changed, and for the
+# organization's other Customer Administrators when it concerns an administrator account (backend/app/team_notices.py).
+# The words follow the trial's team emails, for an organization that is not a trial.
+
+TEAM_INVITED = "INVITED"
+TEAM_SUSPENDED = "SUSPENDED"
+TEAM_RESTORED = "RESTORED"
+TEAM_ROLE_CHANGED = "ROLE_CHANGED"
+
+
+def send_team_change_notice(
+    recipient: str,
+    *,
+    change: str,
+    actor: str,
+    organization: str,
+    when: str,
+    role_before: str | None = None,
+    role_now: str | None = None,
+    roles_added: tuple[str, ...] = (),
+    roles_removed: tuple[str, ...] = (),
+) -> str:
+    """Tell a person what an administrator of their organization changed about their account, and who did."""
+    support = company().support_email
+    # Said after the details, where the person has read what changed.
+    contact: tuple[str, ...] = (f"If this is unexpected, please contact {actor}.",)
+    button = None
+    details: list[tuple[str, str]] = []
+    items: tuple[str, ...] = ()
+    reason = f"You are receiving this email because you have an MDARIX account for {organization}."
+    if change == TEAM_REMOVED:
+        subject = f"{actor} removed you from MDARIX for {organization}"
+        paragraphs = (
+            f"You can no longer sign in to MDARIX for {organization}, and you were signed out.",
+            f"What you did in MDARIX stays there under your name: it is part of the records of {organization}.",
+        )
+        reason = f"You are receiving this email because you had an MDARIX account for {organization}."
+    elif change == TEAM_INVITATION_WITHDRAWN:
+        subject = f"{actor} withdrew your invitation to MDARIX for {organization}"
+        paragraphs = (
+            "The activation link in the earlier invitation email no longer works. You do not need to do anything.",
+        )
+        reason = f"You are receiving this email because {actor} invited you to MDARIX for {organization}."
+        contact = ()
+    elif change == TEAM_SUSPENDED:
+        subject = f"{actor} suspended your MDARIX account for {organization}"
+        paragraphs = (
+            f"You cannot sign in until an administrator of {organization} restores your account, and you were "
+            "signed out.",
+            "Nothing you did in MDARIX is changed.",
+        )
+    elif change == TEAM_RESTORED:
+        subject = f"Your MDARIX account for {organization} is active again"
+        paragraphs = (
+            f"{actor} restored your account. You can sign in to MDARIX for {organization} again with your email and "
+            "your password.",
+        )
+        button = ("Sign in", f"{company().app_url}/signin")
+        contact = ()
+    elif change == TEAM_ROLE_CHANGED:
+        subject = f"{actor} changed your role in MDARIX for {organization}"
+        paragraphs = (
+            f"{actor}, an administrator of {organization}, changed what you can do in MDARIX. It applies from your "
+            "next action in MDARIX.",
+        )
+        if role_before and role_now:
+            details += [("Role before", role_before), ("Role now", role_now)]
+        items = tuple(f"Added: {role}" for role in roles_added) + tuple(f"Removed: {role}" for role in roles_removed)
+    else:  # TEAM_MFA_RESET
+        return _send(
+            recipient,
+            Message(
+                subject="The authenticator app of your MDARIX account was removed",
+                heading=f"{actor} removed the authenticator app of your MDARIX account",
+                paragraphs=(
+                    f"{actor}, an administrator of {organization}, removed the authenticator app of your account, "
+                    "and you were signed out.",
+                    "At your next sign-in, sign in with your password as usual: MDARIX then asks you to set up a new "
+                    "authenticator app on your phone and gives you new recovery codes.",
+                ),
+                details=(("When", when),),
+                closing=(f"If you did not ask for this, contact {actor}" + (f" or {support}." if support else "."),),
+                reason="You are receiving this email because the sign-in settings of your MDARIX account changed.",
+            ),
+        )
+    return _send(
+        recipient,
+        Message(
+            subject=subject,
+            heading=subject,
+            paragraphs=paragraphs,
+            details=(*details, ("When", when)),
+            items=items,
+            button=button,
+            closing=(*contact, _questions()),
+            reason=reason,
+        ),
+    )
+
+
+def send_team_admin_change_notice(
+    recipient: str,
+    *,
+    change: str,
+    actor: str,
+    actor_email: str,
+    person: str,
+    person_email: str,
+    organization: str,
+    when: str,
+    role_before: str | None = None,
+    role_now: str | None = None,
+) -> str:
+    """Tell a Customer Administrator that another administrator changed an administrator account of the organization
+    (or made someone one, or took the role away). A security notice: a change nobody expected is noticed."""
+    title = "a Customer Administrator"
+    if change == TEAM_INVITED:
+        subject = f"{actor} invited {person} as a Customer Administrator of {organization}"
+    elif change == TEAM_REMOVED:
+        subject = f"{actor} removed {person}, {title} of {organization}"
+    elif change == TEAM_INVITATION_WITHDRAWN:
+        subject = f"{actor} withdrew the invitation to {person} as a Customer Administrator of {organization}"
+    elif change == TEAM_SUSPENDED:
+        subject = f"{actor} suspended {person}, {title} of {organization}"
+    elif change == TEAM_RESTORED:
+        subject = f"{actor} restored the account of {person}, {title} of {organization}"
+    elif change == TEAM_ROLE_CHANGED and role_now == "Customer Administrator":
+        subject = f"{actor} made {person} a Customer Administrator of {organization}"
+    elif change == TEAM_ROLE_CHANGED:
+        subject = f"{actor} took the Customer Administrator role from {person}"
+    else:  # TEAM_MFA_RESET
+        subject = f"{actor} reset the authenticator of {person}, {title} of {organization}"
+    details = [("Changed by", _named(actor, actor_email)), ("Person", _named(person, person_email))]
+    if change == TEAM_ROLE_CHANGED and role_before and role_now:
+        details += [("Role before", role_before), ("Role now", role_now)]
+    support = company().support_email
+    return _send(
+        recipient,
+        Message(
+            subject=subject,
+            heading=subject,
+            paragraphs=(
+                f"Every Customer Administrator of {organization} is told when an administrator account changes, so "
+                "that a change nobody expected is noticed. You do not need to do anything if you expected it.",
+            ),
+            details=(*details, ("When", when)),
+            button=("Review the users", f"{company().app_url}/app/customer-admin"),
+            closing=(
+                f"If you did not expect this, check with {actor}"
+                + (f" and contact {support}." if support else " and reply to this email."),
+            ),
+            reason=f"You are receiving this email as an administrator of {organization} in MDARIX.",
         ),
     )
 

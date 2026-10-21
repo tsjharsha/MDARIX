@@ -22,6 +22,8 @@ export type StoryChapter = {
 
 export type TrialStory = {
   as_of: string;
+  /** An import's signals are still being found: the trend chapter says so, and the story is read again. */
+  signals_pending?: boolean;
   acted: number;
   total: number;
   next: string | null;
@@ -102,6 +104,6 @@ export function storyHeadline(story: TrialStory | null | undefined, failed = fal
     };
   return {
     title: `Chapter ${next.number} of ${story.total}: ${next.title}`,
-    detail: next.finding.text ? `${next.finding.text.replace(/[.\s]+$/, "")}. ${next.promise}` : next.promise,
+    detail: next.finding.text ? `${next.finding.text.replace(/[.…\s]+$/, "")}. ${next.promise}` : next.promise,
   };
 }
