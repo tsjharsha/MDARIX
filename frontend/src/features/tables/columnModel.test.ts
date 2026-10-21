@@ -77,6 +77,21 @@ describe("fields a list can offer", () => {
     expect(fieldLabel("created_at")).toBe("Created");
     expect(fieldLabel("tenant_id")).toBe("Tenant ID");
     expect(fieldLabel("source_ip")).toBe("Source IP");
+    // Acronyms read as acronyms, wherever they are in the name (Platform users, Customer administrators, users).
+    expect(fieldLabel("mfa_enrolled")).toBe("MFA enrolled");
+    expect(fieldLabel("mfa_required")).toBe("MFA required");
+    expect(fieldLabel("ai_processing_allowed")).toBe("AI processing allowed");
+    expect(fieldLabel("capa_identifier")).toBe("CAPA identifier");
+    expect(fieldLabel("open_capas")).toBe("Open CAPAs");
+    expect(fieldLabel("udi")).toBe("UDI");
+    expect(fieldLabel("sso_enabled")).toBe("SSO enabled");
+    expect(fieldLabel("callback_url")).toBe("Callback URL");
+    expect(fieldLabel("role_label")).toBe("Role label");
+    expect(fieldLabel("email_verified")).toBe("Email verified");
+    expect(fieldLabel("last_login_at")).toBe("Last login");
+    // Only whole words: "aid" and "paid" stay words.
+    expect(fieldLabel("first_aid")).toBe("First aid");
+    expect(fieldLabel("paid_until")).toBe("Paid until");
   });
 
   it("shows values as a reader expects", () => {

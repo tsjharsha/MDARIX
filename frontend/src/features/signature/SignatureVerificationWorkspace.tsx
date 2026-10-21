@@ -24,19 +24,21 @@ type Decision = {
 type Person = { id: string; display_name: string };
 
 /**
- * Who signed, in words: "you", a colleague's name (from the organization's list of people who work on cases), or —
- * when the signer is not on that list (for example an approver who does not work cases) — their role.
+ * Who signed, in words: the signer's name and role, "Meera Iyer (Leader)", also when it is the signed-in person
+ * (DEV-024). The name comes from the verification report (``signer_name``), else from the organization's list of
+ * people who work on cases; without one, "You (Leader)" for the signed-in person, else the role.
  */
 export function signerLabel(
   signerId: string,
   role: string | undefined,
   people: Person[],
   currentUserId: string | undefined,
+  signerName?: string | null,
 ): string {
   const roleText = role ? titleCase(role) : "";
+  const name = safeText(signerName) ?? people.find((item) => item.id === signerId)?.display_name;
+  if (name) return roleText ? `${name} (${roleText})` : name;
   if (currentUserId && signerId === currentUserId) return roleText ? `You (${roleText})` : "You";
-  const person = people.find((item) => item.id === signerId);
-  if (person) return roleText ? `${person.display_name} (${roleText})` : person.display_name;
   return roleText ? `A colleague with the ${roleText} role` : "A colleague in your organization";
 }
 
@@ -247,7 +249,9 @@ export function SignatureVerificationWorkspace() {
                 {safeText(item.business_id ?? item.signature_business_id) && (
                   <span>Signature ID: {safeText(item.business_id ?? item.signature_business_id)}</span>
                 )}
-                <span>Signed by: {signerLabel(String(item.signer_user_id), item.signer_role, people, me)}</span>
+                <span>
+                  Signed by: {signerLabel(String(item.signer_user_id), item.signer_role, people, me, item.signer_name)}
+                </span>
                 <span>
                   Decision version of {formatDateTime(item.object_version, String(item.object_version ?? "—"))}
                 </span>

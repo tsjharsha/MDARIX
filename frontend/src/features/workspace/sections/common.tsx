@@ -8,9 +8,12 @@ import type { Product360 } from "../../../app/types";
 import { sectionAllowed, useWorkspace } from "../workspaceContext";
 import { Upload } from "lucide-react";
 
+/** A count with en-US grouping, whatever the browser's language: "4,993" (DEV-025). */
+export const formatCount = (count: number) => count.toLocaleString("en-US");
+
 /** "1 complaint", "3 complaints": a count with its noun in the right number. */
 export const countOf = (count: number, noun: string, plural = `${noun}s`) =>
-  `${count.toLocaleString()} ${count === 1 ? noun : plural}`;
+  `${formatCount(count)} ${count === 1 ? noun : plural}`;
 
 /** Render children only once the shared Product 360 context is available; otherwise say why not. */
 export function NeedsProduct({ children }: { children: (view: Product360) => ReactNode }) {

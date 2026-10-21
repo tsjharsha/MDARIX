@@ -97,7 +97,7 @@ export type SitePage = (typeof SITE_PAGES)[number];
 
 const QUESTION_FLOW = [
   "Complaint signal",
-  "ProductVersion",
+  "Product version",
   "Change",
   "Component",
   "Supplier",
@@ -214,7 +214,7 @@ const ROADMAP_ICONS: Record<CapabilityIcon, LucideIcon> = {
   connector: PlugZap,
   database: Database,
 };
-// One tone per stage, in the order of capabilityStatus: live today, next with design partners, planned.
+// One tone per stage, in the order of capabilityStatus: available today, in a pilot, planned.
 const ROADMAP_TONES = ["live", "next", "planned"] as const;
 // Each stage lists only what it adds, so the track says that and the running total ("+3 more · 12 in total"): a
 // later stage never reads as all there is.
@@ -225,8 +225,8 @@ const ROADMAP_COUNTS = capabilityStatus.map((status, index) => {
   return `+${added} more · ${total} in total`;
 });
 
-// What you get, as a roadmap (the /roadmap page): a track from "Live now" to "Planned" that draws itself when it
-// scrolls into view, the free trial's capabilities in full, then what design partners get next and what is planned.
+// What you get, as a roadmap (the /roadmap page): a track from "Available today" to "Planned" that draws itself when it
+// scrolls into view, the free trial's capabilities in full, then what comes in a pilot and what is planned.
 // The motion runs once (the live stop keeps a soft pulse) and none of it runs for people who ask for reduced motion.
 function ScopeClarity() {
   const [today, ...later] = capabilityStatus;
@@ -274,7 +274,7 @@ function ScopeClarity() {
             <span className="ms-roadmap-rail-next" />
             <span className="ms-roadmap-spark" />
           </span>
-          <ol className="ms-roadmap-track" aria-label="From what is live now to what is planned">
+          <ol className="ms-roadmap-track" aria-label="From what is available today to what is planned">
             {capabilityStatus.map((status, index) => (
               <li
                 key={status.label}
@@ -294,7 +294,7 @@ function ScopeClarity() {
       </Reveal>
       <Reveal className="ms-card ms-card-flat ms-scope-trial">
         <strong>In your free trial</strong>
-        <p>Everything marked Live now, on sample data first and then on your own exports.</p>
+        <p>Everything marked Available today, on sample data first and then on your own exports.</p>
         <ul className="ms-check-list">
           {trialIncludes.map((item) => (
             <li key={item}>
@@ -501,7 +501,7 @@ export function HomePage() {
 
 const AVAILABILITY_TONE: Record<Availability, { tone: "live" | "next" | "planned"; icon: LucideIcon }> = {
   "Available today": { tone: "live", icon: BadgeCheck },
-  "With design partners": { tone: "next", icon: UsersRound },
+  "In a pilot": { tone: "next", icon: UsersRound },
   Planned: { tone: "planned", icon: CircleDashed },
 };
 
@@ -623,7 +623,7 @@ export function PlatformPage() {
           eyebrow="Four pages"
           id="platform-pages"
           title="Every capability, and where it stands today."
-          copy="Each page holds its capabilities as sections, and each capability carries its label: Available today, With design partners or Planned."
+          copy="Each page holds its capabilities as sections, and each capability carries its label: Available today, In a pilot or Planned."
         />
         <div className="ms-platform-pages">
           {platformGroups.map((group, index) => (
@@ -725,7 +725,7 @@ export function RoadmapPage() {
       <PageHero
         eyebrow="Roadmap"
         title="Know what is available today, and what comes next."
-        copy="Everything marked Live now works in every workspace, the free trial included. What we build with design partners and what is still planned is labelled as such, so you always know which is which."
+        copy="Everything marked Available today works in every workspace, the free trial included. What comes in a pilot and what is still planned is labelled as such, so you always know which is which."
         center
       />
       <ScopeClarity />
@@ -950,8 +950,8 @@ export function LifecyclePage() {
             <h3>Broader lifecycle intelligence</h3>
             <p>
               Strategy, requirements, design controls, regulatory, clinical, manufacturing operations, field actions and
-              recalls, continuous monitoring, and retirement remain roadmap areas. AI assistance is switched on with
-              design partners once it is validated.
+              recalls, continuous monitoring, and retirement remain roadmap areas. AI assistance is switched on in a
+              pilot once it is validated.
             </p>
           </Reveal>
         </div>
@@ -1159,9 +1159,7 @@ export function TrustPage() {
           <ul className="ms-check-list">
             <li>
               <Check size={16} aria-hidden="true" />
-              <span>
-                Start with file exports from your existing systems; live connections are built with design partners.
-              </span>
+              <span>Start with file exports from your existing systems; live connections are built in a pilot.</span>
             </li>
             <li>
               <Check size={16} aria-hidden="true" />

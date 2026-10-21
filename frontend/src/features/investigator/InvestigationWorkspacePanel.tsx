@@ -71,6 +71,11 @@ export function AiOffNote({
   );
 }
 
+/** What "How MDARIX checks AI output" says while AI cannot run: "AI is off for free trials, so there is no AI output on
+ * this case to check." (DEV-010). */
+export const noAiOutputText = (banner: Pick<AiBanner, "shortReason">) =>
+  `${banner.shortReason}, so there is no AI output on this case to check.`;
+
 export function InvestigationTabSummary({
   activeTab,
   workspace,
@@ -81,6 +86,7 @@ export function InvestigationTabSummary({
   brief,
   onOpenDecision,
   decisionLabel = "Open Decision Center",
+  aiBanner = null,
 }: {
   activeTab: string;
   workspace: InvestigationWorkspace | null;
@@ -92,6 +98,8 @@ export function InvestigationTabSummary({
   onOpenDecision: () => void;
   /** The decision action's name: the Decision Center, or the case's own decision under the MVP feature set. */
   decisionLabel?: string;
+  /** Why AI cannot run, when it cannot: then there is no AI output to check. */
+  aiBanner?: AiBanner | null;
 }) {
   const summaries: Record<string, { title: string; description: string; count: string; state: string }> = {
     overview: {
@@ -150,8 +158,8 @@ export function InvestigationTabSummary({
     },
     assurance: {
       title: "How MDARIX checks AI output",
-      description: "What MDARIX checks in every AI result before you see it.",
-      count: "Every AI result is checked",
+      description: aiBanner ? noAiOutputText(aiBanner) : "What MDARIX checks in every AI result before you see it.",
+      count: aiBanner ? "No AI output to check" : "Every AI result is checked",
       state: "Advisory only",
     },
     decision: {
@@ -194,8 +202,9 @@ export function InvestigationWorkspacePanel({
   temporalMode: TemporalMode;
   asOf: string;
   onOpenDecision: () => void;
-  /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand. */
-  onOpenIntelligence?: (view: IntelligenceView) => void;
+  /** Opens the case's Intelligence tab on a view, where people judge AI output and do the work by hand; `add` opens
+   * the view's form to add one as well ("Add hypotheses by hand", DEV-019). */
+  onOpenIntelligence?: (view: IntelligenceView, add?: boolean) => void;
   /** Opens the case's Decision Brief tab, where a person writes the brief (the manual way to the AI brief). */
   onOpenBrief?: () => void;
 }) {
@@ -253,7 +262,7 @@ export function InvestigationWorkspacePanel({
     onOpenIntelligence && aiBanner
       ? aiBanner.manual
           .filter((path) => views.includes(path.view))
-          .map((path) => ({ label: path.label, onClick: () => onOpenIntelligence(path.view) }))
+          .map((path) => ({ label: path.label, onClick: () => onOpenIntelligence(path.view, path.add) }))
       : [];
 
   useEffect(() => {
@@ -579,7 +588,7 @@ export function InvestigationWorkspacePanel({
                   type="button"
                   key={path.view}
                   className="primary-action secondary"
-                  onClick={() => onOpenIntelligence(path.view)}
+                  onClick={() => onOpenIntelligence(path.view, path.add)}
                 >
                   {path.label}
                 </button>
@@ -630,6 +639,7 @@ export function InvestigationWorkspacePanel({
         brief={brief}
         onOpenDecision={onOpenDecision}
         decisionLabel={decisionLabel}
+        aiBanner={aiBanner}
       />
       {(actionStatus || pendingAction) && (
         <div className={`action-feedback ${actionStatus.startsWith("BACKEND") ? "error-feedback" : ""}`} role="status">
@@ -936,12 +946,6 @@ export function InvestigationWorkspacePanel({
           <summary className="section-title">
             <ShieldCheck size={18} /> How MDARIX checks AI output
           </summary>
-          {aiBanner && (
-            <p className="ac-muted">
-              {aiBanner.shortReason}, so there is no AI output on this case to check. When AI is on, every result goes
-              through these checks before you see it.
-            </p>
-          )}
           <ul className="guardrail-list">
             <li>Every statement must point to a record of this case; a statement without a source is flagged.</li>
             <li>It stays within this case's product, version and point in time, and within your organization.</li>
@@ -949,6 +953,12 @@ export function InvestigationWorkspacePanel({
             <li>No made-up confidence scores; the checks of each AI run are saved with it for the audit trail.</li>
           </ul>
         </details>
+        {/* Outside the folded list, so the panel never reads empty while AI is off (DEV-010). */}
+        {aiBanner && (
+          <p className="ac-muted">
+            {noAiOutputText(aiBanner)} When AI is on, every result goes through these checks before you see it.
+          </p>
+        )}
       </section>
       <section id="workflow-decision" className="panel empty-state">
         <h3>Decision readiness</h3>

@@ -3,6 +3,7 @@ import indexHtml from "../../index.html?raw";
 import sitemap from "../../public/sitemap.xml?raw";
 import {
   HOME_FILE,
+  NOT_FOUND_FILE,
   headTags,
   inlineStylesheet,
   moveInlineStyles,
@@ -11,13 +12,30 @@ import {
   sitemapPaths,
   visibleText,
 } from "../../scripts/prerender.mjs";
-import { INDEXED_PATHS, pageHead, renderPage } from "./prerender";
+import { INDEXED_PATHS, NOT_FOUND_PATH, pageHead, renderNotFoundPage, renderPage } from "./prerender";
 import { PAGE_META } from "./seo";
 
 // What crawlers and link previews read without JavaScript (WEB-05): every page of the sitemap as its own HTML file,
 // with its own head and its text (scripts/prerender.mjs, run by npm run build).
 const attribute = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const count = (html: string, part: string) => html.split(part).length - 1;
+
+describe("the pre-rendered page an unknown address gets (WEB-17)", () => {
+  it("is the website's Page not found page, never indexed and without a canonical address", () => {
+    const markup = moveInlineStyles(renderNotFoundPage(), new Map());
+    const html = pageHtml(indexHtml, pageHead(null), markup, "/assets/prerender-test.css");
+    expect(NOT_FOUND_FILE).toBe("404.html");
+    expect(INDEXED_PATHS as readonly string[]).not.toContain(NOT_FOUND_PATH);
+    expect(html).toContain("<title>Page not found · MDARIX</title>");
+    expect(html).toContain('<meta name="robots" content="noindex, follow" />');
+    expect(html).not.toContain('rel="canonical"');
+    expect(markup).toContain('<h1 id="not-found-title">Page not found</h1>');
+    expect(markup).toContain("Go to the home page");
+    // The website's frame (header and footer) is there too.
+    expect(markup).toContain("Skip to content");
+    expect(markup).not.toMatch(/\sstyle="/);
+  });
+});
 
 describe("the pre-rendered website pages", () => {
   const classes = new Map<string, string>();

@@ -10,6 +10,105 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.41] - 2026-10-21
+
+Small fixes from the free-trial validation and the pre-launch review, on the trial maintenance line
+(`release/0.10`). No migration: every change reads data that is already stored. The API and web images change; the
+usual upgrade script rebuilds all images, the web image with the new `infrastructure/docker/Caddyfile`.
+Findings: UX-25, DEV-008, DEV-010, DEV-017, DEV-018, DEV-019, DEV-024, DEV-025, DEV-027, DEV-028, NEW-5, FUN-11,
+FUN-14, SEC-08, WEB-14 to WEB-18.
+
+### Security
+
+- Only a Platform Administrator can start a golden evaluation (`POST /api/v1/evaluations/runs`; 403
+  `PLATFORM_ADMIN_REQUIRED` for anyone else, SEC-08). A run reads the synthetic golden organization in system scope
+  and keeps a CPU busy for minutes, and any role allowed to run AI could start it, a free trial's Leader included.
+  Platform Admin › AI Control Center › Evaluations still offers the run; the workspace's Trust page shows the
+  published result only. Reading the published result is unchanged.
+- A free-trial request from an address of MDARIX's own organization (the domain of a platform account or of the
+  support address) is never approved automatically; a Platform Administrator reviews it (FUN-14, reason
+  `PLATFORM_ORGANIZATION`).
+- The website publishes `/.well-known/security.txt` (RFC 9116): contact support@mdarix.in, expiry 21 September 2027
+  (UTC; renew it before then), English, and its canonical address (WEB-17).
+
+### Fixed
+
+- A password change counts only the other sessions that were still open: "1 other session was signed out" no longer
+  counts sessions that had expired or ended after 30 minutes without activity (NEW-5). They are still closed. The same
+  count is what the audit trail records for a suspension, a reset password and an MFA reset.
+- Signature verification names the signer and their role, "Meera Iyer (Leader)", also when it is the person reading it
+  (it said "You (Leader)"; DEV-024). The report carries `signer_name`.
+- Checking an import file without a single data row is refused with 422 `IMPORT_FILE_EMPTY` and a plain message, as
+  importing it already was: "The file is empty.", "The file has a header but no data rows." or, for a file whose header
+  lacks the required columns (a JSON body `{}`), "Required column 'complaint_id' (for example 'Complaint Id' or
+  'Complaint Number') is missing." (DEV-018). Both the trial import and the workspace import. A file with rows still
+  answers its report.
+- Import results group their counts: "Imported complaints: 4,993 new, 0 updated, and 1 product, 1 version and 2 lots
+  they name" (DEV-025), whatever the browser's language, as do the check, the row allowance and Platform Admin's view of
+  a trial's imports.
+- After complaints are imported on Getting started, Automatic insights no longer shows the sample's figures ("From
+  sample data · 37 complaints") while it reads the imported ones. It read them again at once, as before, but kept the
+  sample's figures on screen until the answer came, and a busy server (the import's signals and embeddings are worked
+  out at the same time) can take long enough for that read to time out. It now says "Reading the complaints you just
+  imported… The insights update by themselves." and reads again every few seconds until they are the imported data's.
+- "How MDARIX checks AI output" says why it is empty while AI is off: "AI is off for free trials, so there is no AI
+  output on this case to check." The sentence was folded away under the panel's heading (DEV-010); it now shows below
+  it and in the step's summary ("No AI output to check").
+- "Add hypotheses by hand" opens the case's Hypotheses with the form to add one already open (DEV-019).
+- Drawers, toasts and related records name a record by its MDARIX ID with its number in the source system beside it
+  (DEV-008): "CMP000029 (SAMPLE-RV-01): it is a complaint", "CMP000034 (SAMPLE-RV-06): reportability decision
+  recorded.", "CHG000001 (SAMPLE-CHG-014)", "CAPA000002 (SAMPLE-CAPA-02)" in a signal's related records, and the
+  reportability cards show "Source ID", as the second look's cards do. A review has no source number: its ID stays
+  REV000001.
+- Platform Admin › Onboarding shows when the legal texts were accepted to the second in UTC, each text's full SHA-256
+  fingerprint (it wraps), and who approved or declined the request and when: a Platform Administrator, or "Automatic
+  approval (company email)" (DEV-027; `reviewed_by_name` in the queue).
+- A Platform Admin tenant tab refused for want of the customer's approval says so: "The customer's approval is
+  needed", with what to request (DEV-028). It said "Not authorized — Your role cannot read this data". The same on
+  every tenant tab that reads a customer's data (AI processing, Data, Activity and the others).
+- The staff alerts for a new trial request and a website demo request named "Customers & Tenants > Onboarding"; they
+  name "Identity & Access > Onboarding" (FUN-11). Their button, and the trial demo and pilot request alerts' buttons,
+  now open Onboarding itself (`/platform-admin/onboarding`) instead of the Platform Admin home.
+- Generated column headings read acronyms as acronyms: "MFA enrolled" (was "Mfa enrolled") in Platform Admin ›
+  Identity & Access › Platform users, and AI, API, SSO, CAPA, UDI, URL and others wherever a list offers a field.
+
+### Added
+
+- Complaints › Complaint list has a data filter while the sample data is there: "All data", "Only your imported data"
+  and "Only the sample data" (DEV-017; `sources` in `GET /api/v1/complaints`). The signal list has no such filter: a
+  signal has no source of its own.
+- Help in a trial workspace offers "Talk to us about the next step", which opens Next steps: from trial to pilot
+  (UX-25; it was the entry "Next steps").
+- "Finding signals" right after an import on the dashboard's Signal triage ("Finding signals in the complaints you
+  just imported… The counts update by themselves when they are ready.") and on Readiness's trend check, as Getting
+  started and the Signal inbox already did (`detection_pending` in `GET /api/v1/triage/summary` and
+  `GET /api/v1/readiness`; the same light status read every 3 seconds, as background reads, for two minutes at most).
+- A Platform Administrator's changes to a paying organization's administrators are emailed as an administrator's are
+  (follow-on to NEW-2): suspending or restoring a Customer Administrator tells them and the organization's other active
+  Customer Administrators, adding one tells the others (the invitation is its own email), and an MFA reset tells the
+  person (and the administrators, for an administrator account). The one who made the change reads "MDARIX support",
+  never the staff member's name: "MDARIX support suspended your MDARIX account for Northwind Infusion Systems",
+  "MDARIX support suspended Ben Okafor, a Customer Administrator of Northwind Infusion Systems" (Changed by: MDARIX
+  support), "If you did not expect this, contact support@mdarix.in." Nothing for a free trial, for MDARIX's own
+  accounts or for an erasure. The same `TEAM_CHANGE_NOTICE` outbox events, retried per recipient.
+
+### Changed
+
+- The website's availability labels are "Available today", "In a pilot" and "Planned" everywhere (WEB-14): the
+  capability labels said "With design partners" and the roadmap's badges "Live now", "Next" and "Planned". The
+  sentences that named the stage say "in a pilot" (for example "Answers written by AI come in a pilot, once AI is
+  validated and switched on."), and so do the roadmap's title ("Roadmap: available today, in a pilot, planned") and
+  descriptions. "Design partner" still names the customers MDARIX builds with.
+- "ProductVersion" is written "Product Version" in the website's menus and "product version" in its text (WEB-15).
+- The website answers an address that is no page with its "Page not found" page and a real 404 status (WEB-17); it
+  answered 200 with the application shell. Pre-rendered pages, files, the application (`/app`, `/platform-admin`),
+  sign-in and account screens, the guides, former page addresses, `/api` and `/health` are served as before. The page
+  is pre-rendered at build time (`dist/404.html`, never indexed). `/favicon.ico` is the site's icon (16, 32 and 48 px).
+- The website's skip link no longer shows a 2 px edge above the page until it is focused (WEB-16). Its focus ring is
+  dark teal on light grounds (at least 6.6:1) and bright teal on the navy panels (at least 7.7:1); it was bright teal
+  everywhere, 1.6:1 on the light grounds (WEB-18). The legal pages' sections are headings of the second level under
+  the page title (they jumped from h1 to h3), with the same look.
+
 ## [0.10.40] - 2026-10-21
 
 Team-change emails for pilot organizations, retried team and support-access emails, and an import that answers

@@ -48,6 +48,12 @@ export type PanelSource = {
   reload?: () => void;
 };
 
+/** The refusal of a customer's data without the customer's approval (backend/app/support_access.py). */
+export const CUSTOMER_APPROVAL_REQUIRED = "CUSTOMER_APPROVAL_REQUIRED";
+/** What the panel says then when the server gives no message of its own. */
+export const CUSTOMER_APPROVAL_TEXT =
+  "This is the customer's data. Reading it needs support access that the customer approved: request it under Security > Support access.";
+
 export function Panel({
   title,
   eyebrow,
@@ -94,6 +100,14 @@ export function Panel({
             <Lock size={20} aria-hidden="true" />
             <strong>Your free trial has ended</strong>
             <span>{shown.error || "Contact us to continue with your data intact."}</span>
+          </div>
+        ) : shown.code === CUSTOMER_APPROVAL_REQUIRED ? (
+          // A Platform Administrator reading a customer's data without the customer's approval: what is needed, not
+          // "your role" (DEV-028). The server's message names the area of support access to request.
+          <div className="ac-empty">
+            <Lock size={20} aria-hidden="true" />
+            <strong>The customer's approval is needed</strong>
+            <span>{shown.error || CUSTOMER_APPROVAL_TEXT}</span>
           </div>
         ) : (
           <div className="ac-empty">

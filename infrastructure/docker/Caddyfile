@@ -119,14 +119,35 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 
 	# The website's pages are pre-rendered at build time (frontend/scripts/prerender.mjs, WEB-05): the home page is
 	# /home.html and /platform is /platform/index.html, each with its own title, description, canonical and text.
-	# /index.html is the plain application shell, for the application, sign-in and every other address (a website
-	# page that is not pre-rendered gets it too, and the browser draws the page as before).
+	# /index.html is the plain application shell, for the addresses the browser routes itself (frontend/src/app/App.tsx
+	# and the website's resolveSitePath in frontend/src/PublicMegaSite.tsx; frontend/src/site/routing.test.ts keeps the
+	# list below in step with them): the application, sign-in and account screens, the guides, the website's former
+	# capability pages under /platform/ and its former page addresses. Any other address is no page: it gets the
+	# website's "Page not found" page with a real 404 status (WEB-17), so a crawler or a link checker is not told it
+	# exists.
 	handle {
 		header Cache-Control "no-cache"
 		root * /srv
 		rewrite / /home.html
-		try_files {path} {path}/index.html /index.html
-		file_server
+
+		@built file {path} {path}/index.html
+		handle @built {
+			try_files {path} {path}/index.html
+			file_server
+		}
+
+		@shell path_regexp shell ^/(app|platform-admin)(/.*)?$|^/platform/.+$|^/(signin|forgot-password|activate-account|reset-password|mfa|request-demo|help/pilot-guide|help/trial-guide|help/user-guide|why-mdarix|ai-trust|integrations|pricing|plans|capabilities|regulations)/?$
+		handle @shell {
+			rewrite * /index.html
+			file_server
+		}
+
+		handle {
+			rewrite * /404.html
+			file_server {
+				status 404
+			}
+		}
 	}
 
 	log {

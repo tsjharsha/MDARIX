@@ -61,7 +61,19 @@ const slices = (items: { label: string; count: number }[]): Slice[] =>
  * against the months before, breakdowns whose bars filter the whole panel, and questions to ask next that answer
  * themselves from the records (rules on the server, no AI). One request (GET /api/v1/trial/insights) feeds it all.
  */
-export function InsightsPanel({ insights, source }: { insights: Insights | null; source: PanelSource }) {
+/** What the panel says while it reads complaints just imported (item 9). */
+export const READING_IMPORTED = "Reading the complaints you just imported… The insights update by themselves.";
+
+export function InsightsPanel({
+  insights,
+  source,
+  reading = false,
+}: {
+  insights: Insights | null;
+  source: PanelSource;
+  /** Complaints were just imported and the insights shown are not theirs yet: say so instead of showing them. */
+  reading?: boolean;
+}) {
   const { open, notify, work } = useWorkspace();
   const [filters, setFilters] = useState<InsightFilters>({});
   const [tab, setTab] = useState<Facet>("version");
@@ -80,10 +92,21 @@ export function InsightsPanel({ insights, source }: { insights: Insights | null;
   return (
     <Panel
       title="Automatic insights"
-      eyebrow={insights ? `From ${insights.scope} · ${countOf(insights.total_complaints, "complaint")}` : "Insights"}
+      eyebrow={
+        reading
+          ? "From your data"
+          : insights
+            ? `From ${insights.scope} · ${countOf(insights.total_complaints, "complaint")}`
+            : "Insights"
+      }
       source={source}
     >
-      {insights && (
+      {reading && (
+        <p className="ac-note" role="status">
+          {READING_IMPORTED}
+        </p>
+      )}
+      {insights && !reading && (
         <InsightsBody
           insights={insights}
           filters={filters}

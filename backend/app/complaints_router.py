@@ -36,7 +36,8 @@ def _uuid(text: str) -> uuid.UUID | None:
 
 
 def _facets(db: Session, tenant_id: uuid.UUID) -> dict:
-    """What the list's filters offer: the problem codes, countries and product versions the complaints record."""
+    """What the list's filters offer: the problem codes, countries, product versions and sources the complaints
+    record. The sources tell a free trial's own imported complaints from the sample's (DEV-017)."""
 
     def distinct(column) -> list[str]:
         return [
@@ -64,6 +65,7 @@ def _facets(db: Session, tenant_id: uuid.UUID) -> dict:
     return {
         "problem_codes": distinct(Complaint.problem_code),
         "countries": distinct(Complaint.country),
+        "sources": distinct(Complaint.source_system),
         "versions": [
             {
                 "id": str(version_id),

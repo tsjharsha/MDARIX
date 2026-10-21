@@ -889,6 +889,10 @@ def signature_verification(
         .order_by(SignedApprovalRecord.signed_at)
         .all()
     )
+    # Each signer by name, the signed-in person too (DEV-024): the organization's own accounts only.
+    from backend.app.workflow.people import names_by_id
+
+    signers = names_by_id(db, t.id, [r.signer_user_id for r in rows])
     result = []
     for r in rows:
         if r.decision_type == CASE_DECISION_TYPE:
@@ -915,6 +919,7 @@ def signature_verification(
                 "valid": valid,
                 "decision": r.decision,
                 "signer_user_id": r.signer_user_id,
+                "signer_name": signers.get(str(r.signer_user_id)),
                 "signer_role": r.signer_role,
                 "object_version": r.object_version,
                 "signed_at": r.signed_at,

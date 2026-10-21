@@ -44,6 +44,7 @@ import {
   otherDecision,
   reasonSlices,
   recordId,
+  recordName,
   recordTone,
   secondLookHeadline,
   secondLookPath,
@@ -438,7 +439,8 @@ function DecisionDrawer({
   const starters = SECOND_LOOK_STARTERS[decision];
   const problem = decisionProblem(reason) ?? starterProblem(reason, starters);
   const field = useRef<HTMLTextAreaElement>(null);
-  const name = recordId(item);
+  // The MDARIX ID with the source system's number beside it: "CMP000029 (SAMPLE-RV-01): it is a complaint" (DEV-008).
+  const name = recordName(item);
   const revising = !!item.decision;
   const request = investigationRequestFor(item);
   const submit = async (event: React.FormEvent) => {

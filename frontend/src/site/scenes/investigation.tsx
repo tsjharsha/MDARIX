@@ -244,7 +244,7 @@ function TimelineViews({ label }: { label: string }) {
 }
 
 /** Ask MDARIX: a scoped question, an answer whose every sentence cites a source record, and the line it will not
- * claim. Marked advisory and with design partners, because AI is off in the free trial. Platform, "Ask a precise
+ * claim. Marked advisory and in a pilot, because AI is off in the free trial. Platform, "Ask a precise
  * question and get a cited, bounded answer." */
 function AskCited({ label }: { label: string }) {
   const answer = [
@@ -262,7 +262,7 @@ function AskCited({ label }: { label: string }) {
         <text x={18} y={29} style={px(15)} fontWeight={800}>
           Ask MDARIX
         </text>
-        <Chip x={578} y={23} align="end" text="Advisory · design partners" tone="amber" index={1} />
+        <Chip x={578} y={23} align="end" text="Advisory · in a pilot" tone="amber" index={1} />
         {/* The question and its scope */}
         <g className="sc-rise" style={at(0, "0.3s")}>
           <rect

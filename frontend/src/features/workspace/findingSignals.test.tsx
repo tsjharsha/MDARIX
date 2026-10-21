@@ -20,7 +20,7 @@ const FILTERS = {
 describe("signals found after the import answers", () => {
   it("says in the import result that signals are being found", () => {
     expect(importedText("Complaints", { created: 4993, updated: 0, signals: "FINDING" })).toBe(
-      `Imported complaints: 4993 new, 0 updated. ${FINDING_SIGNALS_TEXT}`,
+      `Imported complaints: 4,993 new, 0 updated. ${FINDING_SIGNALS_TEXT}`,
     );
     expect(FINDING_SIGNALS_TEXT).not.toMatch(/MVP|trial/);
     // Without complaints there are no signals to find, and nothing is said about them.

@@ -44,7 +44,7 @@ type AiActivity = {
 };
 
 export function AiControlCenter({ section }: { section: string }) {
-  if (section === "Evaluations") return <TrustEvaluation />;
+  if (section === "Evaluations") return <TrustEvaluation canStart />;
   if (section === "AI runs") return <Executions />;
   if (section === "Agents & guardrails") return <Agents />;
   return <Overview />;

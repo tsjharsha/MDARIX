@@ -13,7 +13,7 @@ import {
 import { useSiteInfo } from "../../site/legal";
 import { ReportProblemDialog } from "./ReportProblem";
 import { TRIAL_GUIDE_PATH } from "../help/trialGuide";
-import { NEXT_STEPS_SECTION, NEXT_STEPS_SUBTITLE } from "../help/trialNextSteps";
+import { NEXT_STEPS_HELP, NEXT_STEPS_LINK } from "../help/trialNextSteps";
 import { WorkspaceContext } from "../workspace/workspaceContext";
 import { USER_GUIDE_PATH } from "../help/userGuide";
 
@@ -22,10 +22,10 @@ export const VIDEOS_PATH = "/videos";
 
 /**
  * Help in every signed-in screen: getting started (during a trial), the step-by-step user guide (every screen), the
- * free trial user guide (the trial's seven steps, during a trial), the website's short videos, Next steps from trial to
- * pilot (during a trial), the pilot guide, the support address, a
- * "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and privacy pages.
- * The support address comes from the server configuration (backend/app/site_info.py).
+ * free trial user guide (the trial's seven steps, during a trial), the website's short videos, "Talk to us about the
+ * next step", which opens Next steps from trial to pilot (during a trial, UX-25), the pilot guide, the support
+ * address, a "report a problem" form that reaches the MDARIX team (with an email fallback), and the security and
+ * privacy pages. The support address comes from the server configuration (backend/app/site_info.py).
  */
 export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -116,8 +116,8 @@ export function HelpMenu({ onGettingStarted }: { onGettingStarted?: () => void }
               >
                 <Signpost size={15} aria-hidden="true" />
                 <span className="help-menu-item">
-                  {NEXT_STEPS_SECTION}
-                  <small>{NEXT_STEPS_SUBTITLE}</small>
+                  {NEXT_STEPS_HELP}
+                  <small>{NEXT_STEPS_LINK}</small>
                 </span>
               </button>
             </li>

@@ -17,7 +17,7 @@ export const menus: Record<string, MenuGroup[]> = {
           "Connect product, supplier, lot, complaint, change, and evidence relationships.",
         ),
         current(
-          "ProductVersion Intelligence",
+          "Product Version Intelligence",
           "/platform/product-version",
           "Compare revisions, scope, and impact with traceable context.",
         ),
@@ -92,7 +92,7 @@ export const menus: Record<string, MenuGroup[]> = {
       title: "By Investigation",
       items: [
         current("Complaint Investigation", "/solutions#complaint-investigation"),
-        current("ProductVersion Investigation", "/solutions#version-investigation"),
+        current("Product Version Investigation", "/solutions#version-investigation"),
         current("Change Investigation", "/solutions#change-investigation"),
         current("Supplier Investigation", "/solutions#supplier-investigation"),
         current("Component Investigation", "/solutions#component-investigation"),
@@ -449,7 +449,7 @@ export const capabilityStatus: {
 }[] = [
   {
     label: "Available today",
-    badge: "Live now",
+    badge: "Available today",
     text: "In every workspace, including the 30-day free trial.",
     promise: "Start on sample data, then on your own exports. No integration and no credit card.",
     items: [
@@ -510,8 +510,8 @@ export const capabilityStatus: {
     ],
   },
   {
-    label: "With design partners",
-    badge: "Next",
+    label: "In a pilot",
+    badge: "In a pilot",
     text: "Built and validated together during a pilot.",
     promise: "As a design partner, we connect your systems and validate each step with your team.",
     items: [
@@ -907,7 +907,7 @@ export const platformCapabilityData: Record<
     cards: [
       {
         title: "Start with a precise question",
-        text: "Frame the issue, product, ProductVersion, time window, and investigation scope before retrieval begins.",
+        text: "Frame the issue, product, product version, time window, and investigation scope before retrieval begins.",
       },
       {
         title: "Retrieve only what you can access",
@@ -940,7 +940,7 @@ export const platformCapabilityData: Record<
       },
       {
         title: "Version-aware impact",
-        text: "Compare ProductVersions and follow a complaint or change to the affected configuration without losing source provenance.",
+        text: "Compare product versions and follow a complaint or change to the affected configuration without losing source provenance.",
       },
       {
         title: "Manufacturing context",
@@ -964,7 +964,7 @@ export const platformCapabilityData: Record<
       },
       {
         title: "Connected system handoff",
-        text: "Bring context from PLM, QMS, ERP/MES, and supplier systems through versioned mappings: CSV exports today, live connections with design partners. Each system keeps ownership of its data.",
+        text: "Bring context from PLM, QMS, ERP/MES, and supplier systems through versioned mappings: CSV exports today, live connections in a pilot. Each system keeps ownership of its data.",
       },
     ],
     steps: [
@@ -1009,14 +1009,14 @@ export const platformCapabilityData: Record<
     steps: ["Product", "Version", "Component", "Supplier", "Lot", "Signal", "Evidence", "Review"],
   },
   "product-version": {
-    kicker: "ProductVersion intelligence · controlled MedTech release history",
+    kicker: "Product version intelligence · controlled MedTech release history",
     summary:
       "Keep every medical-device revision anchored to its product identity, approved configuration, effective dates, verification context, and field experience—so reviewers can see exactly which version was relevant to an investigation.",
     stats: ["Revision identity", "Change control", "Verification context", "Field impact"],
     cards: [
       {
         title: "A controlled revision record",
-        text: "Keep product identity separate from ProductVersion identity, status, effective dates, and release ownership.",
+        text: "Keep product identity separate from product version identity, status, effective dates, and release ownership.",
       },
       {
         title: "Change-to-evidence trace",
@@ -1114,7 +1114,7 @@ export const investigationCapability = {
   cards: [
     {
       title: "Frame the investigation",
-      text: "Define the question, product and ProductVersion scope, time window, owner, and review objective before analysis begins.",
+      text: "Define the question, product and product version scope, time window, owner, and review objective before analysis begins.",
     },
     {
       title: "Build the evidence chain",
@@ -1147,7 +1147,7 @@ export const evidenceCapability = {
     },
     {
       title: "Anchor every record",
-      text: "Relate observations to the right product, ProductVersion, component, supplier, lot, complaint, investigation, and time window.",
+      text: "Relate observations to the right product, product version, component, supplier, lot, complaint, investigation, and time window.",
     },
     {
       title: "Separate fact from inference",

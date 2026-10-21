@@ -1,0 +1,4 @@
+Contact: mailto:support@mdarix.in
+Expires: 2027-09-21T00:00:00Z
+Preferred-Languages: en
+Canonical: https://mdarix.in/.well-known/security.txt
