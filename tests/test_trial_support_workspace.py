@@ -72,11 +72,13 @@ def _outbox(grant_id, event_name: str) -> list[OutboxEvent]:
 
 
 def _deliver(grant_id, event_name: str) -> None:
-    """What the outbox worker does with the grant's queued notice."""
-    (event,) = _outbox(grant_id, event_name)
+    """What the outbox worker does with the grant's queued notices: one per recipient, the decision maker's first."""
+    events = sorted(_outbox(grant_id, event_name), key=lambda event: event.payload.get("audience") != "DECIDER")
+    assert events
     with SessionLocal() as db:
-        bind_system(db, "test: deliver the notice")
-        assert notifications.handle_event(db, event.event_name, event.payload) is True
+        bind_system(db, "test: deliver the notices")
+        for event in events:
+            assert notifications.handle_event(db, event.event_name, event.payload) is True
 
 
 def _asked(tenant_id, areas, *, write=False):
@@ -460,3 +462,79 @@ def test_read_only_access_names_people_as_reading_the_directory(monkeypatch):
     assert covers == ["Read only. People: the user directory, to read"]
     # With changes allowed, the words of the area are unchanged.
     assert access.SupportScope(frozenset({access.PEOPLE}), True).describe()[0]["label"] == access.AREAS[access.PEOPLE]
+
+
+def test_each_recipient_s_support_email_is_its_own_event_so_a_retry_resends_nobody_else(monkeypatch):
+    """0.10.40: the owner's and the colleagues' emails were one event, so a retry after one colleague's address failed
+    sent the owner's email again. Now each recipient's email is retried on its own, with the same content."""
+    from auth import emailer
+    from outbox.worker import OutboxWorker
+
+    owner, approval, owner_email, _colleague, colleague_email = _trial_with_colleague()
+    tenant_id = approval["tenant_id"]
+    grant_id, _recipient, _ = _granted(owner, tenant_id, [access.RECORDS])
+    granted = _outbox(grant_id, notifications.SUPPORT_ACCESS_GRANTED)
+    assert sorted(event.payload["audience"] for event in granted) == ["COLLEAGUE", "DECIDER"]
+    assert not any("@" in str(value) for event in granted for value in event.payload.values())
+
+    sent, refused = [], {colleague_email}
+
+    def smtp(to, subject, text, html=None, reply_to=None):
+        if to in refused:
+            raise emailer.EmailDeliveryError("The email provider refused the message")
+        sent.append((to, subject))
+        return "SENT"
+
+    monkeypatch.setattr(emailer, "_send_email", smtp)
+
+    def publish(name, payload):
+        with SessionLocal() as db:
+            bind_system(db, "test: the outbox worker delivers")
+            assert notifications.handle_event(db, name, payload)
+
+    worker = OutboxWorker(publish, base_delay_seconds=1, max_delay_seconds=1)
+    ids = [event.id for event in granted]
+    stats = {"published": 0, "failed": 0, "dead_lettered": 0}
+
+    def cycle():
+        with SessionLocal() as db:
+            bind_system(db, "test: one worker cycle")
+            for event_id in ids:
+                worker._deliver_one(db, event_id, stats)
+            db.query(OutboxEvent).filter(OutboxEvent.id.in_(ids)).update(
+                {"next_attempt_at": None}, synchronize_session=False
+            )
+            db.commit()
+
+    cycle()
+    assert [to for to, _ in sent] == [owner_email] and sent[0][1].startswith("Support access to ")
+    assert stats["published"] == 1 and stats["failed"] == 1
+    refused.clear()
+    cycle()
+    cycle()
+    assert [to for to, _ in sent] == [owner_email, colleague_email]  # the owner's email once, the colleague's once
+    assert sent[1][1].startswith("MDARIX support has read-only access to the ")
+
+
+def test_a_customer_s_administrators_each_get_their_own_support_event():
+    from tests.test_customer_admin_account_security import _tenant, _user
+
+    with SessionLocal() as db:
+        bind_system(db, "test: two administrators")
+        tenant = _tenant(db, "SUPPORT")
+        first = _user(db, tenant, "CUSTOMER_ADMIN", "First Admin")
+        second = _user(db, tenant, "CUSTOMER_ADMIN", "Second Admin")
+        _user(db, tenant, "LEADER", "A Leader")
+        grant_id = uuid.uuid4()
+        for notify in (
+            notifications.notify_support_access_awaiting_customer,
+            notifications.notify_support_access_granted,
+        ):
+            events = notify(db, tenant.id, grant_id=grant_id)
+            assert sorted(event.payload["recipient_user_id"] for event in events) == sorted(
+                [str(first.id), str(second.id)]
+            )
+            assert {event.payload["audience"] for event in events} == {"DECIDER"}
+        ended = notifications.notify_support_access_ended(db, tenant.id, grant_id=grant_id, ended="EXPIRED")
+        assert len(ended) == 2 and {event.payload["ended"] for event in ended} == {"EXPIRED"}
+        db.rollback()

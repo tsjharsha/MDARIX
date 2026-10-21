@@ -26,10 +26,6 @@ from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.trial import imports
 from backend.app.trial.service import trial_subscription
-from backend.app.signals import hooks as signal_hooks
-
-from backend.app.db.data_plane import open_tenant_data_session
-from retrieval.record_evidence import embed_tenant_evidence
 
 router = APIRouter(prefix="/api/v1/data/import", tags=["Data import"])
 
@@ -113,9 +109,6 @@ def _import_and_audit(
         )
     )
     db.commit()
-    if signal_hooks.imported_complaints(result):
-        # Signals from the new complaints (backend/app/signals/detection.py); never fails or undoes the import.
-        signal_hooks.after_complaints_saved(data, tenant_id, source="CSV import")
     return result
 
 
@@ -158,7 +151,4 @@ async def run_import(
     tenant_id = uuid.UUID(str(ctx.tenant_id))
     raw = await _body(request, policy)
     result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options)
-    if result.get("rows"):
-        # Semantic search over the imported records, after the response (their text is already searchable).
-        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
-    return result
+    return imports.after_import(background, tenant_id, result, source="CSV import")

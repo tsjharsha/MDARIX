@@ -1370,6 +1370,25 @@ def _complaint_evidence(complaint: Complaint, row: dict, product, version, lot, 
     )
 
 
+def after_import(background, tenant_id, result: dict, *, source: str) -> dict:
+    """Schedule what follows an import, after its response (``background``: the route's BackgroundTasks): signals
+    from the complaints it created or changed (backend/app/signals/hooks.py ``detect_after_import``), then semantic
+    search over its records (their text is already searchable). Each runs in a session of its own bound to the
+    organization, and neither can fail or undo the import. The answer says when signals are being found
+    (``signals: "FINDING"``, until ``hooks.detection_pending`` turns false); the insights are read from their own
+    route (GET /api/v1/trial/insights), so the answer does not wait for them."""
+    from backend.app.db.data_plane import open_tenant_data_session
+    from backend.app.signals import hooks as signal_hooks
+    from retrieval.record_evidence import embed_tenant_evidence
+
+    if signal_hooks.imported_complaints(result):
+        background.add_task(signal_hooks.detect_after_import, open_tenant_data_session, tenant_id, source=source)
+        result = {**result, "signals": "FINDING"}
+    if result.get("rows"):
+        background.add_task(embed_tenant_evidence, open_tenant_data_session, tenant_id)
+    return result
+
+
 def insights(db: Session, tenant_id) -> dict:
     """Counts and concentrations computed from the workspace's complaints; facts for a person to interpret."""
     own = (

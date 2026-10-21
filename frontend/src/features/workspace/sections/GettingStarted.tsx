@@ -30,6 +30,7 @@ import { InsightsPanel } from "./TrialInsights";
 import type { Insights } from "../trialInsights";
 import { featureSetOf, importTemplatesFor } from "../../../app/featureSet";
 import type { SampleCounts } from "../sampleStory";
+import { DETECTION_STATUS_PATH } from "../signals";
 import type { TrialPerson } from "./ColleagueWelcome";
 import {
   CHAPTER_ACTION,
@@ -74,7 +75,11 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
   const { open, work, session, notify } = useWorkspace();
   const status = useResource<TrialStatus>("/api/v1/trial/status");
   const insights = useResource<Insights>("/api/v1/trial/insights");
-  const loadedStory = useResource<TrialStory>(TRIAL_STORY_PATH);
+  // Right after an import its signals are still being found: the story is read again until they are.
+  const loadedStory = useResource<TrialStory>(TRIAL_STORY_PATH, {
+    refreshWhile: (data) => !!data.signals_pending,
+    statusPath: DETECTION_STATUS_PATH,
+  });
   // The last story read stays on screen while a reload is under way or has failed; with none at all, the headline
   // says the story could not be loaded and offers to try again (never "Reading..." for ever).
   const lastStory = useRef<TrialStory | null>(null);

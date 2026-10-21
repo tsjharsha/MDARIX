@@ -720,10 +720,13 @@ def update_control_plane_resource(
             raise HTTPException(
                 422, detail={"code": "UNKNOWN_PERSONA", "message": "Persona is not in the R1 catalog"}
             ) from exc
+    before = (row.role, row.status) if resource == "users" else None
     for field, value in payload.values.items():
         setattr(row, "username" if resource == "users" and field == "email" else field, value)
     if resource == "users" and str(payload.values.get("status", "ACTIVE")).upper() != "ACTIVE":
         revoke_user_sessions(db, row.id, row.tenant_id)
+    if before is not None:
+        _queue_user_change_notices(db, admin, row, *before)
     if hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
     version = getattr(row, "version", "v1")
@@ -737,6 +740,22 @@ def update_control_plane_resource(
         "status": getattr(row, "status", "ACTIVE"),
         "version": version,
     }
+
+
+def _queue_user_change_notices(db: Session, admin, user: AuthUser, role_before, status_before) -> None:
+    """A changed account role or status is emailed to the person, and to the other administrators when it concerns an
+    administrator account (backend/app/team_notices.py)."""
+    from auth.emailer import TEAM_ROLE_CHANGED
+    from backend.app import team_notices
+    from backend.app.role_codes import role_code
+
+    if role_code(role_before) != role_code(user.role):
+        team_notices.queue_organization_change(
+            db, admin, user, TEAM_ROLE_CHANGED, role_before=role_code(role_before), role_now=role_code(user.role)
+        )
+    change = team_notices.status_change(status_before, user.status)
+    if change:
+        team_notices.queue_organization_change(db, admin, user, change)
 
 
 @router.post("/admin/configuration/connectors/{configuration_id}/test")
