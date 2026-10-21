@@ -22,8 +22,9 @@ own safeguards); problem reports a customer chose to send to MDARIX; what MDARIX
 organization (staff accountability); and the continuity cases where nobody in the organization could act:
 recovering the only active Customer Administrator's authenticator, activating the first one, and recovering the
 authenticator of a free trial's people (a trial has no administrator; backend/app/access/platform_customer_admins.py).
-In a free trial, its owner decides on support access in place of a Customer Administrator (support_access_api.py).
-Until after the launch, MDARIX asks no free trial for support access (``TRIAL_SUPPORT_ACCESS_ENABLED``).
+In a free trial, its owner (and only its owner) decides on support access in place of a Customer Administrator
+(support_access_api.py ``require_decision_maker``). What a grant opens is read through platform routes that call
+:func:`require_customer_approved_access`, among them the read-only support workspace (support_workspace.py).
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ from backend.app.db.models.foundation import AuditEvent, AuthUser, Tenant
 CONFIGURATION = "CONFIGURATION"
 AUDIT = "AUDIT"
 PEOPLE = "PEOPLE"
+RECORDS = "RECORDS"
 DATA_EXPORT = "DATA_EXPORT"
 
 #: What a customer can grant, in the words their administrators read when they decide.
@@ -51,12 +53,14 @@ AREAS: dict[str, str] = {
     CONFIGURATION: "Configuration: products and versions, integrations, data mappings and AI settings",
     AUDIT: "Audit trail: everything people and systems did in the organization",
     PEOPLE: "People: the user directory, account recovery and erasure of personal data",
+    RECORDS: "Quality records: complaints, investigations, decisions and data imports, to read",
     DATA_EXPORT: "A full export: a copy of every record of the organization",
 }
-
-# Hidden until after launch; owner decision 2026-10-19. While False, Platform Admin cannot request support access to
-# a free trial (POST /platform-admin/support-access answers 422) and a trial's Team tab does not show it.
-TRIAL_SUPPORT_ACCESS_ENABLED = False
+#: How an area reads in a read-only grant, where its words above name changes (People: recovery and erasure are
+#: changes, which a read-only grant never opens). The other areas read the same either way.
+READ_ONLY_AREAS: dict[str, str] = {
+    PEOPLE: "People: the user directory, to read",
+}
 
 PENDING = "PENDING"  # requested; a second platform administrator approves it for MDARIX
 AWAITING_CUSTOMER = "AWAITING_CUSTOMER"  # approved by MDARIX; the customer decides
@@ -68,6 +72,8 @@ OPEN = frozenset({PENDING, AWAITING_CUSTOMER, APPROVED})
 
 ACCESS_USED = "SUPPORT_ACCESS_USED"
 ACCESS_REFUSED = "SUPPORT_ACCESS_REFUSED"
+# An approved grant whose window passed (the scheduler's support-access-expiry, or the next list that reads it).
+ACCESS_EXPIRED = "SUPPORT_ACCESS_EXPIRED"
 # Repeated reads of the same page under the same grant within this window are recorded once: paging through a list
 # (or the audit trail itself, where every recorded read would shift the pages being read) is one use, not ten.
 # Changes (write) are always recorded.
@@ -120,8 +126,13 @@ class SupportScope:
         return {"areas": sorted(self.areas), "write": self.write}
 
     def describe(self) -> list[dict]:
-        """The areas as the customer reads them, in the order of AREAS."""
-        return [{"code": code, "label": label} for code, label in AREAS.items() if code in self.areas]
+        """The areas as the customer reads them, in the order of AREAS; read-only, an area whose words name changes
+        reads as what it opens (READ_ONLY_AREAS)."""
+        return [
+            {"code": code, "label": label if self.write else READ_ONLY_AREAS.get(code, label)}
+            for code, label in AREAS.items()
+            if code in self.areas
+        ]
 
 
 # ------------------------------------------------------------------------------------------- decisions
@@ -411,17 +422,39 @@ def require_people_access(db: Session, user: AuthUser, target: AuthUser, *, cont
 
 
 def expire(db: Session, tenant_id=None, now: datetime | None = None) -> int:
-    """Close every open grant whose window has passed (requested, awaiting the customer or approved)."""
+    """Close every open grant whose window has passed (requested, awaiting the customer or approved). An approved one
+    is written to its organization's audit trail (``SUPPORT_ACCESS_EXPIRED``) and its decision makers are emailed
+    that it ended (backend/app/notifications.py). The caller commits.
+
+    Closing it changes nothing about what it opens: :func:`evaluate` refuses a grant past its window whatever its
+    status says, so access ends at the second it expires, before this runs."""
+    from backend.app.enterprise_audit import make_audit_event
+    from backend.app.notifications import notify_support_access_ended
+
     now = now or datetime.now(timezone.utc)
     query = db.query(SupportAccessGrant).filter(
         SupportAccessGrant.status.in_(sorted(OPEN)), SupportAccessGrant.expires_at <= now
     )
     if tenant_id is not None:
         query = query.filter(SupportAccessGrant.tenant_id == tenant_id)
-    rows = query.all()
+    rows = query.with_for_update(skip_locked=True).all()
     for row in rows:
+        was_active = row.status == APPROVED and row.customer_decided_by is not None
         row.status = EXPIRED
         row.updated_at = now
+        if was_active:
+            db.add(
+                make_audit_event(
+                    tenant_id=row.tenant_id,
+                    actor_ref="system:support-access-expiry",
+                    action=ACCESS_EXPIRED,
+                    entity_type="SupportAccessGrant",
+                    entity_id=row.id,
+                    details={"source": "SYSTEM", "expires_at": _aware(row.expires_at).isoformat()},
+                    created_at=now,
+                )
+            )
+            notify_support_access_ended(db, row.tenant_id, grant_id=row.id, ended="EXPIRED")
     if rows:
         db.flush()
     return len(rows)

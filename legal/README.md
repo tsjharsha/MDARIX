@@ -98,6 +98,17 @@ against known breached passwords, sign-in rate limits and lockout, authenticator
 attachments; CSV and Excel imports are read in memory, never stored, and macro workbooks are refused),
 an append-only, hash-chained audit trail verified daily, and encrypted backups.
 
+**Support access** (since 0.10.39, described in the privacy policy, "How we protect it", last updated 21 October
+2026): MDARIX staff reach an organization's own data only under support access. A platform administrator asks for
+named areas (Configuration, Audit trail, People, Quality records, Full export), read-only unless changes are asked
+for, for 24 hours at most; a different platform administrator (neither the requester nor the recipient) approves it
+for MDARIX; then the organization decides: one of its Customer Administrators, or a free trial's owner, with a
+current authenticator code. Every use is written to the organization's audit trail (repeated reads of the same page
+within 10 minutes once); the decision makers are emailed when MDARIX asks, when access is approved and when it ends,
+and a free trial's other members are told when it is approved and when it ends. Either side can revoke it at any
+time. Platform records about an organization (registry, plan, usage counts, its accounts) and staff's own actions are
+not behind support access (`docs/runbooks/SUPPORT_ACCESS.md`).
+
 **Not offered today** (the documents should not promise them): single sign-on (OIDC/SAML), certifications such as
 ISO 27001, SOC 2 or HIPAA attestation, a validated (GxP/Part 11) system, data residency choices beyond the chosen
 hosting region, and dedicated databases for free trials (trials share the platform; each paid pilot gets a dedicated database

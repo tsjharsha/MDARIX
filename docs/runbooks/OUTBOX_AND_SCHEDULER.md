@@ -134,6 +134,7 @@ briefly unavailable) is logged and tried again on the next one.
 | `trial-retention` | 24 h | Delete trial data 30 days after the trial ends (held while its move into the MVP is requested) |
 | `embedding-catch-up` | 15 min | Embed evidence that has no embedding yet |
 | `operations-alerts` | 5 min | Alert on dead letters and a stopped worker; ping `MDARIX_SCHEDULER_HEARTBEAT_URL` |
+| `support-access-expiry` | 5 min | Close support access whose time ran out (`SUPPORT_ACCESS_EXPIRED` in the organization's audit trail) and queue `SUPPORT_ACCESS_ENDED` to its decision makers. Access itself ends at the second it expires, whether this has run or not |
 | `export-expiry` | 1 h | Delete data exports after their download period |
 | `connector-sync` | 15 min | Sync connections that have a sync schedule |
 | `audit-chain-verification` | 24 h | Verify every organization's tamper-evident audit trail |

@@ -137,6 +137,21 @@
   min-width: 0;
   text-overflow: ellipsis;
 }
+/* A tick box in a dialog (Request support access, opened from Trials) keeps its own size, beside its words. */
+.cc-area .ac-modal .ca-field .ca-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--ac-ink);
+  font-weight: 400;
+}
+.cc-area .ac-modal .ca-field input[type="checkbox"] {
+  flex: none;
+  width: auto;
+  min-height: 0;
+  margin: 3px 0 0;
+  padding: 0;
+}
 /* Edit details drawer: each group of fields is a fieldset that looks like a drawer section. */
 .cc-fieldset {
   min-width: 0;
@@ -570,4 +585,58 @@ dl.cw-review {
 }
 .cc-trial-progress span.is-on {
   background: var(--ac-teal);
+}
+
+/* The read-only support workspace (SupportWorkspace.tsx): the banner every page carries, and the trial's chapters. */
+.cc-support-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--ac-teal);
+  border-left-width: 4px;
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+}
+.cc-support-banner > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--ac-teal);
+}
+.cc-support-banner div {
+  display: grid;
+  gap: 3px;
+}
+.cc-support-banner small {
+  color: var(--ac-ink-2);
+}
+.cc-support-banner.is-closed {
+  border-color: var(--ac-line);
+  background: var(--ac-surface);
+}
+.cc-support-banner.is-closed > svg {
+  color: var(--ac-muted);
+}
+.cc-support-story {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cc-support-story li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cc-trial-support {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.cc-trial-support small {
+  color: var(--ac-muted);
 }

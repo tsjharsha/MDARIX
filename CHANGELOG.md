@@ -10,6 +10,82 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.39] - 2026-10-21
+
+Full support access for free trials (NEW-1, owner decision 19 October: after the launch), on the trial maintenance
+line (`release/0.10`). No migration: the new area and the new emails need no schema change. A new scheduler job
+(`support-access-expiry`) runs in the existing scheduler container.
+
+### Added
+
+- Platform Admin › Customers & Tenants › Trials has a **Support access** column. **Request support access** opens the
+  usual request form, pre-filled with the trial, the signed-in administrator, Quality records, People and Audit trail
+  (read only, 4 hours) and a reason to complete. Full export and Configuration are ticked on purpose only. The column
+  then says where the request stands ("waiting for a second MDARIX approval", "waiting for the trial owner", "Open to
+  you until ...").
+- A **read-only workspace** for Platform Admin (**Open read-only workspace**, on a trial whose owner approved access
+  for you). Every page carries the banner "MDARIX support, read-only, access granted by <owner> until <time>". It
+  shows only the pages of the areas granted: complaints, investigations, decisions and data imports (Quality records),
+  the team (People), the audit trail (Audit trail), and the trial's chapters. Nothing in it can change the trial's
+  data.
+  - The server enforces it, not the screen (`backend/app/support_workspace.py`): GET routes only
+    (`/api/v1/platform-admin/tenants/{id}/support-workspace[/complaints|investigations|decisions|imports|team|audit]`),
+    each behind the customer-approved grant for its one area (403 `CUSTOMER_APPROVAL_REQUIRED` without it, audited as
+    `SUPPORT_ACCESS_REFUSED`). Each answers named fields only: never a password, an authenticator secret, a recovery
+    code, a token or a session. Platform staff have no session in the trial, so no workspace route acts on its data.
+  - Each page read is a `SUPPORT_ACCESS_USED` event in the trial's own audit trail, with the address read.
+  - `GET /api/v1/platform-admin/support-workspace/access`: where support access to each organization stands, for the
+    Trials column.
+- **Export data** in the read-only workspace, under a Full export grant. It is the organization's full export that
+  Customer Administration already makes (`/platform-admin/tenants/{id}/exports`: credentials left out, a current
+  authenticator code where MFA applies). Asking for it and downloading it are both checked against the grant and
+  audited (`TENANT_EXPORT_REQUESTED`, `TENANT_EXPORT_DOWNLOADED` and a use of the grant); a download after the access
+  ended is refused.
+- A new support access area, **Quality records**: "complaints, investigations, decisions and data imports, to read"
+  (`RECORDS` in `backend/app/support_access.py`). The four existing areas opened none of these records.
+- The trial owner's Support access (Getting started › Team) shows each request's start, end and length, and its
+  reason, and has **History**: the request, MDARIX's approval, the owner's decision, each page MDARIX support read and
+  each export, and how it ended, in words, from the trial's audit trail (`GET /api/v1/trial/support-access/{id}/activity`).
+- Emails to the people who decide (a trial's owner, or a customer's administrators) when an access is approved
+  ("Support access to <organization> is approved", with who, until when and the areas; also a security notice) and
+  when an approved access ends ("Support access to <organization> has ended": its time ran out, the organization
+  revoked it, or MDARIX ended it). Outbox events `SUPPORT_ACCESS_GRANTED` and `SUPPORT_ACCESS_ENDED`.
+- In a free trial, every other active member is told too (owner decision 21 October), for information only and with
+  no button: "MDARIX support has read-only access to <organization>'s trial" (who, the areas, who approved it, until
+  when, that each use is recorded in the trial's audit trail and that only the person who runs the trial decides) and
+  "MDARIX support access to <organization>'s trial has ended". A paying customer's other users get nothing new; its
+  administrators get the emails above.
+- Scheduler job `support-access-expiry` (every 5 minutes): closes support access whose time ran out, writes
+  `SUPPORT_ACCESS_EXPIRED` to the organization's audit trail and queues the ended email. Access itself ends at the
+  second it expires, whether the job has run or not.
+
+### Changed
+
+- Support access for free trials is back (it waited for after the launch since 0.10.31). The trial's Getting started
+  › Team shows Support access to its owner again; Request access offers free trials again; and
+  `POST /platform-admin/support-access` no longer refuses a trial (`SUPPORT_ACCESS_TRIALS_LATER` and the
+  `TRIAL_SUPPORT_ACCESS_ENABLED` switches are removed). The user guide describes it again.
+- Who decides is checked in one place for every approval, denial and revocation (`require_decision_maker`): in a free
+  trial its owner and only its owner. A colleague is refused, and so is any Customer Administrator account in a trial
+  (`TRIAL_OWNER_REQUIRED`). Elsewhere, as before, a Customer Administrator.
+- The email that MDARIX asks for support access now reaches a trial's owner (a trial has no Customer Administrators,
+  so before it reached nobody), with a button to Getting started › Team. Customers' administrators get it as before.
+- An MDARIX revocation is marked `source: PLATFORM_ADMIN` in the organization's audit trail.
+- Read-only access names People as what it opens: "People: the user directory, to read", not "account recovery and
+  erasure of personal data", which only a grant with changes allows. It reads so in the emails, the approve dialog
+  (which now lists every area with what it covers), the lists of requests and the History (which shows what the
+  request and the approval covered). With changes allowed the words are unchanged. No other area's words name a change.
+- A support access History (the trial owner's, and a customer's in Customer Administration) names an MDARIX colleague
+  whose account the organization cannot read "MDARIX support", never an account id, and says what each use opened.
+
+### Legal
+
+- Privacy policy, "How we protect it": a new paragraph on support access (who approves it, the areas, read-only unless
+  changes are approved, 24 hours at most, each use in the audit trail, the emails, revocation). Its "Last updated" is
+  21 October 2026, so a trial request sent from now on records the new date and SHA-256 (`legal_acceptance`); the
+  sitemap's `lastmod` of `/privacy` is 21 October 2026. `legal/README.md` lists the facts. The terms and the trial
+  agreement are unchanged: nothing in them contradicts it.
+
 ## [0.10.38] - 2026-10-20
 
 A faster website on phones, keyboard access to the header menus, faster large imports, and "pilot" as the name of the
