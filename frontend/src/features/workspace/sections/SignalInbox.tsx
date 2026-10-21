@@ -14,6 +14,7 @@ import {
 import { displayId, safeText } from "../../../app/displayId";
 import { sectionAllowed, useCan, useWorkspace } from "../workspaceContext";
 import { pageText } from "../tasks";
+import { sourceChoices, sourceText } from "../complaintList";
 import {
   EMPTY_NEW_SIGNAL,
   PRIORITY_REASON_MAX,
@@ -58,7 +59,7 @@ export const FINDING_SIGNALS =
 /** What the inbox says when it lists no signal: they are still being found, none match, or there are none. */
 export function inboxEmpty(filters: SignalFilters, finding: boolean): { title: string; detail: string } {
   if (finding) return { title: "Finding signals…", detail: "The signals from your import appear here in a moment." };
-  if (filters.q || filters.priorities.length || filters.productId || filters.origin || filters.owner)
+  if (filters.q || filters.priorities.length || filters.productId || filters.origin || filters.owner || filters.source)
     return { title: "No matching signals", detail: "Change the filters or the search to see more." };
   return {
     title: `No ${filters.status === "ALL" ? "" : `${statusFilterLabel(filters.status).toLowerCase()} `}signals`,
@@ -117,6 +118,8 @@ export function SignalInbox({
   const total = list.data?.total ?? rows.length;
   const pages = Math.max(1, Math.ceil(total / (list.data?.page_size || PAGE_SIZE)));
   const chips = statusChips(list.data?.counts_by_status, filters.status);
+  // While the sample data is there (a free trial): All data, only your imported data, only the sample data.
+  const sources = sourceChoices(listOf(list.data?.sources) as string[], filters.source);
 
   if (selected)
     return (
@@ -218,6 +221,20 @@ export function SignalInbox({
             <option value="me">Mine</option>
             <option value="unassigned">Unassigned</option>
           </select>
+          {sources.length > 0 && (
+            <select
+              aria-label="Data"
+              value={filters.source}
+              onChange={(event) => change({ source: event.target.value })}
+            >
+              <option value="">All data</option>
+              {sources.map((value) => (
+                <option key={value} value={value}>
+                  {sourceText(value)}
+                </option>
+              ))}
+            </select>
+          )}
           <label className="ca-inline-select">
             Sort by
             <select

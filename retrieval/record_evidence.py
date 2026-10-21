@@ -3,7 +3,8 @@
 Each imported complaint, investigation, CAPA, change, requirement, risk, failure mode or control gets one evidence row
 (type SOURCE_RECORD) holding a readable summary of the record, linked to the record and to its product, version and
 lot. The summary is chunked in the import's own transaction; embeddings for semantic search are added afterwards by
-embed_tenant_evidence (run in the background so a large import does not wait for the embedding model).
+the background service (queue_embeddings, run_embeddings_job below), so neither the import nor the API waits for the
+embedding model.
 
 upsert_record_evidence writes one record; upsert_record_evidences writes a whole import's records with the same result
 in a few statements (NEW-4): a 5,000-row complaints file took about 13 statements a row.
@@ -12,6 +13,7 @@ in a few statements (NEW-4): a 5,000-row complaints file took about 13 statement
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -252,13 +254,157 @@ def upsert_record_evidences(db: Session, tenant_id, items: Iterable[RecordEviden
     return [evidence_id for evidence_id, _ in rows]
 
 
-def embed_tenant_evidence(open_session, tenant_id) -> None:
-    """Add embeddings for chunks that have none yet (background step after an import commits)."""
+# ------------------------------------------------------------------------------------- embeddings after an import
+#
+# An import's records are embedded by the background service, not by the API (0.10.42): the embedding model is
+# CPU-bound, and in the API process it slowed every request for minutes after a large import. The import queues one
+# outbox event once its signals are found (backend/app/trial/imports.py after_import); the outbox worker
+# (scripts/run_outbox_worker.py) embeds in slices of about EMBEDDING_SLICE_SECONDS, each slice queueing the next, so
+# its heartbeat and the other events (emails) never wait long. A failure is tried again by the outbox (outbox/worker.py:
+# 30 s, doubling, then dead-lettered and alerted); the import itself is long saved by then. Until the embeddings are
+# in, search finds the new records by their text and links (structured search), as before.
+
+EMBEDDINGS_EVENT = "RECORD_EMBEDDINGS_REQUESTED"
+EMBEDDING_SLICE_SECONDS = 20.0
+# The embedding thread's niceness (Linux): it yields to the scheduler and anything else in the background service.
+EMBEDDING_NICE = 10
+
+
+class EmbeddingsIncomplete(RuntimeError):
+    """Some chunks could not be embedded: the outbox tries the event again later."""
+
+
+def _add_embeddings_event(tenant_id, payload: dict) -> None:
+    """One RECORD_EMBEDDINGS_REQUESTED event for the organization, committed on its own (control database)."""
+    from backend.app.db.models.stage2 import OutboxEvent
+    from backend.app.db.session import SessionLocal
+    from backend.app.db.tenant_scope import bind_tenant
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        db.add(
+            OutboxEvent(
+                tenant_id=tenant_id,
+                event_name=EMBEDDINGS_EVENT,
+                aggregate_type="Evidence",
+                payload={**payload, "tenant_id": str(tenant_id)},
+                occurred_at=datetime.now(timezone.utc),
+            )
+        )
+        db.commit()
+
+
+def queue_embeddings(tenant_id, *, source: str, records: int = 0, imported_at: str | None = None) -> None:
+    """Ask the background service to embed the organization's records that have none yet: an import's follow-up step,
+    after its signals (a background task of the route). The payload holds counts and times only, never record text.
+    Never raises: a failure is logged, and the scheduled embedding catch-up embeds them later."""
+    tenant = uuid.UUID(str(tenant_id))
+    try:
+        _add_embeddings_event(
+            tenant,
+            {
+                "source": source,
+                "records": int(records or 0),
+                "imported_at": imported_at or datetime.now(timezone.utc).isoformat(),
+            },
+        )
+    except Exception:
+        logger.exception(
+            "Embeddings after %s could not be queued for tenant %s; the scheduled catch-up embeds them", source, tenant
+        )
+
+
+def _at_low_priority(work):
+    """``work()`` in a thread of its own at niceness EMBEDDING_NICE (Linux sets the priority per thread; elsewhere it
+    runs at the usual priority), so the lower priority ends with it. Returns its result or raises its error."""
+    import os
+    import threading
+
+    outcome: dict = {}
+
+    def run():
+        try:
+            os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), EMBEDDING_NICE)
+        except (AttributeError, OSError):  # not Linux, or not allowed: the work still runs
+            pass
+        try:
+            outcome["result"] = work()
+        except BaseException as exc:  # handed to the caller below
+            outcome["error"] = exc
+
+    thread = threading.Thread(target=run, name="mdarix-embeddings")
+    thread.start()
+    thread.join()
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["result"]
+
+
+def _seconds_since(stamp) -> float | None:
+    try:
+        return (datetime.now(timezone.utc) - datetime.fromisoformat(str(stamp))).total_seconds()
+    except (TypeError, ValueError):
+        return None
+
+
+def run_embeddings_job(payload: dict, open_session=None, slice_seconds: float = EMBEDDING_SLICE_SECONDS) -> dict:
+    """Deliver one RECORD_EMBEDDINGS_REQUESTED event (outbox worker): embed the organization's chunks that have no
+    current embedding for about ``slice_seconds``, in its data plane bound to it (``open_tenant_data_session``).
+    Work left over is queued as the next event, with the counts so far; chunks that could not be embedded raise
+    EmbeddingsIncomplete once nothing else is left (or at once when nothing could be embedded), so the outbox tries
+    again. An organization without an active data plane (deleted meanwhile) has nothing to embed."""
     from retrieval.service import TrustedRetrievalService
 
-    try:
+    if open_session is None:
+        from backend.app.db.data_plane import open_tenant_data_session as open_session
+    tenant_id = uuid.UUID(str(payload["tenant_id"]))
+    source = str(payload.get("source") or "import")
+    started = time.monotonic()
+
+    def work():
         with open_session(tenant_id) as db:
-            TrustedRetrievalService().index_evidence_chunks(db, tenant_id)
-            db.commit()
-    except Exception:  # the import already succeeded; search falls back to the structured links until next run
-        logger.exception("Embedding imported records failed for tenant %s", tenant_id)
+            return TrustedRetrievalService().index_evidence_chunks(db, tenant_id, budget_seconds=slice_seconds)
+
+    try:
+        result = _at_low_priority(work)
+    except RuntimeError as exc:
+        if str(exc).startswith("DATA_PLANE_UNAVAILABLE"):
+            logger.warning("Embeddings after %s skipped: tenant %s has no active data plane", source, tenant_id)
+            return {"indexed": 0, "failed": 0, "deferred": 0}
+        raise
+    took = time.monotonic() - started
+    embedded = int(payload.get("embedded") or 0) + int(result["indexed"])
+    seconds = float(payload.get("seconds") or 0) + took
+    # A slice that embedded something hands the rest on; one that embedded nothing (the model is down) does not, or
+    # the slices would chase the same failing chunks for ever: it fails, and the outbox backs off.
+    if result["deferred"] and (result["indexed"] or not result["failed"]):
+        logger.info(
+            "Embeddings after %s: %d chunks embedded in %.1f s, %d left for the next slice (tenant %s)",
+            source,
+            result["indexed"],
+            took,
+            result["deferred"],
+            tenant_id,
+        )
+        _add_embeddings_event(tenant_id, {**payload, "embedded": embedded, "seconds": round(seconds, 1)})
+        return result
+    if result["failed"]:
+        logger.warning(
+            "Embeddings after %s: %d chunks could not be embedded (tenant %s); the outbox tries again",
+            source,
+            result["failed"],
+            tenant_id,
+        )
+        raise EmbeddingsIncomplete(f"{result['failed']} chunk(s) could not be embedded")
+    since = _seconds_since(payload.get("imported_at"))
+    logger.info(
+        "Embeddings after %s finished in %.1f s, %s after the import (%d records imported, %d chunks embedded, "
+        "tenant %s)",
+        source,
+        seconds,
+        f"{since:.1f} s" if since is not None else "unknown",
+        int(payload.get("records") or 0),
+        embedded,
+        tenant_id,
+    )
+    return result

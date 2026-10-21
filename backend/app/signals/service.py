@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from backend.app.business_ids import as_uuid, wanted_ids
@@ -33,6 +33,10 @@ from backend.app.workflow import tasks as task_service
 
 SEVERITY_LENGTH = 40
 RECENT_DAYS = 7
+# Complaint ids per IN (...) list when linking, well within PostgreSQL's limit of bind parameters.
+LINK_BATCH = 1000
+# At most this many complaint sources are listed for the inbox's Data filter.
+SOURCES_MAX = 50
 # Audit actions of the history events whose action is not simply SIGNAL_<EVENT>.
 AUDIT_ACTIONS = {
     "MERGED_INTO": "SIGNAL_MERGED",
@@ -41,6 +45,13 @@ AUDIT_ACTIONS = {
 }
 # When a complaint happened (its event time, else when it was received, else when it was recorded).
 COMPLAINT_EVENT_AT = func.coalesce(Complaint.event_timestamp, Complaint.complaint_timestamp, Complaint.created_at)
+# A link's complaint, joined on the complaint's id alone (0.10.42). The link's foreign key (tenant_id, complaint_id)
+# holds the complaint to the link's organization, every query here filters the links by organization, and row-level
+# security applies as ever. A condition on the complaint's organization as well let PostgreSQL, while its statistics
+# do not know a new organization's rows yet (until autovacuum analyzes the tables, a minute or so after a large
+# import), scan all the organization's complaints for every link: seconds to minutes for one import's signal, where
+# the primary key finds each complaint at once.
+LINKED_COMPLAINT = Complaint.id == SignalComplaint.complaint_id
 
 
 def now_utc() -> datetime:
@@ -171,8 +182,10 @@ def _facts(row) -> logic.ComplaintFacts:
     )
 
 
-def complaint_facts_query(db: Session, tenant_id):
-    return db.query(
+def complaint_facts_query(db: Session, tenant_id, *, linked: bool = False):
+    """The facts of the organization's complaints; with ``linked``, of the complaints the signal links filtered by the
+    caller (the organization is then the links', LINKED_COMPLAINT)."""
+    query = db.query(
         Complaint.id,
         Complaint.product_id,
         Complaint.product_version_id,
@@ -182,7 +195,10 @@ def complaint_facts_query(db: Session, tenant_id):
         Complaint.severity,
         Complaint.serious_injury,
         Complaint.death,
-    ).filter(Complaint.tenant_id == as_uuid(tenant_id))
+    )
+    if linked:
+        return query.select_from(SignalComplaint).join(Complaint, LINKED_COMPLAINT)
+    return query.filter(Complaint.tenant_id == as_uuid(tenant_id))
 
 
 def complaint_facts(query) -> list[logic.ComplaintFacts]:
@@ -190,10 +206,59 @@ def complaint_facts(query) -> list[logic.ComplaintFacts]:
 
 
 def signal_complaint_facts(db: Session, signal: Signal) -> list[logic.ComplaintFacts]:
-    linked = db.query(SignalComplaint.complaint_id).filter(
-        SignalComplaint.tenant_id == signal.tenant_id, SignalComplaint.signal_id == signal.id
+    """The facts of the signal's complaints, read through its links (LINKED_COMPLAINT)."""
+    return complaint_facts(
+        complaint_facts_query(db, signal.tenant_id, linked=True).filter(
+            SignalComplaint.tenant_id == signal.tenant_id, SignalComplaint.signal_id == signal.id
+        )
     )
-    return complaint_facts(complaint_facts_query(db, signal.tenant_id).filter(Complaint.id.in_(linked)))
+
+
+def from_source(source: str):
+    """The signals whose data comes from ``source`` (the Signal inbox's Data filter, like the complaint list's;
+    signals have no source of their own, so it is read from the complaints linked to them):
+
+    - the sample's source (MDARIX_SAMPLE, "Only the sample data"): at least one complaint is linked and every linked
+      complaint is from the sample;
+    - any other source (TRIAL_UPLOAD, "Only your imported data"): at least one linked complaint is from it, so a
+      signal that mixes imported and sample complaints counts as the organization's own data;
+    - a signal with no linked complaint (one created by hand without complaints) matches no source: it is listed
+      under All data only.
+
+    A condition on Signal (correlated EXISTS), so the list, its count and the counts per status stay one query each."""
+    from backend.app.trial.sample_data import SAMPLE_SOURCE
+
+    def linked(*conditions):
+        return (
+            select(SignalComplaint.id)
+            .join(Complaint, LINKED_COMPLAINT)
+            .where(SignalComplaint.tenant_id == Signal.tenant_id, SignalComplaint.signal_id == Signal.id, *conditions)
+            .exists()
+        )
+
+    if source == SAMPLE_SOURCE:
+        return and_(
+            linked(Complaint.source_system == SAMPLE_SOURCE),
+            ~linked(Complaint.source_system.is_distinct_from(SAMPLE_SOURCE)),
+        )
+    return linked(Complaint.source_system == source)
+
+
+def complaint_sources(db: Session, tenant_id) -> list[str]:
+    """The sources the organization's complaints come from (the complaint list's ``sources``): the inbox offers its
+    Data filter only while the sample data is there."""
+    return [
+        row[0]
+        for row in db.query(Complaint.source_system)
+        .filter(
+            Complaint.tenant_id == as_uuid(tenant_id),
+            Complaint.source_system.is_not(None),
+            Complaint.source_system != "",
+        )
+        .distinct()
+        .order_by(Complaint.source_system)
+        .limit(SOURCES_MAX)
+    ]
 
 
 def linked_complaint_ids(db: Session, signal: Signal) -> list[uuid.UUID]:
@@ -271,34 +336,46 @@ def recompute(db: Session, signal: Signal, *, min_complaints: int | None = None,
 
 def link_complaints(db: Session, signal: Signal, complaint_ids, *, how: str, actor_ref) -> list[uuid.UUID]:
     """Link complaints to the signal (``how``: RULE, MANUAL, MERGE); those already linked are skipped. Returns the
-    newly linked ids. Does not commit."""
+    newly linked ids. Does not commit.
+
+    The links are inserted in a few statements (db/bulk.py), not one per complaint: an import's signal can link
+    thousands of complaints, and one INSERT each was most of detection's time (0.10.42). The rows are not loaded into
+    the session."""
+    from backend.app.db.bulk import insert_rows
+
     wanted = list(dict.fromkeys(as_uuid(item) for item in complaint_ids if as_uuid(item) is not None))
     if not wanted:
         return []
-    present = {
-        row[0]
-        for row in db.query(SignalComplaint.complaint_id).filter(
-            SignalComplaint.tenant_id == signal.tenant_id,
-            SignalComplaint.signal_id == signal.id,
-            SignalComplaint.complaint_id.in_(wanted),
-        )
-    }
-    now = now_utc()
-    added = [complaint_id for complaint_id in wanted if complaint_id not in present]
-    for complaint_id in added:
-        db.add(
-            SignalComplaint(
-                id=uuid.uuid4(),
-                tenant_id=signal.tenant_id,
-                signal_id=signal.id,
-                complaint_id=complaint_id,
-                added_how=how,
-                added_by=str(actor_ref or DETECTION_ACTOR),
-                added_at=now,
+    present: set[uuid.UUID] = set()
+    for start in range(0, len(wanted), LINK_BATCH):
+        present.update(
+            row[0]
+            for row in db.query(SignalComplaint.complaint_id).filter(
+                SignalComplaint.tenant_id == signal.tenant_id,
+                SignalComplaint.signal_id == signal.id,
+                SignalComplaint.complaint_id.in_(wanted[start : start + LINK_BATCH]),
             )
         )
+    now = now_utc()
+    added = [complaint_id for complaint_id in wanted if complaint_id not in present]
     if added:
-        db.flush()
+        db.flush()  # the signal itself first: the links reference it
+        insert_rows(
+            db,
+            SignalComplaint,
+            [
+                {
+                    "id": uuid.uuid4(),
+                    "tenant_id": signal.tenant_id,
+                    "signal_id": signal.id,
+                    "complaint_id": complaint_id,
+                    "added_how": how,
+                    "added_by": str(actor_ref or DETECTION_ACTOR),
+                    "added_at": now,
+                }
+                for complaint_id in added
+            ],
+        )
     return added
 
 
@@ -571,10 +648,7 @@ def summaries(db: Session, control_db: Session | None, tenant_id, rows: list[Sig
     recent = {
         str(signal_id): int(count)
         for signal_id, count in db.query(SignalComplaint.signal_id, func.count(SignalComplaint.id))
-        .join(
-            Complaint,
-            and_(Complaint.tenant_id == SignalComplaint.tenant_id, Complaint.id == SignalComplaint.complaint_id),
-        )
+        .join(Complaint, LINKED_COMPLAINT)
         .filter(
             SignalComplaint.tenant_id == tenant,
             SignalComplaint.signal_id.in_(ids),
@@ -646,10 +720,7 @@ def _window(signal: Signal, now: datetime) -> tuple[datetime, datetime]:
 def _complaints(db: Session, signal: Signal) -> list[dict]:
     rows = (
         db.query(Complaint, SignalComplaint.added_how, ProductVersion.business_id, ProductVersion.version_identifier)
-        .join(
-            SignalComplaint,
-            and_(SignalComplaint.tenant_id == Complaint.tenant_id, SignalComplaint.complaint_id == Complaint.id),
-        )
+        .join(SignalComplaint, LINKED_COMPLAINT)
         .outerjoin(
             ProductVersion,
             and_(ProductVersion.tenant_id == Complaint.tenant_id, ProductVersion.id == Complaint.product_version_id),
@@ -693,10 +764,7 @@ def _version_split(db: Session, signal: Signal, now: datetime) -> list[dict]:
             func.count(Complaint.id),
         )
         .select_from(Complaint)
-        .join(
-            SignalComplaint,
-            and_(SignalComplaint.tenant_id == Complaint.tenant_id, SignalComplaint.complaint_id == Complaint.id),
-        )
+        .join(SignalComplaint, LINKED_COMPLAINT)
         .outerjoin(
             ProductVersion,
             and_(ProductVersion.tenant_id == Complaint.tenant_id, ProductVersion.id == Complaint.product_version_id),

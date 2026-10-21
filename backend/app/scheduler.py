@@ -101,19 +101,37 @@ def trial_reminders(db: Session, _state: dict) -> dict:
 
 
 def embedding_catch_up(db: Session, _state: dict) -> dict:
-    """Embed evidence that has none yet (records imported while the API restarted, or a failed background step)."""
+    """Embed evidence that has none yet (records imported while the API restarted, or a failed background step).
+    An organization whose import's embeddings are still queued or under way in the outbox worker is left to that job
+    (retrieval/record_evidence.py), so the two never embed the same records at once; a dead-lettered job no longer
+    holds it back."""
     from backend.app.db.data_plane import open_tenant_data_session
     from backend.app.customer_lifecycle import customer_allows_access_clause
     from backend.app.db.models.foundation import Tenant
+    from backend.app.db.models.stage2 import OutboxEvent
+    from retrieval.record_evidence import EMBEDDINGS_EVENT
     from retrieval.service import TrustedRetrievalService
 
     service = TrustedRetrievalService()
     totals = {"tenants": 0, "indexed": 0, "failed": 0, "deferred": 0}
+    queued = (
+        db.query(OutboxEvent.tenant_id)
+        .filter(
+            OutboxEvent.event_name == EMBEDDINGS_EVENT,
+            OutboxEvent.published_at.is_(None),
+            OutboxEvent.dead_lettered_at.is_(None),
+            OutboxEvent.tenant_id.is_not(None),  # a NULL would make NOT IN leave out every organization
+        )
+        .distinct()
+    )
     tenant_ids = [
         row.id
         for row in db.query(Tenant.id)
         .filter(
-            Tenant.status.in_(["ACTIVE", "active"]), customer_allows_access_clause(), served_tenants_clause(Tenant.id)
+            Tenant.status.in_(["ACTIVE", "active"]),
+            customer_allows_access_clause(),
+            served_tenants_clause(Tenant.id),
+            Tenant.id.notin_(queued),
         )
         .all()
     ]

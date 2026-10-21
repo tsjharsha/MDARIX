@@ -10,6 +10,54 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.42] - 2026-10-21
+
+An import's signals show within seconds and the workspace stays responsive while the import's follow-up work runs,
+and the Signal inbox gets the complaint list's Data filter. Trial maintenance line (`release/0.10`). No migration:
+the schema stays at md48. The API image changes (its command and code); the background service runs the same image.
+Measured with production's limits (2 CPUs shared by the API, the background service and PostgreSQL; the local
+embedding model) on the 4,994-row test file: the new signals show in the Signal inbox about 7 s after the import
+answers (47 to 61 s before) and on Getting started 11 to 24 s after (73 to 127 s before); meanwhile requests answer
+in 0.3 to 0.7 s at the median and 6 s at worst (0.4 to 2.2 s at the median and up to 18 s before).
+
+### Changed
+
+- An import's embeddings for semantic search are made by the background service instead of the API. Once the
+  import's signals are found the API queues one `RECORD_EMBEDDINGS_REQUESTED` outbox event; the outbox worker embeds
+  the records about 20 seconds at a time, at a lower CPU priority, each slice queueing the next, so the worker's
+  heartbeat and emails never wait long. A failure is retried by the outbox (30 s, doubling, then dead-lettered and
+  alerted) and never touches the import. Until the embeddings are in (about 10 minutes for 5,000 complaints on a
+  2-CPU server), search finds the new records by their text and links, as before. A connector's manual sync queues
+  its embeddings the same way. The scheduled embedding catch-up leaves an organization to its queued job.
+- The background service has a quarter of the default CPU weight (`cpu_shares: 256` in `docker-compose.prod.yml`):
+  when the API, the database and the background service all want the CPU, the API and the database come first.
+- The local embedding model runs on one CPU thread (it started one per physical core of the host, which competed
+  for the CPU in a container limited to fewer: 19 texts a second instead of 12 in a 1.5-CPU container).
+- Signal detection links an import's complaints to their signal in a few statements instead of one per complaint
+  (6.6 s to 2.1 s for the test file); it finds the same signals.
+- Log lines give the real numbers of each import's follow-up work (counts and times only): "Signals after trial
+  import found in 2.6 s (4993 records imported, 1 signals created, 0 updated, tenant ...)" from the API, and
+  "Embeddings after trial import finished in 485.0 s, 598.7 s after the import (4993 records imported, 4996 chunks
+  embedded, tenant ...)" from the background service.
+
+### Fixed
+
+- Right after a large import, the Signal inbox, a signal's details, Getting started's story, Readiness and signal
+  detection itself could take seconds to minutes: until PostgreSQL's autovacuum analyzes the tables, its statistics
+  do not know the new organization's rows, and it read every complaint of the organization for each complaint
+  linked to a signal. Those reads now look each complaint up by its key (for example the inbox's list 7.2 s to
+  0.06 s, the backlog check behind the story and Readiness 10.5 s to 0.02 s, in that state).
+- The API no longer restarts a busy worker after 5 seconds without an answer to uvicorn's health check, which dropped
+  the requests it was serving, an import among them; it waits 30 seconds (`--timeout-worker-healthcheck 30`).
+
+### Added
+
+- Signal inbox: a Data filter, as on the complaint list, while the sample data is there: All data, Only your imported
+  data, Only the sample data. A signal's data is that of the complaints linked to it: imported when at least one of
+  them is from your import (a signal mixing imported and sample complaints is your data), sample when all of them are
+  from the sample; a signal without complaints shows under All data only. The Open, New and All counts follow the
+  filter. `GET /api/v1/triage/signals` takes `source_system` and returns `sources`.
+
 ## [0.10.41] - 2026-10-21
 
 Small fixes from the free-trial validation and the pre-launch review, on the trial maintenance line
