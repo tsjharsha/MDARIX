@@ -238,6 +238,30 @@ def test_a_private_site_asks_for_the_login_everywhere_but_the_monitors():
     assert "redir https://{$MDARIX_DOMAIN}{uri} permanent" in redirect
 
 
+def test_caddy_redirects_the_other_domains_to_the_main_one_and_none_by_default():
+    environment = SERVICES["web"]["environment"]
+    # Empty by default: the names join the site's own address list, so an empty value leaves MDARIX_DOMAIN alone.
+    assert environment["MDARIX_REDIRECT_DOMAINS"] == "${MDARIX_REDIRECT_DOMAINS:-}"
+    site = re.search(r"^\{\$MDARIX_DOMAIN\} \{\$MDARIX_REDIRECT_DOMAINS\} \{\n(.*?)\n\}", CADDYFILE, re.S | re.M)
+    assert site, "the main site must list MDARIX_DOMAIN and then MDARIX_REDIRECT_DOMAINS"
+    body = site.group(1)
+    # Every name but the main domain is sent to it, with the path and the query (Caddy's {uri}), permanently; a
+    # redirect name never reaches the pages, the API or the login of a private site.
+    assert "@redirect_domain not host {$MDARIX_DOMAIN}" in body
+    assert "redir @redirect_domain https://{$MDARIX_DOMAIN}{uri} permanent" in body
+    lines = [line.strip() for line in body.splitlines() if line.strip() and not line.strip().startswith("#")]
+    assert lines[:2] == [
+        "@redirect_domain not host {$MDARIX_DOMAIN}",
+        "redir @redirect_domain https://{$MDARIX_DOMAIN}{uri} permanent",
+    ]
+    # The only other site blocks are the snippets' (www redirect): no second definition of the main domain.
+    assert len(re.findall(r"^\{\$MDARIX_DOMAIN\}", CADDYFILE, re.M)) == 1
+    template = (ROOT / ".env.production.example").read_text(encoding="utf-8")
+    assert re.search(r"^MDARIX_REDIRECT_DOMAINS=$", template, re.M)
+    reference = (ROOT / "docs" / "runbooks" / "ENVIRONMENT_VARIABLES.md").read_text(encoding="utf-8")
+    assert "`MDARIX_REDIRECT_DOMAINS`" in reference
+
+
 def test_every_action_in_the_workflows_is_pinned_to_a_commit():
     for workflow in ("ci.yml", "codeql.yml", "release.yml"):
         text = (ROOT / ".github" / "workflows" / workflow).read_text(encoding="utf-8")

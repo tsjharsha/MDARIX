@@ -38,8 +38,15 @@ describe("what search engines read", () => {
     expect(robots).toContain(`Sitemap: ${SITE_URL}/sitemap.xml`);
   });
 
+  it("names mdarix.com as the website's one address, never the former mdarix.in (0.10.46)", () => {
+    expect(SITE_URL).toBe("https://mdarix.com");
+    // mdarix.in only redirects to mdarix.com now; its email addresses (support@, privacy@) stay as they are.
+    for (const [name, text] of Object.entries({ robots, sitemap, indexHtml }))
+      expect(text, name).not.toMatch(/(https?:\/\/|www\.)mdarix\.in\b/);
+  });
+
   it("describes the organization for link previews and search without a person's name or address", () => {
-    expect(indexHtml).toContain('property="og:image" content="https://mdarix.in/og-image.png"');
+    expect(indexHtml).toContain('property="og:image" content="https://mdarix.com/og-image.png"');
     expect(indexHtml).toContain('"@type": "Organization"');
     // The static page never claims a canonical address: each page sets its own (seo.ts).
     expect(indexHtml).not.toContain('rel="canonical"');

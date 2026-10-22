@@ -29,7 +29,7 @@ SHELL = b'<!doctype html><head><title>MDARIX</title></head><body><div id="root">
 
 def _page(path: str) -> bytes:
     return (
-        f'<!doctype html><head><link rel="canonical" href="https://mdarix.in{path}" /></head>'
+        f'<!doctype html><head><link rel="canonical" href="https://mdarix.com{path}" /></head>'
         '<body><div id="root"><div class="mdx-site">Page text</div></div></body>'
     ).encode()
 

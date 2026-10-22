@@ -165,7 +165,7 @@ def test_invitation_emails_link_the_privacy_policy_before_activation(monkeypatch
     import auth.emailer as emailer
 
     sent = []
-    monkeypatch.setenv("MDARIX_APP_URL", "https://mdarix.in")
+    monkeypatch.setenv("MDARIX_APP_URL", "https://mdarix.com")
     monkeypatch.setattr(emailer, "_send", lambda recipient, message: sent.append(message) or "SENT")
     emailer.send_activation_email("a@example.invalid", "token", "Acme")
     emailer.send_trial_invitation("b@example.invalid", "token", "Acme", ends_on="18 November 2026", users=3, rows=5000)
@@ -174,7 +174,7 @@ def test_invitation_emails_link_the_privacy_policy_before_activation(monkeypatch
     )
     assert len(sent) == 3
     for message in sent:
-        assert any("https://mdarix.in/privacy" in line for line in message.closing), message.subject
+        assert any("https://mdarix.com/privacy" in line for line in message.closing), message.subject
 
 
 # ------------------------------------------------------------------------------------------- CMP-22

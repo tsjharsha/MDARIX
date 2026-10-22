@@ -85,9 +85,10 @@ describe("free trial user guide", () => {
 });
 
 describe("free trial user guide illustrations", () => {
-  it("show the address people type, mdarix.in", () => {
+  it("show the address people type, mdarix.com", () => {
     const html = GUIDE_STEPS.map((step) => renderToStaticMarkup(<GuideScene step={step.key} />)).join("");
-    expect(html).toContain("mdarix.in/activate-account");
-    expect(html).not.toContain("mdarix.com");
+    expect(html).toContain("mdarix.com/activate-account");
+    // The address bar shows the main domain, never the former one (mdarix.in now only redirects to it, 0.10.46).
+    expect(html).not.toMatch(/mdarix\.in\b/);
   });
 });

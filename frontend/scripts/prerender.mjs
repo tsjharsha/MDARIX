@@ -21,7 +21,7 @@ const FRONTEND = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DIST = join(FRONTEND, "dist");
 export const RENDERER = join(FRONTEND, "dist-prerender", "prerender.js");
 const SITEMAP = join(FRONTEND, "public", "sitemap.xml");
-export const SITE_URL = "https://mdarix.in";
+export const SITE_URL = "https://mdarix.com";
 /** The home page's file: dist/index.html is the application shell, so "/" has a file of its own (Caddyfile). */
 export const HOME_FILE = "home.html";
 /** The "Page not found" page, sent with a 404 status for an address that is no page (Caddyfile, WEB-17). */
