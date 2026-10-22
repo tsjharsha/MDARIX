@@ -68,6 +68,9 @@ before. Rotating the two keys is a separate step, taken later (KEY_ROTATION.md).
 - `/videos`: Video 1's summary no longer names warning letters: "What MDARIX does, the post-market problems it helps
   you catch early, what the 30-day trial gives you, and the quality loop." A test checks that no website source names
   warning letters or class actions (the legal documents excepted).
+- In the workspace, the eight sentences that named warning letters now name FDA inspection findings instead: the
+  Complaints › Second look note, five Readiness "why it matters" lines and two Getting started steps (for example
+  "Recent FDA inspection findings include complaints cancelled or logged as inquiries…"). The facts are unchanged.
 
 ### Fixed
 

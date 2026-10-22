@@ -43,21 +43,20 @@ DECIDED_SIGNAL_STATUSES = ("DECISION_RECORDED", "CLOSED")
 # Why each check matters, in plain words; worded from published 2025-2026 FDA warning letters and inspection
 # summaries and from the EU, UK and Canadian vigilance rules (MDARIX gives no legal advice).
 WHY = {
-    "COMPLAINTS_TO_RECHECK": "2026 FDA warning letters cite complaints cancelled or logged as inquiries although they "
-    "met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem.",
-    "COMPLAINTS_PAST_TARGET": "Complaint handling is among the observations FDA cites most often; complaint backlogs "
-    "were cited in 2026 warning letters.",
-    "REPORTING_CLOCKS": "A 2026 warning letter cites a report filed about nine months late; FDA, EU, UK and Canadian "
+    "COMPLAINTS_TO_RECHECK": "Recent FDA inspection findings include complaints cancelled or logged as inquiries although "
+    "they met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem.",
+    "COMPLAINTS_PAST_TARGET": "Complaint handling is among the observations FDA cites most often, complaint backlogs "
+    "included.",
+    "REPORTING_CLOCKS": "FDA has cited a report filed about nine months late; FDA, EU, UK and Canadian "
     "rules set reporting windows of 2 to 30 days from awareness.",
     "TRENDS_WITHOUT_ACTION": "Trends must reach CAPA and the risk file: FDA's QMSR inspections follow the risk file, "
     "and the EU MDR (Article 88) asks for statistically significant increases to be reported.",
-    "HARM_CLOSED_WITHOUT_CASE": "A 2026 warning letter cites complaints of potentially fatal harm closed without "
-    "corrective action.",
+    "HARM_CLOSED_WITHOUT_CASE": "FDA has cited complaints of potentially fatal harm closed without corrective action.",
     "CAPA_EFFECTIVENESS": "CAPA is among the observations FDA cites most often, and closing a CAPA without verifying "
     "that it worked is a recurring finding.",
     "TRIAGE_OVERDUE": "Signals left waiting are trends nobody has looked at.",
     "RISK_FILE_INPUT": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as "
-    "input to risk management a significant deficiency (the first QMSR warning letter cited it); ISO 14971:2019 "
+    "input to risk management a significant deficiency; ISO 14971:2019 "
     "clause 10 asks for post-production information to reach risk management.",
 }
 
