@@ -391,11 +391,17 @@ def readiness(db: Session, tenant_id: uuid.UUID, today: date | None = None) -> d
     """Every check, the four home numbers first. A check that cannot be read (an older database) is shown as such and
     never fails the others."""
     from backend.app.case_workflow.readiness import safely
+    from backend.app.signals.insight import shared_trend_boards
 
     today = today or today_utc()
     checks = []
-    for step in CHECKS:
-        found = safely(db, step.__name__, lambda session, step=step: step(session, tenant_id, today))
+    # The trend check and the risk file check read the same trend board: once (0.10.43).
+    with shared_trend_boards():
+        found_checks = [
+            (step, safely(db, step.__name__, lambda session, step=step: step(session, tenant_id, today)))
+            for step in CHECKS
+        ]
+    for step, found in found_checks:
         if found is None:
             code = step.__name__.upper()
             found = {

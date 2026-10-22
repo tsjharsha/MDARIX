@@ -72,6 +72,18 @@ export function signedDecisionLabel(code: unknown): string {
 }
 
 /**
+ * The version a signature was given on, in words: the brief the decision was made on ("Decision Brief DBV000012
+ * version 2", the report's ``version_label``), or for an older approval the moment the decision was last changed. Never
+ * the version's own code: for a decision on a brief that is a 64-character fingerprint (0.10.43).
+ */
+export function signedVersionText(item: { version_label?: unknown; object_version?: unknown }): string {
+  const label = safeText(item.version_label);
+  if (label) return label;
+  const version = String(item.object_version ?? "");
+  return /^\d{4}-\d{2}-\d{2}/.test(version) ? `The decision as of ${formatDateTime(version)}` : "Not available";
+}
+
+/**
  * The overall result of a verification report in words: every signature valid, at least one that no longer matches
  * what was signed (a problem, never shown as merely unsigned), or no signature yet.
  */
@@ -252,9 +264,7 @@ export function SignatureVerificationWorkspace() {
                 <span>
                   Signed by: {signerLabel(String(item.signer_user_id), item.signer_role, people, me, item.signer_name)}
                 </span>
-                <span>
-                  Decision version of {formatDateTime(item.object_version, String(item.object_version ?? "—"))}
-                </span>
+                <span>Signed version: {signedVersionText(item)}</span>
                 <span>
                   Signed: {formatUtc(item.signed_at)} ({formatDateTime(item.signed_at)})
                 </span>

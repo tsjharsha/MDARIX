@@ -298,13 +298,15 @@ def trial_insights(
 
 @router.get("/trial/story")
 def trial_story_chapters(
+    findings: bool = True,
     ctx: AuthenticatedRequestContext = Depends(get_request_context),
     db: Session = Depends(get_db),
     data: Session = Depends(get_data_plane_db),
 ):
     """The quality loop chapter by chapter: what the trial's records show in each and whether it acted on it. Right
     after an import, while its signals are still being found, ``signals_pending`` is true and the trend chapter says
-    so (Getting started reads the story again until it is false)."""
+    so (Getting started reads the story again until it is false). ``findings=false``: which chapters were tried and
+    the next one only, without what the records show (the workspace's "Chapter done" notice)."""
     from backend.app.ai_settings import ai_ready
     from backend.app.signals.hooks import detection_pending
     from backend.app.trial import citations, story
@@ -321,6 +323,7 @@ def trial_story_chapters(
         cited=tuple(cited),
         tried_before=story.remembered(profile),
         signals_pending=detection_pending(db, data, tenant_id),
+        with_findings=findings,
     )
 
 

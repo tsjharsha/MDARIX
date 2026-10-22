@@ -265,7 +265,11 @@ def backlog(
     page_size: int = 25,
     today: date | None = None,
 ) -> dict:
-    """Open complaints that are in no signal and no case, oldest first, against the organization's target days."""
+    """Open complaints that are in no signal and no case, oldest first, against the organization's target days.
+
+    The board is counted from a few columns of each complaint; only the page shown reads the whole records. After a
+    large import thousands of complaints are open, and reading every one whole (with all its timestamps, which the
+    database driver parses in Python) was most of the time of Readiness and of the trial's story (0.10.43)."""
     today = today or today_utc()
     target = settings_of(db, tenant_id)["backlog_target_days"]
     in_signal = exists().where(
@@ -275,29 +279,27 @@ def backlog(
         _same_organization(InvestigationComplaint.tenant_id), InvestigationComplaint.complaint_id == Complaint.id
     )
     query = (
-        _records(db, tenant_id)
-        .add_columns(ComplaintSecondLook.decision)
+        db.query(Complaint.id, Complaint.status, Complaint.complaint_type, ComplaintSecondLook.decision, RECEIVED_AT)
         .outerjoin(
             ComplaintSecondLook,
             (ComplaintSecondLook.complaint_id == Complaint.id) & (ComplaintSecondLook.tenant_id == Complaint.tenant_id),
         )
-        .filter(~in_signal, ~in_case)
+        .filter(Complaint.tenant_id == tenant_id, ~in_signal, ~in_case)
     )
     if product_id:
         query = query.filter(Complaint.product_id == product_id)
     rows = query.order_by(RECEIVED_AT.asc(), Complaint.id).limit(READ_LIMIT + 1).all()
     truncated = len(rows) > READ_LIMIT
     items = []
-    for complaint, product_name, version, received, decision in rows[:READ_LIMIT]:
-        if not rules.counts_as_open(complaint.status, complaint.complaint_type, decision):
+    for complaint_id, status, complaint_type, decision, received in rows[:READ_LIMIT]:
+        if not rules.counts_as_open(status, complaint_type, decision):
             continue
-        record = record_of(complaint, product_name, version, received)
         age = rules.age_days(_day(received), today)
         if age is None:
             continue
         items.append(
             {
-                **record,
+                "id": str(complaint_id),
                 "age_days": age,
                 "days_past_target": max(0, age - target),
                 "state": rules.backlog_state(age, target),
@@ -320,6 +322,8 @@ def backlog(
     wanted = {"past_target": "PAST_TARGET", "due_soon": "DUE_SOON"}.get(show)
     chosen = [item for item in items if item["state"] == wanted] if wanted else items
     start = (page - 1) * page_size
+    shown = chosen[start : start + page_size]
+    records = _records_by_id(db, tenant_id, [uuid.UUID(item["id"]) for item in shown])
     return {
         "summary": summary,
         "show": show if wanted else "all",
@@ -328,5 +332,20 @@ def backlog(
         "page_size": page_size,
         "pages": max(1, -(-len(chosen) // page_size)),
         "truncated": truncated,
-        "items": chosen[start : start + page_size],
+        # Each complaint shown whole, then what the board says of it (a complaint deleted meanwhile is left out).
+        "items": [{**records[item["id"]], **item} for item in shown if item["id"] in records],
     }
+
+
+# At most this many complaints are read whole by one statement (the driver sends one parameter per id).
+RECORDS_CHUNK = 5000
+
+
+def _records_by_id(db: Session, tenant_id: uuid.UUID, ids: list[uuid.UUID]) -> dict[str, dict]:
+    """``{complaint id: record_of(...)}`` of these complaints of the organization."""
+    found: dict[str, dict] = {}
+    for start in range(0, len(ids), RECORDS_CHUNK):
+        for row in _records(db, tenant_id).filter(Complaint.id.in_(ids[start : start + RECORDS_CHUNK])).all():
+            record = record_of(*row)
+            found[record["id"]] = record
+    return found

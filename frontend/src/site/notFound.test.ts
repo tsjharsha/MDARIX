@@ -62,8 +62,12 @@ describe("addresses that are no page get a real 404", () => {
     }
     expect(caddyfile).toContain("rewrite * /404.html");
     expect(caddyfile).toMatch(/file_server \{\s*status 404\s*\}/);
-    // Built files and pre-rendered pages come first; the API, assets and videos keep their own handlers above.
-    expect(caddyfile.indexOf("@built file {path} {path}/index.html")).toBeLessThan(caddyfile.indexOf("@shell"));
+    // Built files and pre-rendered pages come first, except the not-found page itself: /404.html opened by its own
+    // name answered 200 before 0.10.43, and now gets the 404 like any address that is no page.
+    expect(caddyfile).toMatch(/@built \{\s*file \{path\} \{path\}\/index\.html\s*not path \/404\.html\s*\}/);
+    expect(shell.test("/404.html")).toBe(false);
+    // The API, assets and videos keep their own handlers above.
+    expect(caddyfile.indexOf("@built {")).toBeLessThan(caddyfile.indexOf("@shell"));
     for (const handler of ["handle /api/*", "handle /assets/*", "handle_path /media/videos/*"])
       expect(caddyfile.indexOf(handler), handler).toBeLessThan(caddyfile.indexOf("@built"));
   });

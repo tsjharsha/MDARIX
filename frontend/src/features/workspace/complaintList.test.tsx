@@ -110,7 +110,7 @@ describe("Complaints › Complaint list", () => {
   it("is a tab of Complaints that a link opens", () => {
     const markup = render(<ComplaintsSection tab="Complaint list?version=PVR000002&country=US" />);
     expect(markup).toMatch(/aria-selected="true"[^>]*>Complaint list</);
-    expect(markup).toContain("Loading Complaints in your organization");
+    expect(markup).toContain("Loading Complaint list");
   });
 
   it("shows the filters chosen, with what the complaints record to choose from", () => {

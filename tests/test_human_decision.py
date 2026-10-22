@@ -270,6 +270,9 @@ def test_signing_a_decision_records_everything_and_verifies(org):
     ]
     # The report names the signer, for the signer too (DEV-024), and for a colleague who reads it.
     assert verification["signatures"][0]["signer_name"] == "Approver Brief"
+    # The signed version in words (0.10.43): the brief version, not its content hash.
+    assert verification["signatures"][0]["object_version"] == brief["content_hash"]
+    assert verification["signatures"][0]["version_label"] == f"Decision Brief {brief['business_id']} version 1"
     viewer, _ = org["viewer"]
     read_by_colleague = viewer.get(f"/api/v1/governance/decisions/{decision['id']}/signature-verification")
     assert read_by_colleague.status_code == 200, read_by_colleague.text
