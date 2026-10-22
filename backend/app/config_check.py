@@ -1,15 +1,18 @@
 """Refuse to start a staging or production server whose configuration is missing or unsafe.
 
 ``problems()`` lists every issue at once (so an operator fixes them in one pass); the API calls ``enforce()`` at
-startup and exits when the list is not empty. Local development and test runs are never blocked: they use local
-defaults on purpose. Run ``python -m backend.app.config_check`` on a server to see the list without starting it;
-``--offline`` skips the checks that need the database, for the pre-flight check before the migrate job has run.
+startup and exits when the list is not empty. ``warnings()`` lists what an operator should know but does not stop the
+server (older encryption keys still loaded); ``enforce()`` logs them. Local development and test runs are never
+blocked: they use local defaults on purpose. Run ``python -m backend.app.config_check`` on a server to see the list
+without starting it; ``--offline`` skips the checks that need the database, for the pre-flight check before the
+migrate job has run.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import logging
 import os
 import re
 import sys
@@ -17,6 +20,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from backend.app.runtime_env import PRODUCTION, STAGING, environment, is_production_like
+from security import keyring
+
+# Encryption keys with a keyring (security/keyring.py): <name>_ID names the current key, <name>S lists older ones.
+KEYRING_SETTINGS = ("MDARIX_MFA_ENCRYPTION_KEY", "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY")
 
 # Values that only ever appear in templates and examples; a server that still shows one was never configured.
 PLACEHOLDER_MARKERS = ("example.com", "example.test", "changeme", "change-me", "change_me")
@@ -126,6 +133,7 @@ def problems(*, offline: bool = False) -> list[str]:
     if _get("MDARIX_RLS_SYSTEM_TOKEN") == LOCAL_SYSTEM_TOKEN:
         add("MDARIX_RLS_SYSTEM_TOKEN must not be the public local-development value")
     add(_aes_key_problem("MDARIX_MFA_ENCRYPTION_KEY"))
+    found.extend(keyring.problems("MDARIX_MFA_ENCRYPTION_KEY"))
     add(_aes_key_problem("MDARIX_CONNECTOR_ENCRYPTION_KEY"))
     add(_secret_problem("MDARIX_DEMO_REQUEST_SALT"))
     add(_secret_problem("MDARIX_RATE_LIMIT_SALT"))
@@ -136,6 +144,7 @@ def problems(*, offline: bool = False) -> list[str]:
             add("MDARIX_OBJECT_STORAGE_BUCKET must be set for the s3 provider")
     elif provider == "local":
         add(_aes_key_problem("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY"))
+        found.extend(keyring.problems("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY"))
     else:
         add("MDARIX_OBJECT_STORAGE_PROVIDER must be s3 or local")
     if not _get("MDARIX_CLAMD_HOST") and not _get("MDARIX_MALWARE_SCANNER_COMMAND"):
@@ -550,12 +559,23 @@ def _runtime_role_problem() -> str | None:
     return None
 
 
+def warnings() -> list[str]:
+    """What an operator should know about this staging or production server that does not stop it (empty when
+    nothing): older encryption keys still loaded after a rotation."""
+    if not is_production_like():
+        return []
+    return [item for name in KEYRING_SETTINGS for item in keyring.warnings(name)]
+
+
 def enforce() -> None:
-    """Raise SystemExit listing every problem when this staging/production server is not safe to start."""
+    """Raise SystemExit listing every problem when this staging/production server is not safe to start; log the
+    warnings of one that may start."""
     found = problems()
     if found:
         lines = "\n".join(f"  - {item}" for item in found)
         raise SystemExit(f"MDARIX will not start in {environment()}: fix the configuration first.\n{lines}")
+    for item in warnings():
+        logging.getLogger("mdarix.config").warning("Configuration warning: %s", item)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -573,6 +593,8 @@ def main(argv: list[str] | None = None) -> int:
         print("Offline check: the system-scope token and the runtime role are verified once the database is reachable.")
     for issue in issues:
         print(f"- {issue}")
+    for item in warnings():
+        print(f"Warning: {item}")
     return 1 if issues else 0
 
 

@@ -161,7 +161,12 @@ def triage_overdue(db: Session, tenant_id, today) -> bytes:
     return _csv(
         ["Signal", "Title", "Status", "Triage due"],
         [
-            [row.business_id, row.title, row.status, row.due_at.date().isoformat() if row.due_at else None]
+            [
+                row.business_id,
+                service.signal_title(row),
+                row.status,
+                row.due_at.date().isoformat() if row.due_at else None,
+            ]
             for row in service.triage_overdue_rows(db, tenant_id)
         ],
     )
@@ -169,7 +174,10 @@ def triage_overdue(db: Session, tenant_id, today) -> bytes:
 
 def trends_without_action(db: Session, tenant_id, today) -> bytes:
     decided, rising = service.trends_without_action_rows(db, tenant_id, today)
-    rows = [["Decided signal, no CAPA and no risk review", row.business_id, row.title, None] for row in decided]
+    rows = [
+        ["Decided signal, no CAPA and no risk review", row.business_id, service.signal_title(row), None]
+        for row in decided
+    ]
     rows += [["Significant rise, no signal", None, item.get("name"), item.get("sentence")] for item in rising]
     return _csv(["Finding", "Signal", "Name", "Trend check"], rows)
 

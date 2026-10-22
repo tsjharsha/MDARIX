@@ -4,6 +4,13 @@ The local backend is intentionally retained for development.  Production must
 select ``MDARIX_OBJECT_STORAGE_PROVIDER=s3`` and provide an S3-compatible
 endpoint/bucket and credentials.  Object keys and signed URLs never cross a
 tenant prefix.
+
+Local files are encrypted with MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY (AES-GCM, bound to the file's object key). The key
+can rotate (security/keyring.py): with MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID set (for example k2), a file is written
+as "MDARIXENC2" with that key ID, and older keys stay readable in MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS
+("k1:<base64>"). Without a key ID, files are written as "MDARIXENC1" exactly as before key IDs existed; those are opened
+with the current key and then with each older key. ``python scripts/reencrypt_object_storage.py --apply`` re-encrypts
+every stored file with the current key after a rotation.
 """
 
 from __future__ import annotations
@@ -13,14 +20,71 @@ import hmac
 import os
 import subprocess
 import time
-import base64
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from urllib.parse import urlencode
 
+from security import keyring as keys
+
+ENCRYPTION_SETTING = "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY"
+_LEGACY_PREFIX = b"MDARIXENC1"
+_PREFIX = b"MDARIXENC2"
+
 
 class StorageError(RuntimeError):
     pass
+
+
+def object_keyring(environ=None) -> keys.Keyring | None:
+    """The current file key, its ID and the older keys still readable (from the environment, or ``environ``); None
+    without a key."""
+    return keys.load(ENCRYPTION_SETTING, environ=environ)
+
+
+def is_encrypted(body: bytes) -> bool:
+    return body.startswith(_PREFIX) or body.startswith(_LEGACY_PREFIX)
+
+
+def stored_key_id(body: bytes) -> str | None:
+    """The key ID a stored file was encrypted with (None for one encrypted without a key ID)."""
+    return keys.split_labelled(body, _PREFIX)[0] if body.startswith(_PREFIX) else None
+
+
+def seal_object(ring: keys.Keyring, object_key: str, content: bytes) -> bytes:
+    """A file's stored bytes: encrypted with the current key, in the labelled format once the key has an ID."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    nonce = os.urandom(12)
+    if ring.current_id is None:
+        return _LEGACY_PREFIX + nonce + AESGCM(ring.current).encrypt(nonce, content, object_key.encode())
+    sealed = AESGCM(ring.current).encrypt(nonce, content, f"{object_key}:{ring.current_id}".encode())
+    return keys.labelled_header(_PREFIX, ring.current_id) + nonce + sealed
+
+
+def open_object(ring: keys.Keyring, object_key: str, body: bytes) -> bytes:
+    """The content of an encrypted file: opened with the key it names, or (unlabelled) with the current key and then
+    each older key. Raises ValueError when none of them opens it."""
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    if body.startswith(_PREFIX):
+        key_id, rest = keys.split_labelled(body, _PREFIX)
+        key = ring.key_for(key_id)
+        if key is None:
+            raise ValueError(f"OBJECT_KEY_ID_UNKNOWN:{key_id}")
+        try:
+            return AESGCM(key).decrypt(rest[:12], rest[12:], f"{object_key}:{key_id}".encode())
+        except InvalidTag as exc:
+            raise ValueError("OBJECT_UNREADABLE") from exc
+    if not body.startswith(_LEGACY_PREFIX):
+        raise ValueError("OBJECT_NOT_ENCRYPTED")
+    nonce, ciphertext = body[len(_LEGACY_PREFIX) : len(_LEGACY_PREFIX) + 12], body[len(_LEGACY_PREFIX) + 12 :]
+    for key in ring.unlabelled_candidates():
+        try:
+            return AESGCM(key).decrypt(nonce, ciphertext, object_key.encode())
+        except InvalidTag:
+            continue
+    raise ValueError("OBJECT_UNREADABLE")
 
 
 class ObjectStorageService:
@@ -30,6 +94,8 @@ class ObjectStorageService:
         self.tenant_quota_bytes = int(os.getenv("MDARIX_OBJECT_STORAGE_TENANT_QUOTA_BYTES", str(100 * 1024 * 1024)))
         self.signing_secret = os.getenv("MDARIX_OBJECT_STORAGE_SIGNING_SECRET")
         self.encryption_key = os.getenv("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY")
+        # The key, its ID and the older keys as they are now, like every other setting read here.
+        self.encryption_settings = keys.settings(ENCRYPTION_SETTING)
         self.retention_days = int(os.getenv("MDARIX_OBJECT_STORAGE_RETENTION_DAYS", "2555"))
         if self.provider == "s3":
             try:
@@ -125,13 +191,7 @@ class ObjectStorageService:
             stored = content
             if self.encryption_key:
                 try:
-                    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-                    key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
-                    if len(key_bytes) not in {16, 24, 32}:
-                        raise ValueError("encryption key must decode to 16, 24, or 32 bytes")
-                    nonce = os.urandom(12)
-                    stored = b"MDARIXENC1" + nonce + AESGCM(key_bytes).encrypt(nonce, content, object_key.encode())
+                    stored = seal_object(object_keyring(self.encryption_settings), object_key, content)
                 except ImportError as exc:
                     raise StorageError("OBJECT_ENCRYPTION_REQUIRES_CRYPTOGRAPHY") from exc
                 except Exception as exc:
@@ -207,15 +267,11 @@ class ObjectStorageService:
             if not path.is_file():
                 raise FileNotFoundError(object_key)
             body = path.read_bytes()
-            if body.startswith(b"MDARIXENC1"):
+            if is_encrypted(body):
                 if not self.encryption_key:
                     raise StorageError("OBJECT_ENCRYPTION_KEY_NOT_CONFIGURED")
                 try:
-                    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-                    key_bytes = base64.urlsafe_b64decode(self.encryption_key + "=" * (-len(self.encryption_key) % 4))
-                    nonce, ciphertext = body[10:22], body[22:]
-                    body = AESGCM(key_bytes).decrypt(nonce, ciphertext, expected.encode())
+                    body = open_object(object_keyring(self.encryption_settings), expected, body)
                 except Exception as exc:
                     raise StorageError("OBJECT_DECRYPTION_FAILED") from exc
         self._audit("OBJECT_READ", str(tenant_id), expected, size=len(body))

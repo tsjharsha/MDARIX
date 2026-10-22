@@ -78,9 +78,11 @@ services:
       - ./videos:/media/videos:ro
     security_opt:
       - no-new-privileges:true
+    # Caddy runs as the image's caddy user (uid 10002, Dockerfile.web) with no capability at all: in this container's
+    # own network namespace ports from 80 up need none (the host's setting is not changed).
     cap_drop: [ALL]
-    # The caddy binary carries the file capability to bind 80/443; it must stay in the bounding set to start.
-    cap_add: [NET_BIND_SERVICE]
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "80"
     mem_limit: 256m
     cpus: 1.0
     healthcheck:
@@ -92,7 +94,31 @@ services:
       start_period: 20s
     depends_on:
       api: {condition: service_healthy}
+      web-volumes: {condition: service_completed_successfully}
     networks: [internal]
+    logging: *logging
+
+  # One-shot, before every start of web: gives Caddy's two volumes to the caddy user (infrastructure/docker/
+  # caddy-volumes.sh). Volumes written while Caddy ran as root (0.10.46 and earlier) hold the certificates of every
+  # domain and the ACME account; afterwards there is nothing to change and it ends at once. It runs as root with only
+  # the capabilities to change an owner and to look into folders it does not own, and no network. Before going back
+  # to a release that runs Caddy as root: docker compose run --rm --no-deps web-volumes 0:0
+  web-volumes:
+    image: ${MDARIX_IMAGE_REPOSITORY:-mdarix}/web:${MDARIX_RELEASE:-latest}
+    user: "0:0"
+    entrypoint: ["caddy-volumes"]
+    restart: "no"
+    read_only: true
+    network_mode: none
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    mem_limit: 64m
+    cpus: 0.5
     logging: *logging
 
   # One-shot: schema migrations, the least-privilege runtime role, the application grants and the system-scope token.

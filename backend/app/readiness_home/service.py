@@ -32,6 +32,7 @@ from backend.app.db.models.foundation import Capa, Complaint, InvestigationCompl
 from backend.app.db.models.reviews import CaseReview
 from backend.app.db.models.signals import InvestigationSignal, Signal
 from backend.app.signals.labels import AWAITING_TRIAGE
+from backend.app.signals.logic import display_title
 from backend.app.standards import DISCLAIMER, chips
 
 LOOKBACK_DAYS = 365
@@ -219,7 +220,7 @@ def trends_without_action_rows(db: Session, tenant_id: uuid.UUID, today: date) -
         .where(or_(has_capa, has_risk_review))
     )
     decided = (
-        db.query(Signal.id, Signal.business_id, Signal.title)
+        db.query(Signal.id, Signal.business_id, Signal.title, Signal.origin)
         .filter(Signal.tenant_id == tenant_id, Signal.status.in_(DECIDED_SIGNAL_STATUSES), ~acted_on)
         .order_by(Signal.updated_at.desc())
         .all()
@@ -234,7 +235,7 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
     results with no open signal."""
     decided, rising = trends_without_action_rows(db, tenant_id, today)
     value = len(decided) + len(rising)
-    items = [{"id": str(row.id), "ref": row.business_id, "label": row.title} for row in decided] + [
+    items = [{"id": str(row.id), "ref": row.business_id, "label": signal_title(row)} for row in decided] + [
         {"id": item["key"], "ref": None, "label": item["name"]} for item in rising
     ]
     return _check(
@@ -320,11 +321,16 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
+def signal_title(row) -> str | None:
+    """A signal row's title as every list shows it (a rule title from before 0.10.44 with its count grouped)."""
+    return display_title(row.title, row.origin)
+
+
 def triage_overdue_rows(db: Session, tenant_id: uuid.UUID) -> list:
     """Signals new or in triage past their due date: every one, for the check and the inspection pack."""
     now = datetime.now(timezone.utc)
     return (
-        db.query(Signal.id, Signal.business_id, Signal.title, Signal.status, Signal.due_at)
+        db.query(Signal.id, Signal.business_id, Signal.title, Signal.origin, Signal.status, Signal.due_at)
         .filter(Signal.tenant_id == tenant_id, Signal.status.in_(AWAITING_TRIAGE), Signal.due_at < now)
         .order_by(Signal.due_at)
         .all()
@@ -340,7 +346,7 @@ def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         ATTENTION if rows else CLEAR,
         "New or in triage, past the due date their priority set",
         {"section": "Signals", "tab": "Signal inbox"},
-        [{"id": str(row.id), "ref": row.business_id, "label": row.title} for row in rows],
+        [{"id": str(row.id), "ref": row.business_id, "label": signal_title(row)} for row in rows],
     )
 
 

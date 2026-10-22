@@ -10,6 +10,76 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.47] - 2026-10-22
+
+Keyrings for the MFA and file encryption keys, Caddy no longer runs as root, signal titles from before grouped counts
+read grouped, Platform Admin can change an account's name, and the workspace fits a 320 px phone, on the trial
+maintenance line (`release/0.10`). No migration: the schema stays at md48, and no stored record is rewritten. The API
+and web images change; the upgrade script rebuilds all images. What the deploy changes on the server: the release,
+the images, and the owner of Caddy's two volumes (the certificates and the ACME account become the `caddy` user's, by
+the new one-shot `web-volumes` job; nothing in them is moved or deleted, so the certificates are reused). The deploy
+rotates no key and sets none of the new key settings: with them unset, MFA secrets and files are sealed exactly as
+before. Rotating the two keys is a separate step, taken later (KEY_ROTATION.md).
+
+### Added
+
+- MFA and file encryption keys can rotate without re-enrolment or lost files, as the connector key can
+  (`security/keyring.py`). New settings, all empty by default: `MDARIX_MFA_ENCRYPTION_KEY_ID` and
+  `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID` (the current key's ID, such as `k2`) and `MDARIX_MFA_ENCRYPTION_KEYS` and
+  `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS` (older keys still readable, `k1:<base64>`). With a key ID set, a new MFA
+  secret is sealed as `MDARIXMFA2` and a new file written as `MDARIXENC2`, each recording its key ID, which is also
+  bound into what AES-GCM authenticates (with the account, or the file's object key, as before). Values sealed before
+  (`MDARIXMFA1`, `MDARIXENC1`) still open, with the current key and then with each older key, so the key in use today
+  becomes `k1` at the first rotation. Without a key ID nothing changes, byte for byte in format: 0.10.46 opens what
+  0.10.47 seals.
+- `scripts/reseal_mfa_secrets.py` (run in the migrate job) and `scripts/reencrypt_object_storage.py` (run in an API
+  container, where the files are): dry run by default, listing counts only; `--apply` re-seals each secret or file
+  with the current key, checks that it opens with that key alone before it replaces the old value (a file through a
+  temporary file renamed over it, keeping its owner, permissions and modification time), reports what it cannot open
+  and leaves it, and exits 1 if anything was left. Safe to run again.
+- The configuration check refuses a malformed key ID, a malformed older key, an ID listed twice and the current key ID
+  listed among the older keys, and warns (at start and in `python -m backend.app.config_check`) while older keys are
+  still loaded. `scripts/move_tenant_to_cell.py` carries the new settings to the cell. KEY_ROTATION.md's "Rotate only
+  with a plan" is now "Rotate with a keyring: MFA and file encryption keys" (backup, new keys as `k2` with the old as
+  `k1`, restart, dry runs, apply, check an MFA sign-in and a download, remove `k1` a week later, keep old keys while
+  backups made with them are kept); documented in `.env.production.example` and ENVIRONMENT_VARIABLES.md.
+- Platform Admin › Identity & Access › Platform users: **Change name**, for each account of the administrator's own
+  organization, one's own included. A dialog confirms the change, says what stays the same (email address, role,
+  access) and checks the name as the server does: trimmed, inner spaces as one, 1 to 120 characters, changed; the
+  result shows as "Name changed to …" and in the list. `PATCH /api/v1/admin/control-plane/users/{id}` now checks a
+  `display_name` the same way (`422 DISPLAY_NAME_INVALID`; it took any value before) and its `USER_UPDATED` audit event
+  records the name before and after.
+
+### Changed
+
+- Caddy runs as the user `caddy` (uid 10002) instead of root (SEC-10), with no capability: the `web` service drops
+  `cap_add: NET_BIND_SERVICE` and sets `net.ipv4.ip_unprivileged_port_start=80` in its own network namespace (the
+  host's setting is unchanged), so it still listens on 80 and 443 (HTTP/3 too) behind `no-new-privileges`. Before every
+  start of `web`, the one-shot `web-volumes` job (root, only the `CHOWN` and `DAC_READ_SEARCH` capabilities, no network)
+  gives `/data` and `/config` to `caddy`; once they are, it changes nothing. Tested with volumes written by the 0.10.46
+  image: the new image served the same certificate, as uid 10002; `docker compose run --rm --no-deps web-volumes 0:0`
+  gives the volumes back to root before going back to 0.10.46 (DEPLOYMENT.md), which then served it again.
+- Signals raised by the threshold rule before 0.10.44 stored their titles with the count ungrouped ("2290 complaints:
+  …"). The API now shows them grouped ("2,290 complaints: …") wherever a signal's title is returned: the Signal inbox
+  and a signal, its triage task in My Work, Readiness's findings and the inspection pack, the decision brief's signals
+  and the case audit trail. Only titles MDARIX wrote are touched (origin `THRESHOLD_RULE`, which no one can edit), and
+  only their leading count; a title a person wrote, an imported one and a suggested one are shown as written. The stored
+  title is not rewritten. A search for "2,290" also finds such a signal. No email quotes a signal's title.
+- `/videos`: Video 1's summary no longer names warning letters: "What MDARIX does, the post-market problems it helps
+  you catch early, what the 30-day trial gives you, and the quality loop." A test checks that no website source names
+  warning letters or class actions (the legal documents excepted).
+
+### Fixed
+
+- The signed-in workspace on a phone: the top bar ran 13 px past a 360 px screen and 53 px past 320 px (the Sign out
+  button was off the screen), and the whole page scrolled sideways. Below 640 px the top bar's spacing and its icon
+  buttons are tighter, and with a free trial's badge the organization's name (an icon alone at that width) is left out
+  below 400 px: the page heading names the organization. Getting started also ran past 360 and 320 px: the import
+  options' selects (as wide as their longest choice), the "What were you cited for?" columns (280 px at least) and a
+  long action button now fit, and a panel's title and actions take two lines when needed. Measured on Getting
+  started, the complaint list and the Signal inbox at 390, 360 and 320 px: the page is as wide as the screen (before:
+  28 and 68 px wider on Getting started, 13 and 53 px on the others). Wider screens are unchanged.
+
 ## [0.10.46] - 2026-10-22
 
 A domain switch: the main address of MDARIX is **https://mdarix.com**, and `mdarix.in` and the other registered

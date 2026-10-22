@@ -18,6 +18,7 @@ from backend.app.business_ids import as_uuid
 from backend.app.case_intelligence import rules as intelligence
 from backend.app.case_workflow import readiness, states
 from backend.app.decision_brief import rules
+from backend.app.signals.logic import display_title
 
 logger = logging.getLogger("mdarix.decision_brief")
 
@@ -96,7 +97,7 @@ def signals_section(db: Session, case) -> list[dict]:
         {
             "id": str(row.id),
             "business_id": row.business_id,
-            "title": row.title,
+            "title": display_title(row.title, row.origin),
             "priority": row.confirmed_priority or row.suggested_priority,
             "status": row.status,
             "complaint_count": int(row.complaint_count or 0),

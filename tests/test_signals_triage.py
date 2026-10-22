@@ -820,3 +820,55 @@ def test_other_organizations_signals_are_not_found(org):
     with SessionLocal() as db:
         bind_tenant(db, org["tenant_id"])
         assert db.query(SignalComplaint).filter(SignalComplaint.signal_id == uuid.UUID(signal["id"])).count() == 1
+
+
+def test_a_rule_title_from_before_grouped_counts_reads_grouped_everywhere_and_stays_stored(org):
+    # Rule signals raised before 0.10.44 stored "2290 complaints: ..."; the API shows "2,290 complaints: ..." in the
+    # inbox, the signal, its triage task and Readiness, without rewriting the stored title (no migration). A title a
+    # person wrote is never touched, even one that looks like a rule's.
+    from backend.app.readiness_home import service as readiness
+    from backend.app.signals import service as signal_service
+
+    lead, lead_id = org["lead"]
+    tenant_id = org["tenant_id"]
+    seed = _seed(tenant_id, complaints=2, problem="GROUPING")
+    old_title = "2290 complaints: unspecified problem on Grouping Pump Rev C in 30 days"
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        rule = signal_service.create_signal(
+            db,
+            tenant_id,
+            title=old_title,
+            origin="THRESHOLD_RULE",
+            product_id=seed["product_id"],
+            product_version_id=seed["version_id"],
+            complaint_ids=[uuid.UUID(item) for item in seed["complaint_ids"]],
+            actor_ref=None,
+        )
+        rule.due_at = datetime.now(timezone.utc) - timedelta(days=1)
+        db.commit()
+        rule_id, rule_number = str(rule.id), rule.business_id
+    person = _manual(lead, {**seed, "complaint_ids": []}, title="2290 complaints: our own wording kept as written")
+    grouped = "2,290 complaints: unspecified problem on Grouping Pump Rev C in 30 days"
+
+    listing = lead.get("/api/v1/triage/signals", params={"product_id": seed["product_id"]}).json()["items"]
+    titles = {item["id"]: item["title"] for item in listing}
+    assert titles == {rule_id: grouped, person["id"]: "2290 complaints: our own wording kept as written"}
+    assert lead.get(f"/api/v1/triage/signals/{rule_id}").json()["title"] == grouped
+    found = lead.get("/api/v1/triage/signals", params={"q": "2,290 complaints: unspecified"}).json()["items"]
+    assert [item["id"] for item in found] == [rule_id]
+
+    queue = lead.get("/api/v1/tasks", params={"view": "queue", "page_size": 200, "q": rule_number}).json()["items"]
+    assert [item["title"] for item in queue] == [f"Triage {rule_number}: {grouped}"]
+    mine = lead.get("/api/v1/tasks", params={"view": "queue", "page_size": 200, "q": person["business_id"]}).json()
+    assert [item["title"] for item in mine["items"]] == [
+        f"Triage {person['business_id']}: 2290 complaints: our own wording kept as written"
+    ]
+
+    with SessionLocal() as db:
+        bind_tenant(db, tenant_id)
+        overdue = readiness.triage_overdue(db, tenant_id, datetime.now(timezone.utc).date())
+        assert {"id": rule_id, "ref": rule_number, "label": grouped} in overdue["items"]
+        assert db.query(Signal.title).filter(Signal.id == uuid.UUID(rule_id)).scalar() == old_title  # as stored
+        task_title = db.query(WorkflowTask.title).filter(WorkflowTask.source_entity_id == uuid.UUID(rule_id)).scalar()
+        assert task_title == f"Triage {rule_number}: {old_title}"

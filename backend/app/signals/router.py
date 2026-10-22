@@ -16,7 +16,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import case, false, func, or_, select
+from sqlalchemy import and_, case, false, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.access.permissions import AI_RUN, INVESTIGATION_CREATE, SIGNAL_TRIAGE, require_permission
@@ -153,13 +153,16 @@ def _filtered(
     if text:
         escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
-        query = query.filter(
-            or_(
-                Signal.title.ilike(pattern, escape="\\"),
-                Signal.business_id.ilike(pattern, escape="\\"),
-                Signal.problem_key.ilike(pattern, escape="\\"),
-            )
-        )
+        matches = [
+            Signal.title.ilike(pattern, escape="\\"),
+            Signal.business_id.ilike(pattern, escape="\\"),
+            Signal.problem_key.ilike(pattern, escape="\\"),
+        ]
+        # "2,290" also finds a rule signal raised before 0.10.44, whose stored title reads "2290" (logic.display_title).
+        plain = logic.ungrouped_search(escaped)
+        if plain is not None:
+            matches.append(and_(Signal.origin == logic.RULE_ORIGIN, Signal.title.ilike(f"%{plain}%", escape="\\")))
+        query = query.filter(or_(*matches))
     return query
 
 

@@ -26,6 +26,8 @@ from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
 from backend.app.role_codes import role_code
 from backend.app.sorting import order_query
+from backend.app.signals.labels import SIGNAL_SOURCE
+from backend.app.signals.logic import RULE_ORIGIN, display_task_title
 from backend.app.sorting_lookup import lookup_order, person_names
 from backend.app.workflow import tasks as service
 from backend.app.workflow.labels import (
@@ -330,6 +332,17 @@ def _needs_impact_conclusion(task: WorkflowTask) -> bool:
     return task.task_type == "IMPACT_ASSESSMENT" and bool((task.details or {}).get("impact_assessment_id"))
 
 
+def _rule_signal_ids(db: Session, model, tenant_id, ids) -> set[str]:
+    """The signals among ``ids`` that a rule raised: their triage tasks quote a title MDARIX wrote."""
+    wanted = wanted_ids(ids)
+    if not wanted:
+        return set()
+    rows = db.query(model.id).filter(
+        model.tenant_id == tenant_id, model.id.in_(list(wanted)), model.origin == RULE_ORIGIN
+    )
+    return {str(row_id) for (row_id,) in rows}
+
+
 def serialize_tasks(db: Session, control_db: Session, actor: Actor, rows: list[WorkflowTask]) -> list[dict]:
     """The Task JSON of each row, with business ids, the case and assignee names read in bulk."""
     if not rows:
@@ -359,9 +372,11 @@ def serialize_tasks(db: Session, control_db: Session, actor: Actor, rows: list[W
                 "product_id": str(product_id) if product_id else None,
             }
     names = names_by_id(control_db, actor.tenant_id, (task.assigned_user_id for task in rows))
+    rule_signals = _rule_signal_ids(db, models["Signal"], actor.tenant_id, by_type.get(SIGNAL_SOURCE, set()))
     items = []
     for task in rows:
         business_id = sources.get((task.source_entity_type, str(task.source_entity_id)))
+        rule_signal = task.source_entity_type == SIGNAL_SOURCE and str(task.source_entity_id) in rule_signals
         kind = SOURCE_LABELS.get(task.source_entity_type, task.source_entity_type)
         is_open = task.status in OPEN_TASK_STATUSES
         items.append(
@@ -370,7 +385,7 @@ def serialize_tasks(db: Session, control_db: Session, actor: Actor, rows: list[W
                 "business_id": task.business_id,
                 "task_type": task.task_type,
                 "task_type_label": task_type_label(task.task_type),
-                "title": task.title,
+                "title": display_task_title(task.title, business_id, RULE_ORIGIN if rule_signal else None),
                 "status": task.status,
                 "priority": task.priority,
                 "due_at": _iso(task.due_at),
