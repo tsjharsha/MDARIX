@@ -487,6 +487,8 @@ def test_signing_and_verification_read_the_decision_from_the_tenant_data_plane()
         verification = approver_client.get(f"/api/v1/governance/decisions/{decision.id}/signature-verification")
         assert verification.status_code == 200
         assert verification.json()["signatures"][0]["valid"] is True
+        # A legacy approval's version is when the decision last changed: no brief to name (the screen shows the date).
+        assert verification.json()["signatures"][0]["version_label"] is None
     finally:
         app.dependency_overrides.pop(get_data_plane_db, None)
         db.query(SignedApprovalRecord).filter_by(object_id=decision.id).delete()

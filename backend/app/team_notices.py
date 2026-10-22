@@ -13,8 +13,10 @@ Two kinds of organization change their team:
   them as well (the invitation itself is its own email, sent at once with its link).
 * The same emails when MDARIX support makes such a change in Platform Admin (adding, suspending or restoring a
   Customer Administrator, resetting an account's MFA: backend/app/access/platform_customer_admins.py), with the actor
-  shown as "MDARIX support", never the staff member's name. Nothing for a free trial: its emails name its owner as the
-  one who made the change.
+  shown as "MDARIX support", never the staff member's name. In a free trial MDARIX support only resets the MFA of one
+  of its people (a trial has no administrator): that person is told, as by their owner's reset but with "MDARIX
+  support" as the one who did it (0.10.43); the owner's confirmation and the MDARIX team alert are for the owner's own
+  changes.
 
 Each recipient's email is one ``TEAM_CHANGE_NOTICE`` outbox event, queued in the same transaction as the change, so
 the worker retries a failed address alone (outbox/worker.py: one event, one commit) and nobody gets the same email
@@ -169,17 +171,42 @@ def queue_support_change(
     """Queue the emails of a change MDARIX support made to a paying organization's team in Platform Admin (the caller
     commits, with the change), as ``queue_organization_change`` does for an administrator's: the person changed
     (unless ``tell_person`` is false) and, when it concerns an administrator account, the organization's active
-    Customer Administrators. The actor reads "MDARIX support": the staff member is never named. Nothing for a free
-    trial, for MDARIX's own organization or for an MDARIX staff account. Returns how many emails were queued."""
+    Customer Administrators. The actor reads "MDARIX support": the staff member is never named. In a free trial, an
+    MFA reset is told to the person whose MFA was reset (``_queue_trial_support_change``). Nothing for MDARIX's own
+    organization or for an MDARIX staff account. Returns how many emails were queued."""
     from backend.app.support_access import platform_tenant_id
+    from backend.app.trial.service import trial_subscription
 
     if change not in ORGANIZATION_CHANGES:
         raise ValueError(f"Unknown team change {change}")
     if str(person.tenant_id) == str(platform_tenant_id(db)):
         return 0
+    if trial_subscription(db, person.tenant_id) is not None:
+        return _queue_trial_support_change(db, person, change, now=now, tell_person=tell_person)
     return _queue_organization(
         db, person, change, {"actor_user_id": None, "actor": MDARIX_SUPPORT}, now=now, tell_person=tell_person
     )
+
+
+def _queue_trial_support_change(
+    db: Session, person: AuthUser, change: str, *, now: datetime | None, tell_person: bool
+) -> int:
+    """MDARIX support reset the MFA of a free trial's person (its owner or a colleague): one email, to that person, in
+    the trial's words with "MDARIX support" as the one who did it. MDARIX support makes no other change to a trial's
+    team, and none is told here."""
+    if change != emailer.TEAM_MFA_RESET or not tell_person or is_platform_admin_role(person.role):
+        return 0
+    now = now or datetime.now(timezone.utc)
+    payload = {
+        "kind": TRIAL,
+        "change": change,
+        "user_id": str(person.id),
+        "actor_user_id": None,
+        "actor": MDARIX_SUPPORT,
+        "occurred_at": now.isoformat(),
+    }
+    _queue(db, person.tenant_id, person.id, PERSON, payload, now)
+    return 1
 
 
 def _queue_organization(
@@ -312,11 +339,20 @@ def _trial_email(db: Session, payload: dict, tenant_id, person: AuthUser | None,
                 emailer.send_trial_invitation_withdrawn,
                 {"owner": owner_name, "organization": organization},
             )
+        # A reset MDARIX support made in Platform Admin names MDARIX support, never the staff member.
+        by_support = payload.get("actor") == MDARIX_SUPPORT
         return (
             person.username,
             emailer.send_trial_mfa_reset_notice,
-            {"owner": owner_name, "organization": organization, "when": when},
+            {
+                "owner": MDARIX_SUPPORT_NAME if by_support else owner_name,
+                "organization": organization,
+                "when": when,
+                "by_support": by_support,
+            },
         )
+    if payload.get("actor") == MDARIX_SUPPORT:
+        return None  # MDARIX support's reset is told to the person only
     details = {"change": change, "organization": organization, "when": when}
     if audience == OWNER:
         if not _active(owner) or not team.is_trial_owner(db, tenant_id, owner):

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { decisionLabel, signedDecisionLabel, signerLabel, verificationSummary } from "./SignatureVerificationWorkspace";
+import {
+  decisionLabel,
+  signedDecisionLabel,
+  signedVersionText,
+  signerLabel,
+  verificationSummary,
+} from "./SignatureVerificationWorkspace";
 
 const people = [{ id: "u-2", display_name: "Asha Rao" }];
 
@@ -52,5 +58,22 @@ describe("signature verification labels", () => {
     expect(verificationSummary("INVALID").label).toMatch(/^Invalid/);
     expect(verificationSummary("NOT_SIGNED")).toEqual({ label: "Not signed", tone: "neutral" });
     expect(verificationSummary(undefined).tone).toBe("neutral");
+  });
+
+  it("names the signed version in words, never its fingerprint (0.10.43)", () => {
+    const hash = "9f2c4be1d0a7c3e5f6a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0";
+    // A decision on a brief: the report names the brief version.
+    expect(signedVersionText({ version_label: "Decision Brief DBV000012 version 2", object_version: hash })).toBe(
+      "Decision Brief DBV000012 version 2",
+    );
+    // Without the label (the brief is no longer there), still never the hash.
+    expect(signedVersionText({ version_label: null, object_version: hash })).toBe("Not available");
+    expect(signedVersionText({ object_version: hash })).not.toContain(hash.slice(0, 8));
+    // An older approval: its version is the moment the decision was last changed, shown as a date.
+    const legacy = signedVersionText({ object_version: "2026-10-21T08:30:00+00:00" });
+    expect(legacy.startsWith("The decision as of ")).toBe(true);
+    expect(legacy).toContain("2026");
+    expect(legacy).not.toContain("T08:30:00");
+    expect(signedVersionText({})).toBe("Not available");
   });
 });

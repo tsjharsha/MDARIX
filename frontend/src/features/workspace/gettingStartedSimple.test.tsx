@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { newlyTried } from "./sections/ChapterDone";
+import { newlyTried, pageHidden } from "./sections/ChapterDone";
 import { ChapterRow, QuickRating, TRIAL_TABS, quickRatingShown } from "./sections/GettingStarted";
-import type { StoryChapter, TrialStory } from "./trialStory";
+import { TRIAL_PROGRESS_PATH, TRIAL_STORY_PATH, type StoryChapter, type TrialStory } from "./trialStory";
 
 const chapter = (code: string, number: number, done: boolean): StoryChapter => ({
   code,
@@ -29,6 +29,14 @@ describe("Getting started, simplified", () => {
     expect(newlyTried(null, story(["A"]))).toEqual([]);
     expect(newlyTried(["A"], story(["A"]))).toEqual([]);
     expect(newlyTried(["A"], story(["A", "B"])).map((item) => item.code)).toEqual(["B"]);
+  });
+
+  it("reads which chapters were tried only, not the findings, every half minute (0.10.43)", () => {
+    // The notice needs the chapters, which were tried and the next one: the story without its findings, a fraction
+    // of the full read that Getting started makes.
+    expect(TRIAL_PROGRESS_PATH).toBe(`${TRIAL_STORY_PATH}?findings=false`);
+    // Without a page (the test run, prerendering) nothing counts as hidden.
+    expect(pageHidden()).toBe(false);
   });
 
   it("shows a chapter in one line, with what MDARIX does and why it matters one click away", () => {

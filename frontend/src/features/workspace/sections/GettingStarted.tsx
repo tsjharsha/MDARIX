@@ -93,10 +93,13 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     refreshWhile: (data) => ownImported && !ownInsights(data),
   });
   const readingImported = ownImported && insights.state !== "error" && !ownInsights(insights.data);
-  // Right after an import its signals are still being found: the story is read again until they are.
+  // Right after an import its signals are still being found: the story is read again until they are. A reload that
+  // fails for a moment (the server busy with the import's follow-up work) is asked again, so the page never stays on
+  // the story from before the import (``retry``).
   const loadedStory = useResource<TrialStory>(TRIAL_STORY_PATH, {
     refreshWhile: (data) => !!data.signals_pending,
     statusPath: DETECTION_STATUS_PATH,
+    retry: true,
   });
   // The last story read stays on screen while a reload is under way or has failed; with none at all, the headline
   // says the story could not be loaded and offers to try again (never "Reading..." for ever).

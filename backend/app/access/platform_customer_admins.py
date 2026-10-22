@@ -10,8 +10,9 @@ suspend the tenant instead). Every change is audited in the administrator's tena
 
 Adding, suspending or restoring a Customer Administrator and resetting an account's MFA are told by email as an
 administrator's own changes are (backend/app/team_notices.py): the person changed and the organization's other active
-Customer Administrators, with "MDARIX support" as the one who made the change. Nothing for a free trial, and nothing
-for an erasure (an erased person has no address); the platform administrator sees the result on screen.
+Customer Administrators, with "MDARIX support" as the one who made the change. In a free trial only the person whose
+MFA was reset is told (0.10.43). Nothing for an erasure (an erased person has no address); the platform administrator
+sees the result on screen.
 
 When an invitation email does not arrive, MDARIX support issues a fresh activation link for any account still
 waiting to be activated (``POST /platform-admin/users/{id}/activation-link``) and hands it over.

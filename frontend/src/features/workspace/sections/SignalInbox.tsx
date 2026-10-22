@@ -49,7 +49,7 @@ import {
   type StatusFilter,
   type TriageSummary,
 } from "../signals";
-import { StatusBadge } from "./common";
+import { StatusBadge, listTitle } from "./common";
 import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } from "./SignalDetail";
 
 /** The inbox's line while an import's signals are being found. */
@@ -139,7 +139,7 @@ export function SignalInbox({
     <>
       <Panel
         eyebrow="Signals"
-        title={`Signal inbox${list.data ? ` · ${list.data.total}` : ""}`}
+        title={listTitle("Signal inbox", list.data?.total)}
         source={list}
         action={
           canTriage ? (

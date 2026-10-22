@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 import uuid
 from collections import Counter, defaultdict
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func
@@ -276,6 +278,23 @@ def _open_signals(db: Session, tenant_id: uuid.UUID) -> dict:
     return found
 
 
+# The trend boards already read in one readiness read (``shared_trend_boards``), by organization, grouping, product
+# and day; None outside one.
+_SHARED_BOARDS: ContextVar[dict | None] = ContextVar("shared_trend_boards", default=None)
+
+
+@contextmanager
+def shared_trend_boards():
+    """Within the block, ``trend_board`` reads each board once: Readiness's trend check and its risk file check both
+    read the board by problem (backend/app/readiness_home/service.py), and nothing in a readiness read changes a
+    record. The callers only read the board they are given."""
+    token = _SHARED_BOARDS.set({})
+    try:
+        yield
+    finally:
+        _SHARED_BOARDS.reset(token)
+
+
 def trend_board(
     db: Session,
     tenant_id: uuid.UUID,
@@ -287,6 +306,16 @@ def trend_board(
     """The trend check of every group, most notable first, with what was counted."""
     grouping = grouping if grouping in trend_rules.GROUPINGS else "version"
     today = today or today_utc()
+    shared = _SHARED_BOARDS.get()
+    if shared is None:
+        return _trend_board(db, tenant_id, grouping, product_id, today)
+    key = (str(tenant_id), grouping, str(product_id) if product_id else None, today)
+    if key not in shared:
+        shared[key] = _trend_board(db, tenant_id, grouping, product_id, today)
+    return shared[key]
+
+
+def _trend_board(db: Session, tenant_id: uuid.UUID, grouping: str, product_id: uuid.UUID | None, today: date) -> dict:
     recent_start = today - timedelta(days=trend_rules.RECENT_DAYS - 1)
     since = recent_start - timedelta(days=trend_rules.HISTORY_DAYS)
     rows = _counted(db, tenant_id, since, product_id)

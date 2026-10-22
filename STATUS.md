@@ -94,6 +94,13 @@ What changed (details in `git log`):
 - Request a demo: its own page in the sign-in frame (name, work email, phone), stored in `demo_requests` and listed
   for Platform Admins (Customers & Tenants > Onboarding) to mark contacted or closed; validated, rate limited, with an
   optional email alert. Start free trial is unchanged.
+  No longer offered (checked 2026-10-21 for 0.10.43, in the code and behind the release's Caddyfile): since 0.10.5 the
+  website offers only the free trial. `DEMO_REQUESTS_OFFERED` is false (`frontend/src/site/offer.ts`), so no page
+  links to a demo request and `/request-demo` opens the free-trial sign-up instead of the form. With
+  `MDARIX_FEATURE_SET=mvp` (production) `POST /api/v1/public/demo-requests` answers 404; under `full` (the default:
+  development and CI) the route still accepts a request. Platform Admin > Identity & Access > Onboarding (no longer
+  under Customers & Tenants) still lists the earlier website requests, and the demo requests a free trial sends from
+  Getting started.
 - Each admin page has one `main` landmark (the consoles nested up to three).
 - Trial feedback: a trial workspace invites feedback (banner, "Not now" for three days) and has a Share feedback
   page: ratings, likelihood to recommend, features tried, what is good, what to improve, adoption, and consent to
