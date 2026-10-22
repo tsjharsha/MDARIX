@@ -3,6 +3,7 @@ import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import "./site/site.css";
 import { DEMO_REQUESTS_OFFERED } from "./site/offer";
 import { VideosPage } from "./site/videos";
+import { QUESTIONS_PATH, QuestionPage, QuestionsPage, questionAt } from "./site/questions";
 import { applyPageMeta } from "./site/seo";
 import { menuMove, menuPanelId, type MenuFocus } from "./site/menuKeys";
 import { lifecycleStages, platformGroups, platformPageOf, solutionGroups, FUTURE_LIFECYCLE } from "./site/content";
@@ -193,6 +194,7 @@ const FOOTER: Array<{ title: string; links: [string, string][] }> = [
     links: [
       ["About MDARIX", "/company"],
       ["Resources", "/resources"],
+      ["Questions and answers", QUESTIONS_PATH],
       ["Free trial videos", "/videos"],
       ...(DEMO_REQUESTS_OFFERED ? [["Request a demo", "/request-demo"] as [string, string]] : []),
       ["Contact", "/contact"],
@@ -224,6 +226,9 @@ export function PublicMegaSite({ path }: { path: string }) {
   const [{ page, hash }, setLocation] = useState(() => resolveSitePath(path, window.location.hash.slice(1)));
   const siteInfo = useSiteInfo();
   const firstPage = useRef(true);
+  const question = questionAt(page);
+  // The questions and answers are resources: the header marks Resources on them too.
+  const inResources = page === "/resources" || page === QUESTIONS_PATH || Boolean(question);
 
   // Normalize legacy URLs in the address bar (a "not found" address is left as typed), then bring the requested
   // section into view.
@@ -347,7 +352,7 @@ export function PublicMegaSite({ path }: { path: string }) {
               {name} <ChevronDown size={14} aria-hidden="true" />
             </button>
           ))}
-          <a href="/resources" className={page === "/resources" ? "is-current" : ""} onClick={closeMenus}>
+          <a href="/resources" className={inResources ? "is-current" : ""} onClick={closeMenus}>
             Resources
           </a>
           <a href="/company" className={page === "/company" ? "is-current" : ""} onClick={closeMenus}>
@@ -420,6 +425,8 @@ export function PublicMegaSite({ path }: { path: string }) {
         {page === "/resources" && <ResourcesPage />}
         {page === "/company" && <CompanyPage />}
         {page === "/videos" && <VideosPage />}
+        {page === QUESTIONS_PATH && <QuestionsPage />}
+        {question && <QuestionPage question={question} />}
         {page in LEGAL_PAGES && <LegalDocumentPage path={page as LegalPath} />}
         {page === "/security" && <SecurityPage />}
         {page === "/accessibility" && <AccessibilityPage />}

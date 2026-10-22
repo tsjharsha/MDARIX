@@ -71,6 +71,10 @@ describe("website home", () => {
 describe("the worked example", () => {
   it("says in the hero what MDARIX is for", () => {
     const html = renderToStaticMarkup(<HomePage />);
+    // Problem first (0.10.45): seeing the risk in the data, and trying it on your own data without a demo call.
+    expect(html).toContain("<h1>See the risk in your post-market data, not just collect it.</h1>");
+    expect(html).toContain("Try it on your own data today, no demo call needed.");
+    expect(html.indexOf("no demo call needed")).toBeLessThan(html.indexOf('href="/signup"'));
     expect(html).toContain("Post-market surveillance and complaint handling for medical devices");
     expect(html).toContain(
       "Complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place",

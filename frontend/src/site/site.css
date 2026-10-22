@@ -1866,6 +1866,106 @@
   border-top: 1px solid var(--ms-line);
   font-size: 14px;
 }
+/* Questions and answers (questions.tsx): the reading width of a legal page, the direct answer first in a teal-edged
+   block, the free trial in a box of its own. */
+.ms-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin-bottom: 18px;
+  color: var(--ms-muted);
+  font-size: 14px;
+}
+.ms-legal .ms-breadcrumb a {
+  color: var(--ms-teal);
+}
+.ms-answer {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 20px 22px;
+  border: 1px solid var(--ms-line);
+  border-left: 4px solid var(--ms-teal);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.ms-answer strong {
+  color: var(--ms-navy);
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.ms-answer p {
+  color: var(--ms-ink);
+  font-size: 18px;
+  line-height: 1.6;
+}
+.ms-question-mdarix .ms-check-list {
+  padding-left: 0;
+  list-style: none;
+}
+.ms-legal .ms-question-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 28px;
+}
+.ms-question-list li {
+  padding: 18px 20px;
+  border: 1px solid var(--ms-line);
+  border-radius: var(--ms-radius);
+  background: var(--ms-surface);
+}
+.ms-question-list h2 {
+  font-size: 19px;
+  line-height: 1.35;
+}
+.ms-legal .ms-question-list a {
+  color: var(--ms-navy);
+  text-decoration: none;
+}
+.ms-legal .ms-question-list a:hover {
+  color: var(--ms-teal);
+  text-decoration: underline;
+}
+.ms-question-list p {
+  margin-top: 6px;
+  color: var(--ms-ink-2);
+}
+.ms-question-trial {
+  display: grid;
+  gap: 8px;
+  margin-top: 32px;
+  padding: 20px 22px;
+  border-radius: var(--ms-radius);
+  background: var(--ms-mint);
+}
+.ms-question-trial strong {
+  color: var(--ms-navy);
+  font-size: 18px;
+}
+.ms-question-trial p {
+  color: var(--ms-ink-2);
+}
+.ms-question-trial .ms-btn {
+  justify-self: start;
+  margin-top: 6px;
+}
+.ms-question-more {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ms-line);
+}
+.ms-question-more h2 {
+  color: var(--ms-navy);
+  font-size: 18px;
+}
+.ms-question-more ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+  padding-left: 22px;
+  list-style: disc;
+}
 .ms-contact-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
