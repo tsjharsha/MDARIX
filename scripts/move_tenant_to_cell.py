@@ -101,10 +101,20 @@ SKIPPED = SESSION_TABLES | PLATFORM_TABLES
 CUSTOMER_CHILDREN = ("customer_contacts", "customer_domains", "customer_onboarding_drafts")
 KEY_SETTINGS = (
     "MDARIX_MFA_ENCRYPTION_KEY",
+    "MDARIX_MFA_ENCRYPTION_KEY_ID",
+    "MDARIX_MFA_ENCRYPTION_KEYS",
     "MDARIX_CONNECTOR_ENCRYPTION_KEY",
     "MDARIX_CONNECTOR_ENCRYPTION_KEY_ID",
     "MDARIX_CONNECTOR_ENCRYPTION_KEYS",
     "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY",
+    "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID",
+    "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS",
+    "MDARIX_OBJECT_STORAGE_SIGNING_SECRET",
+)
+OBJECT_SETTINGS = (
+    "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY",
+    "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID",
+    "MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS",
     "MDARIX_OBJECT_STORAGE_SIGNING_SECRET",
 )
 VERIFY = text("SELECT checked, first_broken_seq, last_seq, last_hash FROM public.mdarix_verify_audit_chain(:t)")
@@ -415,10 +425,7 @@ class TenantMove:
         source = ObjectStorageService(root=source_root)
         with environment(
             MDARIX_OBJECT_STORAGE_PROVIDER="local",
-            **{
-                name: target_env.get(name)
-                for name in ("MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY", "MDARIX_OBJECT_STORAGE_SIGNING_SECRET")
-            },
+            **{name: target_env.get(name) for name in OBJECT_SETTINGS},
         ):
             target = ObjectStorageService(root=target_root)
         tenant = str(self.tenant_id)

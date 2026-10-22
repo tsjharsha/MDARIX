@@ -32,6 +32,7 @@ from backend.app.db.models.foundation import Capa, Complaint, InvestigationCompl
 from backend.app.db.models.reviews import CaseReview
 from backend.app.db.models.signals import InvestigationSignal, Signal
 from backend.app.signals.labels import AWAITING_TRIAGE
+from backend.app.signals.logic import display_title
 from backend.app.standards import DISCLAIMER, chips
 
 LOOKBACK_DAYS = 365
@@ -42,21 +43,20 @@ DECIDED_SIGNAL_STATUSES = ("DECISION_RECORDED", "CLOSED")
 # Why each check matters, in plain words; worded from published 2025-2026 FDA warning letters and inspection
 # summaries and from the EU, UK and Canadian vigilance rules (MDARIX gives no legal advice).
 WHY = {
-    "COMPLAINTS_TO_RECHECK": "2026 FDA warning letters cite complaints cancelled or logged as inquiries although they "
-    "met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem.",
-    "COMPLAINTS_PAST_TARGET": "Complaint handling is among the observations FDA cites most often; complaint backlogs "
-    "were cited in 2026 warning letters.",
-    "REPORTING_CLOCKS": "A 2026 warning letter cites a report filed about nine months late; FDA, EU, UK and Canadian "
+    "COMPLAINTS_TO_RECHECK": "Recent FDA inspection findings include complaints cancelled or logged as inquiries although "
+    "they met the firm's own complaint definition, and No Fault Found codes that hid a recurring problem.",
+    "COMPLAINTS_PAST_TARGET": "Complaint handling is among the observations FDA cites most often, complaint backlogs "
+    "included.",
+    "REPORTING_CLOCKS": "FDA has cited a report filed about nine months late; FDA, EU, UK and Canadian "
     "rules set reporting windows of 2 to 30 days from awareness.",
     "TRENDS_WITHOUT_ACTION": "Trends must reach CAPA and the risk file: FDA's QMSR inspections follow the risk file, "
     "and the EU MDR (Article 88) asks for statistically significant increases to be reported.",
-    "HARM_CLOSED_WITHOUT_CASE": "A 2026 warning letter cites complaints of potentially fatal harm closed without "
-    "corrective action.",
+    "HARM_CLOSED_WITHOUT_CASE": "FDA has cited complaints of potentially fatal harm closed without corrective action.",
     "CAPA_EFFECTIVENESS": "CAPA is among the observations FDA cites most often, and closing a CAPA without verifying "
     "that it worked is a recurring finding.",
     "TRIAGE_OVERDUE": "Signals left waiting are trends nobody has looked at.",
     "RISK_FILE_INPUT": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as "
-    "input to risk management a significant deficiency (the first QMSR warning letter cited it); ISO 14971:2019 "
+    "input to risk management a significant deficiency; ISO 14971:2019 "
     "clause 10 asks for post-production information to reach risk management.",
 }
 
@@ -219,7 +219,7 @@ def trends_without_action_rows(db: Session, tenant_id: uuid.UUID, today: date) -
         .where(or_(has_capa, has_risk_review))
     )
     decided = (
-        db.query(Signal.id, Signal.business_id, Signal.title)
+        db.query(Signal.id, Signal.business_id, Signal.title, Signal.origin)
         .filter(Signal.tenant_id == tenant_id, Signal.status.in_(DECIDED_SIGNAL_STATUSES), ~acted_on)
         .order_by(Signal.updated_at.desc())
         .all()
@@ -234,7 +234,7 @@ def trends_without_action(db: Session, tenant_id: uuid.UUID, today: date) -> dic
     results with no open signal."""
     decided, rising = trends_without_action_rows(db, tenant_id, today)
     value = len(decided) + len(rising)
-    items = [{"id": str(row.id), "ref": row.business_id, "label": row.title} for row in decided] + [
+    items = [{"id": str(row.id), "ref": row.business_id, "label": signal_title(row)} for row in decided] + [
         {"id": item["key"], "ref": None, "label": item["name"]} for item in rising
     ]
     return _check(
@@ -320,11 +320,16 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
+def signal_title(row) -> str | None:
+    """A signal row's title as every list shows it (a rule title from before 0.10.44 with its count grouped)."""
+    return display_title(row.title, row.origin)
+
+
 def triage_overdue_rows(db: Session, tenant_id: uuid.UUID) -> list:
     """Signals new or in triage past their due date: every one, for the check and the inspection pack."""
     now = datetime.now(timezone.utc)
     return (
-        db.query(Signal.id, Signal.business_id, Signal.title, Signal.status, Signal.due_at)
+        db.query(Signal.id, Signal.business_id, Signal.title, Signal.origin, Signal.status, Signal.due_at)
         .filter(Signal.tenant_id == tenant_id, Signal.status.in_(AWAITING_TRIAGE), Signal.due_at < now)
         .order_by(Signal.due_at)
         .all()
@@ -340,7 +345,7 @@ def triage_overdue(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         ATTENTION if rows else CLEAR,
         "New or in triage, past the due date their priority set",
         {"section": "Signals", "tab": "Signal inbox"},
-        [{"id": str(row.id), "ref": row.business_id, "label": row.title} for row in rows],
+        [{"id": str(row.id), "ref": row.business_id, "label": signal_title(row)} for row in rows],
     )
 
 

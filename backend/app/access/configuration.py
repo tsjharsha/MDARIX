@@ -690,6 +690,8 @@ def update_control_plane_resource(
         from backend.app.access.governance import _refuse_administrator_authority
 
         _refuse_administrator_authority(str(payload.values.get("role_name", row.role_name)))
+    if resource == "users" and "display_name" in payload.values:
+        payload.values["display_name"] = _display_name(payload.values["display_name"])
     if resource == "users" and "email" in payload.values:
         new_email = str(payload.values["email"]).strip().lower()
         if (
@@ -721,6 +723,12 @@ def update_control_plane_resource(
                 422, detail={"code": "UNKNOWN_PERSONA", "message": "Persona is not in the R1 catalog"}
             ) from exc
     before = (row.role, row.status) if resource == "users" else None
+    # A person's name is shown wherever they act: the audit event keeps what it was and what it became.
+    renamed = (
+        ({"display_name": row.display_name}, {"display_name": payload.values["display_name"]})
+        if resource == "users" and "display_name" in payload.values
+        else (None, None)
+    )
     for field, value in payload.values.items():
         setattr(row, "username" if resource == "users" and field == "email" else field, value)
     if resource == "users" and str(payload.values.get("status", "ACTIVE")).upper() != "ACTIVE":
@@ -730,7 +738,7 @@ def update_control_plane_resource(
     if hasattr(row, "updated_at"):
         row.updated_at = datetime.now(timezone.utc)
     version = getattr(row, "version", "v1")
-    _audit_configuration(db, admin, action, model.__name__, row.id, version)
+    _audit_configuration(db, admin, action, model.__name__, row.id, version, before=renamed[0], after=renamed[1])
     db.commit()
     return {
         "id": str(row.id),
@@ -740,6 +748,24 @@ def update_control_plane_resource(
         "status": getattr(row, "status", "ACTIVE"),
         "version": version,
     }
+
+
+DISPLAY_NAME_MAX = 120  # auth_users.display_name, and every form that sets a name (access/schemas.py)
+
+
+def _display_name(value) -> str:
+    """A person's name as it is stored: trimmed, inner runs of spaces as one, 1 to 120 characters, no control
+    characters."""
+    name = " ".join(str(value).split()) if isinstance(value, str) else ""
+    if not name or len(name) > DISPLAY_NAME_MAX or any(ord(char) < 32 or ord(char) == 127 for char in name):
+        raise HTTPException(
+            422,
+            detail={
+                "code": "DISPLAY_NAME_INVALID",
+                "message": f"A name must have 1 to {DISPLAY_NAME_MAX} characters",
+            },
+        )
+    return name
 
 
 def _queue_user_change_notices(db: Session, admin, user: AuthUser, role_before, status_before) -> None:

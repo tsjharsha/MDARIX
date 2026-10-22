@@ -40,6 +40,7 @@ from backend.app.db.models.reviews import BriefReviewAction, CaseReview, Decisio
 from backend.app.db.models.signals import InvestigationSignal, Signal, SignalEvent
 from backend.app.db.models.stage3 import AIInteraction, SupplierEvidenceRequest
 from backend.app.db.models.workflow import WorkflowTask, WorkflowTaskEvent
+from backend.app.signals.logic import display_title
 
 logger = logging.getLogger("mdarix.case_audit")
 
@@ -134,7 +135,9 @@ def read_signals(found: Gathered) -> None:
             at=link.created_at,
             category="SIGNAL",
             event="SIGNAL_LINKED_TO_CASE",
-            title=rules.title("Signal linked to the case", signal.title if signal else None),
+            title=rules.title(
+                "Signal linked to the case", display_title(signal.title, signal.origin) if signal else None
+            ),
             obj=ref,
             origin=rules.origin_of(link.created_by),
             actor_ref=link.created_by,

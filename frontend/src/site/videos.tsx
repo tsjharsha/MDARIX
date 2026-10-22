@@ -14,7 +14,8 @@ export const TRIAL_VIDEOS: readonly { number: number; title: string; summary: st
   {
     number: 1,
     title: "Welcome to MDARIX",
-    summary: "What MDARIX does, why warning letters happen, what the 30-day trial gives you, and the quality loop.",
+    summary:
+      "What MDARIX does, the post-market problems it helps you catch early, what the 30-day trial gives you, and the quality loop.",
   },
   {
     number: 2,

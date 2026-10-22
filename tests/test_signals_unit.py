@@ -146,6 +146,40 @@ def test_rule_titles_group_large_counts_the_en_us_way():
     assert logic.rule_title(1234567, "X", "P", None, 30).startswith("1,234,567 complaints: ")
 
 
+def test_rule_titles_from_before_grouped_counts_are_shown_grouped_and_nothing_else_changes():
+    # Signals raised before 0.10.44 keep their stored titles; the API shows a rule title's count grouped (0.10.47).
+    old = "2290 complaints: unspecified problem on Aster Pump Rev C in 30 days"
+    assert (
+        logic.display_title(old, "THRESHOLD_RULE")
+        == "2,290 complaints: unspecified problem on Aster Pump Rev C in 30 days"
+    )
+    assert logic.display_title("1234567 complaints: x on P in 7 days", "THRESHOLD_RULE").startswith(
+        "1,234,567 complaints"
+    )
+    for unchanged in (
+        "2,290 complaints: unspecified problem on Aster Pump Rev C in 30 days",  # written since 0.10.44
+        "999 complaints: occlusion alarm on Aster Pump in 30 days",
+        "1 complaint: occlusion alarm on Aster Pump in 30 days",
+        "2290 reports of occlusion",
+        "02290 complaints: x on P in 30 days",
+        "",
+        None,
+    ):
+        assert logic.display_title(unchanged, "THRESHOLD_RULE") == unchanged
+    # A person's (or an imported or suggested) title is shown as written, even one that reads like a rule's.
+    for origin in ("MANUAL", "IMPORT", "AI_SUGGESTED", None):
+        assert logic.display_title(old, origin) == old
+    assert logic.display_task_title(f"Triage SIG000007: {old}", "SIG000007", "THRESHOLD_RULE") == (
+        "Triage SIG000007: 2,290 complaints: unspecified problem on Aster Pump Rev C in 30 days"
+    )
+    assert logic.display_task_title(f"Triage SIG000007: {old}", "SIG000007", "MANUAL") == f"Triage SIG000007: {old}"
+    assert logic.display_task_title(f"Triage SIG000008: {old}", "SIG000007", "THRESHOLD_RULE").endswith(old)
+    assert logic.display_task_title("Review evidence 2290", None, "THRESHOLD_RULE") == "Review evidence 2290"
+    assert logic.ungrouped_search("2,290 complaints") == "2290 complaints"
+    assert logic.ungrouped_search("1,234,567") == "1234567"
+    assert logic.ungrouped_search("2290 complaints") is None and logic.ungrouped_search("a,b 1,23") is None
+
+
 def test_story_readiness_and_trend_sentences_group_their_counts():
     from backend.app.readiness_home import service as readiness_service
     from backend.app.readiness_home import summary as readiness_summary

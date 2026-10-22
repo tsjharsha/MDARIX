@@ -22,7 +22,7 @@ const check = (overrides = {}) => ({
   value: 3,
   state: "CRITICAL" as const,
   detail: "1 of 5 records to recheck reports a death or serious injury",
-  why: "2026 FDA warning letters cite complaints cancelled or logged as inquiries.",
+  why: "Recent FDA inspection findings include complaints cancelled or logged as inquiries.",
   basis: [
     { id: "ISO13485_8_2_2", short: "ISO 13485 8.2.2", title: "Complaint handling" },
     { id: "CFR820_35", short: "21 CFR 820.35", title: "Control of records (QMSR)" },
@@ -80,7 +80,7 @@ describe("readiness screens", () => {
     expect(markup).toContain(">3<");
     expect(markup).toContain("Critical");
     expect(markup).toContain("CMP000001, CMP000002 and 1 more");
-    expect(markup).toContain("2026 FDA warning letters");
+    expect(markup).toContain("Recent FDA inspection findings");
     expect(markup).toContain("uw-rd-tile tone-critical");
     expect(markup).toContain("Open");
   });
@@ -116,7 +116,7 @@ describe("readiness screens", () => {
     ]) {
       expect(markup).toContain('title="Complaint handling">ISO 13485 8.2.2<');
       expect(markup).toContain(">21 CFR 820.35<");
-      expect(markup.indexOf("2026 FDA warning letters")).toBeLessThan(markup.indexOf("ISO 13485 8.2.2"));
+      expect(markup.indexOf("Recent FDA inspection findings")).toBeLessThan(markup.indexOf("ISO 13485 8.2.2"));
     }
     expect(basisIds(check())).toEqual(["ISO13485_8_2_2", "CFR820_35"]);
     // A check without a basis shows none.

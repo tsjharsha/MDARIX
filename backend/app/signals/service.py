@@ -666,7 +666,7 @@ def summaries(db: Session, control_db: Session | None, tenant_id, rows: list[Sig
             {
                 "id": str(row.id),
                 "business_id": row.business_id,
-                "title": row.title,
+                "title": logic.display_title(row.title, row.origin),
                 "origin": row.origin,
                 "origin_label": ORIGIN_LABELS.get(row.origin, row.origin),
                 "rule_code": row.rule_code,

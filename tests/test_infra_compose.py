@@ -137,9 +137,31 @@ def test_the_long_running_services_fit_the_slim_server():
 def test_the_web_container_is_locked_down():
     web = SERVICES["web"]
     assert web["read_only"] is True
-    assert web["cap_drop"] == ["ALL"] and web["cap_add"] == ["NET_BIND_SERVICE"]
+    # Caddy runs as a user, not root, with no capability (SEC-10, 0.10.47): its own network namespace lets it bind 80
+    # and 443 instead of a file capability, which no-new-privileges would refuse to a non-root user.
+    assert web["cap_drop"] == ["ALL"] and "cap_add" not in web
+    assert web["sysctls"] == {"net.ipv4.ip_unprivileged_port_start": "80"}
     assert "no-new-privileges:true" in web["security_opt"]
     assert any(item.startswith("/tmp") for item in web["tmpfs"])
+    dockerfile = (ROOT / "Dockerfile.web").read_text(encoding="utf-8")
+    final_stage = dockerfile[dockerfile.rindex("\nFROM ") :]
+    assert final_stage.rstrip().endswith("USER caddy")
+    assert "adduser -S -D -H -u 10002 -G caddy" in final_stage and "setcap" not in final_stage
+
+
+def test_caddys_volumes_become_caddys_before_it_starts_and_nothing_else_runs_as_root():
+    # Volumes a root Caddy wrote (0.10.46 and earlier: the certificates and the ACME account) are given to the caddy
+    # user by a one-shot job before every start of web; it may only change owners, and has no network.
+    job = SERVICES["web-volumes"]
+    assert SERVICES["web"]["depends_on"]["web-volumes"] == {"condition": "service_completed_successfully"}
+    assert job["image"] == SERVICES["web"]["image"] and job["entrypoint"] == ["caddy-volumes"]
+    assert job["user"] == "0:0" and job["network_mode"] == "none" and job["read_only"] is True
+    assert job["cap_drop"] == ["ALL"] and job["cap_add"] == ["CHOWN", "DAC_READ_SEARCH"]
+    assert "no-new-privileges:true" in job["security_opt"]
+    assert sorted(job["volumes"]) == ["caddy_config:/config", "caddy_data:/data"]
+    script = (ROOT / "infrastructure" / "docker" / "caddy-volumes.sh").read_text(encoding="utf-8")
+    assert 'owner="${1:-10002:10002}"' in script and "chown -h" in script
+    assert "rm " not in script and "chmod" not in script
 
 
 def test_third_party_images_are_pinned_by_digest():
