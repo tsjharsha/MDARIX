@@ -12,6 +12,14 @@ Everything is defined in `docker-compose.prod.yml`. Settings live in two files o
 The API, worker and scheduler processes refuse to start if an owner or backup password reaches their environment, so a
 compromised long-running service never holds credentials that bypass row-level security.
 
+No long-running container runs as root: the API and the background service run as `mdarix` (uid 10001), Caddy as
+`caddy` (uid 10002, since 0.10.47) with no capability at all (its container's own network namespace lets it listen on
+80 and 443). Before every start of `web`, the one-shot `web-volumes` job gives Caddy's volumes (certificates, the ACME
+account) to that user; it changes owners only, and has nothing to do once they are Caddy's. To go back to a release
+that ran Caddy as root (0.10.46 or earlier), first give them back:
+`docker compose run --rm --no-deps web-volumes 0:0` (with the newer release still checked out), then deploy the older
+release.
+
 Staging runs the same stack on a free Oracle Cloud ARM server, with Postgres on the server: see
 [STAGING_ORACLE.md](STAGING_ORACLE.md) (ADR-017).
 On Google Cloud in India (Mumbai, PostgreSQL on the VM for the validation phase, keyless off-site backups), follow

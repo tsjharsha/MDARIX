@@ -1228,6 +1228,22 @@ th.num .table-sort {
   .ac-user {
     margin-left: auto;
   }
+  /* The top bar fits a 320 px phone: tighter spacing, and its buttons (icons only below 900 px) narrower. It ran
+     13 px past a 360 px screen and 53 px past 320 px, and the whole page scrolled sideways (0.10.47). */
+  .ac-header {
+    gap: 6px;
+    padding: 0 8px;
+  }
+  .ac-user {
+    gap: 4px;
+  }
+  .ac-header .ac-secondary {
+    padding: 0 10px;
+  }
+  /* A panel's title and its actions take two lines when one is too narrow (Your trial journey and its guides). */
+  .ac-panel-head {
+    flex-wrap: wrap;
+  }
 }
 
 /* Dashboard (AdminOverview.tsx): key figures with trend lines, activity charts, timeline, and motion. */

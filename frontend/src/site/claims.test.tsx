@@ -43,4 +43,25 @@ describe("website claims", () => {
     );
     expect(renderToStaticMarkup(<ResourcesPage />)).toContain("Lifecycle Management and Marketing Submission");
   });
+
+  it("names no warning letters and no class actions anywhere in the website's source (owner rule, 0.10.47)", async () => {
+    // Read as files, so text that only some pages render (the videos' summaries, scenes, the share card) is covered.
+    // The legal documents (legal/*.md) are not here: they are versioned by their hash and change only with a lawyer.
+    const fs = await import(/* @vite-ignore */ ["node", "fs"].join(":"));
+    const files = (folder: URL, pattern: RegExp): string[] =>
+      fs
+        .readdirSync(folder, { withFileTypes: true, recursive: true })
+        .filter((entry: { isFile(): boolean; name: string }) => entry.isFile() && pattern.test(entry.name))
+        .map((entry: { name: string; parentPath: string }) => `${entry.parentPath}/${entry.name}`);
+    const sources = [
+      ...files(new URL("./", import.meta.url), /^(?!.*\.test\.).*\.(tsx?|css)$/),
+      ...files(new URL("../../public/", import.meta.url), /\.(txt|xml|svg|html|css)$/),
+      new URL("../../index.html", import.meta.url),
+    ];
+    expect(sources.length).toBeGreaterThan(20);
+    const mentions = sources.filter((file) =>
+      /warning[\s-]+letter|class[\s-]+action/i.test(fs.readFileSync(file, "utf8")),
+    );
+    expect(mentions.map(String)).toEqual([]);
+  });
 });

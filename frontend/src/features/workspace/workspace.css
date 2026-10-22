@@ -6,6 +6,7 @@
   max-width: 320px;
   /* Shrinks (the name truncates) so the header never overflows a phone screen; the page heading repeats the name. */
   min-width: 0;
+  overflow: hidden;
   margin-left: 6px;
   padding: 5px 10px;
   border: 1px solid rgb(255 255 255 / 25%);
@@ -136,6 +137,15 @@
   .uw-tenant {
     max-width: 46vw;
   }
+}
+/* On a phone the trial badge leaves the organization's name no room (it showed as an icon alone, and at 360 and
+   320 px the top bar ran past the screen): the name is left out there, as the page heading names it (0.10.47). */
+@media (max-width: 400px) {
+  .ac-header:has(.uw-trial-badge) .uw-tenant {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
   .uw-context select,
   .uw-context input {
     min-width: 0;
@@ -968,6 +978,13 @@
   .uw-trial-steps li button {
     grid-column: 2;
     justify-self: start;
+    /* A long action ("Review and sign the sample decision") wraps instead of running past a 320 px screen. */
+    height: auto;
+    min-height: 36px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+    white-space: normal;
+    text-align: left;
   }
   /* On a phone the badge stays, in its short form ("Trial · 12d"), so the days left are never hidden. */
   .uw-trial-badge {
@@ -1609,6 +1626,19 @@
 /* Import data: the date-order choice sits beside the file picker. */
 .uw-import-dates {
   min-width: 220px;
+}
+/* A select is as wide as its longest choice ("Replace them with [PERSON], [PHONE] and similar"): on a phone that
+   widened the whole Bring your own data panel past the screen (28 px at 360 px, 0.10.47). It takes the field's width
+   instead, and the field never more than the panel's. */
+@media (max-width: 640px) {
+  .uw-import-dates {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .uw-import-dates select {
+    width: 100%;
+    min-width: 0;
+  }
 }
 .uw-import-templates {
   flex-wrap: wrap;
@@ -3576,7 +3606,8 @@ div.uw-task-count:hover {
 /* "What were you cited for?" (sections/CitedFor.tsx) and the chapters it marks. */
 .uw-cited-options {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* One column narrower than 280 px on the smallest phones, never wider than the panel (0.10.47). */
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   gap: 8px;
   margin: 10px 0 12px;
   padding: 0;

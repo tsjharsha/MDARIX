@@ -23,6 +23,7 @@ import { TrialRequestsWorkspace } from "../TrialRequestsWorkspace";
 import "../../customer-admin/customer-admin.css";
 import "../customers/customers.css";
 import { Banner, Intro, Pager, type BannerMessage } from "./common";
+import { ChangeNameDialog, canChangeName } from "./ChangeName";
 
 type User = { id: string; email: string; display_name?: string | null; role?: string | null; status?: string | null };
 type Role = { id: string; code: string; name?: string | null; version?: string | null; status?: string | null };
@@ -60,6 +61,7 @@ export function IdentityAccess({ section, websiteDemos = false }: { section: str
 
 /** An account as the platform account lists return it (backend/app/access/platform_accounts.py). */
 type Account = User & {
+  tenant_id?: string | null;
   role_label?: string | null;
   tenant_name?: string | null;
   tenant_business_id?: string | null;
@@ -96,8 +98,9 @@ const userColumn = {
 
 /** Platform administrators only: MDARIX staff, whichever organization their account signs in to. */
 function PlatformUsers() {
-  const me = useResource<{ user_id?: string }>("/api/v1/auth/session");
+  const me = useResource<{ user_id?: string; tenant_id?: string }>("/api/v1/auth/session");
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
+  const [renaming, setRenaming] = useState<Account | null>(null);
   const [notice, setNotice] = useState<BannerMessage>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -146,29 +149,54 @@ function PlatformUsers() {
           {
             key: "mfa",
             label: "",
-            render: (row) =>
-              canResetMfa(row, me.data?.user_id) ? (
-                <button
-                  type="button"
-                  className="ac-link"
-                  onClick={() =>
-                    setConfirm({
-                      title: `Reset multi-factor authentication for ${name(row)}?`,
-                      body: "Their authenticator and recovery codes stop working and they are signed out everywhere. At their next sign-in they set up a new authenticator. Do this only after confirming who is asking, for example by a call to a known number.",
-                      confirmLabel: "Reset MFA",
-                      danger: true,
-                      reason: { label: "Reason (kept in the audit trail)", min: 5 },
-                      run: (reason) => send(`/api/v1/platform-admin/users/${row.id}/mfa-reset`, "POST", { reason }),
-                      done: `MFA reset for ${name(row)}. They set up a new authenticator at their next sign-in.`,
-                    })
-                  }
-                >
-                  Reset MFA
-                </button>
-              ) : null,
+            render: (row) => (
+              <span className="cc-actions">
+                {/* The name of an account of one's own organization, one's own included (a name is not access). */}
+                {canChangeName(row, me.data?.tenant_id) && (
+                  <button
+                    type="button"
+                    className="ac-link"
+                    aria-label={`Change name of ${name(row)}`}
+                    onClick={() => setRenaming(row)}
+                  >
+                    Change name
+                  </button>
+                )}
+                {canResetMfa(row, me.data?.user_id) && (
+                  <button
+                    type="button"
+                    className="ac-link"
+                    onClick={() =>
+                      setConfirm({
+                        title: `Reset multi-factor authentication for ${name(row)}?`,
+                        body: "Their authenticator and recovery codes stop working and they are signed out everywhere. At their next sign-in they set up a new authenticator. Do this only after confirming who is asking, for example by a call to a known number.",
+                        confirmLabel: "Reset MFA",
+                        danger: true,
+                        reason: { label: "Reason (kept in the audit trail)", min: 5 },
+                        run: (reason) => send(`/api/v1/platform-admin/users/${row.id}/mfa-reset`, "POST", { reason }),
+                        done: `MFA reset for ${name(row)}. They set up a new authenticator at their next sign-in.`,
+                      })
+                    }
+                  >
+                    Reset MFA
+                  </button>
+                )}
+              </span>
+            ),
           },
         ]}
       />
+      {renaming && (
+        <ChangeNameDialog
+          account={renaming}
+          onClose={() => setRenaming(null)}
+          onDone={(text) => {
+            setRenaming(null);
+            setNotice({ text, tone: "good" });
+            users.reload();
+          }}
+        />
+      )}
       <ConfirmDialog
         request={confirm}
         onClose={() => setConfirm(null)}

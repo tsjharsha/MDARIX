@@ -212,11 +212,11 @@ function SecondLook() {
         <Panel eyebrow="Why records are flagged" title="What the second look checks">
           <BarList items={reasonSlices(summary?.by_reason)} colour="series" />
           <p className="ac-note">
-            FDA warning letters cite complaints that were cancelled or logged as inquiries although they met the firm's
-            own complaint definition, and No Fault Found codes that hid a recurring problem. A cancelled record or an
-            inquiry is flagged only when it also carries a sign of a complaint: harm, a malfunction, a serious severity,
-            a problem code or one of your organization's words. A No Fault Found or User Error code is flagged when it
-            recurs: 3 or more times on one product in 12 months.
+            FDA inspection findings include complaints that were cancelled or logged as inquiries although they met the
+            firm's own complaint definition, and No Fault Found codes that hid a recurring problem. A cancelled record
+            or an inquiry is flagged only when it also carries a sign of a complaint: harm, a malfunction, a serious
+            severity, a problem code or one of your organization's words. A No Fault Found or User Error code is flagged
+            when it recurs: 3 or more times on one product in 12 months.
           </p>
         </Panel>
       </div>

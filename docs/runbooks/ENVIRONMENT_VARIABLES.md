@@ -60,6 +60,8 @@ not list.
 | Variable | Required | Meaning |
 |---|---|---|
 | `MDARIX_MFA_ENCRYPTION_KEY` | yes | Encrypts authenticator secrets (URL-safe base64 of 32 bytes). Without it no one can set up MFA. |
+| `MDARIX_MFA_ENCRYPTION_KEY_ID` | no | ID of the current MFA key (`k2` after the first rotation). Unset (the default): secrets are sealed without a key ID, exactly as before 0.10.47. Once set, new secrets record it. KEY_ROTATION.md. |
+| `MDARIX_MFA_ENCRYPTION_KEYS` | no | Older MFA keys still readable during a rotation: `k1:<base64>` (the key in use before the first rotation is `k1`). Run `scripts/reseal_mfa_secrets.py --apply`, then remove them. Malformed entries, an ID listed twice or the current ID listed here stop the server; while any is listed the configuration check warns. |
 | `MDARIX_CONNECTOR_ENCRYPTION_KEY` | yes | Encrypts customer-system API keys. |
 | `MDARIX_DEMO_REQUEST_SALT` | yes | Salts the hashed address of demo requests. |
 | `MDARIX_DEMO_REQUESTS_PER_SOURCE_HOUR`, `MDARIX_DEMO_REQUESTS_PER_DAY` | no | Demo request limits per sending address per hour (5) and in total per day (200). |
@@ -79,6 +81,8 @@ not list.
 | `MDARIX_OBJECT_STORAGE_PROVIDER` | yes | `local` (encrypted files on a volume) or `s3`. |
 | `MDARIX_OBJECT_STORAGE_ROOT` | local | Where local files live. |
 | `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY` | local | Encrypts local files. |
+| `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID` | no | ID of the current file key (`k2` after the first rotation). Unset (the default): files are written without a key ID, exactly as before 0.10.47. KEY_ROTATION.md. |
+| `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS` | no | Older file keys still readable during a rotation: `k1:<base64>`. Run `scripts/reencrypt_object_storage.py --apply` in the API's container, then remove them, but keep each old key for as long as a backup made with it is kept. Checked as the MFA keys are. |
 | `MDARIX_OBJECT_STORAGE_SIGNING_SECRET` | yes | Signs download links. |
 | `MDARIX_OBJECT_STORAGE_BUCKET`, `MDARIX_OBJECT_STORAGE_REGION`, `MDARIX_OBJECT_STORAGE_ENDPOINT`, `MDARIX_OBJECT_STORAGE_ACCESS_KEY`, `MDARIX_OBJECT_STORAGE_SECRET_KEY`, `MDARIX_OBJECT_STORAGE_SSE` | s3 | Bucket settings (server-side encryption `AES256` by default). |
 | `MDARIX_OBJECT_STORAGE_MAX_BYTES`, `MDARIX_OBJECT_STORAGE_TENANT_QUOTA_BYTES` | no | Per-file and per-tenant limits (10 MB, 100 MB). |
