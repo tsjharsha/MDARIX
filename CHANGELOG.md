@@ -10,6 +10,44 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.46] - 2026-10-22
+
+A domain switch: the main address of MDARIX is **https://mdarix.com**, and `mdarix.in` and the other registered
+domains redirect permanently to it, on the trial maintenance line (`release/0.10`). No migration: the schema stays at
+md48, and no API change. The web image changes (the Caddyfile and the website's canonical address); the usual upgrade
+script rebuilds all images. Email is unchanged: mail is still sent from `no-reply@mdarix.in` through ZeptoMail, and the
+support, privacy and security addresses stay `@mdarix.in` (mail for mdarix.com is not set up yet).
+
+### Added
+
+- `MDARIX_REDIRECT_DOMAINS` (Caddy, `docker-compose.prod.yml` passes it to `web`): other host names, separated by
+  spaces, that answer on the server only to redirect permanently (301) to `https://<MDARIX_DOMAIN>`, with the same
+  path and query, so `https://mdarix.in/app/cases?tab=open` opens `https://mdarix.com/app/cases?tab=open`. The names
+  join the main site's address list and the redirect runs before every other handler, so a redirect name never
+  reaches the pages, the API or a private site's login; Caddy obtains a certificate for each name. Empty by default
+  (the site answers `MDARIX_DOMAIN` alone, as before). `MDARIX_WWW_REDIRECT=on` keeps answering
+  `www.<MDARIX_DOMAIN>` as before. Documented in `.env.production.example`, ENVIRONMENT_VARIABLES.md, DEPLOYMENT.md,
+  STAGING_ORACLE.md (empty on staging) and GCP_DEPLOYMENT.md section 4.1 (the switch to mdarix.com).
+
+### Changed
+
+- The website's own address is `https://mdarix.com`: each page's canonical and `og:url`, the share image, the
+  organization and website JSON-LD in `index.html`, `sitemap.xml` (every `<loc>`), the `Sitemap` line of `robots.txt`,
+  the `Canonical` of `security.txt` (its `Contact` stays `mailto:support@mdarix.in`), the question pages' JSON-LD, the
+  "Page not found" description, and the address bar in the free trial user guide's pictures. The production smoke
+  check expects the new canonical. The legal documents are unchanged (their text and SHA-256, recorded with each trial
+  request, stay the same; the only `mdarix.in` they name are email addresses).
+- The deploy for this release changes, in `.env.production` (the previous file kept as `.env.production.pre-0146`),
+  after checking that `mdarix.com` and `www.mdarix.com` resolve to the server: `MDARIX_DOMAIN=mdarix.com`,
+  `MDARIX_WWW_REDIRECT=on`, `MDARIX_APP_URL=https://mdarix.com` (the trusted browser origin and the address in every
+  email link), `MDARIX_REDIRECT_DOMAINS` (the names among `mdarix.in`, `mdarix.net`, `mdarix.online`, `mdarix.info`
+  and their `www` that resolve to the server), and `https://mdarix.com` in place of `https://mdarix.in` in
+  `MDARIX_ALLOWED_ORIGINS` when it is set. If `https://mdarix.com/health/live` does not answer within about three
+  minutes, it puts the previous settings back and `mdarix.in` serves as before.
+- `mdarix.in` keeps working through the redirect: every old link, bookmark and emailed link opens the same page on
+  mdarix.com. Sessions belong to the host they were opened on, so people signed in on `mdarix.in` sign in again on
+  `mdarix.com`; activation, invitation and password-reset links already sent keep working through the redirect.
+
 ## [0.10.45] - 2026-10-22
 
 The website's home page leads with the problem it solves, and the website has questions and answers that search

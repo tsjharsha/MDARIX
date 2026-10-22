@@ -88,7 +88,7 @@ describe("security.txt (RFC 9116)", () => {
       Contact: "mailto:support@mdarix.in",
       Expires: fields.Expires,
       "Preferred-Languages": "en",
-      Canonical: "https://mdarix.in/.well-known/security.txt",
+      Canonical: "https://mdarix.com/.well-known/security.txt",
     });
     expect(fields.Expires).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     expect(new Date(fields.Expires).toISOString().replace(".000", "")).toBe(fields.Expires);

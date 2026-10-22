@@ -185,6 +185,7 @@ values differ from production:
 | `MDARIX_OBJECT_STORAGE_PROVIDER` | `local`, with `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY` set; leave the bucket settings empty |
 | `MDARIX_SCHEDULER_HEARTBEAT_URL` | the heartbeat monitor's ping address (section 8.3) |
 | `MDARIX_WWW_REDIRECT` | `off` (the staging host name has no www record) |
+| `MDARIX_REDIRECT_DOMAINS` | empty (no other names point at a staging server) |
 | `MDARIX_SITE_ACCESS` and the login settings | as in section 0 |
 
 The runtime role (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `MDARIX_DB_RUNTIME_USER`, `MDARIX_DB_RUNTIME_PASSWORD`) is set

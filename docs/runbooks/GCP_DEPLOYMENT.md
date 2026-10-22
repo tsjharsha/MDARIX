@@ -173,6 +173,33 @@ fails; check `/var/log/mdarix-offsite.log` and the bucket listing until a check 
 has no point-in-time recovery: a daily dump and a daily disk snapshot give a recovery point of about a day, accepted
 for the free-trial phase (section 5 moves the database to Cloud SQL when design partners pay).
 
+### 4.1 The main domain moves to mdarix.com (release 0.10.46)
+
+Production went live on `mdarix.in` (above). From release 0.10.46 the main address is **`https://mdarix.com`**; the
+other registered domains (`mdarix.in`, `mdarix.net`, `mdarix.online`, `mdarix.info`, each with its `www`) answer only
+to redirect permanently to it, path and query kept, so every old link and bookmark keeps working.
+
+1. **DNS** (the owner): `mdarix.com` and `www.mdarix.com`, and each other domain and its `www`, as A records to the
+   static IP. A name is listed for Caddy only once it resolves here: Caddy asks Let's Encrypt for a certificate for
+   every listed name, and a name that points elsewhere only fails (and counts against the rate limit). Mail stays
+   on `mdarix.in` (ZeptoMail sender `no-reply@mdarix.in`, Zoho mailboxes): leave its MX, SPF, DKIM, DMARC and
+   bounce records as they are, and do not add mail records for the new domains until mail for them is set up.
+2. **Settings** in `.env.production` (the deploy script for 0.10.46 makes these changes after checking DNS, and keeps
+   the previous file as `.env.production.pre-0146`): `MDARIX_DOMAIN=mdarix.com`, `MDARIX_WWW_REDIRECT=on`,
+   `MDARIX_APP_URL=https://mdarix.com` (the trusted browser origin and the address in emails), `https://mdarix.com`
+   in place of `https://mdarix.in` in `MDARIX_ALLOWED_ORIGINS` when it is set, and
+   `MDARIX_REDIRECT_DOMAINS="mdarix.in www.mdarix.in ..."` with only the names that resolve to the server. The
+   email settings (`MDARIX_SMTP_FROM`, `MDARIX_SUPPORT_EMAIL`, `MDARIX_PRIVACY_EMAIL`, `MDARIX_SMTP_VERIFIED_DOMAIN`)
+   do not change.
+3. **Start and check**: `docker compose up -d --no-build --wait`; `docker compose logs web` shows "certificate
+   obtained successfully" for `mdarix.com`, `www.mdarix.com` and each listed name; `https://mdarix.com/health/live`
+   answers; `https://mdarix.in/some/path?x=1` returns 301 to `https://mdarix.com/some/path?x=1`. Sessions are
+   per host: people signed in on `mdarix.in` sign in again on `mdarix.com`.
+4. **Afterwards**: move the uptime check and its alert policy to `mdarix.com`. When a domain that was not ready
+   (`mdarix.online`, `mdarix.info`) resolves here, add it and its `www` to `MDARIX_REDIRECT_DOMAINS` and run
+   `docker compose up -d --no-build --wait web`. Going back: restore `.env.production.pre-0146` and run the same
+   `up`; `mdarix.in` serves as before.
+
 ## 5. When design partners pay
 
 - Move the database to Cloud SQL for PostgreSQL 16 (point-in-time recovery, SLA): create it with

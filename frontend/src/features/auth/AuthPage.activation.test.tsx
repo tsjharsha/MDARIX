@@ -7,7 +7,7 @@ describe("account activation page", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const render = (mode: string) => {
-    vi.stubGlobal("window", { location: { search: "?token=abc", origin: "https://mdarix.in", hash: "" } });
+    vi.stubGlobal("window", { location: { search: "?token=abc", origin: "https://mdarix.com", hash: "" } });
     return renderToStaticMarkup(<AuthPage mode={mode} />);
   };
 
