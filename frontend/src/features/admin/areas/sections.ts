@@ -105,7 +105,7 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
     "Platform users": "MDARIX staff who administer the platform.",
     "Customer administrators": "The people who manage each customer's own users.",
     "Customer users": "Everyone else with an account in a customer's tenant (read-only here).",
-    Onboarding: "Demo and trial requests from prospective customers.",
+    Onboarding: "Free-trial requests, and the pilot and one-to-one demo requests made from free trials.",
     "Roles & permissions": "What each role is allowed to do.",
     "Effective access": "Everything one person can do, and why.",
   },
@@ -132,8 +132,15 @@ export const SECTION_GUIDE: Record<string, Record<string, string>> = {
   },
 };
 
-/** The one-line purpose of a section, or "" when the area explains itself another way. */
-export const sectionGuide = (area: string, section: string) => SECTION_GUIDE[area]?.[section] ?? "";
+/** Onboarding's purpose while the website offers demo requests (app/featureSet.ts websiteDemoRequestsOffered). */
+const ONBOARDING_WITH_WEBSITE_DEMOS = "Demo and trial requests from prospective customers.";
+
+/** The one-line purpose of a section, or "" when the area explains itself another way. Onboarding names the website's
+ * demo requests only while the website offers them (`websiteDemos`). */
+export const sectionGuide = (area: string, section: string, websiteDemos = false) =>
+  websiteDemos && area === "Identity & Access" && section === "Onboarding"
+    ? ONBOARDING_WITH_WEBSITE_DEMOS
+    : (SECTION_GUIDE[area]?.[section] ?? "");
 
 /** Area name -> its sections, for the areas this folder renders. */
 export const AREA_SECTIONS: Record<string, readonly string[]> = {

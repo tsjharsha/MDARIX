@@ -98,9 +98,11 @@ What changed (details in `git log`):
   website offers only the free trial. `DEMO_REQUESTS_OFFERED` is false (`frontend/src/site/offer.ts`), so no page
   links to a demo request and `/request-demo` opens the free-trial sign-up instead of the form. With
   `MDARIX_FEATURE_SET=mvp` (production) `POST /api/v1/public/demo-requests` answers 404; under `full` (the default:
-  development and CI) the route still accepts a request. Platform Admin > Identity & Access > Onboarding (no longer
-  under Customers & Tenants) still lists the earlier website requests, and the demo requests a free trial sends from
-  Getting started.
+  development and CI) the route still accepts a request. Since 0.10.44 Platform Admin > Identity & Access >
+  Onboarding (no longer under Customers & Tenants) shows website demo requests only where the website offers them and
+  the feature set serves their route (`websiteDemoRequestsOffered`, `frontend/src/app/featureSet.ts`): today under
+  neither feature set. It lists the one-to-one demo requests a free trial sends from Getting started ("Free trials
+  that asked for a one-to-one demo"), once there is one.
 - Each admin page has one `main` landmark (the consoles nested up to three).
 - Trial feedback: a trial workspace invites feedback (banner, "Not now" for three days) and has a Share feedback
   page: ratings, likelihood to recommend, features tried, what is good, what to improve, adoption, and consent to

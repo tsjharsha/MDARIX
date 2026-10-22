@@ -10,6 +10,57 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.44] - 2026-10-22
+
+Counts read with thousands separators, the complaint list's filters fit a phone, Platform Admin no longer shows an
+empty panel for website demo requests, and Getting started reads less right after an import, on the trial maintenance
+line (`release/0.10`). No migration: the schema stays at md48. The API and web images change; the usual upgrade script
+rebuilds all images. Measured with production's limits (2 CPUs shared by the API, the background service and
+PostgreSQL) on the 4,994-row test file, the database restored to the same state before every run and the runs before
+and after the change taken in turn: Getting started counts the new signals 2.7 to 7 s after the import answers in
+three runs of four, 13.5 s in the fourth (6 to 17 s before), and 6 to 6.5 s with the Signal inbox open in a second tab
+(11.5 to 16 s before; the inbox 7.5 s, 12 s before).
+
+### Changed
+
+- Right after an import, Getting started's status (`GET /api/v1/trial/status`) and Automatic insights
+  (`GET /api/v1/trial/insights`) read less, with the same answers (compared byte for byte on every organization of
+  the review database, three of them trials with 4,993 imported complaints). The status counts the sample's records, the
+  organization's own and its uploaded rows in one statement (24 before; 44 statements in all became 21). The insights
+  read only the complaint columns they use, each complaint's month worked out by the database, instead of every
+  complaint as a whole record (about 40,000 timestamps parsed for an import of 5,000 complaints), and answer their
+  JSON as it is. On a development machine the insights take 1.1 s instead of 3.7 s and the status 0.25 s instead of
+  0.4 s. Right after an import, on the bench above: the insights 2.2 to 3.7 s (3.8 to 7.1 s before, up to 13 s on a
+  busier database) and the status about 2 s (1.5 to 3 s, up to 6 s).
+- After an import whose signals are being found, Getting started reads its story again once the small detection status
+  says they are in, not at once: that read could only say "Finding signals", and right after a large import it took
+  seconds and slowed the finding itself. Meanwhile the trend chapter says "Finding signals in the complaints you just
+  imported…" until the new story is in, as before. A refused status read (403) reads the story at once; the wait ends
+  after two minutes in any case.
+- Counts are grouped the en-US way ("2,290"), as the import result groups them since 0.10.41 (DEV-025), whatever the
+  browser's language: a new rule signal's title ("2,290 complaints: unspecified problem on Aster Pump Rev C in 30
+  days"), the Signal inbox's Complaints column and status counts, a signal's Complaints and its split by version, the
+  trend check's counts ("2,290 against 1,204.5 expected"), the record summary of a signal, the story's and Readiness's
+  findings ("4,993 complaints open in no signal or case"), Automatic insights' headline numbers and sentences, and the
+  tab and chip counts of the lists. A signal's title is stored text written when the signal is raised (detection adds
+  complaints to an open signal without changing its title), so signals raised before keep their titles; no stored
+  title is rewritten.
+
+### Fixed
+
+- Complaints › Complaint list: at 390 px (and 360 and 320) the filters ran up to 49 px past their panel (120 px at
+  320) and the page scrolled sideways: a select is as wide as its longest choice, and in the panel's grid the widest
+  one widened the whole filter bar. On a phone (640 px and narrower) each filter now takes the panel's width, one
+  under the other; the Signal inbox's filters, which ran 10 px past at 390 px, and every other list's filter bar
+  (`.ca-toolbar`, `.cc-toolbar`) do the same. Wider screens are unchanged.
+- Platform Admin › Identity & Access › Onboarding showed an empty "Website visitors who asked for a demo" panel. The
+  website has offered only the free trial since 0.10.5, and under `MDARIX_FEATURE_SET=mvp` (production)
+  `POST /api/v1/public/demo-requests` answers 404. Website demo requests are now listed only where the website offers
+  them and the feature set serves their route; the website offers them under neither feature set, so the panel, its
+  wording in the section's heading ("Trial requests") and its line under Identity & Access no longer show under
+  `full` either. The one-to-one demo a free trial books from Getting started is unchanged and still reaches the team:
+  "Free trials that asked for a one-to-one demo" shows once a trial has booked one, with Mark contacted and Close.
+
 ## [0.10.43] - 2026-10-21
 
 Getting started shows an import's new signals sooner and recovers by itself when a reload fails, and small fixes from

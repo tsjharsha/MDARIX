@@ -301,7 +301,8 @@ FINDING_SIGNALS = "Finding signals in the complaints you just imported…"
 
 
 def _plural(count: int, noun: str) -> str:
-    return f"{count} {noun}{'' if count == 1 else 's'}"
+    """ "1 signal", "2,290 complaints": grouped the en-US way (DEV-025)."""
+    return f"{count:,} {noun}{'' if count == 1 else 's'}"
 
 
 CASE_CHAPTERS = ("INVESTIGATE_WITH_AI", "DECIDE_AND_SIGN")

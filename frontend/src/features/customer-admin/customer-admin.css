@@ -71,6 +71,26 @@
   color: var(--ac-ink);
   outline: none;
 }
+/* A list's filter bar on a phone (0.10.44): the filters stack inside their panel, each as wide as the panel. A select
+   is as wide as its longest choice, and in a panel (a grid) the widest one widened the whole bar past the panel's edge
+   (the complaint list at 390 px). The bar may now be narrower than its widest control; wider screens are unchanged. */
+@media (max-width: 640px) {
+  .ca-toolbar,
+  .cc-toolbar {
+    min-width: 0;
+  }
+  .ca-toolbar > select,
+  .ca-toolbar > input:not([type="checkbox"]):not([type="radio"]),
+  .ca-toolbar > .ca-search,
+  .cc-toolbar > select,
+  .cc-toolbar > input:not([type="checkbox"]):not([type="radio"]),
+  .cc-toolbar > .ca-search {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
 .ca-chips {
   display: flex;
   flex-wrap: wrap;

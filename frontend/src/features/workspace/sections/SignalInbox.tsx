@@ -49,7 +49,7 @@ import {
   type StatusFilter,
   type TriageSummary,
 } from "../signals";
-import { StatusBadge, listTitle } from "./common";
+import { StatusBadge, formatCount, listTitle } from "./common";
 import { SignalDetailView, SignalDue, SignalPriorityCell, SignalStatusBadge } from "./SignalDetail";
 
 /** The inbox's line while an import's signals are being found. */
@@ -160,7 +160,7 @@ export function SignalInbox({
               onClick={() => change({ status: chip.value as StatusFilter })}
             >
               {chip.label}
-              {chip.count !== null && <span className="ac-tab-count">{chip.count}</span>}
+              {chip.count !== null && <span className="ac-tab-count">{formatCount(chip.count)}</span>}
             </button>
           ))}
         </div>
@@ -389,8 +389,10 @@ function signalColumns(onOpen: (reference: string) => void): Column<SignalSummar
       fields: ["complaint_count", "recent_complaints_7d"],
       render: (row) => (
         <span className="ca-person">
-          <strong>{row.complaint_count ?? 0}</strong>
-          {(row.recent_complaints_7d ?? 0) > 0 && <small>{row.recent_complaints_7d} in last 7 days</small>}
+          <strong>{formatCount(row.complaint_count ?? 0)}</strong>
+          {(row.recent_complaints_7d ?? 0) > 0 && (
+            <small>{formatCount(row.recent_complaints_7d ?? 0)} in last 7 days</small>
+          )}
         </span>
       ),
     },
