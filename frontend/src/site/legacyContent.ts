@@ -236,8 +236,8 @@ if (lifecycleMonitorGroup) {
 export const pages: Record<string, { eyebrow: string; title: string; copy: string }> = {
   "/": {
     eyebrow: "Post-market surveillance and complaint handling for medical devices",
-    title: "Turn post-market signals into defensible product decisions.",
-    copy: "Complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place, linked to the product version, lot and supplier behind each complaint. People decide and sign.",
+    title: "See the risk in your post-market data, not just collect it.",
+    copy: "Complaints, reporting clocks, trend signals, investigations and CAPA in one traceable place, linked to the product version, lot and supplier behind each complaint. Try it on your own data today, no demo call needed.",
   },
   "/platform": {
     eyebrow: "Platform & AI",
