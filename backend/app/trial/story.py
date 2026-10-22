@@ -30,7 +30,7 @@ CHAPTERS = (
         "Recover complaints hidden as cancellations or inquiries",
         "The second look finds records cancelled, logged as inquiries or coded No Fault Found that carry signs of a "
         "complaint; a person confirms or dismisses each, with a reason.",
-        "FDA warning letters in 2026 cite complaints cancelled or logged as inquiries although they met the firm's "
+        "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's "
         "own complaint definition.",
         {"section": "Complaints", "tab": "Second look"},
         "COMPLAINTS_TO_RECHECK",
@@ -69,7 +69,7 @@ CHAPTERS = (
         "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
         "it, then sign the decision with your password and authenticator code; the CAPA opens from the signed "
         "decision. The person who writes a brief never reviews or signs it, on every case.",
-        "Trends that never become a CAPA are cited in most device warning letters.",
+        "Trends that never become a CAPA are among the findings FDA cites most often.",
         {"section": "Investigations", "tab": "Decision Brief"},
         None,
     ),

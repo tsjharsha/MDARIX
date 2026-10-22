@@ -54,6 +54,8 @@ Do only what limits the damage. Do not change or delete data by hand.
    - Connector encryption key: new `MDARIX_CONNECTOR_ENCRYPTION_KEY`, old key kept in
      `MDARIX_CONNECTOR_ENCRYPTION_KEYS`, then `python scripts/reseal_connector_keys.py --apply`, then remove the old
      key. Customer system credentials are rotated by the customer's administrator.
+   - MFA and file encryption keys (`MDARIX_MFA_ENCRYPTION_KEY`, `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY`): the same way,
+     with their keyrings ([KEY_ROTATION.md](KEY_ROTATION.md), "Rotate with a keyring: MFA and file encryption keys").
 3. **Cut off access.**
    - One user: the customer administrator suspends them (Users); this ends their sessions. A customer administrator:
      a platform administrator suspends them (Platform Admin, tenant page, "Customer administrators"). A whole

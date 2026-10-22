@@ -30,6 +30,16 @@ RUN printf '%s\n' 'package main' '' 'import (' '	caddycmd "github.com/caddyserve
 FROM caddy:2.11-alpine@sha256:881bbc60f9986d5ab8e7cfd6cf7e4ef3c9c0439fef2429d035d065577882f028
 # The pinned base keeps Caddy fixed; its OS packages take Alpine's security fixes at build time (CI scans the result).
 RUN apk upgrade --no-cache
+# Caddy runs as an unprivileged user, caddy (uid and gid 10002), not root (SEC-10). It needs no capability to listen on
+# 80 and 443: docker-compose.prod.yml lets the container's own network namespace bind ports from 80 up
+# (net.ipv4.ip_unprivileged_port_start), so the binary carries no file capability, which no-new-privileges would refuse
+# anyway. /data and /config belong to caddy, so a new volume starts out as Caddy's; volumes a root Caddy wrote are
+# given to it by the web-volumes job (caddy-volumes.sh) before web starts.
+RUN addgroup -S -g 10002 caddy \
+    && adduser -S -D -H -u 10002 -G caddy -h /data -s /sbin/nologin caddy \
+    && chown -R caddy:caddy /data /config
 COPY --from=caddy-build /go/bin/caddy /usr/bin/caddy
+COPY --chmod=755 infrastructure/docker/caddy-volumes.sh /usr/local/bin/caddy-volumes
 COPY infrastructure/docker/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /build/dist /srv
+USER caddy

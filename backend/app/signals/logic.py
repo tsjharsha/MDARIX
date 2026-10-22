@@ -7,6 +7,7 @@ Everything here is pure (no session, no clock unless one is passed), so the rule
 
 from __future__ import annotations
 
+import re
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -174,6 +175,42 @@ def rule_title(count: int, key: str | None, product_name: str | None, version: s
     noun = "complaint" if count == 1 else "complaints"
     title = f"{count:,} {noun}: {humanize_problem(key)} on {product or 'unknown product'} in {window_days} days"
     return title[:TITLE_LENGTH]
+
+
+RULE_ORIGIN = "THRESHOLD_RULE"
+# The leading count of a rule title written before 0.10.44, when counts were not grouped ("2290 complaints: ...").
+_UNGROUPED_RULE_COUNT = re.compile(r"^([1-9][0-9]{3,})(?= complaints: )")
+# A number written with thousands separators in a search ("2,290").
+_GROUPED_NUMBER = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
+
+
+def display_title(title: str | None, origin: str | None) -> str | None:
+    """A signal's title as the API shows it. A rule signal raised before 0.10.44 stored its count ungrouped ("2290
+    complaints: ..."); that count is shown grouped ("2,290 complaints: ..."), as rule_title writes it now. Only a title
+    MDARIX wrote is touched (a THRESHOLD_RULE signal's, which no one can edit), and only its leading count: any other
+    title, a person's above all, is shown exactly as stored. The stored title is never rewritten (no migration)."""
+    if origin != RULE_ORIGIN or not title:
+        return title
+    match = _UNGROUPED_RULE_COUNT.match(title)
+    if match is None:
+        return title
+    return f"{int(match.group(1)):,}{title[match.end(1) :]}"
+
+
+def display_task_title(title: str | None, signal_business_id: str | None, origin: str | None) -> str | None:
+    """A signal's triage task title (``Triage <signal>: <its title>``, service.triage_task_title, stored when the task
+    was queued) with the signal's title as display_title shows it."""
+    prefix = f"Triage {signal_business_id}: "
+    if origin != RULE_ORIGIN or not title or not signal_business_id or not title.startswith(prefix):
+        return title
+    return prefix + display_title(title[len(prefix) :], origin)
+
+
+def ungrouped_search(text: str) -> str | None:
+    """A search with grouped numbers ("2,290 complaints") as a rule title written before 0.10.44 has them ("2290
+    complaints"), or None when the search has none."""
+    plain = _GROUPED_NUMBER.sub("", text)
+    return plain if plain != text else None
 
 
 @dataclass

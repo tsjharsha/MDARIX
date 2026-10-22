@@ -38,23 +38,49 @@ can be read side by side:
    `--apply`. A value that cannot be opened is reported and left unchanged: fix that connection before step 4.
 4. Remove the old key from `MDARIX_CONNECTOR_ENCRYPTION_KEYS` and `dc up -d --no-build --wait`.
 
-## Rotate only with a plan: these keys have no keyring yet
+## Rotate with a keyring: MFA and file encryption keys
 
-Changing either of these keys makes what was encrypted with the old one unreadable. There is no tool yet to read with
-the old key and write with the new one; until there is, rotate them only when the old key is known to have leaked,
-and plan for the consequence.
+`MDARIX_MFA_ENCRYPTION_KEY` encrypts the authenticator secrets (`auth/totp.py`) and `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY`
+the stored files when they are kept on the server's own volume (`MDARIX_OBJECT_STORAGE_PROVIDER=local`,
+`object_storage/service.py`; with S3 storage the provider's key management encrypts the files and this key is not
+used). Since 0.10.47 each has a keyring like the connector key (`security/keyring.py`):
 
-- **`MDARIX_MFA_ENCRYPTION_KEY`** (authenticator secrets, `auth/totp.py`). After a change no stored authenticator can
-  be read: every person who set one up must set it up again. Platform administrators are reset with
-  `scripts/reset_platform_admin_mfa.py` (DEPLOYMENT.md, break-glass); customer administrators reset their people's MFA
-  from the console. Tell everyone before you start.
-- **`MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY`** (stored files, local storage only, `object_storage/service.py`). After a
-  change no stored file can be read. Do not change it on a server that holds files; restore from a backup taken with
-  the old key if it was changed by mistake. With S3 storage the provider's key management (KMS) encrypts the files and
-  rotates its own keys; this setting is not used.
+- `<key>_ID` names the current key (`MDARIX_MFA_ENCRYPTION_KEY_ID`, `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEY_ID`). While it
+  is unset, secrets and files are sealed exactly as before 0.10.47, without a key ID. Once it is set, everything new
+  records the key ID it was sealed with.
+- `<key>S` lists the older keys still readable (`MDARIX_MFA_ENCRYPTION_KEYS`, `MDARIX_OBJECT_STORAGE_ENCRYPTION_KEYS`):
+  `k1:<old key>`. What was sealed without a key ID is opened with the current key and then with each listed key, so
+  the key used before the first rotation is simply listed as `k1`.
 
-Adding a keyring to these two (as connector keys have) is the follow-up that makes them rotatable without
-re-enrolment or data loss.
+The configuration check refuses a malformed entry, an ID listed twice and the current ID listed among the old keys,
+and warns while old keys are listed. Rotate both keys together, in a quiet hour:
+
+1. **Back up first**: `dc --profile backup run --rm backup`, and check it finished without error. Keep a copy of
+   `.env.production` readable by the deploy user only (`install -m 600 .env.production .env.production.pre-rotation`).
+2. Generate two new keys (one per setting, the command at the top of this page) and store them in the password
+   manager. In `.env.production`, for each of the two keys: the new key as `<key>`, `<key>_ID=k2`, and the old key,
+   unchanged, as `<key>S=k1:<old key>`. (At the next rotation: the new key as `k3`, and `k2` in `<key>S`.)
+3. `dc up -d --no-build --wait`. New secrets and files are sealed with `k2`; everything stored before still opens.
+4. Dry runs, which list counts only and change nothing:
+   `dc run --rm migrate python scripts/reseal_mfa_secrets.py` and
+   `dc run --rm --no-deps api python scripts/reencrypt_object_storage.py` (the files are on the API's volume, so this
+   one runs in an API container; the migrate job has no access to them). Then run both again with `--apply`. Each
+   value or file is re-sealed with the current key and checked to open with it before it replaces the old one (a file
+   through a temporary file renamed over it, keeping its owner and permissions). Anything that cannot be opened is
+   reported, left unchanged, and the script exits 1: find out why before step 6. Both scripts are safe to run again;
+   a second run reports everything as already on `k2`.
+5. Check that people notice nothing: sign in with an authenticator code (a platform administrator), and open a stored
+   file (an attachment or a report download).
+6. A week later, remove the `k1` entries from both `<key>S` settings and `dc up -d --no-build --wait`; the
+   configuration check stops warning. **Keep the old keys in the password manager** for as long as any backup made
+   while they were in use is kept (`MDARIX_BACKUP_KEEP_DAYS` on the server, 14 days by default, and the off-site
+   copy's retention, up to 90 days): a database backup holds MFA secrets sealed with the old MFA key, and a file
+   backup holds files encrypted with the old file key. To restore such a backup, list the old key again as `k1` in
+   `<key>S`, restore, then run step 4 again.
+
+If something goes wrong before step 6, put the `.env.production` copy from step 1 back and `dc up -d --no-build
+--wait`: the old key opens everything sealed before the rotation, and anything sealed with `k2` meanwhile (a new
+authenticator, a new file) needs `k2` listed as `MDARIX_..._KEYS=k2:<new key>` to open.
 
 ## Backup encryption (age)
 

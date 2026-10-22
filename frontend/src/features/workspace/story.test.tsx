@@ -121,7 +121,7 @@ const chapter = (code: string, overrides: Partial<StoryChapter> = {}): StoryChap
   number: 1,
   title: "Recover complaints hidden as cancellations or inquiries",
   promise: "The second look finds records cancelled or logged as inquiries that carry signs of a complaint.",
-  pain: "FDA warning letters in 2026 cite complaints cancelled or logged as inquiries.",
+  pain: "Recent FDA inspection findings include complaints cancelled or logged as inquiries.",
   opens: { section: "Complaints", tab: "Second look" },
   finding: { value: 5, text: "5 records may be hidden complaints.", state: "CRITICAL" },
   acted: { done: false, count: 0 },
