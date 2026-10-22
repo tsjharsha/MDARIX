@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://mdarix.in/</loc>
-    <lastmod>2026-10-19</lastmod>
+    <lastmod>2026-10-22</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
@@ -57,7 +57,7 @@
   </url>
   <url>
     <loc>https://mdarix.in/resources</loc>
-    <lastmod>2026-10-19</lastmod>
+    <lastmod>2026-10-22</lastmod>
     <priority>0.5</priority>
   </url>
   <url>
@@ -69,6 +69,41 @@
     <loc>https://mdarix.in/videos</loc>
     <lastmod>2026-10-18</lastmod>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/how-to-trend-medical-device-complaints</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/when-is-a-complaint-reportable</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/post-market-data-and-the-risk-file</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/complaint-signal-vs-trend</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/show-capa-effectiveness</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://mdarix.in/questions/try-complaint-trending-on-your-own-data</loc>
+    <lastmod>2026-10-22</lastmod>
+    <priority>0.6</priority>
   </url>
   <url>
     <loc>https://mdarix.in/privacy</loc>

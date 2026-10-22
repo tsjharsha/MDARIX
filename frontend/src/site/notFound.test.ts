@@ -56,6 +56,9 @@ describe("addresses that are no page get a real 404", () => {
       "/wp-login.php",
       "/.env",
       "/platformx",
+      // The questions are pre-rendered files (served as built); an address that is no question is no page.
+      "/questions/no-such-question",
+      "/questionsx",
     ]) {
       expect(shell.test(path), path).toBe(false);
       expect(resolveSitePath(path, "").page, path).toBe("not-found");

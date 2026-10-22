@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveSitePath } from "../PublicMegaSite";
+import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 
 // The 19 former Platform pages and the page and section that now hold each one.
 const FORMER_PLATFORM_PAGES: Record<string, [string, string]> = {
@@ -41,6 +42,14 @@ describe("website addresses", () => {
       "/trust/regulations",
     ])
       expect(resolveSitePath(path, "")).toEqual({ page: path, hash: "" });
+  });
+
+  it("opens the questions and answers, each question on its own page", () => {
+    for (const path of [QUESTIONS_PATH, ...QUESTION_PATHS]) {
+      expect(resolveSitePath(path, ""), path).toEqual({ page: path, hash: "" });
+      expect(resolveSitePath(`${path}/`, ""), path).toEqual({ page: path, hash: "" });
+    }
+    expect(resolveSitePath("/questions/how-to-trend", "")).toEqual({ page: "not-found", hash: "" });
   });
 
   it("shows a not-found page for unknown addresses instead of the home page", () => {
