@@ -58,8 +58,8 @@ def _day(value) -> date | None:
 
 
 def _n(count: int, noun: str, plural: str | None = None) -> str:
-    """ "1 CAPA", "3 CAPAs"."""
-    return f"{count} {noun if count == 1 else (plural or noun + 's')}"
+    """ "1 CAPA", "3 CAPAs", "4,993 complaints" (grouped the en-US way, DEV-025)."""
+    return f"{count:,} {noun if count == 1 else (plural or noun + 's')}"
 
 
 def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAULT, today: date | None = None) -> dict:

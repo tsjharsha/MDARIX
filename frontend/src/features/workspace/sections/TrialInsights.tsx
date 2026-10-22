@@ -329,7 +329,7 @@ export function InsightsBody({
 function Count({ value, still, suffix = "" }: { value: number; still: boolean; suffix?: string }) {
   return still ? (
     <>
-      {value.toLocaleString()}
+      {value.toLocaleString("en-US")}
       {suffix}
     </>
   ) : (

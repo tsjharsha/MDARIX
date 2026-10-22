@@ -175,18 +175,18 @@ def sentence(name: str, item: Check) -> str:
     if item.result == SHORT_HISTORY:
         return f"{name}: less than {MIN_HISTORY_DAYS} days of history, so the rate is not compared."
     if item.result == TOO_FEW:
-        return f"{name}: {item.recent} complaint(s) in the last {RECENT_DAYS} days, too few to compare."
+        return f"{name}: {item.recent:,} complaint(s) in the last {RECENT_DAYS} days, too few to compare."
     if item.baseline == PREVIOUS_VERSION:
         text = (
-            f"{name}: {item.recent} complaints in the last {RECENT_DAYS} days against {item.expected:.1f} expected from "
+            f"{name}: {item.recent:,} complaints in the last {RECENT_DAYS} days against {item.expected:,.1f} expected from "
             f"{item.baseline_name or 'the previous version'} over the {item.history_days} days before this version's "
-            f"release ({item.history} complaints); chance of at least this many if nothing changed: "
+            f"release ({item.history:,} complaints); chance of at least this many if nothing changed: "
             f"{item.p_value:.3f}."
         )
     else:
         text = (
-            f"{name}: {item.recent} complaints in the last {RECENT_DAYS} days against {item.expected:.1f} expected from "
-            f"the previous {item.history_days} days ({item.history} complaints); chance of at least this many if "
+            f"{name}: {item.recent:,} complaints in the last {RECENT_DAYS} days against {item.expected:,.1f} expected from "
+            f"the previous {item.history_days} days ({item.history:,} complaints); chance of at least this many if "
             f"nothing changed: {item.p_value:.3f}."
         )
     if item.basis == UNITS:

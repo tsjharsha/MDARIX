@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { Tone } from "../../admin/console/dashboardModel";
 import { useWorkspace } from "../workspaceContext";
+import { formatCount } from "./common";
 
 /** The pieces the review boards share (Complaints, Records): the summary banner, filters and paging. */
 
@@ -94,7 +95,9 @@ export function ChipFilter<T extends string>({
           onClick={() => onChange(option.value)}
         >
           {option.label}
-          {typeof counts?.[option.value] === "number" && <span className="ac-tab-count">{counts[option.value]}</span>}
+          {typeof counts?.[option.value] === "number" && (
+            <span className="ac-tab-count">{formatCount(counts[option.value] as number)}</span>
+          )}
         </button>
       ))}
     </div>

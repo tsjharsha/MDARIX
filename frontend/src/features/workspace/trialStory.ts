@@ -4,6 +4,7 @@
 import type { Tone } from "../admin/console/dashboardModel";
 import { checkStateOf } from "./readiness";
 import type { LoopStation } from "./qualityLoop";
+import { FINDING_SIGNALS_NOW } from "./signals";
 
 export type StoryChapter = {
   code: string;
@@ -97,6 +98,20 @@ export const STORY_FAILED = {
   detail:
     "Your records are safe; the connection or the server did not answer in time. Try again, or carry on in Investigations, where the sample case is.",
 };
+
+/** The story as shown while an import's signals are being found and Getting started waits for them before reading it
+ * again (0.10.44): the trend chapter says so, as the server's story does meanwhile (backend/app/trial/story.py). */
+export function findingSignals(story: TrialStory): TrialStory {
+  return {
+    ...story,
+    signals_pending: true,
+    chapters: story.chapters.map((chapter) =>
+      chapter.code === "TRENDS_TO_CASES"
+        ? { ...chapter, finding: { value: null, text: FINDING_SIGNALS_NOW, state: "NOT_SET" } }
+        : chapter,
+    ),
+  };
+}
 
 /** The story's headline: the next chapter to try, or the loop closed; ``failed`` when the story could not be read. */
 export function storyHeadline(story: TrialStory | null | undefined, failed = false): { title: string; detail: string } {

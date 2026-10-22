@@ -168,10 +168,11 @@ def humanize_problem(key: str | None) -> str:
 
 
 def rule_title(count: int, key: str | None, product_name: str | None, version: str | None, window_days: int) -> str:
-    """The title of a rule signal, such as: 4 complaints: occlusion alarm on Aster Pump Rev C in 30 days."""
+    """The title of a rule signal, such as: 4 complaints: occlusion alarm on Aster Pump Rev C in 30 days. The count is
+    grouped the en-US way ("2,290 complaints: ..."), as the import result says its counts (DEV-025)."""
     product = " ".join(part for part in (str(product_name or "").strip(), str(version or "").strip()) if part)
     noun = "complaint" if count == 1 else "complaints"
-    title = f"{count} {noun}: {humanize_problem(key)} on {product or 'unknown product'} in {window_days} days"
+    title = f"{count:,} {noun}: {humanize_problem(key)} on {product or 'unknown product'} in {window_days} days"
     return title[:TITLE_LENGTH]
 
 

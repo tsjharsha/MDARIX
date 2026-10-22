@@ -1,4 +1,5 @@
 import type { AppView } from "./router";
+import { DEMO_REQUESTS_OFFERED } from "../site/offer";
 
 /**
  * Which features the server offers (session context `feature_set`, backend/app/feature_set.py): everything as built
@@ -11,6 +12,14 @@ export type FeatureSet = "full" | "mvp";
 export function featureSetOf(value: unknown): FeatureSet {
   return typeof value === "string" && value.trim().toLowerCase() === "mvp" ? "mvp" : "full";
 }
+
+/**
+ * Whether website visitors can ask for a demo on this deployment: the website offers the form (site/offer.ts) and the
+ * server serves `POST /api/v1/public/demo-requests`, which the MVP parks (backend/app/feature_set.py). The website has
+ * offered only the free trial since 0.10.5, so today this is false under both feature sets. A free trial's own
+ * one-to-one demo (Getting started, `POST /api/v1/trial/demo-request`) does not depend on it.
+ */
+export const websiteDemoRequestsOffered = (featureSet: FeatureSet) => DEMO_REQUESTS_OFFERED && featureSet === "full";
 
 /** Screens (addresses) the MVP parks. An old link to one opens the nearest screen the MVP keeps. */
 export const PARKED_VIEWS: readonly AppView[] = [
