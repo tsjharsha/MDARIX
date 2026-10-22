@@ -49,12 +49,12 @@ const accountStatusLabel = (status: unknown) =>
 export const canResetMfa = (user: User, currentUserId: string | undefined) =>
   !!currentUserId && user.id !== currentUserId && isPlatformAdminRole(user.role);
 
-export function IdentityAccess({ section }: { section: string }) {
+export function IdentityAccess({ section, websiteDemos = false }: { section: string; websiteDemos?: boolean }) {
   if (section === "Roles & permissions") return <RolesAndPermissions />;
   if (section === "Effective access") return <EffectiveAccess />;
   if (section === "Customer administrators") return <CustomerAdministrators />;
   if (section === "Customer users") return <CustomerUsers />;
-  if (section === "Onboarding") return <Onboarding />;
+  if (section === "Onboarding") return <Onboarding websiteDemos={websiteDemos} />;
   return <PlatformUsers />;
 }
 
@@ -194,24 +194,27 @@ function CustomerAdministrators() {
 }
 
 /**
- * People asking to use MDARIX: demo requests from the website, free-trial requests, and requests from free trials for a
- * pilot conversation. Approving a trial creates its customer and tenant (under Customers & Tenants) and the requester's
- * account.
+ * People asking to use MDARIX: free-trial requests, and requests from free trials for a pilot conversation or a
+ * one-to-one demo; demo requests from the website too while the website offers them (`websiteDemos`; it has offered
+ * only the free trial since 0.10.5, and the MVP parks their route). Approving a trial creates its customer and tenant
+ * (under Customers & Tenants) and the requester's account.
  */
-function Onboarding() {
+export function Onboarding({ websiteDemos = false }: { websiteDemos?: boolean }) {
   return (
     <div className="cc-page">
       <div className="cc-title">
         <div>
-          <h2>Demo and trial requests</h2>
+          <h2>{websiteDemos ? "Demo and trial requests" : "Trial requests"}</h2>
           <p className="ac-muted">
-            The people who asked for a demo, a free trial or, from a trial, a pilot conversation. Approving a trial
-            creates the requester&apos;s account, and the customer and tenant it belongs to, which are then managed
-            under Customers &amp; Tenants.
+            {websiteDemos
+              ? "The people who asked for a demo, a free trial or, from a trial, a pilot conversation."
+              : "The people who asked for a free trial and, from their trial, for a pilot conversation or a one-to-one demo."}{" "}
+            Approving a trial creates the requester&apos;s account, and the customer and tenant it belongs to, which are
+            then managed under Customers &amp; Tenants.
           </p>
         </div>
       </div>
-      <DemoRequestsWorkspace />
+      <DemoRequestsWorkspace websiteRequests={websiteDemos} />
       <MvpRequestsWorkspace />
       <TrialRequestsWorkspace />
     </div>

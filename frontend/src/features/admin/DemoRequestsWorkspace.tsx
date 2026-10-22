@@ -63,9 +63,24 @@ const formatDate = (value: string | null) =>
       })
     : "—";
 
+/** The requests the panel lists: every one while the website offers demo requests; otherwise only those booked from
+ * free trials (a website request can no longer be made), with their counts by status. */
+export function shownDemoRequests<T extends Pick<DemoRequest, "source" | "status">>(
+  items: T[],
+  websiteRequests: boolean,
+) {
+  const shown = websiteRequests ? items : items.filter((item) => item.source === "TRIAL");
+  const counts: Record<string, number> = {};
+  for (const item of shown) counts[item.status] = (counts[item.status] ?? 0) + 1;
+  return { items: shown, counts };
+}
+
 // Demo requests from the website (name, work email, phone) and from inside free trials (the organization, the times
 // that suit and how far into the story the trial went). Staff contact the requester and record the outcome.
-export function DemoRequestsWorkspace() {
+// 0.10.44: while the website offers no demo request (`websiteRequests` false: app/featureSet.ts
+// websiteDemoRequestsOffered) the panel lists only the trials' one-to-one demo requests, and is not shown until one
+// arrives: Platform Admin showed an empty "Website visitors who asked for a demo" panel.
+export function DemoRequestsWorkspace({ websiteRequests = true }: { websiteRequests?: boolean }) {
   const [items, setItems] = useState<DemoRequest[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [filter, setFilter] = useState("NEW");
@@ -77,8 +92,9 @@ export function DemoRequestsWorkspace() {
     setState("loading");
     requestJson<{ items: DemoRequest[]; counts: Record<string, number> }>("/api/v1/platform-admin/demo-requests")
       .then((data) => {
-        setItems(data.items);
-        setCounts(data.counts);
+        const shown = shownDemoRequests(data.items, websiteRequests);
+        setItems(shown.items);
+        setCounts(websiteRequests ? data.counts : shown.counts);
         setState("ready");
       })
       .catch(() => setState("error"));
@@ -103,15 +119,21 @@ export function DemoRequestsWorkspace() {
   };
 
   const rows = items.filter((item) => item.status === filter);
+  // Without website requests, nothing to show until a free trial books a demo (a failed read still says so).
+  if (!websiteRequests && !items.length && state !== "error") return null;
   return (
     <section className="platform-admin-card trial-queue" aria-labelledby="demo-queue-title">
       <div className="platform-admin-card-title">
         <div>
           <span className="eyebrow">Demo requests</span>
-          <h3 id="demo-queue-title">Website visitors who asked for a demo</h3>
+          <h3 id="demo-queue-title">
+            {websiteRequests ? "Website visitors who asked for a demo" : "Free trials that asked for a one-to-one demo"}
+          </h3>
           <p>
-            Contact each requester by email or phone to arrange the demo, then mark the request contacted. Close it when
-            the demo has happened or the requester is not a fit.
+            {websiteRequests
+              ? "Contact each requester by email or phone to arrange the demo, then mark the request contacted."
+              : "Booked from a trial's Getting started. Contact the requester to agree a time, then mark the request contacted."}{" "}
+            Close it when the demo has happened or the requester is not a fit.
           </p>
         </div>
         <div className="trial-queue-head-actions">
@@ -152,7 +174,12 @@ export function DemoRequestsWorkspace() {
           caption="Demo requests"
           rows={rows}
           rowKey={(row) => row.id}
-          empty={{ title: "Nothing here yet", detail: "Requests appear here as visitors ask for a demo." }}
+          empty={{
+            title: "Nothing here yet",
+            detail: websiteRequests
+              ? "Requests appear here as visitors ask for a demo."
+              : "Requests appear here as free trials book a demo.",
+          }}
           columns={[
             idColumn("Request ID"),
             { key: "name", label: "Name", render: (row) => <strong>{row.name}</strong> },

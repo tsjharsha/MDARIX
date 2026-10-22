@@ -53,7 +53,8 @@ export function AnimatedNumber({
   const rounded = Math.round(shown);
   return (
     <>
-      {compact ? compactNumber(rounded) : rounded.toLocaleString()}
+      {/* Grouped the en-US way, "4,993", whatever the browser's language (DEV-025). */}
+      {compact ? compactNumber(rounded) : rounded.toLocaleString("en-US")}
       {suffix}
     </>
   );

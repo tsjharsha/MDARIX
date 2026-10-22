@@ -62,7 +62,7 @@ import {
   type SignalRef,
   type SignalSummary,
 } from "../signals";
-import { StatusBadge, countOf } from "./common";
+import { StatusBadge, countOf, formatCount } from "./common";
 import { SignalInsightPanel } from "./SignalInsight";
 import { oneClickQuestion, openCasePath } from "../signalAi";
 
@@ -286,8 +286,10 @@ function SignalBody({
         </Fact>
         <Fact label="Age">{ageText(signal.age_days)}</Fact>
         <Fact label="Complaints">
-          {signal.complaint_count ?? complaints.length}
-          {(signal.recent_complaints_7d ?? 0) > 0 ? ` · ${signal.recent_complaints_7d} in last 7 days` : ""}
+          {formatCount(signal.complaint_count ?? complaints.length)}
+          {(signal.recent_complaints_7d ?? 0) > 0
+            ? ` · ${formatCount(signal.recent_complaints_7d ?? 0)} in last 7 days`
+            : ""}
         </Fact>
         <Fact label="Complaint dates">
           {signal.first_event_at || signal.last_event_at
@@ -487,7 +489,7 @@ function SignalBody({
                     />
                   </span>
                   <strong className="ac-barlist-value">
-                    {item.count} · {item.percent}%
+                    {formatCount(item.count)} · {item.percent}%
                   </strong>
                 </li>
               ))}

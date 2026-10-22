@@ -897,12 +897,23 @@ def upload_counters(source: str = UPLOAD_SOURCE) -> list[tuple]:
     return counters
 
 
+def upload_counts(tenant_id, source: str = UPLOAD_SOURCE) -> list:
+    """One count per kind of record ``upload_counters`` names, each a scalar subquery, to be read in one statement
+    with others (``uploaded_rows``, GET /api/v1/trial/status)."""
+    from sqlalchemy import select
+
+    return [
+        select(func.count(model.id)).where(model.tenant_id == tenant_id, *conditions).scalar_subquery()
+        for model, conditions in upload_counters(source)
+    ]
+
+
 def uploaded_rows(db: Session, tenant_id, source: str = UPLOAD_SOURCE) -> int:
-    """The rows the organization uploaded that are in its workspace (``upload_counters``): a free trial's allowance."""
-    total = 0
-    for model, conditions in upload_counters(source):
-        total += db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, *conditions).scalar() or 0
-    return int(total)
+    """The rows the organization uploaded that are in its workspace (``upload_counters``): a free trial's allowance.
+    Read in one statement (0.10.44; it was one per kind of record, 15 round trips)."""
+    from sqlalchemy import select
+
+    return int(sum(value or 0 for value in db.execute(select(*upload_counts(tenant_id, source))).one()))
 
 
 ON_PROBLEMS = ("refuse", "skip")
@@ -1424,8 +1435,13 @@ def insights(db: Session, tenant_id) -> dict:
         is not None
     )
     scope = UPLOAD_SOURCE if own else SAMPLE_SOURCE
-    base = db.query(Complaint).filter(Complaint.tenant_id == tenant_id, Complaint.source_system == scope)
-    complaints = base.all()
+    # The columns the panel reads and each complaint's month, not whole records (insight_questions.COMPLAINT_COLUMNS);
+    # the same filter as before and no order, so the complaints come in the same order.
+    complaints = (
+        db.query(*insight_questions.COMPLAINT_COLUMNS)
+        .filter(Complaint.tenant_id == tenant_id, Complaint.source_system == scope)
+        .all()
+    )
     total = len(complaints)
     products = {p.id: p for p in db.query(Product).filter(Product.tenant_id == tenant_id).all()}
     versions = {v.id: v for v in db.query(ProductVersion).filter(ProductVersion.tenant_id == tenant_id).all()}
@@ -1470,16 +1486,7 @@ def insights(db: Session, tenant_id) -> dict:
         if lid in lots
     ][:5]
     by_month = sorted(
-        (
-            {"month": month, "complaints": n}
-            for month, n in tally(
-                lambda c: (
-                    (c.complaint_timestamp or c.event_timestamp or c.created_at).strftime("%Y-%m")
-                    if (c.complaint_timestamp or c.event_timestamp or c.created_at)
-                    else None
-                )
-            )
-        ),
+        ({"month": month, "complaints": n} for month, n in tally(lambda c: c.month)),
         key=lambda item: item["month"],
     )
     findings = []
@@ -1490,7 +1497,7 @@ def insights(db: Session, tenant_id) -> dict:
             # The product's name, as people read it, rather than its identifier.
             named = next((item["name"] for item in by_product if item["product_id"] == top["product_id"]), None)
             findings.append(
-                f"{share}% of complaints ({top['complaints']} of {total}) concern "
+                f"{share}% of complaints ({top['complaints']:,} of {total:,}) concern "
                 f"{named or top['product_id']} {top['version']}."
             )
     if by_lot and total:

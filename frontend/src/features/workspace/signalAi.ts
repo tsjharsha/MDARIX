@@ -117,16 +117,20 @@ export function pValueText(value: number | null | undefined): string {
 }
 
 /** "6 against 1.0 expected (6.0×)". */
+// Counts grouped the en-US way, whatever the browser's language: "2,290 against 1,204.5 expected" (DEV-025).
+const grouped = (value: number, decimals = 0) =>
+  value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+
 export function trendCountText(item: Pick<TrendItem, "recent" | "expected" | "ratio" | "result">): string {
-  if (item.result === "SHORT_HISTORY") return `${item.recent} in 30 days`;
+  if (item.result === "SHORT_HISTORY") return `${grouped(item.recent)} in 30 days`;
   const ratio = typeof item.ratio === "number" ? ` (${item.ratio.toFixed(1)}×)` : "";
-  return `${item.recent} against ${item.expected.toFixed(1)} expected${ratio}`;
+  return `${grouped(item.recent)} against ${grouped(item.expected, 1)} expected${ratio}`;
 }
 
 export function trendHeadline(board: TrendBoard | null | undefined): { title: string; detail: string; tone: Tone } {
   if (!board) return { title: "Checking every version against its own history…", detail: "", tone: "neutral" };
   const { significant, elevated, groups, complaints_counted } = board.summary;
-  const counted = `${complaints_counted.toLocaleString()} complaints counted across ${groups.toLocaleString()} groups, whatever their status.`;
+  const counted = `${grouped(complaints_counted)} complaints counted across ${grouped(groups)} groups, whatever their status.`;
   if (significant)
     return {
       title: `${significant} ${significant === 1 ? "group" : "groups"} rising significantly against their own history`,
