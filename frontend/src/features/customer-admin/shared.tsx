@@ -95,6 +95,42 @@ export function readResource<T>(path: string, apply: (result: ResourceResult<T>)
   };
 }
 
+/**
+ * Ask the small status read ``statusPath`` (``{ pending: boolean }``) now and every STATUS_REFRESH_MS until it says
+ * the work is no longer pending, then call ``done`` once: also after REFRESH_FOR_MS, or at once when the status is
+ * refused (a 403 says the same the next time). A read that fails for a passing reason is asked again. Returns the
+ * function that stops it (the page closed). Getting started waits so for an import's signals before reading its
+ * story again (0.10.44).
+ */
+export function whenNoLongerPending(statusPath: string, done: () => void): () => void {
+  let current = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const started = Date.now();
+  const finish = () => {
+    if (!current) return;
+    current = false;
+    done();
+  };
+  const ask = () => {
+    if (!current) return;
+    if (Date.now() - started > REFRESH_FOR_MS) return finish();
+    requestJson<{ pending?: boolean }>(statusPath, { background: true })
+      .then((status) => {
+        if (!status.pending) return finish();
+        if (current) timer = setTimeout(ask, STATUS_REFRESH_MS);
+      })
+      .catch((reason) => {
+        if (!isTransientFailure(reason)) return finish();
+        if (current) timer = setTimeout(ask, STATUS_REFRESH_MS);
+      });
+  };
+  ask();
+  return () => {
+    current = false;
+    if (timer !== undefined) clearTimeout(timer);
+  };
+}
+
 /** Whether a loaded resource is to be read again: its data is there and ``refreshWhile`` says it is not final. */
 export function stillUnfinished<T>(
   result: { state: PanelState; data: T | null },
@@ -762,7 +798,8 @@ export function Tabs<T extends string>({
             {typeof counts?.[tab] === "number" && (
               <>
                 {" "}
-                <span className="ac-tab-count">{counts[tab]}</span>
+                {/* Grouped the en-US way, "4,993", whatever the browser's language (DEV-025). */}
+                <span className="ac-tab-count">{(counts[tab] as number).toLocaleString("en-US")}</span>
               </>
             )}
           </button>

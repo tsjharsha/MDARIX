@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useMemo, useState } from "react";
-import { PARKED_ADMIN_FALLBACK, adminAreasFor, featureSetOf } from "../../app/featureSet";
+import { PARKED_ADMIN_FALLBACK, adminAreasFor, featureSetOf, websiteDemoRequestsOffered } from "../../app/featureSet";
 import { SwitchOrganization } from "../shared/SwitchOrganization";
 import { HelpMenu } from "../shared/HelpMenu";
 import { LayoutDashboard, LogOut, Menu, RefreshCw, Search, X } from "lucide-react";
@@ -57,6 +57,8 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
   // Under the MVP feature set some areas and sections are parked (app/featureSet.ts adminAreasFor).
   const featureSet = featureSetOf(securityContext?.feature_set);
   const SECTIONS = useMemo(() => adminAreasFor(ALL_AREAS, featureSet), [featureSet]);
+  // Website demo requests, only where the website offers them and the server serves their route.
+  const websiteDemos = websiteDemoRequestsOffered(featureSet);
   const [location, setLocation] = useState<Location>(() =>
     initialSection === NEW_CUSTOMER
       ? locationFor({ domain: CUSTOMERS_AND_TENANTS, item: "Customers" }, SECTIONS)
@@ -257,8 +259,8 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                     <p className="ac-eyebrow">Platform administration · {activeDomain[1]}</p>
                     <h1>{activeDomain[0]}</h1>
                     {/* One line on what the open section is for (Data & Integrations has its own step guide). */}
-                    {sectionGuide(activeDomain[0], location.item) && (
-                      <p className="ac-muted">{sectionGuide(activeDomain[0], location.item)}</p>
+                    {sectionGuide(activeDomain[0], location.item, websiteDemos) && (
+                      <p className="ac-muted">{sectionGuide(activeDomain[0], location.item, websiteDemos)}</p>
                     )}
                   </div>
                 </div>
@@ -331,6 +333,7 @@ export function SimplifiedPlatformAdminScreen({ securityContext, initialSection 
                         domain={location.domain}
                         section={location.item}
                         onSection={(item) => setLocation({ domain: location.domain, item })}
+                        websiteDemos={websiteDemos}
                       />
                     ) : null}
                   </SectionErrorBoundary>

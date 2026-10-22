@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge } from "../../admin/console/charts";
-import { Tabs, errorText, send, useResource } from "../../customer-admin/shared";
+import { Tabs, errorText, send, useResource, whenNoLongerPending } from "../../customer-admin/shared";
 import { sectionAllowed, useWorkspace, type WorkspaceSection } from "../workspaceContext";
 import { ImportPanel, templateSummary, type ImportResult, type ImportTemplate } from "./ImportData";
 import { formatDay } from "../../../app/dates";
@@ -38,6 +38,7 @@ import {
   TRIAL_STORY_PATH,
   chapterStatus,
   chapterTone,
+  findingSignals,
   loopFromStory,
   storyHeadline,
   type StoryChapter,
@@ -101,14 +102,37 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
     statusPath: DETECTION_STATUS_PATH,
     retry: true,
   });
+  // After an import whose signals are being found (they are in within seconds), the story is read again once the small
+  // detection status says they are in, not at once: that read could only say "Finding signals", and right after a
+  // large import it took seconds and slowed the finding itself (0.10.44). Until that read answers, the trend chapter
+  // says the signals are being found ("waiting" for them, then "reading" the story).
+  const [afterImport, setAfterImport] = useState<"waiting" | "reading" | null>(null);
+  const awaitingSignals = afterImport !== null;
+  const reloadStory = loadedStory.reload;
   // The last story read stays on screen while a reload is under way or has failed; with none at all, the headline
   // says the story could not be loaded and offers to try again (never "Reading..." for ever).
   const lastStory = useRef<TrialStory | null>(null);
   if (loadedStory.data) lastStory.current = loadedStory.data;
-  const storyData = loadedStory.data ?? lastStory.current;
+  const readFrom = useRef<TrialStory | null>(null);
+  useEffect(() => {
+    if (afterImport !== "waiting") return;
+    return whenNoLongerPending(DETECTION_STATUS_PATH, () => {
+      readFrom.current = lastStory.current;
+      setAfterImport("reading");
+      reloadStory();
+    });
+  }, [afterImport, reloadStory]);
+  // The story read once the signals are in has answered (or failed for good): it is shown as it is.
+  useEffect(() => {
+    if (afterImport !== "reading") return;
+    if (loadedStory.data !== readFrom.current || loadedStory.state === "error" || loadedStory.state === "forbidden")
+      setAfterImport(null);
+  }, [afterImport, loadedStory.data, loadedStory.state]);
+  const lastData = loadedStory.data ?? lastStory.current;
+  const storyData = lastData && awaitingSignals ? findingSignals(lastData) : lastData;
   const storyFailed = !storyData && (loadedStory.state === "error" || loadedStory.state === "forbidden");
   const story =
-    storyData && loadedStory.state !== "ready"
+    storyData && (loadedStory.state !== "ready" || awaitingSignals)
       ? { ...loadedStory, state: "ready" as const, data: storyData }
       : loadedStory;
   const trial = status.data;
@@ -304,7 +328,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
                   if (newComplaints(entity, result) > 0) setOwnImported(true);
                   status.reload();
                   insights.reload();
-                  story.reload();
+                  // Its signals being found: the story is read once they are in (``awaitingSignals``).
+                  if (result.signals === "FINDING") setAfterImport("waiting");
+                  else story.reload();
                   work.refreshProducts();
                 }}
               />

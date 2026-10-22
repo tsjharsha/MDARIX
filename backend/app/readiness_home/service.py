@@ -94,8 +94,8 @@ def _midnight(day: date) -> datetime:
 
 
 def _n(count: int, noun: str) -> str:
-    """ "1 complaint", "3 complaints"."""
-    return f"{count} {noun}{'' if count == 1 else 's'}"
+    """ "1 complaint", "4,993 complaints": grouped the en-US way (DEV-025)."""
+    return f"{count:,} {noun}{'' if count == 1 else 's'}"
 
 
 def _check(code, title, value, state, detail, opens, items=None, extra=None) -> dict:
@@ -127,7 +127,7 @@ def complaints_to_recheck(db: Session, tenant_id: uuid.UUID, today: date) -> dic
         detail = "No cancelled record or inquiry shows complaint signs"
     elif harm:
         verb = "reports" if harm == 1 else "report"
-        detail = f"{harm} of {_n(count, 'record')} to recheck {verb} a death or serious injury"
+        detail = f"{harm:,} of {_n(count, 'record')} to recheck {verb} a death or serious injury"
     else:
         detail = f"{_n(count, 'record')} to recheck, none reporting a death or serious injury"
     return _check(
@@ -154,7 +154,7 @@ def complaints_past_target(db: Session, tenant_id: uuid.UUID, today: date) -> di
         past,
         # The number is what is past the target; complaints still inside it are no finding (named in the detail).
         CRITICAL if past else CLEAR,
-        f"{_n(summary['open_unlinked'], 'complaint')} open in no signal or case; {summary['due_soon']} due within a "
+        f"{_n(summary['open_unlinked'], 'complaint')} open in no signal or case; {summary['due_soon']:,} due within a "
         f"week; target {summary['target_days']} days",
         {"section": "Complaints", "tab": "Backlog"},
         [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in found["items"]],
@@ -308,8 +308,8 @@ def capa_effectiveness(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
         "CAPAs without a verified effect",
         value,
         CRITICAL if (summary["closed_without_check"] or summary["overdue"]) else ATTENTION if value else CLEAR,
-        f"{summary['closed_without_check']} closed without a check, {_n(summary['overdue'], 'check')} overdue, "
-        f"{summary['not_planned']} with no check planned",
+        f"{summary['closed_without_check']:,} closed without a check, {_n(summary['overdue'], 'check')} overdue, "
+        f"{summary['not_planned']:,} with no check planned",
         {"section": "Records", "tab": "Effectiveness checks"},
         [
             {"id": item["capa"]["id"], "ref": item["capa"]["business_id"] or item["capa"]["capa_identifier"]}

@@ -135,6 +135,31 @@ def test_rule_titles():
     assert len(logic.rule_title(3, "X" * 400, "P", None, 30)) <= logic.TITLE_LENGTH
 
 
+def test_rule_titles_group_large_counts_the_en_us_way():
+    # 0.10.44: "2290 complaints: unspecified problem on ..." read as a code; counts are grouped as the import result
+    # groups them (DEV-025). A title is stored text: signals raised before keep theirs.
+    assert (
+        logic.rule_title(2290, "UNSPECIFIED", "Aster Pump", "Rev C", 30)
+        == "2,290 complaints: unspecified problem on Aster Pump Rev C in 30 days"
+    )
+    assert logic.rule_title(999, "OCCLUSION_ALARM", "Aster Pump", None, 30).startswith("999 complaints: ")
+    assert logic.rule_title(1234567, "X", "P", None, 30).startswith("1,234,567 complaints: ")
+
+
+def test_story_readiness_and_trend_sentences_group_their_counts():
+    from backend.app.readiness_home import service as readiness_service
+    from backend.app.readiness_home import summary as readiness_summary
+    from backend.app.signals import trend_rules
+    from backend.app.trial import story
+
+    assert story._plural(2290, "signal") == "2,290 signals" and story._plural(1, "signal") == "1 signal"
+    assert readiness_service._n(4993, "complaint") == "4,993 complaints"
+    assert readiness_summary._n(4993, "complaint") == "4,993 complaints"
+    text = trend_rules.sentence("Pump Rev B", trend_rules.check(recent=2290, history=1500, days_of_history=180))
+    assert text.startswith("Pump Rev B: 2,290 complaints in the last ") and "(1,500 complaints)" in text
+    assert "2290" not in text and "1500" not in text
+
+
 def test_grouping_by_product_version_and_problem():
     product, version = uuid.uuid4(), uuid.uuid4()
     rows = [

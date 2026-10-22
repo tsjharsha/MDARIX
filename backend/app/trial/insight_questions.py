@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.app.db.models.foundation import (
@@ -43,10 +44,31 @@ IDS_MAX = 100
 ROWS_MAX = 12
 
 
-def month_of(complaint: Complaint) -> str | None:
-    """The complaint's month (YYYY-MM): received, else the event, else when the record was made (as by_month counts)."""
-    when = complaint.complaint_timestamp or complaint.event_timestamp or complaint.created_at
-    return when.strftime("%Y-%m") if when else None
+# The complaint's month (YYYY-MM): received, else the event, else when the record was made (as by_month counts),
+# worked out by the database in its session's time zone, the zone a timestamp read into Python is given.
+MONTH = func.to_char(
+    func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at), "YYYY-MM"
+).label("month")
+
+# What the panel reads of each complaint in scope (imports.insights): these columns and its month, not whole records.
+# A whole record parsed its eight timestamps, about 40,000 for an import of 5,000 complaints: most of the read's time
+# (0.10.44).
+COMPLAINT_COLUMNS = (
+    Complaint.id,
+    Complaint.business_id,
+    Complaint.complaint_identifier,
+    Complaint.product_id,
+    Complaint.product_version_id,
+    Complaint.lot_batch_id,
+    Complaint.problem_code,
+    Complaint.country,
+    Complaint.reporter_type,
+    Complaint.status,
+    Complaint.death,
+    Complaint.serious_injury,
+    Complaint.malfunction,
+    MONTH,
+)
 
 
 def month_series(months: list[str]) -> list[str]:
@@ -114,14 +136,14 @@ class _Records:
 
     def __init__(self, db: Session, tenant_id, scope: str, complaints, products, versions, lots):
         self.db, self.tenant_id, self.scope = db, tenant_id, scope
-        self.complaints: list[Complaint] = complaints
+        self.complaints: list = complaints
         self.products: dict = products
         self.versions: dict = versions
         self.lots: dict = lots
         self.sites = {
             site.id: site for site in db.query(ManufacturingSite).filter(ManufacturingSite.tenant_id == tenant_id).all()
         }
-        self.months = {complaint.id: month_of(complaint) for complaint in complaints}
+        self.months = {complaint.id: complaint.month for complaint in complaints}
         self.series = month_series([month for month in self.months.values() if month])
         self.windows = windows(self.series)
         self._components: dict = {}
@@ -312,8 +334,8 @@ def _version_question(records: _Records) -> dict | None:
                 _day(sibling.release_timestamp) or "—",
                 len(own),
                 _rate(per_month) if per_month is not None else "—",
-                ", ".join(f"{lot} ({n})" for lot, n in lots) or "—",
-                ", ".join(f"{code} ({n})" for code, n in codes) or "—",
+                ", ".join(f"{lot} ({n:,})" for lot, n in lots) or "—",
+                ", ".join(f"{code} ({n:,})" for code, n in codes) or "—",
             ]
         )
         parts.append(
@@ -729,9 +751,9 @@ def _origin_question(records: _Records) -> dict | None:
         top, n = countries[0]
         with_country = sum(n for _c, n in countries)
         in_all = _count(len(countries), "country", "countries")
-        parts.append(f"{top} has the most complaints ({n} of {with_country} with a country; {in_all} in all)")
+        parts.append(f"{top} has the most complaints ({n:,} of {with_country:,} with a country; {in_all} in all)")
     if reporters:
-        parts.append("By reporter type: " + ", ".join(f"{kind} {n}" for kind, n in reporters[:4]))
+        parts.append("By reporter type: " + ", ".join(f"{kind} {n:,}" for kind, n in reporters[:4]))
     missing = []
     no_country = total - sum(n for _c, n in countries)
     no_reporter = total - sum(n for _r, n in reporters)
@@ -879,7 +901,8 @@ def answers_for(questions: list[dict], text: str) -> list[dict]:
 
 
 def build(db: Session, tenant_id, scope: str, complaints, products, versions, lots) -> dict:
-    """The panel's new fields for the complaints in scope; empty when there are none."""
+    """The panel's new fields for the complaints in scope (rows of ``COMPLAINT_COLUMNS``); empty when there are
+    none."""
     records = _Records(db, tenant_id, scope, complaints, products, versions, lots)
     rows, labels = compact_records(records)
     questions = [item for item in (ask(records) for ask in QUESTIONS) if item] if complaints else []

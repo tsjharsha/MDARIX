@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -120,10 +120,43 @@ def _require_trial(db: Session, ctx: AuthenticatedRequestContext):
     return subscription
 
 
-def _count(db: Session, model, tenant_id, source: str) -> int:
-    return int(
-        db.query(func.count(model.id)).filter(model.tenant_id == tenant_id, model.source_system == source).scalar() or 0
-    )
+# The records Getting started counts: the sample's, and the organization's own imported ones.
+SAMPLE_COUNTED = {
+    "products": Product,
+    "lots": LotBatch,
+    "complaints": Complaint,
+    "investigations": Investigation,
+    "capas": Capa,
+    "risks": Risk,
+}
+OWN_COUNTED = {"products": Product, "lots": LotBatch, "complaints": Complaint}
+
+
+def _data_counts(data: Session, tenant_id) -> tuple[dict, dict, int]:
+    """The sample's records, the organization's imported ones and its uploaded rows (``imports.uploaded_rows``), in
+    one statement: they were 24 round trips, which right after an import, with the server busy with its follow-up
+    work, made the status take seconds (0.10.44)."""
+    from sqlalchemy import select
+
+    def count(model, source: str):
+        return (
+            select(func.count(model.id))
+            .where(model.tenant_id == tenant_id, model.source_system == source)
+            .scalar_subquery()
+        )
+
+    uploads = imports.upload_counts(tenant_id)
+    values = data.execute(
+        select(
+            *(count(model, SAMPLE_SOURCE) for model in SAMPLE_COUNTED.values()),
+            *(count(model, imports.UPLOAD_SOURCE) for model in OWN_COUNTED.values()),
+            *uploads,
+        )
+    ).one()
+    numbers = [int(value or 0) for value in values]
+    sample = dict(zip(SAMPLE_COUNTED, numbers[: len(SAMPLE_COUNTED)]))
+    own = dict(zip(OWN_COUNTED, numbers[len(SAMPLE_COUNTED) : len(SAMPLE_COUNTED) + len(OWN_COUNTED)]))
+    return sample, own, sum(numbers[len(SAMPLE_COUNTED) + len(OWN_COUNTED) :])
 
 
 @router.get("/trial/status")
@@ -144,6 +177,7 @@ def trial_status(
         .scalar()
     )
     viewer = _current_user(db, ctx)
+    sample, own_data, uploaded = _data_counts(data, tenant_id)
     return {
         "is_trial": True,
         "is_owner": team.is_trial_owner(db, tenant_id, viewer),
@@ -158,21 +192,10 @@ def trial_status(
         "data_deleted_at": retention.deletion_date(db, data, subscription, now).isoformat(),
         "days_left": max(0, int(-(-seconds_left // 86400))),
         "limits": {"users": TRIAL_USER_LIMIT, "rows": TRIAL_ROW_LIMIT, "file_bytes": TRIAL_FILE_LIMIT_BYTES},
-        "usage": {"users": int(users or 0), "rows": imports.uploaded_rows(data, tenant_id)},
+        "usage": {"users": int(users or 0), "rows": uploaded},
         # The sample dataset's records (Getting started explains what each part is for).
-        "sample": {
-            "products": _count(data, Product, tenant_id, SAMPLE_SOURCE),
-            "lots": _count(data, LotBatch, tenant_id, SAMPLE_SOURCE),
-            "complaints": _count(data, Complaint, tenant_id, SAMPLE_SOURCE),
-            "investigations": _count(data, Investigation, tenant_id, SAMPLE_SOURCE),
-            "capas": _count(data, Capa, tenant_id, SAMPLE_SOURCE),
-            "risks": _count(data, Risk, tenant_id, SAMPLE_SOURCE),
-        },
-        "own_data": {
-            "products": _count(data, Product, tenant_id, imports.UPLOAD_SOURCE),
-            "lots": _count(data, LotBatch, tenant_id, imports.UPLOAD_SOURCE),
-            "complaints": _count(data, Complaint, tenant_id, imports.UPLOAD_SOURCE),
-        },
+        "sample": sample,
+        "own_data": own_data,
         "templates": [
             {
                 "entity": entity,
@@ -293,7 +316,10 @@ def trial_insights(
     data: Session = Depends(get_data_plane_db),
 ):
     _require_trial(db, ctx)
-    return imports.insights(data, uuid.UUID(str(ctx.tenant_id)))
+    # Answered as it is: the insights hold only strings, numbers, booleans, lists and dicts, and for an import of 5,000
+    # complaints FastAPI's generic conversion of its 100,000 values took longer than working them out (0.10.44). The
+    # same bytes as before.
+    return JSONResponse(imports.insights(data, uuid.UUID(str(ctx.tenant_id))))
 
 
 @router.get("/trial/story")

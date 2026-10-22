@@ -513,7 +513,7 @@ def records_summary(db: Session, signal: Signal) -> dict:
     else:
         about = "about several problems"
     add(
-        f"{total} complaint{'s' if total != 1 else ''} {about} between {days[0].isoformat()} and {days[-1].isoformat()}.",
+        f"{total:,} complaint{'s' if total != 1 else ''} {about} between {days[0].isoformat()} and {days[-1].isoformat()}.",
         complaints,
     )
     deaths = [row for row in complaints if row.death]
@@ -521,11 +521,11 @@ def records_summary(db: Session, signal: Signal) -> dict:
     malfunctions = [row for row in complaints if row.malfunction]
     harm = []
     if deaths:
-        harm.append(f"{len(deaths)} report a death")
+        harm.append(f"{len(deaths):,} report a death")
     if injuries:
-        harm.append(f"{len(injuries)} a serious injury")
+        harm.append(f"{len(injuries):,} a serious injury")
     if malfunctions:
-        harm.append(f"{len(malfunctions)} a malfunction")
+        harm.append(f"{len(malfunctions):,} a malfunction")
     if harm:
         add("; ".join(harm) + ".", deaths + injuries + malfunctions)
     else:
@@ -536,7 +536,7 @@ def records_summary(db: Session, signal: Signal) -> dict:
         named = sum(by_lot.values())
         if count >= 2:
             add(
-                f"{count} of the {named} complaints that name a lot name lot {lot}"
+                f"{count:,} of the {named:,} complaints that name a lot name lot {lot}"
                 + (f"; {len(by_lot)} lots in all." if len(by_lot) > 1 else "."),
                 [row for row in complaints if lots.get(row.id) == lot],
             )
@@ -544,7 +544,7 @@ def records_summary(db: Session, signal: Signal) -> dict:
     if by_market:
         market, count = by_market.most_common(1)[0]
         add(
-            f"{count} from {market}" + (f"; {len(by_market)} markets in all." if len(by_market) > 1 else "."),
+            f"{count:,} from {market}" + (f"; {len(by_market):,} markets in all." if len(by_market) > 1 else "."),
             [row for row in complaints if " ".join(str(row.country or "").split()) == market],
         )
     word_rows: dict[str, list] = defaultdict(list)
@@ -557,7 +557,7 @@ def records_summary(db: Session, signal: Signal) -> dict:
     )[:4]
     if common:
         add(
-            "Recurring words: " + ", ".join(f'"{word}" ({len(cited)})' for word, cited in common) + ".",
+            "Recurring words: " + ", ".join(f'"{word}" ({len(cited):,})' for word, cited in common) + ".",
             common[0][1],
         )
     coded_away = [
