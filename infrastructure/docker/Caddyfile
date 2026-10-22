@@ -124,13 +124,16 @@ import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 	# list below in step with them): the application, sign-in and account screens, the guides, the website's former
 	# capability pages under /platform/ and its former page addresses. Any other address is no page: it gets the
 	# website's "Page not found" page with a real 404 status (WEB-17), so a crawler or a link checker is not told it
-	# exists.
+	# exists. The not-found page opened by its own name (/404.html) is no page either: it gets the same 404 (0.10.43).
 	handle {
 		header Cache-Control "no-cache"
 		root * /srv
 		rewrite / /home.html
 
-		@built file {path} {path}/index.html
+		@built {
+			file {path} {path}/index.html
+			not path /404.html
+		}
 		handle @built {
 			try_files {path} {path}/index.html
 			file_server

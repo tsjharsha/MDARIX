@@ -67,6 +67,29 @@ def test_highest_severity_ranks_known_severities_first():
     assert logic.highest_severity([None, ""]) is None
 
 
+def test_highest_severity_does_not_depend_on_the_order_the_complaints_are_read_in():
+    # 0.10.43: two different unrecognised severities (or two known ones of the same rank) gave whichever was read
+    # first, and the reads have no ORDER BY. The first in alphabetical order is kept, whatever the order.
+    for values, expected in (
+        (["Grade B", "grade a", None, "Grade  C"], "GRADE A"),
+        (["Unclassified", "Pending review"], "PENDING REVIEW"),
+        (["severe", "Serious"], "SERIOUS"),
+        (["major", "HIGH"], "HIGH"),
+        (["medium", "Moderate", "odd"], "MEDIUM"),
+        (["zeta", "alpha", "Minor"], "MINOR"),  # a known severity still outranks every unknown one
+    ):
+        for ordered in (values, list(reversed(values)), values[1:] + values[:1]):
+            assert logic.highest_severity(ordered) == expected, ordered
+    facts = [
+        ComplaintFacts(
+            id=uuid.uuid4(), product_id=None, product_version_id=None, problem_key="X", event_at=None, severity=s
+        )
+        for s in ("Level 3", "Level 1", "Level 2")
+    ]
+    assert logic.summarize(facts).highest_severity == "LEVEL 1"
+    assert logic.summarize(reversed(facts)).highest_severity == "LEVEL 1"
+
+
 @pytest.mark.parametrize(
     ("rows", "expected"),
     [

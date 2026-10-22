@@ -6,7 +6,7 @@ import { formatDay } from "../../../app/dates";
 import { sortParams, useServerSort } from "../../../app/tableSort";
 import { displayId } from "../../../app/displayId";
 import { investigationRequestFor, useOpenInvestigation, useWorkspace } from "../workspaceContext";
-import { StatusBadge } from "./common";
+import { StatusBadge, listTitle } from "./common";
 import {
   EMPTY_COMPLAINT_FILTERS,
   complaintListPath,
@@ -54,11 +54,9 @@ export function ComplaintList({
     setPage(1);
   };
   return (
-    <Panel
-      eyebrow={eyebrow}
-      title={`Complaints in your organization${list.data ? ` · ${list.data.total}` : ""}`}
-      source={list}
-    >
+    // Named like the other lists, "Complaint list · 4,993": the count after "Complaints in your organization" read as a
+    // stray "· 4993" (0.10.43), and it is the count of the filters chosen, not of the whole organization.
+    <Panel eyebrow={eyebrow} title={listTitle("Complaint list", list.data?.total)} source={list}>
       <ComplaintFilterBar
         // A new lot filter (cleared, or from a link) starts the lot field afresh.
         key={filters.lot}

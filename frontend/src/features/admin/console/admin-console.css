@@ -871,7 +871,8 @@ button.ac-stat:hover {
   text-align: left;
 }
 /* List headings: a dark navy row (the header bar's colour) with bold white text, white on navy is about 13:1.
-   Each heading sorts its list (app/tableSort.tsx). The colours have fallbacks for tables shown in dialogs. */
+   Each heading sorts its list (app/tableSort.tsx). The colours have fallbacks for tables shown in dialogs. A heading
+   reads as written, in sentence case ("About the request"): the older global rule for th capitalizes every word. */
 .ac-table th {
   background: var(--ac-navy, #183249);
   border-bottom-color: var(--ac-navy, #183249);
@@ -879,6 +880,7 @@ button.ac-stat:hover {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  text-transform: none;
 }
 .ac-table thead th:first-child {
   border-top-left-radius: 8px;

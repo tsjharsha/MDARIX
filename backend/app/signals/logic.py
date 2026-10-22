@@ -64,15 +64,17 @@ def severity_rank(value: str | None) -> int:
 
 
 def highest_severity(values: Iterable[str | None]) -> str | None:
-    """The most severe of the recorded severities (upper case); a known severity outranks an unknown one, and among
-    unknown ones the first recorded is kept. None when none is recorded."""
+    """The most severe of the recorded severities (upper case); a known severity outranks an unknown one. Between two of
+    the same rank (two unknown ones, or SERIOUS and SEVERE) the first in alphabetical order is kept, so the answer never
+    depends on the order the complaints are read in (it did before 0.10.43: the reads have no order). None when none
+    is recorded."""
     best, best_rank = None, -2
     for value in values:
         text = " ".join(str(value or "").split()).upper()
         if not text:
             continue
         rank = severity_rank(text)
-        if rank > best_rank:
+        if rank > best_rank or (rank == best_rank and text < best):
             best, best_rank = text, rank
     return best
 

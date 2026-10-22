@@ -4,8 +4,9 @@ follow-on to NEW-2; backend/app/access/platform_customer_admins.py, backend/app/
 Adding, suspending or restoring a Customer Administrator and resetting an account's MFA queue the same
 ``TEAM_CHANGE_NOTICE`` events as an administrator's own changes: the person changed (an invitation is its own email)
 and the organization's other active Customer Administrators. The one who made the change reads "MDARIX support",
-never the staff member's name or address. Nothing for a free trial, for MDARIX's own staff or for an erasure; the
-reason stays in the audit trail.
+never the staff member's name or address. In a free trial, MDARIX support's MFA reset of its owner or a colleague is
+told to that person (0.10.43; before, nobody was told). Nothing for MDARIX's own staff or for an erasure; the reason
+stays in the audit trail.
 """
 
 import uuid
@@ -147,7 +148,42 @@ def test_an_mfa_reset_tells_the_person_in_mdarix_supports_words(staff, mail, com
     _no_staff_member(mail)
 
 
-def test_nothing_for_a_free_trial_or_mdarix_staff():
+def test_an_mfa_reset_in_a_free_trial_tells_the_person_in_mdarix_supports_words(staff, mail, company):  # noqa: F811
+    from tests.test_trial_self_admin import _member, _pretend_enrolled, _trial_with_colleague
+
+    owner, approval, owner_email, _colleague, colleague_email = _trial_with_colleague()
+    tenant = approval["tenant_id"]
+    owner_id, colleague_id = _member(owner, owner_email)["id"], _member(owner, colleague_email)["id"]
+    _pretend_enrolled(owner_id)
+    # A colleague, and the owner (whose MFA nobody inside the trial can reset): each is told, and nobody else.
+    for person_id, email in ((colleague_id, colleague_email), (owner_id, owner_email)):
+        mail.clear()
+        reset = staff.post(f"/api/v1/platform-admin/users/{person_id}/mfa-reset", json={"reason": REASON})
+        assert reset.status_code == 200, reset.text
+        events = queued_notices(tenant)
+        assert [
+            (event.payload["audience"], event.payload["kind"], event.payload["actor"], event.payload["actor_user_id"])
+            for event in events
+        ] == [("PERSON", team_notices.TRIAL, team_notices.MDARIX_SUPPORT, None)]
+        assert events[0].payload["change"] == emailer.TEAM_MFA_RESET and events[0].payload["user_id"] == person_id
+        deliver_team_notices(tenant)
+        (message,) = mail
+        assert message["to"] == email
+        assert message["subject"] == "The authenticator app of your MDARIX account was removed"
+        assert "MDARIX support removed the authenticator app of your MDARIX account" in message["text"]
+        assert (
+            "MDARIX support removed the authenticator app of your account in the MDARIX free trial of "
+            in message["text"]
+        )
+        assert "and you were signed out." in message["text"]
+        assert "who runs the MDARIX free trial" not in message["text"]
+        assert "If you did not ask for this, contact support@mdarix.in." in message["text"]
+        assert "UTC" in message["text"]  # when, in UTC
+        _no_staff_member(mail)
+        assert queued_notices(tenant) == []  # delivered once
+
+
+def test_nothing_for_mdarix_staff_and_only_an_mfa_reset_in_a_free_trial():
     from backend.app.support_access import platform_tenant_id
     from tests.test_trial_self_admin import _trial_with_colleague
 
@@ -155,7 +191,10 @@ def test_nothing_for_a_free_trial_or_mdarix_staff():
     with SessionLocal() as db:
         bind_system(db, "test: the trial's colleague")
         colleague = db.query(AuthUser).filter(AuthUser.username == colleague_email).one()
-        assert team_notices.queue_support_change(db, colleague, emailer.TEAM_MFA_RESET) == 0
+        # In a free trial MDARIX support resets MFA, told to the person; it makes no other change to a trial's team.
+        assert team_notices.queue_support_change(db, colleague, emailer.TEAM_MFA_RESET) == 1
+        assert team_notices.queue_support_change(db, colleague, emailer.TEAM_MFA_RESET, tell_person=False) == 0
+        assert team_notices.queue_support_change(db, colleague, emailer.TEAM_SUSPENDED) == 0
         staff_member = (
             db.query(AuthUser).filter(AuthUser.tenant_id == platform_tenant_id(db)).first()
             if platform_tenant_id(db)
