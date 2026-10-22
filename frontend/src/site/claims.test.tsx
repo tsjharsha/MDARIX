@@ -9,7 +9,9 @@ describe("website claims", () => {
   it("does not say the inspection checks are drawn from 2026 FDA warning letters alone (CMP-09)", () => {
     const html = renderToStaticMarkup(<HomePage />);
     expect(html).not.toContain("drawn from 2026 FDA warning letters");
-    expect(html).toContain("shaped by what recent FDA warning letters and inspections cite");
+    // The website names no warning letters at all (owner rule, 0.10.45).
+    expect(html).not.toMatch(/warning letter/i);
+    expect(html).toContain("shaped by what FDA inspections cite");
     expect(html).toContain("EU, UK and Canadian vigilance rules");
   });
 

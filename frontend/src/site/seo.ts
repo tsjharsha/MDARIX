@@ -81,6 +81,41 @@ export const PAGE_META = {
     description:
       "Fourteen short videos that walk a medical device quality team through the MDARIX free trial, from the first complaint to a signed CAPA decision.",
   },
+  "/questions": {
+    title: "Questions and answers on complaint trending and reportability · MDARIX",
+    description:
+      "Direct answers on trending medical device complaints, MDR reportability, the ISO 14971 risk file and CAPA effectiveness, and what MDARIX does about each.",
+  },
+  "/questions/how-to-trend-medical-device-complaints": {
+    title: "How do I trend medical device complaints? · MDARIX",
+    description:
+      "Count clusters, compare each product version's complaint rate with its own history and use units in the field as the denominator. How MDARIX does it.",
+  },
+  "/questions/when-is-a-complaint-reportable": {
+    title: "When does a complaint become a reportable event? · MDARIX",
+    description:
+      "21 CFR Part 803 and EU MDR Article 87 in brief: what is reportable, the reporting windows from the day of awareness, and who decides.",
+  },
+  "/questions/post-market-data-and-the-risk-file": {
+    title: "How should post-market data feed the risk file? · MDARIX",
+    description:
+      "ISO 14971:2019 clause 10 in brief: review post-market information for safety, review the risk file where it matters, and record every risk review.",
+  },
+  "/questions/complaint-signal-vs-trend": {
+    title: "What is the difference between a complaint signal and a trend? · MDARIX",
+    description:
+      "A trend measures how a complaint rate changes against its history; a signal is an observation a person triages. Neither is a conclusion about cause.",
+  },
+  "/questions/show-capa-effectiveness": {
+    title: "How do I show a CAPA was effective? · MDARIX",
+    description:
+      "Set the criteria before the action, measure complaint recurrence from the right date, and sign the result. What ISO 13485 asks and what MDARIX does.",
+  },
+  "/questions/try-complaint-trending-on-your-own-data": {
+    title: "Can I try complaint trending on my own data without a demo call? · MDARIX",
+    description:
+      "Yes: a free 30-day trial for up to 3 users and 5,000 uploaded rows, sample data first, then your own complaint exports. No demo call, no credit card.",
+  },
   "/privacy": {
     title: "Privacy policy · MDARIX",
     description:

@@ -10,6 +10,41 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.45] - 2026-10-22
+
+The website's home page leads with the problem it solves, and the website has questions and answers that search
+engines and AI assistants can quote, on the trial maintenance line (`release/0.10`). Website only: no migration (the
+schema stays at md48) and no API change. The web image changes; the usual upgrade script rebuilds all images. The
+Caddyfile is unchanged: the new pages are pre-rendered files, served as built.
+
+### Added
+
+- Questions and answers: `/questions` and six question pages, each pre-rendered with its own title, description and
+  canonical address and listed in `sitemap.xml` (28 pages, 21 before):
+  - `/questions/how-to-trend-medical-device-complaints`: How do I trend medical device complaints?
+  - `/questions/when-is-a-complaint-reportable`: When does a complaint become a reportable event?
+  - `/questions/post-market-data-and-the-risk-file`: How should post-market data feed the risk file?
+  - `/questions/complaint-signal-vs-trend`: What is the difference between a complaint signal and a trend?
+  - `/questions/show-capa-effectiveness`: How do I show a CAPA was effective?
+  - `/questions/try-complaint-trending-on-your-own-data`: Can I try complaint trending on my own data without a demo
+    call?
+
+  Each page puts a direct answer of two or three sentences under the question (the page's only H1), then a short
+  explanation, then what MDARIX does about it today, and links to the free trial (`/signup`) and the other questions.
+  The pages that state a reporting rule or a standard (21 CFR Part 803, EU MDR Article 87, ISO 14971:2019 clause 10)
+  say that they are general information, not legal or regulatory advice. Each question page carries its question and
+  answer as schema.org `FAQPage` JSON-LD; `/questions` carries the list of pages as a `CollectionPage`. A JSON-LD block
+  is data that no browser runs, so the CSP (`script-src 'self'`) holds, as for the organization's block in
+  `index.html`. The Resources page lists the questions, the footer links to them under Company, and the header marks
+  Resources on them. An address under `/questions/` that is no question gets the "Page not found" page with a 404.
+
+### Changed
+
+- The home page's headline leads with the problem: "See the risk in your post-market data, not just collect it.", and
+  its line under it ends "Try it on your own data today, no demo call needed." The inspection-readiness section's line
+  no longer names warning letters: "Eight checks shaped by what FDA inspections cite and by the EU, UK and Canadian
+  vigilance rules". The sitemap's `lastmod` of `/` and `/resources` is 22 October 2026.
+
 ## [0.10.44] - 2026-10-22
 
 Counts read with thousands separators, the complaint list's filters fit a phone, Platform Admin no longer shows an

@@ -14,11 +14,13 @@ import {
 } from "../../scripts/prerender.mjs";
 import { INDEXED_PATHS, NOT_FOUND_PATH, pageHead, renderNotFoundPage, renderPage } from "./prerender";
 import { PAGE_META } from "./seo";
+import { QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 
 // What crawlers and link previews read without JavaScript (WEB-05): every page of the sitemap as its own HTML file,
 // with its own head and its text (scripts/prerender.mjs, run by npm run build).
 const attribute = (value: string) => value.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
 const count = (html: string, part: string) => html.split(part).length - 1;
+const JSON_LD = '<script type="application/ld+json">';
 
 describe("the pre-rendered page an unknown address gets (WEB-17)", () => {
   it("is the website's Page not found page, never indexed and without a canonical address", () => {
@@ -46,11 +48,17 @@ describe("the pre-rendered website pages", () => {
 
   it("covers exactly the pages of the sitemap, the home page in a file of its own", () => {
     expect(sitemapPaths(sitemap)).toEqual(INDEXED_PATHS);
-    expect(INDEXED_PATHS).toHaveLength(21);
+    // 21 pages, then (0.10.45) the questions and answers: their index and six questions.
+    expect(INDEXED_PATHS).toHaveLength(28);
+    expect(INDEXED_PATHS.filter((path) => path.startsWith(QUESTIONS_PATH))).toEqual([
+      QUESTIONS_PATH,
+      ...QUESTION_PATHS,
+    ]);
     expect(outputFile("/")).toBe(HOME_FILE);
     expect(HOME_FILE).not.toBe("index.html");
     expect(outputFile("/platform")).toBe("platform/index.html");
     expect(outputFile("/trust/regulations")).toBe("trust/regulations/index.html");
+    expect(outputFile(QUESTION_PATHS[0])).toBe(`${QUESTION_PATHS[0].slice(1)}/index.html`);
     expect(() => outputFile("/../secret")).toThrow();
   });
 
@@ -83,9 +91,15 @@ describe("the pre-rendered website pages", () => {
       expect(html, path).toContain(`<div id="root">${markup}</div>`);
       expect(visibleText(markup).split(" ").length, path).toBeGreaterThan(100);
       expect(markup, path).toMatch(/<h1[\s>]/);
-      // The CSP allows no inline script or style: the page adds no script (the JSON-LD block is data), and its
-      // inline styles are classes of one stylesheet.
-      expect(count(html, "<script"), path).toBe(count(indexHtml, "<script"));
+      // The CSP allows no inline script or style: the page adds no script, and its inline styles are classes of one
+      // stylesheet. A JSON-LD block is data, which no browser runs: the template has the organization's, and the
+      // questions and answers carry their own (questions.tsx).
+      expect(count(html, "<script") - count(html, JSON_LD), path).toBe(
+        count(indexHtml, "<script") - count(indexHtml, JSON_LD),
+      );
+      expect(count(markup, JSON_LD), path).toBe(path.startsWith(QUESTIONS_PATH) ? 1 : 0);
+      for (const block of markup.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g))
+        expect(JSON.parse(block[1])["@type"], path).toBe(path === QUESTIONS_PATH ? "CollectionPage" : "FAQPage");
       expect(html, path).not.toMatch(/\sstyle="/);
       expect(html, path).toContain('<link rel="stylesheet" href="/assets/prerender-test.css" />');
     }
@@ -100,6 +114,8 @@ describe("the pre-rendered website pages", () => {
     expect(text("/privacy")).toContain("Privacy policy");
     expect(pages.find((page) => page.path === "/privacy")!.markup).toContain("<noscript>");
     expect(text("/signup")).toContain("30");
+    expect(text(QUESTION_PATHS[1])).toContain("When does a complaint become a reportable event?");
+    expect(text(QUESTIONS_PATH)).toContain("How do I show a CAPA was effective?");
   });
 
   it("turns inline styles into classes of a stylesheet, as strong as an inline style", () => {

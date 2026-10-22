@@ -41,6 +41,7 @@ import {
 } from "./content";
 import { FlowChain, InvestigationAnimation, Photo, Reveal } from "./motion";
 import { DesignPhases } from "./designPhases";
+import { QUESTIONS, QUESTIONS_PATH, QUESTION_PATHS } from "./questions";
 import {
   CustomerVoices,
   LifecycleHero,
@@ -92,6 +93,8 @@ export const SITE_PAGES = [
   "/resources",
   "/company",
   "/videos",
+  QUESTIONS_PATH,
+  ...QUESTION_PATHS,
 ] as const satisfies readonly string[];
 export type SitePage = (typeof SITE_PAGES)[number];
 
@@ -385,7 +388,7 @@ export function HomePage() {
         <SectionHead
           eyebrow="Inspection readiness"
           title="See your quality loop the way an inspector will."
-          copy="Eight checks shaped by what recent FDA warning letters and inspections cite and by the EU, UK and Canadian vigilance rules, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
+          copy="Eight checks shaped by what FDA inspections cite and by the EU, UK and Canadian vigilance rules, read from your own records every day. Each one opens the records behind it, and the weakest link is named."
         />
         <Reveal>
           <QualityLoop
@@ -1244,6 +1247,29 @@ export function ResourcesPage() {
             </Reveal>
           ))}
         </div>
+      </section>
+      <section className="ms-section ms-band" aria-labelledby="resources-questions">
+        <SectionHead
+          eyebrow="Questions and answers"
+          id="resources-questions"
+          title="Direct answers to the questions quality teams ask."
+          copy="Trending complaints, reportability, the risk file and CAPA effectiveness: a short answer first, then the explanation and what MDARIX does about it."
+        />
+        <div className="ms-grid-3">
+          {QUESTIONS.map((question, index) => (
+            <Reveal key={question.path} delay={(index % 3) * 80} className="ms-card ms-card-flat">
+              <strong>
+                <a href={question.path}>{question.question}</a>
+              </strong>
+              <p>{question.summary}</p>
+            </Reveal>
+          ))}
+        </div>
+        <Reveal className="ms-center">
+          <a className="ms-link" href={QUESTIONS_PATH}>
+            All questions and answers <ArrowRight size={14} aria-hidden="true" />
+          </a>
+        </Reveal>
       </section>
       <section className="ms-section">
         <SectionHead
