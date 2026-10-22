@@ -52,7 +52,7 @@ def api_docs_served(status: int, body: bytes) -> bool:
 # in the page (frontend/scripts/prerender.mjs, infrastructure/docker/Caddyfile; WEB-05). The canonical names the
 # production site whatever the host the check runs against.
 WEBSITE_PAGES = ("/", "/platform", "/trust/regulations", "/videos")
-SITE_URL = "https://mdarix.in"
+SITE_URL = "https://mdarix.com"  # the website canonical, frontend/src/site/seo.ts SITE_URL
 
 
 def website_page(body: bytes, path: str) -> bool:

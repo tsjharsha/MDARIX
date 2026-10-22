@@ -27,7 +27,7 @@ describe("header menu keys", () => {
   it("names each panel for its button's aria-controls, set only while the menu is open", () => {
     expect(menuPanelId("Product Lifecycle")).toBe("ms-menu-product-lifecycle");
     const scope = globalThis as unknown as { window?: unknown };
-    scope.window = { location: { pathname: "/", search: "", hash: "", origin: "https://mdarix.in" } };
+    scope.window = { location: { pathname: "/", search: "", hash: "", origin: "https://mdarix.com" } };
     try {
       const html = renderToStaticMarkup(createElement(PublicMegaSite, { path: "/" }));
       expect(html).toContain('aria-expanded="false"');

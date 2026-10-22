@@ -5,7 +5,7 @@
 // The same tags are written into each page's own HTML file at build time (scripts/prerender.mjs, pageHead below), so
 // crawlers and link previews that run no JavaScript read them too (WEB-05); the browser keeps them up to date.
 
-export const SITE_URL = "https://mdarix.in";
+export const SITE_URL = "https://mdarix.com";
 export const SHARE_IMAGE = `${SITE_URL}/og-image.png`;
 
 export type PageMeta = { title: string; description: string };
@@ -155,7 +155,7 @@ export const INDEXED_PATHS = Object.keys(PAGE_META) as IndexedPath[];
 
 const NOT_FOUND: PageMeta = {
   title: "Page not found · MDARIX",
-  description: "This page does not exist. The MDARIX website starts at mdarix.in.",
+  description: "This page does not exist. The MDARIX website starts at mdarix.com.",
 };
 
 function setMeta(attribute: "name" | "property", key: string, content: string) {
