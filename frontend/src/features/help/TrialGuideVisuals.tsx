@@ -145,7 +145,7 @@ function Check({ x, y, r = 9, color = C.green }: { x: number; y: number; r?: num
 
 function OpenScene() {
   return (
-    <Frame address="mdarix.in" label="The MDARIX website: choose Start free trial, then fill in the two-step request">
+    <Frame address="mdarix.com" label="The MDARIX website: choose Start free trial, then fill in the two-step request">
       <rect x="1" y="35" width={W - 2} height="294" fill={C.navy} />
       <text x="30" y="88" fontSize="20" fontWeight="800" fill="#fff">
         Inspection-ready,
@@ -187,7 +187,7 @@ function OpenScene() {
 function SignInScene() {
   return (
     <Frame
-      address="mdarix.in/activate-account"
+      address="mdarix.com/activate-account"
       label="Activate from the invitation email, choose your own password, add an authenticator app"
     >
       <g className="tg-pop" style={{ ["--d" as string]: "0.1s" }}>
@@ -278,7 +278,7 @@ function TeamScene() {
   ];
   return (
     <Frame
-      address="mdarix.in/app · Getting started"
+      address="mdarix.com/app · Getting started"
       label="Your team: enter a colleague's name and work email, then Invite colleague, twice"
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
@@ -346,7 +346,7 @@ function SampleScene() {
   const stations = [C.green, C.green, C.green, C.amber, C.red, C.red, C.amber, C.red];
   const chapters = ["Hidden complaints", "Reporting clocks", "Trend to case", "Investigate a case", "Decide and sign"];
   return (
-    <Frame address="mdarix.in/app · Getting started" label="The quality loop on the sample data, chapter by chapter">
+    <Frame address="mdarix.com/app · Getting started" label="The quality loop on the sample data, chapter by chapter">
       <rect x="1" y="35" width="300" height="294" fill={C.navy} />
       <circle cx="150" cy="182" r="96" fill="none" stroke="#ffffff22" strokeWidth="10" />
       <circle
@@ -423,7 +423,7 @@ function OwnDataScene() {
   const types = ["Products", "Lots", "Complaints", "Investigations", "CAPAs", "Risks"];
   return (
     <Frame
-      address="mdarix.in/app · Import data"
+      address="mdarix.com/app · Import data"
       label="Upload your own data: your quality system's export as it comes, checked, then imported"
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
@@ -488,7 +488,7 @@ function OwnDataScene() {
 function FeedbackScene() {
   return (
     <Frame
-      address="mdarix.in/app · Share feedback"
+      address="mdarix.com/app · Share feedback"
       label="Share feedback: rate your experience and send it in about three minutes"
     >
       <rect x="24" y="52" width="512" height="262" rx="12" fill={C.surface} stroke={C.line} />
@@ -551,7 +551,7 @@ function DemoScene() {
   const days = Array.from({ length: 21 }, (_, index) => index);
   return (
     <Frame
-      address="mdarix.in/app · Getting started"
+      address="mdarix.com/app · Getting started"
       label="Book a one-to-one demo: times that suit, the chapters to focus on, then Request the demo"
     >
       <rect x="24" y="52" width="250" height="262" rx="12" fill={C.surface} stroke={C.line} />

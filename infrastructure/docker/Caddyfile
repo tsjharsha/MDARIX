@@ -35,7 +35,17 @@
 
 import www_redirect_{$MDARIX_WWW_REDIRECT:off}
 
-{$MDARIX_DOMAIN} {
+# MDARIX_REDIRECT_DOMAINS lists, separated by spaces, the other host names that answer here and send every request to
+# MDARIX_DOMAIN with the same path and query (301 Moved Permanently), for example the former main domain and the other
+# registered domains: "mdarix.in www.mdarix.in mdarix.net www.mdarix.net". Caddy obtains a certificate for each, so
+# list only names whose DNS already points at this server. Empty by default: the site then answers MDARIX_DOMAIN alone.
+# The names are added to the site's own address list, so an empty value still leaves a valid site, and the redirect
+# runs before every other handler (Caddy orders redir ahead of basic_auth and handle). Do not list www.<MDARIX_DOMAIN>
+# while MDARIX_WWW_REDIRECT=on (it has its own site above, and Caddy refuses a name defined twice).
+{$MDARIX_DOMAIN} {$MDARIX_REDIRECT_DOMAINS} {
+	@redirect_domain not host {$MDARIX_DOMAIN}
+	redir @redirect_domain https://{$MDARIX_DOMAIN}{uri} permanent
+
 	import site_access_{$MDARIX_SITE_ACCESS:public}
 
 	encode zstd gzip

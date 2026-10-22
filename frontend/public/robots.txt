@@ -10,4 +10,4 @@ Disallow: /activate-account
 Disallow: /reset-password
 Disallow: /mfa
 
-Sitemap: https://mdarix.in/sitemap.xml
+Sitemap: https://mdarix.com/sitemap.xml

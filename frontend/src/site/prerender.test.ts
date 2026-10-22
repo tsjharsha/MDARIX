@@ -65,7 +65,7 @@ describe("the pre-rendered website pages", () => {
   it("gives each page its own title, description, canonical address and link-preview tags, once each", () => {
     for (const { path, html: page } of pages) {
       const meta = PAGE_META[path];
-      const url = `https://mdarix.in${path}`;
+      const url = `https://mdarix.com${path}`;
       // The head only: the page's drawings carry SVG <title> elements of their own.
       const html = page.slice(0, page.indexOf("</head>"));
       expect(count(html, "<title>"), path).toBe(1);
@@ -79,7 +79,7 @@ describe("the pre-rendered website pages", () => {
       expect(html, path).toContain(`<meta property="og:url" content="${url}" />`);
       expect(html, path).toContain('<meta name="robots" content="index, follow" />');
       // The template's shared tags stay: the share image, twitter:card, the organization's JSON-LD.
-      expect(html, path).toContain('property="og:image" content="https://mdarix.in/og-image.png"');
+      expect(html, path).toContain('property="og:image" content="https://mdarix.com/og-image.png"');
       expect(html, path).toContain('name="twitter:card"');
       expect(html, path).toContain('"@type": "Organization"');
     }
