@@ -144,6 +144,10 @@ describe("the questions and answers", () => {
     for (const item of trialIncludes) expect(text).toContain(item);
     expect(text).toContain("approved automatically and ready within minutes, up to a daily limit");
     expect(text).toContain("reviewed by the MDARIX team first, usually within one business day");
+    // Since 0.10.48 a personal address is approved automatically too, and a disposable one is reviewed.
+    expect(text).toContain("with a company or personal email address it is approved automatically");
+    expect(text).toContain("Requests from disposable email addresses, and any beyond that limit, are reviewed");
+    expect(text).not.toContain("Requests from personal email addresses are reviewed");
     expect(text).toContain("do not enter patient-identifiable data");
     expect(text).toContain("deleted 30 days after the trial ends");
     // The agreement says the same.
@@ -152,6 +156,8 @@ describe("the questions and answers", () => {
       "**Users:** up to 3 people",
       "**Data:** up to 5,000 uploaded rows",
       "approved automatically, usually within minutes, up to a daily limit",
+      "so is a request from a personal email address",
+      "from a disposable email address",
       "usually within one business day",
       "Do not enter patient-identifiable data",
       "deleted 30 days after the trial ends",

@@ -1,5 +1,6 @@
 """DEV-027: Platform Admin > Onboarding shows who approved or declined a trial request (a Platform Administrator, or
-the automatic approval for a company email), with the request's recorded legal acceptance."""
+the automatic approval for a company or, since 0.10.48, a personal email), with the request's recorded legal
+acceptance."""
 
 from backend.app.db.models.foundation import AuthUser
 from backend.app.db.models.stage2 import OnboardingRequest
@@ -54,3 +55,11 @@ def test_the_automatic_approval_is_named_as_such():
         row.reviewed_by = auto_approval._approver(db).id
         db.commit()
     assert _queued(admin, email)["reviewed_by_name"] == "Automatic approval (company email)"
+    # A personal address's automatic approval is made by an account of its own, so the queue tells the two apart.
+    personal = _request_trial()
+    with SessionLocal() as db:
+        bind_system(db, "test: a personal address's automatic approval")
+        row = db.query(OnboardingRequest).filter(OnboardingRequest.email == personal).one()
+        row.reviewed_by = auto_approval._approver(db, personal=True).id
+        db.commit()
+    assert _queued(admin, personal)["reviewed_by_name"] == "Automatic approval (personal email)"

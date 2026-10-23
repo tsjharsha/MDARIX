@@ -19,8 +19,11 @@ export type SiteInfo = {
     users: number;
     rows: number;
     data_deleted_after_days: number;
-    /** Personal and disposable mail domains: a person reviews these requests (backend/app/trial/auto_approval.py). */
-    free_mail_domains?: string[];
+    /** How requests are approved: MDARIX_TRIAL_AUTO_APPROVE (backend/app/trial/auto_approval.py). */
+    auto_approval?: "company-and-personal" | "company-domains" | "off";
+    /** Real mail providers (Gmail, Outlook, ...) and throwaway inboxes, as automatic approval lists them. */
+    personal_mail_domains?: string[];
+    disposable_mail_domains?: string[];
   };
 };
 

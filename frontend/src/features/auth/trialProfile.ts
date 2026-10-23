@@ -98,13 +98,37 @@ export const EMPTY_PROFILE: TrialProfile = {
   noPatientData: false,
 };
 
-/** Adds the market when it is not chosen yet, removes it when it is. */
+/** How the server approves trial requests: MDARIX_TRIAL_AUTO_APPROVE (backend/app/trial/auto_approval.py). */
+export type TrialApproval = "company-and-personal" | "company-domains" | "off";
+
+/** What an email address is to automatic approval. */
+export type MailKind = "company" | "personal" | "disposable";
+
+/** The part of the site information sign-up reads to say what happens to a request (backend/app/site_info.py). */
+export type TrialMailRules = {
+  auto_approval?: string;
+  personal_mail_domains?: readonly string[];
+  disposable_mail_domains?: readonly string[];
+};
+
 /**
- * Whether an email is at a personal or disposable mail domain (or a subdomain of one), by the server's own list
- * (site-info): such a request is reviewed by a person instead of being approved at once. False while the list is not
- * known.
+ * The server's setting. While it is not known (the pre-rendered page, or site-info not answered yet), the default the
+ * server runs without a setting: company and personal addresses are approved at once.
  */
-export function isPersonalEmail(email: string, freeMailDomains: readonly string[] | undefined): boolean {
+export function trialApproval(rules: TrialMailRules | undefined): TrialApproval {
+  const value = rules?.auto_approval;
+  return value === "company-domains" || value === "off" ? value : "company-and-personal";
+}
+
+function atDomain(domain: string, domains: readonly string[] | undefined): boolean {
+  return !!domains?.some((listed) => domain === listed || domain.endsWith(`.${listed}`));
+}
+
+/**
+ * Whether an email is at a disposable or a personal mail domain (or a subdomain of one), by the server's own lists
+ * (site-info), as automatic approval decides it; "company" otherwise, and while the lists are not known.
+ */
+export function mailKind(email: string, rules: TrialMailRules | undefined): MailKind {
   const at = email.lastIndexOf("@");
   const domain =
     at < 0
@@ -113,10 +137,22 @@ export function isPersonalEmail(email: string, freeMailDomains: readonly string[
           .slice(at + 1)
           .trim()
           .toLowerCase();
-  if (!domain || !freeMailDomains?.length) return false;
-  return freeMailDomains.some((free) => domain === free || domain.endsWith(`.${free}`));
+  if (!domain) return "company";
+  if (atDomain(domain, rules?.disposable_mail_domains)) return "disposable";
+  if (atDomain(domain, rules?.personal_mail_domains)) return "personal";
+  return "company";
 }
 
+/**
+ * Whether the MDARIX team reviews a request from this kind of address before any trial is prepared (whatever the
+ * day's limit): every request when automatic approval is off, a disposable address always, a personal one when the
+ * server approves company addresses only.
+ */
+export function reviewedFirst(kind: MailKind, approval: TrialApproval): boolean {
+  return approval === "off" || kind === "disposable" || (kind === "personal" && approval === "company-domains");
+}
+
+/** Adds the market when it is not chosen yet, removes it when it is. */
 export function toggleMarket(markets: string[], code: string): string[] {
   return markets.includes(code) ? markets.filter((item) => item !== code) : [...markets, code];
 }

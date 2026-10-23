@@ -10,6 +10,72 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.48] - 2026-10-23
+
+Free-trial requests from personal email addresses (Gmail, Outlook, Yahoo and the other known mail providers) are
+approved automatically, as company emails are (owner decision), on the trial maintenance line (`release/0.10`). No
+migration: the schema stays at md48, and no stored record is rewritten. The API and web images change; the upgrade
+script rebuilds all images, now stops before anything changes when less than 8 GB is free on the server's disk, and
+after a successful upgrade removes old release images by name (keeping this release's and the previous one's).
+Nothing is set on the server: production does not set `MDARIX_TRIAL_AUTO_APPROVE`, so it gets the new default.
+`MDARIX_TRIAL_AUTO_APPROVE=company-domains` in `.env.production` and `dc up -d --no-build --wait` go back to company
+emails only, without a release.
+
+### Added
+
+- `MDARIX_TRIAL_AUTO_APPROVE=company-and-personal`, the new default (also when the setting is unset or empty): a
+  request from a company email or from a personal address at a known mail provider (`PERSONAL_MAIL_DOMAINS` in
+  `backend/app/trial/auto_approval.py`, or a subdomain of one) is approved right after sign-up. `company-domains`
+  (personal addresses wait for review, as before) and `off` (every request waits) work as before; any other value is
+  now read as `company-domains`, so a mistyped setting never approves more.
+- `MDARIX_TRIAL_AUTO_APPROVE_PERSONAL_DAILY_MAX` (default 10): personal addresses have a daily cap of their own,
+  counted like the company one (the request's UTC day, every earlier personal-address request, approved or not, so a
+  burst beyond it is seen by a person). `MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX` (20) now counts company addresses only;
+  neither cap uses up the other. Both documented in ENVIRONMENT_VARIABLES.md and `.env.production.example`.
+- A second automatic-approval account, "Automatic approval (personal email)" (`automatic-approval-personal@mdarix.invalid`,
+  disabled, in the platform organization, created at the first personal approval), approves personal addresses, so
+  Platform Admin › Trial requests ("Approved: …") and the audit trail (`TRIAL_REQUEST_APPROVED`'s actor) say which rule
+  approved a request. Company approvals keep "Automatic approval (company email)", and earlier approvals keep their
+  name. No schema change: the request records who approved it, as before.
+- `/api/v1/public/site-info` `trial.auto_approval` (the setting the server runs), `trial.personal_mail_domains` and
+  `trial.disposable_mail_domains`. `trial.free_mail_domains` now lists the domains whose requests a person reviews in
+  the current setting (the disposable ones by default), for a sign-up page opened before 0.10.48.
+
+### Changed
+
+- The free-mail list is split into real providers (`PERSONAL_MAIL_DOMAINS`: the 40 entries from gmail.com to hey.com,
+  unchanged) and throwaway inboxes (`DISPOSABLE_MAIL_DOMAINS`: the 11 former entries from mailinator.com to maildrop.cc,
+  and 21 more of the same services' and other well-known disposable domains, such as guerrillamail.net, grr.la,
+  yopmail.fr, temp-mail.io and throwawaymail.com). A disposable address always waits for a Platform Administrator, in
+  every setting (`DISPOSABLE`). Subdomains match as before.
+- The one-trial-per-company rule no longer reaches across a personal provider: for a personal address the rule is one
+  request per address, whatever its capitals (`ADDRESS_ALREADY_HAS_A_REQUEST`), so two people with Gmail addresses
+  each get a trial. Sign-up already refuses an address that has an account or a request (409), as before. Company
+  domains keep `COMPANY_ALREADY_HAS_A_REQUEST`.
+- The platform organization's own addresses (FUN-14) are also matched whole: a staff account's or the support
+  address's own Gmail or Outlook address waits for review, without holding back the provider's other users. The DNS
+  check stays for personal addresses (the providers' domains resolve; a made-up subdomain of one does not, so its
+  request waits). Reserved domains wait as `RESERVED_DOMAIN` (they were `FREE_MAIL`).
+- Sign-up says what happens next as the server is set. By default, under the email field: "With a company or personal
+  email, the trial is approved automatically and the activation link arrives within minutes (up to a daily limit of
+  new trials). Requests from disposable addresses, and any beyond that limit, are reviewed by the MDARIX team, usually
+  within one business day."; before sending, for a company or a personal address: "the trial is approved
+  automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX
+  team reviews it first, usually within one business day)."; a disposable address gets the note "This looks like a
+  disposable address. The MDARIX team reviews requests from disposable addresses, usually within one business day.
+  With your company or personal email, the activation link arrives within minutes." The frame's first point reads
+  "Ready within minutes with a company or personal email, isolated from every other customer." With
+  `company-domains` the wording before 0.10.48 stays; with `off` sign-up says that the MDARIX team reviews every
+  request.
+- The website, the questions page "Can I try complaint trending on my own data without a demo call?" and the free trial
+  user guide say that a company or personal email is approved automatically, up to a daily limit, and that disposable
+  addresses are reviewed. The trial agreement's 1.2 says so too: "A request from a company email address is approved
+  automatically, usually within minutes, up to a daily limit of new trials; so is a request from a personal email
+  address, for example Gmail or Outlook, while we offer this. Other requests, for example from a disposable email
+  address, from a company email domain that already has a trial or a request, or beyond that daily limit, are reviewed
+  by the MDARIX team first, usually within one business day." (Last updated 23 October 2026; its SHA-256, recorded
+  with each new trial request, changes.) The privacy policy and the terms are unchanged.
+
 ## [0.10.47] - 2026-10-22
 
 Keyrings for the MFA and file encryption keys, Caddy no longer runs as root, signal titles from before grouped counts

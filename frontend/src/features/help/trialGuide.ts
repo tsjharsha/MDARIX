@@ -45,8 +45,8 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
       "Choose Request free trial. Sending the request accepts the Terms of Service and the Free Trial Agreement and acknowledges the Privacy Policy; MDARIX records which version of each you accepted.",
     ],
     result:
-      "With a company email the trial is approved automatically and the activation email arrives within minutes, up to a daily limit of new trials. Requests from personal email addresses, and any beyond that limit, are reviewed by the MDARIX team, usually within one business day.",
-    tip: "Use your work email: a company email gets its trial within minutes, and every trial message goes there.",
+      "With a company or personal email the trial is approved automatically and the activation email arrives within minutes, up to a daily limit of new trials. Requests from disposable email addresses, and any beyond that limit, are reviewed by the MDARIX team, usually within one business day.",
+    tip: "Use an address you read every day: a company or personal email gets its trial within minutes, and every trial message goes there.",
   },
   {
     key: "sign-in",

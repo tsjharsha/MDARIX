@@ -1401,7 +1401,7 @@ export function CompanyPage() {
             {[
               [
                 "Request your free trial",
-                "Tell us your name, company and work email. With a company email your trial is approved automatically and ready within minutes, up to a daily limit; requests from personal email addresses are reviewed by the MDARIX team, usually within one business day.",
+                "Tell us your name, company and work email. With a company or personal email your trial is approved automatically and ready within minutes, up to a daily limit; requests from disposable email addresses are reviewed by the MDARIX team, usually within one business day.",
               ],
               [
                 "Explore a ready-made investigation",
