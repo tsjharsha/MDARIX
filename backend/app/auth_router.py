@@ -598,7 +598,8 @@ SIGNUP_ACCEPTED = {
     "next_step": "The MDARIX team reviews your request, usually within one business day, and emails an invitation once "
     "it is approved.",
 }
-# A company email is approved at once (backend/app/trial/auto_approval.py): the workspace is prepared after this answer.
+# A company or personal email is approved at once (backend/app/trial/auto_approval.py, by the server's setting): the
+# workspace is prepared after this answer.
 SIGNUP_APPROVING = {
     "status": "TRIAL_APPROVING",
     "tenant_created": False,
@@ -677,8 +678,9 @@ def signup(data: Signup, request: Request, background: BackgroundTasks, db: Sess
         background.add_task(_alert_trial_request, row.organization, row.display_name, email, profile)
         from backend.app.trial import auto_approval
 
-        # A company email is approved at once, after the response (its invitation is the next email); any other
-        # request is acknowledged and waits for review. Only a newly stored request gets either.
+        # A request that qualifies (a company email, or a personal one unless the server says company-domains) is
+        # approved at once, after the response (its invitation is the next email); any other request is acknowledged
+        # and waits for review. Only a newly stored request gets either.
         approving, _why = auto_approval.eligible(db, row.id)
         if approving:
             background.add_task(auto_approval.approve_or_acknowledge, row.id, row.organization, row.display_name, email)

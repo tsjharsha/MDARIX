@@ -228,7 +228,8 @@ def _platform_organization() -> None:
 
 def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monkeypatch):
     """A company domain is approved right after sign-up by the automatic-approval account; a second colleague of the
-    same company, a free-mail address and anything over the day's cap wait for a Platform Administrator."""
+    same company, a personal address (in company-domains mode, the behaviour before 0.10.48; the default approves it,
+    tests/test_trial_personal_auto_approval.py) and anything over the day's cap wait for a Platform Administrator."""
     from backend.app.trial import auto_approval
 
     _platform_organization()
@@ -255,7 +256,7 @@ def test_a_company_email_gets_its_trial_at_once_and_others_wait_for_review(monke
         assert trial_subscription(db, row.tenant_id) is not None
     finally:
         db.close()
-    # The second person of the same company is invited by the first; a free-mail address is reviewed by a person.
+    # The second person of the same company is invited by the first; in this mode a personal address is reviewed.
     assert sign_up(f"colleague@{company}") == "ONBOARDING_REQUEST_ACCEPTED"
     assert sign_up(f"trial.{uuid.uuid4().hex[:8]}@gmail.com") == "ONBOARDING_REQUEST_ACCEPTED"
     monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE_DAILY_MAX", "0")

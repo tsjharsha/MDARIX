@@ -15,7 +15,8 @@ type TrialRequest = {
   status: "PENDING_REVIEW" | "APPROVED" | "DECLINED" | string;
   created_at: string | null;
   reviewed_at: string | null;
-  /** Who approved or declined it: a Platform Administrator, or "Automatic approval (company email)". */
+  /** Who approved or declined it: a Platform Administrator, "Automatic approval (company email)" or, since 0.10.48,
+   * "Automatic approval (personal email)". */
   reviewed_by_name?: string | null;
   decision_reason: string | null;
   tenant_key: string | null;

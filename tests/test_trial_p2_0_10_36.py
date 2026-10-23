@@ -269,7 +269,7 @@ def test_the_daily_cap_counts_the_days_company_requests_not_only_the_approvals(m
     earlier = [
         request(f"a@first-{tag}.com", 1, "DECLINED"),  # never approved, still an attempt
         request(f"b@second-{tag}.com", 2),
-        request(f"c-{tag}@gmail.com", 3),  # free mail is never an automatic approval: not counted
+        request(f"c-{tag}@gmail.com", 3),  # a personal address counts towards its own cap, not the company one
     ]
     this = request(f"d@third-{tag}.com", 4)
     later = request(f"e@fourth-{tag}.com", 5)  # after this one: not counted

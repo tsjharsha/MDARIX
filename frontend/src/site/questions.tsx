@@ -261,7 +261,7 @@ const QUESTION_LIST = [
     question: "Can I try complaint trending on my own data without a demo call?",
     summary: "Yes: a free 30-day trial, requested on the website, with sample data first and then your own exports.",
     answer:
-      "Yes. You request the MDARIX free 30-day trial on the website, with no demo call and no credit card; with a company email address it is approved automatically and ready within minutes, up to a daily limit. Your workspace starts with sample data, and you can then import your own complaint, product and lot exports, up to 5,000 rows, and see the signals and trend checks on your own data.",
+      "Yes. You request the MDARIX free 30-day trial on the website, with no demo call and no credit card; with a company or personal email address it is approved automatically and ready within minutes, up to a daily limit. Your workspace starts with sample data, and you can then import your own complaint, product and lot exports, up to 5,000 rows, and see the signals and trend checks on your own data.",
     sections: [
       {
         title: "What the trial includes",
@@ -270,7 +270,7 @@ const QUESTION_LIST = [
       {
         title: "How a request is approved",
         paragraphs: [
-          "A request from a company email address is approved automatically, usually within minutes, up to a daily limit of new trials. Requests from personal email addresses are reviewed by the MDARIX team first, usually within one business day.",
+          "A request from a company or personal email address is approved automatically, usually within minutes, up to a daily limit of new trials. Requests from disposable email addresses, and any beyond that limit, are reviewed by the MDARIX team first, usually within one business day.",
         ],
       },
       {
