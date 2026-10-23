@@ -17,7 +17,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Response
 
 from backend.app.deployment_role import deployment_role
-from backend.app.trial.auto_approval import FREE_MAIL_DOMAINS
+from backend.app.trial import auto_approval
 from backend.app.version import APP_VERSION
 
 router = APIRouter(prefix="/api/v1/public", tags=["Website"])
@@ -77,9 +77,14 @@ def site_info(response: Response) -> dict:
             "users": 3,
             "rows": 5000,
             "data_deleted_after_days": 30,
-            # The addresses whose requests a person reviews (automatic approval's own list), so sign-up can say so
-            # before the request is sent.
-            "free_mail_domains": sorted(FREE_MAIL_DOMAINS),
+            # How requests are approved (MDARIX_TRIAL_AUTO_APPROVE: company-and-personal, company-domains or off) and
+            # automatic approval's own lists of personal and disposable mail domains, so sign-up says what happens
+            # before the request is sent, whichever way the server is set (frontend/src/features/auth/SignupForm.tsx).
+            "auto_approval": auto_approval.mode(),
+            "personal_mail_domains": sorted(auto_approval.PERSONAL_MAIL_DOMAINS),
+            "disposable_mail_domains": sorted(auto_approval.DISPOSABLE_MAIL_DOMAINS),
+            # The domains whose requests a person reviews in this mode, for a sign-up page opened before 0.10.48.
+            "free_mail_domains": auto_approval.reviewed_mail_domains(),
         },
         # MULTI, PLATFORM or CELL (backend/app/deployment_role.py); free trials exist on MULTI only.
         "deployment_role": deployment_role(),

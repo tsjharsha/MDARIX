@@ -20,13 +20,29 @@ def test_site_info_shows_the_configured_company(monkeypatch):
     assert body["trial"]["data_deleted_after_days"] == 30
 
 
-def test_sign_up_reads_the_free_mail_domains_that_automatic_approval_uses():
-    """The website's note for a personal address uses the server's own list, so the two never disagree."""
-    from backend.app.trial.auto_approval import FREE_MAIL_DOMAINS, is_company_domain
+def test_sign_up_reads_how_requests_are_approved_and_the_lists_automatic_approval_uses(monkeypatch):
+    """The sign-up page says what happens to a personal or disposable address from the server's own setting and lists,
+    so the two never disagree, whichever way the server is set (MDARIX_TRIAL_AUTO_APPROVE)."""
+    from backend.app.trial.auto_approval import DISPOSABLE_MAIL_DOMAINS, PERSONAL_MAIL_DOMAINS, is_company_domain
 
-    domains = client.get("/api/v1/public/site-info").json()["trial"]["free_mail_domains"]
-    assert domains == sorted(FREE_MAIL_DOMAINS) and "gmail.com" in domains
-    assert not any(is_company_domain(domain) for domain in domains)
+    monkeypatch.delenv("MDARIX_TRIAL_AUTO_APPROVE", raising=False)
+    trial = client.get("/api/v1/public/site-info").json()["trial"]
+    assert trial["auto_approval"] == "company-and-personal"
+    assert trial["personal_mail_domains"] == sorted(PERSONAL_MAIL_DOMAINS) and "gmail.com" in PERSONAL_MAIL_DOMAINS
+    assert (
+        trial["disposable_mail_domains"] == sorted(DISPOSABLE_MAIL_DOMAINS)
+        and "mailinator.com" in DISPOSABLE_MAIL_DOMAINS
+    )
+    assert not any(is_company_domain(domain) for domain in trial["personal_mail_domains"])
+    assert not any(is_company_domain(domain) for domain in trial["disposable_mail_domains"])
+    # A sign-up page opened before 0.10.48 reads only free_mail_domains as "a person reviews these": the disposable
+    # ones now, and the personal ones too when they wait.
+    assert trial["free_mail_domains"] == sorted(DISPOSABLE_MAIL_DOMAINS)
+    for value in ("company-domains", "off"):
+        monkeypatch.setenv("MDARIX_TRIAL_AUTO_APPROVE", value)
+        trial = client.get("/api/v1/public/site-info").json()["trial"]
+        assert trial["auto_approval"] == value
+        assert trial["free_mail_domains"] == sorted(PERSONAL_MAIL_DOMAINS | DISPOSABLE_MAIL_DOMAINS)
 
 
 def test_the_version_the_server_runs_is_answered_fresh_without_a_session(monkeypatch):

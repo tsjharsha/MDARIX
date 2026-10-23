@@ -2,7 +2,7 @@
 
 **Product validation phase.** MDARIX is in a product validation phase. It is operated by its founder, an individual, while the company that will operate it is being registered. During this phase MDARIX is offered only as a free trial. Once the company is registered, this agreement will be updated with the company's details and we will tell you by email.
 
-Last updated: 20 October 2026
+Last updated: 23 October 2026
 
 This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we", "us"), gives your organization a free trial of the MDARIX product investigation platform (the "Service"). Our [Terms of service](/terms) and [Privacy policy](/privacy) also apply to the trial. Where they conflict with this agreement, this agreement prevails for the trial.
 
@@ -10,7 +10,7 @@ This agreement applies when the founder of MDARIX, operating it ("MDARIX", "we",
 
 1.1 You can request a trial on our website with your name, job title, work email address, organization name and country, and some answers about your organization.
 
-1.2 A request from a company email address is approved automatically, usually within minutes, up to a daily limit of new trials. Other requests, for example from a personal email address, from an organization that already has a trial or a request, or beyond that daily limit, are reviewed by the MDARIX team first, usually within one business day. We may decline a request at our discretion. When a request is approved, we create a private workspace for your organization and email an invitation to the person who made the request.
+1.2 A request from a company email address is approved automatically, usually within minutes, up to a daily limit of new trials; so is a request from a personal email address, for example Gmail or Outlook, while we offer this. Other requests, for example from a disposable email address, from a company email domain that already has a trial or a request, or beyond that daily limit, are reviewed by the MDARIX team first, usually within one business day. We may decline a request at our discretion. When a request is approved, we create a private workspace for your organization and email an invitation to the person who made the request.
 
 1.3 Sending the request accepts this agreement and the Terms of service and acknowledges the Privacy policy. We record when you sent it and which version of each text was published at that moment.
 

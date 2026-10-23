@@ -19,7 +19,10 @@ describe("website claims", () => {
     const html = renderToStaticMarkup(<CompanyPage />);
     expect(html).not.toContain("We review every request");
     expect(html).toContain("approved automatically and ready within minutes, up to a daily limit");
-    expect(html).toContain("requests from personal email addresses are reviewed by the MDARIX team");
+    // Since 0.10.48 a personal address is approved automatically too; a disposable one is reviewed (owner decision).
+    expect(html).toContain("With a company or personal email your trial is approved automatically");
+    expect(html).toContain("requests from disposable email addresses are reviewed by the MDARIX team");
+    expect(html).not.toContain("requests from personal email addresses are reviewed");
     expect(TRIAL_VIDEOS.map((video) => video.summary).join(" ")).not.toContain("prepared for you at once");
   });
 
