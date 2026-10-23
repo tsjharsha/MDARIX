@@ -240,6 +240,6 @@ To go into `legal/trial-agreement.md` as a new 1.5:
    sanctioned. Should Russia or Belarus be treated differently from now (they are in the list as ordinary countries)?
 3. Is a country check at sign-up enough during the validation phase, or is screening of the organization and the
    requester against consolidated lists needed before approval (manual review would be possible; automatic approval
-   currently accepts company emails at once)?
+   currently accepts company emails and, since 0.10.48, personal addresses such as Gmail at once)?
 4. Should the refusal message name the reason (sanctions) or stay neutral, as it does now ("MDARIX cannot offer a free
    trial to organizations in this country or region")?

@@ -3,8 +3,21 @@
 import type { ReactNode } from "react";
 import { CalendarCheck, FileSearch, LockKeyhole, ShieldCheck, UserCheck } from "lucide-react";
 import { SignupMotion } from "./SignupMotion";
+import { trialApproval, type TrialApproval } from "./trialProfile";
+import { useSiteInfo } from "../../site/legal";
 
-const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, string][] }> = {
+/** How soon the sign-up page's workspace is ready, as the server approves requests (site-info). Exported for its test. */
+export const READY_LINES: Record<TrialApproval, string> = {
+  "company-and-personal": "Ready within minutes with a company or personal email, isolated from every other customer.",
+  "company-domains": "Ready within minutes with a company email, isolated from every other customer.",
+  off: "Prepared once the MDARIX team approves your request, isolated from every other customer.",
+};
+
+function TrialReadyLine() {
+  return <>{READY_LINES[trialApproval(useSiteInfo()?.trial)]}</>;
+}
+
+const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof ShieldCheck, string, ReactNode][] }> = {
   signin: {
     eyebrow: "Investigation intelligence",
     title: "Evidence before inference. Humans decide.",
@@ -22,11 +35,7 @@ const ASIDE: Record<string, { eyebrow: string; title: string; points: [typeof Sh
     eyebrow: "Free 30-day trial",
     title: "Watch MDARIX find the pattern in your complaints.",
     points: [
-      [
-        ShieldCheck,
-        "Your own private workspace",
-        "Ready within minutes with a company email, isolated from every other customer.",
-      ],
+      [ShieldCheck, "Your own private workspace", <TrialReadyLine />],
       [FileSearch, "Sample data on day one", "Explore a full device investigation before sharing anything."],
       [UserCheck, "Then your own exports", "CSV templates, checked for personal data before import."],
     ],

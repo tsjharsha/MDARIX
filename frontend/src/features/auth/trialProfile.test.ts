@@ -8,9 +8,11 @@ import {
   EMPTY_PROFILE,
   MARKETS,
   TRIAL_DATA,
-  isPersonalEmail,
+  mailKind,
+  reviewedFirst,
   signupBody,
   toggleMarket,
+  trialApproval,
 } from "./trialProfile";
 
 describe("trial request profile", () => {
@@ -118,15 +120,42 @@ describe("country and phone", () => {
   });
 });
 
-describe("personal email addresses", () => {
-  it("are recognised by the server's free-mail list, including its subdomains, and only once the list is known", () => {
-    const list = ["gmail.com", "yahoo.co.in", "outlook.com"];
-    expect(isPersonalEmail("asha@gmail.com", list)).toBe(true);
-    expect(isPersonalEmail("  Asha@GMAIL.com ", list)).toBe(true);
-    expect(isPersonalEmail("asha@mail.yahoo.co.in", list)).toBe(true);
-    expect(isPersonalEmail("asha@acme-devices.com", list)).toBe(false);
-    expect(isPersonalEmail("asha@notgmail.com", list)).toBe(false);
-    expect(isPersonalEmail("asha@", list)).toBe(false);
-    expect(isPersonalEmail("asha@gmail.com", undefined)).toBe(false);
+describe("company, personal and disposable email addresses", () => {
+  const rules = {
+    auto_approval: "company-and-personal",
+    personal_mail_domains: ["gmail.com", "yahoo.co.in", "outlook.com"],
+    disposable_mail_domains: ["mailinator.com", "yopmail.com"],
+  };
+
+  it("are told apart by the server's own lists, including their subdomains, and only once the lists are known", () => {
+    expect(mailKind("asha@gmail.com", rules)).toBe("personal");
+    expect(mailKind("  Asha@GMAIL.com ", rules)).toBe("personal");
+    expect(mailKind("asha@mail.yahoo.co.in", rules)).toBe("personal");
+    expect(mailKind("asha@mailinator.com", rules)).toBe("disposable");
+    expect(mailKind("asha@inbox.yopmail.com", rules)).toBe("disposable");
+    expect(mailKind("asha@acme-devices.com", rules)).toBe("company");
+    expect(mailKind("asha@notgmail.com", rules)).toBe("company");
+    expect(mailKind("asha@", rules)).toBe("company");
+    expect(mailKind("asha@gmail.com", undefined)).toBe("company");
+  });
+
+  it("read the server's setting, and its default while it is not known", () => {
+    expect(trialApproval(undefined)).toBe("company-and-personal");
+    expect(trialApproval({})).toBe("company-and-personal");
+    expect(trialApproval(rules)).toBe("company-and-personal");
+    expect(trialApproval({ auto_approval: "company-domains" })).toBe("company-domains");
+    expect(trialApproval({ auto_approval: "off" })).toBe("off");
+  });
+
+  it("are reviewed first as the server decides it", () => {
+    // The default: a personal address is approved at once like a company one; a disposable one always waits.
+    expect(reviewedFirst("company", "company-and-personal")).toBe(false);
+    expect(reviewedFirst("personal", "company-and-personal")).toBe(false);
+    expect(reviewedFirst("disposable", "company-and-personal")).toBe(true);
+    // company-domains: as before 0.10.48, a personal address waits.
+    expect(reviewedFirst("company", "company-domains")).toBe(false);
+    expect(reviewedFirst("personal", "company-domains")).toBe(true);
+    expect(reviewedFirst("disposable", "company-domains")).toBe(true);
+    for (const kind of ["company", "personal", "disposable"] as const) expect(reviewedFirst(kind, "off")).toBe(true);
   });
 });

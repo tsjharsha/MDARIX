@@ -1,6 +1,13 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { STEP_ONE_CODES, SignupForm, TrialConsent, WhatHappensNext } from "./SignupForm";
+import {
+  EMAIL_HINTS,
+  ReviewedAddressNote,
+  STEP_ONE_CODES,
+  SignupForm,
+  TrialConsent,
+  WhatHappensNext,
+} from "./SignupForm";
 import { GUIDE_STEPS } from "../help/trialGuide";
 
 describe("free trial request form", () => {
@@ -13,19 +20,57 @@ describe("free trial request form", () => {
     expect(GUIDE_STEPS[0].actions.join(" ")).toContain("authenticator app on your phone");
   });
 
-  it("says before the request what happens next, for a company and for a personal address", () => {
+  it("says before the request what happens next, by default the same for a company and a personal address", () => {
+    // The pre-rendered page, before site-info answers: the server's default (company-and-personal).
     const html = renderToStaticMarkup(<SignupForm />);
     expect(html).toContain("sample data from day one");
     expect(html).toContain("AI is off");
-    expect(html).toContain("With a company email, the trial is approved automatically and the activation link arrives");
-    expect(html).toContain("daily limit of new trials");
-    expect(html).toContain("reviewed by the MDARIX team, usually within one business day");
-    expect(renderToStaticMarkup(<WhatHappensNext personal={false} />)).toContain(
-      "we email you the activation link within minutes",
+    expect(html).toContain(
+      "With a company or personal email, the trial is approved automatically and the activation link arrives",
     );
-    expect(renderToStaticMarkup(<WhatHappensNext personal />)).toContain(
+    expect(html).toContain("daily limit of new trials");
+    expect(html).toContain("Requests from disposable addresses, and any beyond that limit, are reviewed by the MDARIX");
+    expect(html).not.toContain("personal addresses such as Gmail are reviewed");
+    const automatic = "the trial is approved automatically and we email you the activation link within minutes";
+    const limit =
+      "beyond the day&#x27;s limit of new trials, the MDARIX team reviews it first, usually within one business day";
+    const company = renderToStaticMarkup(<WhatHappensNext reviewed={false} approval="company-and-personal" />);
+    expect(company).toContain(automatic);
+    expect(company).toContain(limit);
+    expect(company).not.toContain("with a company email");
+    // A personal address is approved at once (no note) and reads like a company one; a disposable one is reviewed.
+    expect(renderToStaticMarkup(<ReviewedAddressNote kind="personal" approval="company-and-personal" />)).toBe("");
+    expect(renderToStaticMarkup(<ReviewedAddressNote kind="company" approval="company-and-personal" />)).toBe("");
+    const disposable = renderToStaticMarkup(<ReviewedAddressNote kind="disposable" approval="company-and-personal" />);
+    expect(disposable).toContain("This looks like a disposable address.");
+    expect(disposable).toContain("With your company or personal email, the activation link arrives within minutes.");
+    expect(renderToStaticMarkup(<WhatHappensNext reviewed approval="company-and-personal" />)).toContain(
       "the MDARIX team reviews your request, usually within one business day",
     );
+  });
+
+  it("keeps the wording before 0.10.48 when the server approves company emails only, and says so when it is off", () => {
+    expect(EMAIL_HINTS["company-domains"]).toBe(
+      "With a company email, the trial is approved automatically and the activation link arrives within minutes (up to " +
+        "a daily limit of new trials). Requests from personal addresses such as Gmail are reviewed by the MDARIX team, " +
+        "usually within one business day.",
+    );
+    expect(renderToStaticMarkup(<WhatHappensNext reviewed={false} approval="company-domains" />)).toContain(
+      "with a company email, the trial is approved automatically and we email you the activation link within minutes (beyond the day&#x27;s limit of new trials, the MDARIX team reviews it first).",
+    );
+    const personal = renderToStaticMarkup(<ReviewedAddressNote kind="personal" approval="company-domains" />);
+    expect(personal).toContain("This looks like a personal address.");
+    expect(personal).toContain("With your company email, the activation link arrives within minutes.");
+    const disposable = renderToStaticMarkup(<ReviewedAddressNote kind="disposable" approval="company-domains" />);
+    expect(disposable).toContain("With your company email, the activation link arrives within minutes.");
+    expect(disposable).not.toContain("or personal");
+    expect(renderToStaticMarkup(<WhatHappensNext reviewed approval="company-domains" />)).toContain(
+      "the MDARIX team reviews your request, usually within one business day",
+    );
+    // Off: every request is reviewed, said once under the field; no note per address.
+    expect(EMAIL_HINTS.off).toContain("The MDARIX team reviews every trial request");
+    for (const kind of ["company", "personal", "disposable"] as const)
+      expect(renderToStaticMarkup(<ReviewedAddressNote kind={kind} approval="off" />)).toBe("");
   });
 
   it("opens the legal texts in a new tab, so reading them keeps what was typed", () => {

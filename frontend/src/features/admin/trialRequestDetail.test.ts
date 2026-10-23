@@ -36,6 +36,10 @@ describe("a trial request's review detail", () => {
     expect(reviewLines(approved)).toEqual([
       { label: "Approved", value: "Automatic approval (company email), 2026-10-19 10:42:05 UTC" },
     ]);
+    // A personal address's automatic approval is named as such (0.10.48), so the two rules read apart.
+    expect(reviewLines({ ...approved, reviewed_by_name: "Automatic approval (personal email)" })).toEqual([
+      { label: "Approved", value: "Automatic approval (personal email), 2026-10-19 10:42:05 UTC" },
+    ]);
     expect(reviewLines({ ...approved, status: "DECLINED", reviewed_by_name: "Priya Nair" })).toEqual([
       { label: "Declined", value: "Priya Nair, 2026-10-19 10:42:05 UTC" },
     ]);

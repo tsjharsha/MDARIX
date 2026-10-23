@@ -12,11 +12,15 @@ import {
   TRIAL_DATA,
   countries,
   isInternationalPhone,
-  isPersonalEmail,
+  mailKind,
   phoneWithDialCode,
+  reviewedFirst,
   signupBody,
   toggleMarket,
+  trialApproval,
+  type MailKind,
   type Option,
+  type TrialApproval,
   type TrialProfile,
 } from "./trialProfile";
 import { TRIAL_GUIDE_PATH } from "../help/paths";
@@ -47,10 +51,18 @@ const MESSAGES: Record<string, string> = {
 };
 
 const PHONE_HINT = "International format: + country code and number, for example +91 98765 43210.";
-const EMAIL_HINT =
-  "With a company email, the trial is approved automatically and the activation link arrives within minutes (up to a " +
-  "daily limit of new trials). Requests from personal addresses such as Gmail are reviewed by the MDARIX team, " +
-  "usually within one business day.";
+/** Under the email field: how a request is approved, as the server is set (site-info). Exported for its test. */
+export const EMAIL_HINTS: Record<TrialApproval, string> = {
+  "company-and-personal":
+    "With a company or personal email, the trial is approved automatically and the activation link arrives within " +
+    "minutes (up to a daily limit of new trials). Requests from disposable addresses, and any beyond that limit, are " +
+    "reviewed by the MDARIX team, usually within one business day.",
+  "company-domains":
+    "With a company email, the trial is approved automatically and the activation link arrives within minutes (up to " +
+    "a daily limit of new trials). Requests from personal addresses such as Gmail are reviewed by the MDARIX team, " +
+    "usually within one business day.",
+  off: "The MDARIX team reviews every trial request, usually within one business day, and then emails you the invitation.",
+};
 
 /** The asterisk of a required field (the input itself carries `required`, which screen readers announce). */
 function Req() {
@@ -87,16 +99,41 @@ function Choice({
   );
 }
 
-/** Before the request is sent: what happens next, for a company or a personal address. */
-export function WhatHappensNext({ personal }: { personal: boolean }) {
+/** Before the request is sent: what happens next, for an address the MDARIX team reviews first or one approved at once
+ * (a company email, or a personal one unless the server approves company emails only). */
+export function WhatHappensNext({ reviewed, approval }: { reviewed: boolean; approval: TrialApproval }) {
   return (
     <p className="su-hint su-wide">
       <strong>What happens next:</strong>{" "}
-      {personal
+      {reviewed
         ? "the MDARIX team reviews your request, usually within one business day, and then emails you the invitation."
-        : "with a company email, the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first)."}{" "}
+        : approval === "company-domains"
+          ? "with a company email, the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first)."
+          : "the trial is approved automatically and we email you the activation link within minutes (beyond the day's limit of new trials, the MDARIX team reviews it first, usually within one business day)."}{" "}
       Your workspace comes with sample data, and AI is off during the trial.
     </p>
+  );
+}
+
+/** Next to the email, for an address the MDARIX team reviews first, while the server approves some at once. */
+export function ReviewedAddressNote({ kind, approval }: { kind: MailKind; approval: TrialApproval }) {
+  if (approval === "off" || !reviewedFirst(kind, approval)) return null;
+  const quick = approval === "company-and-personal" ? "company or personal email" : "company email";
+  return (
+    <div className="su-mfa-note su-wide" role="status">
+      <Info size={20} aria-hidden="true" />
+      {kind === "disposable" ? (
+        <p>
+          <strong>This looks like a disposable address.</strong> The MDARIX team reviews requests from disposable
+          addresses, usually within one business day. With your {quick}, the activation link arrives within minutes.
+        </p>
+      ) : (
+        <p>
+          <strong>This looks like a personal address.</strong> The MDARIX team reviews requests from personal addresses,
+          usually within one business day. With your company email, the activation link arrives within minutes.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -135,15 +172,18 @@ export function SignupForm() {
   const [profile, setProfile] = useState<TrialProfile>(EMPTY_PROFILE);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  // A company email's trial is prepared at once (the server says TRIAL_APPROVING); any other waits for review.
+  // A request approved at once is being prepared (the server says TRIAL_APPROVING); any other waits for review.
   const [approving, setApproving] = useState(false);
   const [message, setMessage] = useState("");
   const [problem, setProblem] = useState("");
   const stepOne = useRef<HTMLFieldSetElement>(null);
   const phoneInput = useRef<HTMLInputElement>(null);
   const allCountries = useMemo(() => countries(), []);
-  // A personal address (the server's free-mail list) waits for a person's review: said before the request is sent.
-  const personal = isPersonalEmail(email, useSiteInfo()?.trial.free_mail_domains);
+  // What happens to this address, by the server's setting and lists (site-info): said before the request is sent.
+  const rules = useSiteInfo()?.trial;
+  const approval = trialApproval(rules);
+  const kind = mailKind(email, rules);
+  const reviewed = reviewedFirst(kind, approval);
   const answer =
     <K extends keyof TrialProfile>(key: K) =>
     (value: TrialProfile[K]) =>
@@ -332,18 +372,9 @@ export function SignupForm() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <small id="su-email-hint">{EMAIL_HINT}</small>
+            <small id="su-email-hint">{EMAIL_HINTS[approval]}</small>
           </label>
-          {personal && (
-            <div className="su-mfa-note su-wide" role="status">
-              <Info size={20} aria-hidden="true" />
-              <p>
-                <strong>This looks like a personal address.</strong> The MDARIX team reviews requests from personal
-                addresses, usually within one business day. With your company email, the activation link arrives within
-                minutes.
-              </p>
-            </div>
-          )}
+          <ReviewedAddressNote kind={kind} approval={approval} />
           <label className="auth-field">
             <span>
               Company <Req />
@@ -474,7 +505,7 @@ export function SignupForm() {
               We will not upload patient-identifiable data during the trial. <Req />
             </span>
           </label>
-          <WhatHappensNext personal={personal} />
+          <WhatHappensNext reviewed={reviewed} approval={approval} />
           <TrialConsent />
           {alert && <div className="su-wide">{alert}</div>}
           <div className="su-actions su-wide">
