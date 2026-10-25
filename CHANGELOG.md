@@ -10,6 +10,38 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.49] - 2026-10-25
+
+A security fix on the trial maintenance line (`release/0.10`), requirement R11: a custom role can no longer turn an
+administrator into someone who signs. Before this release a Customer Administrator could create a custom role named
+"Approver", activate it and assign it to their own account; an active custom role was read before the account role,
+so the signing refusal for administrators no longer saw an administrator, and the account had an Approver's
+permissions. A test confirmed it on 0.10.48 (`tests/test_custom_role_escalation.py`: 8 of its 10 checks fail on
+0.10.48 and pass on 0.10.49). No migration: the schema stays at md48, and no stored record is rewritten; assignments
+made before this release stay, and grant nothing (the upgrade log counts them). The API and web images change.
+
+### Security
+
+- An administrator account keeps its administrator role: an active custom-role assignment no longer replaces it
+  (`permissions.role_of_user`), so administrators never sign or approve, whatever custom role they hold. This also
+  covers any assignment made before 0.10.49.
+- Nobody assigns a custom role to their own account, and an assignment switched off cannot be switched back on by the
+  person it belongs to (`SELF_CHANGE_NOT_ALLOWED`, as for the account role and additional roles).
+- A custom role is not assigned to an administrator account (`ADMINISTRATOR_ROLE_FIXED`): administrators stay outside
+  the case workflow, as with additional roles.
+- A custom role is never named or coded like an administrator role, by its code or any spelling of it ("Admin",
+  "Customer Admin") or by the label people see ("Platform Administrator"): creating, renaming (Administration ›
+  control plane) or assigning one is refused (`ADMINISTRATOR_ROLE_NOT_ASSIGNABLE`; platform-role spellings by a
+  customer administrator stay `PLATFORM_ROLE_NOT_ALLOWED`). A role named so before 0.10.49 grants nothing.
+
+### Changed
+
+- Administration › Users › a person › Custom roles: on your own account the assign control is replaced by "Another
+  administrator must change your roles.", and on an administrator's account by "An administrator's role is set on the
+  account. Custom roles do not change it." Roles already listed can still be removed.
+- "What they can access now" no longer lists custom roles on an administrator's account, since they grant nothing;
+  they stay under Custom roles, where they can be removed.
+
 ## [0.10.48] - 2026-10-23
 
 Free-trial requests from personal email addresses (Gmail, Outlook, Yahoo and the other known mail providers) are

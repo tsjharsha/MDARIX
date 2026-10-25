@@ -124,6 +124,7 @@ DB_MODULES = {
     "test_activation_link",
     "test_identity_invitation_delivery",
     "test_customer_admin_workspace",
+    "test_custom_role_escalation",
     "test_csv_safe",
     "test_auth_limits",
     "test_auth_session_lifecycle",

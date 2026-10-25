@@ -71,7 +71,7 @@ from backend.app.access.common import (
     erasure_refused,
 )
 from backend.app.access.session import context
-from backend.app.role_codes import WORKFLOW_ROLES, role_label
+from backend.app.role_codes import WORKFLOW_ROLES, is_administrator_name, is_administrator_role, role_label
 
 router = APIRouter(prefix="/api/v1", tags=["Access Control"])
 logger = logging.getLogger(__name__)
@@ -207,6 +207,7 @@ def create_permission_set(payload: PermissionSetRequest, request: Request, db: S
 @router.post("/admin/identity/roles")
 def create_role(payload: RoleRequest, request: Request, db: Session = Depends(get_db)):
     admin = _admin_tenant(request, db)
+    refuse_administrator_role_name(payload.name, payload.code)
     now = datetime.now(timezone.utc)
     row = RoleDefinition(
         id=uuid.uuid4(),
@@ -228,6 +229,39 @@ def create_role(payload: RoleRequest, request: Request, db: Session = Depends(ge
         "version": row.version,
         "status": row.status,
     }
+
+
+def refuse_administrator_role_name(*names: str | None) -> None:
+    """An administrator's code ("Admin") or the label people see ("Platform Administrator") is never a custom role's
+    name or code (R11): administrator roles are given on the account only."""
+    if any(is_administrator_name(name) for name in names):
+        raise HTTPException(
+            422,
+            detail={
+                "code": "ADMINISTRATOR_ROLE_NOT_ASSIGNABLE",
+                "message": "Administrator roles are given on the account, not as custom roles",
+            },
+        )
+
+
+def _guard_custom_role_assignment(admin: AuthUser, user: AuthUser, role: RoleDefinition) -> None:
+    """R11: a custom role never makes an administrator an approver, and never carries an administrator role.
+
+    The same rules as for the account role and additional roles: nobody changes their own role, an administrator
+    account keeps its administrator role, and administrator roles are given on the account, never as custom roles
+    (platform roles only by the platform)."""
+    for name in (role.name, role.code):
+        _guard_user_administration(admin, new_role=name)
+    _guard_user_administration(admin, target=user, changes_access=True)
+    refuse_administrator_role_name(role.name, role.code)
+    if is_administrator_role(user.role):
+        raise HTTPException(
+            409,
+            detail={
+                "code": "ADMINISTRATOR_ROLE_FIXED",
+                "message": "An administrator's role is set on the account; a custom role cannot change it",
+            },
+        )
 
 
 @router.post("/admin/identity/role-assignments")
@@ -253,6 +287,7 @@ def assign_role(payload: RoleAssignmentRequest, request: Request, db: Session = 
                 "message": "User and role must belong to this tenant and be active",
             },
         )
+    _guard_custom_role_assignment(admin, user, role)
     row = db.query(RoleAssignment).filter_by(tenant_id=admin.tenant_id, user_id=user.id, role_id=role.id).first()
     if row is None or str(row.status).upper() != "ACTIVE":
         # The person is told which role they were given (backend/app/team_notices.py).
@@ -1067,6 +1102,12 @@ def update_role_assignment_status(
             detail={"code": "ROLE_ASSIGNMENT_NOT_FOUND", "message": "Role assignment is not available for this tenant"},
         )
     was_active, active = str(row.status).upper() == "ACTIVE", str(payload.status).upper() == "ACTIVE"
+    if active and not was_active:
+        # Switching an assignment on is an assignment (R11); switching it off always removes access, so is allowed.
+        person = db.query(AuthUser).filter(AuthUser.id == row.user_id, AuthUser.tenant_id == admin.tenant_id).first()
+        role = db.query(RoleDefinition).filter(RoleDefinition.id == row.role_id).first()
+        if person is not None and role is not None:
+            _guard_custom_role_assignment(admin, person, role)
     row.status = payload.status
     row.updated_at = datetime.now(timezone.utc)
     person = db.query(AuthUser).filter(AuthUser.id == row.user_id, AuthUser.tenant_id == admin.tenant_id).first()
@@ -1089,8 +1130,12 @@ def user_effective_access(user_id: uuid.UUID, request: Request, db: Session = De
     admin = _admin_tenant(request, db)
     user = db.query(AuthUser).filter(AuthUser.id == user_id, AuthUser.tenant_id == admin.tenant_id).first()
     ensure_user_visible(admin, user)
+    # An administrator's custom roles grant nothing (R11; permissions.role_of_user), so they are not listed as
+    # access; any left from before 0.10.49 still show among the assignments, where they can be removed.
     assignments = (
-        db.query(RoleAssignment)
+        []
+        if is_administrator_role(user.role)
+        else db.query(RoleAssignment)
         .filter(
             RoleAssignment.user_id == user.id,
             RoleAssignment.tenant_id == admin.tenant_id,

@@ -20,7 +20,14 @@ from backend.app.db.models.foundation import AuthUser, RoleAssignment, RoleDefin
 from backend.app.db.models.workflow import UserAdditionalRole
 from backend.app.db.session import get_db
 from backend.app.request_context import AuthenticatedRequestContext, get_request_context
-from backend.app.role_codes import CUSTOMER_ADMIN, PLATFORM_ADMIN, WORKFLOW_ROLES, role_code
+from backend.app.role_codes import (
+    CUSTOMER_ADMIN,
+    PLATFORM_ADMIN,
+    WORKFLOW_ROLES,
+    is_administrator_name,
+    is_administrator_role,
+    role_code,
+)
 
 RECORDS_WRITE = "records.write"
 AI_RUN = "ai.run"
@@ -105,7 +112,13 @@ def effective_role(db: Session, ctx: AuthenticatedRequestContext) -> str | None:
 
 
 def role_of_user(db: Session, user: AuthUser) -> str | None:
-    """An active role assignment, else the account's role."""
+    """An active role assignment, else the account's role.
+
+    An administrator account keeps its administrator role: no assignment replaces it (R11), so a custom role named
+    like "Approver" never turns an administrator into someone who signs. A custom role named like an administrator
+    role (refused since 0.10.49) is ignored."""
+    if is_administrator_role(user.role):
+        return user.role
     assigned = (
         db.query(RoleDefinition.name)
         .join(RoleAssignment, RoleAssignment.role_id == RoleDefinition.id)
@@ -115,9 +128,9 @@ def role_of_user(db: Session, user: AuthUser) -> str | None:
             RoleAssignment.status == "ACTIVE",
             RoleDefinition.status == "ACTIVE",
         )
-        .first()
+        .all()
     )
-    return assigned[0] if assigned else user.role
+    return next((name for (name,) in assigned if not is_administrator_name(name)), user.role)
 
 
 def additional_roles_of_user(db: Session, user: AuthUser) -> list[str]:
