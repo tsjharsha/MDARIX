@@ -21,6 +21,7 @@ import {
 import { downloadFile } from "../../reports/download";
 import { safeText } from "../../../app/displayId";
 import { roleLabel } from "../../../app/roles";
+import { isCustomerAdminRole } from "../../../app/navigationPolicy";
 
 /** The answer to an invitation or re-invitation, as the administrator should read it. When the account exists but
  * the email could not be delivered (201, delivery FAILED), MDARIX support issues an activation link to pass on. */
@@ -241,6 +242,7 @@ function UserDrawer({
   const status = String(user.status ?? "").toUpperCase();
   const name = user.display_name ?? user.email ?? "this user";
   const managedByMdarix = isPlatformRole(user.role);
+  const administratorAccount = managedByMdarix || isCustomerAdminRole(user.role);
   const activeRoles = listOf(roles.data).filter((role) => String(role.status).toUpperCase() === "ACTIVE");
   const myRoleAssignments = listOf(roleAssignments.data).filter(
     (row) => row.user_id === user.id && String(row.status).toUpperCase() === "ACTIVE",
@@ -414,36 +416,46 @@ function UserDrawer({
               ))}
               {!myRoleAssignments.length && <li className="ac-muted">None assigned.</li>}
             </ul>
-            <div className="ca-inline-form">
-              <select aria-label="Role to assign" value={roleId} onChange={(event) => setRoleId(event.target.value)}>
-                <option value="">{activeRoles.length ? "Choose an active role" : "No active roles yet"}</option>
-                {activeRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name} ({role.version})
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                className="ac-secondary"
-                disabled={!roleId}
-                onClick={async () => {
-                  try {
-                    await send("/api/v1/admin/identity/role-assignments", "POST", {
-                      user_id: user.id,
-                      role_id: roleId,
-                    });
-                    notify(`${roleName(roleId)} assigned to ${name}.`);
-                    setRoleId("");
-                    refreshAccess();
-                  } catch (reason) {
-                    notify(errorText(reason, "Role could not be assigned."), "critical");
-                  }
-                }}
-              >
-                Assign
-              </button>
-            </div>
+            {/* The server refuses these too (R11): nobody gives themselves a role, and an administrator account keeps
+                its administrator role, so a custom role never lets an administrator sign. */}
+            {isSelf || administratorAccount ? (
+              <p className="ac-muted">
+                {isSelf
+                  ? "Another administrator must change your roles."
+                  : "An administrator's role is set on the account. Custom roles do not change it."}
+              </p>
+            ) : (
+              <div className="ca-inline-form">
+                <select aria-label="Role to assign" value={roleId} onChange={(event) => setRoleId(event.target.value)}>
+                  <option value="">{activeRoles.length ? "Choose an active role" : "No active roles yet"}</option>
+                  {activeRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name} ({role.version})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="ac-secondary"
+                  disabled={!roleId}
+                  onClick={async () => {
+                    try {
+                      await send("/api/v1/admin/identity/role-assignments", "POST", {
+                        user_id: user.id,
+                        role_id: roleId,
+                      });
+                      notify(`${roleName(roleId)} assigned to ${name}.`);
+                      setRoleId("");
+                      refreshAccess();
+                    } catch (reason) {
+                      notify(errorText(reason, "Role could not be assigned."), "critical");
+                    }
+                  }}
+                >
+                  Assign
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="ca-drawer-section">
