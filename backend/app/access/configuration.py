@@ -685,6 +685,12 @@ def update_control_plane_resource(
         )
         if "role" in payload.values:
             payload.values["role"] = canonical_stored_role(str(payload.values["role"]))
+    if resource == "roles":
+        # The same rule as creating one (access/identity.py, R11): a custom role is never renamed to an administrator
+        # role, so a role already given to someone cannot become one.
+        from backend.app.access.identity import refuse_administrator_role_name
+
+        refuse_administrator_role_name(payload.values.get("name"), payload.values.get("code"))
     if resource == "approval-authorities":
         # The same rule as creating one (access/governance.py): an administrator role never holds approval authority.
         from backend.app.access.governance import _refuse_administrator_authority

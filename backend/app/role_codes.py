@@ -100,3 +100,11 @@ def is_administrator_role(role: str | None) -> bool:
 def role_label(role: str | None) -> str:
     """The name people see for a role: the standard label, else the role as the organization wrote it."""
     return ROLE_LABELS.get(role_code(role)) or str(role or "").strip()
+
+
+def is_administrator_name(value: str | None) -> bool:
+    """True for an administrator role's code or any spelling of it ("Admin") and for the label people see
+    ("Platform Administrator"). A custom role never carries one of these (R11): administrator roles are given on the
+    account only."""
+    labels = {role_code(ROLE_LABELS[code]) for code in (PLATFORM_ADMIN, CUSTOMER_ADMIN)}
+    return is_administrator_role(value) or role_code(value) in labels
