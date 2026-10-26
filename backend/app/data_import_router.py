@@ -217,3 +217,34 @@ def record_lineage(
         "key": key,
         "imports": import_lineage.of_record(data, uuid.UUID(str(ctx.tenant_id)), entity, key),
     }
+
+
+@router.get("/runs/{import_ref}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def import_run_report(
+    import_ref: uuid.UUID,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The data-quality report of one import run (R17), as recorded when it ran, with its quarantined rows' state now."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    event = (
+        db.query(AuditEvent)
+        .filter(
+            AuditEvent.tenant_id == tenant_id,
+            AuditEvent.action == "DATA_IMPORTED",
+            AuditEvent.details["import_ref"].astext == str(import_ref),
+        )
+        .one_or_none()
+    )
+    if event is None or "quality_report" not in (event.details or {}):
+        raise HTTPException(404, detail={"code": "IMPORT_RUN_NOT_FOUND", "message": "No such import run"})
+    return {
+        "import_ref": str(import_ref),
+        "entity": event.details.get("entity"),
+        "imported_at": event.created_at.isoformat(),
+        "imported_by": event.actor_ref,
+        "mapping_version": event.details.get("mapping_version"),
+        "report": event.details["quality_report"],
+        "quarantine_now": import_quarantine.counts(data, tenant_id, import_ref),
+    }

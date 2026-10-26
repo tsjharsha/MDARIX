@@ -159,3 +159,14 @@ def reprocess(db: Session, tenant_id, row_id: uuid.UUID, corrected: dict, import
     item.resolved_at = datetime.now(timezone.utc)
     item.resolved_by = actor
     return {**result, "quarantine_row": _view(item)}
+
+
+def counts(db: Session, tenant_id, import_ref: uuid.UUID) -> dict:
+    """Open and re-processed rows of one import, now."""
+    rows = dict(
+        db.query(ImportQuarantineRow.status, func.count())
+        .filter(ImportQuarantineRow.tenant_id == tenant_id, ImportQuarantineRow.import_ref == import_ref)
+        .group_by(ImportQuarantineRow.status)
+        .all()
+    )
+    return {"open": rows.get(OPEN, 0), "reprocessed": rows.get(REPROCESSED, 0)}

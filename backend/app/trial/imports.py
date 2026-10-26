@@ -1137,7 +1137,12 @@ def import_file(
         )
         set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
         import_quarantine.store(db, tenant_id, import_ref, entity, policy.source, set_aside, _personal_data, _mask)
-        result.update(import_ref=str(import_ref), mapping_version=version, quarantined_rows=len(set_aside))
+        result.update(
+            import_ref=str(import_ref),
+            mapping_version=version,
+            quarantined_rows=len(set_aside),
+            quality_report=quality_report(len(parsed), len(rows), len(set_aside), report["updated_records"]),
+        )
     result.update(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],
@@ -1147,6 +1152,20 @@ def import_file(
     if report.get("rejects_csv"):
         result["rejects_csv"] = report["rejects_csv"]
     return result
+
+
+def quality_report(read: int, accepted: int, quarantined: int, changed: int | None) -> dict:
+    """The data-quality report of one governed import run (R17): every row read is either accepted or quarantined,
+    and ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
+    is None for a products file, whose rows may add versions to an existing product."""
+    return {
+        "rows_read": read,
+        "rows_accepted": accepted,
+        "rows_quarantined": quarantined,
+        "rows_changed": changed,
+        "rows_new": accepted - changed if changed is not None else None,
+        "balanced": read == accepted + quarantined,
+    }
 
 
 def import_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
