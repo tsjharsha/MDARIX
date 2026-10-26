@@ -514,6 +514,8 @@ class _Report:
         self.new_rows = 0
         # The file holds no data row at all: nothing in it, or a header alone (DEV-018).
         self.no_rows = False
+        # Non-blank data lines in the file, counted as read: what the run report balances against (R17).
+        self.data_lines = 0
 
     def add(self, row: int | None, column: str | None, message: str) -> None:
         self.error_count += 1
@@ -561,9 +563,10 @@ def _parse(
     for line_number, cells in enumerate(reader, 2):
         if not any(cell.strip() for cell in cells):
             continue
+        report.data_lines += 1
         if any(cell.strip() for cell in cells[len(fields) :]):
+            # Kept with its problem, so it is set aside (and quarantined, counted) rather than lost.
             report.add(line_number, None, "This row has more values than the header has columns.")
-            continue
         row = {
             column: (cells[i].strip() if i < len(cells) else "")
             for i, column in enumerate(fields)
@@ -1141,7 +1144,7 @@ def import_file(
             import_ref=str(import_ref),
             mapping_version=version,
             quarantined_rows=len(set_aside),
-            quality_report=quality_report(len(parsed), len(rows), len(set_aside), report["updated_records"]),
+            quality_report=quality_report(checked.data_lines, len(rows), len(set_aside), report["updated_records"]),
         )
     result.update(
         rejected_rows=report["rejected_rows"],
@@ -1155,8 +1158,8 @@ def import_file(
 
 
 def quality_report(read: int, accepted: int, quarantined: int, changed: int | None) -> dict:
-    """The data-quality report of one governed import run (R17): every row read is either accepted or quarantined,
-    and ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
+    """The data-quality report of one governed import run (R17): ``read`` is the file's non-blank data lines, each of
+    which must end accepted or quarantined; ``balanced`` says the counts agree with the file. ``rows_changed`` (rows that updated a record already there)
     is None for a products file, whose rows may add versions to an existing product."""
     return {
         "rows_read": read,

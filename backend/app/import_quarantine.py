@@ -112,13 +112,17 @@ def listing(db: Session, tenant_id, status: str = OPEN, import_ref: uuid.UUID | 
     counts = dict(
         query.with_entities(ImportQuarantineRow.status, func.count()).group_by(ImportQuarantineRow.status).all()
     )
+    # Rows suggesting harm first, then oldest, in the query itself so none falls past the limit (A2).
     items = (
         query.filter(ImportQuarantineRow.status == status)
-        .order_by(ImportQuarantineRow.created_at, ImportQuarantineRow.line)
+        .order_by(
+            func.jsonb_array_length(ImportQuarantineRow.harm_words) == 0,
+            ImportQuarantineRow.created_at,
+            ImportQuarantineRow.line,
+        )
         .limit(500)
         .all()
     )
-    items.sort(key=lambda item: not item.harm_words)  # stable: harm first, then oldest
     return {
         "counts": {"open": counts.get(OPEN, 0), "reprocessed": counts.get(REPROCESSED, 0)},
         "items": [_view(item) for item in items],
