@@ -20,7 +20,7 @@ from backend.app import import_lineage, import_quarantine
 from backend.app import regulatory_reference as reference
 from backend.app.db.models.ingestion import ImportLineage, ImportQuarantineRow
 from backend.app.db.models.regulatory_reference import ImdrfCode, ImdrfCodeMapping
-from backend.app.db.session import SessionLocal
+from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_role_active
 from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.trial import imports
 from tests.test_customer_admin_account_security import _tenant
@@ -134,7 +134,9 @@ def test_an_approved_mapping_reaches_worksheets_and_stays_in_its_organization(or
         reference.review_mapping(db, first, uuid.UUID(proposed["id"]), True, None, "bob")
         db.commit()
         assert reference.approved_imdrf_codes(db, first, "problem_code", "PC-GOV", RELEASE) == [("A", "A0101")]
-    with SessionLocal() as other:
+    if not runtime_role_active():
+        pytest.skip("needs the least-privilege runtime role")
+    with RuntimeSessionLocal() as other:  # the owner role bypasses row-level security
         bind_tenant(other, second)
         assert other.query(ImdrfCodeMapping).filter(ImdrfCodeMapping.customer_code == "PC-GOV").count() == 0
         assert other.query(ImportQuarantineRow).filter(ImportQuarantineRow.tenant_id == first).count() == 0
