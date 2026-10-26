@@ -59,10 +59,16 @@ def stored_values(row: dict, personal_data, mask) -> dict:
 
 
 def store(
-    db: Session, tenant_id, entity: str, source: str, set_aside: list[tuple[int, dict, list[str]]], personal_data, mask
-) -> uuid.UUID:
-    """Keep the set-aside rows of one import, in its transaction; returns the import's reference."""
-    import_ref = uuid.uuid4()
+    db: Session,
+    tenant_id,
+    import_ref: uuid.UUID,
+    entity: str,
+    source: str,
+    set_aside: list[tuple[int, dict, list[str]]],
+    personal_data,
+    mask,
+) -> None:
+    """Keep the set-aside rows of one import, in its transaction."""
     now = datetime.now(timezone.utc)
     for line, row, problems in set_aside:
         values = stored_values(row, personal_data, mask)
@@ -80,7 +86,6 @@ def store(
                 created_at=now,
             )
         )
-    return import_ref
 
 
 def _view(item: ImportQuarantineRow) -> dict:
@@ -136,6 +141,20 @@ def reprocess(db: Session, tenant_id, row_id: uuid.UUID, corrected: dict, import
             409, detail={"code": "QUARANTINE_ROW_CLOSED", "message": "This row was already re-processed"}
         )
     result = import_records(db, tenant_id, item.entity, [corrected], policy)
+    from backend.app import import_lineage
+    from backend.app.trial.imports import TEMPLATES
+
+    # The corrected row keeps the lineage of the import it first came in with (R16).
+    import_lineage.write(
+        db,
+        tenant_id,
+        item.import_ref,
+        item.entity,
+        TEMPLATES[item.entity]["required"],
+        [(item.line, corrected)],
+        import_lineage.REPROCESSED_MAPPING,
+        policy.source,
+    )
     item.status = REPROCESSED
     item.resolved_at = datetime.now(timezone.utc)
     item.resolved_by = actor

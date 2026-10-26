@@ -56,9 +56,8 @@ def test_store_keeps_reasons_and_flags_harm():
         ),
         (5, {"complaint_id": "C-5", "product_id": "P-1", "description": ""}, ["description: required"]),
     ]
-    ref = quarantine.store(
-        session, tenant, "complaints", "CSV_IMPORT", set_aside, imports._personal_data, imports._mask
-    )
+    ref = uuid.uuid4()
+    quarantine.store(session, tenant, ref, "complaints", "CSV_IMPORT", set_aside, imports._personal_data, imports._mask)
     assert all(isinstance(item, ImportQuarantineRow) for item in session.added)
     first, second = session.added
     assert (first.line, first.problems, first.harm_words, first.status) == (

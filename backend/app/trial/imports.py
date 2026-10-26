@@ -58,7 +58,8 @@ class ImportPolicy:
     # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
     # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
     create_references: bool = False
-    # Rows set aside are stored for correction (R14, backend/app/import_quarantine.py); a free trial never stores them.
+    # A governed import: rows set aside are stored for correction (R14) and every written row keeps its lineage
+    # (R16); a free trial never stores either.
     quarantine: bool = False
 
 
@@ -1124,12 +1125,19 @@ def import_file(
         )
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy)
-    if policy.quarantine and report["rejected_rows"]:
-        from backend.app import import_quarantine
+    if policy.quarantine:
+        # A workspace import is governed: each written row keeps its lineage (R16), each set-aside row is stored
+        # for correction (R14), under one import reference that the DATA_IMPORTED audit event also carries.
+        from backend.app import import_lineage, import_quarantine
 
+        import_ref = uuid.uuid4()
+        version = import_lineage.mapping_version(entity, report["columns"], date_format)
+        import_lineage.write(
+            db, tenant_id, import_ref, entity, TEMPLATES[entity]["required"], rows, version, policy.source
+        )
         set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
-        import_ref = import_quarantine.store(db, tenant_id, entity, policy.source, set_aside, _personal_data, _mask)
-        result.update(quarantined_rows=len(set_aside), import_ref=str(import_ref))
+        import_quarantine.store(db, tenant_id, import_ref, entity, policy.source, set_aside, _personal_data, _mask)
+        result.update(import_ref=str(import_ref), mapping_version=version, quarantined_rows=len(set_aside))
     result.update(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],

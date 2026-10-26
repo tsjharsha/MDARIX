@@ -19,7 +19,7 @@ from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
-from backend.app import import_quarantine
+from backend.app import import_lineage, import_quarantine
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuditEvent
@@ -199,3 +199,21 @@ def quarantine_reprocess(
     )
     db.commit()
     return result
+
+
+@router.get("/lineage/{entity}", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def record_lineage(
+    entity: str,
+    key: str = Query(..., max_length=400),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data: Session = Depends(get_data_plane_db),
+):
+    """The imports that brought a record in, with their mapping versions (R16). ``key`` is the record's identifier
+    columns joined with ':' (for a lot: lot_id:product_id:version)."""
+    if entity not in imports.TEMPLATES:
+        raise HTTPException(404, detail={"code": "TEMPLATE_NOT_FOUND", "message": "Unknown template"})
+    return {
+        "entity": entity,
+        "key": key,
+        "imports": import_lineage.of_record(data, uuid.UUID(str(ctx.tenant_id)), entity, key),
+    }
