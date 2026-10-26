@@ -14,11 +14,12 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
+from backend.app import import_quarantine
 from backend.app.access.permissions import RECORDS_WRITE, require_permission
 from backend.app.db.data_plane import get_data_plane_db
 from backend.app.db.models.foundation import AuditEvent
@@ -152,3 +153,49 @@ async def run_import(
     raw = await _body(request, policy)
     result = await run_in_threadpool(_import_and_audit, db, data, ctx, tenant_id, entity, raw, policy, order, options)
     return imports.after_import(background, tenant_id, result, source="CSV import")
+
+
+@router.get("/quarantine", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def quarantine_list(
+    status: str = Query(default=import_quarantine.OPEN, pattern="^(OPEN|REPROCESSED)$"),
+    import_ref: uuid.UUID | None = None,
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Rows imports set aside (R14), those suggesting harm first, with the counts for the reconciliation."""
+    return import_quarantine.listing(data, uuid.UUID(str(ctx.tenant_id)), status, import_ref)
+
+
+@router.post("/quarantine/{row_id}/reprocess", dependencies=[Depends(require_permission(RECORDS_WRITE))])
+def quarantine_reprocess(
+    row_id: uuid.UUID,
+    corrected: dict[str, str] = Body(..., embed=True, alias="row"),
+    ctx: AuthenticatedRequestContext = Depends(get_request_context),
+    db: Session = Depends(get_db),
+    data: Session = Depends(get_data_plane_db),
+):
+    """Import a corrected quarantined row through the usual checks; the row closes only if it passes."""
+    tenant_id = uuid.UUID(str(ctx.tenant_id))
+    policy = _policy(db, ctx)
+    try:
+        result = import_quarantine.reprocess(
+            data, tenant_id, row_id, corrected, imports.import_records, policy, str(ctx.user_id)
+        )
+        data.commit()
+    except HTTPException:
+        data.rollback()
+        raise
+    db.add(
+        AuditEvent(
+            id=uuid.uuid4(),
+            tenant_id=tenant_id,
+            actor_ref=str(ctx.user_id),
+            action="QUARANTINE_ROW_REPROCESSED",
+            entity_type="DataImport",
+            # The row's reference only: its values are the organization's records.
+            details={"quarantine_row": str(row_id), "entity": result["quarantine_row"]["entity"]},
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db.commit()
+    return result

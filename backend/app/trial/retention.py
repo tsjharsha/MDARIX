@@ -143,6 +143,7 @@ TRIAL_DATA_TABLES = (
     "suppliers",
     "changes",
     "manufacturing_sites",
+    "import_quarantine_rows",
     "data_quality_issues",
     "normalization_issues",
     "normalization_runs",

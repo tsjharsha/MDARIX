@@ -58,6 +58,8 @@ class ImportPolicy:
     # A complaints file may name products, versions and lots not loaded yet: with this they are added from it (a free
     # trial starts from one complaints export); without it each must be loaded first (an organization's master data).
     create_references: bool = False
+    # Rows set aside are stored for correction (R14, backend/app/import_quarantine.py); a free trial never stores them.
+    quarantine: bool = False
 
 
 TRIAL_POLICY = ImportPolicy(
@@ -69,7 +71,7 @@ TRIAL_POLICY = ImportPolicy(
     xlsx_max_bytes=20 * 1024 * 1024,
     create_references=True,
 )
-WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE)
+WORKSPACE_POLICY = ImportPolicy(source=WORKSPACE_UPLOAD_SOURCE, quarantine=True)
 # A complaint's status as its quality system names it (complaints.status holds 40 characters).
 COMPLAINT_STATUS_MAX = 40
 
@@ -975,22 +977,6 @@ def check_file(
     return result
 
 
-def _checked_file(
-    db: Session,
-    tenant_id,
-    entity: str,
-    raw: bytes,
-    policy: ImportPolicy,
-    date_format: str,
-    skip_problem_rows: bool,
-    mask_personal_data: bool,
-) -> tuple[dict, list]:
-    """The check report and the rows that would be imported (masked when asked; without the set-aside rows)."""
-    report = _Report()
-    rows = _parse(entity, raw, report, policy, date_format)
-    return _check_rows(db, tenant_id, entity, rows, report, policy, date_format, skip_problem_rows, mask_personal_data)
-
-
 def check_records(db: Session, tenant_id, entity: str, records: list[dict], policy: ImportPolicy) -> dict:
     report = _Report()
     rows = rows_from_records(entity, records, report)
@@ -1127,13 +1113,23 @@ def import_file(
     skip_problem_rows: bool = False,
     mask_personal_data: bool = False,
 ) -> dict:
-    report, rows = _checked_file(db, tenant_id, entity, raw, policy, date_format, skip_problem_rows, mask_personal_data)
+    checked = _Report()
+    parsed = _parse(entity, raw, checked, policy, date_format)
+    report, rows = _check_rows(
+        db, tenant_id, entity, parsed, checked, policy, date_format, skip_problem_rows, mask_personal_data
+    )
     if not report["ready"]:
         raise HTTPException(
             422, detail={"code": "IMPORT_CHECK_FAILED", "message": "Fix the listed problems first", "report": report}
         )
     # The checked rows themselves: masked where asked, without the rows set aside.
     result = _write_rows(db, tenant_id, entity, rows, policy)
+    if policy.quarantine and report["rejected_rows"]:
+        from backend.app import import_quarantine
+
+        set_aside = [(line, row, checked.row_problems[line]) for line, row in parsed if line in checked.row_problems]
+        import_ref = import_quarantine.store(db, tenant_id, entity, policy.source, set_aside, _personal_data, _mask)
+        result.update(quarantined_rows=len(set_aside), import_ref=str(import_ref))
     result.update(
         rejected_rows=report["rejected_rows"],
         masked_values=report["masked_values"],
