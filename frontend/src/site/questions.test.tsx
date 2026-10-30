@@ -31,10 +31,10 @@ const textOf = (html: string) =>
     .replace(/\s+/g, " ");
 
 describe("the questions and answers", () => {
-  it("are an index and six question pages, each with its own address, title and description", () => {
-    expect(QUESTIONS).toHaveLength(6);
+  it("are an index and seven question pages, each with its own address, title and description", () => {
+    expect(QUESTIONS).toHaveLength(7);
     expect(QUESTION_PATHS).toEqual(QUESTIONS.map((question) => question.path));
-    expect(new Set(QUESTION_PATHS).size).toBe(6);
+    expect(new Set(QUESTION_PATHS).size).toBe(7);
     for (const path of [QUESTIONS_PATH, ...QUESTION_PATHS]) {
       expect(path).toMatch(/^\/questions(\/[a-z0-9-]+)?$/);
       expect(PAGE_META[path as keyof typeof PAGE_META], path).toBeDefined();

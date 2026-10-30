@@ -9,6 +9,7 @@ import {
   NotebookText,
   UserCheck,
 } from "lucide-react";
+import { BESIDE_YOUR_QMS } from "./besideYourQms";
 import { TRIAL_GUIDE_PATH } from "./trialGuide";
 import { GUIDE_PARTS, GUIDE_SECTIONS, ROLE_SUMMARY } from "./userGuide";
 import "./trialGuide.css";
@@ -48,8 +49,8 @@ export function UserGuidePage() {
           </p>
           <h1>MDARIX, screen by screen</h1>
           <p className="tg-lede">
-            How to use every part of MDARIX, one task at a time, with the names of the buttons and fields exactly as you
-            see them: from signing in to a signed decision, its CAPA and the inspection pack.
+            {BESIDE_YOUR_QMS} How to use every part of MDARIX, one task at a time, with the names of the buttons and
+            fields exactly as you see them: from signing in to a signed decision, its CAPA and the inspection pack.
           </p>
           <p className="ug-other">
             New to a free trial? The{" "}

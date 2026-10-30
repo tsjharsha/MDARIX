@@ -632,7 +632,7 @@ export const afterTheTrial = {
     ],
     [
       "A dedicated database, run by MDARIX",
-      "Your pilot has a dedicated MDARIX transactional database, set up only for your organization and run by MDARIX. Your systems stay the systems of record. Free trials share the MDARIX platform, with each organization's records kept apart.",
+      "Your pilot has a dedicated MDARIX transactional database, set up only for your organization and run by MDARIX. Your QMS keeps the complaint record, CAPA and change control. Free trials share the MDARIX platform, with each organization's records kept apart.",
     ],
     [
       "2 to 3 weeks of setup and validation",

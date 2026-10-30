@@ -4,7 +4,7 @@ This walkthrough is for anyone who wants to understand what happens in MDARIX fr
 
 It follows one **Quality Manager** through one example case. In MDARIX the Quality Manager holds the **Leader** role, which allows every step in the workflow. In a real team most steps are done by colleagues, and the Quality Manager oversees them, steps in when needed, and handles escalations. Each step below says who normally does it.
 
-> **What MDARIX is, and is not.** MDARIX helps people investigate problems with medical devices. It collects the facts, keeps them organized and shows what is still unknown. It **never decides for you**: people decide, and authorized people sign. It does not replace your quality management system and does not send anything to a regulator.
+> **What MDARIX is, and is not.** MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. MDARIX helps people investigate problems with medical devices. It collects the facts, keeps them organized and shows what is still unknown. It **never decides for you**: people decide, and authorized people sign. It does not send anything to a regulator.
 
 ---
 

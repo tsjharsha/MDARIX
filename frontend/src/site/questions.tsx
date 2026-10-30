@@ -1,4 +1,5 @@
 import { ArrowRight, Check } from "lucide-react";
+import { BESIDE_YOUR_QMS, WHAT_MDARIX_ADDS } from "../features/help/besideYourQms";
 import { trialIncludes } from "./legacyContent";
 import { SITE_URL } from "./seo";
 
@@ -297,6 +298,44 @@ const QUESTION_LIST = [
     links: [
       ["Free trial agreement", "/trial-agreement"],
       ["Privacy policy", "/privacy"],
+      ["Free trial videos", "/videos"],
+    ],
+  },
+  {
+    path: "/questions/does-mdarix-replace-our-qms",
+    question: "Does MDARIX replace our QMS or complaint software?",
+    summary: "No. MDARIX works beside it, and your QMS keeps the complaint record, CAPA and change control.",
+    answer: `No. ${BESIDE_YOUR_QMS}`,
+    sections: [
+      {
+        title: "What stays in your QMS",
+        paragraphs: [
+          "Complaints are logged and closed in your QMS or complaint software, and CAPA and change control run there. MDARIX never changes your records in it.",
+        ],
+      },
+      {
+        title: "What MDARIX adds",
+        paragraphs: [WHAT_MDARIX_ADDS],
+      },
+      {
+        title: "How your data gets in",
+        paragraphs: [
+          "In the free trial you upload CSV or Excel exports of your complaints, products and lots. In a pilot, your systems are connected through an approved mapping file and refreshed on a schedule.",
+        ],
+      },
+    ],
+    mdarix: {
+      title: "What MDARIX does",
+      points: [
+        "Opens a signal when complaints about the same problem cluster, and compares each product version's complaint rate with its own history.",
+        "Brings complaints closed as inquiries or no fault found back for a second look.",
+        "Keeps each complaint's reporting clock, and each reportability decision with the named person who made it and their reason.",
+        "Keeps each decision with its evidence and the named person who signed it.",
+        "MDARIX never decides for you and never submits a report: you file every report in the authority's own system.",
+      ],
+    },
+    links: [
+      ["Integration approach", "/trust#integrations"],
       ["Free trial videos", "/videos"],
     ],
   },
