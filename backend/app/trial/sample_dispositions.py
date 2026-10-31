@@ -30,9 +30,24 @@ from backend.app.trial.sample_data import SAMPLE_SOURCE
 
 logger = logging.getLogger("mdarix.trial.sample_dispositions")
 
-# The sample parties (fixed constants; the distributor and authorised-representative preview reads them later).
+# The sample parties (fixed constants, read by the distributor and authorised-representative preview, T-G37P).
 SAMPLE_DISTRIBUTOR = "Sample Distributor Europe (Sample)"
 SAMPLE_AUTHORISED_REPRESENTATIVE = "Sample EU Authorised Representative (Sample)"
+# What the sample distributor filed: complaint -> its own reference. Fixed like the parties (no table holds a submitter
+# until G37), so a running trial needs no refresh; RT-01's reporter type is Distributor.
+DISTRIBUTOR_SUBMISSIONS = {"SAMPLE-RT-01": "DIST-REF-2231"}
+# RT-01 as the distributor typed it into the intake form (the intake preview; the form asks for no names).
+DISTRIBUTOR_WORDS = {
+    "SAMPLE-RT-01": "The respiratory therapist called our service desk: low-flow alarm right after a filter change. We "
+    "told them to re-seat the filter and the alarm cleared. No patient harm.",
+}
+# The closing note the sample released to the distributor, shown once the complaint is closed.
+RELEASED_CLOSING_NOTES = {
+    "SAMPLE-RT-01": "Closed at service level. The low-flow alarm followed a filter change; re-seating the filter "
+    "cleared it and the controller works as specified. No further action is needed. Thank you for your report.",
+}
+# The products the sample authorised representative represents (not PulseWatch 410).
+AUTHORISED_REPRESENTATIVE_PRODUCTS = ("SAMPLE-ORBIT-300", "SAMPLE-VENTRA-250")
 MARKER = "SAMPLE-RT-01"
 HCP = "Healthcare professional"
 

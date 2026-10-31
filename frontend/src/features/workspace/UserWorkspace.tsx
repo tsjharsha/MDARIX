@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Signpost,
+  Telescope,
   Upload,
   UserRound,
   X,
@@ -64,6 +65,8 @@ import { FeedbackPrompt, FeedbackSection } from "./sections/Feedback";
 import { ColleagueWelcome } from "./sections/ColleagueWelcome";
 import { ImportDataSection } from "./sections/ImportData";
 import { TrialNextStepsSection } from "./sections/TrialNextSteps";
+import { LookAheadSection } from "./sections/LookAhead";
+import { LOOK_AHEAD_SUBTITLE, LOOK_AHEAD_SUMMARY } from "./partyPreview";
 import { NEXT_STEPS_SUBTITLE, NEXT_STEPS_SUMMARY } from "../help/trialNextSteps";
 import { requestJson } from "../../app/apiClient";
 import { rolesSummary } from "../../app/roles";
@@ -186,6 +189,12 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
     icon: MessageSquareText,
     description: "Tell us what to improve",
     guide: "Tell us what works and what to improve.",
+    context: false,
+  },
+  "Look ahead": {
+    icon: Telescope,
+    description: LOOK_AHEAD_SUBTITLE,
+    guide: LOOK_AHEAD_SUMMARY,
     context: false,
   },
   "Next steps": {
@@ -572,6 +581,7 @@ export function UserWorkspace({
                       {section === "My Account" && <AccountSection tab={tab} />}
                       {section === "Import data" && <ImportDataSection />}
                       {section === "Share feedback" && <FeedbackSection isTrial={!!trial?.is_trial} />}
+                      {section === "Look ahead" && trial?.is_trial && <LookAheadSection focus={tab} />}
                       {section === "Next steps" && trial?.is_trial && <TrialNextStepsSection />}
                     </div>
                   </SectionErrorBoundary>

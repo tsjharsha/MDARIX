@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Signpost,
   Star,
+  Telescope,
   Upload,
   Users,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { TeamPanel } from "./TrialTeam";
 import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
+import { LOOK_AHEAD_SECTION, LOOK_AHEAD_SUMMARY, LOOK_AHEAD_TABS } from "../partyPreview";
 import { SampleDataPanel } from "./SampleData";
 import { InsightsPanel } from "./TrialInsights";
 import type { Insights } from "../trialInsights";
@@ -271,6 +273,29 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
             />
           ))}
         </ol>
+        {hasSample && (
+          <div id="trial-look-ahead" className="uw-story-partner uw-anchor uw-look-ahead">
+            <div>
+              <strong>
+                <Telescope size={16} aria-hidden="true" /> {LOOK_AHEAD_SECTION}: distributors and your EU authorised
+                representative
+              </strong>
+              <p>{LOOK_AHEAD_SUMMARY} Not a chapter: there is nothing to try or save.</p>
+            </div>
+            <div className="uw-story-partner-actions">
+              {LOOK_AHEAD_TABS.map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className="ac-secondary"
+                  onClick={() => open(LOOK_AHEAD_SECTION, page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {quickRatingShown({ acted, feedbackLoaded: feedback.state === "ready", feedbackSent, ratedNow }) && (
           <QuickRating
             onSent={() => {

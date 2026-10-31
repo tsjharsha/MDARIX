@@ -10,6 +10,43 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.55] - 2026-10-31
+
+On the trial maintenance line (`release/0.10`): a read-only preview of the distributor and EU authorised-representative
+views (requirement T-G37P, TA-37P.1 to TA-37P.3; the trial plan calls this release "0.10.54"). Trial organisations
+only: the pages and their routes (`/api/v1/trial/preview/...`) answer 404 outside a free trial, and MDARIX 1.0.1 brings
+the real views (G14, G37). No AI, nothing submitted, nothing saved.
+
+**No migration.** No new table, role or sign-in: the pages read the existing complaints, dispositions, market
+assessments, case scopes and signals, and every opening is an audit event (`PARTY_VIEW_PREVIEW_OPENED`). The proactive
+PMS tables (`tr03`) are not in this release. The API and web images change.
+
+### Added
+
+- **Look ahead** (trial menu, and a Look ahead card under the last chapter of Getting started; not a chapter), three
+  pages, each opening with "Preview with sample data. In a pilot, your distributor or authorised representative signs
+  in separately, with MFA and an access end date (from MDARIX 1.0.1).":
+  - **How a distributor reports**: the distributor's intake form filled with the submission that became SAMPLE-RT-01
+    (the reporter's words, product, lot, the distributor's first knowledge, its reference DIST-REF-2231). The fields
+    are read-only and Send to the manufacturer is disabled.
+  - **As your distributor sees it**: for Sample Distributor Europe (Sample), only the complaints whose reporter type is
+    Distributor and which it filed, each with its reference, status (received, under assessment, closed), date
+    received and date of last change, and the closing note the sample released once the complaint is closed. No
+    patient data, conclusion, root cause or report.
+  - **As your authorised representative sees it**: for Sample EU Authorised Representative (Sample), OrbitCare 300
+    and VentraLink 250 (not PulseWatch 410): every complaint with its state, dates and EU/NI assessment; a High risk
+    panel (a safety or injury trigger, a harm level at or above the EU threshold, or a reportable conclusion); a
+    Recurring issues panel (open signals and recurring service-level matters); and the note "The authorised
+    representative is not your PRRC. It has its own PRRC (MDR Art. 11 and 15(6))."
+- `backend/app/party_views/service.py`: the submitter status and the authorised representative's panels, written once
+  for a product set; the preview passes the fixed sample set, G37 will pass a mandate's product set. The high-risk
+  panel reuses the disposition triggers (`complaint_disposition/triggers.py`), the recurring panel the Readiness rule.
+- The sample parties' submissions, the distributor's words and the released closing note are fixed constants beside
+  the sample parties (`trial/sample_dispositions.py`), so running trials show the preview without a refresh. No sample
+  record is added or changed: every count quoted elsewhere stays.
+- Next steps' "What changes from the trial to the pilot" gains a row for distributors and the authorised
+  representative; the in-app user guide, the free trial user guide and the pilot guide describe the preview.
+
 ## [0.10.54] - 2026-10-31
 
 On the trial maintenance line (`release/0.10`): the five ready-to-use documents, signed and exported as PDF and DOCX,
