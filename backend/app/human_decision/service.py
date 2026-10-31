@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 from sqlalchemy.orm import Session
 
+from backend.app.complaint_disposition.rules import ATTRIBUTION_LABELS
 from backend.app.case_workflow import states
 from backend.app.db.models.decision_outcomes import DecisionFollowUp
 from backend.app.db.models.foundation import Decision, Investigation, Product, SignedApprovalRecord
@@ -384,6 +385,11 @@ def decision_view(
         "decision_status": decision.decision_status,
         "decision_status_label": rules.decision_status_label(decision.decision_status),
         "rationale": decision.rationale,
+        "root_cause_attribution": decision.root_cause_attribution,
+        "root_cause_attribution_label": ATTRIBUTION_LABELS.get(decision.root_cause_attribution or ""),
+        "attribution_reason": decision.attribution_reason,
+        # Decisions signed before 0.10.53 carry none.
+        "attribution_note": None if decision.root_cause_attribution else "Recorded before root-cause attribution",
         "conditions": decision.conditions,
         "follow_up_actions": [_follow_up_action_view(item) for item in decision.follow_up_actions or ()],
         "residual_unknowns": list(decision.residual_unknowns or ()),

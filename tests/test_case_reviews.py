@@ -397,13 +397,30 @@ def test_a_policy_required_review_blocks_readiness_until_it_is_completed(org):
     short = risk.post(f"{BASE}/{review['id']}/complete", json={"outcome": "NO_CHANGE_REQUIRED", "rationale": "ok"})
     assert short.status_code == 422
 
-    done = _complete(
-        risk,
-        review["id"],
-        "NO_CHANGE_REQUIRED",
-        assessed={"risk_ids": [seed["risk_id"]], "markets": ["EU", "eu"], "notes": "Risk file RF-12 checked"},
-    )
+    # Risk-control effectiveness (T-G1aR): each assessed risk needs its answer; a "no" a risk file update with an owner
+    # and a due date; a new failure mode, not in the risk file, needs one too.
+    assessed = {"risk_ids": [seed["risk_id"]], "markets": ["EU", "eu"], "notes": "Risk file RF-12 checked"}
+    unanswered = _complete(risk, review["id"], "NO_CHANGE_REQUIRED", assessed=assessed)
+    assert unanswered.status_code == 422 and _code(unanswered) == "FINDING_UNANSWERED"
+    due = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
+    no_owner = {"risk_id": seed["risk_id"], "control_worked": "NO", "reason": "The occlusion alarm did not sound"}
+    refused = _complete(risk, review["id"], "NO_CHANGE_REQUIRED", assessed={**assessed, "findings": [no_owner]})
+    assert refused.status_code == 422 and "owner and a due date" in refused.text
+    stranger = {**no_owner, "owner_user_id": str(uuid.uuid4()), "due_on": due}
+    refused = _complete(risk, review["id"], "NO_CHANGE_REQUIRED", assessed={**assessed, "findings": [stranger]})
+    assert refused.status_code == 422 and _code(refused) == "OWNER_NOT_IN_ORGANIZATION"
+    findings = [
+        {**no_owner, "owner_user_id": risk_id, "due_on": due},
+        {"description": "Battery shutdown with a full indicator", "owner_user_id": risk_id, "due_on": due},
+    ]
+    done = _complete(risk, review["id"], "NO_CHANGE_REQUIRED", assessed={**assessed, "findings": findings})
     assert done.status_code == 200, done.text
+    answers = {item["key"]: item for item in done.json()["assessed"]["findings"]}
+    assert answers[seed["risk_id"]]["control_worked"] == "NO" and answers[seed["risk_id"]]["risk_file_update"]["due_on"]
+    assert answers["NEW-1"]["kind"] == "NOT_IN_RISK_FILE" and answers["NEW-1"]["risk_file_update"]["owner_user_id"]
+    # Both updates reach Records > Risk file input as open reassessments of the product (overdue past their day).
+    product = risk.get(f"/api/v1/post-market/risk-file/{seed['product_id']}").json()
+    assert product["risk_file"]["reassessments_open"] >= 2 and product["risk_file"]["reassessments_overdue"] == 0
     body = done.json()
     assert body["status"] == "COMPLETED" and body["outcome"] == "NO_CHANGE_REQUIRED"
     assert body["outcome_label"] == "No change to the risk file required" and body["rationale"] == RATIONALE

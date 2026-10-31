@@ -6,6 +6,8 @@ import type { Slice, Tone } from "../admin/console/dashboardModel";
 import type { TrustSummary } from "./trust";
 
 export const COMPLAINTS_TABS = [
+  // How each complaint is resolved: routine first (disposition.ts, T-G36).
+  "Dispositions",
   "Second look",
   "Backlog",
   "Reportability",

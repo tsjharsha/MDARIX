@@ -36,6 +36,7 @@ _TRIAL_BUSINESS_TABLES = (
     "complaint_market_assessments",
     "complaint_classifications",
     "signer_training_records",
+    "complaint_dispositions",
     "capa_effectiveness_checks",
     "capas",
     "risks",
@@ -179,8 +180,9 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
         plane = db.query(TenantDataPlane).filter(TenantDataPlane.tenant_id == tenant_id).one()
         assert plane.status == "ACTIVE"
         assert db.query(Product).filter(Product.tenant_id == tenant_id).count() == 3
-        # 28 sample complaints and the 9 of the rest of the story (hidden complaints, reporting clocks).
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 37
+        # 28 sample complaints, the 9 of the rest of the story (hidden complaints, reporting clocks) and the 5 routine
+        # complaints (backend/app/trial/sample_dispositions.py).
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 42
     finally:
         db.close()
 
@@ -191,11 +193,11 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert deleted - ends == timedelta(days=30)
     # The workspace dashboard reads the trial's own data, not another tenant's.
     counts = user.get("/api/v1/analytics/command-center").json()["counts"]
-    assert counts["products"] == 3 and counts["complaints"] == 37
+    assert counts["products"] == 3 and counts["complaints"] == 42
     insights = user.get("/api/v1/trial/insights").json()
     assert insights["scope"] == "sample data" and insights["findings"]
     # One request carries the whole panel: headline numbers, the complaints to filter and the questions answered.
-    assert insights["headline"]["total"] == 37 and len(insights["records"]) == 37
+    assert insights["headline"]["total"] == 42 and len(insights["records"]) == 42
     assert insights["questions"] and all(item["answer"]["summary"] for item in insights["questions"])
 
 
@@ -213,7 +215,7 @@ def test_every_sample_complaint_is_on_a_lot_of_its_version_made_before_the_event
             .filter(Complaint.tenant_id == uuid.UUID(approval["tenant_id"]))
             .all()
         )
-        assert len(rows) == 37
+        assert len(rows) == 42
         wrong = [
             (complaint.complaint_identifier, lot.lot_identifier)
             for complaint, lot in rows
@@ -232,7 +234,7 @@ def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatc
     user, _approval, _email = _approved_trial_client()
     assert user.get("/api/v1/session/context").json()["feature_set"] == "mvp"
     sample = user.get("/api/v1/trial/status").json()["sample"]
-    assert sample == {"products": 3, "lots": 15, "complaints": 37, "investigations": 1, "capas": 2, "risks": 3}
+    assert sample == {"products": 3, "lots": 15, "complaints": 42, "investigations": 1, "capas": 2, "risks": 3}
     assert authenticated_client().get("/api/v1/session/context").json()["feature_set"] == "full"
 
 
@@ -367,7 +369,7 @@ def test_the_owner_removes_the_sample_data_and_keeps_their_own_and_their_progres
 
     preview = user.get("/api/v1/trial/sample-data/removal").json()
     assert preview["is_owner"] and preview["has_sample"]
-    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 37
+    assert preview["sample"]["products"] == 3 and preview["sample"]["complaints"] == 42
     assert preview["work_on_sample"] >= 2 and preview["own_records_affected"] == 0
     assert user.post("/api/v1/trial/sample-data/removal", json={}).status_code == 422
     removed = user.post("/api/v1/trial/sample-data/removal", json={"confirm": True})
@@ -789,8 +791,9 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert story.status_code == 200, story.text
     body = story.json()
     assert [chapter["code"] for chapter in body["chapters"]] == [
-        "HIDDEN_COMPLAINTS",
+        "ROUTINE_COMPLAINTS",
         "REPORTING_CLOCKS",
+        "HIDDEN_COMPLAINTS",
         "TRENDS_TO_CASES",
         "INVESTIGATE_WITH_AI",
         "DECIDE_AND_SIGN",
@@ -799,8 +802,11 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
         "SHOW_THE_INSPECTOR",
         "YOUR_DATA",
     ]
-    assert body["acted"] == 0 and body["next"] == "HIDDEN_COMPLAINTS"
+    assert body["acted"] == 0 and body["next"] == "ROUTINE_COMPLAINTS"
     chapters = {chapter["code"]: chapter for chapter in body["chapters"]}
+    # Routine first: the complaints waiting for a disposition, the routine sample complaints among them.
+    assert chapters["ROUTINE_COMPLAINTS"]["number"] == 1 and chapters["ROUTINE_COMPLAINTS"]["finding"]["value"] >= 4
+    assert chapters["ROUTINE_COMPLAINTS"]["opens"] == {"section": "Complaints", "tab": "Dispositions"}
     assert chapters["HIDDEN_COMPLAINTS"]["finding"]["value"] >= 5
     assert chapters["INVESTIGATE_WITH_AI"]["finding"]["value"] == 1  # the guided investigation
     # Trials start without AI: the chapter promises what the case page does without it.
@@ -815,7 +821,7 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     assert chapters["HIDDEN_COMPLAINTS"]["case"] is None
     assert all(chapter["promise"] and chapter["pain"] and chapter["opens"]["section"] for chapter in body["chapters"])
 
-    # A person decides one hidden complaint: the first chapter is acted on.
+    # A person decides one hidden complaint: its chapter is acted on.
     record = flagged["SAMPLE-RV-01"]["id"]
     decided = user.post(
         f"/api/v1/complaints/{record}/second-look",
@@ -823,20 +829,20 @@ def test_the_trial_tells_the_whole_story_from_the_first_minute():
     )
     assert decided.status_code == 200, decided.text
     body = user.get("/api/v1/trial/story").json()
-    assert body["acted"] == 1 and body["next"] == "REPORTING_CLOCKS"
-    assert body["chapters"][0]["acted"] == {"done": True, "count": 1}
+    assert body["acted"] == 1 and body["next"] == "ROUTINE_COMPLAINTS"
+    assert body["chapters"][2]["acted"] == {"done": True, "count": 1}
 
     # The Platform Admin sees the trial, its usage and how far into the story it went; the trial user does not.
     assert user.get("/api/v1/platform-admin/trials").status_code in (401, 403)
     overview = authenticated_client().get("/api/v1/platform-admin/trials", params={"q": tenant_key})
     assert overview.status_code == 200, overview.text
     item = next(entry for entry in overview.json()["items"] if entry["tenant_key"] == tenant_key)
-    assert item["story"]["acted"] == ["HIDDEN_COMPLAINTS"] and item["story"]["total"] == 9
+    assert item["story"]["acted"] == ["HIDDEN_COMPLAINTS"] and item["story"]["total"] == 10
     assert item["users"] == {"used": 1, "limit": 3} and item["days_left"] == 30 and item["state"] == "ACTIVE"
     assert item["story"]["last_activity"]
     summary = overview.json()["summary"]
     assert summary["active"] >= 1 and summary["acted"] >= 1 and summary["chapters"]["HIDDEN_COMPLAINTS"] >= 1
-    assert [chapter["code"] for chapter in overview.json()["chapters"]][0] == "HIDDEN_COMPLAINTS"
+    assert [chapter["code"] for chapter in overview.json()["chapters"]][0] == "ROUTINE_COMPLAINTS"
 
 
 def test_opening_a_case_is_not_investigating_but_starting_its_analysis_is():
@@ -928,7 +934,7 @@ def test_the_story_is_added_once_and_the_refresh_leaves_a_trial_with_it_alone():
         assert seed_story_examples(db, tenant_id) == {"created": False}
         windows = db.query(ReportabilitySettings).filter(ReportabilitySettings.tenant_id == tenant_id).one()
         assert windows.updated_by == STORY_WINDOWS_BY and len(windows.windows) == 3
-        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 37
+        assert db.query(Complaint).filter(Complaint.tenant_id == tenant_id).count() == 42
     finally:
         db.close()
 
@@ -956,11 +962,16 @@ def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minut
     assert "Scaled by the units in the field" in orbit["sentence"]
     assert board.json()["basis"]["units"] >= 1
     # PulseWatch 410 and VentraLink 250 stay flat, as the sample's own explanation says: the rise is OrbitCare's only,
-    # whichever way the complaints are grouped.
+    # whichever way the complaints are grouped. The routine samples SAMPLE-RT-01 and RT-05 (VentraLink Rev B, reported
+    # late) have their events before the last 30 days, so VentraLink Rev B keeps at most 2 recent complaints.
     for group in ("version", "problem", "type"):
         items = user.get("/api/v1/triage/trends", params={"group": group}).json()["items"]
         flagged = {item["name"] for item in items if item["result"] in ("SIGNIFICANT", "ELEVATED")}
         assert flagged and all(name.startswith("OrbitCare 300") for name in flagged), (group, flagged)
+        ventra = [
+            item for item in items if item["name"].startswith("VentraLink 250 Respiratory Controller (Sample) Rev B")
+        ]
+        assert ventra and sum(item["recent"] for item in ventra) <= 2, (group, ventra)
 
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
     trends = chapters["TRENDS_TO_CASES"]["finding"]
@@ -1005,7 +1016,7 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert names[:3] == ["00-README.txt", "01-readiness-summary.pdf", "02-inspection-checks.csv"]
     assert names[-1] == "manifest.json" and len(names) == 12
     manifest = json.loads(archive.read("manifest.json"))
-    assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 8
+    assert manifest["unreadable"] == [] and manifest["checks"]["checks"] == 10
     for entry in manifest["files"]:
         assert hashlib.sha256(archive.read(entry["name"])).hexdigest() == entry["sha256"], entry["name"]
     assert archive.read("01-readiness-summary.pdf").startswith(b"%PDF")
@@ -1021,7 +1032,7 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert len(rows("10-risk-file-input.csv")) == 4  # the header and the three sample products
     assert any("SAMPLE-CAPA-01" in line for line in rows("09-capas-without-verified-effect.csv"))
     checks = rows("02-inspection-checks.csv")
-    assert len(checks) == 9 and any("03-hidden-complaints.csv" in line for line in checks)
+    assert len(checks) == 11 and any("03-hidden-complaints.csv" in line for line in checks)
     readme = archive.read("00-README.txt").decode("utf-8")
     assert "SHA-256" in readme and "verify against the source records" in readme
     assert "03-hidden-complaints.csv; basis: ISO 13485 8.2.2; 21 CFR 820.35" in readme
@@ -1059,7 +1070,7 @@ def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkey
         payload = event.payload
         assert payload["week"] == "2026-W43" and "@" not in str(payload)  # no address in the queue
         content = payload["content"]
-        assert content["first"] is True and content["total"] == 8 and content["weakest"]["state"] == "CRITICAL"
+        assert content["first"] is True and content["total"] == 10 and content["weakest"]["state"] == "CRITICAL"
 
         sent = []
         from auth import emailer
@@ -1069,7 +1080,7 @@ def test_the_weekly_readiness_email_reaches_the_quality_leads_once_a_week(monkey
         )
         assert notifications.handle_event(db, digest.EVENT, payload) is True
         assert [recipient for recipient, _ in sent] == [email]  # the trial's Leader
-        assert sent[0][1]["week"] == "2026-W43" and sent[0][1]["content"]["total"] == 8
+        assert sent[0][1]["week"] == "2026-W43" and sent[0][1]["content"]["total"] == 10
 
         # The next week says what changed (compared with this week's snapshot).
         with open_tenant_data_session(tenant_id) as data:
@@ -1152,13 +1163,13 @@ def test_a_trial_books_a_one_to_one_demo_and_mdarix_sees_its_progress(monkeypatc
             "Recover complaints hidden as cancellations or inquiries",
             "Feed post-market data into the risk file",
         )
-        assert details["progress"].startswith("0 of 9 story chapters tried, 30 days left")
+        assert details["progress"].startswith("0 of 10 story chapters tried, 30 days left")
 
         admin = authenticated_client()
         listed = admin.get("/api/v1/platform-admin/demo-requests").json()["items"]
         item = next(entry for entry in listed if entry["id"] == booked.json()["request"]["id"])
         assert item["source"] == "TRIAL" and item["organization"] == "Trial Devices Inc"
-        assert item["trial_tenant_id"] == str(tenant_id) and item["context"]["chapters_total"] == 9
+        assert item["trial_tenant_id"] == str(tenant_id) and item["context"]["chapters_total"] == 10
         assert item["note"] == "We have a notified body audit in March."
         trials = admin.get("/api/v1/platform-admin/trials", params={"q": approval["tenant_key"]}).json()
         mine = next(entry for entry in trials["items"] if entry["tenant_id"] == str(tenant_id))
@@ -1589,12 +1600,24 @@ def test_the_sample_case_shows_competing_hypotheses_open_questions_and_a_failure
         "rationale": "The supplier change and the inspection results support the proposed conclusion.",
         "password": PASSWORD,
     }
+    # The decision is signed only with its root-cause attribution (tr02); undetermined only with a reason.
+    sign = f"/api/v1/investigations/{case_id}/decision/sign"
+    unattributed = user.post(sign, json={**body, "residual_unknowns_acknowledged": True})
+    assert unattributed.status_code == 422 and "root-cause attribution" in unattributed.text
+    undetermined = user.post(
+        sign, json={**body, "residual_unknowns_acknowledged": True, "root_cause_attribution": "UNDETERMINED"}
+    )
+    assert undetermined.status_code == 422 and "Undetermined" in undetermined.text
+    body["root_cause_attribution"] = "DEVICE_RELATED"
     unacknowledged = user.post(f"/api/v1/investigations/{case_id}/decision/sign", json=body)
     assert unacknowledged.status_code == 422 and "acknowledge" in unacknowledged.text
     signed = user.post(
         f"/api/v1/investigations/{case_id}/decision/sign", json={**body, "residual_unknowns_acknowledged": True}
     )
     assert signed.status_code == 200, signed.text
+    decision = signed.json()["decision"]
+    assert decision["root_cause_attribution"] == "DEVICE_RELATED" and decision["attribution_note"] is None
+    assert decision["root_cause_attribution_label"] == "Device-related"
 
     # Removing the sample data removes what the sample author recorded too.
     assert user.post("/api/v1/trial/sample-data/removal", json={"confirm": True}).status_code == 200

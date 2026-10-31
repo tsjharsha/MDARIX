@@ -413,6 +413,16 @@ def _assessed_view(assessed: dict | None, risks: dict[str, Risk]) -> dict:
         ],
         "markets": list(data.get("markets") or ()),
         "notes": data.get("notes"),
+        # Risk-control effectiveness (T-G1aR): each finding's answer and any risk file update (owner, due date).
+        "findings": [
+            {
+                "key": key,
+                **item,
+                "control_label": rules.CONTROL_LABELS.get(item.get("control_worked") or ""),
+                "risk_identifier": risks[key].risk_identifier if key in risks else None,
+            }
+            for key, item in (data.get("findings") or {}).items()
+        ],
     }
 
 

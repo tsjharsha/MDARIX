@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Mapping
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -329,12 +329,80 @@ class ReviewRequestPayload(BaseModel):
         return _future(value)
 
 
+# Risk-control effectiveness (T-G1aR, ISO 14971:2019 clause 10): each finding of a risk review is a risk-register entry
+# already in the risk file (did its risk control work?) or a new failure mode or hazard (risk file update required).
+CONTROL_ANSWERS = ("YES", "NO", "NOT_ASSESSABLE")
+CONTROL_LABELS = {"YES": "Yes, it worked", "NO": "No, it did not work", "NOT_ASSESSABLE": "Not assessable"}
+FINDINGS_MAX = 50
+QMS_REFERENCE_MAX = 120
+
+
+class FindingPayload(BaseModel):
+    """One finding: ``risk_id`` names the register entry (or none: not in the risk file)."""
+
+    risk_id: uuid.UUID | None = None
+    description: str | None = Field(default=None, max_length=REASON_MAX)
+    control_worked: str | None = Field(default=None, max_length=20)
+    reason: str | None = Field(default=None, max_length=REASON_MAX)
+    owner_user_id: uuid.UUID | None = None
+    due_on: date | None = None
+    qms_reference: str | None = Field(default=None, max_length=QMS_REFERENCE_MAX)
+
+
+def findings_problem(risk_ids, findings, today: date) -> tuple[str | None, dict]:
+    """Why a risk review's findings cannot be completed, and the findings as stored (keyed by finding: the risk id, or
+    NEW-1, NEW-2...). Every assessed risk needs its answer; a "no" and a new failure mode each need a risk file update
+    with an owner and a due date."""
+    stored: dict[str, dict] = {}
+    answered: set[str] = set()
+    new = 0
+    for item in findings:
+        reason = _clean(item.reason) or ""
+        update = None
+        if item.risk_id is not None:
+            key = str(item.risk_id)
+            if key in answered:
+                return "Answer each risk once", {}
+            answered.add(key)
+            answer = str(item.control_worked or "").strip().upper()
+            if answer not in CONTROL_ANSWERS:
+                return "For each risk in the risk file, say whether its risk control worked", {}
+            if len(reason) < REASON_MIN:
+                return f"Give the reason for each risk-control answer in at least {REASON_MIN} characters", {}
+            entry = {"kind": "IN_RISK_FILE", "risk_id": key, "control_worked": answer, "reason": reason}
+            needs_update = answer == "NO"
+        else:
+            new += 1
+            key = f"NEW-{new}"
+            description = _clean(item.description) or ""
+            if len(description) < REASON_MIN:
+                return f"Describe the new failure mode or hazard in at least {REASON_MIN} characters", {}
+            entry = {"kind": "NOT_IN_RISK_FILE", "description": description, "reason": reason or None}
+            needs_update = True
+        if needs_update:
+            if item.owner_user_id is None or item.due_on is None:
+                return "A risk file update needs an owner and a due date", {}
+            if item.due_on < today:
+                return "The risk file update's due date cannot be in the past", {}
+            update = {
+                "owner_user_id": str(item.owner_user_id),
+                "due_on": item.due_on.isoformat(),
+                "qms_reference": _clean(item.qms_reference),
+            }
+        stored[key] = {**entry, "risk_file_update": update}
+    if any(str(risk) not in answered for risk in risk_ids):
+        return "Every risk you assessed needs its risk-control answer", {}
+    return None, stored
+
+
 class AssessedPayload(BaseModel):
-    """What the reviewer looked at: risks of the case's product, markets, notes."""
+    """What the reviewer looked at: risks of the case's product, markets, notes, and (risk reviews) each finding's
+    risk-control answer."""
 
     risk_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
     markets: list[str] = Field(default_factory=list, max_length=100)
     notes: str | None = Field(default=None, max_length=NOTES_MAX)
+    findings: list[FindingPayload] = Field(default_factory=list, max_length=FINDINGS_MAX)
 
     @field_validator("risk_ids")
     @classmethod

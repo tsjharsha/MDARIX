@@ -3,7 +3,8 @@ and whether the organization has acted on it yet.
 
 Each chapter answers one pain FDA and notified bodies cite in 2026 (MDARIX Final Lightweight MVP Plan, P1-P8): a
 finding read from the organization's records (the sample data at first, its own export later) and a real action
-recorded in MDARIX (a person decided a second-look record, signed a market's reporting conclusion, opened a case from a
+recorded in MDARIX (a person signed a complaint's disposition, decided a second-look record, signed a market's
+reporting conclusion, opened a case from a
 signal, ran the AI, signed a decision, planned or signed an effectiveness check, completed a risk review, downloaded
 the readiness summary, imported their own complaints). Nothing here is inferred from page views.
 
@@ -26,14 +27,16 @@ logger = logging.getLogger("mdarix.trial.story")
 # value is the chapter's finding (None: a count of its own).
 CHAPTERS = (
     (
-        "HIDDEN_COMPLAINTS",
-        "Recover complaints hidden as cancellations or inquiries",
-        "The second look finds records cancelled, logged as inquiries or coded No Fault Found that carry signs of a "
-        "complaint; a person confirms or dismisses each, with a reason.",
-        "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's "
-        "own complaint definition.",
-        {"section": "Complaints", "tab": "Second look"},
-        "COMPLAINTS_TO_RECHECK",
+        "ROUTINE_COMPLAINTS",
+        "Close a routine complaint in minutes",
+        "Most complaints are resolved at service level. On one screen you see why the complaint is not on the "
+        "reportability watch, confirm where and by whom the device was used, record the fix and why no investigation "
+        "is needed, and sign once. A known issue joins its open case; a complaint that meets an escalation trigger "
+        "opens a case, with the trigger's facts.",
+        "ISO 13485 clause 8.2.2 lets a complaint close without an investigation only with a documented reason; treating "
+        "every complaint as a worst case makes daily handling too slow.",
+        {"section": "Complaints", "tab": "Dispositions"},
+        None,
     ),
     (
         "REPORTING_CLOCKS",
@@ -46,6 +49,16 @@ CHAPTERS = (
         "without stated criteria is hard to defend.",
         {"section": "Complaints", "tab": "Reportability"},
         "REPORTING_CLOCKS",
+    ),
+    (
+        "HIDDEN_COMPLAINTS",
+        "Recover complaints hidden as cancellations or inquiries",
+        "The second look finds records cancelled, logged as inquiries or coded No Fault Found that carry signs of a "
+        "complaint; a person confirms or dismisses each, with a reason.",
+        "Recent FDA inspection findings include complaints cancelled or logged as inquiries although they met the firm's "
+        "own complaint definition.",
+        {"section": "Complaints", "tab": "Second look"},
+        "COMPLAINTS_TO_RECHECK",
     ),
     (
         "TRENDS_TO_CASES",
@@ -70,7 +83,8 @@ CHAPTERS = (
         "DECIDE_AND_SIGN",
         "Decide, sign and open the CAPA",
         "The sample case's Decision Brief is written and waiting for you: review it as the quality reviewer, accept "
-        "it, then sign the decision with your password and authenticator code; the CAPA opens from the signed "
+        "it, then sign the decision with your password and authenticator code and its root-cause attribution "
+        "(device-, use- or environment-related, or undetermined with a reason); the CAPA opens from the signed "
         "decision. The person who writes a brief never reviews or signs it, on every case.",
         "Trends that never become a CAPA are among the findings FDA cites most often.",
         {"section": "Investigations", "tab": "Decision Brief"},
@@ -89,7 +103,8 @@ CHAPTERS = (
         "RISK_FILE",
         "Feed post-market data into the risk file",
         "Per product, what post-market data said (harm, malfunctions, rising trends) beside what reached the risk "
-        "file (reviews, assessed risks, reassessments).",
+        "file (reviews, assessed risks, reassessments); the risk review asks whether each risk control worked, and a "
+        "new failure mode needs a risk file update with an owner and a date.",
         "Since February 2026 FDA inspects under QMSR and names post-market data not used in risk management a "
         "significant deficiency (ISO 14971 clause 10).",
         {"section": "Records", "tab": "Risk file input"},
@@ -154,6 +169,7 @@ def chapter_counters() -> tuple:
     one organization (``acted_counts``) and for every trial at once (the Platform Admin overview)."""
     from backend.app.db.models.capa_effectiveness import CapaEffectivenessCheck
     from backend.app.db.models.case_ai import CaseAiRun
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
     from backend.app.db.models.complaint_review import ComplaintSecondLook
     from backend.app.db.models.foundation import AuditEvent, Complaint, Decision
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
@@ -164,13 +180,20 @@ def chapter_counters() -> tuple:
     from backend.app.trial.imports import UPLOAD_SOURCE
 
     return (
+        # A disposition a person signed (the sample author's finished example excluded).
+        ("ROUTINE_COMPLAINTS", ComplaintDisposition, (ComplaintDisposition.source_system.is_(None),)),
         ("HIDDEN_COMPLAINTS", ComplaintSecondLook, ()),
         ("REPORTING_CLOCKS", ComplaintReportability, ()),
         # A market conclusion a person signed (the sample author's finished example excluded).
         (
             "REPORTING_CLOCKS",
             ComplaintMarketAssessment,
-            (ComplaintMarketAssessment.conclusion.isnot(None), ComplaintMarketAssessment.source_system.is_(None)),
+            (
+                ComplaintMarketAssessment.conclusion.isnot(None),
+                ComplaintMarketAssessment.source_system.is_(None),
+                # The routine path's "not reportable" conclusions belong to chapter 1, not to this chapter.
+                ComplaintMarketAssessment.question_set != "ROUTINE-BASIS",
+            ),
         ),
         ("TRENDS_TO_CASES", InvestigationSignal, ()),
         # A question asked of MDARIX, or an analysis a person started (the case page's automatic first run does not
@@ -244,6 +267,17 @@ def _reached(counts: dict[str, int], tried_before: tuple, moment: datetime | Non
         "counts": counts,
         "last_activity": moment.isoformat() if moment else None,
     }
+
+
+def _dispositions_waiting(db: Session, tenant_id: uuid.UUID) -> int:
+    from backend.app.complaint_disposition.service import waiting_ids
+
+    try:
+        return len(waiting_ids(db, tenant_id))
+    except Exception:
+        logger.exception("Trial story: the dispositions waiting could not be read")
+        db.rollback()
+        return 0
 
 
 def _investigations_open(db: Session, tenant_id: uuid.UUID) -> int:
@@ -367,7 +401,9 @@ def story(
     counts = acted_counts(db, tenant_id)
     open_cases = _investigations_open(db, tenant_id) if with_findings else 0
     awaiting = _decisions_open(db, tenant_id) if with_findings else 0
+    waiting = _dispositions_waiting(db, tenant_id) if with_findings else 0
     findings = {
+        "ROUTINE_COMPLAINTS": (waiting, f"{_plural(waiting, 'complaint')} waiting for a disposition"),
         "INVESTIGATE_WITH_AI": (open_cases, f"{_plural(open_cases, 'open case')} to investigate"),
         "DECIDE_AND_SIGN": (awaiting, f"{_plural(awaiting, 'case')} without a signed decision"),
         "YOUR_DATA": (

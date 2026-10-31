@@ -154,6 +154,13 @@ export function DecisionRecordDrawer({
                 <p className="uw-intel-statement">{decision.rationale}</p>
               </>
             )}
+            <h4>Root-cause attribution</h4>
+            <p className="uw-intel-statement">
+              {safeText(decision.root_cause_attribution_label) ??
+                safeText(decision.attribution_note) ??
+                "Recorded before root-cause attribution"}
+              {safeText(decision.attribution_reason) ? `: ${decision.attribution_reason}` : ""}
+            </p>
           </section>
           <section className="ca-drawer-section" aria-label="Signature">
             <h3>Signature</h3>

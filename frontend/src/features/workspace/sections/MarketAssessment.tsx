@@ -554,11 +554,13 @@ export function TrainingPanel({
   colleagues,
   required,
   onDone,
+  note = "Read the questions and the scale on this page, then confirm each.",
 }: {
   documents: TrainingDocument[];
   colleagues: string[];
   required: boolean;
   onDone: () => void;
+  note?: string;
 }) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -585,8 +587,7 @@ export function TrainingPanel({
         {documents.map((document) => document.version).join(" and ")}
       </h4>
       <p className="ac-muted">
-        ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. Read the
-        questions and the scale on this page, then confirm each.{" "}
+        ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
         {required
           ? "In a free trial this is a practice record; MDARIX runs no training."
           : "Your organization keeps its own training records; signing here does not wait for this one."}

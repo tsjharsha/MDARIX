@@ -3866,3 +3866,153 @@ div.uw-task-count:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Complaints › Dispositions: the decision tree and the routine path (release 0.10.53) */
+.ca-drawer:has(.uw-dp) {
+  width: min(780px, 100%);
+}
+.uw-dp,
+.uw-dp form {
+  display: grid;
+  gap: 14px;
+}
+.uw-dp h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+}
+.uw-dp-path {
+  border-left: 4px solid var(--ac-warning);
+}
+.uw-dp-path.tone-good {
+  border-left-color: var(--ac-good);
+}
+.uw-dp-basis {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.uw-dp-tree {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-dp-step {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--ac-line);
+  border-left: 4px solid var(--ac-line);
+  border-radius: 8px;
+}
+.uw-dp-step.is-taken {
+  border-left-color: var(--ac-navy);
+}
+.uw-dp-step.is-refused,
+.uw-dp-step.is-open {
+  opacity: 0.6;
+}
+.uw-dp-question {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.uw-dp-number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ac-page);
+  font-size: 12px;
+  font-weight: 700;
+}
+.uw-dp-facts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+.uw-dp-choices {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-dp-choices legend {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.uw-dp-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.uw-dp-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.uw-dp-record {
+  display: grid;
+  gap: 8px;
+}
+.uw-dp-show summary {
+  cursor: pointer;
+  color: var(--ac-navy);
+  font-size: 13px;
+}
+.uw-dp-show dl,
+.uw-dp-show ul,
+.uw-dp-show ol {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+.uw-dp-show dt {
+  font-weight: 600;
+}
+.uw-dp-show dd {
+  margin: 0 0 4px;
+}
+.uw-dp-sign ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+.uw-dp-record-view {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 4px 10px;
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+.uw-dp-record-view dt {
+  font-weight: 600;
+}
+.uw-dp-record-view dd {
+  margin: 0;
+}
+.uw-dp-filters {
+  margin-bottom: 10px;
+}
+.uw-table-scroll {
+  overflow-x: auto;
+}
+.uw-rv-finding {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--ac-line);
+}
+@media (max-width: 600px) {
+  .uw-dp-record-view {
+    grid-template-columns: 1fr;
+  }
+}

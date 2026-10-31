@@ -26,7 +26,8 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter, defaultdict
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from types import SimpleNamespace
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -153,6 +154,20 @@ def _facts(db: Session, tenant_id: uuid.UUID, start: date, today: date) -> dict:
         .all()
     ):
         facts[product_id]["reviews"].append((review, case_ref))
+        # A risk file update a risk review asked for (T-G1aR): open, and overdue past its day.
+        for key, finding in ((review.assessed or {}).get("findings") or {}).items():
+            update = finding.get("risk_file_update")
+            if update:
+                due = datetime.combine(date.fromisoformat(update["due_on"]), time.max, tzinfo=timezone.utc)
+                title = f"Risk file update: {finding.get('description') or finding.get('reason')}"
+                facts[product_id]["follow_ups"].append(
+                    (
+                        SimpleNamespace(
+                            business_id=f"{review.business_id} {key}", title=title, status="OPEN", due_at=due
+                        ),
+                        case_ref,
+                    )
+                )
     for follow_up, product_id, case_ref in (
         db.query(DecisionFollowUp, Investigation.product_id, Investigation.business_id)
         .join(

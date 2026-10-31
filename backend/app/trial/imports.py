@@ -99,6 +99,10 @@ COLUMN_HELP: dict[str, dict[str, str]] = {
         "product_name": "The product's name. During a free trial a product, version or lot the complaints name but you "
         "have not loaded is added from this file, under this name.",
         "problem_code": "Your problem code. Signals group by product version and problem code.",
+        "use_environment": "Where the device was used (hospital ward, intensive care unit, operating theatre, home, "
+        "ambulance, clinic): proposed for a person to confirm. Any other value stays Unknown, shown as you gave it.",
+        "user_type": "Who used it (healthcare professional, lay user, patient, service engineer): proposed for a person "
+        "to confirm. Any other value stays Unknown, shown as you gave it.",
     },
 }
 
@@ -156,6 +160,8 @@ TEMPLATES: dict[str, dict] = {
             "death",
             "malfunction",
             "product_name",
+            "use_environment",
+            "user_type",
         ],
         "example": [
             [
@@ -181,6 +187,8 @@ TEMPLATES: dict[str, dict] = {
                 "N",
                 "Y",
                 "AquaFlow 200 Infusion Pump",
+                "Intensive care unit",
+                "Healthcare professional",
             ],
             # The investigations example links both complaints, so the templates load in the order they are offered
             # (FUN-10).
@@ -207,6 +215,8 @@ TEMPLATES: dict[str, dict] = {
                 "N",
                 "Y",
                 "AquaFlow 200 Infusion Pump",
+                "Intensive care unit",
+                "Healthcare professional",
             ],
         ],
     },
@@ -1155,6 +1165,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
     complaints = lookup.complaints(row["complaint_id"] for _, row in rows) if entity == "complaints" else {}
     new_complaints: dict[str, dict] = {}
     evidence: list = []
+    proposed: dict = {}  # complaint id -> (use environment, user type) as the file gives them
     if entity in business_imports.TEMPLATES:
         created, updated = business_imports.write(
             entity, rows, db, tenant_id, lookup, lambda when: _stamp(now, when, source), _date, now, source
@@ -1283,6 +1294,8 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
                 new_complaints[row["complaint_id"]].update(values, updated_at=now)
             updated += 1
         evidence.append(_complaint_evidence(complaint, row, product, version, lot, source))
+        if row.get("use_environment") or row.get("user_type"):
+            proposed[row["complaint_id"]] = (row.get("use_environment"), row.get("user_type"))
     if evidence:
         from backend.app.db.bulk import insert_rows
         from retrieval.record_evidence import upsert_record_evidences
@@ -1290,6 +1303,7 @@ def _write_rows(db: Session, tenant_id, entity: str, rows, policy: ImportPolicy)
         db.flush()
         insert_rows(db, Complaint, list(new_complaints.values()))
         upsert_record_evidences(db, tenant_id, evidence)
+        _propose_classifications(db, tenant_id, complaints, proposed, now)
     result = {"entity": entity, "created": created, "updated": updated, "rows": len(rows)}
     if also_created:
         result["also_created"] = also_created
@@ -1349,6 +1363,44 @@ def _add_named_references(
         lookup.lots[row["lot_id"]] = lot
         added["lots"] = 1
     return added
+
+
+def _propose_classifications(db: Session, tenant_id, complaints: dict, proposed: dict, now: datetime) -> None:
+    """The optional use environment and user type columns as proposed classifications (T-G39), for a person to confirm
+    when the disposition is signed. A value outside the fixed lists stays Unknown, with the value kept as given;
+    nothing is inferred from free text. A complaint already classified keeps its classification."""
+    from backend.app.complaint_classification import rules as coding
+    from backend.app.db.models.market_assessment import ComplaintClassification
+
+    if not proposed:
+        return
+    ids = {complaints[ref].id: ref for ref in proposed if ref in complaints}
+    classified = {
+        row[0]
+        for row in db.query(ComplaintClassification.complaint_id).filter(
+            ComplaintClassification.tenant_id == tenant_id, ComplaintClassification.complaint_id.in_(list(ids))
+        )
+    }
+    for complaint_id, ref in ids.items():
+        if complaint_id in classified:
+            continue
+        environment, environment_source = coding.code_source_value("use_environment", proposed[ref][0])
+        user, user_source = coding.code_source_value("user_type", proposed[ref][1])
+        db.add(
+            ComplaintClassification(
+                tenant_id=tenant_id,
+                complaint_id=complaint_id,
+                version=1,
+                use_environment=environment,
+                user_type=user,
+                source_values={"use_environment": environment_source, "user_type": user_source},
+                state="PROPOSED",
+                coding_criteria_version=coding.CODING_CRITERIA_VERSION,
+                created_by="system:trial-import",
+                created_at=now,
+            )
+        )
+    db.flush()
 
 
 def _complaint_details(row: dict) -> dict:

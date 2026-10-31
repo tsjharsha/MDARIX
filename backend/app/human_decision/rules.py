@@ -196,6 +196,9 @@ class SignPayload(BaseModel):
     residual_unknowns_acknowledged: bool = False
     supersedes_decision_id: uuid.UUID | None = None
     supersede_reason: str | None = Field(default=None, max_length=SUPERSEDE_REASON_MAX + 1000)
+    # The root-cause attribution (tr02, T-G36): required for every new signature; "undetermined" needs its reason.
+    root_cause_attribution: str | None = Field(default=None, max_length=30)
+    attribution_reason: str | None = Field(default=None, max_length=4000)
     password: str = Field(min_length=1, max_length=128)
     mfa_code: str | None = Field(default=None, min_length=6, max_length=12)
 

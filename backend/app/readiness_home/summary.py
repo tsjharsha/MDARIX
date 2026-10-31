@@ -195,6 +195,9 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "checks_signed_not_effective": signed.get("NOT_EFFECTIVE", 0),
         "now": capa_check.get("detail"),
     }
+    from backend.app.complaint_disposition.service import counts_by_branch
+
+    dispositions = counts_by_branch(db, tenant_id, begin, end)
     data = {
         "period": {"from": start.isoformat(), "to": today.isoformat(), "days": period_days},
         "readiness": checks,
@@ -203,6 +206,8 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
             "confirmed": second_look.get("CONFIRMED", 0),
             "dismissed": second_look.get("DISMISSED", 0),
         },
+        # Dispositions signed in the period (tr02), by branch, with the escalations by trigger.
+        "dispositions": dispositions,
         "reporting": reporting,
         "trends": trends,
         "risk_file": risk_file,
@@ -296,6 +301,19 @@ def lines(data: dict) -> list[tuple[str, str]]:
         f"Second look: {_n(second['confirmed'], 'record')} confirmed as complaints and {second['dismissed']} dismissed in the "
         "period."
     )
+    signed = data.get("dispositions") or {}
+    if signed:
+        branches = signed["by_branch"]
+        body(
+            f"Dispositions: {_n(signed['signed'], 'disposition')} signed in the period: "
+            f"{branches.get('SERVICE_LEVEL', 0)} resolved at service level ({signed['routine']} on the routine path), "
+            f"{branches.get('KNOWN_ISSUE', 0)} known issues linked to an open case, "
+            f"{branches.get('ESCALATED_BY_TRIGGER', 0)} escalated by a trigger and "
+            f"{branches.get('ESCALATED_BY_CHOICE', 0)} by choice."
+        )
+        triggered = [f"{code} {count}" for code, count in signed["by_trigger"].items() if count]
+        if triggered:
+            body("Escalations by trigger: " + "; ".join(triggered) + ".")
 
     reporting = data["reporting"]
     heading("3. Reporting to regulatory authorities (management review input, clause 5.6.2)")

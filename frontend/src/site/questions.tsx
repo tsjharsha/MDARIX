@@ -305,7 +305,7 @@ const QUESTION_LIST = [
     path: "/questions/does-mdarix-replace-our-qms",
     question: "Does MDARIX replace our QMS or complaint software?",
     summary: "No. MDARIX works beside it, and your QMS keeps the complaint record, CAPA and change control.",
-    answer: `No. ${BESIDE_YOUR_QMS}`,
+    answer: `No: ${BESIDE_YOUR_QMS}`,
     sections: [
       {
         title: "What stays in your QMS",
