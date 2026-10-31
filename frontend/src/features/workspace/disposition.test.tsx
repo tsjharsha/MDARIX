@@ -161,6 +161,20 @@ describe("the disposition rules on screen", () => {
       SERVICE_LEVEL: "refused",
       CHOICE: "refused",
     });
+    // A known issue (an open case matches) opens on that case; a trigger still wins over it.
+    const case1 = { id: "case-1", ref: "INV1", identifier: "SAMPLE-INV-001", question: "Why?", match: [] };
+    const known = screen({ candidates: [case1] });
+    expect(formOf(known)).toMatchObject({ branch: "KNOWN_ISSUE", caseId: "case-1" });
+    expect(treeStates(known, "KNOWN_ISSUE")).toEqual({
+      TRIGGER: "no",
+      KNOWN_ISSUE: "taken",
+      SERVICE_LEVEL: "open",
+      CHOICE: "open",
+    });
+    expect(formOf(screen({ candidates: [case1], trigger_codes: ["INJURY"] }))).toMatchObject({
+      branch: "ESCALATED_BY_TRIGGER",
+      caseId: "",
+    });
     expect(treeStates(screen(), "SERVICE_LEVEL")).toEqual({
       TRIGGER: "no",
       KNOWN_ISSUE: "no",
@@ -181,7 +195,9 @@ describe("the disposition rules on screen", () => {
     const known = screen({
       candidates: [{ id: "case-1", ref: "INV1", identifier: "SAMPLE-INV-001", question: "Why?", match: [] }],
     });
-    expect(signProblem(known, filled(known), true)).toMatch(/not that known issue/);
+    expect(signProblem(known, { ...filled(known), branch: "SERVICE_LEVEL", caseId: "" }, true)).toMatch(
+      /not that known issue/,
+    );
     expect(signProblem(known, { ...filled(known), branch: "KNOWN_ISSUE", caseId: "case-1" }, true)).toMatch(/reason/);
   });
 

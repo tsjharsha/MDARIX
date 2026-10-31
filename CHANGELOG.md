@@ -100,7 +100,8 @@ images change. Run `scripts/refresh_trial_story.py --apply` to give running tria
 - On the Dispositions board, a complaint whose expected branch is a known issue (an open case with the same product
   and problem code, or the same lot) is marked "Known issue" and offers "Link to the open case"; "Routine path" and
   "Close on the routine path" stay for service-level candidates, "Decide the disposition" for trigger cases (owner
-  decision 7).
+  decision 7). Its disposition screen opens with the known-issue branch and the matching open case pre-selected, not
+  service level; a trigger still wins.
 - The free trial end-to-end journey (`frontend/e2e/trial-journey.spec.ts`) follows the ten chapters: it closes
   SAMPLE-RT-01 on the routine path (practice training, service record, attribution, one signature), opens the second
   look from its tab, and signs the sample decision with its root-cause attribution.
