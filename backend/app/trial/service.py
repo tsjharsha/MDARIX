@@ -543,6 +543,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_decision import stage_sample_decision
 
         sample["decision"] = stage_sample_decision(db, tenant.id, now)
+        # The sample answers of the per-market assessment: a signed EU/NI example and a pending US draft
+        # (backend/app/trial/sample_assessments.py).
+        from backend.app.trial.sample_assessments import stage_sample_assessments
+
+        sample["assessments"] = stage_sample_assessments(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

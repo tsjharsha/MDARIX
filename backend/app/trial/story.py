@@ -3,7 +3,7 @@ and whether the organization has acted on it yet.
 
 Each chapter answers one pain FDA and notified bodies cite in 2026 (MDARIX Final Lightweight MVP Plan, P1-P8): a
 finding read from the organization's records (the sample data at first, its own export later) and a real action
-recorded in MDARIX (a person decided a second-look record, recorded a reporting decision, opened a case from a
+recorded in MDARIX (a person decided a second-look record, signed a market's reporting conclusion, opened a case from a
 signal, ran the AI, signed a decision, planned or signed an effectiveness check, completed a risk review, downloaded
 the readiness summary, imported their own complaints). Nothing here is inferred from page views.
 
@@ -37,10 +37,13 @@ CHAPTERS = (
     ),
     (
         "REPORTING_CLOCKS",
-        "Decide every report inside its window",
-        "Every complaint reporting a death, a serious injury or a malfunction runs a clock against your reporting "
-        "windows, per market; missing answers are flagged and a person decides.",
-        "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections.",
+        "Assess a serious complaint per market",
+        "Each market you report to asks its own seriousness and causation questions, with the regulation's clause "
+        "beside each: death, each serious-injury criterion, caused or contributed, and a malfunction judged as if it "
+        "recurred. The harm-severity scale shows each market's threshold, an Unknown keeps the market pending, and "
+        "you sign each market's conclusion after a short practice training on the questions.",
+        "Reports filed months late, or never evaluated, are a repeat finding in FDA inspections; seriousness judged "
+        "without stated criteria is hard to defend.",
         {"section": "Complaints", "tab": "Reportability"},
         "REPORTING_CLOCKS",
     ),
@@ -153,6 +156,7 @@ def chapter_counters() -> tuple:
     from backend.app.db.models.case_ai import CaseAiRun
     from backend.app.db.models.complaint_review import ComplaintSecondLook
     from backend.app.db.models.foundation import AuditEvent, Complaint, Decision
+    from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.db.models.reportability import ComplaintReportability
     from backend.app.db.models.reviews import CaseReview
     from backend.app.db.models.signals import InvestigationSignal
@@ -162,6 +166,12 @@ def chapter_counters() -> tuple:
     return (
         ("HIDDEN_COMPLAINTS", ComplaintSecondLook, ()),
         ("REPORTING_CLOCKS", ComplaintReportability, ()),
+        # A market conclusion a person signed (the sample author's finished example excluded).
+        (
+            "REPORTING_CLOCKS",
+            ComplaintMarketAssessment,
+            (ComplaintMarketAssessment.conclusion.isnot(None), ComplaintMarketAssessment.source_system.is_(None)),
+        ),
         ("TRENDS_TO_CASES", InvestigationSignal, ()),
         # A question asked of MDARIX, or an analysis a person started (the case page's automatic first run does not
         # count: opening a page is not investigating).

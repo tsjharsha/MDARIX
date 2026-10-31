@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BLANK_WINDOW,
-  EMPTY_DECISION,
   clockText,
-  decisionBody,
-  decisionProblem,
   marketsOf,
   timelinessOf,
   watchHeadline,
@@ -98,45 +95,6 @@ describe("the reportability watch", () => {
     const unset = watchHeadline(summary({ configured: false, windows: 0, open: 3 }));
     expect(unset.detail).toContain("without due dates until your reporting windows are entered");
     expect(watchHeadline(summary()).tone).toBe("good");
-  });
-
-  it("checks a decision: a report needs its reference and filing day, never in the future or before awareness", () => {
-    const today = "2026-10-13";
-    const reported = { decision: "REPORTED" as const, rationale: "Death: MDR filed", reference: "", reportedOn: "" };
-    expect(decisionProblem(EMPTY_DECISION, today, null)).toBe("Choose whether it was reported");
-    expect(decisionProblem(reported, today, null)).toContain("reference");
-    expect(decisionProblem({ ...reported, reference: "MDR-1" }, today, null)).toBe("Give the day the report was filed");
-    expect(decisionProblem({ ...reported, reference: "MDR-1", reportedOn: "2026-10-14" }, today, null)).toContain(
-      "future",
-    );
-    expect(
-      decisionProblem({ ...reported, reference: "MDR-1", reportedOn: "2026-09-01" }, today, "2026-09-10"),
-    ).toContain("before the organization became aware");
-    expect(decisionProblem({ ...reported, reference: "MDR-1", reportedOn: "2026-10-01" }, today, "2026-09-10")).toBe(
-      null,
-    );
-    expect(
-      decisionProblem({ decision: "NOT_REPORTABLE", rationale: "short", reference: "", reportedOn: "" }, today, null),
-    ).toBe("Say in at least 10 characters why");
-  });
-
-  it("sends the report's details only for a report", () => {
-    expect(
-      decisionBody({
-        decision: "REPORTED",
-        rationale: " Filed  in time ",
-        reference: " MDR-1 ",
-        reportedOn: "2026-10-01",
-      }),
-    ).toEqual({
-      decision: "REPORTED",
-      rationale: "Filed in time",
-      report_reference: "MDR-1",
-      reported_on: "2026-10-01",
-    });
-    expect(
-      decisionBody({ decision: "NOT_REPORTABLE", rationale: "Not device related", reference: "x", reportedOn: "x" }),
-    ).toEqual({ decision: "NOT_REPORTABLE", rationale: "Not device related" });
   });
 
   it("says whether a decision came inside the window", () => {

@@ -14,6 +14,13 @@
       "jurisdiction": "International"
     },
     {
+      "id": "ISO13485_6_2",
+      "short": "ISO 13485 6.2",
+      "title": "Human resources: competence, training and awareness",
+      "jurisdiction": "International",
+      "starter": true
+    },
+    {
       "id": "ISO13485_7_3_9",
       "short": "ISO 13485 7.3.9",
       "title": "Control of design and development changes",
@@ -68,6 +75,13 @@
       "jurisdiction": "United States"
     },
     {
+      "id": "CFR803_3",
+      "short": "21 CFR 803.3",
+      "title": "Definitions: serious injury, caused or contributed, malfunction, remedial action",
+      "jurisdiction": "United States",
+      "starter": true
+    },
+    {
       "id": "CFR803_17",
       "short": "21 CFR 803.17",
       "title": "Written MDR procedures",
@@ -110,6 +124,13 @@
       "jurisdiction": "United States"
     },
     {
+      "id": "MDR_2",
+      "short": "EU MDR Art. 2(64)–(66)",
+      "title": "Definitions: incident, serious incident, serious public health threat",
+      "jurisdiction": "European Union",
+      "starter": true
+    },
+    {
       "id": "MDR_83",
       "short": "EU MDR Art. 83",
       "title": "Post-market surveillance system",
@@ -126,6 +147,13 @@
       "short": "EU MDR Art. 88",
       "title": "Trend reporting",
       "jurisdiction": "European Union"
+    },
+    {
+      "id": "MDCG_2023_3",
+      "short": "MDCG 2023-3",
+      "title": "Questions and answers on vigilance terms and concepts (EU MDR)",
+      "jurisdiction": "European Union",
+      "starter": true
     },
     {
       "id": "ISO14971_10",
@@ -156,6 +184,13 @@
       "short": "SOR/98-282 ss. 59–61",
       "title": "Mandatory problem reporting (Canada)",
       "jurisdiction": "Canada"
+    },
+    {
+      "id": "IN_MDR",
+      "short": "India MDR 2017 Rules 3, 26",
+      "title": "Medical Devices Rules 2017: definitions and post-market reporting of adverse events",
+      "jurisdiction": "India",
+      "starter": true
     }
   ]
 }

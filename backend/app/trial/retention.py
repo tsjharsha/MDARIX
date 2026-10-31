@@ -66,6 +66,10 @@ TRIAL_DATA_TABLES = (
     "complaint_reportability",
     "reportability_settings",
     "capa_effectiveness_checks",
+    # Per-market assessments, classifications (both on complaints listed below) and signer training records (tr01).
+    "complaint_market_assessments",
+    "complaint_classifications",
+    "signer_training_records",
     # The case AI run (md42): about the cases listed below.
     "case_ai_runs",
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.

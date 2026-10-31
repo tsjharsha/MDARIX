@@ -14,7 +14,14 @@ const SOURCES = import.meta.glob("../**/*.tsx", { query: "?raw", import: "defaul
 
 describe("the catalog of standards", () => {
   it("is the backend's catalog (tests/test_standards_unit.py keeps the two identical)", () => {
-    expect(STANDARDS).toHaveLength(26);
+    expect(STANDARDS).toHaveLength(31);
+    expect(STANDARDS.filter((standard) => standard.starter).map((standard) => standard.id)).toEqual([
+      "ISO13485_6_2",
+      "CFR803_3",
+      "MDR_2",
+      "MDCG_2023_3",
+      "IN_MDR",
+    ]);
     expect(new Set(STANDARDS.map((standard) => standard.id)).size).toBe(STANDARDS.length);
     expect(standardOf("CA_MDR")).toEqual({
       id: "CA_MDR",

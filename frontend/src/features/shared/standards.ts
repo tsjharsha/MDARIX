@@ -3,7 +3,8 @@
 // disclaimer once per page; references elsewhere (the sample story, the trial's citation themes) are built from it.
 import catalog from "./standards.json";
 
-export type Standard = { id: string; short: string; title: string; jurisdiction: string };
+/** ``starter``: the wording awaits the regulatory consultant's confirmation (shown marked "Starter text"). */
+export type Standard = { id: string; short: string; title: string; jurisdiction: string; starter?: boolean };
 
 export const STANDARDS: readonly Standard[] = catalog.standards;
 

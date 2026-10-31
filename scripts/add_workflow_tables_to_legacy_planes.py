@@ -1,5 +1,6 @@
 """Give legacy dedicated organization databases the workflow changes of migrations md27 (roles, tasks), md28
-(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot) and md44 (email preferences, trial demo requests).
+(signals), md29 (case scope and evidence review), md30 (intelligence judgements), md31 (intelligence values), md32 (reviews and the Decision Brief), md33 (the human decision), md40 (complaint review), md41 (reporting and CAPA), md42 (the case AI run), md43 (units per lot), md44 (email preferences, trial demo requests) and tr01 (per-market assessments,
+complaint classifications, signer training).
 
     python scripts/add_workflow_tables_to_legacy_planes.py            # dry run: what would change
     python scripts/add_workflow_tables_to_legacy_planes.py --apply    # change them
@@ -152,6 +153,13 @@ STEPS = (
             "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' "
             "AND table_name = 'demo_requests' AND column_name = 'trial_tenant_id')"
         ),
+    ),
+    Step(
+        "tr01",
+        "tr01_trial_market_assessments.py",
+        "create_market_assessment_tables",
+        ("complaint_market_assessments", "complaint_classifications", "signer_training_records"),
+        ("tenants", "complaints"),
     ),
 )
 
