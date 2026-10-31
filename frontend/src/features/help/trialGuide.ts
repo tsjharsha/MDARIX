@@ -88,6 +88,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
       "In Getting started, open About the sample data: seven points, each with what is in the sample, why it matters and a button to the screen that shows it.",
       "Follow Your story, chapter by chapter. The quality loop at the top always names the next chapter; its button opens the right screen.",
       "A chapter counts as tried when you act in it: confirm or dismiss a record in the second look, record a reporting decision, open a case from a signal, ask MDARIX a question about the case, sign a decision, plan an effectiveness check, complete a risk review, sign a document.",
+      "After the last chapter, the Look ahead card opens three read-only previews with sample data: How a distributor reports, As your distributor sees it, and As your authorised representative sees it. Nothing there can be sent or changed.",
       "Finish in Records › Reports: choose Management review report and Generate, cut-off now, write Actions decided, choose Save the section, then Sign the document; its PDF and DOCX are what you would file in your QMS. Readiness keeps Download PDF for the readiness summary and Inspection pack (ZIP) with every record behind each check.",
     ],
     result:
