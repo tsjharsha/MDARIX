@@ -961,18 +961,17 @@ def test_the_trial_finds_the_rise_per_device_and_its_signal_from_the_first_minut
     assert orbit["basis"] == "UNITS" and orbit["label"] == "Rate significantly higher than the previous version"
     assert "Scaled by the units in the field" in orbit["sentence"]
     assert board.json()["basis"]["units"] >= 1
-    # PulseWatch 410 stays flat, as the sample's own explanation says: the problem rise is OrbitCare's only.
+    # PulseWatch 410 and VentraLink 250 stay flat, as the sample's own explanation says: the rise is OrbitCare's only,
+    # whichever way the complaints are grouped. The routine samples SAMPLE-RT-01 and RT-05 (VentraLink Rev B, reported
+    # late) have their events before the last 30 days, so VentraLink Rev B keeps at most 2 recent complaints.
     for group in ("version", "problem", "type"):
         items = user.get("/api/v1/triage/trends", params={"group": group}).json()["items"]
         flagged = {item["name"] for item in items if item["result"] in ("SIGNIFICANT", "ELEVATED")}
-        # VentraLink 250 Rev B's four recent complaints of different kinds (two of them the routine and battery
-        # sample complaints of 0.10.53) also show as a higher rate by version and by type, never by problem.
-        expected = (
-            ("OrbitCare 300",)
-            if group == "problem"
-            else ("OrbitCare 300", "VentraLink 250 Respiratory Controller (Sample) Rev B")
-        )
-        assert flagged and all(name.startswith(expected) for name in flagged), (group, flagged)
+        assert flagged and all(name.startswith("OrbitCare 300") for name in flagged), (group, flagged)
+        ventra = [
+            item for item in items if item["name"].startswith("VentraLink 250 Respiratory Controller (Sample) Rev B")
+        ]
+        assert ventra and sum(item["recent"] for item in ventra) <= 2, (group, ventra)
 
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
     trends = chapters["TRENDS_TO_CASES"]["finding"]

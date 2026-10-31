@@ -160,8 +160,19 @@ images change. Run `scripts/refresh_trial_story.py --apply` to give running tria
   disposition), 2 "Assess a serious complaint per market", 3 "Recover complaints hidden as cancellations or
   inquiries", then the trend, investigation, decision (now with its root-cause attribution), CAPA, risk file (now with
   the risk-control question), inspector and own-data chapters.
-- With the routine sample complaints, VentraLink 250 Rev B's four recent complaints of different kinds show as a
-  higher rate on the trend check by version and by type (never by problem code); the sample's explanation says so.
+- SAMPLE-RT-01 and SAMPLE-RT-05 are VentraLink 250 Rev B complaints reported late: their events were 36 and 33 days
+  ago (lot 4, made 68 days ago), their awareness 2 days and 1 day ago. The trend check flags only OrbitCare 300, by
+  version, problem code or type, as the trial guide, the story and the videos say; RT-01 keeps the routine path and
+  RT-05 the `NEW_FAILURE_MODE` escalation on the reportability watch, with running clocks (owner decision 1,
+  `tests/test_free_trial.py`).
+- On the Dispositions board, a complaint whose expected branch is a known issue (an open case with the same product
+  and problem code, or the same lot) is marked "Known issue" and offers "Link to the open case"; "Routine path" and
+  "Close on the routine path" stay for service-level candidates, "Decide the disposition" for trigger cases (owner
+  decision 7). Its disposition screen opens with the known-issue branch and the matching open case pre-selected, not
+  service level; a trigger still wins.
+- The free trial end-to-end journey (`frontend/e2e/trial-journey.spec.ts`) follows the ten chapters: it closes
+  SAMPLE-RT-01 on the routine path (practice training, service record, attribution, one signature), opens the second
+  look from its tab, and signs the sample decision with its root-cause attribution.
 - In the user guide: Dispositions, the routine path, the classification, the attribution and the risk-control
   question.
 

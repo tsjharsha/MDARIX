@@ -8,8 +8,9 @@ import { fileURLToPath } from "node:url";
 /*
  * The free trial, end to end, as a prospect lives it: the website's "Start free trial", sign-up with a company email
  * (approved at once), the activation link, authenticator setup with its QR code, Getting started (what you were cited
- * for, the journey, the chapters, the team), the second look with sentence starters, the sample decision reviewed and
- * signed with password and authenticator code, an Excel export uploaded as the quality system wrote it, the one-click
+ * for, the journey, the ten chapters, the team), chapter 1's routine complaint closed on the routine path with one
+ * signature, the second look with sentence starters, the sample decision reviewed and signed with its root-cause
+ * attribution, password and authenticator code, an Excel export uploaded as the quality system wrote it, the one-click
  * rating, a demo booked, the sample data removed, and the early end of the trial approved by the Platform Administrator
  * with the data deleted. Then the free trial user guide on desktop and phone.
  *
@@ -294,7 +295,7 @@ test.describe("free trial journey", () => {
     expect(problems).toEqual([]);
   });
 
-  test("4. Getting started: what you were cited for, the journey, nine chapters, the tabs and the team", async ({
+  test("4. Getting started: what you were cited for, the journey, ten chapters, the tabs and the team", async ({
     browser,
   }) => {
     test.setTimeout(90_000);
@@ -320,8 +321,8 @@ test.describe("free trial journey", () => {
 
     await expect(page.getByText(/steps done · next:/)).toBeVisible({ timeout: 20_000 });
     const story = panel(page, "Your story, chapter by chapter");
-    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(9);
-    await expect(story.getByText(/^\d of 9 tried$/)).toBeVisible();
+    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(10);
+    await expect(story.getByText(/^\d+ of 10 tried$/)).toBeVisible();
 
     // The tabs below the story.
     await trialTabs(page).getByRole("tab", { name: "About the sample data" }).click();
@@ -345,7 +346,59 @@ test.describe("free trial journey", () => {
     await page.context().close();
   });
 
-  test("5. second look: a sentence starter alone is refused, finished in own words it is recorded", async ({
+  test("5. chapter 1: a routine complaint closed on the routine path with one signature", async ({ browser }) => {
+    test.setTimeout(150_000);
+    const page = await ownerPage(browser);
+    const problems = watchErrors(page);
+    await openSection(page, "Getting started");
+    await page.getByRole("button", { name: "Close a routine complaint" }).first().click();
+    await expect(page.getByRole("heading", { level: 1, name: "Complaints" })).toBeVisible({ timeout: 20_000 });
+
+    // The board predicts each branch: the routine path for a service-level candidate, the open case for a known issue
+    // (SAMPLE-RT-04, an OrbitCare 300 lot 4 pressure alarm of the sample case).
+    const card = (identifier: string) => page.locator("li.uw-cr-card").filter({ hasText: identifier });
+    await expect(card("SAMPLE-RT-01")).toContainText("Routine path", { timeout: 20_000 });
+    await expect(card("SAMPLE-RT-04").getByRole("button", { name: "Link to the open case" })).toBeVisible();
+    await card("SAMPLE-RT-01").getByRole("button", { name: "Close on the routine path" }).click();
+    const drawer = page.getByRole("dialog", { name: /: disposition$/ });
+    await expect(drawer.getByText("Routine path: one screen, one signature")).toBeVisible({ timeout: 20_000 });
+
+    // Free trials: a practice acknowledgement of the disposition rules and the coding criteria, before anything else.
+    const training = drawer.getByRole("button", { name: /^I have read version / });
+    for (let left = await training.count(); left > 0; left--) {
+      await training.first().click();
+      await expect(training).toHaveCount(left - 1, { timeout: 20_000 });
+    }
+
+    // Question 3, pre-selected: the service record, why no investigation is needed, and the root-cause attribution.
+    await drawer.getByRole("textbox", { name: /^Troubleshooting done/ }).fill("Checked the filter seating by phone.");
+    await drawer.getByRole("combobox", { name: /^Correction/ }).selectOption({ label: "User instructed" });
+    await drawer.getByRole("textbox", { name: /^Service ticket/ }).fill("SDE-E2E-01");
+    await drawer
+      .getByRole("textbox", { name: /^What was done/ })
+      .fill("User instructed to re-seat the filter in its housing.");
+    await drawer.getByRole("textbox", { name: /^Result/ }).fill("Alarm cleared; the controller ran normally.");
+    await drawer
+      .getByRole("textbox", { name: /^Why no investigation is needed/ })
+      .fill("A handling step after a filter change, corrected on instruction; no harm and no device fault indicated.");
+    await drawer
+      .getByRole("group", { name: "Root-cause attribution" })
+      .getByRole("radio", { name: "Use-related" })
+      .check();
+
+    // One signature covers the disposition, the classification and a "not reportable" conclusion per market.
+    await expect(drawer.getByRole("heading", { name: "One signature covers" })).toBeVisible();
+    await drawer.getByLabel("Your password").fill(OWNER_PASSWORD);
+    await drawer.getByLabel("Authenticator code").fill(await freshCode(page));
+    await drawer.getByRole("button", { name: "Sign the disposition" }).click();
+    await expect(page.getByText(/: the disposition is signed\./)).toBeVisible({ timeout: 30_000 });
+    await expect(drawer).toContainText("(routine path; target under 10 minutes)", { timeout: 20_000 });
+    await shot(page, "5-routine-close");
+    expect(problems).toEqual([]);
+    await page.context().close();
+  });
+
+  test("6. second look: a sentence starter alone is refused, finished in own words it is recorded", async ({
     browser,
   }) => {
     test.setTimeout(120_000);
@@ -360,6 +413,11 @@ test.describe("free trial journey", () => {
     });
     const problems = watchErrors(page);
     await openSection(page, "Complaints");
+    // Complaints opens on Dispositions (routine first); the second look is its own tab.
+    await page
+      .getByRole("tablist", { name: "Complaint sections" })
+      .getByRole("tab", { name: /^Second look/ })
+      .click();
     await expect.poll(() => storyReads.done > 0 && storyReads.pending === 0, { timeout: 30_000 }).toBe(true);
     await page
       .getByRole("button", { name: /: it is a complaint$/ })
@@ -383,12 +441,12 @@ test.describe("free trial journey", () => {
     await page.getByRole("button", { name: "Done", exact: true }).click();
     // The "chapter done, next" banner follows the person anywhere (it checks the story every 30 seconds).
     await expect(page.getByText(/^Chapter \d done: /)).toBeVisible({ timeout: 45_000 });
-    await shot(page, "5-second-look");
+    await shot(page, "6-second-look");
     expect(problems).toEqual([]);
     await page.context().close();
   });
 
-  test("6. the sample decision: review the brief, accept it, sign with password and authenticator code", async ({
+  test("7. the sample decision: review the brief, accept it, sign with its root-cause attribution, password and authenticator code", async ({
     browser,
   }) => {
     test.setTimeout(150_000);
@@ -420,6 +478,11 @@ test.describe("free trial journey", () => {
     await decide
       .getByLabel("Your rationale (in your own words)")
       .fill("The inspection results and the supplier change record support the root cause; the trend confirms it.");
+    // The decision is signed only with its root-cause attribution (undetermined only with a reason).
+    await decide
+      .getByRole("group", { name: "Root-cause attribution" })
+      .getByRole("radio", { name: "Device-related" })
+      .check();
     await decide.getByRole("button", { name: "Continue to sign" }).click();
 
     const sign = page.getByRole("dialog", { name: "Sign the decision" });
@@ -432,12 +495,12 @@ test.describe("free trial journey", () => {
         timeout: 30_000,
       },
     );
-    await shot(page, "6-signed");
+    await shot(page, "7-signed");
     expect(problems).toEqual([]);
     await page.context().close();
   });
 
-  test("7. an Excel export uploaded as the quality system wrote it: columns matched, extras left out, products added", async ({
+  test("8. an Excel export uploaded as the quality system wrote it: columns matched, extras left out, products added", async ({
     browser,
   }) => {
     test.setTimeout(120_000);
@@ -468,21 +531,21 @@ test.describe("free trial journey", () => {
     });
     // With its own data in, the owner is offered to remove the sample.
     await expect(page.getByRole("button", { name: "Remove the sample data" })).toBeVisible({ timeout: 20_000 });
-    await shot(page, "7-imported");
+    await shot(page, "8-imported");
     expect(problems).toEqual([]);
     await page.context().close();
   });
 
-  test("8. a one-click rating and a one-to-one demo booked", async ({ browser }) => {
+  test("9. a one-click rating and a one-to-one demo booked", async ({ browser }) => {
     test.setTimeout(90_000);
     const page = await ownerPage(browser);
     const problems = watchErrors(page);
     await openSection(page, "Getting started");
     const story = panel(page, "Your story, chapter by chapter");
-    // Progress is read once the story has loaded (its nine chapters are listed).
-    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(9, { timeout: 20_000 });
-    const tried = Number(((await story.getByText(/^\d of 9 tried$/).textContent()) ?? "0").split(" ")[0]);
-    expect(tried, "second look, sign-off and own data are three chapters").toBeGreaterThanOrEqual(3);
+    // Progress is read once the story has loaded (its ten chapters are listed).
+    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(10, { timeout: 20_000 });
+    const tried = Number(((await story.getByText(/^\d+ of 10 tried$/).textContent()) ?? "0").split(" ")[0]);
+    expect(tried, "routine close, second look, sign-off and own data are four chapters").toBeGreaterThanOrEqual(4);
 
     const rating = page.getByRole("group", { name: "How useful is MDARIX so far?" });
     await expect(rating).toBeVisible({ timeout: 20_000 });
@@ -496,13 +559,13 @@ test.describe("free trial journey", () => {
     await expect(page.getByRole("heading", { name: "Demo requested" })).toBeVisible({ timeout: 20_000 });
     await page.getByRole("button", { name: "Back to your trial" }).click();
     await expect(page.getByRole("button", { name: "Demo requested" })).toBeDisabled({ timeout: 20_000 });
-    triedBeforeRemoval = (await story.getByText(/^\d of 9 tried$/).textContent()) ?? "";
-    await shot(page, "8-rating-demo");
+    triedBeforeRemoval = (await story.getByText(/^\d+ of 10 tried$/).textContent()) ?? "";
+    await shot(page, "9-rating-demo");
     expect(problems).toEqual([]);
     await page.context().close();
   });
 
-  test("9. the sample data removed: the preview first, own data and progress stay", async ({ browser }) => {
+  test("10. the sample data removed: the preview first, own data and progress stay", async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await ownerPage(browser);
     const problems = watchErrors(page);
@@ -523,17 +586,17 @@ test.describe("free trial journey", () => {
       timeout: 60_000,
     });
     const story = panel(page, "Your story, chapter by chapter");
-    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(9, { timeout: 20_000 });
-    await expect(story.getByText(/^\d of 9 tried$/)).toHaveText(triedBeforeRemoval || /^\d of 9 tried$/, {
+    await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(10, { timeout: 20_000 });
+    await expect(story.getByText(/^\d+ of 10 tried$/)).toHaveText(triedBeforeRemoval || /^\d+ of 10 tried$/, {
       timeout: 20_000,
     });
     await expect(panel(page, "Automatic insights")).toContainText("4 complaints", { timeout: 20_000 });
-    await shot(page, "9-sample-removed");
+    await shot(page, "10-sample-removed");
     expect(problems).toEqual([]);
     await page.context().close();
   });
 
-  test("10. ending the trial early: the owner asks, Platform Admin approves and deletes the data, sign-in stops", async ({
+  test("11. ending the trial early: the owner asks, Platform Admin approves and deletes the data, sign-in stops", async ({
     browser,
   }) => {
     test.setTimeout(150_000);
@@ -554,7 +617,7 @@ test.describe("free trial journey", () => {
     await form.getByLabel(/I understand that once the MDARIX team confirms/).check();
     await form.getByRole("button", { name: "Send the request" }).click();
     await expect(owner.getByRole("button", { name: "Withdraw my request" })).toBeVisible({ timeout: 20_000 });
-    await shot(owner, "10-exit-requested");
+    await shot(owner, "11-exit-requested");
     await owner.context().close();
 
     // Platform Admin: the request is approved with the data deleted.
@@ -573,7 +636,7 @@ test.describe("free trial journey", () => {
     await expect(drawer.getByLabel("Delete the trial's data now")).toBeChecked();
     await drawer.getByRole("button", { name: "End the trial and delete its data" }).click();
     await expect(row).toContainText("Ended, data deleted", { timeout: 60_000 });
-    await shot(admin, "10-exit-approved");
+    await shot(admin, "11-exit-approved");
     await context.close();
 
     // The owner can no longer sign in (the password field's eye works on sign-in too).
@@ -590,7 +653,7 @@ test.describe("free trial journey", () => {
     await expect(page.getByRole("status")).toBeVisible({ timeout: 20_000 });
     await expect(page).toHaveURL(/\/signin/);
     await expect(page.getByRole("status")).not.toContainText("Signed in");
-    await shot(page, "10-signin-refused");
+    await shot(page, "11-signin-refused");
     await fresh.close();
     expect(problems).toEqual([]);
   });

@@ -145,13 +145,17 @@ export function Dispositions() {
 
 export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () => void }) {
   const signed = item.disposition;
+  // The branch the tree is expected to take, in its order: a trigger, then a known issue, then service level.
+  const known = !item.triggers.length && item.known_issue.length > 0;
   const tone = signed
     ? BRANCH_TONES[signed.branch]
     : item.triggers.length
       ? "critical"
-      : item.routine_offered
-        ? "good"
-        : "warning";
+      : known
+        ? BRANCH_TONES.KNOWN_ISSUE
+        : item.routine_offered
+          ? "good"
+          : "warning";
   return (
     <li className="uw-cr-card">
       <span className={`uw-cr-rail tone-${tone}`} aria-hidden="true" />
@@ -173,6 +177,8 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
               tone="critical"
               label={`Trigger: ${item.triggers.join(", ").replace(/_/g, " ").toLowerCase()}`}
             />
+          ) : known ? (
+            <ToneBadge tone={BRANCH_TONES.KNOWN_ISSUE} label="Known issue" />
           ) : item.routine_offered ? (
             <ToneBadge tone="good" label="Routine path" />
           ) : (
@@ -195,9 +201,11 @@ export function DispositionCard({ item, onOpen }: { item: BoardItem; onOpen: () 
           <button type="button" className={signed ? "ac-secondary" : "ac-primary"} onClick={onOpen}>
             {signed
               ? "Open the disposition"
-              : item.routine_offered
-                ? "Close on the routine path"
-                : "Decide the disposition"}
+              : known
+                ? "Link to the open case"
+                : item.routine_offered && !item.triggers.length
+                  ? "Close on the routine path"
+                  : "Decide the disposition"}
           </button>
         </div>
       </div>

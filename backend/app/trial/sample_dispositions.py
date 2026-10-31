@@ -3,11 +3,11 @@ disposition release, the trial plan's "0.10.52").
 
 | ID | Product | What happened | Shows |
 |---|---|---|---|
-| SAMPLE-RT-01 | VentraLink 250 Rev B | Low-flow alarm after a filter change, re-seated on the phone; filed by Sample Distributor Europe | The routine path |
+| SAMPLE-RT-01 | VentraLink 250 Rev B | Low-flow alarm after a filter change, re-seated on the phone; filed late by Sample Distributor Europe | The routine path |
 | SAMPLE-RT-02 | PulseWatch 410 Rev A | SpO2 cable frayed at the connector; replaced; no patient | A second service-level close |
 | SAMPLE-RT-03 | PulseWatch 410 Rev A | The same cable wear, three weeks earlier; signed by the sample author | With RT-02: a recurring matter |
 | SAMPLE-RT-04 | OrbitCare 300 Rev B, lot 4 | Intermittent pressure alarm; nurse restarted the pump; no harm | A known issue (SAMPLE-INV-001) |
-| SAMPLE-RT-05 | VentraLink 250 Rev B | Shut down on battery during transport although the indicator showed full | NEW_FAILURE_MODE, on the watch |
+| SAMPLE-RT-05 | VentraLink 250 Rev B | Shut down on battery during transport although the indicator showed full; reported a month later | NEW_FAILURE_MODE, on the watch |
 
 Every complaint carries a proposed classification (use environment and user type) for a person to confirm when the
 disposition is signed; RT-02's source value "Step-down unit" is not on the list, so it stays Unknown with the source
@@ -43,10 +43,11 @@ ROUTINE_COMPLAINTS = [
         "SAMPLE-RT-01",
         "SAMPLE-VENTRA-250",
         "Rev B",
-        5,
+        4,
         2,
         "Low-flow alarm after a filter change. The respiratory therapist called the distributor's service desk, was told "
-        "to re-seat the filter, and the alarm cleared. No patient harm. Filed by Sample Distributor Europe.",
+        "to re-seat the filter, and the alarm cleared. No patient harm. Filed by Sample Distributor Europe with its "
+        "monthly service report.",
         {
             "problem_code": None,
             "country": "Germany",
@@ -102,10 +103,11 @@ ROUTINE_COMPLAINTS = [
         "SAMPLE-RT-05",
         "SAMPLE-VENTRA-250",
         "Rev B",
-        5,
+        4,
         1,
         "The controller switched off on battery during a patient transport although the battery indicator showed full. "
-        "Staff ventilated the patient manually. No harm.",
+        "Staff ventilated the patient manually. No harm. The hospital reported it a month later, after its incident "
+        "review.",
         {
             "problem_code": "BATTERY_SHUTDOWN",
             "country": "Germany",
@@ -117,6 +119,11 @@ ROUTINE_COMPLAINTS = [
         ("Ambulance", HCP),
     ),
 ]
+# Days since the event for the two VentraLink 250 Rev B complaints, reported late (the others: six hours before
+# awareness). Their events fall before the trend check's last 30 days, so VentraLink keeps at most 2 complaints there
+# and stays flat by version and by type, as the sample's explanation says; only OrbitCare 300 rises. Both are on lot 4,
+# made 68 days ago, before the event. Awareness stays recent: the routine path and the reporting clocks read it.
+LATE_EVENT_DAYS = {"SAMPLE-RT-01": 36, "SAMPLE-RT-05": 33}
 # The story complaints' proposed values, as the source gives them.
 STORY_CLASSIFICATIONS = {
     "SAMPLE-RV-01": ("Hospital ward", HCP),
@@ -218,7 +225,11 @@ def seed_routine_examples(db: Session, tenant_id, now: datetime | None = None) -
                 product_id=product.id,
                 product_version_id=version.id if version else None,
                 lot_batch_id=lot.id if lot else None,
-                event_timestamp=aware - timedelta(hours=6),
+                event_timestamp=(
+                    now - timedelta(days=LATE_EVENT_DAYS[identifier])
+                    if identifier in LATE_EVENT_DAYS
+                    else aware - timedelta(hours=6)
+                ),
                 complaint_timestamp=aware,
                 awareness_timestamp=aware,
                 description=description,
