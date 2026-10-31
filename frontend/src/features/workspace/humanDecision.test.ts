@@ -42,7 +42,12 @@ const OTHER = "9d1c2b3a-1111-4222-8333-444455556666";
 const RATIONALE = "The evidence in the brief supports the proposed conclusion.";
 const context = { briefVersionId: UUID, briefContentHash: "sha256:abc123", supersedesDecisionId: null };
 
-const form = (change: Partial<DecisionForm> = {}): DecisionForm => ({ ...emptyDecisionForm(), ...change });
+// Attributed by default: the attribution's own rule has its own test below.
+const form = (change: Partial<DecisionForm> = {}): DecisionForm => ({
+  ...emptyDecisionForm(),
+  attribution: "DEVICE_RELATED",
+  ...change,
+});
 
 describe("addresses", () => {
   it("builds the decision addresses", () => {
@@ -136,6 +141,15 @@ describe("the decision form", () => {
       expect.stringMatching(/rationale of at least 20/),
     ]);
     expect(decisionFormProblems(form({ outcome: "ACCEPT_CONCLUSION", rationale: RATIONALE }), ready)).toEqual([]);
+  });
+
+  it("requires the root-cause attribution, and a reason for undetermined", () => {
+    const signed = form({ outcome: "ACCEPT_CONCLUSION", rationale: RATIONALE });
+    expect(decisionFormProblems({ ...signed, attribution: "" }, ready)).toEqual(["Choose the root-cause attribution."]);
+    expect(decisionFormProblems({ ...signed, attribution: "UNDETERMINED" }, ready)[0]).toMatch(/Undetermined/);
+    expect(
+      decisionFormProblems({ ...signed, attribution: "UNDETERMINED", attributionReason: "Device not returned" }, ready),
+    ).toEqual([]);
   });
 
   it("requires conditions, the acknowledgement and the supersede reason when they apply", () => {

@@ -548,6 +548,11 @@ def approve_request(db: Session, request_id: uuid.UUID, admin: AuthUser) -> dict
         from backend.app.trial.sample_assessments import stage_sample_assessments
 
         sample["assessments"] = stage_sample_assessments(db, tenant.id, now)
+        # The routine complaints, their proposed classifications and a signed service-level example
+        # (backend/app/trial/sample_dispositions.py).
+        from backend.app.trial.sample_dispositions import seed_routine_examples
+
+        sample["routine"] = seed_routine_examples(db, tenant.id, now)
         user = AuthUser(
             id=uuid.uuid4(),
             tenant_id=tenant.id,

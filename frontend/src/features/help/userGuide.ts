@@ -201,7 +201,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             title: "Follow the story",
             steps: [
               "The ring at the top shows how much of the loop you have tried. Its main button opens the next chapter.",
-              "Under Your story, chapter by chapter, each of the nine chapters shows what your records show now.",
+              "Under Your story, chapter by chapter, each of the ten chapters shows what your records show now.",
               "Open What MDARIX does here, and why it matters to read the chapter in two sentences.",
               "Choose the chapter's button (for example Review hidden complaints) to try it. A chapter counts as tried when you act in it: decide, record, run or sign.",
             ],
@@ -335,8 +335,50 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
   {
     id: "complaints-signals",
     title: "Complaints and signals",
-    summary: "Find the complaints that hide, keep every reporting clock, and turn a rising trend into a case.",
+    summary:
+      "Close routine complaints at service level with a documented reason, find the complaints that hide, keep every reporting clock, and turn a rising trend into a case.",
     sections: [
+      {
+        id: "dispositions",
+        title: "Dispositions: close a routine complaint in minutes",
+        where: "Complaints › Dispositions, and Signals › By resolution",
+        purpose:
+          "Most complaints are resolved at service level. You decide how each one is resolved, in a fixed order, and sign once; a complaint that meets an escalation trigger opens a case. The disposition never replaces the reportability assessment.",
+        tasks: [
+          {
+            title: "Close a routine complaint on the routine path",
+            who: "Leader, and anyone who triages signals, opens cases or reviews quality.",
+            steps: [
+              "Open Complaints › Dispositions. A complaint marked Routine path is not on the reportability watch, has no second-look flag and meets no escalation trigger: choose Close on the routine path.",
+              "Read the summary in the reporter's words and, for each enabled market, the basis: not on the reportability watch, so not reportable.",
+              "Question 1 shows No trigger met; Show the triggers lists the five starter triggers. Question 2 lists any open case with the same product and problem code, or the same lot.",
+              "Under question 3, Resolved at service level is chosen: fill in the troubleshooting, the correction, what was done, the result, the service ticket and why no investigation is needed (ISO 13485:2016 clause 8.2.2).",
+              "Choose the Root-cause attribution: device-related, use-related, environment-related or undetermined (with a reason). Show definitions explains each.",
+              "Check the classification for trends: Use environment and User type, proposed from your records. A value not on the list stays Unknown, with the source value shown; nothing is guessed. Show the coding criteria explains how to code.",
+              "The first time, record the practice training on the disposition rules and the coding criteria (I have read version ...).",
+              "Enter Your password and the Authenticator code and choose Sign the disposition.",
+            ],
+            result:
+              "One signature covers the disposition, the classification and a not-reportable conclusion for each enabled market. The complaint leaves the Backlog, and the hands-on time is recorded.",
+          },
+          {
+            title: "Link a known issue, or escalate",
+            steps: [
+              "When an open case matches, choose it under question 2 and say why it is the same issue: the complaint joins the case's scope as a contributing complaint, with a new scope version.",
+              "When a trigger is met, question 1 shows it with its facts and the other branches are refused: say why the case is needed and sign; a case opens with the complaint in its scope.",
+              "Otherwise choose Escalate: open a case under question 4, with your reason.",
+            ],
+            note: "A signed disposition is never edited. To change it, sign a new version with its reason; the earlier one stays visible. Readiness lists a disposition to review when a trigger is met after signing.",
+          },
+          {
+            title: "See service-level matters as a trend",
+            steps: [
+              "Open Signals › By resolution and group by product and problem code, lot, use environment, user type or attribution.",
+              "Two or more service-level resolutions on one product and problem code within 30 days, with no open case covering them, show as a Recurring service-level matter here and on Readiness; the next such complaint is escalated.",
+            ],
+          },
+        ],
+      },
       {
         id: "second-look",
         title: "Second look: complaints hidden as inquiries",
@@ -705,6 +747,7 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Under Outcome choose Accept the conclusion, Accept with conditions (write the conditions), Reject the conclusion, or Close with no further action.",
               "Under Follow-up actions required, tick what the decision needs: CAPA required, Product change required, Field action review required, Risk reassessment required or Regulatory action required.",
               "Write Your rationale (in your own words), at least 20 characters, and read What your signature means.",
+              "Choose the Root-cause attribution: device-related, use-related, environment-related or undetermined (say why). The signed record shows it.",
             ],
           },
           {
@@ -802,6 +845,15 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "Choose Risks and reviews to see the risks, the risk reviews and the reassessments open.",
             ],
             note: "Input reaches the risk file through a case's risk review and the Risk reassessment required follow-up of a signed decision.",
+          },
+          {
+            title: "Say whether each risk control worked",
+            steps: [
+              "In a case's risk review, tick each risk in the risk file you assessed and answer Did its risk control work?: Yes, No or Not assessable, with the reason.",
+              "A No needs a risk file update with its owner and due date. A new failure mode or hazard, not in the risk file, is added with Add a new failure mode or hazard, with its owner and due date.",
+            ],
+            result:
+              "The review cannot be completed while a finding lacks its answer. Each risk file update shows here until done, and as overdue after its date (ISO 14971:2019 clause 10).",
           },
         ],
       },

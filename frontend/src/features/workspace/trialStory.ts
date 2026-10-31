@@ -40,8 +40,9 @@ export const TRIAL_PROGRESS_PATH = `${TRIAL_STORY_PATH}?findings=false`;
 
 /** Short names for the loop picture (the titles are sentences). */
 export const CHAPTER_SHORT: Record<string, string> = {
-  HIDDEN_COMPLAINTS: "Hidden complaints",
+  ROUTINE_COMPLAINTS: "Routine close",
   REPORTING_CLOCKS: "Reporting clocks",
+  HIDDEN_COMPLAINTS: "Hidden complaints",
   TRENDS_TO_CASES: "Trend to case",
   INVESTIGATE_WITH_AI: "Investigation",
   DECIDE_AND_SIGN: "Signed decision",
@@ -53,8 +54,9 @@ export const CHAPTER_SHORT: Record<string, string> = {
 
 /** What each chapter's button says. */
 export const CHAPTER_ACTION: Record<string, string> = {
-  HIDDEN_COMPLAINTS: "Review hidden complaints",
+  ROUTINE_COMPLAINTS: "Close a routine complaint",
   REPORTING_CLOCKS: "Check reporting clocks",
+  HIDDEN_COMPLAINTS: "Review hidden complaints",
   TRENDS_TO_CASES: "Open the signal inbox",
   INVESTIGATE_WITH_AI: "Open the guided investigation",
   DECIDE_AND_SIGN: "Review and sign the sample decision",

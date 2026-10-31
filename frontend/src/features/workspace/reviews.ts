@@ -68,7 +68,7 @@ export type Review = {
   outcome?: string | null;
   outcome_label?: string | null;
   rationale?: string | null;
-  assessed?: { risk_ids?: unknown; markets?: unknown; notes?: unknown } | null;
+  assessed?: { risk_ids?: unknown; markets?: unknown; notes?: unknown; findings?: unknown } | null;
   scope_version?: number | null;
   due_at?: string | null;
   overdue?: boolean | null;
@@ -274,8 +274,34 @@ export function requestReviewBody(type: ReviewType, reason: string, dueAt: strin
   return { review_type: type, ...(text ? { reason: text } : {}), ...(dueAt ? { due_at: dueAt } : {}) };
 }
 
-export type CompleteForm = { outcome: string; rationale: string; riskIds: string[]; markets: string[]; notes: string };
-export const EMPTY_COMPLETE: CompleteForm = { outcome: "", rationale: "", riskIds: [], markets: [], notes: "" };
+/** One finding of a risk review (T-G1aR): a risk in the risk file (did its control work?) or a new failure mode. */
+export type Finding = { control: string; reason: string; ownerId: string; dueDay: string };
+export type NewHazard = { description: string; ownerId: string; dueDay: string };
+export const CONTROL_ANSWERS = [
+  { value: "YES", label: "Yes, it worked" },
+  { value: "NO", label: "No, it did not work" },
+  { value: "NOT_ASSESSABLE", label: "Not assessable" },
+] as const;
+export const EMPTY_FINDING: Finding = { control: "", reason: "", ownerId: "", dueDay: "" };
+
+export type CompleteForm = {
+  outcome: string;
+  rationale: string;
+  riskIds: string[];
+  markets: string[];
+  notes: string;
+  findings: Record<string, Finding>;
+  newHazards: NewHazard[];
+};
+export const EMPTY_COMPLETE: CompleteForm = {
+  outcome: "",
+  rationale: "",
+  riskIds: [],
+  markets: [],
+  notes: "",
+  findings: {},
+  newHazards: [],
+};
 export const NOTES_MAX = 5000;
 
 /** Why the outcome cannot be recorded yet, or null when it can. The reviewer always chooses the outcome. */
@@ -286,16 +312,46 @@ export function completeProblem(type: ReviewType | null, form: CompleteForm): st
   const rationale = textProblem(form.rationale, "your rationale", { min: RATIONALE_MIN, max: RATIONALE_MAX });
   if (rationale) return rationale;
   if (form.notes.trim().length > NOTES_MAX) return `Keep the notes to ${NOTES_MAX} characters.`;
+  if (type === "RISK") {
+    for (const id of form.riskIds) {
+      const finding = form.findings[id] ?? EMPTY_FINDING;
+      if (!finding.control) return "For each risk you assessed, say whether its risk control worked.";
+      if (finding.reason.trim().length < 10) return "Give the reason for each risk-control answer (10 characters).";
+      if (finding.control === "NO" && (!finding.ownerId || !finding.dueDay))
+        return "A risk control that did not work needs a risk file update with an owner and a due date.";
+    }
+    for (const hazard of form.newHazards) {
+      if (hazard.description.trim().length < 10) return "Describe the new failure mode or hazard (10 characters).";
+      if (!hazard.ownerId || !hazard.dueDay) return "A risk file update needs an owner and a due date.";
+    }
+  }
   return null;
 }
 
 /** The body of POST /case-reviews/{id}/complete: only the assessed parts that were filled in. */
 export function completeBody(form: CompleteForm) {
   const notes = form.notes.trim();
+  const update = (ownerId: string, dueDay: string) => (ownerId ? { owner_user_id: ownerId, due_on: dueDay } : {});
+  const findings = [
+    ...form.riskIds.map((id) => {
+      const finding = form.findings[id] ?? EMPTY_FINDING;
+      return {
+        risk_id: id,
+        control_worked: finding.control,
+        reason: finding.reason.trim(),
+        ...(finding.control === "NO" ? update(finding.ownerId, finding.dueDay) : {}),
+      };
+    }),
+    ...form.newHazards.map((hazard) => ({
+      description: hazard.description.trim(),
+      ...update(hazard.ownerId, hazard.dueDay),
+    })),
+  ];
   const assessed = {
     ...(form.riskIds.length ? { risk_ids: [...form.riskIds] } : {}),
     ...(form.markets.length ? { markets: [...form.markets] } : {}),
     ...(notes ? { notes } : {}),
+    ...(findings.length ? { findings } : {}),
   };
   return { outcome: form.outcome, rationale: form.rationale.trim(), assessed };
 }

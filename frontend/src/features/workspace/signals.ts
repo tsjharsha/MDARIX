@@ -227,6 +227,8 @@ export const SIGNALS_TABS = [
   "Trends",
   // Each product version against its own history (signalAi.ts): a check beside the count rule.
   "Trend check",
+  // Service-level and known-issue resolutions beside the complaint counts (T-G36R).
+  "By resolution",
   "Detection rules",
 ] as const;
 export type SignalsTab = (typeof SIGNALS_TABS)[number];

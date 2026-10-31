@@ -70,6 +70,8 @@ TRIAL_DATA_TABLES = (
     "complaint_market_assessments",
     "complaint_classifications",
     "signer_training_records",
+    # Complaint dispositions (tr02): on the complaints listed below.
+    "complaint_dispositions",
     # The case AI run (md42): about the cases listed below.
     "case_ai_runs",
     # Case scope versions and evidence review history (md29): about the cases and evidence listed below.

@@ -147,6 +147,8 @@ _COMPLAINT_SYNONYMS: dict[str, tuple[str, ...]] = {
     "serious_injury": ("serious injury", "injury", "serious injury reported"),
     "death": ("death", "patient death", "death reported", "fatal"),
     "malfunction": ("malfunction", "device malfunction", "malfunction reported"),
+    "use_environment": ("use environment", "environment of use", "location of use", "care setting", "use setting"),
+    "user_type": ("user type", "user", "operator", "operator type", "user category"),
 }
 
 _SYNONYMS: dict[str, dict[str, tuple[str, ...]]] = {
