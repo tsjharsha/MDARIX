@@ -397,9 +397,9 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
             )
 
         lots = []
-        for lot_index, (built, version) in enumerate(
-            ((200, versions[0]), (140, versions[0]), (70, versions[1]), (50, versions[1]), (30, versions[1])), 1
-        ):
+        # Days ago each lot was made: every complaint is on a lot of its own version, made before the event it reports.
+        made = ((200, versions[0]), (160, versions[0]), (75, versions[1]), (68, versions[1]), (30, versions[1]))
+        for lot_index, (built, version) in enumerate(made, 1):
             lot = LotBatch(
                 id=uuid.uuid4(),
                 tenant_id=tenant_id,
@@ -418,12 +418,14 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
         complaints = []
         for c_index, days_ago in enumerate(complaint_days, 1):
             after_release = days_ago < 75
+            version = versions[1] if after_release else versions[0]
             if index == 1 and after_release:
                 # Most post-release OrbitCare complaints come from lots 3 and 4 (first NovaSense sensors).
                 lot = lots[2] if c_index % 3 else lots[3]
             else:
-                lot = lots[(c_index - 1) % (4 if after_release else 2)]
-            version = versions[1] if after_release else versions[0]
+                # Its version's lots made before the event (two days before the complaint), in turn.
+                usable = [item for item, (built, of) in zip(lots, made) if of is version and built >= days_ago + 2]
+                lot = usable[(c_index - 1) % len(usable)]
             complaint = Complaint(
                 id=uuid.uuid4(),
                 tenant_id=tenant_id,
@@ -491,7 +493,7 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                 ),
                 (
                     "Complaint trend summary",
-                    "Pressure-alarm complaints averaged 0.8 per month on Rev A and 5.6 per month after Rev B, with "
+                    "Pressure-alarm complaints averaged 0.8 per month in the 150 days before Rev B and 5.6 per month after Rev B, with "
                     "most from lots 003 and 004.",
                     "Quantifies the signal. It does not by itself establish the cause.",
                 ),

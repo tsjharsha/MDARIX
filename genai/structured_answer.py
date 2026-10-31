@@ -274,6 +274,9 @@ def compose(records: CaseRecords) -> StructuredAnswer:
     ]
     missing = _unique(missing, _statement_key)[:MAX_ITEMS]
     limitations = _unique([plain_text(text) for text in records.limitations if plain_text(text)], str.lower)[:10]
+    if facts or supporting or contradicting or unknowns:
+        # The case's records answer even when the search matched none of them: say that, not "nothing retrieved".
+        limitations = [CASE_SEARCH_MISSED if text == SEARCH_FOUND_NOTHING else text for text in limitations]
 
     sources = _unique(
         [
@@ -301,17 +304,18 @@ def compose(records: CaseRecords) -> StructuredAnswer:
     if not facts and not sources:
         next_steps.append("Add or link evidence that answers the question.")
 
+    # One count of records: the answer's Sources, which hold the search hits and every record a statement rests on.
     if records.investigation_scoped:
         summary = (
-            f"From the case records: {_plural(len(facts), 'recorded fact')}, "
+            f"From the case records: {_plural(len(sources), 'record')}, with "
+            f"{_plural(len(facts), 'recorded fact')}, "
             f"{_plural(len(supporting), 'supporting evidence link')} and "
-            f"{_plural(len(contradicting), 'contradicting evidence link')}, "
-            f"{_plural(len(unknowns), 'open unknown')} and "
-            f"{_plural(len(records.sources), 'record')} found for your question."
+            f"{_plural(len(contradicting), 'contradicting evidence link')}, and "
+            f"{_plural(len(unknowns), 'open unknown')}."
         )
     else:
         summary = (
-            f"From your organization's records: {_plural(len(records.sources), 'record')} found for your question, "
+            f"From your organization's records: {_plural(len(sources), 'record')} found for your question, "
             f"with {_plural(len(facts), 'recorded fact')} on them."
         )
     return StructuredAnswer(
@@ -1010,6 +1014,10 @@ NOTHING_FOUND_ALL = (
     "uploaded."
 )
 NOTHING_FOUND_CASE = "No evidence record of this case matches this question."
+CASE_SEARCH_MISSED = (
+    "No evidence record of this case matches the words of your question, so the answer shows what the case records "
+    "hold."
+)
 
 
 def records_only_wording(answer: StructuredAnswer, *, investigation_scoped: bool) -> StructuredAnswer:
@@ -1023,7 +1031,7 @@ def records_only_wording(answer: StructuredAnswer, *, investigation_scoped: bool
         or answer.unknowns
     )
     limitations = [text for text in answer.limitations if text != SEARCH_FOUND_NOTHING]
-    if not nothing and len(limitations) == len(answer.limitations):
+    if not nothing and CASE_SEARCH_MISSED not in limitations:
         return answer
     searched = SEARCHED_CASE if investigation_scoped else SEARCHED_ALL
     update: dict = {"limitations": [searched, *limitations]}

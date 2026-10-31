@@ -184,7 +184,7 @@ export function AskMdarixPage({
   );
 }
 
-function AskAnswer({ result }: { result: any }) {
+export function AskAnswer({ result }: { result: any }) {
   const response = result?.response ?? {};
   const answer: string | null = response.provider_output?.answer ?? null;
   const sources = listOf(response.sources_provenance) as Source[];
@@ -316,7 +316,8 @@ function AskAnswer({ result }: { result: any }) {
         </div>
       )}
 
-      {(answer || showStructured) && notes.length > 0 && (
+      {/* A records-only answer already says why AI was not used (its note); the model's notes are for its answer. */}
+      {(answer || (showStructured && structured.aiUsed !== false)) && notes.length > 0 && (
         <p className="ask-note">
           <Info size={14} aria-hidden="true" /> {notes.join(" ")} AI suggestions are advisory; a person decides.
         </p>

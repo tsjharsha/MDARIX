@@ -65,6 +65,10 @@ export function MfaAlreadyOn({
         Replace authenticator app
       </button>
       {message && <p role="status">{message}</p>}
+      <p>
+        Only need new recovery codes? Keep your app: go back, open My Account › Security and choose Generate new
+        recovery codes.
+      </p>
       <p className="auth-links">
         <a href={returnTo}>Keep my current app and go back</a>
       </p>
