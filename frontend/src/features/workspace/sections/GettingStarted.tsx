@@ -23,6 +23,7 @@ import { EndTrialPanel } from "./EndTrial";
 import { CitedFor } from "./CitedFor";
 import { RemoveSamplePanel } from "./RemoveSample";
 import { TeamPanel } from "./TrialTeam";
+import { BESIDE_YOUR_QMS } from "../../help/besideYourQms";
 import { journeyProgress, type JourneyKey } from "../../help/trialGuide";
 import { NEXT_STEPS_LINK, NEXT_STEPS_SECTION, NEXT_STEPS_SUMMARY } from "../../help/trialNextSteps";
 import { SampleDataPanel } from "./SampleData";
@@ -242,8 +243,9 @@ export function GettingStartedSection({ focus }: { focus?: string } = {}) {
       <div id="trial-story" className="uw-anchor" />
       <Panel title="Your story, chapter by chapter" eyebrow={`${acted} of ${total} tried`} source={story}>
         <p className="uw-trial-lede">
-          Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records first and on your
-          own export once you upload it. It counts as tried when you act in it: decide, record, run or sign.
+          {BESIDE_YOUR_QMS} Each chapter is one pain FDA and notified bodies cite in 2026, shown on the sample records
+          first and on your own export once you upload it. It counts as tried when you act in it: decide, record, run or
+          sign.
           {hasSample && (
             <>
               {" "}

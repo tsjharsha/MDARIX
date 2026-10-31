@@ -2,6 +2,8 @@
 // The new pages (./pages.tsx) are built from these objects so no copy is lost; edit wording here.
 export type MenuItem = { label: string; href: string; future?: boolean; description?: string };
 export type MenuGroup = { title: string; items: MenuItem[] };
+import { BESIDE_YOUR_QMS, WHAT_MDARIX_ADDS } from "../features/help/besideYourQms";
+
 const current = (label: string, href: string, description?: string): MenuItem => ({ label, href, description });
 const future = (label: string, anchor: string): MenuItem => ({ label, href: `/platform/${anchor}` });
 
@@ -160,7 +162,7 @@ export const menus: Record<string, MenuGroup[]> = {
     {
       title: "A Different Intelligence Layer",
       items: [
-        current("Not Another QMS", "/why-mdarix#not-qms", "Keep existing systems of record."),
+        current("Not Another QMS", "/why-mdarix#not-qms", BESIDE_YOUR_QMS),
         current(
           "Product Reality",
           "/why-mdarix#product-reality",
@@ -257,7 +259,7 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
   "/why-mdarix": {
     eyebrow: "Why MDARIX",
     title: "Evidence before inference. Challenge before conclusion.",
-    copy: "MDARIX works above your existing systems of record to reconstruct product reality and make investigation intelligence inspectable.",
+    copy: `${BESIDE_YOUR_QMS} ${WHAT_MDARIX_ADDS}`,
   },
   "/resources": {
     eyebrow: "Resources",
@@ -271,7 +273,7 @@ export const pages: Record<string, { eyebrow: string; title: string; copy: strin
   },
   "/integrations": {
     eyebrow: "Integrations",
-    title: "Work above the systems you already trust.",
+    title: "Work beside the systems you already trust.",
     copy: "QMS, PLM, ERP, MES, supplier, document, and evidence platforms remain authoritative systems of record.",
   },
   "/security": {

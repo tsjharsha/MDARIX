@@ -1,12 +1,12 @@
 # MDARIX pilot guide
 
-This guide is for the people taking part in an MDARIX design-partner pilot: the customer administrator who sets the organization up, and the quality, risk and regulatory staff who take complaints from signal to a signed decision in it. It describes what MDARIX does today. MDARIX supports investigations; it is not your quality management system, it does not submit anything to a regulator, and it never makes a regulated decision for you: authorized people decide, and sign.
+This guide is for the people taking part in an MDARIX design-partner pilot: the customer administrator who sets the organization up, and the quality, risk and regulatory staff who take complaints from signal to a signed decision in it. It describes what MDARIX does today. MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. MDARIX does not submit anything to a regulator, and it never makes a regulated decision for you: authorized people decide, and sign.
 
 ## From the free trial to the pilot
 
 The pilot is the paid step that follows a free trial, for design partners: MDARIX working on your real complaints, connected to your own systems, run by your own team. It lasts from 3 months to 1 year, agreed in a written proposal that also carries its price, before anything is signed. In a trial workspace, **Next steps** (in the menu, and in the Help menu) explains what changes and sends a request for a pilot conversation to the MDARIX team.
 
-- **A dedicated database, run by MDARIX.** The pilot runs on a dedicated MDARIX transactional database, set up only for your organization and hosted and run by MDARIX. It holds only your organization's data. Your complaint, QMS, PLM and ERP systems stay your systems of record.
+- **A dedicated database, run by MDARIX.** The pilot runs on a dedicated MDARIX transactional database, set up only for your organization and hosted and run by MDARIX. It holds only your organization's data. Your QMS keeps the complaint record, CAPA and change control.
 - **Real data only.** There is no sample data in the pilot. If you uploaded your own data in the trial and removed the sample data, MDARIX moves that data into your pilot database when you ask for it in your request. Otherwise nothing is moved, and the trial data is deleted 30 days after the trial ends.
 
 The pilot starts in five steps. Setup takes at least 2 to 3 weeks, and the pilot itself starts only when the setup is validated and you have signed it off:
@@ -15,7 +15,7 @@ The pilot starts in five steps. Setup takes at least 2 to 3 weeks, and the pilot
 2. **Install and secure (week 1).** MDARIX sets up the dedicated database for your organization. Your Customer Administrator is set up with two-factor sign-in and configures users, roles and security settings.
 3. **Connect and map your data (week 2).** Each source system gets a mapping file: which field in your system becomes which field in MDARIX. A test load is checked against your record counts, then the mapping is approved and released.
 4. **Validate and sign off (week 3).** Validation testing against your intended use, your own acceptance testing and training for your team. You sign off the setup. MDARIX is not a validated (GxP) system out of the box; your quality system and its validation stay yours.
-5. **Work on your real complaints (the pilot starts).** Your team takes real complaints from signal to signed decision. MDARIX reviews progress with you regularly against success criteria agreed at the start.
+5. **Work on your real complaints (the pilot starts).** Your team takes real complaints from signal to signed decision. MDARIX keeps the decisions, and your QMS keeps the complaint record. MDARIX reviews progress with you regularly against success criteria agreed at the start.
 
 What MDARIX needs from you: a sponsor who owns the pilot's goals, a named Customer Administrator, an IT contact for the installation and the connections, the list of systems in scope with a sample export from each, at least two quality team members for the workflow, and time for validation testing in week 3.
 

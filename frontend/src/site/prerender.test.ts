@@ -48,8 +48,8 @@ describe("the pre-rendered website pages", () => {
 
   it("covers exactly the pages of the sitemap, the home page in a file of its own", () => {
     expect(sitemapPaths(sitemap)).toEqual(INDEXED_PATHS);
-    // 21 pages, then (0.10.45) the questions and answers: their index and six questions.
-    expect(INDEXED_PATHS).toHaveLength(28);
+    // 21 pages, then (0.10.45) the questions and answers: their index and six questions, and (0.10.50) a seventh.
+    expect(INDEXED_PATHS).toHaveLength(29);
     expect(INDEXED_PATHS.filter((path) => path.startsWith(QUESTIONS_PATH))).toEqual([
       QUESTIONS_PATH,
       ...QUESTION_PATHS,
