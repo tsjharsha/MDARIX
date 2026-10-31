@@ -127,6 +127,26 @@ def test_a_records_only_answer_that_found_nothing_says_plainly_what_it_searched(
     assert records_only_wording(found, investigation_scoped=True) == found
 
 
+def test_the_summary_limitations_and_supporting_evidence_agree_when_the_search_found_nothing():
+    """AI off, a case chosen: the search matched none of the case's evidence, but two records were reviewed as
+    supporting. The summary counts the records the answer shows, and no line says that nothing was retrieved."""
+    from genai.structured_answer import CASE_SEARCH_MISSED, SEARCH_FOUND_NOTHING, SEARCHED_CASE, records_only_wording
+
+    links = [
+        {"relation": "support", "statement": f"{ref.title} was reviewed as supporting evidence", "source": ref}
+        for ref in (EV1, EV2)
+    ]
+    records = CaseRecords(investigation_scoped=True, links=links, limitations=[SEARCH_FOUND_NOTHING], hypotheses=1)
+    answer = records_only_wording(compose(records), investigation_scoped=True)
+    assert len(answer.supporting_evidence) == 2 and len(answer.sources) == 2
+    assert answer.summary.startswith("From the case records: 2 records, with ")
+    assert "0 records" not in answer.summary
+    assert answer.limitations == [SEARCHED_CASE, CASE_SEARCH_MISSED]
+    # With AI the model's answer keeps the plain line too, never the search's technical one.
+    merged = merge(compose(records), read_model_reply(json.dumps({"summary": "Two records support it."}), set()), {})
+    assert CASE_SEARCH_MISSED in merged.limitations and SEARCH_FOUND_NOTHING not in merged.limitations
+
+
 def test_the_record_based_answer_sorts_links_unknowns_and_what_is_missing():
     answer = compose(_records())
     assert [item.hypothesis_business_id for item in answer.supporting_evidence] == ["HYP-000001"]

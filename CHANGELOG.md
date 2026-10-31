@@ -10,6 +10,58 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.51] - 2026-10-31
+
+Fixes on the trial maintenance line (`release/0.10`) for what was seen while recording the trial videos on 16 October.
+Each was checked against 0.10.50: four had been fixed in 0.10.17, and the checks that prove it still pass. No
+migration: the schema stays at md48, and no stored record is rewritten. The API and web images change. The sample
+data change reaches new trials only; existing trials keep their sample as it is.
+
+### Fixed
+
+- Ask MDARIX, with a case chosen and the search matching none of its evidence, no longer says "0 records found for
+  your question" above the case's own records, or "No relevant tenant-scoped, context-valid evidence was retrieved"
+  beside them. The summary counts the records the answer shows (its Sources), "From the case records: 2 records, with
+  0 recorded facts, 2 supporting evidence links and 0 contradicting evidence links, and 0 open unknowns.", and
+  Limitations says "No evidence record of this case matches the words of your question, so the answer shows what the
+  case records hold.", with AI and without it. Without a case, the count is the same Sources count as before.
+- An Ask MDARIX answer built without AI says once why AI was not used (for example "AI is off for free trials, so this
+  answer comes from your records only."); it was said twice, the second time followed by "AI suggestions are advisory;
+  a person decides."
+- "Set up MFA" for someone who already has an authenticator app now also says where new recovery codes are made: "Only
+  need new recovery codes? Keep your app: go back, open My Account › Security and choose Generate new recovery codes."
+- Platform Admin › Trials and the demo requests read "1 day left" on a trial's last day (was "1 days left"); so does
+  the email that tells the MDARIX team a trial asked for a demo.
+- Sample data of new trials: every complaint is on a lot of its own version, made before the event it reports.
+  PulseWatch 410's two Rev B complaints were on Rev A lots 001 and 002 (now lots 003 and 005), and three OrbitCare
+  300 complaints were on lots made after their event; lots 002, 003 and 004 are now made 160, 75 and 68 days before
+  the trial starts (were 140, 70 and 50). Complaint counts per product and version, and per OrbitCare lot, are
+  unchanged.
+
+### Checked, already fixed
+
+- Ask MDARIX with AI switched off while a provider is configured shows "Answer built from your records (AI not used)"
+  and the records the answer used, not "No matching evidence found": fixed in 0.10.17, the grounding is recorded
+  before the model is asked (`tests/test_grounded_ask.py`).
+- Records › Risk file input reads "1 malfunction" and "1 risk assessed": fixed in 0.10.17 (`riskFile.test.tsx`,
+  `tests/test_readiness_plurals_unit.py`).
+- My Account › Security (and the administrator's Security page) has "Generate new recovery codes", after the current
+  password and a code from the app; the earlier codes stop working, the new ones are shown once, and the change is
+  audited (`MFA_RECOVERY_CODES_REGENERATED`) and emailed. "Set up MFA" for an enrolled account shows "Two-factor
+  sign-in is on" with "Replace authenticator app" instead of an error. Both since 0.10.17
+  (`tests/test_mfa_self_service.py`, `twoFactor.test.tsx`).
+- The sample decision brief's "Restore incoming inspection to 32 units per lot for NovaSense pressure sensors"
+  pre-ticks CAPA required in the case's Decision tab: fixed in 0.10.17 (`signalAi.test.tsx`).
+- VentraLink 250 stays flat in a new trial's trend check: fixed in 0.10.17 (`tests/test_free_trial.py`).
+
+### Not changed
+
+- A trial has no customer administrator by design: its three people are workspace users, and the trial owner looks
+  after the team in Getting started › Team (invite, remove, reset a colleague's MFA, support access); MDARIX support
+  resets the owner's MFA (Platform Admin › Trials). Some sentences a trial user can read still say "ask your
+  administrator" (the sign-in MFA step, My Account › Access, the empty dashboard); they are noted for a wording
+  release.
+
 ## [0.10.50] - 2026-10-31
 
 Wording only, on the trial maintenance line (`release/0.10`), requirement T-MSG: one message on what MDARIX is beside
