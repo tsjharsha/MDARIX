@@ -50,8 +50,9 @@ CATALOG: tuple[Standard, ...] = (
     ),
     Standard("ISO13485_7_3_9", "ISO 13485 7.3.9", "Control of design and development changes", INTERNATIONAL),
     Standard("ISO13485_7_4", "ISO 13485 7.4", "Purchasing (suppliers)", INTERNATIONAL),
-    Standard("ISO13485_8_2_1", "ISO 13485 8.2.1", "Feedback", INTERNATIONAL),
-    Standard("ISO13485_8_2_2", "ISO 13485 8.2.2", "Complaint handling", INTERNATIONAL),
+    # Printed by the ready-to-use documents (T-G35, 0.10.54): starter text until the consultant confirms the wording.
+    Standard("ISO13485_8_2_1", "ISO 13485 8.2.1", "Feedback", INTERNATIONAL, True),
+    Standard("ISO13485_8_2_2", "ISO 13485 8.2.2", "Complaint handling", INTERNATIONAL, True),
     Standard("ISO13485_8_2_3", "ISO 13485 8.2.3", "Reporting to regulatory authorities", INTERNATIONAL),
     Standard("ISO13485_8_4", "ISO 13485 8.4", "Analysis of data", INTERNATIONAL),
     Standard("ISO13485_8_5_2", "ISO 13485 8.5.2", "Corrective action", INTERNATIONAL),
