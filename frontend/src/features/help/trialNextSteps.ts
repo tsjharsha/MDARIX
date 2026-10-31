@@ -59,6 +59,11 @@ export const TRIAL_TO_MVP: readonly TrialToMvpChange[] = [
     trial: "Immediately after sign-up",
     mvp: "After 2 to 3 weeks of setup, configuration and validation testing",
   },
+  {
+    aspect: "Distributors and your EU authorised representative",
+    trial: "A read-only preview with sample data, under Look ahead",
+    mvp: "They sign in separately, with MFA and an access end date (from MDARIX 1.0.1)",
+  },
   { aspect: "Length", trial: "30 days", mvp: "3 months to 1 year, agreed in your proposal" },
   {
     aspect: "Cost",

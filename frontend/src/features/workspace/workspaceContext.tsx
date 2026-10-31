@@ -24,12 +24,14 @@ export const WORKSPACE_SECTIONS = [
   "Import data",
   "My Account",
   "Share feedback",
+  // A read-only preview of the distributor and authorised-representative views: free trials only (sections/LookAhead.tsx).
+  "Look ahead",
   // From trial to pilot: shown only in free-trial workspaces, to everyone in one (sections/TrialNextSteps.tsx).
   "Next steps",
 ] as const;
 
 /** Sections that exist only in a free-trial workspace. */
-export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Next steps"];
+export const TRIAL_ONLY_SECTIONS: readonly string[] = ["Getting started", "Look ahead", "Next steps"];
 
 export type WorkspaceSection = (typeof WORKSPACE_SECTIONS)[number];
 
@@ -51,6 +53,7 @@ export const SECTION_MENU_KEYS: Record<WorkspaceSection, string[]> = {
   "Import data": ["products"],
   "My Account": [],
   "Share feedback": [],
+  "Look ahead": [],
   "Next steps": [],
 };
 

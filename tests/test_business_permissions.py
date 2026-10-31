@@ -37,6 +37,8 @@ EXEMPT = {
     ("POST", "/api/v1/investigations/decisions/{decision_id}/reviews"): "approval authority + segregation of duties",
     ("POST", "/api/v1/regulatory/documents/{document_id}/status"): "checked in the route: approval permission + SoD",
     ("PUT", "/api/v1/workspace/context"): "the user's own workspace preferences",
+    ("POST", "/api/v1/signer-training/{document_code}/acknowledge"): "the person's own record of reading a document "
+    "(T-G40P): every signed-in member acknowledges for themselves, nobody for another",
     ("POST", "/api/v1/workspace/context/reset"): "the user's own workspace preferences",
     ("POST", "/api/v1/stage3/interactions/{interaction_id}/feedback"): "feedback on the user's own AI answer",
     ("POST", "/api/v1/trial/team"): "trial owner only, checked in the route",
@@ -147,6 +149,7 @@ EXEMPT = {
 EXEMPT_BUT_SIGNED_IN = {
     ("POST", "/api/v1/support/problems"),
     ("POST", "/api/v1/investigations/{investigation_id}/decision/sign"),
+    ("POST", "/api/v1/signer-training/{document_code}/acknowledge"),
 }
 
 

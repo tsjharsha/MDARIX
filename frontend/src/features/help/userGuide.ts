@@ -1061,6 +1061,25 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
         ],
       },
       {
+        id: "look-ahead",
+        title: "Look ahead: distributors and your EU authorised representative (free trial)",
+        where: "Look ahead (in the menu, and the Look ahead card under the last chapter of Getting started)",
+        purpose:
+          "Three read-only previews with sample data. In a pilot, your distributor or authorised representative signs in separately, with MFA and an access end date (from MDARIX 1.0.1).",
+        tasks: [
+          {
+            title: "Open the three pages",
+            steps: [
+              "How a distributor reports: the intake form filled with a sample submission (the reporter's words, product, lot, the date the distributor first knew, its reference). Send to the manufacturer is disabled.",
+              "As your distributor sees it: only Sample Distributor Europe's own complaints, each with its reference, status (received, under assessment, closed), the date received and of the last change, and a closing note once one is released.",
+              "As your authorised representative sees it: OrbitCare 300 and VentraLink 250 (not PulseWatch 410), every complaint with its state, dates and EU/NI assessment, a High risk panel and a Recurring issues panel.",
+            ],
+            result: "Nothing is saved; each opening is in the audit trail. No page shows patient or reporter data.",
+            note: "The authorised representative is not your PRRC. It has its own PRRC (MDR Art. 11 and 15(6)).",
+          },
+        ],
+      },
+      {
         id: "demo",
         title: "Book a one-to-one demo (free trial)",
         where: "Getting started › See it on your own records, one to one",
