@@ -4,7 +4,7 @@ import walkthrough from "../../../../docs/user-guide/QUALITY_MANAGER_WORKFLOW_WA
 import { afterTheTrial } from "../../site/content";
 import { renderPage } from "../../site/prerender";
 import { questionAt } from "../../site/questions";
-import { BESIDE_YOUR_QMS } from "./besideYourQms";
+import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import pilotGuide from "./PILOT_GUIDE.md?raw";
 import { TrialGuidePage } from "./TrialGuidePage";
 import { CONNECTION, MVP_STEPS, QUESTIONS } from "./trialNextSteps";
@@ -21,13 +21,26 @@ const text = (html: string) =>
     .replace(/\s+/g, " ");
 
 describe("MDARIX works beside your QMS", () => {
-  it("says what ships by 0.10.53, and claims no feature a later release ships", () => {
+  it("says what ships by 0.10.54, and claims no feature a later release ships", () => {
     expect(BESIDE_YOUR_QMS).toBe(
       "MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. " +
         "MDARIX helps you decide and proves it: routine complaints close at service level with a documented reason, " +
-        "and serious ones are assessed per market.",
+        "serious ones are assessed per market, and you get signed documents to file in your QMS.",
     );
-    expect(BESIDE_YOUR_QMS).not.toMatch(/signed documents|proactive/i);
+    expect(BESIDE_YOUR_QMS).not.toMatch(/proactive/i);
+  });
+
+  it("frames reactive and proactive PMS and the loop, without claiming MDARIX records proactive sources yet", () => {
+    expect(PMS_FRAMING).toBe(
+      "Post-market surveillance gathers data reactively, from what reaches you (complaints, service records, " +
+        "incidents, field actions), and proactively, from what you go out to look for. The results feed one loop: " +
+        "PMS → risk management → clinical evaluation → PSUR → back to the PMS plan.",
+    );
+    expect(PMS_FRAMING).not.toMatch(/MDARIX also plans|records your proactive/i);
+    expect(text(renderToStaticMarkup(<TrialGuidePage />))).toContain(PMS_FRAMING);
+    expect(text(renderToStaticMarkup(<UserGuidePage />))).toContain(PMS_FRAMING);
+    expect(pilotGuide).toContain(PMS_FRAMING);
+    expect(walkthrough).toContain(PMS_FRAMING);
   });
 
   it("is said in the same words on the website, the guides and the docs", () => {

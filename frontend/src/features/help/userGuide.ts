@@ -4,6 +4,8 @@
 // screens they describe (frontend/src/features/workspace/**, auth/AuthPage.tsx, help/HelpMenu.tsx) and describe the
 // MVP screens (app/featureSet.ts), which every workspace uses.
 
+import { PMS_FRAMING } from "./besideYourQms";
+
 export { USER_GUIDE_PATH } from "./paths";
 
 export type GuideTask = {
@@ -856,6 +858,46 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
               "The review cannot be completed while a finding lacks its answer. Each risk file update shows here until done, and as overdue after its date (ISO 14971:2019 clause 10).",
           },
         ],
+      },
+      {
+        id: "documents",
+        title: "Ready-to-use documents",
+        where:
+          "Records › Reports (the management review report also from Readiness; the case documents from a case's Reviews step)",
+        purpose:
+          "Five documents to file in your QMS and hand to an auditor: the management review report with its PMS section, the CAPA log, the investigation report, the risk-review extract and the change-impact input. MDARIX fills the data sections from your records; you write the judgement sections.",
+        tasks: [
+          {
+            title: "Generate a document",
+            steps: [
+              "Open Records › Reports and choose the document under Ready-to-use documents.",
+              "Choose the Period (or the Case, or the Change record) and choose Generate, cut-off now.",
+              "Open the version: each section folds open; under each figure, its records open the screen that holds them.",
+            ],
+            result:
+              "A draft version, with the clauses it serves (each pending approval until confirmed), its template version, period and cut-off.",
+            note: "A data section cannot be edited. Correct the record, then generate again.",
+          },
+          {
+            title: "Write the judgement sections and sign",
+            steps: [
+              "Under each section marked Written by the manufacturer (for example Actions decided), write the text and choose Save the section.",
+              "Enter your password and authenticator code and choose Sign the document.",
+            ],
+            who: "Quality review",
+            result:
+              "The signed version shows the signature, the template version and the PDF's SHA-256. It is never edited: generate again for version 2; both stay listed.",
+          },
+          {
+            title: "Download and file it",
+            steps: [
+              "Choose PDF (the signed record) or DOCX; the DOCX says it was exported from the signed version.",
+              "After filing it in your QMS, enter the QMS filing reference and, if you like, the minutes spent, and choose Save the filing.",
+            ],
+            note: "In a free trial every document carries the practice-record label.",
+          },
+        ],
+        tips: [PMS_FRAMING],
       },
       {
         id: "audit",

@@ -48,7 +48,7 @@ export const CHAPTER_SHORT: Record<string, string> = {
   DECIDE_AND_SIGN: "Signed decision",
   CAPA_EFFECTIVE: "CAPA proven",
   RISK_FILE: "Risk file",
-  SHOW_THE_INSPECTOR: "Inspector summary",
+  SHOW_THE_INSPECTOR: "Documents",
   YOUR_DATA: "Your own data",
 };
 
@@ -62,7 +62,7 @@ export const CHAPTER_ACTION: Record<string, string> = {
   DECIDE_AND_SIGN: "Review and sign the sample decision",
   CAPA_EFFECTIVE: "Check CAPA effectiveness",
   RISK_FILE: "Open risk file input",
-  SHOW_THE_INSPECTOR: "Open Readiness",
+  SHOW_THE_INSPECTOR: "Open the documents",
   YOUR_DATA: "Upload your data",
 };
 

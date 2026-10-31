@@ -80,7 +80,7 @@ EXPECTED = [
     ),
 ]
 # Entries whose wording awaits the regulatory consultant (T-B6): marked starter text on screen and in exports.
-STARTER = {"ISO13485_6_2", "CFR803_3", "MDR_2", "MDCG_2023_3", "IN_MDR"}
+STARTER = {"ISO13485_6_2", "ISO13485_8_2_1", "ISO13485_8_2_2", "CFR803_3", "MDR_2", "MDCG_2023_3", "IN_MDR"}
 DISCLAIMER = (
     "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its "
     "validation stay yours."
