@@ -37,6 +37,10 @@ data change reaches new trials only; existing trials keep their sample as it is.
   300 complaints were on lots made after their event; lots 002, 003 and 004 are now made 160, 75 and 68 days before
   the trial starts (were 140, 70 and 50). Complaint counts per product and version, and per OrbitCare lot, are
   unchanged.
+- Sample wording: the OrbitCare pressure-alarm rate reads "0.8 a month in the 150 days before Rev B" (it said "on
+  Rev A", which over Rev A's whole life is about 0.4), in the sample decision brief and the trend summary evidence;
+  and the risk-file chapter says SAMPLE-RSK-03 (VentraLink 250) was not reassessed "since the malfunction
+  complaints", as VentraLink has no harm complaint.
 
 ### Checked, already fixed
 

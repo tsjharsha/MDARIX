@@ -39,7 +39,7 @@ EVIDENCE_RELATIONSHIPS = {
 
 NARRATIVE = {
     "problem_statement": (
-        "Pressure-alarm complaints on OrbitCare 300 rose from 0.8 a month on Rev A to 5.6 a month after Rev B, mostly "
+        "Pressure-alarm complaints on OrbitCare 300 rose from 0.8 a month in the 150 days before Rev B to 5.6 a month after Rev B, mostly "
         "from lots 003 and 004."
     ),
     "proposed_conclusion": (

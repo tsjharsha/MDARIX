@@ -493,7 +493,7 @@ def seed_sample_workspace(db: Session, tenant_id, now: datetime | None = None) -
                 ),
                 (
                     "Complaint trend summary",
-                    "Pressure-alarm complaints averaged 0.8 per month on Rev A and 5.6 per month after Rev B, with "
+                    "Pressure-alarm complaints averaged 0.8 per month in the 150 days before Rev B and 5.6 per month after Rev B, with "
                     "most from lots 003 and 004.",
                     "Quantifies the signal. It does not by itself establish the cause.",
                 ),
