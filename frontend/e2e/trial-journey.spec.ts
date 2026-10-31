@@ -323,6 +323,8 @@ test.describe("free trial journey", () => {
     const story = panel(page, "Your story, chapter by chapter");
     await expect(story.locator("ol.uw-story-steps > li")).toHaveCount(10);
     await expect(story.getByText(/^\d+ of 10 tried$/)).toBeVisible();
+    // After the last chapter, the Look ahead card (not a chapter) opens the three read-only previews (T-G37P).
+    await expect(story.getByRole("button", { name: "As your authorised representative sees it" })).toBeVisible();
 
     // The tabs below the story.
     await trialTabs(page).getByRole("tab", { name: "About the sample data" }).click();

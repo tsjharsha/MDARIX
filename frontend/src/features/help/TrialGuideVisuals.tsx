@@ -343,8 +343,8 @@ function TeamScene() {
 }
 
 function SampleScene() {
-  const stations = [C.green, C.green, C.green, C.amber, C.red, C.red, C.amber, C.red];
-  const chapters = ["Hidden complaints", "Reporting clocks", "Trend to case", "Investigate a case", "Decide and sign"];
+  const stations = [C.green, C.green, C.green, C.amber, C.red, C.red, C.amber, C.red, C.amber, C.red];
+  const chapters = ["Routine close", "Reporting clocks", "Hidden complaints", "Trend to case", "Investigation"];
   return (
     <Frame address="mdarix.com/app · Getting started" label="The quality loop on the sample data, chapter by chapter">
       <rect x="1" y="35" width="300" height="294" fill={C.navy} />
@@ -377,7 +377,7 @@ function SampleScene() {
         );
       })}
       <text x="150" y="178" fontSize="26" fontWeight="800" textAnchor="middle" fill="#fff">
-        3 of 9
+        3 of 10
       </text>
       <text x="150" y="198" fontSize="10.5" textAnchor="middle" fill="#cbd5e1">
         chapters tried

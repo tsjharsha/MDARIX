@@ -4091,3 +4091,109 @@ div.uw-task-count:hover {
   flex-wrap: wrap;
   gap: 8px 14px;
 }
+
+/* Look ahead: the distributor and authorised-representative preview (T-G37P). */
+.uw-look-ahead strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.uw-look-ahead strong svg {
+  flex: none;
+}
+.uw-preview-banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--ac-teal);
+  border-radius: var(--ac-radius);
+  background: var(--ac-teal-wash);
+  color: var(--ac-ink);
+  font-size: 14px;
+}
+.uw-preview-banner svg {
+  flex: none;
+  margin-top: 2px;
+}
+.uw-preview-form {
+  display: grid;
+  gap: 10px;
+  max-width: 640px;
+}
+.uw-preview-form .ca-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.uw-preview-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.uw-preview-prrc {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-page);
+  color: var(--ac-ink);
+  font-weight: 600;
+}
+.uw-preview-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.uw-preview-panels section {
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-preview-panels h3,
+.uw-preview-heading {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.uw-preview-items {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.uw-preview-items li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--ac-line);
+  border-radius: var(--ac-radius);
+  background: var(--ac-surface);
+}
+.uw-preview-items p {
+  margin: 0;
+}
+.uw-preview-list {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.uw-preview-list li {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+.uw-preview-list li p {
+  margin: 0;
+}
+.uw-preview-list li span {
+  color: var(--ac-ink-2);
+}
