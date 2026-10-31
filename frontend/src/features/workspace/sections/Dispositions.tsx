@@ -580,6 +580,7 @@ export function DispositionPanel({
           <TrainingPanel
             documents={missing}
             colleagues={screen.trained_colleagues}
+            required
             onDone={onTrained}
             note="Read the disposition rules and the coding criteria (Show, below), then confirm each."
           />

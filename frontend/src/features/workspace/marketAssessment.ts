@@ -164,6 +164,8 @@ export type AssessmentDetail = {
   severity_level: string | null;
   starter_mark: string;
   practice_label: string | null;
+  /** The practice-training rule binds free-trial organizations only (owner decision 6, 31 Oct 2026). */
+  training_required: boolean;
   legacy_decision: LegacyDecision | null;
 };
 

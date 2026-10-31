@@ -140,7 +140,12 @@ images change. Run `scripts/refresh_trial_story.py --apply` to give running tria
 - Practice training before signing: a market conclusion is refused until the signer has acknowledged the current
   version of the market's question set and of the scale ("I have read version …"; in a trial, a practice record). The
   screen names the colleagues who hold a current acknowledgement. A new version makes earlier acknowledgements out of
-  date.
+  date. This rule binds free-trial organizations only (owner decision 6, 31 October): any other organization (the
+  demo, a pilot on this line) may record an acknowledgement but is not refused without one; pilots get the full rule
+  (G40) later.
+- The assessment form is shorter (owner decision 7): each question's definition sits behind a "Show definition" button
+  (collapsed at first; the question, its clause chips and the Starter text mark stay visible), and the evidence
+  checkboxes are compact, on one line where they fit.
 - Signed records made in a free trial carry "Practice record: made in a free trial with sample or de-identified data.
   Not your regulatory record."
 - Sample data: SAMPLE-RV-07 has a signed EU/NI assessment by the sample author (with its acknowledgements) as a

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -17,6 +17,7 @@ from backend.app.db.models.market_assessment import (
     ComplaintMarketAssessment,
     SignerTrainingRecord,
 )
+from backend.app.db.models.stage2 import SubscriptionLifecycle
 from backend.app.db.session import RuntimeSessionLocal, SessionLocal, runtime_role_active
 from backend.app.db.tenant_scope import bind_system, bind_tenant
 from backend.app.reportability import markets
@@ -50,11 +51,41 @@ US_NONE = dict(
 )
 
 
+def _on_free_trial(tenant_id) -> None:
+    """Put an organization on the Free Trial plan: the practice-training rule binds trial organizations only."""
+    from backend.app.trial.service import _free_trial_plan
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        plan = _free_trial_plan(db, now)
+        db.add(
+            SubscriptionLifecycle(
+                id=uuid.uuid4(),
+                tenant_id=tenant_id,
+                plan_id=plan.id,
+                plan_version=plan.version,
+                starts_at=now,
+                expires_at=now + timedelta(days=30),
+                status="ACTIVE",
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        db.commit()
+
+
+def _windows(client) -> None:
+    settings = client.get(SETTINGS).json()
+    saved = client.put(SETTINGS, json={"windows": settings["templates"][:3], "lookback_days": 365, "reason": REASON})
+    assert saved.status_code == 200, saved.text
+
+
 @pytest.fixture(scope="module")
 def org():
     from backend.app.trial.retention import purge_trial
 
     tenant_id = _organization("MA")
+    _on_free_trial(tenant_id)
     other_id = _organization("MB")
     clients = {
         "regulatory": _client(tenant_id, "REGULATORY_REVIEWER", "Rita Regulatory"),
@@ -62,11 +93,7 @@ def org():
         "viewer": _client(tenant_id, "VIEWER"),
         "other": _client(other_id, "REGULATORY_REVIEWER"),
     }
-    settings = clients["viewer"].get(SETTINGS).json()
-    saved = clients["regulatory"].put(
-        SETTINGS, json={"windows": settings["templates"][:3], "lookback_days": 365, "reason": REASON}
-    )
-    assert saved.status_code == 200, saved.text
+    _windows(clients["regulatory"])
     try:
         yield {"tenant_id": tenant_id, "other_id": other_id, "product": _product(tenant_id), **clients}
     finally:
@@ -147,7 +174,7 @@ def test_a_serious_us_complaint_is_assessed_trained_signed_versioned_and_filed(o
     _acknowledge(regulatory)
     trained = regulatory.get(f"{TRAINING}?documents=QUESTION_SET_US,HARM_SCALE").json()["documents"]
     assert [doc["state"] for doc in trained] == ["CURRENT", "CURRENT"]
-    assert trained[0]["method"] == "read and acknowledged in MDARIX"  # not a trial: no practice label
+    assert trained[0]["method"] == "practice acknowledgement in a free trial"
 
     bad = _sign(regulatory, complaint, "US", item, "REPORTABLE", password="not the password")
     assert bad.status_code == 403 and bad.json()["detail"]["code"] == "INVALID_REAUTHENTICATION"
@@ -163,7 +190,7 @@ def test_a_serious_us_complaint_is_assessed_trained_signed_versioned_and_filed(o
     assert current["signed_by"] == "Rita Regulatory" and len(current["content_fingerprint"]) == 64
     assert current["answers"]["US2C"]["answer"] == "YES" and current["harm_level"] == "CRITICAL"
     assert current["due_on"] == (TODAY - timedelta(days=24) + timedelta(days=30)).isoformat()
-    assert us["draft"] is None and signed.json()["practice_label"] is None
+    assert us["draft"] is None and signed.json()["practice_label"].startswith("Practice record")
     with SessionLocal() as db:
         bind_tenant(db, org["tenant_id"])
         record = db.get(SignedApprovalRecord, uuid.UUID(current["signed_record_id"]))
@@ -288,6 +315,34 @@ def test_a_changed_version_makes_the_acknowledgement_out_of_date(org, monkeypatc
     refused = _sign(regulatory, complaint, "US", item, "REPORTABLE")
     assert refused.status_code == 409 and refused.json()["detail"]["code"] == "TRAINING_REQUIRED"
     assert [doc["version"] for doc in refused.json()["detail"]["missing"]] == ["US-starter-2"]
+
+
+def test_the_practice_training_rule_binds_a_trial_organization_only(org):
+    """Owner decision 6 (31 Oct 2026): a non-trial organization signs without an acknowledgement, and may record one."""
+    from backend.app.trial.retention import purge_trial
+
+    complaint = _complaint(org["tenant_id"], org["product"], country="US", malfunction=True)
+    trial = org["regulatory"].get(_url(complaint)).json()
+    assert trial["training_required"] is True and trial["practice_label"]
+
+    tenant_id = _organization("MN")
+    try:
+        signer = _client(tenant_id, "REGULATORY_REVIEWER", "Nina Pilot")
+        _windows(signer)
+        complaint = _complaint(tenant_id, _product(tenant_id), country="US", malfunction=True)
+        detail = signer.get(_url(complaint)).json()
+        assert detail["training_required"] is False and detail["practice_label"] is None
+        assert [entry["state"] for entry in _market(detail, "US")["training"]] == ["MISSING", "MISSING"]
+        answers = _answers(**{**US_NONE, "US4": "YES", "US5": "YES"})
+        item = _save(signer, complaint, "US", answers, harm_level="MINOR")
+        signed = _sign(signer, complaint, "US", item, "REPORTABLE")
+        assert signed.status_code == 200, signed.text
+        _acknowledge(signer)  # the recording stays available outside a trial
+        states = signer.get(f"{TRAINING}?documents=HARM_SCALE").json()["documents"]
+        assert states[0]["state"] == "CURRENT" and states[0]["method"] == "read and acknowledged in MDARIX"
+    finally:
+        with SessionLocal() as db:
+            purge_trial(db, tenant_id, "test:market-assessment-cleanup")
 
 
 def test_signing_needs_the_authenticator_code_when_signatures_require_it(org, monkeypatch):

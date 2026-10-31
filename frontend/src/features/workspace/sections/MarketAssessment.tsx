@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { BookOpenCheck, FileWarning, Gauge, PenLine, Save, ShieldCheck } from "lucide-react";
 import { ToneBadge } from "../../admin/console/charts";
 import { Drawer, Tabs, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
@@ -46,7 +46,7 @@ const EVIDENCE = ["Complaint description", "Severity (quality system)", "Patient
 /**
  * Complaints › Reportability › Assess per market: each enabled market's starter questions with the clause beside each,
  * the harm-severity scale, the suggestion, and the person's signed conclusion (password and authenticator code, after a
- * practice training acknowledgement on the current version of the questions and the scale).
+ * practice training acknowledgement on the current version of the questions and the scale, in a free trial only).
  */
 export function MarketAssessmentDrawer({
   complaint,
@@ -149,7 +149,14 @@ export function MarketPanel({
   }, [suggested]);
   const missing = trainingMissing(item);
   const questions = item.question_set.questions;
-  const problem = signProblem(questions, form, sign, suggested, item.disagreement, !missing.length);
+  const problem = signProblem(
+    questions,
+    form,
+    sign,
+    suggested,
+    item.disagreement,
+    !detail.training_required || !missing.length,
+  );
   const run = async (step: () => Promise<unknown>, done: string, failed: string) => {
     setBusy(true);
     setError("");
@@ -211,7 +218,12 @@ export function MarketPanel({
       </header>
       {item.current && <SignedVersion version={item.current} complaintId={detail.complaint.id} onSaved={onSaved} />}
       {missing.length > 0 && canDecide && (
-        <TrainingPanel documents={missing} colleagues={item.trained_colleagues} onDone={onSaved} />
+        <TrainingPanel
+          documents={missing}
+          colleagues={item.trained_colleagues}
+          required={detail.training_required}
+          onDone={onSaved}
+        />
       )}
       <ScalePanel
         scale={detail.scale}
@@ -366,23 +378,38 @@ function QuestionRow({
   onChange: (entry: AnswerEntry) => void;
 }) {
   const value = entry ?? { answer: null, rationale: "", evidence: [] };
+  const [open, setOpen] = useState(false);
+  const definitionId = useId();
   return (
     <li className="uw-ma-question">
-      <fieldset className="ca-field" disabled={disabled}>
+      {/* Not a disabled fieldset: the definition toggle stays usable when the answers are read-only. */}
+      <fieldset className="ca-field">
         <legend>
           <strong>{question.id}.</strong> {question.text}
         </legend>
         <p className="uw-ma-clause">
           <span className="uw-basis-chip">{question.clause}</span> <BasisChips ids={question.basis} label="Basis" />
           <span className="uw-ma-starter-chip">Starter text</span>
+          <button
+            type="button"
+            className="ac-link uw-ma-definition-toggle"
+            aria-expanded={open}
+            aria-controls={definitionId}
+            onClick={() => setOpen(!open)}
+          >
+            {open ? "Hide definition" : "Show definition"}
+          </button>
         </p>
-        <p className="ac-muted">{question.definition}</p>
+        <p id={definitionId} className="ac-muted" hidden={!open}>
+          {question.definition}
+        </p>
         {question.note && <p className="uw-hint">{question.note}</p>}
         <div className="uw-ma-answers" role="radiogroup" aria-label={`Answer to ${question.id}`}>
           {ANSWERS.map((answer) => (
             <label key={answer} className="ca-check">
               <input
                 type="radio"
+                disabled={disabled}
                 name={`answer-${question.id}`}
                 checked={value.answer === answer}
                 onChange={() => onChange({ ...value, answer })}
@@ -395,6 +422,7 @@ function QuestionRow({
           Rationale
           <textarea
             rows={2}
+            disabled={disabled}
             maxLength={ASSESSMENT_LIMITS.rationaleMax}
             value={value.rationale}
             onChange={(event) => onChange({ ...value, rationale: event.target.value })}
@@ -405,6 +433,7 @@ function QuestionRow({
             <label key={evidence} className="ca-check">
               <input
                 type="checkbox"
+                disabled={disabled}
                 checked={value.evidence.includes(evidence)}
                 onChange={(event) =>
                   onChange({
@@ -518,15 +547,18 @@ export function ScalePanel({
   );
 }
 
-/** The practice training a signature needs: read each document, then "I have read version …". */
+/** The training on what a signature relies on: read each document, then "I have read version …". Required to sign in a
+ * free trial only (owner decision 6); elsewhere the record can be made but signing does not wait for it. */
 export function TrainingPanel({
   documents,
   colleagues,
+  required,
   onDone,
   note = "Read the questions and the scale on this page, then confirm each.",
 }: {
   documents: TrainingDocument[];
   colleagues: string[];
+  required: boolean;
   onDone: () => void;
   note?: string;
 }) {
@@ -550,12 +582,15 @@ export function TrainingPanel({
   return (
     <section className="ca-drawer-section uw-ma-training" role="status">
       <h4>
-        <BookOpenCheck size={15} aria-hidden="true" /> Before you sign: practice training on{" "}
+        <BookOpenCheck size={15} aria-hidden="true" />{" "}
+        {required ? "Before you sign: practice training on" : "Training record on"}{" "}
         {documents.map((document) => document.version).join(" and ")}
       </h4>
       <p className="ac-muted">
-        ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note} In
-        a free trial this is a practice record; MDARIX runs no training.
+        ISO 13485 clause 6.2: whoever signs is trained on the current version of what the signature relies on. {note}{" "}
+        {required
+          ? "In a free trial this is a practice record; MDARIX runs no training."
+          : "Your organization keeps its own training records; signing here does not wait for this one."}
       </p>
       <ul>
         {documents.map((document) => (
@@ -571,11 +606,13 @@ export function TrainingPanel({
           </li>
         ))}
       </ul>
-      <p className="uw-cr-meta">
-        {colleagues.length
-          ? `Trained colleagues who can sign instead: ${colleagues.join(", ")}.`
-          : "No colleague holds a current acknowledgement yet."}
-      </p>
+      {required && (
+        <p className="uw-cr-meta">
+          {colleagues.length
+            ? `Trained colleagues who can sign instead: ${colleagues.join(", ")}.`
+            : "No colleague holds a current acknowledgement yet."}
+        </p>
+      )}
       <InlineError text={error} />
     </section>
   );
