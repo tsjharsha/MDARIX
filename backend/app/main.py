@@ -65,6 +65,7 @@ from backend.app.investigation_open_router import router as investigation_open_r
 from backend.app.case_workflow.router import router as case_workflow_router
 from backend.app.complaints_router import router as complaints_router
 from backend.app.complaint_review.router import router as complaint_review_router
+from backend.app.complaint_disposition.router import router as complaint_disposition_router
 from backend.app.reportability.assessment_router import router as market_assessment_router
 from backend.app.reportability.router import router as reportability_router
 from backend.app.signer_training.router import router as signer_training_router
@@ -442,6 +443,7 @@ app.include_router(investigation_open_router)
 app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
 app.include_router(complaint_review_router)  # Second look and backlog board (md40)
+app.include_router(complaint_disposition_router)  # Complaint disposition, triggers, routine path (tr02)
 app.include_router(reportability_router)  # Reportability watch and reporting windows (md41)
 app.include_router(market_assessment_router)  # Seriousness and causation per market, signed conclusions (tr01)
 app.include_router(signer_training_router)  # Training on the current version of what a signature relies on (tr01)

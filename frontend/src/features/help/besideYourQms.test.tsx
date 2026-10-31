@@ -21,17 +21,19 @@ const text = (html: string) =>
     .replace(/\s+/g, " ");
 
 describe("MDARIX works beside your QMS", () => {
-  it("is two sentences, and claims no feature a later release ships", () => {
+  it("says what ships by 0.10.53, and claims no feature a later release ships", () => {
     expect(BESIDE_YOUR_QMS).toBe(
-      "MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control.",
+      "MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. " +
+        "MDARIX helps you decide and proves it: routine complaints close at service level with a documented reason, " +
+        "and serious ones are assessed per market.",
     );
-    expect(BESIDE_YOUR_QMS).not.toMatch(/service level|per market|signed documents/i);
+    expect(BESIDE_YOUR_QMS).not.toMatch(/signed documents|proactive/i);
   });
 
   it("is said in the same words on the website, the guides and the docs", () => {
     const faq = questionAt("/questions/does-mdarix-replace-our-qms")!;
     expect(faq.question).toBe("Does MDARIX replace our QMS or complaint software?");
-    expect(faq.answer).toBe(`No. ${BESIDE_YOUR_QMS}`);
+    expect(faq.answer).toBe(`No: ${BESIDE_YOUR_QMS}`);
     expect(text(renderPage("/questions/does-mdarix-replace-our-qms"))).toContain(BESIDE_YOUR_QMS);
     expect(text(renderPage("/"))).toContain("Works beside your QMS or complaint software");
     for (const path of ["/trust", "/company"] as const) expect(text(renderPage(path)), path).toContain(BESIDE_YOUR_QMS);

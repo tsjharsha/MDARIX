@@ -15,6 +15,7 @@ from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.orm import Session
 
 from backend.app.complaint_review import rules
+from backend.app.db.models.complaint_disposition import ComplaintDisposition
 from backend.app.db.models.complaint_review import ComplaintSecondLook, ComplaintSettings
 from backend.app.db.models.foundation import AuthUser, Complaint, InvestigationComplaint, Product, ProductVersion
 from backend.app.db.models.signals import SignalComplaint
@@ -265,7 +266,8 @@ def backlog(
     page_size: int = 25,
     today: date | None = None,
 ) -> dict:
-    """Open complaints that are in no signal and no case, oldest first, against the organization's target days.
+    """Open complaints that are in no signal and no case and not resolved by a signed disposition, oldest first,
+    against the organization's target days.
 
     The board is counted from a few columns of each complaint; only the page shown reads the whole records. After a
     large import thousands of complaints are open, and reading every one whole (with all its timestamps, which the
@@ -278,13 +280,20 @@ def backlog(
     in_case = exists().where(
         _same_organization(InvestigationComplaint.tenant_id), InvestigationComplaint.complaint_id == Complaint.id
     )
+    # A signed service-level or known-issue disposition (tr02) takes the complaint off the board.
+    resolved = exists().where(
+        _same_organization(ComplaintDisposition.tenant_id),
+        ComplaintDisposition.complaint_id == Complaint.id,
+        ComplaintDisposition.superseded_by.is_(None),
+        ComplaintDisposition.branch.in_(("SERVICE_LEVEL", "KNOWN_ISSUE")),
+    )
     query = (
         db.query(Complaint.id, Complaint.status, Complaint.complaint_type, ComplaintSecondLook.decision, RECEIVED_AT)
         .outerjoin(
             ComplaintSecondLook,
             (ComplaintSecondLook.complaint_id == Complaint.id) & (ComplaintSecondLook.tenant_id == Complaint.tenant_id),
         )
-        .filter(Complaint.tenant_id == tenant_id, ~in_signal, ~in_case)
+        .filter(Complaint.tenant_id == tenant_id, ~in_signal, ~in_case, ~resolved)
     )
     if product_id:
         query = query.filter(Complaint.product_id == product_id)

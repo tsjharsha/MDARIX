@@ -28,7 +28,7 @@ export const TRIAL_FACTS: readonly [string, string][] = [
   ["30 days", "free, no credit card"],
   ["3 people", "you and two colleagues"],
   ["5,000 rows", "of your own data, 2 MB a file"],
-  ["9 chapters", "a story on sample data"],
+  ["10 chapters", "a story on sample data, routine complaints first"],
 ];
 
 export const GUIDE_STEPS: readonly GuideStep[] = [
@@ -173,7 +173,7 @@ export function journeyProgress(input: JourneyInput): JourneyStep[] {
     open: [true, "Trial approved"],
     "sign-in": [true, "Signed in"],
     team: [invited >= wanted, `${Math.min(invited, wanted)} of ${wanted} colleagues invited`],
-    sample: [tried >= SAMPLE_CHAPTERS_GOAL, `${tried} of 9 chapters tried`],
+    sample: [tried >= SAMPLE_CHAPTERS_GOAL, `${tried} of 10 chapters tried`],
     "own-data": [own > 0, own > 0 ? "Your own data is in" : "Not uploaded yet"],
     feedback: [!!input.feedbackSent, input.feedbackSent ? "Thank you" : "Not sent yet"],
     demo: [!!input.demoRequested, input.demoRequested ? "Demo requested" : "Not booked yet"],

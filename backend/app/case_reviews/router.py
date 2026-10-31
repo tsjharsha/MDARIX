@@ -376,6 +376,22 @@ def _check_risks(db: Session, case: Investigation, risk_ids) -> None:
         raise service.error(422, "RISK_NOT_FOR_PRODUCT", "Every assessed risk must be a risk of this case's product")
 
 
+def _check_owners(control_db: Session, tenant_id, findings: dict) -> None:
+    """Every risk file update's owner is a member of the organization."""
+    from backend.app.db.models.foundation import AuthUser
+
+    owners = {
+        uuid.UUID(item["risk_file_update"]["owner_user_id"]) for item in findings.values() if item["risk_file_update"]
+    }
+    if not owners:
+        return
+    found = {
+        row[0] for row in control_db.query(AuthUser.id).filter(AuthUser.tenant_id == tenant_id, AuthUser.id.in_(owners))
+    }
+    if found != owners:
+        raise service.error(422, "OWNER_NOT_IN_ORGANIZATION", "Choose the owner from your organization's people")
+
+
 @router.post(BASE + "/{review_id}/complete")
 def complete_review(
     review_id: uuid.UUID,
@@ -402,16 +418,28 @@ def complete_review(
         raise service.error(422, "OUTCOME_NOT_FOR_REVIEW_TYPE", problem)
     case = _case_of(db, row)
     _refuse_closed(case)
-    _check_risks(db, case, payload.assessed.risk_ids)
+    risk_ids = list(
+        dict.fromkeys(
+            [*payload.assessed.risk_ids, *(item.risk_id for item in payload.assessed.findings if item.risk_id)]
+        )
+    )
+    _check_risks(db, case, risk_ids)
+    findings: dict = {}
+    if row.review_type == rules.RISK:
+        problem, findings = rules.findings_problem(risk_ids, payload.assessed.findings, service.now_utc().date())
+        if problem:
+            raise service.error(422, "FINDING_UNANSWERED", problem)
+        _check_owners(control_db, case.tenant_id, findings)
     now = service.now_utc()
     role = row.reviewer_role or person.role_for(permission)
     row.status = "COMPLETED"
     row.outcome = payload.outcome
     row.rationale = payload.rationale
     row.assessed = {
-        "risk_ids": [str(item) for item in payload.assessed.risk_ids],
+        "risk_ids": [str(item) for item in risk_ids],
         "markets": list(payload.assessed.markets),
         "notes": payload.assessed.notes,
+        **({"findings": findings} if findings else {}),
     }
     row.completed_at = now
     row.updated_at = now
@@ -428,8 +456,9 @@ def complete_review(
         new_values={"status": "COMPLETED", "outcome": row.outcome},
         details={
             "outcome": row.outcome,
-            "assessed_risks": len(payload.assessed.risk_ids),
+            "assessed_risks": len(risk_ids),
             "assessed_markets": len(payload.assessed.markets),
+            "risk_file_updates": sum(1 for item in findings.values() if item["risk_file_update"]),
             "scope_version": row.scope_version,
         },
     )

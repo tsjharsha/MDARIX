@@ -11,7 +11,12 @@ The four numbers of the home screen (the lightweight MVP plan):
 Further inspection checks drawn from 2025-2026 findings:
 - HARM_CLOSED_WITHOUT_CASE: complaints reporting a death or serious injury, closed, in no investigation;
 - CAPA_EFFECTIVENESS: CAPAs closed without an effectiveness check, and checks overdue;
-- TRIAGE_OVERDUE: signals still awaiting triage past their due date.
+- TRIAGE_OVERDUE: signals still awaiting triage past their due date;
+- DISPOSITIONS_DUE: complaints without a disposition past the backlog target, service-level and known-issue
+  dispositions that meet a trigger since they were signed ("disposition to review"), and the escalations of the last
+  30 days (the trial's stand-in for the head-of-QA notice);
+- RECURRING_SERVICE_LEVEL: two or more service-level resolutions on one product and problem code within 30 days
+  that no open case covers.
 
 Each check names its regulatory basis (``BASIS``, ids of the one catalog in backend/app/standards.py).
 
@@ -55,6 +60,10 @@ WHY = {
     "CAPA_EFFECTIVENESS": "CAPA is among the observations FDA cites most often, and closing a CAPA without verifying "
     "that it worked is a recurring finding.",
     "TRIAGE_OVERDUE": "Signals left waiting are trends nobody has looked at.",
+    "DISPOSITIONS_DUE": "ISO 13485 clause 8.2.2 lets a complaint close without an investigation only when the reason "
+    "is documented; a complaint left without a decision is a backlog finding.",
+    "RECURRING_SERVICE_LEVEL": "A recurring problem fixed in the field each time is a trend: closed service tickets must "
+    "still reach the analysis of data.",
     "RISK_FILE_INPUT": "Under the QMSR, FDA inspections follow the risk file and name post-market data not used as "
     "input to risk management a significant deficiency; ISO 14971:2019 "
     "clause 10 asks for post-production information to reach risk management.",
@@ -80,6 +89,10 @@ BASIS = {
     # Signals waiting past their triage date: signals come from the analysis of complaint data, and one left waiting
     # is data nobody has analysed.
     "TRIAGE_OVERDUE": ("ISO13485_8_4",),
+    # Complaints without a documented disposition, or one to review: complaint handling (clause 8.2.2).
+    "DISPOSITIONS_DUE": ("ISO13485_8_2_2",),
+    # Service-level matters that recur: analysis of data (clause 8.4).
+    "RECURRING_SERVICE_LEVEL": ("ISO13485_8_4", "ISO13485_8_2_2"),
     # Post-market data not in the risk file: production and post-production information feeds risk management.
     "RISK_FILE_INPUT": ("ISO14971_10",),
 }
@@ -412,6 +425,86 @@ def risk_file_input(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     )
 
 
+def dispositions_due(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    """Complaints waiting for a disposition past the backlog target, dispositions to review (a trigger met after
+    signing), and the escalations of the last 30 days, which every Leader sees here."""
+    from backend.app.complaint_disposition import service as disposition
+    from backend.app.complaint_disposition.triggers import codes
+    from backend.app.complaint_review.service import settings_of
+
+    target = settings_of(db, tenant_id)["backlog_target_days"]
+    review = disposition.to_review(db, tenant_id, today)
+    late = disposition.waiting_past_target(db, tenant_id, today, target)
+    escalated = disposition.escalations(db, tenant_id, _midnight(today - timedelta(days=30)))
+    refs = {
+        row.id: row.business_id or row.complaint_identifier
+        for row in db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier).filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.id.in_(
+                [item[0] for item in late[:ITEMS_MAX]] + [row.complaint_id for row in escalated] or [None]
+            ),
+        )
+    }
+    items = [
+        {
+            "id": item["id"],
+            "ref": item["ref"],
+            "label": f"Disposition to review: {', '.join(item['triggers'])} met after signing",
+        }
+        for item in review
+    ]
+    items += [
+        {"id": str(complaint_id), "ref": refs.get(complaint_id), "label": f"No disposition, {age} days"}
+        for complaint_id, age in late
+    ]
+    items += [
+        {
+            "id": str(row.complaint_id),
+            "ref": refs.get(row.complaint_id),
+            "label": "Escalated: " + (", ".join(codes(row.triggers or [])) or "by choice"),
+        }
+        for row in escalated
+    ]
+    value = len(review) + len(late)
+    return _check(
+        "DISPOSITIONS_DUE",
+        "Complaints waiting for a disposition",
+        value,
+        CRITICAL if review else ATTENTION if late or escalated else CLEAR,
+        f"{_n(len(late), 'complaint')} without a disposition past the {target}-day target; "
+        f"{_n(len(review), 'disposition')} to review (a trigger met after signing); "
+        f"{_n(len(escalated), 'escalation')} to a case in the last 30 days",
+        {"section": "Complaints", "tab": "Dispositions"},
+        items,
+        {"to_review": len(review), "past_target": len(late), "escalated": len(escalated)},
+    )
+
+
+def recurring_service_level(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
+    from backend.app.complaint_disposition import service as disposition
+    from backend.app.complaint_disposition.triggers import RECURRING_COUNT, RECURRING_DAYS
+
+    found = disposition.recurring(db, tenant_id, today)
+    return _check(
+        "RECURRING_SERVICE_LEVEL",
+        "Recurring service-level matters",
+        len(found),
+        ATTENTION if found else CLEAR,
+        f"{RECURRING_COUNT} or more service-level resolutions on one product and problem code within {RECURRING_DAYS} "
+        "days that no open case covers (starter threshold); the next such complaint is escalated by RECURRENCE",
+        {"section": "Signals", "tab": "By resolution"},
+        [
+            {
+                "id": item["product_id"],
+                "ref": f"{item['product_name']}, {item['problem_code'].replace('_', ' ').lower()}",
+                "label": f"{item['count']} service-level resolutions in {RECURRING_DAYS} days ({', '.join(item['complaints'])})"
+                ", no case covers it",
+            }
+            for item in found
+        ],
+    )
+
+
 HOME = ("COMPLAINTS_TO_RECHECK", "COMPLAINTS_PAST_TARGET", "REPORTING_CLOCKS", "TRENDS_WITHOUT_ACTION")
 CHECKS = (
     complaints_to_recheck,
@@ -422,6 +515,8 @@ CHECKS = (
     harm_closed_without_case,
     capa_effectiveness,
     triage_overdue,
+    dispositions_due,
+    recurring_service_level,
 )
 
 

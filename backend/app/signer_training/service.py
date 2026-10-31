@@ -1,8 +1,10 @@
 """The documents a signature relies on, and who holds a training record on their current versions.
 
 The documents are MDARIX's starter documents: each market's question set (``US-starter-1``...) and the harm-severity
-scale (``scale-starter-1``), read from backend/app/reportability/markets.py, so a new version there makes every record
-of the earlier version out of date at once. In a free trial a record is a practice acknowledgement: the person opened
+scale (``scale-starter-1``), read from backend/app/reportability/markets.py, and the disposition rules
+(``disposition-starter-1``, backend/app/complaint_disposition/rules.py) and classification coding criteria
+(``coding-starter-1``, backend/app/complaint_classification/rules.py), so a new version there makes every record of the
+earlier version out of date at once. In a free trial a record is a practice acknowledgement: the person opened
 the document and confirmed "I have read version ..." (T-G40P); MDARIX runs no training. The MVP keeps the same table
 for the customer's own records (trainer, method, evidence) and adds its complaint-handling procedure as a document.
 """
@@ -15,12 +17,16 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from backend.app.complaint_classification import rules as coding
+from backend.app.complaint_disposition import rules as disposition
 from backend.app.db.models.market_assessment import SignerTrainingRecord
 from backend.app.reportability import markets
 
 TRIAL_METHOD = "practice acknowledgement in a free trial"
 WORKSPACE_METHOD = "read and acknowledged in MDARIX"
 HARM_SCALE = "HARM_SCALE"
+DISPOSITION_RULES = "DISPOSITION_RULES"
+CODING_CRITERIA = "CODING_CRITERIA"
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,12 @@ def documents() -> dict[str, Document]:
         for market, question_set in markets.QUESTION_SETS.items()
     }
     found[HARM_SCALE] = Document(HARM_SCALE, "Harm-severity scale (starter)", markets.SCALE_VERSION)
+    found[DISPOSITION_RULES] = Document(
+        DISPOSITION_RULES, "Complaint disposition rules (starter)", disposition.RULES_VERSION
+    )
+    found[CODING_CRITERIA] = Document(
+        CODING_CRITERIA, "Classification coding criteria (starter)", coding.CODING_CRITERIA_VERSION
+    )
     return found
 
 
@@ -59,10 +71,21 @@ def for_market(market: str) -> list[Document]:
     return [every[question_set_code(market)], every[HARM_SCALE]]
 
 
+def for_disposition() -> list[Document]:
+    """What a disposition (and the routine path's one signature) relies on: the disposition rules and the coding
+    criteria the classification is confirmed under."""
+    every = documents()
+    return [every[DISPOSITION_RULES], every[CODING_CRITERIA]]
+
+
 def content(code: str) -> dict | None:
     """What the person reads before acknowledging."""
     if code == HARM_SCALE:
         return {"scale": markets.scale()}
+    if code == DISPOSITION_RULES:
+        return {"rules": list(disposition.DISPOSITION_RULES)}
+    if code == CODING_CRITERIA:
+        return {"rules": list(coding.CODING_CRITERIA)}
     for market in markets.MARKETS:
         if code == question_set_code(market):
             return {"question_set": markets.QUESTION_SETS[market].as_dict()}

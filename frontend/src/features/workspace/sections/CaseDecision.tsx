@@ -25,6 +25,7 @@ import {
   acknowledgementRequired,
   awaitsBriefReview,
   caseDecisionPath,
+  ATTRIBUTIONS,
   decisionFormProblems,
   decisionHistory,
   emptyDecisionForm,
@@ -784,6 +785,42 @@ function DecisionFormPanel({
             onChange={(event) => set({ rationale: event.target.value })}
           />
         </label>
+        <fieldset className="uw-dp-choices">
+          <legend>Root-cause attribution</legend>
+          <div className="uw-dp-inline">
+            {ATTRIBUTIONS.map((item) => (
+              <label key={item.code} className="uw-dp-choice">
+                <input
+                  type="radio"
+                  name="root-cause-attribution"
+                  checked={form.attribution === item.code}
+                  onChange={() => set({ attribution: item.code })}
+                />
+                {item.label}
+              </label>
+            ))}
+          </div>
+          <details className="uw-dp-show">
+            <summary>Show definitions</summary>
+            <dl>
+              {ATTRIBUTIONS.map((item) => (
+                <div key={item.code}>
+                  <dt>{item.label}</dt>
+                  <dd>{item.definition}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+          {form.attribution === "UNDETERMINED" && (
+            <label className="ca-field">
+              Why the cause cannot be attributed
+              <input
+                value={form.attributionReason}
+                onChange={(event) => set({ attributionReason: event.target.value })}
+              />
+            </label>
+          )}
+        </fieldset>
         {current && (
           <>
             <p className="ca-note-box">
