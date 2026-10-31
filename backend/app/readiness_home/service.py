@@ -162,13 +162,41 @@ def complaints_past_target(db: Session, tenant_id: uuid.UUID, today: date) -> di
     )
 
 
+def _disagreement_items(db: Session, tenant_id: uuid.UUID, rows, listed: set[str]) -> list[dict]:
+    ids = [row.complaint_id for row in rows if str(row.complaint_id) not in listed]
+    refs = {
+        complaint_id: business_id or identifier
+        for complaint_id, business_id, identifier in (
+            db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier)
+            .filter(Complaint.tenant_id == tenant_id, Complaint.id.in_(ids))
+            .all()
+            if ids
+            else []
+        )
+    }
+    found, seen = [], set()
+    for row in rows:
+        if row.complaint_id in refs and row.complaint_id not in seen:
+            seen.add(row.complaint_id)
+            found.append(
+                {"id": str(row.complaint_id), "ref": f"{refs[row.complaint_id]} ({row.market}: against the scale)"}
+            )
+    return found
+
+
 def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
     from backend.app.reportability.service import watch
+
+    from backend.app.reportability.assessments import disagreements
 
     found = watch(db, None, tenant_id, show="open", page=1, page_size=10**6, today=today)
     summary = found["summary"]
     # The number: complaints awaiting a decision whose clock is overdue or due soon, or whose answers are missing.
     flagged = [item for item in found["items"] if item["state"] in ("OVERDUE", "DUE_SOON") or item["follow_ups"]]
+    # Signed market conclusions whose answers disagree with the harm-severity scale, each with its written reason
+    # (T-G15H): listed so that a reviewer sees them.
+    disagreeing = disagreements(db, tenant_id)
+    against_scale = _disagreement_items(db, tenant_id, disagreeing, {item["id"] for item in flagged})
     if not summary["configured"]:
         # Without the organization's windows there are no due dates: that itself is the finding.
         state = NOT_SET
@@ -182,19 +210,24 @@ def reporting_clocks(db: Session, tenant_id: uuid.UUID, today: date) -> dict:
             f"{summary['overdue']} overdue, {summary['due_soon']} due soon, {summary['follow_up']} with missing "
             f"answers; {summary['decided_late']} decided after the window"
         )
+        if disagreeing:
+            state = CRITICAL if state == CRITICAL else ATTENTION
+            detail += f"; {_n(len(disagreeing), 'signed answer')} against the harm-severity scale, with a reason"
     return _check(
         "REPORTING_CLOCKS",
         "Reporting clocks",
-        len(flagged),
+        len(flagged) + len(against_scale),
         state,
         detail,
         {"section": "Complaints", "tab": "Reportability" if summary["configured"] else "Reporting windows"},
-        [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in flagged],
+        [{"id": item["id"], "ref": item["business_id"] or item["complaint_identifier"]} for item in flagged]
+        + against_scale,
         {
             "overdue": summary["overdue"],
             "due_soon": summary["due_soon"],
             "open": summary["open"],
             "configured": summary["configured"],
+            "scale_disagreements": len(disagreeing),
         },
     )
 

@@ -132,10 +132,12 @@ _EU = [
 
 _GB = ["United Kingdom", "UK", "GB", "Great Britain", "England", "Scotland", "Wales"]
 _CA = ["Canada", "CA", "CAN"]
+_IN = ["India", "IN", "IND"]
 
 # Starting points to check against the organization's procedure; never applied until a person saves them. Sources:
 # 21 CFR 803.50 and 803.53 (FDA); EU MDR Article 87; GB Medical Devices Regulations 2002 as amended, regulation 44ZH
-# (from 16 June 2025); Canada Medical Devices Regulations SOR/98-282 section 60 (calendar days).
+# (from 16 June 2025); Canada Medical Devices Regulations SOR/98-282 section 60 (calendar days); India Medical Devices
+# Rules 2017 Rule 26 (its period is starter text until the regulatory consultant confirms it).
 TEMPLATES = (
     {
         "name": "FDA MDR: death, serious injury or malfunction (30 calendar days)",
@@ -204,6 +206,16 @@ TEMPLATES = (
         "note": "Whether a recurrence could cause death or serious deterioration rests on a judgment; your reviewer "
         "applies it.",
         "basis": ["CA_MDR"],
+    },
+    {
+        "name": "India MDR 2017: serious adverse event (15 days)",
+        "markets": _IN,
+        "triggers": [DEATH, SERIOUS_INJURY],
+        "days": 15,
+        "day_basis": CALENDAR,
+        "note": "Starter text: confirm the period against Rule 26 and the Materiovigilance Programme of India guidance "
+        "before saving.",
+        "basis": ["IN_MDR"],
     },
 )
 TEMPLATE_BASIS = {template["name"]: template["basis"] for template in TEMPLATES}

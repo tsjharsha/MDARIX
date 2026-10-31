@@ -24,6 +24,7 @@ MIRROR = Path(__file__).resolve().parents[1] / "frontend" / "src" / "features" /
 EXPECTED = [
     ("ISO13485_4_2_5", "ISO 13485 4.2.5", "Control of records", "International"),
     ("ISO13485_5_6_2", "ISO 13485 5.6.2", "Management review input", "International"),
+    ("ISO13485_6_2", "ISO 13485 6.2", "Human resources: competence, training and awareness", "International"),
     ("ISO13485_7_3_9", "ISO 13485 7.3.9", "Control of design and development changes", "International"),
     ("ISO13485_7_4", "ISO 13485 7.4", "Purchasing (suppliers)", "International"),
     ("ISO13485_8_2_1", "ISO 13485 8.2.1", "Feedback", "International"),
@@ -38,6 +39,12 @@ EXPECTED = [
         "United States",
     ),
     ("CFR820_35", "21 CFR 820.35", "Control of records (QMSR)", "United States"),
+    (
+        "CFR803_3",
+        "21 CFR 803.3",
+        "Definitions: serious injury, caused or contributed, malfunction, remedial action",
+        "United States",
+    ),
     ("CFR803_17", "21 CFR 803.17", "Written MDR procedures", "United States"),
     ("CFR803_50", "21 CFR 803.50", "30-day reports by manufacturers", "United States"),
     ("CFR803_53", "21 CFR 803.53", "5-day reports", "United States"),
@@ -45,6 +52,12 @@ EXPECTED = [
     ("CFR11_50", "21 CFR 11.50", "Signature manifestations", "United States"),
     ("CFR11_70", "21 CFR 11.70", "Signature/record linking", "United States"),
     ("CFR11_200", "21 CFR 11.200", "Electronic signature components and controls", "United States"),
+    (
+        "MDR_2",
+        "EU MDR Art. 2(64)–(66)",
+        "Definitions: incident, serious incident, serious public health threat",
+        "European Union",
+    ),
     ("MDR_83", "EU MDR Art. 83", "Post-market surveillance system", "European Union"),
     (
         "MDR_87",
@@ -53,12 +66,21 @@ EXPECTED = [
         "European Union",
     ),
     ("MDR_88", "EU MDR Art. 88", "Trend reporting", "European Union"),
+    ("MDCG_2023_3", "MDCG 2023-3", "Questions and answers on vigilance terms and concepts (EU MDR)", "European Union"),
     ("ISO14971_10", "ISO 14971 clause 10", "Production and post-production activities", "International"),
     ("IEC62304_9", "IEC 62304 clause 9", "Software problem resolution process", "International"),
     ("IMDRF_AET", "IMDRF AET", "Adverse event terminology", "International"),
     ("UK_MDR", "UK MDR 2002 (as amended)", "Post-market surveillance and vigilance (Great Britain)", "United Kingdom"),
     ("CA_MDR", "SOR/98-282 ss. 59–61", "Mandatory problem reporting (Canada)", "Canada"),
+    (
+        "IN_MDR",
+        "India MDR 2017 Rules 3, 26",
+        "Medical Devices Rules 2017: definitions and post-market reporting of adverse events",
+        "India",
+    ),
 ]
+# Entries whose wording awaits the regulatory consultant (T-B6): marked starter text on screen and in exports.
+STARTER = {"ISO13485_6_2", "CFR803_3", "MDR_2", "MDCG_2023_3", "IN_MDR"}
 DISCLAIMER = (
     "MDARIX organizes the evidence these ask for; it does not certify compliance. Your quality system and its "
     "validation stay yours."
@@ -73,6 +95,10 @@ def test_the_catalog_holds_exactly_the_agreed_entries():
     assert standards.DISCLAIMER == DISCLAIMER
     for word in ("compliant", "certified", "Part 11"):
         assert all(word not in s.title for s in standards.CATALOG)
+    assert {s.id for s in standards.CATALOG if s.starter} == STARTER
+    assert (
+        standards.BY_ID["MDR_2"].as_dict()["starter"] is True and "starter" not in standards.BY_ID["MDR_87"].as_dict()
+    )
 
 
 def test_the_web_app_mirror_is_identical():
@@ -234,6 +260,7 @@ def test_each_template_names_its_basis():
         "EU": {"MDR_87"},
         "United Kingdom": {"UK_MDR"},
         "Canada": {"CA_MDR"},
+        "India": {"IN_MDR"},
     }
     assert all(rules.clean_window(template)["basis"] == template["basis"] for template in rules.TEMPLATES)
 

@@ -33,6 +33,9 @@ _TRIAL_BUSINESS_TABLES = (
     # The rest of the sample story (backend/app/trial/sample_data.py seed_story_examples) and what people do with it.
     "complaint_second_looks",
     "complaint_reportability",
+    "complaint_market_assessments",
+    "complaint_classifications",
+    "signer_training_records",
     "capa_effectiveness_checks",
     "capas",
     "risks",

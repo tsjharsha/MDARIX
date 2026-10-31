@@ -121,6 +121,7 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         )
         for row in decisions
     ]
+    from backend.app.reportability.assessments import signed_counts
     from backend.app.reportability.service import settings_of
 
     windows = settings_of(db, tenant_id)["windows"]
@@ -132,6 +133,8 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "after_window": sum(1 for value in timeliness if value is False),
         "windows": [window["name"] for window in windows],
         "basis": known(code for window in windows for code in window.get("basis") or []),
+        # Per-market conclusions signed in the period (tr01); the counts above are single decisions made before.
+        "markets": signed_counts(db, tenant_id, begin, end),
     }
     signals = Counter(
         status
@@ -296,10 +299,16 @@ def lines(data: dict) -> list[tuple[str, str]]:
 
     reporting = data["reporting"]
     heading("3. Reporting to regulatory authorities (management review input, clause 5.6.2)")
+    per_market = reporting.get("markets") or {}
     body(
-        f"{_n(reporting['decisions'], 'reportability decision')} in the period: {reporting['reported']} reported, "
-        f"{reporting['not_reportable']} not reportable; {reporting['inside_window']} inside the window, "
-        f"{reporting['after_window']} after it."
+        f"{_n(per_market.get('signed', 0), 'market conclusion')} signed in the period: "
+        f"{per_market.get('reportable', 0)} reportable ({per_market.get('filed', 0)} with the filing recorded), "
+        f"{per_market.get('not_reportable', 0)} not reportable."
+    )
+    body(
+        f"{_n(reporting['decisions'], 'single reportability decision')} (recorded before per-market assessment) in the "
+        f"period: {reporting['reported']} reported, {reporting['not_reportable']} not reportable; "
+        f"{reporting['inside_window']} inside the window, {reporting['after_window']} after it."
     )
     body(
         "Reporting windows: " + ("; ".join(reporting["windows"]) if reporting["windows"] else "none entered yet") + "."

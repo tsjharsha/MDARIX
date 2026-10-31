@@ -10,6 +10,76 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.52] - 2026-10-31
+
+On the trial maintenance line (`release/0.10`): seriousness and causation assessed per market, the harm-severity scale,
+and practice training before signing (requirements T-G15S, T-G15H, T-G40P and T-G39's shared part; the trial plan
+calls this release "0.10.51"). Built once for the trial and the pilot: the new routes are not part of `mvp-1.0`'s
+pilot-only gate. No AI anywhere in it; MDARIX submits nothing.
+
+**Migration `tr01marketassessments`** (`tr01_trial_market_assessments.py`, chained from md48; expand-only): three new
+tables with tenant row-level security, `complaint_market_assessments` (one market's assessment of a complaint, in
+versions: a draft, then signed conclusions), `complaint_classifications` (use environment and user type; no screen yet)
+and `signer_training_records`. No existing table changes. After the forward merge, `mvp-1.0` needs a merge revision
+joining its head (md52) and tr01. The production upgrade takes the usual backup and 8 GB disk check. The API and web
+images change. Run `scripts/refresh_trial_story.py --apply` to give running trials the new sample answers.
+
+### Added
+
+- Complaints › Reportability › **Assess per market**: each market the organization enabled (it entered a reporting
+  window for it: US, EU and Northern Ireland, Great Britain, India) gets its own assessment; the market of the event's
+  country comes first. Starter question sets `US-starter-1`, `EU-starter-1`, `GB-starter-1` and `IN-starter-1`
+  paraphrase 21 CFR 803.3, EU MDR Art. 2(64)–(66) with MDCG 2023-3, the UK MDR 2002 as amended by SI 2024/1368, and
+  India MDR 2017 Rules 3 and 26. Every question shows its definition and its clause and is marked "Starter text —
+  awaiting regulatory confirmation: check it against your own procedure."
+- The US questions ask death, each serious-injury limb on its own, caused or contributed, malfunction, and whether the
+  malfunction would be likely to cause or contribute to a death or serious injury if it recurred ("recurrence is
+  presumed"; a No needs its reason). The 5-work-day report (803.53) is suggested only for remedial action to prevent an
+  unreasonable risk of substantial harm or FDA's written request; otherwise a reportable event gets the
+  30-calendar-day report (803.50).
+- Each answer is Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. The answers point to
+  a suggestion: reportable (with its report type and due date from the organization's window, or the regulation's
+  period when no window matches), pending information, or not reportable. **Unknown is never No**: "not reportable"
+  is refused while an Unknown could make the event reportable. A person confirms or overrides the suggestion with a
+  reason and signs each market's conclusion with password and authenticator code; the signed record holds every
+  answer, the harm level, the scale version and the question-set version. A change is a new version; the earlier one
+  stays visible. The filing reference and date are recorded on the signed conclusion once the organization has
+  reported.
+- The harm-severity scale `scale-starter-1`: five levels with the IMDRF Annex F health-impact terms mapped to each and
+  each market's serious threshold. The complaint's quality-system severity maps to a level ("Critical" → critical); a
+  different level needs a reason, and death, life-threatening harm and permanent impairment cannot be lowered. An
+  answer of "not serious" at or above a threshold needs a written reason, shown on the signed record and listed under
+  Readiness › Reporting clocks. The scale never answers a question or changes a conclusion.
+- Practice training before signing: a market conclusion is refused until the signer has acknowledged the current
+  version of the market's question set and of the scale ("I have read version …"; in a trial, a practice record). The
+  screen names the colleagues who hold a current acknowledgement. A new version makes earlier acknowledgements out of
+  date. This rule binds free-trial organizations only (owner decision 6, 31 October): any other organization (the
+  demo, a pilot on this line) may record an acknowledgement but is not refused without one; pilots get the full rule
+  (G40) later.
+- The assessment form is shorter (owner decision 7): each question's definition sits behind a "Show definition" button
+  (collapsed at first; the question, its clause chips and the Starter text mark stay visible), and the evidence
+  checkboxes are compact, on one line where they fit.
+- Signed records made in a free trial carry "Practice record: made in a free trial with sample or de-identified data.
+  Not your regulatory record."
+- Sample data: SAMPLE-RV-07 has a signed EU/NI assessment by the sample author (with its acknowledgements) as a
+  finished example; SAMPLE-RV-08 has a saved US assessment that stays pending information; SAMPLE-RV-06 waits for the
+  user; the harm complaints carry a quality-system severity. Sample removal removes them and the work done on them;
+  the user's own acknowledgements stay until the 30-day purge.
+- Reporting-window template "India MDR 2017: serious adverse event (15 days)", marked starter text.
+- The catalog of standards gains 21 CFR 803.3, EU MDR Art. 2(64)–(66), MDCG 2023-3, India MDR 2017 Rules 3 and 26
+  and ISO 13485 6.2, each marked starter text.
+
+### Changed
+
+- Getting started, chapter 2 is "Assess a serious complaint per market" (same position; it counts a signed market
+  conclusion as well as an earlier single decision).
+- The watch settles a complaint when every required market is concluded (not reportable, or reportable with the
+  filing recorded); each card lists its markets. The management review summary counts signed market conclusions; the
+  inspection pack's reporting-clocks file gains a Markets column.
+- Single reportability decisions recorded before this release stay as they were, readable and marked "Single
+  decision, recorded before per-market assessment", and still settle their complaint. No row is moved; new decisions
+  are made per market (the single-decision API stays for existing data).
+
 ## [0.10.51] - 2026-10-31
 
 Fixes on the trial maintenance line (`release/0.10`) for what was seen while recording the trial videos on 16 October.

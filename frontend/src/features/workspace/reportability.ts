@@ -1,10 +1,11 @@
 // Pure rules for Complaints › Reportability and Complaints › Reporting windows: what the watch asks the server for,
-// how clocks, states and missing answers read, what a reportability decision and a change of the windows send, and
-// when they may be sent. The server (/api/v1/complaints/reportability, backend/app/reportability) keeps the clocks;
+// how clocks, states and missing answers read, how an earlier single decision reads, and what a change of the windows
+// sends and when it may be sent (the per-market assessment is in marketAssessment.ts). The server (/api/v1/complaints/reportability, backend/app/reportability) keeps the clocks;
 // a person decides; MDARIX never submits a report.
 import type { Tone } from "../admin/console/dashboardModel";
 import { collapsed } from "./complaintReview";
 import { daysUntil } from "../../app/dates";
+import type { MarketSummary } from "./marketAssessment";
 
 export const REPORT_LIMITS = {
   reasonMin: 10,
@@ -64,7 +65,9 @@ export type Clock = {
 
 export type WatchState = "OVERDUE" | "DUE_SOON" | "IN_REVIEW" | "RUNNING" | "NO_WINDOW" | "FOLLOW_UP" | "DECIDED";
 
+/** A single decision recorded before per-market assessment (release 0.10.52): kept and shown as it was. */
 export type ReportabilityDecision = {
+  single_decision?: boolean;
   decision: "REPORTED" | "NOT_REPORTABLE";
   rationale: string;
   report_reference: string | null;
@@ -106,6 +109,8 @@ export type WatchItem = {
   in_review: boolean;
   state: WatchState;
   decision: ReportabilityDecision | null;
+  /** Each market the complaint must be assessed for, with its state and clock. */
+  markets: MarketSummary[];
 };
 
 export type WatchSummary = {
@@ -219,50 +224,7 @@ export function watchHeadline(summary: WatchSummary | null | undefined): { title
   };
 }
 
-// The decision ---------------------------------------------------------------------------------------------------
-
-export type DecisionForm = {
-  decision: "REPORTED" | "NOT_REPORTABLE" | "";
-  rationale: string;
-  reference: string;
-  reportedOn: string;
-};
-
-export const EMPTY_DECISION: DecisionForm = { decision: "", rationale: "", reference: "", reportedOn: "" };
-
-export function decisionProblem(form: DecisionForm, today: string, awareDate: string | null): string | null {
-  if (!form.decision) return "Choose whether it was reported";
-  if (form.decision === "REPORTED") {
-    if (!collapsed(form.reference)) return "Give the report's reference (for example the MDR or vigilance number)";
-    if (collapsed(form.reference).length > REPORT_LIMITS.referenceMax)
-      return `Keep the reference under ${REPORT_LIMITS.referenceMax} characters`;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(form.reportedOn)) return "Give the day the report was filed";
-    if (form.reportedOn > today) return "The day the report was filed cannot be in the future";
-    if (awareDate && form.reportedOn < awareDate)
-      return "The report cannot be filed before the organization became aware";
-  }
-  const reason = collapsed(form.rationale);
-  if (reason.length < REPORT_LIMITS.reasonMin) return `Say in at least ${REPORT_LIMITS.reasonMin} characters why`;
-  if (reason.length > REPORT_LIMITS.reasonMax) return `Keep the rationale under ${REPORT_LIMITS.reasonMax} characters`;
-  return null;
-}
-
-export function decisionBody(form: DecisionForm) {
-  const base = { decision: form.decision, rationale: collapsed(form.rationale) };
-  return form.decision === "REPORTED"
-    ? { ...base, report_reference: collapsed(form.reference), reported_on: form.reportedOn }
-    : base;
-}
-
-export function decisionForm(decision: ReportabilityDecision | null): DecisionForm {
-  if (!decision) return EMPTY_DECISION;
-  return {
-    decision: decision.decision,
-    rationale: decision.rationale,
-    reference: decision.report_reference ?? "",
-    reportedOn: decision.reported_on ?? "",
-  };
-}
+// An earlier single decision ------------------------------------------------------------------------------------
 
 /** "Reported (MDR-…) on 3 Oct 2026" or "Not reportable", with whether it came inside the window. */
 export function timelinessOf(decision: ReportabilityDecision | null): { label: string; tone: Tone } | null {

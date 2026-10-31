@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { REPORTABILITY_STARTERS, SECOND_LOOK_STARTERS, starterProblem } from "./starters";
+import { SECOND_LOOK_STARTERS, starterProblem } from "./starters";
 import { Starters } from "./sections/Starters";
 
 describe("sentence starters for reasons", () => {
@@ -10,12 +10,6 @@ describe("sentence starters for reasons", () => {
     expect(starterProblem("Meets our complaint definition because harm", starters)).toContain("own words");
     expect(starterProblem("Meets our complaint definition because the patient was injured", starters)).toBeNull();
     expect(starterProblem("The patient was injured during infusion", starters)).toBeNull();
-  });
-
-  it("follows the reportable malfunction wording of 21 CFR 803", () => {
-    expect(REPORTABILITY_STARTERS.REPORTED.join(" ")).toContain(
-      "if it recurred it would be likely to cause or contribute to a death or serious injury",
-    );
   });
 
   it("offers the starters as buttons that start the sentence", () => {

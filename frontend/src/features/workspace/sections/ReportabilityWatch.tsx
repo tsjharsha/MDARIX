@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
   AlarmClock,
   CheckCircle2,
@@ -10,33 +10,27 @@ import {
   Settings2,
 } from "lucide-react";
 import { Empty, Panel, StatTile, ToneBadge, ToneIcon } from "../../admin/console/charts";
-import { Drawer, errorText, formatDate, send, useResource } from "../../customer-admin/shared";
+import { formatDate, useResource } from "../../customer-admin/shared";
 import { formatDay } from "../../../app/dates";
-import { investigationRequestFor, useCan, useOpenInvestigation, useWorkspace } from "../workspaceContext";
-import { recordId, recordName, type ComplaintsTab } from "../complaintReview";
+import { investigationRequestFor, useCan, useOpenInvestigation } from "../workspaceContext";
+import { recordId, type ComplaintsTab } from "../complaintReview";
 import {
   AWARE_SOURCE,
-  EMPTY_DECISION,
-  REPORT_LIMITS,
   TRIGGER_LABELS,
   WATCH_SHOWS,
   clockText,
-  decisionBody,
-  decisionForm,
-  decisionProblem,
   timelinessOf,
   watchHeadline,
   watchPath,
   watchStateOf,
-  type DecisionForm,
   type WatchItem,
   type WatchList,
   type WatchShow,
 } from "../reportability";
+import { marketChip } from "../marketAssessment";
 import { StatusBadge, countOf } from "./common";
-import { ChipFilter, Hero, InlineError, Pager, ProductFilter } from "./boardParts";
-import { Starters } from "./Starters";
-import { REPORTABILITY_STARTERS, starterProblem } from "../starters";
+import { ChipFilter, Hero, Pager, ProductFilter } from "./boardParts";
+import { MarketAssessmentDrawer } from "./MarketAssessment";
 import { BasisChips, BasisNote } from "../../shared/Basis";
 
 /** Whether the signed-in role may record a reportability decision (the server's rule). */
@@ -45,8 +39,6 @@ function useCanDecide() {
   const approve = useCan("regulatory.approve");
   return review || approve;
 }
-
-const todayIso = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Complaints › Reportability: every complaint that reports a death, a serious injury or a malfunction (or a patient
@@ -189,7 +181,9 @@ export function ReportabilityWatch({ onOpenTab }: { onOpenTab: (tab: ComplaintsT
         </p>
         <BasisNote />
       </Panel>
-      {deciding && <DecisionDrawer item={deciding} onClose={() => setDeciding(null)} onDecided={list.reload} />}
+      {deciding && (
+        <MarketAssessmentDrawer complaint={deciding} onClose={() => setDeciding(null)} onChanged={list.reload} />
+      )}
     </div>
   );
 }
@@ -270,8 +264,22 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
               : " · no regulatory review yet"}
           </p>
         )}
+        {item.markets.length > 0 && (
+          <ul className="uw-cr-chips" aria-label="Markets">
+            {item.markets.map((market) => {
+              const chip = marketChip(market);
+              return (
+                <li key={market.market} className={`uw-cr-chip tone-${chip.tone}`}>
+                  {chip.label}
+                  {market.clock ? ` · ${clockText(market.clock)}` : ""}
+                </li>
+              );
+            })}
+          </ul>
+        )}
         {item.decision && (
           <div className="uw-cr-decision">
+            <ToneBadge tone="neutral" label="Single decision, recorded before per-market assessment" />
             <ToneBadge
               tone={item.decision.decision === "REPORTED" ? "good" : "neutral"}
               label={
@@ -296,11 +304,12 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
         {canDecide && (
           <button
             type="button"
-            className={item.decision ? "ac-secondary" : "ac-primary"}
+            className={item.state === "DECIDED" ? "ac-secondary" : "ac-primary"}
             onClick={onDecide}
-            aria-label={`${name}: ${item.decision ? "change the reportability decision" : "record the reportability decision"}`}
+            aria-label={`${name}: assess seriousness and causation per market`}
           >
-            <Scale size={15} aria-hidden="true" /> {item.decision ? "Change decision" : "Record decision"}
+            <Scale size={15} aria-hidden="true" />{" "}
+            {item.state === "DECIDED" ? "Open the assessment" : "Assess per market"}
           </button>
         )}
         {openInvestigation && request && !item.case && (
@@ -310,137 +319,5 @@ export function WatchCard({ item, onDecide }: { item: WatchItem; onDecide: () =>
         )}
       </div>
     </li>
-  );
-}
-
-function DecisionDrawer({ item, onClose, onDecided }: { item: WatchItem; onClose: () => void; onDecided: () => void }) {
-  const { notify } = useWorkspace();
-  const [form, setForm] = useState<DecisionForm>(() => (item.decision ? decisionForm(item.decision) : EMPTY_DECISION));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  // "CMP000034 (SAMPLE-RV-06): reportability decision", with the source system's number (DEV-008).
-  const name = recordName(item);
-  // A starter begins the rationale; the person finishes it in their own words (workspace/starters.ts).
-  const starters = form.decision ? REPORTABILITY_STARTERS[form.decision] : [];
-  const problem = decisionProblem(form, todayIso(), item.aware_date) ?? starterProblem(form.rationale, starters);
-  const field = useRef<HTMLTextAreaElement>(null);
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (problem || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      await send(`/api/v1/complaints/${encodeURIComponent(item.id)}/reportability`, "POST", decisionBody(form));
-      notify(`${name}: reportability decision recorded.`);
-      onDecided();
-      onClose();
-    } catch (failure) {
-      setError(errorText(failure, "The decision was not recorded."));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Drawer title={`${name}: reportability decision`} onClose={onClose}>
-      <form className="ca-form" onSubmit={submit}>
-        <section className="ca-drawer-section">
-          <h3>{item.binding ? clockText(item.binding) : watchStateOf(item.state).label}</h3>
-          <p>
-            {item.triggers.length
-              ? `Reports ${item.triggers.map((trigger) => TRIGGER_LABELS[trigger].toLowerCase()).join(", ")}`
-              : "A patient was involved"}
-            {item.country ? ` in ${item.country}` : ""}
-            {item.aware_date ? `; aware ${formatDay(item.aware_date)}` : ""}.
-            {item.binding ? ` ${item.binding.window}: due ${formatDay(item.binding.due_date)}.` : ""}
-          </p>
-          {item.follow_ups.length > 0 && (
-            <p className="uw-hint">Missing answers: {item.follow_ups.map((flag) => flag.label).join("; ")}.</p>
-          )}
-        </section>
-        <fieldset className="ca-field uw-rw-choice">
-          <legend>Decision</legend>
-          <label className="ca-check">
-            <input
-              type="radio"
-              name="decision"
-              checked={form.decision === "REPORTED"}
-              onChange={() => setForm({ ...form, decision: "REPORTED" })}
-            />
-            Reported to the authority
-          </label>
-          <label className="ca-check">
-            <input
-              type="radio"
-              name="decision"
-              checked={form.decision === "NOT_REPORTABLE"}
-              onChange={() => setForm({ ...form, decision: "NOT_REPORTABLE" })}
-            />
-            Not reportable
-          </label>
-        </fieldset>
-        {form.decision === "REPORTED" && (
-          <div className="ca-form-grid">
-            <label className="ca-field">
-              Report reference
-              <input
-                value={form.reference}
-                maxLength={REPORT_LIMITS.referenceMax}
-                placeholder="e.g. MDR or vigilance report number"
-                onChange={(event) => setForm({ ...form, reference: event.target.value })}
-              />
-            </label>
-            <label className="ca-field">
-              Filed on
-              <input
-                type="date"
-                value={form.reportedOn}
-                max={todayIso()}
-                min={item.aware_date ?? undefined}
-                onChange={(event) => setForm({ ...form, reportedOn: event.target.value })}
-              />
-            </label>
-          </div>
-        )}
-        <label className="ca-field">
-          Rationale
-          <textarea
-            ref={field}
-            rows={4}
-            maxLength={REPORT_LIMITS.reasonMax}
-            value={form.rationale}
-            placeholder={
-              form.decision === "NOT_REPORTABLE"
-                ? "e.g. The malfunction could not cause or contribute to a death or serious injury (procedure QP-08, step 4)"
-                : "e.g. Death reported by the user facility; reported within 30 days"
-            }
-            onChange={(event) => setForm({ ...form, rationale: event.target.value })}
-          />
-        </label>
-        <Starters
-          starters={starters}
-          onPick={(starter) => {
-            setForm({ ...form, rationale: starter });
-            window.setTimeout(() => field.current?.focus(), 0);
-          }}
-        />
-        {form.decision && !form.rationale && (
-          <p className="ac-muted">In your own words: why this event is, or is not, reportable.</p>
-        )}
-        {form.decision && form.rationale && problem && <p className="uw-hint">{problem}</p>}
-        <InlineError text={error} />
-        <p className="ac-muted">
-          MDARIX does not submit reports: record what was filed in the authority&apos;s system. The decision and its
-          rationale are in the audit trail.
-        </p>
-        <div className="ca-action-row">
-          <button type="button" className="ac-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-            {busy ? "Saving…" : "Record decision"}
-          </button>
-        </div>
-      </form>
-    </Drawer>
   );
 }
