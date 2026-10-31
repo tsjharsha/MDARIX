@@ -38,7 +38,8 @@ SAMPLE_SOURCE = "MDARIX_SAMPLE"
 
 # (identifier, name, family, symptom, complaint pattern, problem code). The pattern lists days-ago for each complaint:
 # OrbitCare complaints cluster after the day-75 Rev B release; the others stay flat. With the story complaints
-# (_STORY_COMPLAINTS), PulseWatch and VentraLink Rev B each have at most 2 complaints in the trend check's last 30 days,
+# (_STORY_COMPLAINTS) and the routine ones (sample_dispositions.py, whose VentraLink events are older than 30 days),
+# PulseWatch and VentraLink Rev B each have at most 2 complaints in the trend check's last 30 days,
 # so neither is flagged as a rise (VentraLink's last one was at day 14, which made 3 there: a "significant rise").
 # OrbitCare's complaints carry the problem code PRESSURE_ALARM, so its signal reads "5 complaints: pressure alarm on
 # OrbitCare 300 ..." rather than "unspecified problem"; the others keep none.

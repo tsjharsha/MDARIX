@@ -595,6 +595,11 @@ def sign_decision(
         supersedes_decision_id=payload.supersedes_decision_id,
         supersede_reason=payload.supersede_reason,
     )
+    from backend.app.complaint_disposition.rules import attribution_problem, collapse
+
+    attribution = collapse(payload.root_cause_attribution).upper() or None
+    attribution_reason = collapse(payload.attribution_reason) or None
+    problem = problem or attribution_problem(attribution, attribution_reason)
     if problem:
         raise error(422, "DECISION_INVALID", problem)
     actor = governance.session_actor(control_db, ctx)
@@ -694,6 +699,8 @@ def sign_decision(
             "decided_at": now,
             "signer": {"id": user_id, "role": role},
             "outcome": payload.outcome,
+            # Bound into the signature through the snapshot's hash.
+            "root_cause_attribution": {"code": attribution, "reason": attribution_reason},
         }
     )
     snapshot_digest = rules.snapshot_hash(snapshot)
@@ -729,6 +736,8 @@ def sign_decision(
         context_snapshot_id=snapshot_id,
         ai_execution_refs=rules.ai_execution_refs(content),
         supersedes_decision_id=current.id if current is not None else None,
+        root_cause_attribution=attribution,
+        attribution_reason=attribution_reason,
     )
     data.add(decision)
     data.flush()
@@ -914,6 +923,7 @@ def sign_decision(
                 "brief_version": row.version,
                 "brief_content_hash": version,
                 "outcome": payload.outcome,
+                "root_cause_attribution": attribution,
                 "follow_ups": rules.follow_up_types(follow_up_actions),
                 "supersedes_decision_id": str(current.id) if current is not None else None,
                 "signer_role": role,

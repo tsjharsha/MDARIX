@@ -54,9 +54,10 @@ const item = (overrides: Partial<SecondLookItem> = {}): SecondLookItem => ({
 });
 
 describe("the Complaints section", () => {
-  it("offers the second look, the backlog, the reportability watch and the settings, opening the tab a link names", () => {
+  it("offers the dispositions first, the second look, the backlog, the watch and the settings, opening the tab a link names", () => {
     const tabs = (markup: string) => [...markup.matchAll(/role="tab"[^>]*>([^<]+)</g)].map((match) => match[1]);
     expect(tabs(render(<ComplaintsSection />))).toEqual([
+      "Dispositions",
       "Second look",
       "Backlog",
       "Reportability",
@@ -64,9 +65,11 @@ describe("the Complaints section", () => {
       "Review settings",
       "Reporting windows",
     ]);
-    expect(render(<ComplaintsSection />)).toContain("Checking your records");
+    // Routine first: the complaints waiting for a disposition (T-G36).
+    expect(render(<ComplaintsSection />)).toContain("Complaints waiting, newest first");
+    expect(render(<ComplaintsSection tab="Second look" />)).toContain("Checking your records");
     expect(render(<ComplaintsSection tab="Backlog" />)).toContain("Reading your open complaints");
-    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Checking your records");
+    expect(render(<ComplaintsSection tab="Unknown" />)).toContain("Complaints waiting, newest first");
   });
 
   it("has its own address and menu entry", () => {

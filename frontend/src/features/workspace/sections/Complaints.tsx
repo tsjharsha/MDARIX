@@ -21,6 +21,7 @@ import { StatusBadge, countOf } from "./common";
 import { Hero, InlineError, Pager, ProductFilter } from "./boardParts";
 import { TrustBadge } from "./TrustBadge";
 import { ReportabilityWatch } from "./ReportabilityWatch";
+import { Dispositions } from "./Dispositions";
 import { ReportingWindows } from "./ReportingWindows";
 import { Starters } from "./Starters";
 import { ComplaintList } from "./ComplaintList";
@@ -76,10 +77,11 @@ import {
 export function ComplaintsSection({ tab }: { tab?: string }) {
   const [target] = useState(() => parseComplaintListTab(tab));
   const [active, setActive] = useState<ComplaintsTab>(() =>
-    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Second look"),
+    target.isList ? COMPLAINT_LIST_TAB : offeredTab(tab, COMPLAINTS_TABS, "Dispositions"),
   );
   return (
     <Tabs tabs={COMPLAINTS_TABS} active={active} onChange={setActive} label="Complaint sections">
+      {active === "Dispositions" && <Dispositions />}
       {active === "Second look" && <SecondLook />}
       {active === "Backlog" && <Backlog />}
       {active === "Reportability" && <ReportabilityWatch onOpenTab={setActive} />}

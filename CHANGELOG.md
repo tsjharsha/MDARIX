@@ -10,6 +10,104 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.53] - 2026-10-31
+
+On the trial maintenance line (`release/0.10`): the complaint disposition with its escalation triggers, the routine
+path, the trend of service-level matters, the classification screens, the root-cause attribution (disposition and case
+decision) and the risk-control question in the case's risk review (requirements T-G36, T-G36T, T-G36R, T-U13, T-G39,
+T-G1aR and T-SAM; the trial plan calls this release "0.10.52"). Built once for the trial and the pilot: the new routes
+are not part of `mvp-1.0`'s pilot-only gate. No AI anywhere in it; MDARIX submits nothing.
+
+**Migration `tr02complaintdispositions`** (`tr02_trial_complaint_dispositions.py`, chained from tr01; expand-only): one
+new table, `complaint_dispositions` (a complaint's disposition, in signed versions), with tenant row-level security,
+and two nullable columns on `decisions`, `root_cause_attribution` and `attribution_reason`. No existing row changes:
+the signing route requires the attribution for new signatures only. After the forward merge, `mvp-1.0` needs a merge
+revision joining its head and tr02. The production upgrade takes the usual backup and 8 GB disk check. The API and web
+images change. Run `scripts/refresh_trial_story.py --apply` to give running trials the routine sample complaints.
+
+### Added
+
+- Complaints › **Dispositions** (the first Complaints tab): open complaints in no case that are waiting for a
+  disposition, newest first, each marked Routine path or Standard path, and the signed dispositions. Each opens the
+  decision tree, its four questions answered in order with the branch taken and the branches refused shown:
+  1. **Is an escalation trigger met?** The starter triggers have the MVP's codes and are computed from fields the
+     trial already has: `SAFETY` (death; harm level catastrophic), `INJURY` (serious injury Yes, or a patient involved
+     with the outcome unknown; a harm level at or above a market's threshold), `REPORTABLE` (a market concluded
+     reportable; US question 5 Yes; an earlier "reported" decision), `RECURRENCE` (an open signal, or a recurring
+     service-level matter, on the same product and problem code that no open case covers) and `NEW_FAILURE_MODE` (a
+     problem code never recorded before on the product, not covered by an open case). Each met trigger is shown and
+     kept with its field, value and record; the other branches are refused and a case opens at once through the
+     existing open-case path. A trigger met at signing that was not met when the screen opened refuses the signature.
+  2. **Is it a known issue?** The open cases whose scope holds a complaint with the same product and problem code, or
+     the same lot. The complaint joins the chosen case's scope as a contributing complaint through a new scope version;
+     no case is opened.
+  3. **Resolved at service level?** The troubleshooting, the correction (part replaced, setting corrected, user
+     instructed, other), what was done, its result, the service ticket and why no investigation is needed (ISO
+     13485:2016 clause 8.2.2), with the **root-cause attribution**: device-related, use-related, environment-related,
+     or undetermined with a reason.
+  4. Otherwise **escalated by choice**, with a reason: a case opens.
+- One signature (password and authenticator code) per disposition, after a practice training acknowledgement on the
+  disposition rules `disposition-starter-1` and the coding criteria `coding-starter-1` (free trials only, as for market
+  conclusions). A signed disposition is never edited; a change is a new version with its reason, and the earlier one
+  stays visible. A signed service-level or known-issue disposition takes the complaint off the Backlog.
+- **The routine path**: for a complaint not on the reportability watch, with no open or confirmed second-look flag and
+  no trigger met, one screen shows the summary in the reporter's words, the basis for each enabled market ("not on
+  the reportability watch"), the classification and the disposition with service level pre-selected. The one
+  signature also covers a "not reportable" conclusion per enabled market, recorded under question set `ROUTINE-BASIS`;
+  the signature record lists every item it covers. The hands-on time from opening the screen to signing is recorded
+  and shown against the ten-minute target.
+- **Classification for trends** on the disposition screen: use environment and user type, proposed from the records
+  and confirmed by the signature, under the coding criteria `coding-starter-1` (shown behind "Show the coding
+  criteria"). A source value off the fixed lists stays Unknown with the source value shown; nothing is guessed. A
+  change of a confirmed classification needs a reason and is a new version. The trial import reads optional "use
+  environment" and "user type" columns as proposals.
+- Signals › **By resolution**: service-level, known-issue and escalated dispositions beside the complaint counts, by
+  product and problem code, lot, use environment, user type or attribution, filtered by the classification and the
+  attribution; Unknown is its own group.
+- Readiness checks **Complaints waiting for a disposition** (`DISPOSITIONS_DUE`: past the backlog target, dispositions
+  to review because a trigger is met after signing, and the escalations of the last 30 days for every Leader) and
+  **Recurring service-level matters** (`RECURRING_SERVICE_LEVEL`: two or more service-level resolutions on one product
+  and problem code within 30 days that no open case covers; starter threshold). The management review summary counts
+  the dispositions by branch and lists the escalations by trigger.
+- The case decision is signed only with its **root-cause attribution** ("undetermined" only with a reason), bound into
+  the signature through the decision's snapshot and shown on the signed decision record. Decisions signed before this
+  release show "Recorded before root-cause attribution".
+- The case's **risk review** asks, for each risk in the risk file it assessed, whether its risk control worked (yes, no
+  or not assessable, with a reason); a "no" and each new failure mode or hazard not in the risk file need a risk file
+  update with an owner and a due date. The review cannot be completed while a finding lacks its answer. The updates
+  show under Records › Risk file input as open reassessments, and as overdue after their date (ISO 14971:2019 clause
+  10). The answers sit in the review's `assessed` record; no migration.
+- Sample data: SAMPLE-RT-01 to SAMPLE-RT-05 (a filter re-seated on the phone, filed by Sample Distributor Europe; two
+  cable-wear repairs on PulseWatch 410, the earlier one signed at service level by the sample author three weeks ago;
+  an OrbitCare 300 lot 4 pressure alarm that is a known issue of SAMPLE-INV-001; a VentraLink 250 battery shutdown
+  that escalates by `NEW_FAILURE_MODE` and stays on the reportability watch), with proposed classifications on them
+  and on SAMPLE-RV-01 to RV-09 (SAMPLE-RT-02's "Step-down unit" stays Unknown). The sample parties "Sample Distributor
+  Europe (Sample)" and "Sample EU Authorised Representative (Sample)" are fixed constants. Sample removal removes them
+  and every disposition, classification and market conclusion made on them; the user's own acknowledgements stay
+  until the 30-day purge.
+
+### Changed
+
+- Getting started has ten chapters, routine first: 1 "Close a routine complaint in minutes" (new; it counts a signed
+  disposition), 2 "Assess a serious complaint per market", 3 "Recover complaints hidden as cancellations or
+  inquiries", then the trend, investigation, decision (now with its root-cause attribution), CAPA, risk file (now with
+  the risk-control question), inspector and own-data chapters.
+- SAMPLE-RT-01 and SAMPLE-RT-05 are VentraLink 250 Rev B complaints reported late: their events were 36 and 33 days
+  ago (lot 4, made 68 days ago), their awareness 2 days and 1 day ago. The trend check flags only OrbitCare 300, by
+  version, problem code or type, as the trial guide, the story and the videos say; RT-01 keeps the routine path and
+  RT-05 the `NEW_FAILURE_MODE` escalation on the reportability watch, with running clocks (owner decision 1,
+  `tests/test_free_trial.py`).
+- On the Dispositions board, a complaint whose expected branch is a known issue (an open case with the same product
+  and problem code, or the same lot) is marked "Known issue" and offers "Link to the open case"; "Routine path" and
+  "Close on the routine path" stay for service-level candidates, "Decide the disposition" for trigger cases (owner
+  decision 7). Its disposition screen opens with the known-issue branch and the matching open case pre-selected, not
+  service level; a trigger still wins.
+- The free trial end-to-end journey (`frontend/e2e/trial-journey.spec.ts`) follows the ten chapters: it closes
+  SAMPLE-RT-01 on the routine path (practice training, service record, attribution, one signature), opens the second
+  look from its tab, and signs the sample decision with its root-cause attribution.
+- In the user guide: Dispositions, the routine path, the classification, the attribution and the risk-control
+  question.
+
 ## [0.10.52] - 2026-10-31
 
 On the trial maintenance line (`release/0.10`): seriousness and causation assessed per market, the harm-severity scale,

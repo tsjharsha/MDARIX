@@ -11,8 +11,10 @@ MDARIX_SAMPLE) and quantities, once, to every trial that still holds its sample 
 trial's own records and its own reporting windows are never changed. The guided investigation also gets its
 sample Decision Brief, written by the sample author and waiting for quality review (backend/app/trial/sample_decision.py),
 unless the case already has a brief, and the per-market assessment's sample answers (a signed EU/NI example, a pending
-US draft and the harm complaints' severities, backend/app/trial/sample_assessments.py) unless they are there. Each
-trial is committed on its own, with an audit event.
+US draft and the harm complaints' severities, backend/app/trial/sample_assessments.py) unless they are there, and
+the routine complaints with their proposed classifications and a signed service-level example
+(backend/app/trial/sample_dispositions.py) unless they are there. Each trial is committed on its own, with an audit
+event.
 """
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
     )
     from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
+    from backend.app.trial.sample_dispositions import has_routine_examples, seed_routine_examples
 
     results = []
     for tenant_id, tenant_key, name in trials(db):
@@ -90,7 +93,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             )
             decision_missing = not has_sample_decision(session, tenant_id)
             assessments_missing = not has_sample_assessments(session, tenant_id)
-            if not story_missing and not lots_missing and not decision_missing and not assessments_missing:
+            routine_missing = not has_routine_examples(session, tenant_id)
+            if not (story_missing or lots_missing or decision_missing or assessments_missing or routine_missing):
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
             if not apply:
@@ -99,6 +103,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *([f"quantities for {lots_missing} sample lots"] if lots_missing else []),
                     *(["the sample decision brief"] if decision_missing else []),
                     *(["the sample market assessments"] if assessments_missing else []),
+                    *(["the routine sample complaints"] if routine_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -109,6 +114,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 added["decision"] = stage_sample_decision(session, tenant_id, now)
             if assessments_missing:
                 added["assessments"] = stage_sample_assessments(session, tenant_id, now)
+            if routine_missing:
+                added["routine"] = seed_routine_examples(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

@@ -93,6 +93,7 @@ def _body(brief: dict, **changes) -> dict:
         "brief_content_hash": brief["content_hash"],
         "outcome": "ACCEPT_CONCLUSION",
         "rationale": RATIONALE,
+        "root_cause_attribution": "DEVICE_RELATED",
         "password": PASSWORD,
     }
     body.update(changes)

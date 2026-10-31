@@ -42,6 +42,10 @@ import {
   toggled,
   type CaseReviews,
   type CompleteForm,
+  type Finding,
+  type NewHazard,
+  CONTROL_ANSWERS,
+  EMPTY_FINDING,
   type ContextItem,
   type Review,
   type ReviewDetail,
@@ -488,10 +492,26 @@ function AssessedSummary({ review }: { review: Review }) {
     .filter(Boolean);
   const risks = listOf(assessed.risk_ids).length;
   const notes = safeText(assessed.notes);
-  if (!markets.length && !risks && !notes) return null;
+  const findings = listOf(assessed.findings) as {
+    key: string;
+    risk_identifier?: string | null;
+    description?: string | null;
+    control_label?: string | null;
+    reason?: string | null;
+    risk_file_update?: { due_on: string } | null;
+  }[];
+  if (!markets.length && !risks && !notes && !findings.length) return null;
   return (
     <ul className="uw-intel-list" aria-label="What the reviewer assessed">
       {risks > 0 && <li>Risks assessed: {risks}</li>}
+      {findings.map((item) => (
+        <li key={item.key}>
+          {item.risk_identifier ?? (item.description ? `Not in the risk file: ${item.description}` : item.key)}
+          {item.control_label ? ` · risk control: ${item.control_label}` : ""}
+          {item.reason ? ` (${item.reason})` : ""}
+          {item.risk_file_update ? ` · risk file update due ${item.risk_file_update.due_on}` : ""}
+        </li>
+      ))}
       {markets.length > 0 && <li>Markets assessed: {markets.join(", ")}</li>}
       {notes && <li>Notes: {notes}</li>}
     </ul>
@@ -517,6 +537,9 @@ function CompleteForm({
   const problem = completeProblem(type, form);
   const set = (change: Partial<CompleteForm>) => setForm((value) => ({ ...value, ...change }));
   const risks = type === "RISK" ? assessableRisks(riskContext(review.context)) : [];
+  const people = useResource<{ id: string; display_name: string | null }[]>(
+    type === "RISK" ? "/api/v1/investigation-assignees" : null,
+  );
   const markets = type === "REGULATORY" ? assessableMarkets(regulatoryContext(review.context)) : [];
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -560,21 +583,91 @@ function CompleteForm({
       </label>
       {type === "RISK" && (
         <fieldset className="ca-fieldset">
-          <legend>Risks you assessed (optional)</legend>
+          <legend>Risks in the risk file you assessed: did each risk control work?</legend>
           {risks.length ? (
-            risks.map((item) => (
-              <label className="ca-check" key={item.key}>
-                <input
-                  type="checkbox"
-                  checked={form.riskIds.includes(String(item.id))}
-                  onChange={(event) => set({ riskIds: toggled(form.riskIds, String(item.id), event.target.checked) })}
-                />
-                {item.label}
-              </label>
-            ))
+            risks.map((item) => {
+              const id = String(item.id);
+              const finding = form.findings[id] ?? EMPTY_FINDING;
+              const setFinding = (change: Partial<Finding>) =>
+                set({ findings: { ...form.findings, [id]: { ...finding, ...change } } });
+              return (
+                <div key={item.key} className="uw-rv-finding">
+                  <label className="ca-check">
+                    <input
+                      type="checkbox"
+                      checked={form.riskIds.includes(id)}
+                      onChange={(event) => set({ riskIds: toggled(form.riskIds, id, event.target.checked) })}
+                    />
+                    {item.label}
+                  </label>
+                  {form.riskIds.includes(id) && (
+                    <div className="ca-form-grid">
+                      <label className="ca-field">
+                        Did its risk control work?
+                        <select
+                          value={finding.control}
+                          onChange={(event) => setFinding({ control: event.target.value })}
+                        >
+                          <option value="">Choose…</option>
+                          {CONTROL_ANSWERS.map((answer) => (
+                            <option key={answer.value} value={answer.value}>
+                              {answer.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="ca-field">
+                        Reason
+                        <input
+                          value={finding.reason}
+                          onChange={(event) => setFinding({ reason: event.target.value })}
+                        />
+                      </label>
+                      {finding.control === "NO" && (
+                        <UpdateFields
+                          people={people.data ?? []}
+                          ownerId={finding.ownerId}
+                          dueDay={finding.dueDay}
+                          onChange={(ownerId, dueDay) => setFinding({ ownerId, dueDay })}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
           ) : (
             <p className="ac-muted">The context lists no risks to choose from.</p>
           )}
+          <h4>New failure mode or hazard, not in the risk file</h4>
+          {form.newHazards.map((hazard, index) => {
+            const change = (patch: Partial<NewHazard>) =>
+              set({ newHazards: form.newHazards.map((item, at) => (at === index ? { ...item, ...patch } : item)) });
+            return (
+              <div key={index} className="ca-form-grid uw-rv-finding">
+                <label className="ca-field">
+                  Risk file update required: what is new
+                  <input value={hazard.description} onChange={(event) => change({ description: event.target.value })} />
+                </label>
+                <UpdateFields
+                  people={people.data ?? []}
+                  ownerId={hazard.ownerId}
+                  dueDay={hazard.dueDay}
+                  onChange={(ownerId, dueDay) => change({ ownerId, dueDay })}
+                />
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            className="ac-secondary"
+            onClick={() => set({ newHazards: [...form.newHazards, { description: "", ownerId: "", dueDay: "" }] })}
+          >
+            Add a new failure mode or hazard
+          </button>
+          <p className="ac-muted">
+            ISO 14971:2019 clause 10. Each risk file update shows under Records › Risk file input until it is done.
+          </p>
         </fieldset>
       )}
       {type === "REGULATORY" && (
@@ -620,6 +713,38 @@ function CompleteForm({
         </button>
       </div>
     </form>
+  );
+}
+
+function UpdateFields({
+  people,
+  ownerId,
+  dueDay,
+  onChange,
+}: {
+  people: { id: string; display_name: string | null }[];
+  ownerId: string;
+  dueDay: string;
+  onChange: (ownerId: string, dueDay: string) => void;
+}) {
+  return (
+    <>
+      <label className="ca-field">
+        Owner of the risk file update
+        <select value={ownerId} onChange={(event) => onChange(event.target.value, dueDay)}>
+          <option value="">Choose…</option>
+          {people.map((person) => (
+            <option key={person.id} value={person.id}>
+              {person.display_name ?? "A colleague"}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="ca-field">
+        Due date
+        <input type="date" value={dueDay} onChange={(event) => onChange(ownerId, event.target.value)} />
+      </label>
+    </>
   );
 }
 

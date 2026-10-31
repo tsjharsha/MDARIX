@@ -131,8 +131,9 @@ const chapter = (code: string, overrides: Partial<StoryChapter> = {}): StoryChap
 describe("the trial's story", () => {
   it("has a short name and an action for every chapter the server tells", () => {
     const codes = [
-      "HIDDEN_COMPLAINTS",
+      "ROUTINE_COMPLAINTS",
       "REPORTING_CLOCKS",
+      "HIDDEN_COMPLAINTS",
       "TRENDS_TO_CASES",
       "INVESTIGATE_WITH_AI",
       "DECIDE_AND_SIGN",

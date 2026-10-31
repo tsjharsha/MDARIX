@@ -1,6 +1,6 @@
 # MDARIX pilot guide
 
-This guide is for the people taking part in an MDARIX design-partner pilot: the customer administrator who sets the organization up, and the quality, risk and regulatory staff who take complaints from signal to a signed decision in it. It describes what MDARIX does today. MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. MDARIX does not submit anything to a regulator, and it never makes a regulated decision for you: authorized people decide, and sign.
+This guide is for the people taking part in an MDARIX design-partner pilot: the customer administrator who sets the organization up, and the quality, risk and regulatory staff who take complaints from signal to a signed decision in it. It describes what MDARIX does today. MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control. MDARIX helps you decide and proves it: routine complaints close at service level with a documented reason, and serious ones are assessed per market. MDARIX does not submit anything to a regulator, and it never makes a regulated decision for you: authorized people decide, and sign.
 
 ## From the free trial to the pilot
 

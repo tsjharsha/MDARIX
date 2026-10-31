@@ -140,19 +140,44 @@ describe("review actions", () => {
   it("sends only the assessed parts that were filled in", () => {
     expect(
       completeBody({
+        ...EMPTY_COMPLETE,
         outcome: "NO_CHANGE_REQUIRED",
         rationale: " Reason given here ",
-        riskIds: [],
-        markets: [],
         notes: " ",
       }),
     ).toEqual({ outcome: "NO_CHANGE_REQUIRED", rationale: "Reason given here", assessed: {} });
     expect(
-      completeBody({ outcome: "REPORTING_REQUIRED", rationale: "r", riskIds: ["r-1"], markets: ["DE"], notes: "n" }),
-    ).toEqual({
-      outcome: "REPORTING_REQUIRED",
-      rationale: "r",
-      assessed: { risk_ids: ["r-1"], markets: ["DE"], notes: "n" },
+      completeBody({ ...EMPTY_COMPLETE, outcome: "REPORTING_REQUIRED", rationale: "r", markets: ["DE"], notes: "n" }),
+    ).toEqual({ outcome: "REPORTING_REQUIRED", rationale: "r", assessed: { markets: ["DE"], notes: "n" } });
+  });
+
+  it("asks whether each assessed risk control worked, and a risk file update for a no or a new failure mode", () => {
+    const base = { ...EMPTY_COMPLETE, outcome: "NO_CHANGE_REQUIRED", rationale: "The review found what it found." };
+    const assessed = { ...base, riskIds: ["r-1"] };
+    expect(completeProblem("RISK", assessed)).toMatch(/risk control worked/);
+    const no = { control: "NO", reason: "The occlusion alarm did not sound", ownerId: "", dueDay: "" };
+    expect(completeProblem("RISK", { ...assessed, findings: { "r-1": no } })).toMatch(/owner and a due date/);
+    const ready = {
+      ...assessed,
+      findings: { "r-1": { ...no, ownerId: "u-1", dueDay: "2026-12-01" } },
+      newHazards: [{ description: "Battery shutdown with a full indicator", ownerId: "u-2", dueDay: "2026-12-01" }],
+    };
+    expect(completeProblem("RISK", ready)).toBeNull();
+    expect(completeProblem("RISK", { ...ready, newHazards: [{ description: "x", ownerId: "", dueDay: "" }] })).toMatch(
+      /new failure mode/,
+    );
+    expect(completeBody(ready).assessed).toEqual({
+      risk_ids: ["r-1"],
+      findings: [
+        {
+          risk_id: "r-1",
+          control_worked: "NO",
+          reason: "The occlusion alarm did not sound",
+          owner_user_id: "u-1",
+          due_on: "2026-12-01",
+        },
+        { description: "Battery shutdown with a full indicator", owner_user_id: "u-2", due_on: "2026-12-01" },
+      ],
     });
   });
 

@@ -576,6 +576,10 @@ class Decision(Base):
     superseded_by_decision_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     superseded_at = tz()
     supersede_reason: Mapped[str | None] = mapped_column(Text)
+    # tr02: the root-cause attribution the decision maker signs (DEVICE_RELATED, USE_RELATED, ENVIRONMENT_RELATED or
+    # UNDETERMINED with a reason); required for new signatures, empty on decisions signed before 0.10.53.
+    root_cause_attribution: Mapped[str | None] = mapped_column(String(30))
+    attribution_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         ForeignKeyConstraint(["tenant_id", "investigation_id"], ["investigations.tenant_id", "investigations.id"]),
         UniqueConstraint("tenant_id", "decision_identifier", name="uq_decisions_tenant_identifier"),
