@@ -278,7 +278,24 @@ describe("the disposition screens", () => {
       triggers: [],
       known_issue: [],
     } as BoardItem;
-    expect(render(<DispositionCard item={item} onOpen={vi.fn()} />)).toContain("Close on the routine path");
+    const routine = render(<DispositionCard item={item} onOpen={vi.fn()} />);
+    expect(routine).toContain("Close on the routine path");
+    expect(routine).toContain("Routine path");
+    // A known issue (an open case with the same product and problem code, or the same lot) links to that case.
+    const known = render(<DispositionCard item={{ ...item, known_issue: ["CASE-1"] }} onOpen={vi.fn()} />);
+    expect(known).toContain("Link to the open case");
+    expect(known).toContain("Known issue");
+    expect(known).not.toContain("Close on the routine path");
+    expect(known).not.toContain("Routine path");
+    // A trigger decides first, even with a matching open case.
+    const triggered = render(
+      <DispositionCard
+        item={{ ...item, routine_offered: false, triggers: ["NEW_FAILURE_MODE"], known_issue: ["CASE-1"] }}
+        onOpen={vi.fn()}
+      />,
+    );
+    expect(triggered).toContain("Decide the disposition");
+    expect(triggered).not.toContain("Link to the open case");
     expect(render(<DispositionCard item={{ ...item, disposition: signed }} onOpen={vi.fn()} />)).toContain(
       "Open the disposition",
     );

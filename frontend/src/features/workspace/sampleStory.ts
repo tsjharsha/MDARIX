@@ -75,7 +75,7 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
       "SAMPLE-CHG-014: OrbitCare 300 Rev B moved its pressure sensor to a new supplier and cut incoming inspection from 32 to 13 units per lot.",
       "Pressure-alarm complaints rose afterwards, mostly from lots 003 and 004.",
       "Lots carry quantities, so the rate is counted per unit in the field.",
-      "PulseWatch 410 stays flat. VentraLink 250 Rev B shows a higher rate from four recent complaints of different kinds, among them a new battery shutdown (SAMPLE-RT-05).",
+      "PulseWatch 410 and VentraLink 250 stay flat, as a background.",
     ],
     requirement: "Complaint data is analysed for trends, and a significant increase is reported.",
     reference: cite("ISO13485_8_4", "MDR_88"),
