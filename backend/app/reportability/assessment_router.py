@@ -4,8 +4,9 @@ For a complaint on the reportability watch: each market the organization enabled
 market's starter questions (each with its definition and clause), the harm-severity scale, the suggested conclusion
 and the person's signed conclusion. Reading is open to every signed-in member; saving and signing need
 regulatory.review or regulatory.approve, like the single decision did. A conclusion is signed with the current
-password and, when signatures require it, an authenticator code, after a training record (in a trial a practice
-acknowledgement) on the current version of the market's question set and of the scale. Administrators never sign.
+password and, when signatures require it, an authenticator code; in a free trial only, after a practice
+acknowledgement of the current version of the market's question set and of the scale (owner decision 6, 31 Oct 2026:
+other organisations may record one but are not refused without it). Administrators never sign.
 A signed version is never edited; a change is a new version. MDARIX never answers, never signs and never submits.
 
 These routes serve a free trial and a pilot alike: they are not part of mvp-1.0's ``_PILOT_API`` gate (T-B1).
@@ -152,6 +153,7 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         wanted_holders[market] = training.holders(db, tenant_id, training.for_market(market), exclude=str(ctx.user_id))
         refs |= set(wanted_holders[market])
     names = people(control_db, tenant_id, [ref for ref in refs if ref])
+    trial = is_trial(control_db, tenant_id)
     items = []
     for market in shown:
         versions = by_market.get(market, [])
@@ -189,7 +191,8 @@ def detail(db: Session, control_db: Session, ctx, complaint_id: uuid.UUID, today
         "severity_level": markets.level_of_severity(record.get("severity")),
         "answer_labels": markets.ANSWER_LABELS,
         "starter_mark": STARTER_MARK,
-        "practice_label": markets.PRACTICE_LABEL if is_trial(control_db, tenant_id) else None,
+        "practice_label": markets.PRACTICE_LABEL if trial else None,
+        "training_required": trial,
         "legacy_decision": (
             {**service.decision_view(legacy, names), "note": LEGACY_NOTE} if legacy is not None else None
         ),
@@ -363,7 +366,9 @@ def sign_conclusion(
         raise _error(403, "ADMINISTRATOR_CANNOT_SIGN", "Administrators cannot sign market conclusions")
     needed = training.for_market(market)
     untrained = training.missing(db, tenant_id, ctx.user_id, needed)
-    if untrained:
+    trial = is_trial(control_db, tenant_id)
+    # Decision 6 (31 Oct 2026): the practice-training rule binds trial organisations only; pilots get G40 later.
+    if untrained and trial:
         trained = training.holders(db, tenant_id, needed, exclude=str(ctx.user_id))
         names = people(control_db, tenant_id, trained)
         raise _error(
@@ -406,7 +411,6 @@ def sign_conclusion(
     windows = service.settings_of(db, tenant_id)["windows"]
     aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
     clock = markets.market_clock(market, conclusion, report_type, windows, aware, today)
-    trial = is_trial(control_db, tenant_id)
     material = {
         "complaint_id": str(complaint_id),
         "complaint": ref,
@@ -428,7 +432,7 @@ def sign_conclusion(
         "override_reason": override_reason or None,
         "report_type": report_type,
         "due_on": clock["due_date"] if clock else None,
-        "training": [document.as_dict() for document in needed],
+        "training": [document.as_dict() for document in needed if document not in untrained],
         "starter_mark": STARTER_MARK,
         "practice_label": markets.PRACTICE_LABEL if trial else None,
     }

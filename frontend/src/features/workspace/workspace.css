@@ -3786,6 +3786,23 @@ div.uw-task-count:hover {
   gap: 4px 14px;
 }
 .uw-ma-evidence {
+  gap: 2px 12px;
+  font-size: 12px;
+}
+/* Compact evidence: one line where it fits, not the 38px form-field inputs of .ca-field. */
+.uw-ma-evidence .ca-check {
+  gap: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.uw-ma-evidence input {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+.uw-ma-definition-toggle {
+  margin-left: auto;
+  padding: 2px 6px;
   font-size: 12px;
 }
 .uw-ma-levels {

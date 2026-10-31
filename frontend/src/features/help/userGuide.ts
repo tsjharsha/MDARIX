@@ -408,9 +408,9 @@ export const GUIDE_PARTS: readonly GuidePart[] = [
             who: "Regulatory Reviewer, Authorized Decision Maker, Leader.",
             steps: [
               "On Complaints › Reportability, filter Needs a decision, Overdue, Due soon or Missing answers, and choose Assess per market on a card. The market of the event's country is shown first; open any other enabled market from its tab.",
-              "Before your first signature, read the market's questions and the harm-severity scale and confirm I have read version … for each (a practice training acknowledgement in a free trial). The screen names colleagues who already hold one.",
+              "In a free trial, before your first signature, read the market's questions and the harm-severity scale and confirm I have read version … for each (a practice training acknowledgement). The screen names colleagues who already hold one.",
               "Check the harm level: the complaint's severity from your quality system is mapped on the scale, with the market's serious threshold. Choose another level only with a reason.",
-              "Answer each question Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. Each shows its definition, its clause and the Starter text mark.",
+              "Answer each question Yes, No, Unknown or Not applicable, with a rationale and the evidence relied on. Each shows its clause and the Starter text mark; Show definition opens its full definition.",
               "Choose Save answers to see the suggestion: Reportable (with its report type), Pending information (an Unknown could make it reportable) or Not reportable.",
               "Under Sign the conclusion, confirm the suggestion or override it with a reason, enter your password and authenticator code, and choose Save and sign.",
               "When your organization has reported, enter the Filing reference and Filed on date on the signed conclusion and choose Record the filing.",

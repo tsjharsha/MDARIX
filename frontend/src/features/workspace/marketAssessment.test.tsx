@@ -171,6 +171,7 @@ const detail = (market: MarketItem): AssessmentDetail => ({
   starter_mark: STARTER,
   practice_label:
     "Practice record: made in a free trial with sample or de-identified data. Not your regulatory record.",
+  training_required: true,
   legacy_decision: null,
 });
 
@@ -248,6 +249,28 @@ describe("the assessment screen", () => {
     expect(html).toContain("Authenticator code");
   });
 
+  it("keeps each definition behind an accessible Show definition toggle, collapsed at first", () => {
+    const html = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />);
+    const toggles = html.match(/<button type="button" class="ac-link uw-ma-definition-toggle"[^>]*>/g) ?? [];
+    expect(toggles).toHaveLength(QUESTIONS.length);
+    expect(toggles[0]).toContain('aria-expanded="false"');
+    const controls = /aria-controls="([^"]+)"/.exec(toggles[0] ?? "")?.[1];
+    expect(html).toContain(`<p id="${controls}" class="ac-muted" hidden="">Definition of US1</p>`);
+    expect(html.split("Show definition").length - 1).toBe(QUESTIONS.length);
+    // Read-only: the answers are disabled, the toggle is not.
+    const readOnly = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />, []);
+    expect(readOnly).toMatch(/<input type="radio" disabled=""/);
+    expect(readOnly).not.toMatch(/uw-ma-definition-toggle"[^>]*disabled/);
+  });
+
+  it("lets a non-trial organization sign without the practice training, and still record it", () => {
+    const pilot = { ...detail(item()), training_required: false, practice_label: null };
+    const html = render(<MarketPanel detail={pilot} item={item()} onSaved={vi.fn()} />);
+    expect(html).not.toContain("Before you sign");
+    expect(html).toContain("Training record on US-starter-1");
+    expect(html).toContain("signing here does not wait for this one");
+  });
+
   it("is read-only without regulatory review or approval", () => {
     const html = render(<MarketPanel detail={detail(item())} item={item()} onSaved={vi.fn()} />, []);
     expect(html).not.toContain("Save and sign");
@@ -281,7 +304,7 @@ describe("the assessment screen", () => {
   });
 
   it("names the document and version to acknowledge", () => {
-    const html = render(<TrainingPanel documents={item().training} colleagues={[]} onDone={vi.fn()} />);
+    const html = render(<TrainingPanel documents={item().training} colleagues={[]} required onDone={vi.fn()} />);
     expect(html).toContain("I have read version US-starter-1");
     expect(html).toContain("No colleague holds a current acknowledgement yet.");
     expect(html).toContain("ISO 13485 clause 6.2");
