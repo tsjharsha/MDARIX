@@ -212,6 +212,9 @@ def case_of(db: Session, tenant_id: uuid.UUID, case_id) -> Investigation | None:
 
 
 def case_ref(case: Investigation) -> str:
+    """ "SAMPLE-INV-001 (INV000001)": the case's own identifier and the ID MDARIX gave it."""
+    if case.business_id and case.investigation_identifier and case.business_id != case.investigation_identifier:
+        return f"{case.investigation_identifier} ({case.business_id})"
     return case.business_id or case.investigation_identifier
 
 
@@ -400,7 +403,7 @@ def investigation_report(db: Session, tenant_id: uuid.UUID, *, case: Investigati
             decision_rows.append(
                 row(
                     f"Signed decision: record {record.business_id}, signed by {signer} ({label(record.signer_role)}) on "
-                    f"{record.signed_at.isoformat(timespec='minutes')}; meaning: {record.signature_meaning} "
+                    f"{record.signed_at.isoformat(timespec='minutes')}; meaning: {record.signature_meaning.rstrip('. ')}. "
                     f"Fingerprint (SHA-256): {record.content_fingerprint}.",
                     [*decision_source, src("Signature", record.id, record.business_id, case.id)],
                 )
@@ -488,7 +491,8 @@ def finding_rows(db: Session, tenant_id, reviews: list[CaseReview], control_db=N
                         f"Risk file update required ({subject}); owner {owners.get(update.get('owner_user_id'), 'a colleague')}, "
                         f"due {update.get('due_on')}"
                         + (f", QMS reference {update['qms_reference']}" if update.get("qms_reference") else "")
-                        + f" (review {review.business_id}, finding {key}).",
+                        + f" (review {review.business_id}"
+                        + (f", finding {key})." if key.startswith("NEW-") else ")."),
                         sources,
                     )
                 )

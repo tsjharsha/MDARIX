@@ -675,7 +675,7 @@ def management_review(
                 f"Service-level trend: {matter['count']} service-level resolutions of "
                 f"{matter['problem_code'].replace('_', ' ').lower()} on {matter['product_name']} within "
                 f"{triggers.RECURRING_DAYS} days; no case covers it.",
-                [src("Disposition", ids.get(ref), ref) for ref in matter["complaints"]],
+                [src("Complaint", ids.get(ref), ref) for ref in matter["complaints"]],
             )
         )
 

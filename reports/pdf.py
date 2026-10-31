@@ -35,6 +35,8 @@ def escape(value: str) -> str:
             out.append("\\" + ch)
         elif ch in WIN_ANSI:
             out.append(WIN_ANSI[ch])
+        elif ch == "→":  # not in the fonts' encoding: written as an ASCII arrow
+            out.append("->")
         elif ch in "\r\n\t":
             out.append(" ")
         elif ord(ch) < 32 or ord(ch) > 255:

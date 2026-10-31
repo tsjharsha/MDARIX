@@ -145,3 +145,11 @@ def test_the_pdf_and_the_docx_carry_the_version_clauses_labels_records_and_signa
     assert b"PRACTICE RECORD - NOT YOUR REGULATORY RECORD" in render.render_pdf(_view(signed=False))
     no_trial = {**_view(signed=False), "practice_label": None}
     assert b"DRAFT - NOT SIGNED" in render.render_pdf(no_trial)
+
+
+def test_the_pms_loop_arrows_print_in_the_pdf():
+    from reports.pdf import escape
+
+    from backend.app.readiness_home.summary import PMS_FRAMING
+
+    assert "PMS -> risk management -> clinical evaluation -> PSUR -> back to the PMS plan" in escape(PMS_FRAMING)
