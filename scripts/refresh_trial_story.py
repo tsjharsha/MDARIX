@@ -10,7 +10,9 @@ trend check counts by (md43), and its signals wait for the scheduler. This adds 
 MDARIX_SAMPLE) and quantities, once, to every trial that still holds its sample data, then runs signal detection; a
 trial's own records and its own reporting windows are never changed. The guided investigation also gets its
 sample Decision Brief, written by the sample author and waiting for quality review (backend/app/trial/sample_decision.py),
-unless the case already has a brief. Each trial is committed on its own, with an audit event.
+unless the case already has a brief, and the per-market assessment's sample answers (a signed EU/NI example, a pending
+US draft and the harm complaints' severities, backend/app/trial/sample_assessments.py) unless they are there. Each
+trial is committed on its own, with an audit event.
 """
 
 from __future__ import annotations
@@ -66,6 +68,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
         seed_lot_quantities,
         seed_story_examples,
     )
+    from backend.app.trial.sample_assessments import has_sample_assessments, stage_sample_assessments
     from backend.app.trial.sample_decision import has_sample_decision, stage_sample_decision
 
     results = []
@@ -86,7 +89,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                 .count()
             )
             decision_missing = not has_sample_decision(session, tenant_id)
-            if not story_missing and not lots_missing and not decision_missing:
+            assessments_missing = not has_sample_assessments(session, tenant_id)
+            if not story_missing and not lots_missing and not decision_missing and not assessments_missing:
                 results.append({"tenant": tenant_key, "name": name, "result": "already has the story"})
                 continue
             if not apply:
@@ -94,6 +98,7 @@ def refresh(db: Session, apply: bool) -> list[dict]:
                     *(["the story"] if story_missing else []),
                     *([f"quantities for {lots_missing} sample lots"] if lots_missing else []),
                     *(["the sample decision brief"] if decision_missing else []),
+                    *(["the sample market assessments"] if assessments_missing else []),
                 ]
                 results.append({"tenant": tenant_key, "name": name, "result": f"would add {' and '.join(wanted)}"})
                 continue
@@ -102,6 +107,8 @@ def refresh(db: Session, apply: bool) -> list[dict]:
             added["lot_quantities"] = seed_lot_quantities(session, tenant_id)
             if decision_missing:
                 added["decision"] = stage_sample_decision(session, tenant_id, now)
+            if assessments_missing:
+                added["assessments"] = stage_sample_assessments(session, tenant_id, now)
             session.add(
                 make_audit_event(
                     tenant_id=tenant_id,

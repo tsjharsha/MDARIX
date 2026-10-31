@@ -139,12 +139,35 @@ def reporting_clocks(db: Session, tenant_id, today) -> bytes:
                 binding.get("due_date"),
                 binding.get("days_left"),
                 _labels(item.get("follow_ups")),
+                _markets(item.get("markets")),
             ]
         )
     return _csv(
-        ["Complaint", "Source ID", "Product", "Country", "State", "Window", "Due", "Days left", "Missing answers"],
+        [
+            "Complaint",
+            "Source ID",
+            "Product",
+            "Country",
+            "State",
+            "Window",
+            "Due",
+            "Days left",
+            "Missing answers",
+            "Markets",
+        ],
         rows,
     )
+
+
+def _markets(found) -> str:
+    """Each market the complaint is assessed for, with its state ("US: draft (pending information); EU_NI: ...")."""
+    parts = []
+    for item in found or []:
+        state = str(item.get("state") or "").lower().replace("_", " ")
+        if item.get("state") == "DRAFT" and item.get("suggested"):
+            state += f" ({str(item['suggested']).lower().replace('_', ' ')})"
+        parts.append(f"{item.get('market')}: {state}")
+    return "; ".join(parts)
 
 
 def harm_closed(db: Session, tenant_id, today) -> bytes:

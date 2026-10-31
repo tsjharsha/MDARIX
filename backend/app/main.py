@@ -65,7 +65,9 @@ from backend.app.investigation_open_router import router as investigation_open_r
 from backend.app.case_workflow.router import router as case_workflow_router
 from backend.app.complaints_router import router as complaints_router
 from backend.app.complaint_review.router import router as complaint_review_router
+from backend.app.reportability.assessment_router import router as market_assessment_router
 from backend.app.reportability.router import router as reportability_router
+from backend.app.signer_training.router import router as signer_training_router
 from backend.app.capa_effectiveness.router import router as capa_effectiveness_router
 from backend.app.case_ai.router import router as case_ai_router
 from backend.app.readiness_home.router import router as readiness_router
@@ -441,6 +443,8 @@ app.include_router(investigation_assignees_router)
 app.include_router(complaints_router)
 app.include_router(complaint_review_router)  # Second look and backlog board (md40)
 app.include_router(reportability_router)  # Reportability watch and reporting windows (md41)
+app.include_router(market_assessment_router)  # Seriousness and causation per market, signed conclusions (tr01)
+app.include_router(signer_training_router)  # Training on the current version of what a signature relies on (tr01)
 app.include_router(capa_effectiveness_router)  # CAPA effectiveness checks (md41)
 app.include_router(case_ai_router)  # The case AI run in one pass (md42)
 app.include_router(readiness_router)  # Readiness: the inspector's checks and the management review summary
