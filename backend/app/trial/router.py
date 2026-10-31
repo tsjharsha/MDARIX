@@ -616,7 +616,8 @@ def book_trial_demo(
                 "phone": phone,
                 "preferred_time": row.preferred_time or "",
                 "progress": f"{reached['acted_count']} of {reached['total']} story chapters tried, "
-                f"{context['days_left']} days left" + (", own data uploaded" if context["own_data"] else ""),
+                f"{context['days_left']} day{'' if context['days_left'] == 1 else 's'} left"
+                + (", own data uploaded" if context["own_data"] else ""),
                 "focus": tuple(focus),
                 "note": row.note or "",
             },

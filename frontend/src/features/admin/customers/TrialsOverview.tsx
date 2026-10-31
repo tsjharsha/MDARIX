@@ -23,6 +23,7 @@ import {
 } from "../../customer-admin/shared";
 import { useServerSort, type SortState } from "../../../app/tableSort";
 import { Pager } from "../areas/common";
+import { plural } from "../../customer-admin/labels";
 import {
   TRIAL_SORT_KEYS,
   TRIAL_STATE_FILTERS,
@@ -258,7 +259,7 @@ export function TrialsOverviewView({
                   {item.name}
                 </button>
                 <span>
-                  {item.days_left} days left · {item.story.acted_count} of {item.story.total} chapters · next:{" "}
+                  {plural(item.days_left, "day")} left · {item.story.acted_count} of {item.story.total} chapters · next:{" "}
                   {nextChapterTitle(item, data?.chapters ?? [])}
                 </span>
               </li>
@@ -324,7 +325,7 @@ export function TrialsOverviewView({
                     <small>
                       {row.state === "ENDED"
                         ? retentionText(row.retention, formatDate, row.data_deleted_at)
-                        : `${row.days_left} days left`}
+                        : `${plural(row.days_left, "day")} left`}
                     </small>
                     {row.state !== "ENDED" && row.retention?.held_for_mvp_request && (
                       <small>{retentionText(row.retention, formatDate)}</small>

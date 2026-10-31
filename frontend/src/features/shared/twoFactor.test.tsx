@@ -120,6 +120,8 @@ describe("two-factor sign-in on one's own account", () => {
     expect(html).toContain("Current password");
     expect(html).toContain("Code from your current app, or a recovery code");
     expect(html).toContain("Replace authenticator app");
+    // New recovery codes are a step of their own, in My Account › Security.
+    expect(html).toContain("open My Account › Security and choose Generate new recovery codes");
     expect(html).toContain('href="/app"');
     expect(html).not.toContain("QR code to add MDARIX");
   });
