@@ -392,6 +392,8 @@ def test_another_organization_cannot_read_dispositions_and_removal_and_purge_cov
     story = user.get("/api/v1/trial/story").json()
     chapter = next(item for item in story["chapters"] if item["code"] == "ROUTINE_COMPLAINTS")
     assert chapter["number"] == 1 and chapter["acted"]["count"] >= 3  # RT-01 (twice), RT-02, RT-04, RT-05
+    serious = next(item for item in story["chapters"] if item["code"] == "REPORTING_CLOCKS")
+    assert serious["acted"]["count"] == 0  # the routine path's market conclusions count in chapter 1 only
 
     # The management review summary counts the dispositions by branch and the escalations by trigger.
     summary = user.get("/api/v1/readiness/summary").json()["dispositions"]

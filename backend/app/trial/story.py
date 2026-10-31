@@ -188,7 +188,12 @@ def chapter_counters() -> tuple:
         (
             "REPORTING_CLOCKS",
             ComplaintMarketAssessment,
-            (ComplaintMarketAssessment.conclusion.isnot(None), ComplaintMarketAssessment.source_system.is_(None)),
+            (
+                ComplaintMarketAssessment.conclusion.isnot(None),
+                ComplaintMarketAssessment.source_system.is_(None),
+                # The routine path's "not reportable" conclusions belong to chapter 1, not to this chapter.
+                ComplaintMarketAssessment.question_set != "ROUTINE-BASIS",
+            ),
         ),
         ("TRENDS_TO_CASES", InvestigationSignal, ()),
         # A question asked of MDARIX, or an analysis a person started (the case page's automatic first run does not

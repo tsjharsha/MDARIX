@@ -328,7 +328,7 @@ def summary_of(complaint: Complaint, product_name, version, lot) -> dict:
         "version": version,
         "lot": lot,
         "description": complaint.description,
-        "source": complaint.reporter_type or complaint.source_system,
+        "source": complaint.reporter_type,
         "reporter_type": complaint.reporter_type,
         "problem_code": complaint.problem_code,
         "country": complaint.country,

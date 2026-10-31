@@ -253,8 +253,16 @@ describe("the disposition screens", () => {
     expect(html).toContain("Standard path");
     expect(html).toContain("BATTERY_SHUTDOWN not recorded before");
     expect(html).toContain("Refused: a trigger is met");
-    expect(html).toContain("assess each market under Complaints › Reportability");
+    expect(html).toContain("its market assessment is still due under Complaints › Reportability");
     expect(html).not.toContain("I have read version");
+  });
+
+  it("shows a signed disposition as signed, with a new version only on request", () => {
+    const html = render(
+      <DispositionPanel screen={screen({ current: signed, version: 1 })} onSigned={vi.fn()} onTrained={vi.fn()} />,
+    );
+    expect(html).toContain("Sign a new version");
+    expect(html).not.toContain("Is an escalation trigger met?");
   });
 
   it("shows a signed version with its record, attribution and hands-on time, and a card per complaint", () => {

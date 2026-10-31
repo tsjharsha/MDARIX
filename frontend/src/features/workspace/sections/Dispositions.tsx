@@ -257,6 +257,8 @@ export function DispositionPanel({
   const [form, setForm] = useState<DispositionForm>(() => formOf(screen));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // A signed disposition is shown as signed; changing it is a new version, opened on request.
+  const [changing, setChanging] = useState(!screen.current);
   const complaint = screen.complaint;
   const triggered = screen.trigger_codes.length > 0;
   const missing = screen.training_required ? screen.training.filter((item) => item.state !== "CURRENT") : [];
@@ -296,355 +298,389 @@ export function DispositionPanel({
       </section>
 
       {screen.current && <SignedDisposition version={screen.current} />}
+      {screen.current && (
+        <ul className="uw-dp-basis">
+          <li>
+            Classification: {screen.use_environments[proposed.use_environment] ?? proposed.use_environment}
+            {proposed.use_environment_text ? ` (${proposed.use_environment_text})` : ""} ·{" "}
+            {screen.user_types[proposed.user_type] ?? proposed.user_type}
+            {proposed.state === "CONFIRMED"
+              ? `, confirmed by ${proposed.confirmed_by} under ${proposed.coding_criteria_version}`
+              : ", proposed"}
+          </li>
+          {screen.current.routine_path && screen.routine.markets.length > 0 && (
+            <li>
+              Market conclusions on the routine basis: not reportable for{" "}
+              {screen.routine.markets.map((market) => market.label).join(", ")}
+            </li>
+          )}
+        </ul>
+      )}
+      {screen.reportability.on_watch && (
+        <p className="uw-hint">
+          The disposition never replaces the reportability assessment:{" "}
+          {screen.reportability.settled
+            ? "its markets are concluded."
+            : "its market assessment is still due under Complaints › Reportability."}
+        </p>
+      )}
 
-      <section className={`ca-drawer-section uw-dp-path tone-${screen.routine.offered ? "good" : "warning"}`}>
-        {screen.routine.offered ? (
-          <>
-            <h4>
-              <Timer size={15} aria-hidden="true" /> Routine path: one screen, one signature
-            </h4>
-            <ul className="uw-dp-basis">
-              {screen.routine.markets.map((market) => (
-                <li key={market.market}>
-                  <strong>{market.label}</strong>: not reportable. {screen.routine.basis}.
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <>
-            <h4>Standard path</h4>
-            <ul className="uw-dp-basis">
-              {screen.routine.blocked.map((reason) => (
-                <li key={reason}>{reason}</li>
-              ))}
-            </ul>
-            {screen.reportability.on_watch && (
-              <p className="uw-hint">
-                The disposition never replaces the reportability assessment:{" "}
-                {screen.reportability.settled
-                  ? "its markets are concluded."
-                  : "assess each market under Complaints › Reportability."}
-              </p>
-            )}
-          </>
-        )}
-      </section>
-
-      <form onSubmit={sign}>
-        <ol className="uw-dp-tree" aria-label="Decision tree">
-          <li className={`uw-dp-step is-${states.TRIGGER === "taken" ? "taken" : "no"}`}>
-            <QuestionHead number={1} text="Is an escalation trigger met?" state={triggered ? "taken" : "no"} />
-            {triggered ? (
-              <ul className="uw-dp-facts">
-                {screen.triggers.map((item) => (
-                  <li key={`${item.code}-${item.field}`}>
-                    <ToneBadge tone="critical" label={item.code} /> {item.fact}
-                  </li>
-                ))}
-              </ul>
+      {screen.current && !changing && canSign && (
+        <div className="ca-action-row">
+          <button type="button" className="ac-secondary" onClick={() => setChanging(true)}>
+            Sign a new version
+          </button>
+        </div>
+      )}
+      {changing && (
+        <>
+          <section className={`ca-drawer-section uw-dp-path tone-${screen.routine.offered ? "good" : "warning"}`}>
+            {screen.routine.offered ? (
+              <>
+                <h4>
+                  <Timer size={15} aria-hidden="true" /> Routine path: one screen, one signature
+                </h4>
+                <ul className="uw-dp-basis">
+                  {screen.routine.markets.map((market) => (
+                    <li key={market.market}>
+                      <strong>{market.label}</strong>: not reportable. {screen.routine.basis}.
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
-              <p className="uw-cr-meta">No: none of the five starter triggers is met.</p>
+              <>
+                <h4>Standard path</h4>
+                <ul className="uw-dp-basis">
+                  {screen.routine.blocked.map((reason) => (
+                    <li key={reason}>{reason}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+
+          <form onSubmit={sign}>
+            <ol className="uw-dp-tree" aria-label="Decision tree">
+              <li className={`uw-dp-step is-${states.TRIGGER === "taken" ? "taken" : "no"}`}>
+                <QuestionHead number={1} text="Is an escalation trigger met?" state={triggered ? "taken" : "no"} />
+                {triggered ? (
+                  <ul className="uw-dp-facts">
+                    {screen.triggers.map((item) => (
+                      <li key={`${item.code}-${item.field}`}>
+                        <ToneBadge tone="critical" label={item.code} /> {item.fact}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="uw-cr-meta">No: none of the five starter triggers is met.</p>
+                )}
+                <details className="uw-dp-show">
+                  <summary>Show the triggers</summary>
+                  <dl>
+                    {screen.trigger_rules.map((rule) => (
+                      <div key={rule.code}>
+                        <dt>{rule.label}</dt>
+                        <dd>{rule.definition}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
+                {triggered && (
+                  <label className="ca-field">
+                    Why the case is needed
+                    <textarea
+                      rows={2}
+                      value={form.rationale}
+                      onChange={(event) => set({ rationale: event.target.value })}
+                    />
+                  </label>
+                )}
+              </li>
+
+              <li className={`uw-dp-step is-${states.KNOWN_ISSUE}`}>
+                <QuestionHead number={2} text="Is it a known issue?" state={states.KNOWN_ISSUE} />
+                {screen.candidates.length ? (
+                  <fieldset className="uw-dp-choices" disabled={triggered}>
+                    <legend className="uw-cr-meta">
+                      Open cases with the same product and problem code, or the same lot
+                    </legend>
+                    {screen.candidates.map((item) => (
+                      <label key={item.id} className="uw-dp-choice">
+                        <input
+                          type="radio"
+                          name="branch"
+                          checked={form.branch === "KNOWN_ISSUE" && form.caseId === item.id}
+                          onChange={() => set({ branch: "KNOWN_ISSUE", caseId: item.id })}
+                        />
+                        <span>
+                          <strong>{item.identifier}</strong> {item.question}{" "}
+                          <span className="uw-cr-meta">({item.match.join(", ")})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                ) : (
+                  <p className="uw-cr-meta">
+                    No: no open case holds the same product and problem code, or the same lot.
+                  </p>
+                )}
+                {!triggered && form.branch === "KNOWN_ISSUE" && (
+                  <label className="ca-field">
+                    Why it is the same issue
+                    <textarea
+                      rows={2}
+                      value={form.rationale}
+                      onChange={(event) => set({ rationale: event.target.value })}
+                    />
+                  </label>
+                )}
+                {!triggered && screen.candidates.length > 0 && form.branch !== "KNOWN_ISSUE" && (
+                  <label className="ca-field">
+                    Why it is not that known issue
+                    <input
+                      value={form.notKnownReason}
+                      onChange={(event) => set({ notKnownReason: event.target.value })}
+                    />
+                  </label>
+                )}
+              </li>
+
+              <li className={`uw-dp-step is-${states.SERVICE_LEVEL}`}>
+                <QuestionHead number={3} text="Was it resolved at service level?" state={states.SERVICE_LEVEL} />
+                <label className="uw-dp-choice">
+                  <input
+                    type="radio"
+                    name="branch"
+                    disabled={triggered}
+                    checked={form.branch === "SERVICE_LEVEL"}
+                    onChange={() => choose("SERVICE_LEVEL")}
+                  />
+                  <span>Yes, resolved at service level</span>
+                </label>
+                {form.branch === "SERVICE_LEVEL" && !triggered && (
+                  <div className="uw-dp-record">
+                    <label className="ca-field">
+                      Troubleshooting done
+                      <input
+                        value={form.record.troubleshooting}
+                        onChange={(event) => setRecord("troubleshooting", event.target.value)}
+                      />
+                    </label>
+                    <div className="ca-form-grid">
+                      <label className="ca-field">
+                        Correction
+                        <select
+                          value={form.record.correction_type}
+                          onChange={(event) => setRecord("correction_type", event.target.value)}
+                        >
+                          <option value="">Choose…</option>
+                          {Object.entries(screen.corrections).map(([code, label]) => (
+                            <option key={code} value={code}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="ca-field">
+                        Service ticket
+                        <input
+                          value={form.record.service_ticket}
+                          onChange={(event) => setRecord("service_ticket", event.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <label className="ca-field">
+                      What was done
+                      <input
+                        value={form.record.correction}
+                        onChange={(event) => setRecord("correction", event.target.value)}
+                      />
+                    </label>
+                    <label className="ca-field">
+                      Result
+                      <input value={form.record.result} onChange={(event) => setRecord("result", event.target.value)} />
+                    </label>
+                    <label className="ca-field">
+                      Why no investigation is needed ({screen.no_investigation_clause})
+                      <textarea
+                        rows={2}
+                        value={form.record.no_investigation_rationale}
+                        onChange={(event) => setRecord("no_investigation_rationale", event.target.value)}
+                      />
+                    </label>
+                    <fieldset className="uw-dp-choices">
+                      <legend>Root-cause attribution</legend>
+                      <div className="uw-dp-inline">
+                        {screen.attributions.map((item) => (
+                          <label key={item.code} className="uw-dp-choice">
+                            <input
+                              type="radio"
+                              name="attribution"
+                              checked={form.attribution === item.code}
+                              onChange={() => set({ attribution: item.code })}
+                            />
+                            {item.label}
+                          </label>
+                        ))}
+                      </div>
+                      <details className="uw-dp-show">
+                        <summary>Show definitions</summary>
+                        <dl>
+                          {screen.attributions.map((item) => (
+                            <div key={item.code}>
+                              <dt>{item.label}</dt>
+                              <dd>{item.definition}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </details>
+                      {form.attribution === "UNDETERMINED" && (
+                        <label className="ca-field">
+                          Why the cause cannot be attributed
+                          <input
+                            value={form.attributionReason}
+                            onChange={(event) => set({ attributionReason: event.target.value })}
+                          />
+                        </label>
+                      )}
+                    </fieldset>
+                  </div>
+                )}
+              </li>
+
+              <li className={`uw-dp-step is-${states.CHOICE}`}>
+                <QuestionHead number={4} text="Otherwise: escalate by choice" state={states.CHOICE} />
+                <label className="uw-dp-choice">
+                  <input
+                    type="radio"
+                    name="branch"
+                    disabled={triggered}
+                    checked={form.branch === "ESCALATED_BY_CHOICE"}
+                    onChange={() => choose("ESCALATED_BY_CHOICE")}
+                  />
+                  <span>Escalate: open a case</span>
+                </label>
+                {form.branch === "ESCALATED_BY_CHOICE" && (
+                  <label className="ca-field">
+                    Why you escalate it
+                    <textarea
+                      rows={2}
+                      value={form.rationale}
+                      onChange={(event) => set({ rationale: event.target.value })}
+                    />
+                  </label>
+                )}
+              </li>
+            </ol>
+
+            <section className="ca-drawer-section">
+              <h4>Classification for trends</h4>
+              <div className="ca-form-grid">
+                <ClassificationField
+                  label="Use environment"
+                  options={screen.use_environments}
+                  value={form.useEnvironment}
+                  text={form.useEnvironmentText}
+                  source={proposed.source_values.use_environment}
+                  onChange={(value, text) => set({ useEnvironment: value, useEnvironmentText: text })}
+                />
+                <ClassificationField
+                  label="User type"
+                  options={screen.user_types}
+                  value={form.userType}
+                  text={form.userTypeText}
+                  source={proposed.source_values.user_type}
+                  onChange={(value, text) => set({ userType: value, userTypeText: text })}
+                />
+              </div>
+              <p className="uw-cr-meta">
+                {proposed.state === "CONFIRMED"
+                  ? `Confirmed by ${proposed.confirmed_by}`
+                  : "Proposed: your signature confirms it"}{" "}
+                · coding criteria {screen.coding_criteria.version} · Unknown is never guessed
+              </p>
+              <details className="uw-dp-show">
+                <summary>Show the coding criteria</summary>
+                <ul>
+                  {screen.coding_criteria.rules.map((rule) => (
+                    <li key={rule}>{rule}</li>
+                  ))}
+                </ul>
+              </details>
+            </section>
+
+            {missing.length > 0 && (
+              <TrainingPanel
+                documents={missing}
+                colleagues={screen.trained_colleagues}
+                required
+                onDone={onTrained}
+                note="Read the disposition rules and the coding criteria (Show, below), then confirm each."
+              />
             )}
             <details className="uw-dp-show">
-              <summary>Show the triggers</summary>
-              <dl>
-                {screen.trigger_rules.map((rule) => (
-                  <div key={rule.code}>
-                    <dt>{rule.label}</dt>
-                    <dd>{rule.definition}</dd>
-                  </div>
+              <summary>Show the disposition rules ({screen.disposition_rules.version})</summary>
+              <ol>
+                {screen.disposition_rules.rules.map((rule) => (
+                  <li key={rule}>{rule}</li>
                 ))}
-              </dl>
+              </ol>
             </details>
-            {triggered && (
-              <label className="ca-field">
-                Why the case is needed
-                <textarea
-                  rows={2}
-                  value={form.rationale}
-                  onChange={(event) => set({ rationale: event.target.value })}
-                />
-              </label>
-            )}
-          </li>
+            <p className="uw-ma-starter" role="note">
+              <FileWarning size={15} aria-hidden="true" /> {screen.starter_mark}
+            </p>
 
-          <li className={`uw-dp-step is-${states.KNOWN_ISSUE}`}>
-            <QuestionHead number={2} text="Is it a known issue?" state={states.KNOWN_ISSUE} />
-            {screen.candidates.length ? (
-              <fieldset className="uw-dp-choices" disabled={triggered}>
-                <legend className="uw-cr-meta">
-                  Open cases with the same product and problem code, or the same lot
-                </legend>
-                {screen.candidates.map((item) => (
-                  <label key={item.id} className="uw-dp-choice">
-                    <input
-                      type="radio"
-                      name="branch"
-                      checked={form.branch === "KNOWN_ISSUE" && form.caseId === item.id}
-                      onChange={() => set({ branch: "KNOWN_ISSUE", caseId: item.id })}
-                    />
-                    <span>
-                      <strong>{item.identifier}</strong> {item.question}{" "}
-                      <span className="uw-cr-meta">({item.match.join(", ")})</span>
-                    </span>
+            {canSign ? (
+              <section className="ca-drawer-section uw-dp-sign">
+                <h4>
+                  <CheckCircle2 size={15} aria-hidden="true" /> One signature covers
+                </h4>
+                <ul>
+                  {covers(screen, form.branch).map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                {screen.current && (
+                  <label className="ca-field">
+                    Why the disposition changes (a new version)
+                    <input value={form.changeReason} onChange={(event) => set({ changeReason: event.target.value })} />
                   </label>
-                ))}
-              </fieldset>
-            ) : (
-              <p className="uw-cr-meta">No: no open case holds the same product and problem code, or the same lot.</p>
-            )}
-            {!triggered && form.branch === "KNOWN_ISSUE" && (
-              <label className="ca-field">
-                Why it is the same issue
-                <textarea
-                  rows={2}
-                  value={form.rationale}
-                  onChange={(event) => set({ rationale: event.target.value })}
-                />
-              </label>
-            )}
-            {!triggered && screen.candidates.length > 0 && form.branch !== "KNOWN_ISSUE" && (
-              <label className="ca-field">
-                Why it is not that known issue
-                <input value={form.notKnownReason} onChange={(event) => set({ notKnownReason: event.target.value })} />
-              </label>
-            )}
-          </li>
-
-          <li className={`uw-dp-step is-${states.SERVICE_LEVEL}`}>
-            <QuestionHead number={3} text="Was it resolved at service level?" state={states.SERVICE_LEVEL} />
-            <label className="uw-dp-choice">
-              <input
-                type="radio"
-                name="branch"
-                disabled={triggered}
-                checked={form.branch === "SERVICE_LEVEL"}
-                onChange={() => choose("SERVICE_LEVEL")}
-              />
-              <span>Yes, resolved at service level</span>
-            </label>
-            {form.branch === "SERVICE_LEVEL" && !triggered && (
-              <div className="uw-dp-record">
-                <label className="ca-field">
-                  Troubleshooting done
-                  <input
-                    value={form.record.troubleshooting}
-                    onChange={(event) => setRecord("troubleshooting", event.target.value)}
-                  />
-                </label>
+                )}
                 <div className="ca-form-grid">
                   <label className="ca-field">
-                    Correction
-                    <select
-                      value={form.record.correction_type}
-                      onChange={(event) => setRecord("correction_type", event.target.value)}
-                    >
-                      <option value="">Choose…</option>
-                      {Object.entries(screen.corrections).map(([code, label]) => (
-                        <option key={code} value={code}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
+                    Your password
+                    <input
+                      type="password"
+                      autoComplete="current-password"
+                      value={form.password}
+                      onChange={(event) => set({ password: event.target.value })}
+                    />
                   </label>
                   <label className="ca-field">
-                    Service ticket
+                    Authenticator code
                     <input
-                      value={form.record.service_ticket}
-                      onChange={(event) => setRecord("service_ticket", event.target.value)}
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      value={form.code}
+                      onChange={(event) => set({ code: event.target.value })}
                     />
                   </label>
                 </div>
-                <label className="ca-field">
-                  What was done
-                  <input
-                    value={form.record.correction}
-                    onChange={(event) => setRecord("correction", event.target.value)}
-                  />
-                </label>
-                <label className="ca-field">
-                  Result
-                  <input value={form.record.result} onChange={(event) => setRecord("result", event.target.value)} />
-                </label>
-                <label className="ca-field">
-                  Why no investigation is needed ({screen.no_investigation_clause})
-                  <textarea
-                    rows={2}
-                    value={form.record.no_investigation_rationale}
-                    onChange={(event) => setRecord("no_investigation_rationale", event.target.value)}
-                  />
-                </label>
-                <fieldset className="uw-dp-choices">
-                  <legend>Root-cause attribution</legend>
-                  <div className="uw-dp-inline">
-                    {screen.attributions.map((item) => (
-                      <label key={item.code} className="uw-dp-choice">
-                        <input
-                          type="radio"
-                          name="attribution"
-                          checked={form.attribution === item.code}
-                          onChange={() => set({ attribution: item.code })}
-                        />
-                        {item.label}
-                      </label>
-                    ))}
-                  </div>
-                  <details className="uw-dp-show">
-                    <summary>Show definitions</summary>
-                    <dl>
-                      {screen.attributions.map((item) => (
-                        <div key={item.code}>
-                          <dt>{item.label}</dt>
-                          <dd>{item.definition}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </details>
-                  {form.attribution === "UNDETERMINED" && (
-                    <label className="ca-field">
-                      Why the cause cannot be attributed
-                      <input
-                        value={form.attributionReason}
-                        onChange={(event) => set({ attributionReason: event.target.value })}
-                      />
-                    </label>
-                  )}
-                </fieldset>
-              </div>
+                {problem && <p className="uw-hint">{problem}</p>}
+                <div className="ca-action-row">
+                  <button type="submit" className="ac-primary" disabled={busy || !!problem}>
+                    {busy ? "Signing…" : "Sign the disposition"}
+                  </button>
+                </div>
+              </section>
+            ) : (
+              <p className="uw-hint">Signing a disposition needs signal triage, case opening or quality review.</p>
             )}
-          </li>
-
-          <li className={`uw-dp-step is-${states.CHOICE}`}>
-            <QuestionHead number={4} text="Otherwise: escalate by choice" state={states.CHOICE} />
-            <label className="uw-dp-choice">
-              <input
-                type="radio"
-                name="branch"
-                disabled={triggered}
-                checked={form.branch === "ESCALATED_BY_CHOICE"}
-                onChange={() => choose("ESCALATED_BY_CHOICE")}
-              />
-              <span>Escalate: open a case</span>
-            </label>
-            {form.branch === "ESCALATED_BY_CHOICE" && (
-              <label className="ca-field">
-                Why you escalate it
-                <textarea
-                  rows={2}
-                  value={form.rationale}
-                  onChange={(event) => set({ rationale: event.target.value })}
-                />
-              </label>
-            )}
-          </li>
-        </ol>
-
-        <section className="ca-drawer-section">
-          <h4>Classification for trends</h4>
-          <div className="ca-form-grid">
-            <ClassificationField
-              label="Use environment"
-              options={screen.use_environments}
-              value={form.useEnvironment}
-              text={form.useEnvironmentText}
-              source={proposed.source_values.use_environment}
-              onChange={(value, text) => set({ useEnvironment: value, useEnvironmentText: text })}
-            />
-            <ClassificationField
-              label="User type"
-              options={screen.user_types}
-              value={form.userType}
-              text={form.userTypeText}
-              source={proposed.source_values.user_type}
-              onChange={(value, text) => set({ userType: value, userTypeText: text })}
-            />
-          </div>
-          <p className="uw-cr-meta">
-            {proposed.state === "CONFIRMED"
-              ? `Confirmed by ${proposed.confirmed_by}`
-              : "Proposed: your signature confirms it"}{" "}
-            · coding criteria {screen.coding_criteria.version} · Unknown is never guessed
-          </p>
-          <details className="uw-dp-show">
-            <summary>Show the coding criteria</summary>
-            <ul>
-              {screen.coding_criteria.rules.map((rule) => (
-                <li key={rule}>{rule}</li>
-              ))}
-            </ul>
-          </details>
-        </section>
-
-        {missing.length > 0 && (
-          <TrainingPanel
-            documents={missing}
-            colleagues={screen.trained_colleagues}
-            required
-            onDone={onTrained}
-            note="Read the disposition rules and the coding criteria (Show, below), then confirm each."
-          />
-        )}
-        <details className="uw-dp-show">
-          <summary>Show the disposition rules ({screen.disposition_rules.version})</summary>
-          <ol>
-            {screen.disposition_rules.rules.map((rule) => (
-              <li key={rule}>{rule}</li>
-            ))}
-          </ol>
-        </details>
-        <p className="uw-ma-starter" role="note">
-          <FileWarning size={15} aria-hidden="true" /> {screen.starter_mark}
-        </p>
-
-        {canSign ? (
-          <section className="ca-drawer-section uw-dp-sign">
-            <h4>
-              <CheckCircle2 size={15} aria-hidden="true" /> One signature covers
-            </h4>
-            <ul>
-              {covers(screen, form.branch).map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-            {screen.current && (
-              <label className="ca-field">
-                Why the disposition changes (a new version)
-                <input value={form.changeReason} onChange={(event) => set({ changeReason: event.target.value })} />
-              </label>
-            )}
-            <div className="ca-form-grid">
-              <label className="ca-field">
-                Your password
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={form.password}
-                  onChange={(event) => set({ password: event.target.value })}
-                />
-              </label>
-              <label className="ca-field">
-                Authenticator code
-                <input
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={form.code}
-                  onChange={(event) => set({ code: event.target.value })}
-                />
-              </label>
-            </div>
-            {problem && <p className="uw-hint">{problem}</p>}
-            <div className="ca-action-row">
-              <button type="submit" className="ac-primary" disabled={busy || !!problem}>
-                {busy ? "Signing…" : "Sign the disposition"}
-              </button>
-            </div>
-          </section>
-        ) : (
-          <p className="uw-hint">Signing a disposition needs signal triage, case opening or quality review.</p>
-        )}
-        <InlineError text={error} />
-      </form>
+            <InlineError text={error} />
+          </form>
+        </>
+      )}
       {screen.history.length > 0 && (
         <details className="uw-ma-history">
           <summary>Earlier versions ({screen.history.length})</summary>
