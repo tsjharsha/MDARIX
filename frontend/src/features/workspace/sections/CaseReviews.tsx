@@ -868,7 +868,7 @@ export function ReportingClocks({ context }: { context: unknown }) {
         })}
       </ul>
       <button type="button" className="ac-link" onClick={() => open("Complaints", "Reportability")}>
-        Record decisions on the reportability watch
+        Assess each market on the reportability watch
       </button>
     </div>
   );

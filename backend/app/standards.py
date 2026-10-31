@@ -21,7 +21,9 @@ DISCLAIMER = (
 )
 
 INTERNATIONAL, UNITED_STATES, EUROPEAN_UNION = "International", "United States", "European Union"
-UNITED_KINGDOM, CANADA = "United Kingdom", "Canada"
+UNITED_KINGDOM, CANADA, INDIA = "United Kingdom", "Canada", "India"
+# Entries whose wording the regulatory consultant has not confirmed yet (T-B6): screens and exports mark them.
+STARTER_MARK = "Starter text — awaiting regulatory confirmation: check it against your own procedure."
 
 
 @dataclass(frozen=True)
@@ -30,17 +32,22 @@ class Standard:
     short: str
     title: str
     jurisdiction: str
+    starter: bool = False  # the wording awaits the consultant's confirmation (STARTER_MARK)
 
     def chip(self) -> dict:
         return {"id": self.id, "short": self.short, "title": self.title}
 
     def as_dict(self) -> dict:
-        return {**self.chip(), "jurisdiction": self.jurisdiction}
+        found = {**self.chip(), "jurisdiction": self.jurisdiction}
+        return {**found, "starter": True} if self.starter else found
 
 
 CATALOG: tuple[Standard, ...] = (
     Standard("ISO13485_4_2_5", "ISO 13485 4.2.5", "Control of records", INTERNATIONAL),
     Standard("ISO13485_5_6_2", "ISO 13485 5.6.2", "Management review input", INTERNATIONAL),
+    Standard(
+        "ISO13485_6_2", "ISO 13485 6.2", "Human resources: competence, training and awareness", INTERNATIONAL, True
+    ),
     Standard("ISO13485_7_3_9", "ISO 13485 7.3.9", "Control of design and development changes", INTERNATIONAL),
     Standard("ISO13485_7_4", "ISO 13485 7.4", "Purchasing (suppliers)", INTERNATIONAL),
     Standard("ISO13485_8_2_1", "ISO 13485 8.2.1", "Feedback", INTERNATIONAL),
@@ -55,6 +62,13 @@ CATALOG: tuple[Standard, ...] = (
         UNITED_STATES,
     ),
     Standard("CFR820_35", "21 CFR 820.35", "Control of records (QMSR)", UNITED_STATES),
+    Standard(
+        "CFR803_3",
+        "21 CFR 803.3",
+        "Definitions: serious injury, caused or contributed, malfunction, remedial action",
+        UNITED_STATES,
+        True,
+    ),
     Standard("CFR803_17", "21 CFR 803.17", "Written MDR procedures", UNITED_STATES),
     Standard("CFR803_50", "21 CFR 803.50", "30-day reports by manufacturers", UNITED_STATES),
     Standard("CFR803_53", "21 CFR 803.53", "5-day reports", UNITED_STATES),
@@ -62,6 +76,13 @@ CATALOG: tuple[Standard, ...] = (
     Standard("CFR11_50", "21 CFR 11.50", "Signature manifestations", UNITED_STATES),
     Standard("CFR11_70", "21 CFR 11.70", "Signature/record linking", UNITED_STATES),
     Standard("CFR11_200", "21 CFR 11.200", "Electronic signature components and controls", UNITED_STATES),
+    Standard(
+        "MDR_2",
+        "EU MDR Art. 2(64)–(66)",
+        "Definitions: incident, serious incident, serious public health threat",
+        EUROPEAN_UNION,
+        True,
+    ),
     Standard("MDR_83", "EU MDR Art. 83", "Post-market surveillance system", EUROPEAN_UNION),
     Standard(
         "MDR_87",
@@ -70,6 +91,13 @@ CATALOG: tuple[Standard, ...] = (
         EUROPEAN_UNION,
     ),
     Standard("MDR_88", "EU MDR Art. 88", "Trend reporting", EUROPEAN_UNION),
+    Standard(
+        "MDCG_2023_3",
+        "MDCG 2023-3",
+        "Questions and answers on vigilance terms and concepts (EU MDR)",
+        EUROPEAN_UNION,
+        True,
+    ),
     Standard("ISO14971_10", "ISO 14971 clause 10", "Production and post-production activities", INTERNATIONAL),
     Standard("IEC62304_9", "IEC 62304 clause 9", "Software problem resolution process", INTERNATIONAL),
     Standard("IMDRF_AET", "IMDRF AET", "Adverse event terminology", INTERNATIONAL),
@@ -80,6 +108,13 @@ CATALOG: tuple[Standard, ...] = (
         UNITED_KINGDOM,
     ),
     Standard("CA_MDR", "SOR/98-282 ss. 59–61", "Mandatory problem reporting (Canada)", CANADA),
+    Standard(
+        "IN_MDR",
+        "India MDR 2017 Rules 3, 26",
+        "Medical Devices Rules 2017: definitions and post-market reporting of adverse events",
+        INDIA,
+        True,
+    ),
 )
 
 BY_ID: dict[str, Standard] = {standard.id: standard for standard in CATALOG}

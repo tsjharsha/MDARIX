@@ -18,7 +18,7 @@ from backend.app.db.models.complaint_review import ComplaintSecondLook
 from backend.app.db.models.foundation import Complaint, Investigation, InvestigationComplaint, Product, ProductVersion
 from backend.app.db.models.reportability import ComplaintReportability, ReportabilitySettings
 from backend.app.db.models.reviews import CaseReview
-from backend.app.reportability import rules
+from backend.app.reportability import assessments, rules
 
 # When the organization became aware, for the database's first filter (rules then take the earliest of the three).
 AWARE_AT = func.coalesce(Complaint.awareness_timestamp, Complaint.complaint_timestamp, Complaint.recorded_timestamp)
@@ -149,10 +149,12 @@ def _case_reviews(db: Session, tenant_id: uuid.UUID, complaint_ids: list[uuid.UU
 
 
 def decision_view(row: ComplaintReportability | None, names: dict[str, str]) -> dict | None:
+    """An earlier single decision on the complaint (before per-market assessment, tr01): kept and shown as it was."""
     if row is None:
         return None
     decided_on = row.reported_on if row.decision == rules.REPORTED else _day(row.decided_at)
     return {
+        "single_decision": True,
         "decision": row.decision,
         "rationale": row.rationale,
         "report_reference": row.report_reference,
@@ -270,11 +272,23 @@ def watch(
         )
     }
     names = people(control_db, tenant_id, (row.decided_by for row in decisions.values()))
+    assessed = assessments.rows_by_complaint(db, tenant_id, ids)
     items = []
     for complaint, record in candidates:
         seen = assess(complaint, record, windows, cases.get(complaint.id), today)
         decided = decisions.get(complaint.id)
-        is_decided = decided is not None or seen["settled_by_case"]
+        aware = date.fromisoformat(seen["aware_date"]) if seen["aware_date"] else None
+        seen["markets"] = assessments.markets_summary(record, windows, assessed.get(complaint.id, {}), aware, today)
+        if seen["binding"] is None:
+            # No window starts a clock from the complaint's fields, but a market's assessment does (for example a
+            # malfunction concluded reportable in the EU): that market's clock binds.
+            market_clocks = [item["clock"] for item in seen["markets"] if item["clock"]]
+            if market_clocks:
+                earliest = min(market_clocks, key=lambda clock: clock["due_date"])
+                seen["binding"] = {**earliest, "triggers": [], "basis": []}
+        # Settled by an earlier single decision, by its case's completed regulatory review, or by every market's
+        # signed conclusion (reportable ones with their filing recorded).
+        is_decided = decided is not None or seen["settled_by_case"] or assessments.settled(seen["markets"])
         state = rules.watch_state(
             seen["binding"]["state"] if seen["binding"] else None,
             is_decided,

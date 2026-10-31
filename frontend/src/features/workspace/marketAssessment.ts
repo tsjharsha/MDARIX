@@ -1,0 +1,283 @@
+// Pure rules for the per-market seriousness and causation assessment (Complaints › Reportability): what the screen
+// reads (/api/v1/complaints/{id}/market-assessments, backend/app/reportability/assessment_router.py), what a draft and
+// a signature send, and when they may be sent. The server decides the suggestion and refuses what it must; these
+// checks only say early what it would refuse. A person answers and signs; MDARIX never answers and never submits.
+import type { Tone } from "../admin/console/dashboardModel";
+import { collapsed } from "./complaintReview";
+
+export const ASSESSMENT_LIMITS = { reasonMin: 10, rationaleMax: 2000, referenceMax: 120 };
+
+export type Market = "US" | "EU_NI" | "GB" | "IN";
+export type Answer = "YES" | "NO" | "UNKNOWN" | "NOT_APPLICABLE";
+export const ANSWERS: readonly Answer[] = ["YES", "NO", "UNKNOWN", "NOT_APPLICABLE"];
+export const ANSWER_LABELS: Record<Answer, string> = {
+  YES: "Yes",
+  NO: "No",
+  UNKNOWN: "Unknown",
+  NOT_APPLICABLE: "Not applicable",
+};
+export type Suggestion = "REPORTABLE" | "PENDING_INFORMATION" | "NOT_REPORTABLE";
+export type Conclusion = "REPORTABLE" | "NOT_REPORTABLE";
+export type MarketState = "NOT_STARTED" | "DRAFT" | Conclusion;
+
+export const CONCLUSION_LABELS: Record<Suggestion, string> = {
+  REPORTABLE: "Reportable",
+  PENDING_INFORMATION: "Pending information",
+  NOT_REPORTABLE: "Not reportable",
+};
+export const MARKET_SHORT: Record<Market, string> = { US: "US", EU_NI: "EU/NI", GB: "GB", IN: "India" };
+
+export type Question = {
+  id: string;
+  text: string;
+  definition: string;
+  clause: string;
+  basis: string[];
+  serious: boolean;
+  note: string | null;
+  starter: boolean;
+};
+
+export type QuestionSet = {
+  market: Market;
+  market_label: string;
+  version: string;
+  title: string;
+  note: string | null;
+  starter_mark: string;
+  questions: Question[];
+};
+
+export type AnswerEntry = { answer: Answer | null; rationale: string; evidence: string[] };
+
+export type Version = {
+  id: string;
+  market: Market;
+  version: number;
+  question_set: string;
+  question_set_current: boolean;
+  answers: Record<string, AnswerEntry>;
+  harm_level: string | null;
+  harm_code: string | null;
+  harm_level_reason: string | null;
+  scale_version: string;
+  scale_disagreement_reason: string | null;
+  suggested_conclusion: Suggestion;
+  conclusion: Conclusion | null;
+  override_reason: string | null;
+  report_type: string | null;
+  report_type_label: string | null;
+  window_name: string | null;
+  due_on: string | null;
+  filing_reference: string | null;
+  filed_on: string | null;
+  signed_record_id: string | null;
+  content_fingerprint: string | null;
+  signed_by: string | null;
+  signed_at: string | null;
+  superseded: boolean;
+  sample: boolean;
+  created_by: string;
+  saved_at: string | null;
+};
+
+export type TrainingDocument = {
+  code: string;
+  title: string;
+  version: string;
+  statement: string;
+  state: "CURRENT" | "OUT_OF_DATE" | "MISSING";
+  held_version: string | null;
+  trained_at: string | null;
+  method: string | null;
+};
+
+export type MarketClock = {
+  window: string;
+  due_date: string;
+  days_left: number;
+  state: "OVERDUE" | "DUE_SOON" | "RUNNING";
+  source: "WINDOW" | "REGULATION";
+};
+
+export type MarketItem = {
+  market: Market;
+  label: string;
+  enabled: boolean;
+  preselected: boolean;
+  required: boolean;
+  question_set: QuestionSet;
+  threshold: { level: string; label: string };
+  current: Version | null;
+  draft: Version | null;
+  evaluation: { suggested: Suggestion; report_type: string | null; notes: string[] } | null;
+  disagreement: string | null;
+  history: Version[];
+  clock: MarketClock | null;
+  training: TrainingDocument[];
+  trained_colleagues: string[];
+};
+
+export type ScaleLevel = {
+  code: string;
+  label: string;
+  terms: Array<{ code: string; label: string }>;
+  thresholds: Array<{ market: Market; label: string }>;
+};
+
+export type Scale = {
+  version: string;
+  starter_mark: string;
+  protected_note: string;
+  levels: ScaleLevel[];
+  terms: Array<{ code: string; label: string; level: string; protected: boolean }>;
+};
+
+export type LegacyDecision = {
+  decision: "REPORTED" | "NOT_REPORTABLE";
+  rationale: string;
+  report_reference: string | null;
+  reported_on: string | null;
+  decided_by: string;
+  decided_at: string | null;
+  note: string;
+};
+
+export type AssessmentDetail = {
+  complaint: {
+    id: string;
+    business_id: string | null;
+    complaint_identifier: string | null;
+    product_name: string | null;
+    version: string | null;
+    country: string | null;
+    description: string | null;
+    severity: string | null;
+    aware_date: string | null;
+  };
+  on_watch: boolean;
+  enabled_markets: Market[];
+  preselected: Market | null;
+  markets: MarketItem[];
+  scale: Scale;
+  severity: string | null;
+  severity_level: string | null;
+  starter_mark: string;
+  practice_label: string | null;
+  legacy_decision: LegacyDecision | null;
+};
+
+/** A market as the watch lists it on a complaint. */
+export type MarketSummary = {
+  market: Market;
+  label: string;
+  preselected: boolean;
+  state: MarketState;
+  suggested: Suggestion | null;
+  report_type_label: string | null;
+  filed: boolean;
+  clock: MarketClock | null;
+};
+
+export const assessmentPath = (complaintId: string, market?: Market, tail = "") =>
+  `/api/v1/complaints/${encodeURIComponent(complaintId)}/market-assessments${market ? `/${market}${tail}` : ""}`;
+
+/** "US: reportable · filed", "EU/NI: draft (pending information)", "US: not started", with its tone. */
+export function marketChip(item: MarketSummary): { label: string; tone: Tone } {
+  const name = MARKET_SHORT[item.market] ?? item.market;
+  if (item.state === "REPORTABLE")
+    return {
+      label: `${name}: reportable${item.filed ? " · filed" : " · filing not recorded"}`,
+      tone: item.filed ? "good" : "warning",
+    };
+  if (item.state === "NOT_REPORTABLE") return { label: `${name}: not reportable`, tone: "good" };
+  if (item.state === "DRAFT")
+    return {
+      label: `${name}: draft${item.suggested ? ` (${CONCLUSION_LABELS[item.suggested].toLowerCase()})` : ""}`,
+      tone: item.suggested === "PENDING_INFORMATION" ? "warning" : "neutral",
+    };
+  return { label: `${name}: not assessed`, tone: "serious" };
+}
+
+// The form -------------------------------------------------------------------------------------------------------
+
+export type HarmForm = { level: string; term: string; reason: string };
+export type AssessmentForm = {
+  answers: Record<string, AnswerEntry>;
+  harm: HarmForm;
+  disagreementReason: string;
+};
+
+export function formOf(item: MarketItem, severityLevel: string | null): AssessmentForm {
+  const from = item.draft ?? item.current;
+  return {
+    answers: Object.fromEntries(
+      Object.entries(from?.answers ?? {}).map(([key, value]) => [key, { ...value, evidence: [...value.evidence] }]),
+    ),
+    harm: {
+      level: from?.harm_level ?? severityLevel ?? "",
+      term: from?.harm_code ?? "",
+      reason: from?.harm_level_reason ?? "",
+    },
+    disagreementReason: from?.scale_disagreement_reason ?? "",
+  };
+}
+
+export function draftBody(form: AssessmentForm) {
+  return {
+    answers: form.answers,
+    harm_level: form.harm.level || null,
+    harm_code: form.harm.term || null,
+    harm_level_reason: collapsed(form.harm.reason),
+    scale_disagreement_reason: collapsed(form.disagreementReason),
+  };
+}
+
+/** The first question without an answer or without its rationale, for signing (the server's rule). */
+export function answersProblem(questions: Question[], form: AssessmentForm): string | null {
+  for (const question of questions) {
+    const entry = form.answers[question.id];
+    if (!entry?.answer) return `Answer question ${question.id}`;
+    if (collapsed(entry.rationale).length < ASSESSMENT_LIMITS.reasonMin)
+      return question.id === "US5" && entry.answer === "NO"
+        ? "Question US5 is No: say why a recurrence would not be likely to cause harm"
+        : `Question ${question.id}: give the rationale in at least ${ASSESSMENT_LIMITS.reasonMin} characters`;
+  }
+  return null;
+}
+
+export type SignForm = { conclusion: Conclusion | ""; overrideReason: string; password: string; code: string };
+export const EMPTY_SIGN: SignForm = { conclusion: "", overrideReason: "", password: "", code: "" };
+
+export function signProblem(
+  questions: Question[],
+  form: AssessmentForm,
+  sign: SignForm,
+  suggested: Suggestion | null,
+  disagreement: string | null,
+  trained: boolean,
+): string | null {
+  const answers = answersProblem(questions, form);
+  if (answers) return answers;
+  if (!form.harm.level) return "Choose the harm level on the scale";
+  if (disagreement && collapsed(form.disagreementReason).length < ASSESSMENT_LIMITS.reasonMin)
+    return "An answer disagrees with the scale: give the written reason";
+  if (!sign.conclusion) return "Choose the conclusion";
+  if (sign.conclusion === "NOT_REPORTABLE" && suggested === "PENDING_INFORMATION")
+    return "An Unknown answer could make the event reportable: not reportable cannot be concluded (Unknown is never No)";
+  if (sign.conclusion !== suggested && collapsed(sign.overrideReason).length < ASSESSMENT_LIMITS.reasonMin)
+    return "You override the suggestion: say why";
+  if (!trained) return "Record your practice training on the documents above first";
+  if (!sign.password) return "Enter your password to sign";
+  return null;
+}
+
+export const trainingMissing = (item: MarketItem) => item.training.filter((document) => document.state !== "CURRENT");
+
+/** The level a protected term may not go below, and whether the chosen level is below it. */
+export function lowered(scale: Scale, harm: HarmForm): boolean {
+  const term = scale.terms.find((entry) => entry.code === harm.term);
+  if (!term?.protected || !harm.level) return false;
+  const rank = (code: string) => scale.levels.findIndex((level) => level.code === code);
+  return rank(harm.level) < rank(term.level);
+}

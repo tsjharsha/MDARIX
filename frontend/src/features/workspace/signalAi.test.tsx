@@ -351,7 +351,7 @@ describe("a case's regulatory review", () => {
     expect(markup).toContain("Due in 2 days");
     expect(markup).toContain("FDA MDR (30 calendar days) · due 2026-10-15");
     expect(markup).toContain("Reported");
-    expect(markup).toContain("Record decisions on the reportability watch");
+    expect(markup).toContain("Assess each market on the reportability watch");
     expect(
       renderToStaticMarkup(
         <WorkspaceContext.Provider value={api}>

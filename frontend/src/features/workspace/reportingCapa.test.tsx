@@ -84,6 +84,24 @@ const watchItem = (overrides: Partial<WatchItem> = {}): WatchItem => ({
   in_review: false,
   state: "DUE_SOON",
   decision: null,
+  markets: [
+    {
+      market: "US",
+      label: "United States (FDA)",
+      preselected: true,
+      state: "DRAFT",
+      suggested: "PENDING_INFORMATION",
+      report_type_label: null,
+      filed: false,
+      clock: {
+        window: "FDA MDR (30 calendar days)",
+        due_date: "2026-10-15",
+        days_left: 2,
+        state: "DUE_SOON",
+        source: "WINDOW",
+      },
+    },
+  ],
   ...overrides,
 });
 
@@ -98,7 +116,8 @@ describe("a complaint on the reportability watch", () => {
     expect(markup).toContain("Malfunction");
     expect(markup).toContain("whether anyone was seriously injured is not recorded");
     expect(markup).toContain("uw-cr-rail tone-warning");
-    expect(markup).toContain("Record decision");
+    expect(markup).toContain("Assess per market");
+    expect(markup).toContain("US: draft (pending information) · Due in 2 days");
     expect(markup).toContain("Open investigation");
   });
 
@@ -114,12 +133,13 @@ describe("a complaint on the reportability watch", () => {
 
   it("offers no decision to a role without regulatory review or approval", () => {
     const markup = render(<WatchCard item={watchItem()} onDecide={vi.fn()} />, ["quality.review"]);
-    expect(markup).not.toContain("Record decision");
+    expect(markup).not.toContain("Assess per market");
   });
 
   it("shows a decision with its report, who and whether it came inside the window", () => {
     const decided = watchItem({
       state: "DECIDED",
+      markets: [],
       decision: {
         decision: "REPORTED",
         rationale: "Death: MDR filed within 30 days",
@@ -136,7 +156,8 @@ describe("a complaint on the reportability watch", () => {
     expect(markup).toContain("Reported · MDR-3004-2026-00017");
     expect(markup).toContain("Inside the window");
     expect(markup).toContain("Rita Regulatory");
-    expect(markup).toContain("Change decision");
+    expect(markup).toContain("Single decision, recorded before per-market assessment");
+    expect(markup).toContain("Open the assessment");
     expect(markup).not.toContain("Due in 2 days");
   });
 });
