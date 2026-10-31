@@ -151,6 +151,10 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "rising": [item["sentence"] for item in board["items"] if item["result"] in ("SIGNIFICANT", "ELEVATED")][
             :TOP_GROUPS
         ],
+        # The same groups with their product, for the management review report's links (T-G35.1).
+        "rising_products": [
+            item["product"] for item in board["items"] if item["result"] in ("SIGNIFICANT", "ELEVATED")
+        ][:TOP_GROUPS],
     }
     capas_opened = int(
         db.query(func.count(Capa.id))
@@ -175,6 +179,8 @@ def build(db: Session, tenant_id: uuid.UUID, *, period_days: int = PERIOD_DEFAUL
         "summary": risk_board["summary"],
         "products": [
             {
+                "id": item["product"]["id"],
+                "business_id": item["product"]["business_id"],
                 "name": item["product"]["name"],
                 "label": item["label"],
                 "complaints": item["post_market"]["complaints"],
@@ -400,3 +406,370 @@ def render_pdf(data: dict, organization: str, generated_at: str) -> bytes:
     ]
     footer = f"{organization} - readiness summary - generated {generated_at}"
     return pdf.render("MDARIX readiness summary", header, lines(data), watermark=WATERMARK, footer=footer)
+
+
+# ------------------------------------------------------------------------------- the management review report
+
+# T-MSG's framing of post-market surveillance (F7.8), the same words as the trial guide and the in-app user guide
+# (frontend/src/features/help/besideYourQms.ts PMS_FRAMING). The proactive sources are recorded from 0.10.55 only.
+PMS_FRAMING = (
+    "Post-market surveillance gathers data reactively, from what reaches you (complaints, service records, incidents, "
+    "field actions), and proactively, from what you go out to look for. The results feed one loop: PMS → risk "
+    "management → clinical evaluation → PSUR → back to the PMS plan."
+)
+
+
+def management_review(
+    db: Session, tenant_id: uuid.UUID, *, period_days: int, today: date, control_db: Session | None = None, **_
+) -> dict:
+    """The management review report (T-G35.1, ISO 13485:2016 5.6.2 and 8.2.1): the readiness summary's figures for the
+    period (``build``, so they match Readiness), each row with the records it counts, and the PMS section with the
+    reactive sources and the loop; the PMS conclusion and the actions decided are written by the manufacturer."""
+    from backend.app.complaint_classification.rules import USE_ENVIRONMENT_LABELS, USER_TYPE_LABELS
+    from backend.app.complaint_disposition import rules as disposition_rules
+    from backend.app.complaint_disposition import triggers
+    from backend.app.complaint_disposition.service import recurring
+    from backend.app.db.models.complaint_disposition import ComplaintDisposition
+    from backend.app.db.models.market_assessment import ComplaintClassification, ComplaintMarketAssessment
+    from backend.app.qms_documents.content import (
+        complaint_ref,
+        data,
+        finding_rows,
+        judgement,
+        plural,
+        risk_reviews,
+        row,
+        src,
+    )
+    from backend.app.reportability import markets
+
+    summary = build(db, tenant_id, period_days=period_days, today=today)
+    start = today - timedelta(days=period_days - 1)
+    begin, end = _midnight(start), _midnight(today + timedelta(days=1))
+    received = func.coalesce(Complaint.complaint_timestamp, Complaint.event_timestamp, Complaint.created_at)
+    found = (
+        db.query(Complaint, Product.name, ProductVersion.version_identifier)
+        .outerjoin(Product, (Product.tenant_id == Complaint.tenant_id) & (Product.id == Complaint.product_id))
+        .outerjoin(
+            ProductVersion,
+            (ProductVersion.tenant_id == Complaint.tenant_id) & (ProductVersion.id == Complaint.product_version_id),
+        )
+        .filter(Complaint.tenant_id == tenant_id, received >= begin, received < end)
+        .order_by(Complaint.complaint_identifier)
+        .all()
+    )
+    refs = {complaint.id: complaint_ref(complaint) for complaint, _, _ in found}
+
+    def of(ids) -> list[dict]:
+        return [src("Complaint", item, refs.get(item) or str(item)) for item in ids]
+
+    def grouped(key) -> list[tuple[str, list]]:
+        groups: dict[str, list] = {}
+        for complaint, name, version in found:
+            groups.setdefault(key(complaint, name, version), []).append(complaint.id)
+        return sorted(groups.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+
+    complaints = summary["complaints"]
+    period = summary["period"]
+    complaint_rows = [
+        row(
+            f"{plural(complaints['received'], 'complaint')} received from {period['from']} to {period['to']}; "
+            f"{complaints['closed']} closed. {complaints['death']} report a death, {complaints['serious_injury']} a "
+            f"serious injury, {complaints['malfunction']} a malfunction.",
+            of(refs),
+        )
+    ]
+    for title, key in (
+        ("By product version", lambda c, n, v: f"{n or 'No product'} {v or '(version not recorded)'}"),
+        ("By problem code", lambda c, n, v: (c.problem_code or "not coded").replace("_", " ").lower()),
+    ):
+        complaint_rows += [row(f"{title}: {name}: {len(ids)}.", of(ids)) for name, ids in grouped(key)[:TOP_GROUPS]]
+
+    current = {
+        item.complaint_id: item
+        for item in db.query(ComplaintClassification)
+        .filter(
+            ComplaintClassification.tenant_id == tenant_id,
+            ComplaintClassification.superseded_by.is_(None),
+            ComplaintClassification.complaint_id.in_(list(refs) or [uuid.uuid4()]),
+        )
+        .order_by(ComplaintClassification.version)
+    }
+    for title, field, labels in (
+        ("By use environment", "use_environment", USE_ENVIRONMENT_LABELS),
+        ("By user type", "user_type", USER_TYPE_LABELS),
+    ):
+        groups: dict[str, list] = {}
+        for complaint_id in refs:
+            value = getattr(current.get(complaint_id), field, None) or "UNKNOWN"
+            groups.setdefault(labels.get(value, value.replace("_", " ").capitalize()), []).append(complaint_id)
+        complaint_rows += [
+            row(f"{title}: {name}: {len(ids)}.", of(ids))
+            for name, ids in sorted(groups.items(), key=lambda pair: (-len(pair[1]), pair[0]))
+        ]
+
+    by_look: dict[str, list] = {"CONFIRMED": [], "DISMISSED": []}
+    for decision, complaint_id in db.query(ComplaintSecondLook.decision, ComplaintSecondLook.complaint_id).filter(
+        ComplaintSecondLook.tenant_id == tenant_id,
+        ComplaintSecondLook.decided_at >= begin,
+        ComplaintSecondLook.decided_at < end,
+    ):
+        by_look.setdefault(decision, []).append(complaint_id)
+    look_refs = {
+        item.id: complaint_ref(item)
+        for item in db.query(Complaint.id, Complaint.business_id, Complaint.complaint_identifier).filter(
+            Complaint.tenant_id == tenant_id,
+            Complaint.id.in_([key for ids in by_look.values() for key in ids] or [uuid.uuid4()]),
+        )
+    }
+    second = summary["second_look"]
+    look_rows = [
+        row(
+            f"{plural(second['confirmed'], 'record')} confirmed as complaints in the period.",
+            [src("SecondLook", item, look_refs.get(item)) for item in by_look["CONFIRMED"]],
+        ),
+        row(
+            f"{plural(second['dismissed'], 'record')} dismissed, each with its reason.",
+            [src("SecondLook", item, look_refs.get(item)) for item in by_look["DISMISSED"]],
+        ),
+    ]
+
+    signed = (
+        db.query(ComplaintDisposition, Complaint.business_id, Complaint.complaint_identifier)
+        .join(
+            Complaint,
+            (Complaint.tenant_id == ComplaintDisposition.tenant_id)
+            & (Complaint.id == ComplaintDisposition.complaint_id),
+        )
+        .filter(
+            ComplaintDisposition.tenant_id == tenant_id,
+            ComplaintDisposition.superseded_by.is_(None),
+            ComplaintDisposition.signed_at >= begin,
+            ComplaintDisposition.signed_at < end,
+        )
+        .order_by(Complaint.complaint_identifier)
+        .all()
+    )
+
+    def disposition_sources(chosen) -> list[dict]:
+        return [
+            src("Disposition", item.complaint_id, f"{business_id or identifier} v{item.version}")
+            for item, business_id, identifier in chosen
+        ]
+
+    counted = summary["dispositions"]
+    disposition_rows = [
+        row(
+            f"{plural(counted['signed'], 'disposition')} signed in the period, {counted['routine']} of them on the "
+            "routine path.",
+            disposition_sources(signed),
+        )
+    ]
+    for branch in disposition_rules.BRANCHES:
+        disposition_rows.append(
+            row(
+                f"{disposition_rules.BRANCH_LABELS[branch]}: {counted['by_branch'].get(branch, 0)}.",
+                disposition_sources([item for item in signed if item[0].branch == branch]),
+            )
+        )
+    for code, count in counted["by_trigger"].items():
+        if count:
+            disposition_rows.append(
+                row(
+                    f"Escalated by the trigger {triggers.LABELS.get(code, code).lower()}: {count}.",
+                    disposition_sources([item for item in signed if code in triggers.codes(item[0].triggers or [])]),
+                )
+            )
+
+    assessments = (
+        db.query(ComplaintMarketAssessment, Complaint.business_id, Complaint.complaint_identifier)
+        .join(
+            Complaint,
+            (Complaint.tenant_id == ComplaintMarketAssessment.tenant_id)
+            & (Complaint.id == ComplaintMarketAssessment.complaint_id),
+        )
+        .filter(ComplaintMarketAssessment.tenant_id == tenant_id, ComplaintMarketAssessment.superseded_by.is_(None))
+        .all()
+    )
+
+    def in_period(item) -> bool:
+        return item.signed_at is not None and begin <= item.signed_at < end
+
+    def cite(chosen) -> list[dict]:
+        return [
+            src("MarketAssessment", item.complaint_id, f"{business_id or identifier} {item.market} v{item.version}")
+            for item, business_id, identifier in chosen
+        ]
+
+    vigilance_rows = []
+    for market in markets.MARKETS:
+        mine = [entry for entry in assessments if entry[0].market == market]
+        concluded = [entry for entry in mine if entry[0].conclusion and in_period(entry[0])]
+        reportable = [entry for entry in concluded if entry[0].conclusion == markets.REPORTABLE]
+        routine = [entry for entry in concluded if entry[0].question_set == disposition_rules.ROUTINE_QUESTION_SET]
+        assessed = [entry for entry in concluded if entry not in reportable and entry not in routine]
+        filed = [entry for entry in reportable if entry[0].filed_on]
+        pending = [entry for entry in mine if entry[0].conclusion is None]
+        late = [
+            entry
+            for entry in reportable
+            if entry[0].due_on
+            and (
+                (entry[0].filed_on and entry[0].filed_on > entry[0].due_on)
+                or (not entry[0].filed_on and entry[0].due_on < today)
+            )
+        ]
+        if not (concluded or pending):
+            continue
+        vigilance_rows.append(
+            row(
+                f"{markets.MARKET_LABELS[market]}: {plural(len(reportable), 'conclusion')} reportable "
+                f"({len(filed)} with the report filed, {len(late)} late), {len(assessed)} not reportable on the "
+                f"assessment, {len(routine)} not reportable on the routine basis; {len(pending)} pending now.",
+                cite(concluded + pending),
+            )
+        )
+        if late:
+            vigilance_rows.append(row(f"{markets.MARKET_LABELS[market]}: late reports.", cite(late)))
+    reporting = summary["reporting"]
+    vigilance_rows.append(
+        row(
+            f"{plural(reporting['decisions'], 'single reportability decision')} recorded before per-market assessment: "
+            f"{reporting['reported']} reported, {reporting['not_reportable']} not reportable; "
+            f"{reporting['inside_window']} inside the window, {reporting['after_window']} after it."
+        )
+    )
+
+    trends = summary["trends"]
+    statuses = ", ".join(
+        f"{status.replace('_', ' ').lower()} {count}" for status, count in trends["signals_by_status"].items()
+    )
+    signal_rows = [
+        row(
+            f"{plural(trends['signals_raised'], 'signal')} raised in the period"
+            + (f" ({statuses})." if statuses else "."),
+            [
+                src("Signal", item_id, business_id)
+                for item_id, business_id in db.query(Signal.id, Signal.business_id).filter(
+                    Signal.tenant_id == tenant_id, Signal.created_at >= begin, Signal.created_at < end
+                )
+            ],
+        )
+    ]
+    rising = [
+        row(
+            f"Trend check: {sentence}",
+            [src("Product", product.get("id"), product.get("business_id") or product.get("name"))],
+        )
+        for sentence, product in zip(trends["rising"], trends.get("rising_products") or [])
+    ]
+    signal_rows += rising or [row("Trend check: no product version above its own history.")]
+    for matter in recurring(db, tenant_id, today):
+        ids = dict(
+            db.query(Complaint.business_id, Complaint.id).filter(
+                Complaint.tenant_id == tenant_id, Complaint.business_id.in_(matter["complaints"])
+            )
+        )
+        signal_rows.append(
+            row(
+                f"Service-level trend: {matter['count']} service-level resolutions of "
+                f"{matter['problem_code'].replace('_', ' ').lower()} on {matter['product_name']} within "
+                f"{triggers.RECURRING_DAYS} days; no case covers it.",
+                [src("Disposition", ids.get(ref), ref) for ref in matter["complaints"]],
+            )
+        )
+
+    risk = summary["risk_file"]
+    counts = risk["summary"]
+    risk_rows = [
+        row(
+            f"{plural(counts['products'], 'product')}: {counts['not_reviewed']} with post-market data not reviewed "
+            f"against the risk file, {counts['reassessment_overdue']} with risk reassessments overdue, "
+            f"{counts['reassessment_open']} open, {counts['no_risk_register']} with no risks in MDARIX, "
+            f"{counts['reviewed']} reviewed."
+        )
+    ] + [
+        row(
+            f"{product['name']}: {product['label'].lower()}; {plural(product['complaints'], 'complaint')} "
+            f"({product['harm']} with harm), {plural(product['risk_reviews'], 'risk review')}, "
+            f"{product['risks_assessed']} of {plural(product['risks'], 'risk')} assessed, "
+            f"{plural(product['reassessments_open'], 'reassessment')} open.",
+            [src("Product", product["id"], product["business_id"] or product["name"])],
+        )
+        for product in risk["products"]
+    ]
+
+    capa = summary["capa"]
+    opened = db.query(Capa.id, Capa.business_id, Capa.capa_identifier).filter(
+        Capa.tenant_id == tenant_id, Capa.opened_at >= begin, Capa.opened_at < end
+    )
+    checked = (
+        db.query(Capa.id, Capa.business_id, Capa.capa_identifier)
+        .join(
+            CapaEffectivenessCheck,
+            (CapaEffectivenessCheck.tenant_id == Capa.tenant_id) & (CapaEffectivenessCheck.capa_id == Capa.id),
+        )
+        .filter(
+            Capa.tenant_id == tenant_id,
+            CapaEffectivenessCheck.signed_at >= begin,
+            CapaEffectivenessCheck.signed_at < end,
+        )
+    )
+    capa_rows = [
+        row(
+            f"{plural(capa['opened'], 'CAPA')} opened in the period (as imported from your QMS).",
+            [src("Capa", item.id, item.business_id or item.capa_identifier) for item in opened],
+        ),
+        row(
+            f"Effectiveness checks signed: {capa['checks_signed_effective']} effective, "
+            f"{capa['checks_signed_not_effective']} not effective.",
+            [src("Capa", item.id, item.business_id or item.capa_identifier) for item in checked],
+        ),
+    ]
+    if capa["now"]:
+        capa_rows.append(row(f"At the cut-off: {capa['now']}."))
+
+    service_level = [item for item in signed if item[0].branch == disposition_rules.SERVICE_LEVEL]
+    reportable_events = [
+        item for item in assessments if item[0].conclusion == markets.REPORTABLE and in_period(item[0])
+    ]
+    answers, updates = finding_rows(db, tenant_id, risk_reviews(db, tenant_id, begin=begin, end=end), control_db)
+    pms_rows = [
+        row(PMS_FRAMING),
+        row(f"Reactive source, complaints: {plural(complaints['received'], 'complaint')} received.", of(refs)),
+        row(
+            f"Reactive source, service records: {plural(len(service_level), 'service-level resolution')}.",
+            disposition_sources(service_level),
+        ),
+        row(
+            f"Reactive source, reportable events: {plural(len(reportable_events), 'reportable market conclusion')}.",
+            cite(reportable_events),
+        ),
+        row(
+            f"Into risk management: {plural(len(answers), 'risk-control answer')} and "
+            f"{plural(len(updates), 'risk file update')} required, from the risk reviews completed in the period."
+        ),
+        *answers,
+        *updates,
+        row(
+            "Into the clinical evaluation and the PSUR, and back to the PMS plan: the complaints, reportable events and "
+            "risk-control answers above are this period's post-market input; the clinical evaluation, the PSUR and the "
+            "PMS plan are kept in your QMS."
+        ),
+    ]
+    return {
+        "sections": [
+            data("COMPLAINTS", "Feedback and complaint handling", complaint_rows),
+            data("SECOND_LOOK", "The second look", look_rows),
+            data("DISPOSITIONS", "Complaint dispositions", disposition_rows),
+            data("VIGILANCE", "Reporting to regulatory authorities, by market", vigilance_rows),
+            data("TRENDS", "Signals and trends", signal_rows),
+            data("RISK_FILE", "Post-market data and the risk file", risk_rows),
+            data("CAPA", "Corrective and preventive action", capa_rows),
+            data("PMS", "Post-market surveillance", pms_rows),
+            judgement("MANAGEMENT_REVIEW", "PMS_CONCLUSION"),
+            judgement("MANAGEMENT_REVIEW", "ACTIONS_DECIDED"),
+            data("LIMITATIONS", "Limitations", [row(item) for item in summary["limitations"]]),
+        ],
+        "figures": {"complaints": complaints["received"], "dispositions": counted, "markets": reporting["markets"]},
+    }

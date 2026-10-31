@@ -5,8 +5,8 @@ Each chapter answers one pain FDA and notified bodies cite in 2026 (MDARIX Final
 finding read from the organization's records (the sample data at first, its own export later) and a real action
 recorded in MDARIX (a person signed a complaint's disposition, decided a second-look record, signed a market's
 reporting conclusion, opened a case from a
-signal, ran the AI, signed a decision, planned or signed an effectiveness check, completed a risk review, downloaded
-the readiness summary, imported their own complaints). Nothing here is inferred from page views.
+signal, ran the AI, signed a decision, planned or signed an effectiveness check, completed a risk review, signed a
+ready-to-use document, imported their own complaints). Nothing here is inferred from page views.
 
 ``story`` serves the trial's Getting started page (findings and actions); ``progress`` gives one trial's actions, and
 ``trial_overview`` the same for every trial at once in a fixed number of statements (the Platform Admin overview).
@@ -112,11 +112,14 @@ CHAPTERS = (
     ),
     (
         "SHOW_THE_INSPECTOR",
-        "Hand management review and the inspector one summary",
-        "Readiness shows what an inspector would find today, and the summary PDF organizes it by the management "
-        "review inputs of ISO 13485 clause 5.6.2.",
-        "Management review records are now inspectable under QMSR.",
-        {"section": "Readiness", "tab": None},
+        "File ready-to-use documents",
+        "Five documents to file in your QMS and hand to an auditor: the management review report with its PMS "
+        "section, the CAPA log, the investigation report, the risk-review extract and the change-impact input. Every "
+        "figure links to its records, the judgement sections are left for you to write, and each signed version "
+        "downloads as PDF and DOCX.",
+        "Management review records are now inspectable under QMSR, and copying figures from screens into documents "
+        "by hand costs hours and invites errors.",
+        {"section": "Records", "tab": "Reports"},
         None,
     ),
     (
@@ -171,12 +174,14 @@ def chapter_counters() -> tuple:
     from backend.app.db.models.case_ai import CaseAiRun
     from backend.app.db.models.complaint_disposition import ComplaintDisposition
     from backend.app.db.models.complaint_review import ComplaintSecondLook
-    from backend.app.db.models.foundation import AuditEvent, Complaint, Decision
+    from backend.app.db.models.foundation import Complaint, Decision
     from backend.app.db.models.market_assessment import ComplaintMarketAssessment
     from backend.app.db.models.reportability import ComplaintReportability
+    from backend.app.db.models.reporting import ReportJob
     from backend.app.db.models.reviews import CaseReview
     from backend.app.db.models.signals import InvestigationSignal
     from backend.app.db.models.stage3 import AIInteraction
+    from backend.app.qms_documents.templates import CODES as DOCUMENT_CODES
     from backend.app.trial.imports import UPLOAD_SOURCE
 
     return (
@@ -203,10 +208,11 @@ def chapter_counters() -> tuple:
         ("DECIDE_AND_SIGN", Decision, (Decision.decision_kind == "BRIEF",)),
         ("CAPA_EFFECTIVE", CapaEffectivenessCheck, ()),
         ("RISK_FILE", CaseReview, (CaseReview.review_type == "RISK", CaseReview.status == "COMPLETED")),
+        # A ready-to-use document a person signed (T-G35).
         (
             "SHOW_THE_INSPECTOR",
-            AuditEvent,
-            (AuditEvent.action.in_(("READINESS_SUMMARY_EXPORTED", "READINESS_INSPECTION_PACK_EXPORTED")),),
+            ReportJob,
+            (ReportJob.report_code.in_(DOCUMENT_CODES), ReportJob.status == "SIGNED"),
         ),
         ("YOUR_DATA", Complaint, (Complaint.source_system == UPLOAD_SOURCE,)),
     )

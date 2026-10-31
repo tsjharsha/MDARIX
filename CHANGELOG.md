@@ -10,6 +10,74 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.54] - 2026-10-31
+
+On the trial maintenance line (`release/0.10`): the five ready-to-use documents, signed and exported as PDF and DOCX,
+with their clauses and the management review report's PMS section (requirements T-G35, T-G35.1 to T-G35.5, T-MSG's
+PMS framing and the third sentence's "signed documents", T-SAM chapter 9; the trial plan calls this release
+"0.10.53"). Built once for the trial and the pilot: the new routes (`/api/v1/documents`) are not part of `mvp-1.0`'s
+pilot-only gate. No AI anywhere in it: MDARIX fills the data sections and never writes a judgement section; it submits
+nothing.
+
+**No migration.** A document version is a `report_jobs` row (`report_code` the template's code, `status` DRAFT or
+SIGNED, `context` the period, cut-off, template version, data sections, judgement texts with their writers, the
+signature and the filing reference) and its signature a `signed_approval_records` row whose content fingerprint is the
+signed PDF's SHA-256; the signed PDF is kept in object storage. **New runtime dependency:** `python-docx==1.2.0` (and
+`lxml==6.1.3`), pinned with hashes in `requirements.txt` (owner decision D-T5). The API and web images change.
+
+### Added
+
+- Records › Reports › **Ready-to-use documents**, above the governed reports; the management review report also from
+  Readiness ("Management review report"), the investigation report and the risk-review extract also from a case's
+  Reviews step. Each is generated for a period (or a case or a change record) with the cut-off "now"; every row opens
+  the records behind it (behind a toggle), and the PDF prints their IDs per row and a source list.
+  - **Management review report** (`mrr-starter-1`, ISO 13485:2016 5.6.2 and 8.2.1), extending the readiness summary
+    (`readiness_home/summary.py`), with the same figures as Readiness for the period: complaints by product version,
+    problem code, use environment and user type; the second look; dispositions by branch and escalations by trigger;
+    vigilance by market (reportable, filed, late, not reportable on the assessment or the routine basis, pending);
+    signals, the trend check and service-level trends; post-market data against the risk file; CAPAs with their
+    effectiveness checks; a **PMS section** (the reactive sources from the records: complaints, service-level
+    resolutions, reportable events; the loop into risk management with each risk-control answer and risk file update,
+    then the clinical evaluation, the PSUR and back to the PMS plan, which stay in the QMS). Its judgement sections
+    "PMS conclusion" and "Actions decided" are written by the manufacturer. Proactive sources come with 0.10.55.
+  - **CAPA log** (`capa-log-starter-1`): every imported CAPA with its QMS ID, the case and complaints it came from,
+    status, due date and the effectiveness check signed in MDARIX.
+  - **Investigation report** (`investigation-report-starter-1`, ISO 13485:2016 8.2.2, ISO 14971:2019 clause 10): the
+    case's scope by version (complaints included and excluded, versions, lots, markets, dates), evidence, hypotheses
+    with their support states, the root cause as recorded in the decision, its root-cause attribution and the signed
+    decision's record and fingerprint; the root-cause category is written by the manufacturer.
+  - **Risk-review extract** (`risk-extract-starter-1`, ISO 14971:2019 clause 10): the case's risk reviews, the
+    risk-register entries named, each risk-control answer from 0.10.53 and each risk file update with its owner and
+    due date, post-market data against the risk file for the product, the impact decisions with owners and states,
+    and the closure; the conclusion is written by the manufacturer.
+  - **Change-impact input** (`change-impact-starter-1`): for a change record (for example SAMPLE-CHG-014) the affected
+    product versions (named, or through an affected component) and their lots, the risk and PMS impacts recorded in
+    risk reviews and decisions, and the complaints whose market assessments may need review; "The change itself is
+    run in your QMS."
+- Each template prints the clauses it serves, each "pending approval" until the consultant confirms its wording, and
+  the starter-text mark; in a trial every document carries the practice-record label. A data section cannot be
+  edited ("Correct the record, then generate again"). Signing (password and authenticator code, quality review)
+  needs every judgement section written; the signature manifestation shows the signer, role, time, meaning, template
+  version, period, cut-off and the checksums, and "Writer of the judgement sections and signer: same person" where it
+  is (allowed in a trial). A signed version is never edited: a new generation is the next version, both are listed,
+  and the older one shows "superseded by version n" once the newer one is signed. Each signed version takes a QMS
+  filing reference and the minutes spent.
+- The PDF downloaded is the signed record, byte for byte; the DOCX says "Exported from signed version … (PDF SHA-256
+  …); edits outside MDARIX are not part of this record". No complaint free text appears in a document.
+- The governed `RISK_IMPACT` report lists the risk-control answers and the risk file updates required.
+
+### Changed
+
+- Chapter 9 is "File ready-to-use documents" (it opens Records › Reports and counts a signed document; exporting the
+  readiness summary or the inspection pack no longer counts).
+- "MDARIX works beside your QMS" gains its last part: "…, serious ones are assessed per market, and you get signed
+  documents to file in your QMS", in every place it is said. The trial guide, the user guide, the pilot guide and the
+  quality manager walk-through add the PMS framing: "Post-market surveillance gathers data reactively … The results
+  feed one loop: PMS → risk management → clinical evaluation → PSUR → back to the PMS plan."
+- ISO 13485 8.2.1 and 8.2.2 are marked starter text in the standards catalog.
+- Sample removal also removes the document versions made on sample records, with their signature records.
+- In the user guide: Ready-to-use documents.
+
 ## [0.10.53] - 2026-10-31
 
 On the trial maintenance line (`release/0.10`): the complaint disposition with its escalation triggers, the routine

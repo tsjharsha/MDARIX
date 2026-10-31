@@ -1040,9 +1040,9 @@ def test_the_inspection_pack_holds_every_record_behind_every_check():
     assert readme.count("it does not certify compliance") == 1
     assert checks[0].split(",")[6] == "Basis"
 
-    # The export is audited, and handing the inspector a pack is chapter 8 of the trial's story.
+    # The export is audited; chapter 9 ("File ready-to-use documents") counts a signed document only (T-SAM, 0.10.54).
     chapters = {chapter["code"]: chapter for chapter in user.get("/api/v1/trial/story").json()["chapters"]}
-    assert chapters["SHOW_THE_INSPECTOR"]["acted"]["done"] is True
+    assert chapters["SHOW_THE_INSPECTOR"]["acted"]["done"] is False
     assert user.get("/api/v1/readiness/inspection-pack.zip", params={"period_days": 10}).status_code == 422
 
 

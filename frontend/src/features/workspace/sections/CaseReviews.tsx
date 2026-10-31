@@ -6,6 +6,7 @@ import { Drawer, Table, errorText, formatDate, listOf, send, useResource } from 
 import { safeText } from "../../../app/displayId";
 import { StatementKind } from "../../shared/StatementKind";
 import { useCan, useWorkspace } from "../workspaceContext";
+import { CaseDocumentLinks } from "./Documents";
 import { localDay } from "../workspaceModel";
 import { dueAtFromDay } from "../caseWorkflow";
 import { dueState, dueText } from "../tasks";
@@ -103,6 +104,7 @@ export function CaseReviewsPanel({
         MDARIX gathers the context; risk and regulatory reviewers decide. A review's outcome is always a person's
         judgement, with their rationale.
       </p>
+      <CaseDocumentLinks investigationId={investigationId} />
       <Panel eyebrow={caseLabel} title="Which reviews this case needs" source={reviews}>
         <div className="uw-review-policy">
           {policy.map((row) => {

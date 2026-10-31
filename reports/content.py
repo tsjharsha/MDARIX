@@ -595,14 +595,28 @@ def risk_impact(db: Session, tenant_id, control_db=None) -> dict:
         }
         for item in full["items"]
     ]
+    # Each risk review's risk-control answers and the risk file updates it requires (T-G1aR, ISO 14971:2019 clause 10).
+    from backend.app.qms_documents.content import finding_rows, risk_reviews
+
+    answers, updates = finding_rows(
+        db, uuid.UUID(str(tenant_id)), risk_reviews(db, uuid.UUID(str(tenant_id))), control_db
+    )
+
+    def listed(found: list[dict]) -> list[dict]:
+        return [{"statement": item["text"], "records": [source["ref"] for source in item["sources"]]} for item in found]
+
     return {
         "summary": {
             "risks": len(rows),
+            "risk_control_answers": len(answers),
+            "risk_file_updates_required": len(updates),
             "by_status": [{"label": k, "count": v} for k, v in Counter(r["status"] or "UNKNOWN" for r in rows).items()],
             "without_controls": trace["counts"]["unlinked"]["risks_without_control"],
             "complete_traceability_chains": trace["counts"]["complete_chains"],
         },
         "risks": rows,
+        "risk_control_answers": listed(answers),
+        "risk_file_updates": listed(updates),
         "unlinked": trace["unlinked"],
         "unlinked_business_ids": trace["unlinked_business_ids"],
         "fields_not_captured": full["fields_not_captured"],

@@ -36,13 +36,15 @@
       "id": "ISO13485_8_2_1",
       "short": "ISO 13485 8.2.1",
       "title": "Feedback",
-      "jurisdiction": "International"
+      "jurisdiction": "International",
+      "starter": true
     },
     {
       "id": "ISO13485_8_2_2",
       "short": "ISO 13485 8.2.2",
       "title": "Complaint handling",
-      "jurisdiction": "International"
+      "jurisdiction": "International",
+      "starter": true
     },
     {
       "id": "ISO13485_8_2_3",

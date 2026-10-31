@@ -36,6 +36,8 @@ describe("free trial user guide", () => {
       "Request the demo",
       "Download PDF",
       "Inspection pack (ZIP)",
+      "Generate, cut-off now",
+      "Sign the document",
     ])
       expect(text).toContain(label);
     // Nobody is ever sent a password, and how it is kept is said precisely.
