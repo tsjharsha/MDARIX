@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Archive, PhoneCall, RefreshCw, RotateCcw } from "lucide-react";
 import { requestJson } from "../../app/apiClient";
 import { Table, idColumn } from "../customer-admin/shared";
+import { plural } from "../customer-admin/labels";
 
 type DemoRequest = {
   id: string;
@@ -38,7 +39,7 @@ export function demoContextLines(row: Pick<DemoRequest, "source" | "preferred_ti
   if (context.chapters_total)
     lines.push(
       `${context.chapters_tried ?? 0} of ${context.chapters_total} story chapters tried` +
-        (context.days_left !== undefined ? `, ${context.days_left} days left` : "") +
+        (context.days_left !== undefined ? `, ${plural(context.days_left, "day")} left` : "") +
         (context.own_data ? ", own data uploaded" : ""),
     );
   if (context.focus?.length) lines.push(`Focus: ${context.focus.join("; ")}`);

@@ -196,6 +196,32 @@ def test_approval_creates_a_private_trial_workspace_with_sample_data():
     assert insights["questions"] and all(item["answer"]["summary"] for item in insights["questions"])
 
 
+def test_every_sample_complaint_is_on_a_lot_of_its_version_made_before_the_event():
+    """The sample reads true on every screen: no Rev B complaint on a Rev A lot (PulseWatch's were on lots 001-002),
+    and no complaint about a device from a lot made after the event (OrbitCare's on lots 002 and 004 were)."""
+    from backend.app.db.models.foundation import LotBatch
+
+    _user, approval, _email = _approved_trial_client()
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(Complaint, LotBatch)
+            .join(LotBatch, LotBatch.id == Complaint.lot_batch_id)
+            .filter(Complaint.tenant_id == uuid.UUID(approval["tenant_id"]))
+            .all()
+        )
+        assert len(rows) == 37
+        wrong = [
+            (complaint.complaint_identifier, lot.lot_identifier)
+            for complaint, lot in rows
+            if lot.product_version_id != complaint.product_version_id
+            or lot.created_at > (complaint.event_timestamp or complaint.complaint_timestamp)
+        ]
+        assert wrong == []
+    finally:
+        db.close()
+
+
 def test_a_trial_shows_the_mvp_and_counts_the_sample_data_it_explains(monkeypatch):
     """A free trial always gets the MVP interface, even where the deployment runs the full product, and Getting
     started counts the sample records it explains; any other organization keeps the deployment's setting."""

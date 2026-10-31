@@ -376,6 +376,15 @@ describe("booking a one-to-one demo from the trial", () => {
       "Note: Audit in March.",
     ]);
     expect(demoContextLines({ source: "WEBSITE", note: null, preferred_time: null, context: null })).toEqual([]);
+    // The last day reads singular.
+    expect(
+      demoContextLines({
+        source: "TRIAL",
+        preferred_time: null,
+        note: null,
+        context: { chapters_tried: 9, chapters_total: 9, days_left: 1 },
+      }),
+    ).toEqual(["9 of 9 story chapters tried, 1 day left"]);
   });
 
   it("lets a person switch the weekly readiness email off for themselves", async () => {

@@ -111,7 +111,8 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     key: "risk",
     title: "Post-market data that never reached the risk file",
     inSample: [
-      "SAMPLE-RSK-01 to 03: risks no review has reassessed since the harm and malfunction complaints.",
+      "SAMPLE-RSK-01 and 02: OrbitCare risks no review has reassessed since the harm and malfunction complaints.",
+      "SAMPLE-RSK-03: a VentraLink risk no review has reassessed since the malfunction complaints.",
       "PulseWatch 410: no risk recorded in MDARIX at all.",
     ],
     requirement: "Production and post-production information is fed back into the risk file.",

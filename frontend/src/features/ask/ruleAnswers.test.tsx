@@ -36,3 +36,20 @@ describe("Ask MDARIX without AI", () => {
     expect(EXAMPLE_QUESTIONS.some((text) => /lots/i.test(text))).toBe(true);
   });
 });
+
+describe("A records-only answer", () => {
+  it("says once why AI was not used", async () => {
+    const { AskAnswer } = await import("./AskMdarixPage");
+    const note = "AI is off for free trials, so this answer comes from your records only.";
+    const markup = renderToStaticMarkup(
+      <AskAnswer
+        result={{
+          response: { limitations: [note], grounding: { investigation_scoped: true } },
+          structured: { summary: "From the case records: 2 records.", ai_used: false, ai_note: note },
+        }}
+      />,
+    );
+    expect(markup.split(note).length - 1).toBe(1);
+    expect(markup).not.toContain("AI suggestions are advisory");
+  });
+});
