@@ -101,13 +101,16 @@ export const MVP_STEPS: readonly MvpStep[] = [
   {
     label: "Step 5 · Pilot starts",
     title: "Work on your real complaints",
-    text: "Your team takes real complaints from signal to signed decision. We review progress with you regularly against success criteria agreed at the start.",
+    text: "Your team takes real complaints from signal to signed decision. MDARIX keeps the decisions, and your QMS keeps the complaint record. We review progress with you regularly against success criteria agreed at the start.",
   },
 ];
 
 export const CONNECTION_TITLE = "How your data is connected";
 export const CONNECTION: readonly { title: string; text: string }[] = [
-  { title: "Your systems", text: "Complaint handling, QMS, PLM, ERP. They stay your systems of record." },
+  {
+    title: "Your systems",
+    text: "Complaint handling, QMS, PLM, ERP. Your QMS keeps the complaint record, CAPA and change control.",
+  },
   {
     title: "Mapping file",
     text: "Field by field, reviewed by you, versioned, and approved before use. Every change is recorded.",
@@ -154,7 +157,7 @@ export const QUESTIONS: readonly { question: string; answer: string }[] = [
   {
     question: "Who owns the data?",
     answer:
-      "You do. Your systems stay the systems of record, and your MDARIX database holds only your organization's data.",
+      "You do. Your QMS keeps the complaint record, CAPA and change control, and your MDARIX database holds only your organization's data.",
   },
   {
     question: "Is MDARIX a validated system?",

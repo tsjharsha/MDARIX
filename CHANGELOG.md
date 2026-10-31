@@ -10,6 +10,38 @@ operator knows a release migrates the database.
 
 ## [Unreleased]
 
+## [0.10.50] - 2026-10-31
+
+Wording only, on the trial maintenance line (`release/0.10`), requirement T-MSG: one message on what MDARIX is beside
+a customer's systems, in the same words on the website, in the trial workspace, in the guides and in the docs:
+"MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control."
+It replaces the older "your systems stay the systems of record" lines. Nothing claims a feature that is not shipped.
+No migration: the schema stays at md48, and no stored record is rewritten. No API change. The web image changes; the
+usual upgrade script rebuilds all images. The Caddyfile is unchanged: the new question page is a pre-rendered file.
+
+### Added
+
+- `/questions/does-mdarix-replace-our-qms`: Does MDARIX replace our QMS or complaint software? The answer is the two
+  sentences, then what stays in your QMS, what MDARIX adds, how your data gets in (trial uploads; mapped connections
+  in a pilot) and what MDARIX does today. Pre-rendered with its own title and description, listed on `/questions`,
+  on Resources and in `sitemap.xml` (29 pages, 28 before).
+
+### Changed
+
+- Website: the home page's first point reads "Works beside your QMS or complaint software" (was "Works above QMS,
+  PLM, ERP and supplier systems"); the design-partner band, the Trust page (its lead, "Not Another QMS" and "Pilot
+  boundary") and the Company page ("What MDARIX is not") carry the message; Integrations reads "Work beside the
+  systems you already trust"; Company › After the trial says your QMS keeps the complaint record, CAPA and change
+  control.
+- Trial workspace: Getting started's story, the Free trial user guide and the step-by-step user guide open with the
+  message. Next steps › How the pilot starts › Work on your real complaints adds "MDARIX keeps the decisions, and your
+  QMS keeps the complaint record."; How your data is connected and "Who owns the data?" say your QMS keeps the
+  complaint record, CAPA and change control.
+- The pilot guide (`/help/pilot-guide`) and the quality manager walk-through
+  (`docs/user-guide/QUALITY_MANAGER_WORKFLOW_WALKTHROUGH.md`) use the same words.
+- The message lives once, in `frontend/src/features/help/besideYourQms.ts`; `besideYourQms.test.tsx` checks every
+  place says it and that the older wording is gone.
+
 ## [0.10.49] - 2026-10-25
 
 A security fix on the trial maintenance line (`release/0.10`), requirement R11: a custom role can no longer turn an

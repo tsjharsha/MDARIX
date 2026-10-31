@@ -116,6 +116,11 @@ export const PAGE_META = {
     description:
       "Yes: a free 30-day trial for up to 3 users and 5,000 uploaded rows, sample data first, then your own complaint exports. No demo call, no credit card.",
   },
+  "/questions/does-mdarix-replace-our-qms": {
+    title: "Does MDARIX replace our QMS or complaint software? · MDARIX",
+    description:
+      "No. MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control.",
+  },
   "/privacy": {
     title: "Privacy policy · MDARIX",
     description:

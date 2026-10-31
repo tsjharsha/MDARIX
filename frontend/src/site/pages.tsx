@@ -51,6 +51,7 @@ import {
   StandardsSection,
   WeeklyChart,
 } from "./visuals";
+import { BESIDE_YOUR_QMS } from "../features/help/besideYourQms";
 import { QualityLoop } from "../features/workspace/sections/QualityLoop";
 import { LOOP_ORDER, type LoopStation } from "../features/workspace/qualityLoop";
 
@@ -167,10 +168,7 @@ function CtaBand({ trial = false }: { trial?: boolean }) {
       <Reveal>
         <span className="ms-eyebrow">Design partners</span>
         <h2>Bring one real investigation. See the whole story in one place.</h2>
-        <p>
-          Start with exports from your quality, product and supplier systems. Your systems of record stay where they
-          are.
-        </p>
+        <p>Start with exports from your quality, product and supplier systems. {BESIDE_YOUR_QMS}</p>
         {trial && (
           <div className="ms-cta-trial">
             <strong>In your free trial</strong>
@@ -370,7 +368,7 @@ export function HomePage() {
             </div>
             <ul className="ms-hero-points">
               <li>
-                <Check size={15} aria-hidden="true" /> Works above QMS, PLM, ERP and supplier systems
+                <Check size={15} aria-hidden="true" /> Works beside your QMS or complaint software
               </li>
               <li>
                 <Check size={15} aria-hidden="true" /> Every finding links to its records
@@ -1135,7 +1133,7 @@ export function TrustPage() {
             ],
             [
               "Pilot boundary",
-              "MDARIX is not yet a validated (GxP) system. Design-partner pilots use exported records without patient-identifiable information, and your systems of record stay authoritative.",
+              `MDARIX is not yet a validated (GxP) system. Design-partner pilots use exported records without patient-identifiable information. ${BESIDE_YOUR_QMS}`,
             ],
             [
               "Certification status",
@@ -1378,7 +1376,7 @@ export function CompanyPage() {
             ],
             [
               "What MDARIX is not",
-              "It does not replace your QMS, PLM or ERP, and it is not a regulatory submission system: it never submits anything to a regulator. Those systems stay the record; MDARIX connects them for investigation.",
+              `It does not replace your QMS, PLM or ERP. ${BESIDE_YOUR_QMS} MDARIX is not a regulatory submission system: it never submits anything to a regulator.`,
             ],
             [
               "Design-partner outcome",

@@ -1,0 +1,68 @@
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import walkthrough from "../../../../docs/user-guide/QUALITY_MANAGER_WORKFLOW_WALKTHROUGH.md?raw";
+import { afterTheTrial } from "../../site/content";
+import { renderPage } from "../../site/prerender";
+import { questionAt } from "../../site/questions";
+import { BESIDE_YOUR_QMS } from "./besideYourQms";
+import pilotGuide from "./PILOT_GUIDE.md?raw";
+import { TrialGuidePage } from "./TrialGuidePage";
+import { CONNECTION, MVP_STEPS, QUESTIONS } from "./trialNextSteps";
+import { UserGuidePage } from "./UserGuidePage";
+
+// T-MSG (0.10.50): one message on what MDARIX is beside the customer's systems, the same words in every place
+// (TA-MSG.1), and only what ships today (TA-MSG.2).
+const text = (html: string) =>
+  html
+    .replace(/<script[\s\S]*?<\/script>/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ");
+
+describe("MDARIX works beside your QMS", () => {
+  it("is two sentences, and claims no feature a later release ships", () => {
+    expect(BESIDE_YOUR_QMS).toBe(
+      "MDARIX works beside your QMS or complaint software. Your QMS keeps the complaint record, CAPA and change control.",
+    );
+    expect(BESIDE_YOUR_QMS).not.toMatch(/service level|per market|signed documents/i);
+  });
+
+  it("is said in the same words on the website, the guides and the docs", () => {
+    const faq = questionAt("/questions/does-mdarix-replace-our-qms")!;
+    expect(faq.question).toBe("Does MDARIX replace our QMS or complaint software?");
+    expect(faq.answer).toBe(`No. ${BESIDE_YOUR_QMS}`);
+    expect(text(renderPage("/questions/does-mdarix-replace-our-qms"))).toContain(BESIDE_YOUR_QMS);
+    expect(text(renderPage("/"))).toContain("Works beside your QMS or complaint software");
+    for (const path of ["/trust", "/company"] as const) expect(text(renderPage(path)), path).toContain(BESIDE_YOUR_QMS);
+    expect(text(renderToStaticMarkup(<TrialGuidePage />))).toContain(BESIDE_YOUR_QMS);
+    expect(text(renderToStaticMarkup(<UserGuidePage />))).toContain(BESIDE_YOUR_QMS);
+    expect(pilotGuide).toContain(BESIDE_YOUR_QMS);
+    expect(walkthrough).toContain(BESIDE_YOUR_QMS);
+  });
+
+  it("keeps the decisions in MDARIX and the complaint record in your QMS, from the trial to the pilot", () => {
+    const work = MVP_STEPS.find((step) => step.title === "Work on your real complaints")!;
+    expect(work.text).toContain("MDARIX keeps the decisions, and your QMS keeps the complaint record.");
+    expect(pilotGuide).toContain("MDARIX keeps the decisions, and your QMS keeps the complaint record.");
+    const record = "Your QMS keeps the complaint record, CAPA and change control";
+    for (const said of [
+      CONNECTION.find((item) => item.title === "Your systems")!.text,
+      QUESTIONS.find((item) => item.question === "Who owns the data?")!.answer,
+      afterTheTrial.points.map(([, point]) => point).join(" "),
+    ])
+      expect(said).toContain(record);
+  });
+
+  it("replaces the older 'systems of record stay' wording", () => {
+    const places = [
+      ...["/", "/trust", "/company"].map((path) => text(renderPage(path as "/"))),
+      JSON.stringify({ CONNECTION, QUESTIONS, afterTheTrial }),
+      pilotGuide,
+    ];
+    for (const place of places) {
+      expect(place).not.toMatch(/stay (the|your) systems of record|systems of record stay|stay where they are/i);
+      expect(place).not.toContain("Works above QMS");
+    }
+  });
+});
