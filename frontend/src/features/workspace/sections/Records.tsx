@@ -52,13 +52,15 @@ import { ChipFilter, Hero, InlineError, Pager } from "./boardParts";
 import { BasisLine, SignatureBasis } from "../../shared/Basis";
 import { RiskFileInput } from "./RiskFile";
 import { TrustSection } from "./Trust";
+import { DocumentsPanel } from "./Documents";
+import { parseDocumentLink } from "../documents";
 
 /**
  * Records: what goes to an inspector or a management review. Effectiveness checks: every CAPA's check, planned with
  * criteria and a date, reminded before the day, and signed with its result and the complaint recurrence seen. Under the
  * MVP feature set Records also holds what the parked sections did (app/featureSet.ts): the audit trail with each case's
- * timeline, replay, AI runs and integrity; the reports; and signature verification. Each is shown only to people whose
- * menu holds the section it came from.
+ * timeline, replay, AI runs and integrity; the reports, with the ready-to-use documents first; and signature
+ * verification. Each is shown only to people whose menu holds the section it came from.
  */
 export function RecordsSection({ tab }: { tab?: string }) {
   const { session } = useWorkspace();
@@ -76,6 +78,7 @@ export function RecordsSection({ tab }: { tab?: string }) {
       )
     : RECORDS_TABS;
   const requested = (tab ?? "").split("?")[0];
+  const [documentLink] = useState(() => parseDocumentLink(tab));
   const [active, setActive] = useState<RecordsTab | MvpRecordsTab>(() =>
     (tabs as readonly string[]).includes(requested) ? (requested as MvpRecordsTab) : target.tab,
   );
@@ -84,7 +87,12 @@ export function RecordsSection({ tab }: { tab?: string }) {
       {active === "Effectiveness checks" && <EffectivenessBoard initialCapa={target.capa} />}
       {active === "Risk file input" && <RiskFileInput />}
       {active === "Audit trail" && <TrustSection tab={auditView ?? undefined} />}
-      {active === "Reports" && <ReportsPanel />}
+      {active === "Reports" && (
+        <>
+          <DocumentsPanel initialCode={documentLink.code} initialScope={documentLink.scope} />
+          <ReportsPanel />
+        </>
+      )}
       {active === "Verify a signature" && (
         <Embedded>
           <SignatureVerificationWorkspace />

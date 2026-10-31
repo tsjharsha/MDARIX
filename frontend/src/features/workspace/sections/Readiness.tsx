@@ -4,6 +4,7 @@ import {
   Archive,
   ChevronRight,
   Download,
+  FileCheck2,
   Hourglass,
   ScanSearch,
   ShieldCheck,
@@ -31,6 +32,7 @@ import { InlineError } from "./boardParts";
 import { BasisChips, BasisNote } from "../../shared/Basis";
 import { QualityLoop } from "./QualityLoop";
 import { loopFromReadiness } from "../qualityLoop";
+import { documentLink } from "../documents";
 import { FINDING_SIGNALS_NOW, WHILE_FINDING_SIGNALS } from "../signals";
 
 const HOME_ICONS: Record<string, typeof ScanSearch> = {
@@ -73,6 +75,13 @@ export function ReadinessSection() {
         }
       >
         <SummaryDownload />
+        <button
+          type="button"
+          className="ac-secondary uw-rd-document"
+          onClick={() => open("Records", documentLink("MANAGEMENT_REVIEW"))}
+        >
+          <FileCheck2 size={15} aria-hidden="true" /> Management review report
+        </button>
       </QualityLoop>
       <div className="uw-rd-home" aria-label="The four numbers">
         {(data.data?.home ?? []).map((check) => (

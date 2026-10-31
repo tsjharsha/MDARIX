@@ -4,7 +4,8 @@ The sample's records carry ``source_system = MDARIX_SAMPLE``. Everything that de
 database itself links records: every foreign key is followed from the rows already marked for removal (a decision on
 the sample case, a second look on a sample complaint, a signal of a sample version, a task on the sample case...), until
 nothing new is reached; then the columns that point at any record without a foreign key (a task's source, an evidence
-link, a relationship, a signature record, the intelligence history) are swept for the same rows. The audit trail and the
+link, a relationship, a signature record, the intelligence history, a document version's source records) are swept for
+the same rows. The audit trail and the
 outbox are kept: they are the history of what happened. The organization's own uploads, and what it did with them, do
 not depend on the sample and stay.
 
@@ -148,6 +149,19 @@ def plan(db: Session, tenant_id: uuid.UUID) -> dict:
             )
             if found:
                 doomed[table] |= found
+                changed = True
+        # A document version (T-G35) made on sample records cites them in its context's source_ids, not by a key.
+        if every and "report_jobs" in tables:
+            found = (
+                _ids(
+                    db,
+                    "SELECT id FROM report_jobs WHERE tenant_id = :tenant AND context -> 'source_ids' ?| :ids",
+                    {"tenant": tenant_id, "ids": [str(item) for item in every]},
+                )
+                - doomed["report_jobs"]
+            )
+            if found:
+                doomed["report_jobs"] |= found
                 changed = True
     links: dict[str, list[tuple[str, str]]] = defaultdict(list)
     for child, column, parent in keys:

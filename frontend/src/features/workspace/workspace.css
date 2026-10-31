@@ -4016,3 +4016,78 @@ div.uw-task-count:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Records › Reports › Ready-to-use documents (sections/Documents.tsx, T-G35). */
+.uw-doc-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.uw-doc-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ac-border, #cbd5e1);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.uw-doc-type.is-active {
+  border-color: var(--ac-accent, #087f7b);
+  background: var(--ac-accent-soft, #e6f4f3);
+  font-weight: 600;
+}
+.uw-doc-board,
+.uw-doc-view {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.uw-doc-clauses {
+  font-size: 0.92em;
+}
+.uw-doc-versions,
+.uw-doc-rows {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.uw-doc-section {
+  border: 1px solid var(--ac-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.uw-doc-section > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.uw-doc-mark {
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.8;
+}
+.uw-doc-sources > summary {
+  cursor: pointer;
+  font-size: 0.88em;
+  opacity: 0.8;
+}
+.uw-doc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.88em;
+}
+.uw-doc-hash {
+  font-family: ui-monospace, monospace;
+  font-size: 0.82em;
+  overflow-wrap: anywhere;
+}
+.uw-doc-case-links {
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}

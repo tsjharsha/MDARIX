@@ -1,5 +1,5 @@
 import { ArrowLeft, BookOpen, CheckCircle2, Clock3, Download, Info, Lightbulb, Signpost } from "lucide-react";
-import { BESIDE_YOUR_QMS } from "./besideYourQms";
+import { BESIDE_YOUR_QMS, PMS_FRAMING } from "./besideYourQms";
 import { AFTER_THE_TRIAL, GUIDE_STEPS, TRIAL_FACTS } from "./trialGuide";
 import {
   AFTER_YOUR_TRIAL,
@@ -57,6 +57,7 @@ export function TrialGuidePage() {
             it, sign in, bring two colleagues, see the sample data tell the story, run the same checks on your own
             export, tell us what you think, and book the demo.
           </p>
+          <p className="tg-lede tg-pms">{PMS_FRAMING}</p>
           <JourneyHero titles={GUIDE_STEPS.map((step) => step.title)} />
           <ul className="tg-facts" aria-label="The free trial">
             {TRIAL_FACTS.map(([value, label]) => (

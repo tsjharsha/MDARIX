@@ -17,6 +17,8 @@ describe("the catalog of standards", () => {
     expect(STANDARDS).toHaveLength(31);
     expect(STANDARDS.filter((standard) => standard.starter).map((standard) => standard.id)).toEqual([
       "ISO13485_6_2",
+      "ISO13485_8_2_1",
+      "ISO13485_8_2_2",
       "CFR803_3",
       "MDR_2",
       "MDCG_2023_3",
