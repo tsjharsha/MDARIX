@@ -278,8 +278,8 @@ def send_trial_invitation(
                 heading=f"{invited_by} invited you to the MDARIX free trial of {organization}",
                 paragraphs=(
                     "MDARIX helps medical-device quality teams handle complaints and post-market surveillance "
-                    "investigations: complaints, reporting clocks, trend signals, investigations and CAPA in one "
-                    "traceable place.",
+                    "investigations: complaints, reporting clocks, trend signals, investigations and the CAPAs to raise "
+                    "in your QMS, in one traceable place.",
                     *(
                         (
                             "The trial workspace includes a ready-made sample investigation, so you can see MDARIX at "
@@ -299,7 +299,7 @@ def send_trial_invitation(
                 items=(
                     "Activate your account and choose a password.",
                     "Set up the authenticator app on your phone.",
-                    "Open the guided investigation in Getting started."
+                    "Open Getting started and follow the sample story."
                     if sample_data
                     else "Open Getting started to see what you can try.",
                 ),
@@ -332,7 +332,7 @@ def send_trial_invitation(
             items=(
                 "Activate your account and choose a password.",
                 "Set up the authenticator app on your phone.",
-                "Open the guided investigation in Getting started.",
+                "Open Getting started and follow the sample story.",
                 "Try your own data with the CSV templates (no patient-identifiable data, please).",
             ),
             button=("Activate my account", url),

@@ -64,6 +64,7 @@ import { StatusBadge } from "./common";
 import { parseRequestTab } from "../evidenceWorkflow";
 import { EvidenceRequestsPanel } from "./EvidenceRequests";
 import { RemindersPanel } from "./Reminders";
+import { useAiReady } from "../useAiStatus";
 
 const PAGE_SIZE = 50;
 
@@ -95,7 +96,8 @@ const LIST_EMPTY: Record<TaskView, { title: string; detail: string }> = {
 type MyWorkView = MyWorkTab | typeof MY_WORK_APPROVALS_TAB;
 
 export function MyWorkSection({ tab }: { tab?: string }) {
-  const { work, open, notify } = useWorkspace();
+  const { work, open, notify, isTrial } = useWorkspace();
+  const aiOff = useAiReady() === false || !!isTrial;
   // Under the MVP feature set the Decisions section is parked: the decisions awaiting a signature are listed here, for
   // people who may sign, and each opens on its case's Decision step (app/featureSet.ts).
   const canSign = useCan("decision.sign");
@@ -109,7 +111,7 @@ export function MyWorkSection({ tab }: { tab?: string }) {
     return target.tab === "Evidence requests" ? target.request : null;
   });
   const summary = useResource<TaskSummary>("/api/v1/tasks/summary");
-  const taskTabs = myWorkTabs(summary.data, active);
+  const taskTabs = myWorkTabs(summary.data, active, aiOff);
   const tabs: MyWorkView[] = approvals ? [taskTabs[0], MY_WORK_APPROVALS_TAB, ...taskTabs.slice(1)] : taskTabs;
   const counts = Object.fromEntries(tabs.map((item) => [item, tabCount(item, summary.data)]));
   const view = taskViewForTab(active);
@@ -702,9 +704,11 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
       setMessage({
         tone: "ok",
         text:
-          result.status === "SENT"
-            ? "Request sent to the supplier."
-            : "Request saved; the email will be sent when delivery is available.",
+          result.email_delivery === "NOT_SENT_IN_TRIAL"
+            ? "Request saved, not sent: the free trial sends no email to suppliers. Send it to the supplier yourself if you need the evidence."
+            : result.status === "SENT"
+              ? "Request sent to the supplier."
+              : "Request saved; the email will be sent when delivery is available.",
       });
       setForm({ ...EMPTY_REQUEST });
       onSent();

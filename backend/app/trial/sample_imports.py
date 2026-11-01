@@ -1,6 +1,7 @@
 """The sample's import run (T-SAM for 0.10.56): what a free trial's own Excel or CSV import shows, on the sample data.
 
-- **One import run**, "Sample complaints export.xlsx": every sample complaint is one of its rows (its lineage, R16:
+- **One import run**, "Sample complaints export.xlsx": every sample complaint staged before it is one of its rows
+  (SAMPLE-RV-10, the India hospital's later report, comes after it: sample_reports.py) (its lineage, R16:
   the run, the row and the mapping version), and two rows were set aside with their reasons (stored quarantine, R14),
   so its data-quality report (R17) reads, writes, sets aside and balances like any other run. Its audit record is
   ``TRIAL_DATA_IMPORTED`` marked ``sample`` and holds no created or updated counts, so nothing waits for signals

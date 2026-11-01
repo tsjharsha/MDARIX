@@ -614,9 +614,15 @@ def request_supplier_evidence(
     )
     db.add(row)
     db.flush()
-    delivery = _send_supplier_request(control_db, ctx, payload)
-    # Only an email the provider accepted counts as sent; otherwise the request waits for delivery.
-    row.status = "SENT" if delivery == "SENT" else "PENDING_DELIVERY"
+    from backend.app.signer_training.router import is_trial
+
+    if is_trial(control_db, ctx.tenant_id):
+        # A free trial sends nothing to anyone outside it: the request is saved for the record, never emailed (J33).
+        delivery, row.status = "NOT_SENT_IN_TRIAL", "SAVED"
+    else:
+        delivery = _send_supplier_request(control_db, ctx, payload)
+        # Only an email the provider accepted counts as sent; otherwise the request waits for delivery.
+        row.status = "SENT" if delivery == "SENT" else "PENDING_DELIVERY"
     db.add(
         AuditEvent(
             id=uuid.uuid4(),

@@ -4,7 +4,8 @@ import { ApiError, requestJson } from "../../../app/apiClient";
 import { SortableHeader, useSortedRows } from "../../../app/tableSort";
 import { useResource, errorText } from "../../customer-admin/shared";
 import { Panel } from "../../admin/console/charts";
-import { useCan, useFeatureSet, useWorkspace } from "../workspaceContext";
+import { useCan, useFeatureSet, useIsTrial, useWorkspace } from "../workspaceContext";
+import { TRIAL_SET_ASIDE_NOTE } from "./ImportReports";
 import { importTemplatesFor } from "../../../app/featureSet";
 import { countOf, formatCount } from "./common";
 import { IMPORT_REPORTS_ID, ImportReportsPanel, ProductIdentityPanel } from "./ImportReports";
@@ -230,6 +231,7 @@ export function ImportPanel({
   // Where a complaints export alone is enough, the panel opens on it (once the templates are there), until the person
   // chooses another.
   const [entity, setEntity] = useState("products");
+  const trial = useIsTrial();
   const chosen = useRef(false);
   const offersComplaints = templates.some((item) => item.entity === "complaints");
   useEffect(() => {
@@ -332,6 +334,7 @@ export function ImportPanel({
         By default a file with any problem imports nothing; below you can choose to import the rows that pass and get
         the others back, and to replace personal details instead of refusing them.
       </p>
+      {trial && <p className="uw-trial-note">{TRIAL_SET_ASIDE_NOTE}</p>}
       <div className="ac-tabs uw-import-templates" role="group" aria-label="Template">
         {shown.map((item, index) => (
           <button

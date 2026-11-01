@@ -29,6 +29,32 @@ export type SamplePain = {
 
 export const SAMPLE_PAINS: readonly SamplePain[] = [
   {
+    key: "routine",
+    title: "Routine complaints that wait for a person",
+    inSample: [
+      "SAMPLE-RT-01 and RT-02: a filter re-seated on the phone and a frayed cable replaced, each ready to close at service level with one signature.",
+      "SAMPLE-RT-03: the same cable wear three weeks earlier, already closed: with RT-02, a recurring matter.",
+      "SAMPLE-RT-04: an alarm that belongs to the open investigation; SAMPLE-RT-05: a new failure mode, on the reportability watch.",
+    ],
+    requirement: "Every complaint is evaluated, and the decision not to investigate is recorded with its reason.",
+    reference: cite("ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "Dispositions" },
+    action: "Open the dispositions",
+  },
+  {
+    key: "calls",
+    title: "Calls logged as they come in",
+    inSample: [
+      "SAMPLE-CALL-01 to 04: four calls to the service desk, from a question about the instructions to a monitor taken out of use.",
+      "SAMPLE-CALL-02 and SAMPLE-RT-05 are the same event, called in nine days before the formal complaint: a likely duplicate.",
+      "SAMPLE-URG-01: free flow at set-up and a patient moved to intensive care, logged as urgent before the awareness time is known.",
+    ],
+    requirement: "Feedback is gathered as it arrives, and a possible complaint is judged without delay.",
+    reference: cite("ISO13485_8_2_1", "ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "First contact" },
+    action: "Open the first contacts",
+  },
+  {
     key: "hidden",
     title: "Complaints hidden in plain sight",
     inSample: [
@@ -106,6 +132,57 @@ export const SAMPLE_PAINS: readonly SamplePain[] = [
     reference: cite("ISO13485_8_5_2"),
     opens: { section: "Records", tab: "Effectiveness checks" },
     action: "Open the effectiveness checks",
+  },
+  {
+    key: "reports",
+    title: "Report worksheets and what happened to each",
+    inSample: [
+      "SAMPLE-RV-09: a finished US example, its FDA 3500A worksheet approved by a second person and its submission recorded with FDA's acknowledgements.",
+      "SAMPLE-RV-10: an India report (MvPI worksheet) sent by e-mail and bounced, now waiting for a correction and a new approval.",
+      "The organization's own US guide (your version 2) in use, and a draft whose own test fails, so it cannot be published.",
+    ],
+    requirement: "Reports go to the authority on time, and what was sent, when and with what result is kept.",
+    reference: cite("ISO13485_8_2_3", "CFR803_50", "IN_MDR"),
+    opens: { section: "Complaints", tab: "Reports" },
+    action: "Open the reports",
+  },
+  {
+    key: "follow-through",
+    title: "Questions, owners and reminders",
+    inSample: [
+      "SAMPLE-RV-08: a question to the reporter for the patient's outcome, two attempts unanswered and the reply overdue.",
+      "SAMPLE-RV-01: a request to the hospital that stayed unanswered after three attempts to each contact.",
+      "The sample author is away for a week with you as the backup; SAMPLE-RV-08 and SAMPLE-RT-03 have you as their owner.",
+    ],
+    requirement: "Complaint handling keeps its records: who was asked what, when, and who answers for each event.",
+    reference: cite("ISO13485_8_2_2"),
+    opens: { section: "Complaints", tab: "Communications" },
+    action: "Open the communications log",
+  },
+  {
+    key: "lot-impact",
+    title: "Which other lots share the suspect part",
+    inSample: [
+      "OrbitCare 300 Rev B's pressure sensor came from one sensor lot in lots 003 and 004, the lots with most pressure-alarm complaints, and in three lots without complaints yet (006 to 008).",
+      "Where each lot went, with units still in stock; lot 008 has no distribution imported.",
+    ],
+    requirement:
+      "Corrective action is proportionate to the effects of the problem, including the product already in the field.",
+    reference: cite("ISO13485_8_5_2"),
+    opens: { section: "Investigations", tab: "Scope" },
+    action: "Open the case scope",
+  },
+  {
+    key: "imports",
+    title: "An import with rows set aside",
+    inSample: [
+      "Sample complaints export.xlsx: every row written or set aside, with its data-quality report.",
+      "SAMPLE-RJ-01 has no description; SAMPLE-RJ-02 named a caller and a phone number, kept only as placeholders, and suggests harm, so it reaches triage.",
+    ],
+    requirement: "Records are complete and legible, and personal data is kept only where it is needed.",
+    reference: cite("ISO13485_4_2_5"),
+    opens: { section: "Import data" },
+    action: "Open the import reports",
   },
   {
     key: "risk",

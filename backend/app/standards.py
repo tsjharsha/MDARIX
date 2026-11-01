@@ -11,6 +11,7 @@ keeps the two identical.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -24,6 +25,16 @@ INTERNATIONAL, UNITED_STATES, EUROPEAN_UNION = "International", "United States",
 UNITED_KINGDOM, CANADA, INDIA = "United Kingdom", "Canada", "India"
 # Entries whose wording the regulatory consultant has not confirmed yet (T-B6): screens and exports mark them.
 STARTER_MARK = "Starter text — awaiting regulatory confirmation: check it against your own procedure."
+
+
+def version_words(code: str) -> str:
+    """A document version in words for what a person signs or confirms, never its code (J18): "MDARIX starter,
+    version 1" for disposition-starter-1 or US-starter-1, "your version 2" for an organization's own US-v2."""
+    starter = re.fullmatch(r".+-starter-(\d+)", code or "")
+    if starter:
+        return f"MDARIX starter, version {starter.group(1)}"
+    own = re.fullmatch(r".+-v(\d+)", code or "")
+    return f"your version {own.group(1)}" if own else f"version {code}"
 
 
 @dataclass(frozen=True)

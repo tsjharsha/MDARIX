@@ -89,7 +89,7 @@ const screen = (overrides: Partial<DispositionScreen> = {}): DispositionScreen =
       code: "DISPOSITION_RULES",
       title: "Complaint disposition rules (starter)",
       version: "disposition-starter-1",
-      statement: "I have read version disposition-starter-1",
+      statement: "I have read the complaint disposition rules, MDARIX starter, version 1",
       state: "MISSING",
       held_version: null,
       trained_at: null,
@@ -244,7 +244,7 @@ describe("the disposition screens", () => {
       expect(html).toContain(text);
     expect(html).toContain("Source value: “Step-down unit” (not on the list)");
     expect(html).toContain("Show the coding criteria");
-    expect(html).toContain("I have read version disposition-starter-1");
+    expect(html).toContain("I have read the complaint disposition rules, MDARIX starter, version 1");
     expect(html).toContain("Practice record");
   });
 
@@ -275,7 +275,7 @@ describe("the disposition screens", () => {
     expect(html).toContain("BATTERY_SHUTDOWN not recorded before");
     expect(html).toContain("Refused: a trigger is met");
     expect(html).toContain("its market assessment is still due under Complaints › Reportability");
-    expect(html).not.toContain("I have read version");
+    expect(html).not.toContain("I have read the");
   });
 
   it("shows a signed disposition as signed, with a new version only on request", () => {

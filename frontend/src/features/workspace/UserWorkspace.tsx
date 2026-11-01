@@ -175,9 +175,9 @@ const NAV: Record<WorkspaceSection, { icon: typeof Package; description: string;
   },
   "Import data": {
     icon: Upload,
-    description: "Bring in CSV files",
+    description: "Bring in Excel or CSV files",
     guide:
-      "Bring records from your quality, product and supplier systems in as CSV files. Each file is checked in full before anything is saved; by default a file with any problem imports nothing, or you can import the rows that pass and get the others back to fix.",
+      "Bring records from your quality, product and supplier systems in as Excel or CSV files. Each file is checked in full before anything is saved; by default a file with any problem imports nothing, or you can import the rows that pass and get the others back to fix.",
     context: false,
   },
   "My Account": {

@@ -111,7 +111,7 @@ def test_the_sample_publishes_us_v2_and_holds_a_v3_draft_whose_test_fails(trial)
     vmsr = next(q for q in v2["question_set"]["questions"] if q["extra"])
     assert vmsr["clause"] == "21 CFR 803.19 (VMSR program)" and vmsr["basis"] == ["CFR803_19"]
     assert next(q for q in v2["question_set"]["questions"] if q["id"] == "US2A")["starter"] is False
-    assert v2["signature"]["meaning"].startswith("I approve US-v2")
+    assert v2["signature"]["meaning"].startswith("I approve your version 2 of the")
     assert v2["test_results"]["failed"] == 0 and v2["test_results"]["current"]
     # Every question of every version shows its clause.
     for market in markets.MARKETS:

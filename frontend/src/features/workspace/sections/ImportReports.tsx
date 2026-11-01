@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, FileSpreadsheet, ListChecks, Upload } from
 import { Empty, Panel, StatTile } from "../../admin/console/charts";
 import { errorText, send, useResource } from "../../customer-admin/shared";
 import { formatDateTime, formatDay } from "../../../app/dates";
-import { useCan } from "../workspaceContext";
+import { useCan, useIsTrial } from "../workspaceContext";
 import { countOf, formatCount } from "./common";
 import { EscalateButton } from "./Triage";
 
@@ -282,7 +282,12 @@ function FieldChanges({ importRef }: { importRef: string }) {
   );
 }
 
+/** The privacy line of a trial's set-aside rows (true since 0.10.62: every free-text value is masked when stored). */
+export const TRIAL_SET_ASIDE_NOTE =
+  "In a free trial, rows set aside on import are kept with personal details masked so you can review and fix them, and are deleted with the trial.";
+
 function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quarantine>> }) {
+  const trial = useIsTrial();
   const rows = source.data?.items ?? [];
   if (source.state === "error")
     return <p className="ac-muted">{source.error ?? "The rows set aside could not be read."}</p>;
@@ -302,6 +307,7 @@ function SetAsideRows({ source }: { source: ReturnType<typeof useResource<Quaran
         suggest harm come first. Personal details are kept only as placeholders such as [PERSON]. Fix these rows in your
         file and import it again: rows already in are updated, not added twice.
       </p>
+      {trial && <p className="ac-muted">{TRIAL_SET_ASIDE_NOTE}</p>}
       <div className="ac-table-wrap">
         <table className="ac-table">
           <caption className="ca-sr-only">Rows set aside, with their reasons</caption>

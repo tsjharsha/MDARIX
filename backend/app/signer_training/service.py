@@ -22,6 +22,7 @@ from backend.app.complaint_classification import rules as coding
 from backend.app.complaint_disposition import rules as disposition
 from backend.app.db.models.market_assessment import SignerTrainingRecord
 from backend.app.reportability import markets
+from backend.app.standards import version_words
 
 TRIAL_METHOD = "practice acknowledgement in a free trial"
 WORKSPACE_METHOD = "read and acknowledged in MDARIX"
@@ -35,13 +36,17 @@ class Document:
     code: str
     title: str
     version: str
+    # The document's name in a signed statement ("Complaint disposition rules"); the title when not given.
+    name: str = ""
 
     def as_dict(self) -> dict:
-        return {"code": self.code, "title": self.title, "version": self.version, "statement": statement(self.version)}
+        return {"code": self.code, "title": self.title, "version": self.version, "statement": statement(self)}
 
 
-def statement(version: str) -> str:
-    return f"I have read version {version}"
+def statement(document: Document) -> str:
+    """What the person confirms: the document's name and version in words, never its code ("I have read Complaint
+    disposition rules, MDARIX starter, version 1"). Records made before 0.10.62 keep the statement they hold."""
+    return f"I have read {document.name or document.title}, {version_words(document.version)}"
 
 
 def question_set_code(market: str) -> str:
@@ -58,15 +63,25 @@ def documents(db: Session | None = None, tenant_id=None) -> dict[str, Document]:
     for market, question_set in markets.QUESTION_SETS.items():
         code = codes[market]
         title = f"{question_set.title}: " + (
-            "starter questions" if code == question_set.version else f"your guide version {code}"
+            "starter questions" if code == question_set.version else f"your guide, {version_words(code)}"
         )
-        found[question_set_code(market)] = Document(question_set_code(market), title, code)
-    found[HARM_SCALE] = Document(HARM_SCALE, "Harm-severity scale (starter)", markets.SCALE_VERSION)
+        found[question_set_code(market)] = Document(
+            question_set_code(market), title, code, f"the questions of {question_set.title}"
+        )
+    found[HARM_SCALE] = Document(
+        HARM_SCALE, "Harm-severity scale (starter)", markets.SCALE_VERSION, "the harm-severity scale"
+    )
     found[DISPOSITION_RULES] = Document(
-        DISPOSITION_RULES, "Complaint disposition rules (starter)", disposition.RULES_VERSION
+        DISPOSITION_RULES,
+        "Complaint disposition rules (starter)",
+        disposition.RULES_VERSION,
+        "the complaint disposition rules",
     )
     found[CODING_CRITERIA] = Document(
-        CODING_CRITERIA, "Classification coding criteria (starter)", coding.CODING_CRITERIA_VERSION
+        CODING_CRITERIA,
+        "Classification coding criteria (starter)",
+        coding.CODING_CRITERIA_VERSION,
+        "the classification coding criteria",
     )
     return found
 
@@ -192,7 +207,7 @@ def acknowledge(
         trained_at=now,
         method=TRIAL_METHOD if trial else WORKSPACE_METHOD,
         trainer=None,
-        evidence={"opened": True, "statement": statement(document.version), "document_title": document.title},
+        evidence={"opened": True, "statement": statement(document), "document_title": document.title},
         recorded_by=str(user_id),
         source_system=source_system,
         created_at=now,

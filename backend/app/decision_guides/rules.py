@@ -249,7 +249,8 @@ def approver_problem(approver: str, role: str | None, editors: set[str]) -> str 
 
 def signature_meaning(code: str, title: str) -> str:
     return (
-        f"I approve {code} of the {title} for use: its questions, clauses and test results as shown. Assessments "
+        f"I approve {standards.version_words(code)} of the {title} for use: its questions, clauses and test results as shown. "
+        "Assessments "
         "started after publication use it. The guide points to a conclusion; a person concludes and signs."
     )
 

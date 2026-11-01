@@ -19,6 +19,7 @@ submits a report. Codes are the MVP's (G36), so the MVP swaps sources without re
 from __future__ import annotations
 
 from backend.app.db.models.complaint_disposition import ATTRIBUTIONS
+from backend.app.standards import version_words
 
 RULES_VERSION = "disposition-starter-1"
 ESCALATED_BY_TRIGGER, KNOWN_ISSUE, SERVICE_LEVEL, ESCALATED_BY_CHOICE = (
@@ -218,9 +219,19 @@ def hands_on(seconds: float | None) -> int | None:
 
 
 def signature_meaning(ref: str, branch: str, markets: list[str], classified: bool) -> str:
-    parts = [f"I have dispositioned {ref} as: {BRANCH_LABELS[branch].lower()}, under {RULES_VERSION}"]
+    from backend.app.complaint_classification.rules import CODING_CRITERIA_VERSION
+    from backend.app.reportability.markets import MARKET_LABELS
+
+    parts = [
+        f"I have dispositioned {ref} as: {BRANCH_LABELS[branch].lower()}, under the complaint disposition rules, "
+        f"{version_words(RULES_VERSION)}"
+    ]
     if classified:
-        parts.append("confirmed its classification under coding-starter-1")
+        parts.append(
+            f"confirmed its classification under the classification coding criteria, "
+            f"{version_words(CODING_CRITERIA_VERSION)}"
+        )
     if markets:
-        parts.append(f"and conclude not reportable on the routine basis for {', '.join(markets)}")
+        named = ", ".join(MARKET_LABELS.get(market, market) for market in markets)
+        parts.append(f"and conclude not reportable on the routine basis for {named}")
     return "; ".join(parts) + "."
