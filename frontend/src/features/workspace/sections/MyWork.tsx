@@ -680,7 +680,7 @@ const EMPTY_REQUEST = { supplier_id: "", recipient: "", title: "", items: "" };
 
 /** Ask one of your suppliers for evidence by email: plain text, no links; the supplier answers through MDARIX. */
 function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
-  const { work } = useWorkspace();
+  const { work, isTrial } = useWorkspace();
   const suppliers = useResource<any>("/api/v1/data-plane/suppliers");
   const [form, setForm] = useState({ ...EMPTY_REQUEST });
   const [busy, setBusy] = useState(false);
@@ -771,7 +771,7 @@ function NewEvidenceRequest({ onSent }: { onSent: () => void }) {
         </label>
         <p className="ac-muted">
           {work.investigationId ? "Linked to the investigation open in your workspace. " : ""}
-          The email carries this text only, without links. Requests are limited per person and per day.
+          {supplierRequestNote(isTrial)}
         </p>
         {!options.length && suppliers.state === "ready" && (
           <p className="ac-muted">No suppliers yet: load them from your ERP or supplier system first.</p>
@@ -829,10 +829,21 @@ export function repliesSummary(replies: SupplierReply[] | undefined, format: (va
   return `${list.length === 1 ? "1 reply" : `${list.length} replies`}, latest ${format(latest.recorded_at)}`;
 }
 
+/** What happens to a supplier request: a free trial saves it and e-mails nobody (0.10.62, J33); a pilot e-mails it. */
+export function supplierRequestNote(isTrial: boolean | undefined): string {
+  return isTrial
+    ? "In the free trial MDARIX saves the request here and e-mails nobody: send it to the supplier from your own mail."
+    : "The email carries this text only, without links. Requests are limited per person and per day.";
+}
+
+/** The date column of supplier requests: when a trial saved it, or when a pilot sent it. */
+export const supplierDateLabel = (isTrial: boolean | undefined) => (isTrial ? "Saved" : "Sent");
+
 export const REVIEW_NOTICE =
   "Replies are recorded for review. Supplier material is never accepted as evidence automatically: review it and add it to the investigation's evidence yourself.";
 
 function EvidenceRequests() {
+  const { isTrial } = useWorkspace();
   const requests = useResource<any>("/api/v1/stage3/supplier-evidence-requests");
   const canWrite = useCan("records.write");
   const [replying, setReplying] = useState<any | null>(null);
@@ -856,7 +867,7 @@ function EvidenceRequests() {
             },
             { key: "status", label: "Status", render: (row) => <StatusBadge value={row.status} /> },
             { key: "recipient", label: "To", render: (row) => row.recipient ?? "—" },
-            { key: "created", label: "Sent", render: (row) => formatDate(row.created_at) },
+            { key: "created", label: supplierDateLabel(isTrial), render: (row) => formatDate(row.created_at) },
             { key: "replies", label: "Replies", render: (row) => repliesSummary(row.replies, formatDate) },
             {
               key: "reply",
