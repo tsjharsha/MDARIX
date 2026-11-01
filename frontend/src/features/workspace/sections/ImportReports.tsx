@@ -386,12 +386,15 @@ type ProductProfile = {
   gmdn_term: string | null;
 };
 
-/** "UDI-DI 04000000030010 · GMDN 13215 General-purpose infusion pump", or what is missing (exported for its test). */
-export function identityText(profile: Pick<ProductProfile, "udi_di" | "gmdn_code" | "gmdn_term">) {
+/** "UDI-DI 04000000030010 · GMDN 13215 General-purpose infusion pump", or what is missing (exported for its test). A
+ * sample product carries a GMDN term without a code: it shows "sample" in place of the number. */
+export function identityText(profile: Pick<ProductProfile, "udi_di" | "gmdn_code" | "gmdn_term">, sample = false) {
   const udi = profile.udi_di ? `UDI-DI ${profile.udi_di}` : "No UDI-DI";
   const gmdn = profile.gmdn_code
     ? `GMDN ${[profile.gmdn_code, profile.gmdn_term].filter(Boolean).join(" ")}`
-    : "no GMDN term";
+    : profile.gmdn_term
+      ? `GMDN ${sample ? "sample" : "code not set"} ${profile.gmdn_term}`
+      : "no GMDN term";
   return `${udi} · ${gmdn}`;
 }
 
@@ -459,7 +462,11 @@ function ProductIdentity({
         <span>
           <strong>{product.name}</strong> <span className="ac-muted">{product.product_identifier}</span>
           <br />
-          {profile.data ? identityText(profile.data) : profile.state === "error" ? "Could not be read." : "Reading…"}
+          {profile.data
+            ? identityText(profile.data, product.product_identifier.startsWith("SAMPLE-"))
+            : profile.state === "error"
+              ? "Could not be read."
+              : "Reading…"}
         </span>
         {canEdit && profile.data && !editing && (
           <button type="button" className="ac-secondary" onClick={start}>

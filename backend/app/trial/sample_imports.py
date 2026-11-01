@@ -53,11 +53,12 @@ SET_ASIDE = [
         "event_date": "2026-09-31",
     },
 ]
-# identifier -> (UDI-DI, GMDN code, GMDN term). The UDI-DIs use GS1's restricted-circulation prefix 04.
+# identifier -> (UDI-DI, GMDN code, GMDN term). The UDI-DIs use GS1's restricted-circulation prefix 04. No GMDN code:
+# the sample shows the term with "sample" in place of a number until real codes are verified (owner, 1 Nov 2026).
 SAMPLE_IDENTITY = {
-    "SAMPLE-ORBIT-300": ("04000000030010", "13215", "General-purpose infusion pump"),
-    "SAMPLE-PULSE-410": ("04000000041016", "33586", "Multiple-parameter patient monitor"),
-    "SAMPLE-VENTRA-250": ("04000000025016", "42411", "Intensive-care ventilator"),
+    "SAMPLE-ORBIT-300": ("04000000030010", None, "General-purpose infusion pump"),
+    "SAMPLE-PULSE-410": ("04000000041016", None, "Multiple-parameter patient monitor"),
+    "SAMPLE-VENTRA-250": ("04000000025016", None, "Intensive-care ventilator"),
 }
 # The IMDRF release the sample's links name; its terms show once that release is loaded.
 SAMPLE_IMDRF_RELEASE = "2025"

@@ -69,7 +69,8 @@ def test_the_sample_shows_an_import_run_its_set_aside_rows_lineage_and_reference
     assert [link["code"] for link in links["PRESSURE_ALARM"]] == ["A16"] and "NFF" not in links
 
     profile = _ok(user.get(f"/api/v1/regulatory-reference/products/{complaint['product_id']}"))
-    assert profile["gmdn_code"] == "13215" and profile["udi_di"] == "04000000030010"
+    assert profile["gmdn_code"] is None and profile["udi_di"] == "04000000030010"
+    assert profile["gmdn_term"] == "General-purpose infusion pump"
 
 
 def test_a_trial_import_is_governed_and_its_report_names_the_file():

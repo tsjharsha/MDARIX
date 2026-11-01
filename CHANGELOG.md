@@ -48,7 +48,7 @@ set (R08) is not part of it.
 - **The sample shows each of them** (`backend/app/trial/sample_imports.py`): the import run "Sample complaints
   export.xlsx", whose rows are the sample complaints (lineage), with two rows set aside (SAMPLE-RJ-01 no description;
   SAMPLE-RJ-02 a caller's name and phone number, stored as placeholders, a date that does not exist, and harm, so it
-  lists first) and a balanced report; UDI-DI and GMDN on the three sample products; the sample's alarm and flow
+  lists first) and a balanced report; UDI-DI and the GMDN term on the three sample products, with "sample" in place of the GMDN code until real codes are verified; the sample's alarm and flow
   problem codes linked to IMDRF Annex A (A14, A16). Its audit record carries no created or updated counts, and no
   complaint, product or lot is added: every count quoted elsewhere stays, and OrbitCare stays the only rising trend.
   `scripts/refresh_trial_story.py` adds it, once, to running trials; removing the sample removes it.

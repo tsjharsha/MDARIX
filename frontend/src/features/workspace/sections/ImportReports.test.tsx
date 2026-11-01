@@ -109,6 +109,9 @@ describe("where a record came from and its reference data", () => {
       identityText({ udi_di: "04000000030010", gmdn_code: "13215", gmdn_term: "General-purpose infusion pump" }),
     ).toBe("UDI-DI 04000000030010 · GMDN 13215 General-purpose infusion pump");
     expect(identityText({ udi_di: null, gmdn_code: null, gmdn_term: null })).toBe("No UDI-DI · no GMDN term");
+    const sample = { udi_di: "04000000030010", gmdn_code: null, gmdn_term: "General-purpose infusion pump" };
+    expect(identityText(sample, true)).toBe("UDI-DI 04000000030010 · GMDN sample General-purpose infusion pump");
+    expect(identityText(sample)).toBe("UDI-DI 04000000030010 · GMDN code not set General-purpose infusion pump");
   });
 });
 
